@@ -1,0 +1,50 @@
+#pragma once
+
+namespace witwin::channel::native_ext {
+
+void shadow_boundary_candidate_accumulate(
+    const float *edge_pos_x,
+    const float *edge_pos_y,
+    const float *edge_pos_z,
+    const float *edge_dir_x,
+    const float *edge_dir_y,
+    const float *edge_dir_z,
+    const float *edge_n0_x,
+    const float *edge_n0_y,
+    const float *edge_n0_z,
+    const float *edge_nn_x,
+    const float *edge_nn_y,
+    const float *edge_nn_z,
+    const float *edge_wedge_n,
+    const float *edge_line_min,
+    const float *edge_line_max,
+    const float *source_pos_x,
+    const float *source_pos_y,
+    const float *source_pos_z,
+    const unsigned int *direct_los_visible,
+    const int *direct_blocker_group,
+    const int *edge_adjacent_group0,
+    const int *edge_adjacent_group1,
+    const float *cell_x,
+    const float *cell_y,
+    const float *cell_z,
+    int n_edges,
+    int grid_nx,
+    int grid_ny,
+    int tile_nx,
+    int tile_ny,
+    float k,
+    float wavelength,
+    float band_width_wavelengths,
+    float max_candidate_factor,
+    float *out_incident_weight,
+    float *out_reflection_weight,
+    float *out_incident_response_real,
+    float *out_incident_response_imag,
+    float *out_reflection_response_real,
+    float *out_reflection_response_imag,
+    unsigned int *out_candidate_tile_count,
+    unsigned int *out_candidate_cell_count
+);
+
+} // namespace witwin::channel::native_ext
