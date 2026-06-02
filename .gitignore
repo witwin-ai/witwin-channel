@@ -5,6 +5,15 @@ figures/*.pdf
 tests/output/*.svg
 tests/output/*.json
 
+# Local development and reference content
+/AGENTS.md
+/CLAUDE.md
+/FEATURE_LIST.md
+/docs/dev/
+/figures/
+/reference/
+/tests/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
