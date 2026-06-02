@@ -19,7 +19,7 @@ import drjit as dr
 from witwin.channel.deterministic import types as wt
 from witwin.channel.core.runtime import Rx, Tx, Wave
 from witwin.channel.core.physics.polarization import vector_eval, vector_scale, vector_select, vector_zero
-from witwin.channel.core.numerics.arrays import gather_point3
+from witwin.channel.core.numerics.arrays import gather
 from witwin.channel.deterministic.diffraction.state import Geo
 from witwin.channel.deterministic.reflection.epc import chain_to_target
 
@@ -99,7 +99,7 @@ _paths``,
             path_idx = pair_idx // n_rx + wt.UInt32(path_start)
             rx_idx = pair_idx % n_rx
 
-            image_source = gather_point3(paths.image_source, path_idx)
+            image_source = gather(paths.image_source, path_idx)
             target_pos = wt.Point3f(
                 dr.gather(wt.Float, rx_pos.x, rx_idx),
                 dr.gather(wt.Float, rx_pos.y, rx_idx),

@@ -13,9 +13,9 @@ from witwin.channel.core.runtime import (
     Tx,
     point_grad_enabled,
     scene_geometry_grad_enabled,
-    scene_has_material_table,
     scene_material_grad_enabled,
 )
+from witwin.channel.core.physics.materials import scene_has_material_table
 from witwin.channel.core.numerics.arrays import complex_zero, scalar
 from witwin.channel.core.geometry.raygen import (
     generate_circle_directions,

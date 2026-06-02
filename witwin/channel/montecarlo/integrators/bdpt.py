@@ -102,6 +102,7 @@ class BDPT(Integrator):
             return_timing=return_timing,
             loop_mode="symbolic",
             effective=effective,
+            prefer_rayd_accumulation=True,
         )
         grid = setup.grid
         weighted_diagnostics = setup.weighted_diagnostics
@@ -130,6 +131,32 @@ class BDPT(Integrator):
 
         reflection_coupled_diffraction = bool(config.enable_bdpt_reflection_coupled_diffraction)
         max_diffraction_depth = int(effective["max_diffractions"])
+        rayd_budget = (
+            BDPTDiffractionMIS.rayd_adaptive_budget_for_scene(
+                scene=scene,
+                grid=grid,
+                samples_per_tx=setup.samples_per_tx,
+                max_depth=max_diffraction_depth,
+                reflection_max_bounces=int(effective["reflection_max_bounces"]),
+                include_suffix_reflection=reflection_coupled_diffraction,
+            )
+            if (
+                reflection_coupled_diffraction
+                and max_diffraction_depth > 0
+                and str(setup.resolved_accumulation_backend) == "rayd_reflection_accumulation"
+            )
+            else None
+        )
+        prefix_wedge_sample_cap = (
+            rayd_budget.prefix_state_sample_cap
+            if (
+                reflection_coupled_diffraction
+                and max_diffraction_depth > 0
+                and str(setup.resolved_accumulation_backend) == "rayd_reflection_accumulation"
+                and rayd_budget is not None
+            )
+            else None
+        )
         refl_result = Basic.run_reflection(
             scene=scene,
             grid=grid,
@@ -151,7 +178,11 @@ class BDPT(Integrator):
                 and reflection_coupled_diffraction
             ),
             collect_ad_tapes=collect_ad_tapes,
-            collect_wedge_prefixes=reflection_coupled_diffraction,
+            collect_wedge_prefixes=(
+                max_diffraction_depth > 0
+                and reflection_coupled_diffraction
+            ),
+            prefix_wedge_sample_cap=prefix_wedge_sample_cap,
             loop_mode=setup.loop_mode,
             resolved_accumulation_backend=setup.resolved_accumulation_backend,
         )
@@ -179,6 +210,7 @@ class BDPT(Integrator):
                     if reflection_coupled_diffraction
                     else None
                 ),
+                rayd_budget=rayd_budget,
                 collect_ad_tapes=collect_ad_tapes,
             )
             refl_result.path_counts.diffraction += diff_result.path_count
@@ -213,6 +245,27 @@ class BDPT(Integrator):
             ),
         )
         noise_power = Basic.resolve_noise_power(scene, noise_power)
+        diffraction_runtime_backend = diff_result.runtime_backend or {
+            "implementation": "bdpt_wedge_balance_mis_depth_limited_v2",
+            "cell_scatter_backend": "drjit_scatter_reduce",
+            "wedge_discovery_backend": (
+                "selected_scene_wedges_plus_forward_specular_prefix_wedges"
+                if reflection_coupled_diffraction
+                else "selected_scene_wedges_only"
+            ),
+            "state_sampler": (
+                "bdpt_light_subpath_edge_length_chain_plus_receiver_and_specular_suffix_connections"
+                if reflection_coupled_diffraction
+                else "bdpt_light_subpath_edge_length_chain_plus_receiver_connections"
+            ),
+            "point_evaluation_backend": (
+                "sampled_edge_chain_diffraction_field_to_cell_center_or_plane_hit"
+            ),
+            "source_field_contract": "sionna_iso_v_implicit_basis",
+            "mis_heuristic": "balance",
+            "sample_sequence": str(mc_config.integrator_options.bdpt_diffraction_sampling),
+            "first_order_edge_sampler": "length_receiver_solid_angle_source_power_mixture",
+        }
         metadata = build_metadata(
             grid=grid,
             scene=scene,
@@ -241,29 +294,22 @@ class BDPT(Integrator):
             resolved_accumulation_backend=setup.resolved_accumulation_backend,
             reflection_runtime_backend={
                 **setup.reflection_runtime_backend,
-                "implementation": "bdpt_forward_specular_reflection_only",
+                "bdpt_reflection_policy": "forward_sampled_specular_only",
+                "prefix_wedge_sample_cap": prefix_wedge_sample_cap,
+                "rayd_prefix_suffix_budget": (
+                    None
+                    if rayd_budget is None
+                    else {
+                        "policy": rayd_budget.policy,
+                        "prefix_state_sample_cap": rayd_budget.prefix_state_sample_cap,
+                        "suffix_sample_cap": rayd_budget.suffix_sample_cap,
+                        "edge_bucket_count": rayd_budget.edge_bucket_count,
+                        "grid_cell_count": rayd_budget.grid_cell_count,
+                        "max_prefix_events": rayd_budget.max_prefix_events,
+                    }
+                ),
             },
-            diffraction_runtime_backend={
-                "implementation": "bdpt_wedge_balance_mis_depth_limited_v2",
-                "cell_scatter_backend": "drjit_scatter_reduce",
-                "wedge_discovery_backend": (
-                    "selected_scene_wedges_plus_forward_specular_prefix_wedges"
-                    if reflection_coupled_diffraction
-                    else "selected_scene_wedges_only"
-                ),
-                "state_sampler": (
-                    "bdpt_light_subpath_edge_length_chain_plus_receiver_and_specular_suffix_connections"
-                    if reflection_coupled_diffraction
-                    else "bdpt_light_subpath_edge_length_chain_plus_receiver_connections"
-                ),
-                "point_evaluation_backend": (
-                    "sampled_edge_chain_diffraction_field_to_cell_center_or_plane_hit"
-                ),
-                "source_field_contract": "sionna_iso_v_implicit_basis",
-                "mis_heuristic": "balance",
-                "sample_sequence": str(mc_config.integrator_options.bdpt_diffraction_sampling),
-                "first_order_edge_sampler": "length_receiver_solid_angle_source_power_mixture",
-            },
+            diffraction_runtime_backend=diffraction_runtime_backend,
             state_pool={
                 "total": int(diff_result.state_count),
                 "kept": int(diff_result.state_count),

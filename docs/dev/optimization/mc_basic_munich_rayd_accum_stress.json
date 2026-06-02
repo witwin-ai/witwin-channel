@@ -1,0 +1,375 @@
+{
+  "aggregate": {
+    "max_witwin_over_sionna": 0.6196088468676113,
+    "median_witwin_over_sionna": 0.4730925818543456,
+    "min_witwin_over_sionna": 0.4173147182980209,
+    "witwin_over_sionna_median_by_seed": [
+      0.4730925818543456,
+      0.6196088468676113,
+      0.4173147182980209
+    ]
+  },
+  "caveats": [
+    "This script measures warmed solver wallclock and result synchronization; scene load is reported separately.",
+    "Use Nsight Systems separately for OptiX launch-count gates.",
+    "Use a Sionna 2.0.1 dependency-pinned environment before publishing external benchmark claims."
+  ],
+  "environment": {
+    "drjit_version": "1.2.0",
+    "gpu": {
+      "available": true,
+      "driver_version": "596.49",
+      "memory_total_mib": 16303,
+      "memory_used_mib": 5045,
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "mitsuba_variant": "cuda_ad_mono_polarized",
+    "mitsuba_version": "3.7.1",
+    "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src"
+  },
+  "scenario": {
+    "bounds": [
+      [
+        -120.0,
+        120.0
+      ],
+      [
+        -120.0,
+        140.0
+      ]
+    ],
+    "frequency_hz": 2400000000.0,
+    "grid_size": 256,
+    "max_depth": 5,
+    "munich_xml": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml",
+    "plane_z": 1.5,
+    "samples_per_tx": 1000000,
+    "scene": "munich",
+    "seeds": [
+      11,
+      17,
+      23
+    ],
+    "shadow_boundary_mode": "none",
+    "tx_pos": [
+      8.5,
+      21.0,
+      27.0
+    ],
+    "witwin_accumulation_backend": "rayd_reflection_accumulation"
+  },
+  "seed_results": [
+    {
+      "profiles": {
+        "sionna": {
+          "label": "sionna_radio_map_solver",
+          "max_ms": 39.14570002234541,
+          "mean_ms": 33.41867999988608,
+          "median_ms": 31.758900004206225,
+          "min_ms": 30.31529998406768,
+          "samples_ms": [
+            31.409599992912263,
+            39.14570002234541,
+            31.758900004206225,
+            34.46389999589883,
+            30.31529998406768
+          ]
+        },
+        "witwin": {
+          "label": "witwin_mc_basic",
+          "max_ms": 15.554199984762818,
+          "mean_ms": 14.972739992663264,
+          "median_ms": 15.02489999984391,
+          "min_ms": 14.55369999166578,
+          "samples_ms": [
+            14.602899987949058,
+            15.127999999094754,
+            15.02489999984391,
+            15.554199984762818,
+            14.55369999166578
+          ]
+        }
+      },
+      "result_stats": {
+        "sionna": {
+          "finite": true,
+          "max": 4.1225639506592415e-06,
+          "min": 0.0,
+          "nonzero": 19770,
+          "shape": [
+            1,
+            256,
+            256
+          ],
+          "sum": 0.00036411987827222566
+        },
+        "witwin": {
+          "finite": true,
+          "max": 0.0015151372645050287,
+          "min": 0.0,
+          "nonzero": 20269,
+          "shape": [
+            1,
+            256,
+            256
+          ],
+          "sum": 0.001926542919177081
+        }
+      },
+      "scene_load": {
+        "sionna": {
+          "cell_size": [
+            0.9375,
+            1.015625
+          ],
+          "center": [
+            0.0,
+            10.0,
+            1.5
+          ],
+          "load_seconds": 1.3815319999994244,
+          "loop_mode": "symbolic",
+          "size": [
+            240.0,
+            260.0
+          ]
+        },
+        "witwin": {
+          "accumulation_backend": "rayd_reflection_accumulation",
+          "diffraction_edges": 51631,
+          "edge_policy": {
+            "boundary_edge_policy": "half_plane",
+            "edge_diffraction": true,
+            "edge_selection_mode": "all_edges"
+          },
+          "load_seconds": 5.7901442000002135,
+          "metadata": {
+            "frequency": 2400000000.0,
+            "loader": "sionna.rt.load_scene",
+            "merge_shapes": true,
+            "merge_shapes_exclude_regex": null,
+            "remove_duplicate_vertices": false,
+            "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src",
+            "source_path": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml"
+          },
+          "structures": 11,
+          "triangles": 38936
+        }
+      },
+      "seed": 11,
+      "sionna_file": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\__init__.py",
+      "speed": {
+        "sionna_over_witwin_median": 2.113751173354642,
+        "witwin_over_sionna_median": 0.4730925818543456
+      }
+    },
+    {
+      "profiles": {
+        "sionna": {
+          "label": "sionna_radio_map_solver",
+          "max_ms": 35.4323000065051,
+          "mean_ms": 32.313660002546385,
+          "median_ms": 32.810700009576976,
+          "min_ms": 27.692999981809407,
+          "samples_ms": [
+            34.21220000018366,
+            32.810700009576976,
+            35.4323000065051,
+            31.420100014656782,
+            27.692999981809407
+          ]
+        },
+        "witwin": {
+          "label": "witwin_mc_basic",
+          "max_ms": 21.694600000046194,
+          "mean_ms": 19.288439996307716,
+          "median_ms": 20.329799997853115,
+          "min_ms": 15.386899991426617,
+          "samples_ms": [
+            15.386899991426617,
+            21.074799995403737,
+            20.329799997853115,
+            21.694600000046194,
+            17.956099996808916
+          ]
+        }
+      },
+      "result_stats": {
+        "sionna": {
+          "finite": true,
+          "max": 3.5384960028750356e-06,
+          "min": 0.0,
+          "nonzero": 19818,
+          "shape": [
+            1,
+            256,
+            256
+          ],
+          "sum": 0.00037185700553535924
+        },
+        "witwin": {
+          "finite": true,
+          "max": 0.0020154272206127644,
+          "min": 0.0,
+          "nonzero": 20145,
+          "shape": [
+            1,
+            256,
+            256
+          ],
+          "sum": 0.002836650920795439
+        }
+      },
+      "scene_load": {
+        "sionna": {
+          "cell_size": [
+            0.9375,
+            1.015625
+          ],
+          "center": [
+            0.0,
+            10.0,
+            1.5
+          ],
+          "load_seconds": 1.829046999977436,
+          "loop_mode": "symbolic",
+          "size": [
+            240.0,
+            260.0
+          ]
+        },
+        "witwin": {
+          "accumulation_backend": "rayd_reflection_accumulation",
+          "diffraction_edges": 51631,
+          "edge_policy": {
+            "boundary_edge_policy": "half_plane",
+            "edge_diffraction": true,
+            "edge_selection_mode": "all_edges"
+          },
+          "load_seconds": 2.35120810000808,
+          "metadata": {
+            "frequency": 2400000000.0,
+            "loader": "sionna.rt.load_scene",
+            "merge_shapes": true,
+            "merge_shapes_exclude_regex": null,
+            "remove_duplicate_vertices": false,
+            "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src",
+            "source_path": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml"
+          },
+          "structures": 11,
+          "triangles": 38936
+        }
+      },
+      "seed": 17,
+      "sionna_file": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\__init__.py",
+      "speed": {
+        "sionna_over_witwin_median": 1.6139214361696563,
+        "witwin_over_sionna_median": 0.6196088468676113
+      }
+    },
+    {
+      "profiles": {
+        "sionna": {
+          "label": "sionna_radio_map_solver",
+          "max_ms": 34.41670001484454,
+          "mean_ms": 32.67786000506021,
+          "median_ms": 33.66499999538064,
+          "min_ms": 29.807400016579777,
+          "samples_ms": [
+            34.012499992968515,
+            33.66499999538064,
+            34.41670001484454,
+            29.807400016579777,
+            31.487700005527586
+          ]
+        },
+        "witwin": {
+          "label": "witwin_mc_basic",
+          "max_ms": 17.097400006605312,
+          "mean_ms": 14.475219999440014,
+          "median_ms": 14.048899989575148,
+          "min_ms": 13.398399983998388,
+          "samples_ms": [
+            14.048899989575148,
+            14.19970000279136,
+            17.097400006605312,
+            13.398399983998388,
+            13.631700014229864
+          ]
+        }
+      },
+      "result_stats": {
+        "sionna": {
+          "finite": true,
+          "max": 2.8005256353935692e-06,
+          "min": 0.0,
+          "nonzero": 19862,
+          "shape": [
+            1,
+            256,
+            256
+          ],
+          "sum": 0.00036228928109657604
+        },
+        "witwin": {
+          "finite": true,
+          "max": 0.0001735001860652119,
+          "min": 0.0,
+          "nonzero": 20112,
+          "shape": [
+            1,
+            256,
+            256
+          ],
+          "sum": 0.0005895494400171108
+        }
+      },
+      "scene_load": {
+        "sionna": {
+          "cell_size": [
+            0.9375,
+            1.015625
+          ],
+          "center": [
+            0.0,
+            10.0,
+            1.5
+          ],
+          "load_seconds": 1.2709703000145964,
+          "loop_mode": "symbolic",
+          "size": [
+            240.0,
+            260.0
+          ]
+        },
+        "witwin": {
+          "accumulation_backend": "rayd_reflection_accumulation",
+          "diffraction_edges": 51631,
+          "edge_policy": {
+            "boundary_edge_policy": "half_plane",
+            "edge_diffraction": true,
+            "edge_selection_mode": "all_edges"
+          },
+          "load_seconds": 2.313197899988154,
+          "metadata": {
+            "frequency": 2400000000.0,
+            "loader": "sionna.rt.load_scene",
+            "merge_shapes": true,
+            "merge_shapes_exclude_regex": null,
+            "remove_duplicate_vertices": false,
+            "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src",
+            "source_path": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml"
+          },
+          "structures": 11,
+          "triangles": 38936
+        }
+      },
+      "seed": 23,
+      "sionna_file": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\__init__.py",
+      "speed": {
+        "sionna_over_witwin_median": 2.396273019265667,
+        "witwin_over_sionna_median": 0.4173147182980209
+      }
+    }
+  ]
+}

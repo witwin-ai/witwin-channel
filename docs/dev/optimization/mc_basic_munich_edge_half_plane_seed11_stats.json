@@ -1,0 +1,143 @@
+{
+  "compare_png": "docs\\dev\\optimization\\mc_basic_munich_witwin_sionna_maps_seed11_edge_half_plane.png",
+  "components_png": "docs\\dev\\optimization\\mc_basic_munich_witwin_components_seed11_edge_half_plane.png",
+  "difference": {
+    "mean_abs_db_delta": 1.7805021309328255,
+    "median_abs_db_delta": 0.0,
+    "sum_delta": 5.176681294437519e-05,
+    "sum_ratio": 1.1389398065291054
+  },
+  "path_counts": {
+    "diffraction": 10009,
+    "los": 13691,
+    "reflection": 148288,
+    "total": 171988
+  },
+  "runtime_backends": {
+    "diffraction": {
+      "cell_scatter_backend": "drjit_scatter_reduce",
+      "implementation": "depth0_direct_hit_store_plus_native_wedge_builder_plus_keller_cone_symbolic_loop_drjit_scatter_reduce",
+      "loop_mode": "symbolic",
+      "point_evaluation_backend": "sampled_edge_diffraction_field_to_plane_hits",
+      "source_field_contract": "sionna_iso_v_implicit_basis",
+      "state_sampler": "discovered_wedge_length_proportional_then_uniform_edge_position_then_keller_cone",
+      "wedge_discovery_backend": "depth0_direct_hit_store_triangle_surface_edge_candidates_native_best_edge_builder"
+    },
+    "reflection": {
+      "ad_contract": "explicit_non_ad_backend_raises_on_ad_inputs",
+      "cell_scatter_backend": "rayd_optix_atomic_add",
+      "implementation": "rayd_trace_reflections_accumulating_complex_polarized_non_ad",
+      "loop_mode": "symbolic",
+      "material_source": "scene",
+      "point_evaluation_backend": "rayd_complex_image_source_field",
+      "ray_budget": 1000000,
+      "ray_distribution": "full_sphere",
+      "reflection_model": "rayd_complex_polarized_fresnel",
+      "solid_angle_per_ray_sr": 1.2566370614359173e-05,
+      "source_field_contract": "sionna_iso_v_implicit_basis"
+    },
+    "suffix": {
+      "implementation": "disabled",
+      "requested_backend": "disabled_for_monte_carlo",
+      "resolved_backend": "disabled_for_monte_carlo"
+    }
+  },
+  "scenario": {
+    "backend": "rayd_reflection_accumulation",
+    "frequency_hz": 2400000000.0,
+    "grid_size": 256,
+    "max_depth": 5,
+    "samples_per_tx": 1000000,
+    "seed": 11,
+    "shadow_boundary_mode": "none",
+    "witwin_edge_policy": {
+      "boundary_edge_policy": "half_plane",
+      "edge_diffraction": true,
+      "edge_selection_mode": "all_edges"
+    }
+  },
+  "scene_load": {
+    "sionna": {
+      "cell_size": [
+        0.9375,
+        1.015625
+      ],
+      "center": [
+        0.0,
+        10.0,
+        1.5
+      ],
+      "load_seconds": 1.1887130999821238,
+      "loop_mode": "symbolic",
+      "size": [
+        240.0,
+        260.0
+      ]
+    },
+    "witwin": {
+      "accumulation_backend": "rayd_reflection_accumulation",
+      "diffraction_edges": 51631,
+      "edge_policy": {
+        "boundary_edge_policy": "half_plane",
+        "edge_diffraction": true,
+        "edge_selection_mode": "all_edges"
+      },
+      "load_seconds": 6.112969300011173,
+      "metadata": {
+        "frequency": 2400000000.0,
+        "loader": "sionna.rt.load_scene",
+        "merge_shapes": true,
+        "merge_shapes_exclude_regex": null,
+        "remove_duplicate_vertices": false,
+        "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src",
+        "source_path": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml"
+      },
+      "structures": 11,
+      "triangles": 38936
+    }
+  },
+  "sionna": {
+    "finite": true,
+    "max": 3.21704328598571e-06,
+    "min": 0.0,
+    "nonzero": 19728,
+    "shape": [
+      256,
+      256
+    ],
+    "sum": 0.0003725844611244002
+  },
+  "witwin": {
+    "finite": true,
+    "max": 1.1633454050752334e-05,
+    "min": 0.0,
+    "nonzero": 20275,
+    "shape": [
+      256,
+      256
+    ],
+    "sum": 0.0004243512740687754
+  },
+  "witwin_components": {
+    "diffraction": {
+      "max": 1.1606718544499017e-05,
+      "nonzero": 10009,
+      "sum": 3.6314506485281936e-05
+    },
+    "los": {
+      "max": 1.2334707832906133e-07,
+      "nonzero": 13691,
+      "sum": 0.0002862064565163358
+    },
+    "reflection": {
+      "max": 3.152871386191691e-08,
+      "nonzero": 16693,
+      "sum": 0.00010183031068245384
+    },
+    "total": {
+      "max": 1.1633454050752334e-05,
+      "nonzero": 20275,
+      "sum": 0.0004243512740687754
+    }
+  }
+}

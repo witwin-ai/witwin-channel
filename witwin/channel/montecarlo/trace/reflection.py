@@ -412,11 +412,11 @@ class Reflection:
             polarization_vec,
             ray_dir,
             oriented_normal,
-            eta_r=material_inputs["eta_r"],
-            sigma=material_inputs["sigma"],
+            eta_r=material_inputs.eta_r,
+            sigma=material_inputs.sigma,
             omega=material_omega,
-            gain=material_inputs["gain"],
-            mu_r=material_inputs["mu_r"],
+            gain=material_inputs.gain,
+            mu_r=material_inputs.mu_r,
         )
         new_polarization = polarization.vector_select(continue_hit, reflected_polarization, polarization_vec)
         new_image_source = dr.select(
@@ -524,8 +524,8 @@ class Reflection:
         # Trace reflected TX-emitted rays with the symbolic Dr.Jit loop used by the Monte Carlo radiomap path.
         current_batch_size = int(dr.width(ray_dir.x))
         initial_ray_dir = ray_dir
-        ray_origin = arrays.broadcast_point(tx_pos, current_batch_size)
-        cumulative_image_source = arrays.broadcast_point(tx_pos, current_batch_size)
+        ray_origin = arrays.broadcast(tx_pos, current_batch_size)
+        cumulative_image_source = arrays.broadcast(tx_pos, current_batch_size)
         polarization_vec = Sampler.source_field(ray_dir)
         ray_path_length = dr.zeros(wt.Float, current_batch_size)
         active = dr.full(wt.Bool, True, current_batch_size)
@@ -551,7 +551,7 @@ class Reflection:
                 path_tape_store,
             ],
         ):
-            ray = rayd.Ray(ray_origin, ray_dir)
+            ray = rayd.RayAD(ray_origin, ray_dir)
             si = scene.ray_intersect(ray, active=active, flags=rayd.RayFlags.All)
             hit = si.is_valid() & active
             if dr.hint(collect_wedges, mode="scalar"):

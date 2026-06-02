@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from witwin.channel.core.scene import Scene
+from witwin.channel.core.scene import scene as scene_module
 from witwin.channel.montecarlo import types as wt
 from witwin.core import Material, Mesh, Structure
 
@@ -66,6 +67,20 @@ def test_segment_visible_native_ignore_preserves_surface_group_semantics() -> No
     visible = scene.segment_visible(start, end, ignore_surface_group_idx=group_id, max_ignored_hits=2)
     dr.eval(visible)
     assert _bool_scalar(visible) is True
+
+
+@pytest.mark.gpu
+def test_segment_visible_chunks_large_native_ignore_tables(monkeypatch: pytest.MonkeyPatch) -> None:
+    scene = _open_wall_scene()
+    group_id = scene.triangle_group_id(wt.Int32(0))
+    start = wt.Point3f(wt.Float([0.5, 1.5]), wt.Float([-1.0, -1.0]), wt.Float([1.5, 1.5]))
+    end = wt.Point3f(wt.Float([0.5, 1.5]), wt.Float([1.0, -2.0]), wt.Float([1.5, 1.5]))
+
+    monkeypatch.setattr(scene_module, "_NATIVE_IGNORE_MAX_ENTRIES", 1)
+    visible = scene.segment_visible(start, end, ignore_surface_group_idx=group_id)
+    dr.eval(visible)
+
+    assert _bool_list(visible) == [True, True]
 
 
 @pytest.mark.gpu

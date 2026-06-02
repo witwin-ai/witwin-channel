@@ -4,21 +4,32 @@ import drjit as dr
 import numpy as np
 import pytest
 
+from witwin.channel.core.physics.materials import FaceMaterial
 from witwin.channel.core.physics.polarization import path_basis, vector_from_jones
 from witwin.channel.core.runtime import Material, Tx, Wave
 from witwin.channel.core.geometry.diffraction import wedge_exterior_mask
 from witwin.channel.deterministic import types as wt
+from witwin.channel.deterministic.config import DiffractionExecutionConfig
 from witwin.channel.deterministic.trace import diffraction as trace_diffraction
 from witwin.channel.deterministic.kernels.utd import utd_pair_vectors
 from witwin.channel.deterministic.kernels.utd.native_impl import _shadow_support_mask
 from witwin.channel.deterministic.diffraction.forward import ForwardEval
-from witwin.channel.deterministic.diffraction import accumulation
-from witwin.channel.deterministic.diffraction.state import SOURCE_TYPE_DIRECT_TX, State
+from witwin.channel.deterministic.diffraction import accumulation, builders
+from witwin.channel.deterministic.diffraction.state import (
+    PATH_EXPORT_REDUCED_STATE_LAYOUT,
+    SOURCE_TYPE_DIRECT_TX,
+    State,
+)
 
 
 class _EmptyClosedScene:
     def _triangle_runtime(self):
         return None
+
+
+class _NoEdgeScene:
+    def get_edge_data(self, *args, **kwargs):
+        return {"edge_data": None}
 
 
 def test_receiver_tile_plan_uses_single_tile_outside_memory_safe():
@@ -41,6 +52,27 @@ def test_receiver_tile_plan_chunks_memory_safe_workloads():
     assert plan["enabled"] is True
     assert plan["tile_size"] == 32
     assert plan["tile_count"] == 4
+
+
+def test_prepare_uses_reduced_path_export_layout_constant():
+    _, _, state_arrays, report = builders.prepare(
+        Tx(position=wt.Point3f(0.0, 0.0, 0.0)),
+        0.0,
+        _NoEdgeScene(),
+        Wave(wavelength=0.1),
+        None,
+        Material(),
+        0,
+        0,
+        Material(),
+        "3d",
+        2,
+        state_layout=PATH_EXPORT_REDUCED_STATE_LAYOUT,
+        return_report=True,
+    )
+
+    assert state_arrays["__path_export_state_layout__"] == PATH_EXPORT_REDUCED_STATE_LAYOUT
+    assert report["state_layout"] == PATH_EXPORT_REDUCED_STATE_LAYOUT
 
 
 def test_axis_aligned_z_receiver_grouping_avoids_numpy_copy(monkeypatch):
@@ -105,7 +137,7 @@ def test_axis_aligned_z_receiver_grouping_avoids_numpy_copy(monkeypatch):
             ray_mode="3d",
         ),
         reflection_detail=None,
-        state_layout="path_export_reduced",
+        state_layout=PATH_EXPORT_REDUCED_STATE_LAYOUT,
     )
 
     assert len(raw) == 1
@@ -161,6 +193,362 @@ def test_accumulate_coherent_vector_only_skips_scalar_total(monkeypatch):
     assert total is None
     assert total_vector is not None
     assert return_scalar_flags == [False]
+
+
+def test_diffraction_execution_accepts_rayd_exact_coherent_mode():
+    config = DiffractionExecutionConfig(accumulate_primal="rayd_exact_coherent")
+
+    assert config.accumulate_primal == "rayd_exact_coherent"
+    assert config.to_dict()["accumulate_primal"] == "rayd_exact_coherent"
+
+
+def test_accumulate_coherent_routes_explicit_rayd_exact_coherent(monkeypatch):
+    def fail_utd_accumulate_forward(*args, **kwargs):
+        raise AssertionError("rayd_exact_coherent should bypass Channel UTD accumulation")
+
+    monkeypatch.setattr(
+        trace_diffraction,
+        "utd_accumulate_forward",
+        fail_utd_accumulate_forward,
+    )
+
+    positions = wt.Point3f(
+        wt.Float([0.0, 1.0]),
+        wt.Float([0.0, 0.0]),
+        wt.Float([0.0, 0.0]),
+    )
+    zero = wt.Complex2f(wt.Float([0.0, 0.0]), wt.Float([0.0, 0.0]))
+    direct_x = wt.Complex2f(wt.Float([1.0, 2.0]), wt.Float([0.5, 0.25]))
+    calls = []
+
+    class FakeScene:
+        def accum_dfr_coherent_direct(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                direct_field_x=direct_x,
+                direct_field_y=zero,
+                direct_field_z=zero,
+                multi_field_x=zero,
+                multi_field_y=zero,
+                multi_field_z=zero,
+            )
+
+    sample_grid = SimpleNamespace(
+        axis="z",
+        position=0.0,
+        bounds=((-1.0, 1.0), (-1.0, 1.0)),
+        grid_shape=(2, 1),
+        cell_size=(1.0, 1.0),
+    )
+
+    total, total_vector = trace_diffraction.accumulate_coherent(
+        state_arrays={"n_states": 1},
+        edge_data={"n_edges": 1},
+        sample_grid=sample_grid,
+        rx=SimpleNamespace(positions=positions),
+        tx=object(),
+        scene=FakeScene(),
+        wave=SimpleNamespace(wavelength=0.125, k=50.26548245743669),
+        material=object(),
+        suffix=SimpleNamespace(enabled=False),
+        execution=DiffractionExecutionConfig(accumulate_primal="rayd_exact_coherent"),
+        return_vector=True,
+        return_scalar=False,
+        receiver_axis="z",
+    )
+
+    assert total is None
+    assert len(calls) == 1
+    assert calls[0]["diffraction_states"]["n_states"] == 1
+    assert calls[0]["grid"] is sample_grid
+    assert calls[0]["select_diffraction_point"] is True
+    dr.eval(total_vector["x"].real, total_vector["x"].imag)
+    assert np.asarray(total_vector["x"].real).tolist() == [1.0, 2.0]
+    assert np.asarray(total_vector["x"].imag).tolist() == [0.5, 0.25]
+
+
+def test_accumulate_coherent_auto_routes_rayd_when_supported(monkeypatch):
+    def fail_utd_accumulate_forward(*args, **kwargs):
+        raise AssertionError("auto should use RayD exact coherent when the fast path is supported")
+
+    monkeypatch.setattr(
+        trace_diffraction,
+        "utd_accumulate_forward",
+        fail_utd_accumulate_forward,
+    )
+
+    positions = wt.Point3f(
+        wt.Float([0.0, 1.0]),
+        wt.Float([0.0, 0.0]),
+        wt.Float([0.0, 0.0]),
+    )
+    zero = wt.Complex2f(wt.Float([0.0, 0.0]), wt.Float([0.0, 0.0]))
+    direct_x = wt.Complex2f(wt.Float([1.0, 2.0]), wt.Float([0.5, 0.25]))
+    calls = []
+
+    class FakeScene:
+        def _triangle_runtime(self):
+            return None
+
+        def accum_dfr_coherent_direct(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                direct_field_x=direct_x,
+                direct_field_y=zero,
+                direct_field_z=zero,
+                multi_field_x=zero,
+                multi_field_y=zero,
+                multi_field_z=zero,
+            )
+
+    sample_grid = SimpleNamespace(
+        axis="z",
+        position=0.0,
+        bounds=((-1.0, 1.0), (-1.0, 1.0)),
+        grid_shape=(2, 1),
+        cell_size=(1.0, 1.0),
+    )
+
+    total, total_vector = trace_diffraction.accumulate_coherent(
+        state_arrays={"n_states": 1},
+        edge_data={"n_edges": 1},
+        sample_grid=sample_grid,
+        rx=SimpleNamespace(positions=positions),
+        tx=SimpleNamespace(polarization=(1.0, 0.0, 0.0)),
+        scene=FakeScene(),
+        wave=SimpleNamespace(wavelength=0.125, k=50.26548245743669),
+        material=object(),
+        suffix=SimpleNamespace(enabled=False),
+        execution=DiffractionExecutionConfig(accumulate_primal="auto"),
+        return_vector=True,
+        return_scalar=False,
+        receiver_axis="z",
+        allow_rayd_exact_coherent_auto=True,
+    )
+
+    assert total is None
+    assert len(calls) == 1
+    assert calls[0]["tx_polarization"] == (1.0, 0.0, 0.0)
+    dr.eval(total_vector["x"].real, total_vector["x"].imag)
+    assert np.asarray(total_vector["x"].real).tolist() == [1.0, 2.0]
+
+
+def test_accumulate_coherent_auto_keeps_native_path_for_ad(monkeypatch):
+    zero = wt.Complex2f(wt.Float([0.0, 0.0]), wt.Float([0.0, 0.0]))
+    zero_vector = {"x": zero, "y": zero, "z": zero}
+    calls = []
+
+    def fake_utd_accumulate_forward(*args, **kwargs):
+        calls.append((args, kwargs))
+        return zero, zero, zero_vector, zero_vector, []
+
+    class FakeScene:
+        def _triangle_runtime(self):
+            return None
+
+        def accum_dfr_coherent_direct(self, **kwargs):
+            raise AssertionError("auto should not use RayD exact coherent when AD is active")
+
+    monkeypatch.setattr(trace_diffraction, "utd_accumulate_forward", fake_utd_accumulate_forward)
+    monkeypatch.setattr(trace_diffraction, "scene_geometry_grad_enabled", lambda scene: True)
+
+    positions = wt.Point3f(
+        wt.Float([0.0, 1.0]),
+        wt.Float([0.0, 0.0]),
+        wt.Float([0.0, 0.0]),
+    )
+    sample_grid = SimpleNamespace(
+        axis="z",
+        position=0.0,
+        bounds=((-1.0, 1.0), (-1.0, 1.0)),
+        grid_shape=(2, 1),
+        cell_size=(1.0, 1.0),
+    )
+
+    total, total_vector = trace_diffraction.accumulate_coherent(
+        state_arrays={"n_states": 1},
+        edge_data={"n_edges": 1},
+        sample_grid=sample_grid,
+        rx=SimpleNamespace(positions=positions, effective_polarization=lambda tx: None),
+        tx=SimpleNamespace(polarization=(1.0, 0.0, 0.0)),
+        scene=FakeScene(),
+        wave=SimpleNamespace(wavelength=0.125, k=50.26548245743669),
+        material=object(),
+        suffix=SimpleNamespace(enabled=False),
+        execution=DiffractionExecutionConfig(accumulate_primal="auto"),
+        return_vector=True,
+        return_scalar=False,
+        receiver_axis="z",
+        allow_rayd_exact_coherent_auto=True,
+    )
+
+    assert len(calls) == 1
+    assert total is None
+    dr.eval(total_vector["x"].real, total_vector["x"].imag)
+    assert np.asarray(total_vector["x"].real).tolist() == [0.0, 0.0]
+
+
+def test_baseline_coherent_auto_enables_rayd_for_higher_order(monkeypatch):
+    calls = []
+    zero = wt.Complex2f(wt.Float([0.0, 0.0]), wt.Float([0.0, 0.0]))
+    zero_vector = {"x": zero, "y": zero, "z": zero}
+
+    def fake_accumulate_coherent(**kwargs):
+        calls.append(kwargs)
+        return None, zero_vector
+
+    monkeypatch.setattr(trace_diffraction, "accumulate_coherent", fake_accumulate_coherent)
+
+    positions = wt.Point3f(
+        wt.Float([0.0, 1.0]),
+        wt.Float([0.0, 0.0]),
+        wt.Float([0.0, 0.0]),
+    )
+    config = SimpleNamespace(
+        max_diffractions=2,
+        rx_polarization=None,
+        shadow_support_cutoff_db=None,
+        memory_profile="default",
+        diffraction_execution=DiffractionExecutionConfig(accumulate_primal="auto"),
+    )
+    sample_grid = SimpleNamespace(axis="z")
+    runtime = SimpleNamespace(
+        tx=SimpleNamespace(polarization=(1.0, 0.0, 0.0)),
+        wave=SimpleNamespace(wavelength=0.125, k=50.26548245743669),
+        diffraction=object(),
+    )
+    scene = SimpleNamespace(
+        _triangle_runtime=lambda: None,
+        _merged_vertices=lambda: None,
+    )
+
+    _, metadata = accumulation.baseline_matched_isotropic_diffraction_vector(
+        diffraction_raw_collections=[
+            {
+                "receiver_index_map": wt.UInt32([0, 1]),
+                "rx_positions": positions,
+                "state_arrays": {"n_states": 1},
+                "edge_data": {"n_edges": 1},
+                "runtime": runtime,
+            }
+        ],
+        scene=scene,
+        config=config,
+        n_rx=2,
+        receiver_axis="z",
+        sample_grid=sample_grid,
+        ray_mode="3d",
+        return_metadata=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["allow_rayd_exact_coherent_auto"] is True
+    assert metadata["implementation"] == "rayd_accum_dfr_coherent_direct_exact"
+
+
+def test_higher_order_bvh_pairs_uses_rayd_native_candidate_builder():
+    calls = []
+
+    class FakeScene:
+        def _triangle_runtime(self):
+            return None
+
+        def build_dfr_coherent_higher_candidates(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                count=2,
+                prev_index=wt.Int32([0, 0]),
+                edge_index=wt.Int32([3, 3]),
+                visibility_filtered=True,
+            )
+
+    prev_states = {
+        "edge_idx": wt.UInt32([1, 2, 3]),
+        "edge_pos": wt.Point3f([0.0, 1.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+        "source_pos": wt.Point3f([0.0, 0.0, 0.0], [-1.0, -1.0, -1.0], [0.0, 0.0, 0.0]),
+        "adjacent_face0": wt.Int32([10, 11, 12]),
+        "adjacent_face1": wt.Int32([20, 21, 22]),
+        "incident_basis_u": wt.Vector3f([1.0, 1.0, 1.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+        "incident_basis_v": wt.Vector3f([0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [0.0, 0.0, 0.0]),
+        "incident_basis_k": wt.Vector3f([0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [0.0, 0.0, 0.0]),
+    }
+
+    prev_idx, edge_idx, visibility_filtered = builders.bvh_pairs(
+        prev_states,
+        {"n_edges": 8},
+        prev_start=2,
+        chunk_n_prev=1,
+        scene=FakeScene(),
+        global_to_local_idx=wt.Int32([0, 1, 2, 3]),
+        filter_visibility=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["prev_start"] == 2
+    assert calls[0]["chunk_n_prev"] == 1
+    assert calls[0]["filter_visibility"] is True
+    assert visibility_filtered is True
+    dr.eval(prev_idx, edge_idx)
+    assert np.asarray(prev_idx, dtype=np.uint32).tolist() == [2]
+    assert np.asarray(edge_idx, dtype=np.uint32).tolist() == [3]
+
+
+def test_diffraction_builder_report_includes_higher_order_stage_timings(monkeypatch):
+    class FakeScene:
+        _rayd_scene = None
+
+        def get_edge_data(self, rx_z, include_projection=False):
+            assert include_projection is False
+            return {
+                "edge_data": {
+                    "n_edges": 1,
+                    "global_idx": wt.Int32([0]),
+                }
+            }
+
+    monkeypatch.setattr(
+        builders,
+        "tx_first",
+        lambda *args, **kwargs: builders.State.empty(history_size=2),
+    )
+    monkeypatch.setattr(
+        builders,
+        "prefix_first",
+        lambda *args, **kwargs: builders.State.empty(history_size=2),
+    )
+    monkeypatch.setattr(
+        builders,
+        "higher",
+        lambda *args, **kwargs: builders.State.empty(history_size=2),
+    )
+
+    _, _, _, report = builders.prepare(
+        SimpleNamespace(position=wt.Point3f(0.0, 0.0, 1.0), polarization=(1.0, 0.0, 0.0)),
+        0.0,
+        FakeScene(),
+        SimpleNamespace(wavelength=0.125, k=50.26548245743669),
+        None,
+        object(),
+        0,
+        0,
+        SimpleNamespace(gain_scalar=1.0),
+        "3d",
+        2,
+        retain_lineage_state=False,
+        return_report=True,
+    )
+
+    assert len(report["orders"]) == 1
+    stage_seconds = report["orders"][0]["stage_seconds"]
+    assert set(stage_seconds) >= {
+        "pre_expansion",
+        "higher_order",
+        "inserted_reflection",
+        "post_budget",
+        "lineage_finalize",
+        "total",
+    }
+    assert all(value >= 0.0 for value in stage_seconds.values())
 
 
 def test_raw_diffraction_support_rejects_deep_non_exterior_targets_by_default():
@@ -285,12 +673,12 @@ def test_native_utd_pair_vectors_select_stationary_point_matches_drjit_endpoint_
     source_pos = wt.Point3f(values(-2.0), values(1.0), values(0.0))
     incident_basis = path_basis(edge_pos - source_pos, preferred=edge_dir)
     incident_vector = vector_from_jones({"u": ones, "v": zeros}, incident_basis)
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([0] * width),
@@ -376,12 +764,12 @@ def test_native_utd_pair_vectors_keep_wrapped_rsb_shadow_jump():
         "u": wt.Complex2f(values(-0.0006798789254389703), values(3.633725646068342e-05)),
         "v": wt.Complex2f(values(0.0046222880482673645), values(-0.000247045885771513)),
     }
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([0] * width),
@@ -438,12 +826,12 @@ def test_native_utd_face_operator_keeps_physical_shadow_phase_jump():
         "u": wt.Complex2f(values(0.0006798789254389703), values(-3.633725646068342e-05)),
         "v": wt.Complex2f(values(0.0046222880482673645), values(-0.000247045885771513)),
     }
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([0] * width),
@@ -503,12 +891,12 @@ def test_native_utd_shadow_sector_chart_does_not_switch_mid_sector():
         "u": wt.Complex2f(values(0.0040), values(-0.0002)),
         "v": wt.Complex2f(values(0.0015), values(0.0001)),
     }
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([0] * width),
@@ -568,12 +956,12 @@ def test_native_utd_face_n_boundary_uses_continuous_beta_branches():
         "u": wt.Complex2f(values(0.0040), values(-0.0002)),
         "v": wt.Complex2f(values(0.0015), values(0.0001)),
     }
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([0] * width),
@@ -633,12 +1021,12 @@ def test_native_utd_reflected_face_terms_remain_phase_continuous_at_symmetric_su
         "u": wt.Complex2f(values(0.0040), values(-0.0002)),
         "v": wt.Complex2f(values(0.0015), values(0.0001)),
     }
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([9] * width),
@@ -756,12 +1144,12 @@ def test_native_utd_sum_branch_keeps_reflected_face_shadow_jump(
         "u": wt.Complex2f(values(0.0040), values(-0.0002)),
         "v": wt.Complex2f(values(0.0015), values(0.0001)),
     }
-    face_material = {
-        "eta_r": values(10000.0),
-        "sigma": values(0.0),
-        "gain": values(1.0),
-        "use_fresnel": wt.Bool([True] * width),
-    }
+    face_material = FaceMaterial(
+        eta_r= values(10000.0),
+        sigma= values(0.0),
+        gain= values(1.0),
+        use_fresnel= wt.Bool([True] * width),
+    )
 
     state_arrays = State.make(
         edge_idx=wt.UInt32([edge_idx] * width),

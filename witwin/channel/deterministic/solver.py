@@ -346,10 +346,21 @@ def _solve(
     reflection_detail = None
     diffraction_sample_metadata: list[dict[str, object]] = []
 
+    rayd_exact_auto_candidate = (
+        str(resolved.diffraction_execution.accumulate_primal) == "auto"
+        and grid.surface_mode == "axis_aligned"
+        and int(resolved.max_diffractions) >= 1
+        and resolved.shadow_support_cutoff_db is None
+    )
+    needs_native_grid = (
+        grad_sensitive
+        or str(resolved.diffraction_execution.accumulate_primal) == "rayd_exact_coherent"
+        or rayd_exact_auto_candidate
+    )
     for sample_set in grid.sample_sets:
         sample_grid = (
             NativeGrid.from_grid(grid, sample_index=sample_set.index)
-            if grad_sensitive
+            if needs_native_grid
             else None
         )
         sample_runtime = runtime.with_rx(

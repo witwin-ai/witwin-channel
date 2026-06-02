@@ -12,7 +12,7 @@ from ..kernels.diffraction_builder import DiffractionBuilderKernel
 from ..sampler import Sampler
 from ..config import ResolvedTraceConfig
 from witwin.channel.core.numerics import arrays
-from witwin.channel.core.numerics.arrays import broadcast_float, broadcast_int, scalar
+from witwin.channel.core.numerics.arrays import scalar
 from witwin.channel.core.numerics.constants import EPS
 from witwin.channel.core.physics.materials import FaceMaterial, resolve_surface_material
 from .diffraction_utd import UTD
@@ -934,6 +934,9 @@ class DiffractionStates:
             ),
         )
 
+    def _to_rayd_state_table(self, scene: Scene):
+        return scene._make_rayd_dfr_states(self)
+
     @staticmethod
     def _face_materials(*, scene, adjacent_face0, adjacent_face1) -> tuple[FaceMaterial, FaceMaterial]:
         if scene is None:
@@ -949,12 +952,7 @@ class DiffractionStates:
             scene=scene, prim_idx=adjacent_face1, default_gain=1.0,
             valid_mask=adjacent_face1 >= 0,
         )
-        return (
-            FaceMaterial(eta_r=face0["eta_r"], sigma=face0["sigma"],
-                         gain=face0["gain"], use_fresnel=face0["use_fresnel"], mu_r=face0["mu_r"]),
-            FaceMaterial(eta_r=face1["eta_r"], sigma=face1["sigma"],
-                         gain=face1["gain"], use_fresnel=face1["use_fresnel"], mu_r=face1["mu_r"]),
-        )
+        return (face0, face1)
 
     def orient_face_view(self, incident_dir) -> OrientedEdgeView:
         flip = dr.dot(incident_dir, self.n0) > 0.0
@@ -1004,7 +1002,7 @@ class DiffractionStates:
 
         edge_data = scene.gather_edge_subset(best_edge_idx, valid_mask=store_unique)
         n_rays = int(dr.width(ray_directions.x))
-        source_pos = arrays.broadcast_point(tx_pos, n_rays)
+        source_pos = arrays.broadcast(tx_pos, n_rays)
         face0_material, face1_material = DiffractionStates._face_materials(
             scene=scene,
             adjacent_face0=edge_data["adjacent_face0"],

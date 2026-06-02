@@ -13,8 +13,7 @@ from witwin.channel.core.runtime import Material, Tx, Wave
 from ..reflection.detail import coerce_material_context
 from witwin.channel.core.numerics.constants import DIFFRACTION_MIN_DISTANCE, EPS, RAY_ORIGIN_BIAS, SPEED_OF_LIGHT, UTD_SLOPE_DERIVATIVE_STEP
 from witwin.channel.core.numerics.arrays import (
-    broadcast_point,
-    broadcast_vector,
+    broadcast,
     complex_abs_sqr,
     complex_zero,
 )
@@ -65,7 +64,7 @@ class ForwardEval(UTDMath):
 
     def incident_vectors(edge_state, *, width, edge_pos=None, wave: Wave | None = None, tx: Tx | None = None):
         """Broadcast canonicalized jones+basis state into incident field vectors."""
-        incident_path_basis = {'u': broadcast_vector(edge_state['incident_basis_u'], width), 'v': broadcast_vector(edge_state['incident_basis_v'], width), 'k': broadcast_vector(edge_state['incident_basis_k'], width)}
+        incident_path_basis = {'u': broadcast(edge_state['incident_basis_u'], width), 'v': broadcast(edge_state['incident_basis_v'], width), 'k': broadcast(edge_state['incident_basis_k'], width)}
         incident_jones = {'u': repeat_complex(edge_state['incident_jones_u'], width), 'v': repeat_complex(edge_state['incident_jones_v'], width)}
         incident_derivative_jones = {'u': repeat_complex(edge_state['incident_derivative_jones_u'], width), 'v': repeat_complex(edge_state['incident_derivative_jones_v'], width)}
         incident_vector = vector_from_jones(incident_jones, incident_path_basis)
@@ -75,8 +74,8 @@ class ForwardEval(UTDMath):
         direct_mask = ForwardEval.direct_first_order_mask(edge_state, width=width)
         if not dr.any(direct_mask):
             return incident_vector, incident_normal_derivative_vector
-        edge_pos_b = broadcast_point(edge_state['edge_pos'] if edge_pos is None else edge_pos, width)
-        source_pos_b = broadcast_point(edge_state['source_pos'], width)
+        edge_pos_b = broadcast(edge_state['edge_pos'] if edge_pos is None else edge_pos, width)
+        source_pos_b = broadcast(edge_state['source_pos'], width)
         direct_field = Geo.source_field(source_pos_b, wt.Complex2f(1.0, 0.0), edge_pos_b, wave)
         ray_dir = (edge_pos_b - source_pos_b) / (dr.norm(edge_pos_b - source_pos_b) + wt.Float(EPS))
         pol_dir = project_real_polarization_to_ray(tx.polarization, ray_dir)
@@ -98,8 +97,8 @@ class ForwardEval(UTDMath):
         return items if len(items) > 1 else field
 
     def truncation_factor_with_bounds(edge_state, edge_geometry, target_pos, wave: Wave, *, width, line_min, line_max, stationary_u=None):
-        edge_pos_b = broadcast_point(edge_state['edge_pos'], width)
-        source_pos_b = broadcast_point(edge_state['source_pos'], width)
+        edge_pos_b = broadcast(edge_state['edge_pos'], width)
+        source_pos_b = broadcast(edge_state['source_pos'], width)
         edge_hat = edge_geometry.edge_hat
         source_axial = dr.dot(source_pos_b - edge_pos_b, edge_hat)
         target_axial = dr.dot(target_pos - edge_pos_b, edge_hat)
@@ -206,7 +205,7 @@ class ForwardEval(UTDMath):
         eval_edge_state = dict(edge_state)
         if select_diffraction_point:
             selected_point = Geo.finite_edge_diffraction_point(edge_state, target_pos)
-            anchor_point = broadcast_point(edge_state['edge_pos'], width)
+            anchor_point = broadcast(edge_state['edge_pos'], width)
             anchor_line_min = repeat_float(edge_state['edge_line_min'], width)
             anchor_line_max = repeat_float(edge_state['edge_line_max'], width)
             select_mask = ForwardEval.direct_first_order_mask(edge_state, width=width)
@@ -223,12 +222,12 @@ class ForwardEval(UTDMath):
             eval_edge_state['edge_line_max'] = diffraction_point['edge_line_max']
         else:
             diffraction_point = {
-                'point': broadcast_point(edge_state['edge_pos'], width),
+                'point': broadcast(edge_state['edge_pos'], width),
                 'edge_line_min': repeat_float(edge_state['edge_line_min'], width),
                 'edge_line_max': repeat_float(edge_state['edge_line_max'], width),
                 'valid': dr.full(wt.Bool, True, width),
                 'inside': dr.full(wt.Bool, True, width),
-                'visibility_point': broadcast_point(edge_state['edge_pos'], width),
+                'visibility_point': broadcast(edge_state['edge_pos'], width),
             }
 
         edge_geometry = wedge_geometry(eval_edge_state['source_pos'], eval_edge_state['edge_pos'], eval_edge_state['edge_dir'], eval_edge_state['n0'], target_pos)
@@ -237,11 +236,11 @@ class ForwardEval(UTDMath):
         s = edge_geometry.s
         s_prime = edge_geometry.s_prime
         wedge_n = repeat_float(eval_edge_state['wedge_n'], width)
-        edge_pos_b = broadcast_point(eval_edge_state['edge_pos'], width)
-        edge_dir_b = broadcast_vector(eval_edge_state['edge_dir'], width)
-        n0_b = broadcast_vector(eval_edge_state['n0'], width)
-        nn_b = broadcast_vector(eval_edge_state['n_face_n'], width)
-        source_pos_b = broadcast_point(eval_edge_state['source_pos'], width)
+        edge_pos_b = broadcast(eval_edge_state['edge_pos'], width)
+        edge_dir_b = broadcast(eval_edge_state['edge_dir'], width)
+        n0_b = broadcast(eval_edge_state['n0'], width)
+        nn_b = broadcast(eval_edge_state['n_face_n'], width)
+        source_pos_b = broadcast(eval_edge_state['source_pos'], width)
         source_exterior = wedge_exterior_mask(source_pos_b - edge_pos_b, edge_dir_b, n0_b, nn_b)
         target_exterior = wedge_exterior_mask(target_pos - edge_pos_b, edge_dir_b, n0_b, nn_b)
         visibility_valid = dr.full(wt.Bool, True, width)
@@ -596,7 +595,7 @@ class ForwardEval(UTDMath):
             safe_hit_n = dr.select(hit, hit_n, wt.Vector3f(0.0, 0.0, 1.0))
             reflection_weight, material_inputs = Geo.surface_coeff(incident_dir=ray_dir, normal=hit_n, scene=scene, prim_idx=wt.Int32(hit_prim_idx), material=reflection_material, wave=wave, tx=tx, valid_mask=hit)
             reflected_field = field_at_hit * reflection_weight
-            reflected_vector = reflect_field_vector(field_at_hit_vector, safe_ray_dir, safe_hit_n, eta_r=material_inputs['eta_r'], sigma=material_inputs['sigma'], omega=omega, gain=material_inputs['gain'], mu_r=material_inputs['mu_r'])
+            reflected_vector = reflect_field_vector(field_at_hit_vector, safe_ray_dir, safe_hit_n, eta_r=material_inputs.eta_r, sigma=material_inputs.sigma, omega=omega, gain=material_inputs.gain, mu_r=material_inputs.mu_r)
             reflected_field = dr.select(hit, reflected_field, complex_zero(n_total_rays))
             reflected_vector = vector_select(hit, reflected_vector, vector_zero(n_total_rays))
             dot_dn = dr.dot(ray_dir, hit_n)

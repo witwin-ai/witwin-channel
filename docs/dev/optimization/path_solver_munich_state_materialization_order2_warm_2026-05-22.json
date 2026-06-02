@@ -1,0 +1,280 @@
+{
+  "cases": [
+    {
+      "max_diffraction_order": 2,
+      "samples": 1000000,
+      "sionna": {
+        "error": "Sionna run skipped by --skip-sionna.",
+        "ok": false,
+        "profile": null,
+        "stats": null,
+        "supported": false
+      },
+      "speed": {
+        "sionna_over_witwin_median": null,
+        "witwin_over_sionna_median": null
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 8260,
+              "n_paths": 1989,
+              "path_collection": {
+                "candidate_pairs": 24780,
+                "chunk_count": 1,
+                "field_kept_count": 1989,
+                "input_states": 8260,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 24780,
+                "output_paths": 1989,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 1989,
+                "state_layout": "reduced_v2",
+                "timing": {
+                  "concat_seconds": 1.3900003978051245e-05,
+                  "field_eval_seconds": 0.03672530000039842,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04927950000273995,
+                  "visibility_seconds": 7.700000423938036e-06
+                },
+                "visibility_kept_count": 24780
+              },
+              "receiver_count": 3,
+              "state_layout": "reduced_v2",
+              "tx_index": 0
+            },
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 4667,
+              "n_paths": 4982,
+              "path_collection": {
+                "candidate_pairs": 14001,
+                "chunk_count": 1,
+                "field_kept_count": 4982,
+                "input_states": 4667,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 14001,
+                "output_paths": 4982,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 4982,
+                "state_layout": "reduced_v2",
+                "timing": {
+                  "concat_seconds": 1.1899988749064505e-05,
+                  "field_eval_seconds": 0.033066599993617274,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04559229999722447,
+                  "visibility_seconds": 2.7999922167509794e-06
+                },
+                "visibility_kept_count": 14001
+              },
+              "receiver_count": 3,
+              "state_layout": "reduced_v2",
+              "tx_index": 1
+            }
+          ],
+          "path_counts": {
+            "diffraction": 6971,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "diffraction": {
+              "implementation": "drjit_diffraction_state_path_export",
+              "max_order": 2,
+              "path_export_backend": "drjit_state_materialization"
+            },
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 2,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 1000000
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 2,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 1000000
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 0.37002850000862963,
+            "los": 0.000556200000573881,
+            "reflection": 0.004097500001080334
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 365.0149666694536,
+          "median_ms": 355.1875000121072,
+          "samples_ms": [
+            355.1875000121072,
+            354.21669999777805,
+            385.6406999984756
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 384,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 384
+        }
+      }
+    }
+  ],
+  "environment": {
+    "drjit_version": "1.2.0",
+    "gpu": {
+      "available": true,
+      "driver_version": "596.49",
+      "memory_total_mib": 16303,
+      "memory_used_mib": 7916,
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "sionna_file": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\__init__.py",
+    "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src"
+  },
+  "notes": [
+    "Order 0 is LoS plus requested specular reflection depth.",
+    "Order 1 is comparable to Sionna first-order edge diffraction, but path counts are not expected to match exactly because candidate policies differ.",
+    "Order 2 and 3 are Witwin capability and scale checks; Sionna RT 2.0.1 has no comparable higher-order diffraction path mode."
+  ],
+  "scenario": {
+    "accumulate_primal": "auto",
+    "diffraction_state_budget": 4096,
+    "enable_rd_diffraction": false,
+    "frequency_hz": 3500000000.0,
+    "inserted_reflection_state_budget": 2048,
+    "max_bounces": 1,
+    "max_num_paths": 64,
+    "munich_xml": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml",
+    "orders": [
+      2
+    ],
+    "rx_positions": [
+      [
+        45.0,
+        90.0,
+        1.5
+      ],
+      [
+        30.0,
+        55.0,
+        1.5
+      ],
+      [
+        60.0,
+        20.0,
+        1.5
+      ]
+    ],
+    "sample_counts": [
+      1000000
+    ],
+    "scene": "munich",
+    "tx_positions": [
+      [
+        8.5,
+        21.0,
+        27.0
+      ],
+      [
+        45.0,
+        15.0,
+        22.0
+      ]
+    ]
+  }
+}

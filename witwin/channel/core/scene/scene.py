@@ -9,17 +9,21 @@ import torch
 from witwin.channel import types as wt
 
 from witwin.core import GeometryBase, SceneBase, Structure
-from witwin.channel.core.numerics.arrays import broadcast_float, broadcast_int, broadcast_point, broadcast_vector, concat_points, scalar
+from witwin.channel.core.numerics.arrays import broadcast, concat_points, scalar
 from witwin.channel.core.numerics.constants import EPS, RAY_ORIGIN_BIAS
 from witwin.channel.core.geometry import point_in_triangle_3d
+from witwin.channel.core.physics.wave_math import material_angular_frequency
 from witwin.channel.core.physics.materials import FaceMaterial
 from witwin.channel.core.geometry.mesh_buffers import mesh_buffer_count, to_point3f
-from witwin.channel.core.runtime import point_grad_enabled, scene_geometry_grad_enabled
+from witwin.channel.core.runtime import point_grad_enabled, scene_geometry_grad_enabled, scene_material_grad_enabled
 from .arrays import default_array
 from .builder import MATERIAL_EPS_R_DEFAULT, MATERIAL_SIGMA_E_DEFAULT, SceneBuilder
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .endpoints import Receiver, ReceiverGrid, Transmitter
 from .wedge import WedgeOps, WedgePack
+
+
+_NATIVE_IGNORE_MAX_ENTRIES = 2_000_000_000
 
 
 def _resolve_scene_device(device: str | None) -> str:
@@ -52,6 +56,118 @@ def _scalar_bool(value) -> bool:
 
 def _gather_scalar(buffer, idx: wt.UInt32):
     return dr.gather(type(buffer), buffer, idx)
+
+
+def _grad_enabled_value(value) -> bool:
+    if value is None:
+        return False
+    try:
+        return bool(dr.grad_enabled(value))
+    except (TypeError, RuntimeError):
+        pass
+    if isinstance(value, dict):
+        return any(_grad_enabled_value(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_grad_enabled_value(item) for item in value)
+    try:
+        has_xyz = all(hasattr(value, axis) for axis in ("x", "y", "z"))
+    except RuntimeError:
+        has_xyz = False
+    if has_xyz:
+        return any(_grad_enabled_value(getattr(value, axis)) for axis in ("x", "y", "z"))
+    try:
+        has_complex_parts = hasattr(value, "real") and hasattr(value, "imag")
+    except RuntimeError:
+        has_complex_parts = False
+    if has_complex_parts:
+        real = value.real
+        imag = value.imag
+        return (
+            (real is not value and _grad_enabled_value(real))
+            or (imag is not value and _grad_enabled_value(imag))
+        )
+    return False
+
+
+def _rayd_float(value, *, ad: bool):
+    value = wt.Float(value)
+    if ad:
+        return value
+    return dr.detached_t(wt.Float)(dr.detach(value))
+
+
+def _rayd_int(value, *, ad: bool):
+    value = wt.Int32(value)
+    if ad:
+        return value
+    return dr.detached_t(wt.Int32)(dr.detach(value))
+
+
+def _rayd_bool(value, *, ad: bool):
+    value = wt.Bool(value)
+    if ad:
+        return value
+    return dr.detached_t(wt.Bool)(dr.detach(value))
+
+
+def _rayd_vector3(value, *, ad: bool):
+    vector_type = wt.Vector3f if ad else dr.detached_t(wt.Vector3f)
+    if all(hasattr(value, axis) for axis in ("x", "y", "z")):
+        return vector_type(
+            _rayd_float(value.x, ad=ad),
+            _rayd_float(value.y, ad=ad),
+            _rayd_float(value.z, ad=ad),
+        )
+    if len(value) != 3:
+        raise ValueError("Expected a 3-vector.")
+    return vector_type(
+        _rayd_float(value[0], ad=ad),
+        _rayd_float(value[1], ad=ad),
+        _rayd_float(value[2], ad=ad),
+    )
+
+
+def _rayd_complex(value, *, ad: bool):
+    value = wt.Complex2f(value)
+    complex_type = wt.Complex2f if ad else dr.detached_t(wt.Complex2f)
+    return complex_type(
+        _rayd_float(value.real, ad=ad),
+        _rayd_float(value.imag, ad=ad),
+    )
+
+
+def _rayd_call(trace, *args, ad: bool):
+    if ad:
+        return trace(*args)
+    with dr.suspend_grad():
+        return trace(*args)
+
+
+_DFR_STATE_GRAD_ATTRS = (
+    "edge_index",
+    "edge_pos",
+    "edge_dir",
+    "edge_line_min",
+    "edge_line_max",
+    "n0",
+    "n_face_n",
+    "adjacent_face0",
+    "adjacent_face1",
+    "wedge_n",
+    "source_pos",
+    "source_power",
+    "prefix_reflection_depth",
+    "prefix_initial_ray_dir",
+)
+
+
+def _dfr_states_grad_enabled(states) -> bool:
+    if isinstance(states, dict):
+        return _grad_enabled_value(states)
+    return any(
+        _grad_enabled_value(getattr(states, name, None))
+        for name in _DFR_STATE_GRAD_ATTRS
+    )
 
 
 @dataclass(frozen=True)
@@ -139,6 +255,7 @@ class Scene(SceneBase):
         self._mesh_version = 0
         self._edge_views_cache: tuple[_SceneEdgeView, ...] = ()
         self._edge_data_cache: dict[tuple[int, float], dict[str, object]] = {}
+        self._rayd_visibility_ignore_pipeline_warmed = False
 
         SceneBuilder.rebuild(self)
         self._invalidate_runtime_view_cache()
@@ -604,13 +721,13 @@ class Scene(SceneBase):
     # ------------------------------------------------------------------
 
     def ray_test(self, ray: object, active: bool = True) -> wt.Bool:
-        if not isinstance(ray, rayd.Ray):
-            raise TypeError(f"Scene.ray_test expects rayd.Ray, got {type(ray).__name__}.")
+        if not isinstance(ray, (rayd.Ray, rayd.RayAD)):
+            raise TypeError(f"Scene.ray_test expects rayd.Ray or rayd.RayAD, got {type(ray).__name__}.")
         return wt.Bool(self._require_rayd_scene().shadow_test(ray, active=active))
 
     def ray_intersect(self, ray: object, active: bool = True, flags: object = None) -> object:
-        if not isinstance(ray, rayd.Ray):
-            raise TypeError(f"Scene.ray_intersect expects rayd.Ray, got {type(ray).__name__}.")
+        if not isinstance(ray, (rayd.Ray, rayd.RayAD)):
+            raise TypeError(f"Scene.ray_intersect expects rayd.Ray or rayd.RayAD, got {type(ray).__name__}.")
         return self._require_rayd_scene().intersect(
             ray, active=active, flags=rayd.RayFlags.All if flags is None else flags,
         )
@@ -618,7 +735,421 @@ class Scene(SceneBase):
     def nearest_edge(self, query, active: bool = True):
         return self._require_rayd_scene().nearest_edge(query, active=active)
 
-    def trace_reflections_accumulating(
+    @staticmethod
+    def _make_rayd_dfr_states(diffraction_states, *, ad: bool = False):
+        if isinstance(diffraction_states, dict):
+            return Scene._make_rayd_dfr_states_from_arrays(diffraction_states, ad=ad)
+
+        edge_index = wt.Int32(diffraction_states.edge_index)
+        width = int(dr.width(edge_index))
+        count = getattr(diffraction_states, "stored_count", None)
+        count = width if count is None else int(count)
+        if count < 0 or count > width:
+            raise ValueError(
+                "DiffractionStates.stored_count must be between 0 and the state buffer width."
+            )
+
+        source_to_edge = wt.Vector3f(diffraction_states.edge_pos - diffraction_states.source_pos)
+        incident_direction = source_to_edge / (dr.norm(source_to_edge) + EPS)
+        prefix_depth = wt.Int32(diffraction_states.prefix_reflection_depth)
+        prefix_initial = getattr(diffraction_states, "prefix_initial_ray_dir", None)
+        if prefix_initial is None:
+            initial_direction = incident_direction
+        else:
+            initial_direction = dr.select(
+                prefix_depth > wt.Int32(0),
+                wt.Vector3f(prefix_initial),
+                incident_direction,
+            )
+
+        table = rayd.DfrStatesAD() if ad else rayd.DfrStates()
+        table.count = count
+        table.edge_index = _rayd_int(edge_index, ad=ad)
+        table.edge_pos = _rayd_vector3(diffraction_states.edge_pos, ad=ad)
+        table.edge_dir = _rayd_vector3(diffraction_states.edge_dir, ad=ad)
+        table.edge_t_min = _rayd_float(diffraction_states.edge_line_min, ad=ad)
+        table.edge_t_max = _rayd_float(diffraction_states.edge_line_max, ad=ad)
+        table.n0 = _rayd_vector3(diffraction_states.n0, ad=ad)
+        table.n1 = _rayd_vector3(diffraction_states.n_face_n, ad=ad)
+        table.prim0 = _rayd_int(diffraction_states.adjacent_face0, ad=ad)
+        table.prim1 = _rayd_int(diffraction_states.adjacent_face1, ad=ad)
+        table.exterior_angle = _rayd_float(diffraction_states.wedge_n * dr.pi, ad=ad)
+        table.src = _rayd_vector3(diffraction_states.source_pos, ad=ad)
+        table.src_power = _rayd_float(diffraction_states.source_power, ad=ad)
+        table.wi = _rayd_vector3(incident_direction, ad=ad)
+        table.d0 = _rayd_vector3(initial_direction, ad=ad)
+        table.prefix_depth = _rayd_int(prefix_depth, ad=ad)
+        return table
+
+    @staticmethod
+    def _make_rayd_dfr_states_from_arrays(state_arrays, *, ad: bool = False):
+        if state_arrays is None:
+            raise ValueError("trace_dfr_paths requires diffraction state arrays.")
+        state_count = int(state_arrays.get("n_states", 0))
+        if state_count <= 0:
+            raise ValueError("trace_dfr_paths requires at least one diffraction state.")
+
+        def required(name: str):
+            if name not in state_arrays:
+                raise KeyError(f"trace_dfr_paths state arrays missing {name!r}.")
+            return state_arrays[name]
+
+        edge_pos = required("edge_pos")
+        edge_dir = required("edge_dir")
+        source_pos = required("source_pos")
+        source_to_edge = wt.Vector3f(edge_pos - source_pos)
+        incident_direction = source_to_edge / (dr.norm(source_to_edge) + EPS)
+        edge_index = state_arrays.get("edge_idx")
+        if edge_index is None:
+            edge_index = dr.arange(wt.UInt32, state_count)
+        source_power = state_arrays.get("source_power")
+        if source_power is None:
+            incident_field = state_arrays.get("incident_field")
+            if incident_field is None:
+                source_power = dr.ones(wt.Float, state_count)
+            else:
+                incident_field = wt.Complex2f(incident_field)
+                source_power = dr.square(incident_field.real) + dr.square(incident_field.imag)
+        prefix_depth = wt.Int32(state_arrays.get("prefix_reflection_depth", dr.zeros(wt.UInt32, state_count)))
+
+        table = rayd.DfrStatesAD() if ad else rayd.DfrStates()
+        table.count = state_count
+        table.edge_index = _rayd_int(edge_index, ad=ad)
+        table.edge_pos = _rayd_vector3(edge_pos, ad=ad)
+        table.edge_dir = _rayd_vector3(edge_dir, ad=ad)
+        table.edge_t_min = _rayd_float(required("edge_line_min"), ad=ad)
+        table.edge_t_max = _rayd_float(required("edge_line_max"), ad=ad)
+        table.n0 = _rayd_vector3(required("n0"), ad=ad)
+        table.n1 = _rayd_vector3(state_arrays.get("n_face_n", required("nn") if "nn" in state_arrays else required("n_face_n")), ad=ad)
+        table.prim0 = _rayd_int(required("adjacent_face0"), ad=ad)
+        table.prim1 = _rayd_int(required("adjacent_face1"), ad=ad)
+        table.exterior_angle = _rayd_float(required("wedge_n") * dr.pi, ad=ad)
+        table.src = _rayd_vector3(source_pos, ad=ad)
+        table.src_power = _rayd_float(source_power, ad=ad)
+        table.wi = _rayd_vector3(incident_direction, ad=ad)
+        table.d0 = _rayd_vector3(incident_direction, ad=ad)
+        table.prefix_depth = _rayd_int(prefix_depth, ad=ad)
+        return table
+
+    @staticmethod
+    def _make_rayd_dfr_coherent_utd_states_from_arrays(state_arrays, *, ad: bool = False):
+        if state_arrays is None:
+            raise ValueError("accum_dfr_coherent_direct requires diffraction state arrays.")
+        state_count = int(state_arrays.get("n_states", 0))
+        if state_count <= 0:
+            raise ValueError("accum_dfr_coherent_direct requires at least one diffraction state.")
+
+        def required(name: str):
+            if name not in state_arrays:
+                raise KeyError(f"accum_dfr_coherent_direct state arrays missing {name!r}.")
+            return state_arrays[name]
+
+        table_type = rayd.DfrCoherentUtdStatesAD if ad else rayd.DfrCoherentUtdStates
+        table = table_type()
+        table.count = state_count
+        table.edge_index = _rayd_int(
+            state_arrays.get("edge_idx", dr.arange(wt.UInt32, state_count)),
+            ad=ad,
+        )
+        table.edge_pos = _rayd_vector3(required("edge_pos"), ad=ad)
+        table.edge_dir = _rayd_vector3(required("edge_dir"), ad=ad)
+        table.n0 = _rayd_vector3(required("n0"), ad=ad)
+        table.n_face_n = _rayd_vector3(
+            state_arrays.get("n_face_n", required("nn") if "nn" in state_arrays else required("n_face_n")),
+            ad=ad,
+        )
+        table.wedge_n = _rayd_float(required("wedge_n"), ad=ad)
+        table.edge_line_min = _rayd_float(required("edge_line_min"), ad=ad)
+        table.edge_line_max = _rayd_float(required("edge_line_max"), ad=ad)
+        table.source_pos = _rayd_vector3(required("source_pos"), ad=ad)
+        table.incident_field = _rayd_complex(required("incident_field"), ad=ad)
+        table.incident_normal_derivative = _rayd_complex(
+            required("incident_normal_derivative"), ad=ad
+        )
+        table.r_face0 = _rayd_complex(required("r_face0"), ad=ad)
+        table.r_face_n = _rayd_complex(required("r_face_n"), ad=ad)
+        table.incident_vector_x = _rayd_complex(required("incident_vector_x"), ad=ad)
+        table.incident_vector_y = _rayd_complex(required("incident_vector_y"), ad=ad)
+        table.incident_vector_z = _rayd_complex(required("incident_vector_z"), ad=ad)
+        table.incident_normal_derivative_vector_x = _rayd_complex(
+            required("incident_normal_derivative_vector_x"), ad=ad
+        )
+        table.incident_normal_derivative_vector_y = _rayd_complex(
+            required("incident_normal_derivative_vector_y"), ad=ad
+        )
+        table.incident_normal_derivative_vector_z = _rayd_complex(
+            required("incident_normal_derivative_vector_z"), ad=ad
+        )
+        table.incident_jones_u = _rayd_complex(required("incident_jones_u"), ad=ad)
+        table.incident_jones_v = _rayd_complex(required("incident_jones_v"), ad=ad)
+        table.incident_derivative_jones_u = _rayd_complex(
+            required("incident_derivative_jones_u"), ad=ad
+        )
+        table.incident_derivative_jones_v = _rayd_complex(
+            required("incident_derivative_jones_v"), ad=ad
+        )
+        table.incident_basis_u = _rayd_vector3(required("incident_basis_u"), ad=ad)
+        table.incident_basis_v = _rayd_vector3(required("incident_basis_v"), ad=ad)
+        table.incident_basis_k = _rayd_vector3(required("incident_basis_k"), ad=ad)
+        for prefix in ("face0", "face1"):
+            for key in ("m00", "m01", "m10", "m11"):
+                setattr(
+                    table,
+                    f"{prefix}_operator_{key}",
+                    _rayd_complex(required(f"{prefix}_operator_{key}"), ad=ad),
+                )
+            setattr(table, f"{prefix}_eta_r", _rayd_float(required(f"{prefix}_eta_r"), ad=ad))
+            setattr(table, f"{prefix}_mu_r", _rayd_float(required(f"{prefix}_mu_r"), ad=ad))
+            setattr(table, f"{prefix}_sigma", _rayd_float(required(f"{prefix}_sigma"), ad=ad))
+            setattr(table, f"{prefix}_gain", _rayd_float(required(f"{prefix}_gain"), ad=ad))
+            setattr(
+                table,
+                f"{prefix}_use_fresnel",
+                _rayd_float(wt.Float(required(f"{prefix}_use_fresnel")), ad=ad),
+            )
+
+        source_type = wt.UInt32(state_arrays.get("source_type_code", dr.zeros(wt.UInt32, state_count)))
+        order = wt.UInt32(state_arrays.get("order", dr.full(wt.UInt32, 1, state_count)))
+        select_stationary = wt.Float((source_type == wt.UInt32(0)) & (order == wt.UInt32(1)))
+        prefix_depth = wt.UInt32(state_arrays.get("prefix_reflection_depth", dr.zeros(wt.UInt32, state_count)))
+        intermediate_depth = wt.UInt32(
+            state_arrays.get("intermediate_reflection_depth", dr.zeros(wt.UInt32, state_count))
+        )
+        suffix_depth = wt.UInt32(state_arrays.get("suffix_reflection_depth", dr.zeros(wt.UInt32, state_count)))
+        has_reflection = (
+            (prefix_depth > wt.UInt32(0))
+            | (intermediate_depth > wt.UInt32(0))
+            | (suffix_depth > wt.UInt32(0))
+        )
+        table.select_stationary_point = _rayd_float(select_stationary, ad=ad)
+        table.owner_code = _rayd_int(dr.select(has_reflection, wt.Int32(1), wt.Int32(0)), ad=ad)
+        table.adjacent_face0 = _rayd_int(required("adjacent_face0"), ad=ad)
+        table.adjacent_face1 = _rayd_int(required("adjacent_face1"), ad=ad)
+        return table
+
+    @staticmethod
+    def _make_rayd_dfr_coherent_edge_table(edge_data, *, ad: bool = False):
+        if edge_data is None:
+            raise ValueError("build_dfr_coherent_tx_states requires edge data.")
+        edge_count = int(edge_data.get("n_edges", 0))
+        table_type = rayd.DfrCoherentEdgeAD if ad else rayd.DfrCoherentEdge
+        table = table_type()
+        table.count = edge_count
+        if edge_count <= 0:
+            return table
+        table.edge_index = _rayd_int(dr.arange(wt.UInt32, edge_count), ad=ad)
+        table.edge_pos = _rayd_vector3(edge_data["pos"], ad=ad)
+        table.edge_dir = _rayd_vector3(edge_data["edge_dir"], ad=ad)
+        table.n0 = _rayd_vector3(edge_data["n0"], ad=ad)
+        table.n_face_n = _rayd_vector3(edge_data["n_face_n"], ad=ad)
+        table.wedge_n = _rayd_float(edge_data["wedge_n"], ad=ad)
+        table.edge_line_min = _rayd_float(edge_data["line_min"], ad=ad)
+        table.edge_line_max = _rayd_float(edge_data["line_max"], ad=ad)
+        table.adjacent_face0 = _rayd_int(edge_data["adjacent_face0"], ad=ad)
+        table.adjacent_face1 = _rayd_int(edge_data["adjacent_face1"], ad=ad)
+        return table
+
+    def build_dfr_coherent_tx_states(
+        self,
+        *,
+        edge_data,
+        tx_position,
+        tx_polarization,
+        wave,
+        material_context,
+        active=True,
+    ):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "build_dfr_coherent_tx_states", None)
+        if trace is None:
+            raise RuntimeError("RayD build_dfr_coherent_tx_states is required for native deterministic state prep.")
+        if self._symbolic_recording_active():
+            raise RuntimeError(
+                "RayD build_dfr_coherent_tx_states uses native visibility and cannot be recorded inside a Dr.Jit symbolic scope."
+            )
+        ad = (
+            point_grad_enabled(tx_position)
+            or scene_geometry_grad_enabled(self)
+            or scene_material_grad_enabled(self)
+            or _grad_enabled_value(tx_polarization)
+            or _grad_enabled_value(active)
+        )
+        if ad:
+            raise RuntimeError("RayD coherent Tx state preparation does not support AD inputs yet.")
+        edge_table = self._make_rayd_dfr_coherent_edge_table(edge_data, ad=False)
+        edge_count = int(edge_table.count)
+        if edge_count <= 0:
+            return edge_table
+        ignore_prim_ids = self._native_segment_ignore_ids(
+            width=edge_count,
+            ignore_prim_idx=(edge_data["adjacent_face0"], edge_data["adjacent_face1"]),
+            ignore_surface_group_idx=None,
+        )
+        edge_table.ignore_prim_ids = _rayd_int(ignore_prim_ids, ad=False)
+        edge_table.ignore_k = (
+            0 if edge_count <= 0 else int(dr.width(ignore_prim_ids)) // edge_count
+        )
+        if edge_table.ignore_k > 0:
+            self._warm_rayd_visibility_ignore_pipeline()
+
+        tri_data = self._triangle_runtime()
+        if tri_data is None:
+            raise RuntimeError("RayD coherent Tx state preparation requires scene triangle material runtime data.")
+        n_triangles = int(tri_data.get("n_triangles", 0))
+        if n_triangles <= 0:
+            raise RuntimeError("RayD coherent Tx state preparation requires at least one triangle.")
+
+        rayd_material = rayd.DfrMaterial()
+        rayd_material.eta_r = _rayd_float(tri_data["material_eps_r"], ad=False)
+        rayd_material.sigma = _rayd_float(tri_data["material_sigma_e"], ad=False)
+        rayd_material.mu_r = _rayd_float(tri_data["material_mu_r"], ad=False)
+        rayd_material.gain = _rayd_float(
+            dr.full(wt.Float, float(material_context.gain_scalar), n_triangles),
+            ad=False,
+        )
+        rayd_material.valid = _rayd_bool(
+            tri_data.get("material_specified", dr.full(wt.Bool, True, n_triangles)),
+            ad=False,
+        )
+
+        options = rayd.DfrCoherentOptions()
+        options.wavelength = float(scalar(wave.wavelength))
+        options.k = float(scalar(wave.k))
+        options.max_order = 1
+        options.receiver_model = int(rayd.RAYD_DFR_MATCHED_ISO)
+        options.select_diffraction_point = True
+        options.prefilter_visibility = True
+        options.collect_debug_counts = False
+        if hasattr(options, "omega"):
+            options.omega = float(material_angular_frequency(options.wavelength)[0])
+        if hasattr(options, "tx_pol_x"):
+            options.tx_pol_x = float(
+                scalar(tx_polarization.x if hasattr(tx_polarization, "x") else tx_polarization[0])
+            )
+            options.tx_pol_y = float(
+                scalar(tx_polarization.y if hasattr(tx_polarization, "y") else tx_polarization[1])
+            )
+            options.tx_pol_z = float(
+                scalar(tx_polarization.z if hasattr(tx_polarization, "z") else tx_polarization[2])
+            )
+
+        active_mask = _rayd_bool(self._broadcast_bool(active, edge_count), ad=False)
+        return _rayd_call(
+            trace,
+            edge_table,
+            _rayd_vector3(tx_position, ad=False),
+            rayd_material,
+            options,
+            active_mask,
+            ad=False,
+        )
+
+    def build_dfr_coherent_higher_candidates(
+        self,
+        *,
+        prev_state_arrays,
+        edge_data,
+        global_to_local_edge_index,
+        prev_start: int,
+        chunk_n_prev: int,
+        filter_visibility: bool = False,
+        active=True,
+    ):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "build_dfr_coherent_higher_candidates", None)
+        if trace is None:
+            raise RuntimeError(
+                "RayD build_dfr_coherent_higher_candidates is required for native deterministic higher-order candidate prep."
+            )
+        if self._symbolic_recording_active():
+            raise RuntimeError(
+                "RayD build_dfr_coherent_higher_candidates uses native edge queries and cannot be recorded inside a Dr.Jit symbolic scope."
+            )
+        if (
+            _dfr_states_grad_enabled(prev_state_arrays)
+            or scene_geometry_grad_enabled(self)
+            or _grad_enabled_value(global_to_local_edge_index)
+            or _grad_enabled_value(active)
+        ):
+            raise RuntimeError(
+                "RayD coherent higher-order candidate preparation does not support AD inputs yet."
+            )
+
+        chunk_n_prev = int(chunk_n_prev)
+        prev_start = int(prev_start)
+        if chunk_n_prev <= 0:
+            pairs = rayd.DfrCoherentCandidatePairs()
+            pairs.count = 0
+            return pairs
+
+        state_idx = dr.arange(wt.UInt32, chunk_n_prev) + wt.UInt32(prev_start)
+        state_table = rayd.DfrCoherentUtdStates()
+        state_table.count = chunk_n_prev
+        state_table.edge_index = _rayd_int(
+            dr.gather(wt.UInt32, prev_state_arrays["edge_idx"], state_idx),
+            ad=False,
+        )
+        state_table.edge_pos = _rayd_vector3(
+            dr.gather(wt.Point3f, prev_state_arrays["edge_pos"], state_idx),
+            ad=False,
+        )
+        state_table.source_pos = _rayd_vector3(
+            dr.gather(wt.Point3f, prev_state_arrays["source_pos"], state_idx),
+            ad=False,
+        )
+        if filter_visibility:
+            state_table.adjacent_face0 = _rayd_int(
+                dr.gather(wt.Int32, prev_state_arrays["adjacent_face0"], state_idx),
+                ad=False,
+            )
+            state_table.adjacent_face1 = _rayd_int(
+                dr.gather(wt.Int32, prev_state_arrays["adjacent_face1"], state_idx),
+                ad=False,
+            )
+        state_table.incident_basis_u = _rayd_vector3(
+            dr.gather(wt.Vector3f, prev_state_arrays["incident_basis_u"], state_idx),
+            ad=False,
+        )
+        state_table.incident_basis_v = _rayd_vector3(
+            dr.gather(wt.Vector3f, prev_state_arrays["incident_basis_v"], state_idx),
+            ad=False,
+        )
+        state_table.incident_basis_k = _rayd_vector3(
+            dr.gather(wt.Vector3f, prev_state_arrays["incident_basis_k"], state_idx),
+            ad=False,
+        )
+
+        edge_table = self._make_rayd_dfr_coherent_edge_table(edge_data, ad=False)
+        options = rayd.DfrCoherentOptions()
+        if hasattr(options, "higher_probe_radius_scale"):
+            options.higher_probe_radius_scale = 0.6
+            options.higher_probe_radius_min = 0.5
+            options.higher_probe_radius_max = 4.0
+        if hasattr(options, "higher_filter_visibility"):
+            options.higher_filter_visibility = bool(filter_visibility)
+        active_mask = _rayd_bool(self._broadcast_bool(active, chunk_n_prev), ad=False)
+        dr.eval(
+            state_table.edge_index,
+            state_table.edge_pos,
+            state_table.source_pos,
+            state_table.incident_basis_u,
+            state_table.incident_basis_v,
+            state_table.incident_basis_k,
+            state_table.adjacent_face0,
+            state_table.adjacent_face1,
+            edge_table.edge_index,
+            global_to_local_edge_index,
+            active_mask,
+        )
+        return trace(
+            state_table,
+            edge_table,
+            _rayd_int(global_to_local_edge_index, ad=False),
+            options,
+            active_mask,
+        )
+
+    def accumulate_reflections(
         self,
         *,
         ray_origin,
@@ -635,63 +1166,48 @@ class Scene(SceneBase):
         cell_area: float,
         collect_wedges: bool,
         wedge_capacity: int,
+        collect_wedge_prefixes: bool = False,
+        wedge_sample_stride: int = 1,
         tx_polarization=None,
         active=True,
     ):
         rayd_scene = self._require_rayd_scene()
-        trace = getattr(rayd_scene, "trace_reflections_accumulating", None)
+        trace = getattr(rayd_scene, "accumulate_reflections", None)
         if trace is None:
             raise RuntimeError(
-                "RayD trace_reflections_accumulating is required for "
+                "RayD accumulate_reflections is required for "
                 "accumulation_backend='rayd_reflection_accumulation'."
             )
         if self._symbolic_recording_active():
             raise RuntimeError(
-                "RayD trace_reflections_accumulating uses native optixLaunch and "
+                "RayD accumulate_reflections uses native optixLaunch and "
                 "cannot be recorded inside a Dr.Jit symbolic scope."
             )
 
-        import drjit.cuda as cuda
-
         width = int(dr.width(ray_dir.x))
         if width <= 0:
-            raise ValueError("trace_reflections_accumulating requires at least one ray.")
+            raise ValueError("accumulate_reflections requires at least one ray.")
 
-        def detached_float(value):
-            return cuda.Float(dr.detach(wt.Float(value)))
+        ad = (
+            point_grad_enabled(ray_origin)
+            or point_grad_enabled(ray_dir)
+            or point_grad_enabled(tx_pos)
+            or scene_geometry_grad_enabled(self)
+            or scene_material_grad_enabled(self)
+            or _grad_enabled_value(tx_polarization)
+            or _grad_enabled_value(active)
+        )
+        tx_polarization_value = (
+            getattr(config, "tx_polarization", (1.0, 0.0, 0.0))
+            if tx_polarization is None
+            else tx_polarization
+        )
+        ray_cls = rayd.RayAD if ad else rayd.Ray
+        ray = ray_cls(_rayd_vector3(ray_origin, ad=ad), _rayd_vector3(ray_dir, ad=ad))
+        tx_position = _rayd_vector3(tx_pos, ad=ad)
+        tx_polarization_rayd = _rayd_vector3(tx_polarization_value, ad=ad)
 
-        def detached_bool(value):
-            return cuda.Bool(dr.detach(wt.Bool(value)))
-
-        def detached_point(point):
-            return cuda.Array3f(
-                detached_float(point.x),
-                detached_float(point.y),
-                detached_float(point.z),
-            )
-
-        def detached_vector(value):
-            if value is None:
-                value = getattr(config, "tx_polarization", (1.0, 0.0, 0.0))
-            if all(hasattr(value, axis) for axis in ("x", "y", "z")):
-                return cuda.Array3f(
-                    detached_float(value.x),
-                    detached_float(value.y),
-                    detached_float(value.z),
-                )
-            if len(value) != 3:
-                raise ValueError("tx_polarization must be a 3-vector.")
-            return cuda.Array3f(
-                detached_float(value[0]),
-                detached_float(value[1]),
-                detached_float(value[2]),
-            )
-
-        ray = rayd.RayDetached(detached_point(ray_origin), detached_point(ray_dir))
-        tx_position = detached_point(tx_pos)
-        tx_polarization_detached = detached_vector(tx_polarization)
-
-        grid_desc = rayd.ReflectionAccumulationGrid()
+        grid_desc = rayd.AccumGrid()
         grid_desc.axis = {"x": 0, "y": 1, "z": 2}[str(grid.axis)]
         grid_desc.position = float(grid.position)
         grid_desc.coord0_min = float(grid.bounds[0][0])
@@ -710,19 +1226,20 @@ class Scene(SceneBase):
         if n_triangles <= 0:
             raise RuntimeError("RayD reflection accumulation requires at least one triangle.")
 
-        material = rayd.PrimitiveMaterialPayloadDetached()
-        material.eta_r = detached_float(tri_data["material_eps_r"])
-        material.sigma = detached_float(tri_data["material_sigma_e"])
-        material.mu_r = detached_float(tri_data["material_mu_r"])
-        material.gain = detached_float(dr.full(wt.Float, 1.0, n_triangles))
-        material.valid = detached_bool(
+        material = rayd.MaterialAD() if ad else rayd.Material()
+        material.eta_r = _rayd_float(tri_data["material_eps_r"], ad=ad)
+        material.sigma = _rayd_float(tri_data["material_sigma_e"], ad=ad)
+        material.mu_r = _rayd_float(tri_data["material_mu_r"], ad=ad)
+        material.gain = _rayd_float(dr.full(wt.Float, 1.0, n_triangles), ad=ad)
+        material.valid = _rayd_bool(
             tri_data.get(
                 "material_specified",
                 dr.full(wt.Bool, True, n_triangles),
-            )
+            ),
+            ad=ad,
         )
 
-        options = rayd.ReflectionAccumulationOptions()
+        options = rayd.AccumOptions()
         options.wavelength = float(config.wavelength)
         options.k = float(config.k)
         options.solid_angle_per_ray = float(solid_angle_per_ray)
@@ -732,21 +1249,624 @@ class Scene(SceneBase):
         options.rr_prob = float(rr_prob)
         options.stop_threshold = float(stop_threshold_linear)
         options.collect_wedges = bool(collect_wedges)
-        options.collect_wedge_prefixes = False
+        options.collect_wedge_prefixes = bool(collect_wedge_prefixes)
         options.wedge_capacity = int(wedge_capacity)
+        options.wedge_sample_stride = int(wedge_sample_stride)
 
-        active_mask = detached_bool(self._broadcast_bool(active, width))
-        with dr.suspend_grad():
-            return trace(
-                ray,
-                tx_position,
-                grid_desc,
-                material,
-                int(max_bounces),
-                options,
-                active_mask,
-                tx_polarization_detached,
+        active_mask = _rayd_bool(self._broadcast_bool(active, width), ad=ad)
+        return _rayd_call(
+            trace,
+            ray,
+            tx_position,
+            grid_desc,
+            material,
+            int(max_bounces),
+            options,
+            active_mask,
+            tx_polarization_rayd,
+            ad=ad,
+        )
+
+    def accum_dfr_direct(
+        self,
+        *,
+        diffraction_states,
+        grid,
+        config,
+        seed: int,
+        samples: int,
+        direct_samples: int,
+        keller_samples: int,
+        suffix_samples: int = 0,
+        sample_sequence: str = "hash",
+        active=True,
+    ):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "accum_dfr_direct", None)
+        if trace is None:
+            raise RuntimeError(
+                "RayD accum_dfr_direct is required for "
+                "diffraction_execution.accumulate_primal='rayd_optix'."
             )
+        if self._symbolic_recording_active():
+            raise RuntimeError(
+                "RayD accum_dfr_direct uses native optixLaunch and "
+                "cannot be recorded inside a Dr.Jit symbolic scope."
+            )
+
+        ad = (
+            _dfr_states_grad_enabled(diffraction_states)
+            or scene_geometry_grad_enabled(self)
+            or scene_material_grad_enabled(self)
+            or _grad_enabled_value(active)
+        )
+        state_table = self._make_rayd_dfr_states(diffraction_states, ad=ad)
+        state_count = int(state_table.count)
+        if state_count <= 0:
+            raise ValueError("accum_dfr_direct requires at least one diffraction state.")
+
+        grid_desc = rayd.DfrGrid()
+        grid_desc.axis = {"x": 0, "y": 1, "z": 2}[str(grid.axis)]
+        grid_desc.position = float(grid.position)
+        grid_desc.coord0_min = float(grid.bounds[0][0])
+        grid_desc.coord0_max = float(grid.bounds[0][1])
+        grid_desc.coord1_min = float(grid.bounds[1][0])
+        grid_desc.coord1_max = float(grid.bounds[1][1])
+        grid_desc.resolution0 = int(grid.grid_shape[0])
+        grid_desc.resolution1 = int(grid.grid_shape[1])
+        grid_desc.cell_area = float(grid.cell_size[0] * grid.cell_size[1])
+
+        tri_data = self._triangle_runtime()
+        if tri_data is None:
+            raise RuntimeError(
+                "RayD diffraction accumulation requires scene triangle material runtime data."
+            )
+        n_triangles = int(tri_data.get("n_triangles", 0))
+        if n_triangles <= 0:
+            raise RuntimeError("RayD diffraction accumulation requires at least one triangle.")
+
+        material = rayd.DfrMaterialAD() if ad else rayd.DfrMaterial()
+        material.eta_r = _rayd_float(tri_data["material_eps_r"], ad=ad)
+        material.sigma = _rayd_float(tri_data["material_sigma_e"], ad=ad)
+        material.mu_r = _rayd_float(tri_data["material_mu_r"], ad=ad)
+        material.gain = _rayd_float(dr.full(wt.Float, 1.0, n_triangles), ad=ad)
+        material.valid = _rayd_bool(
+            tri_data.get(
+                "material_specified",
+                dr.full(wt.Bool, True, n_triangles),
+            ),
+            ad=ad,
+        )
+
+        direct_count = max(0, int(direct_samples))
+        keller_count = max(0, int(keller_samples))
+        suffix_count = max(0, int(suffix_samples))
+        strategy_mask = 0
+        if direct_count > 0:
+            strategy_mask |= int(rayd.RAYD_DFR_DIRECT)
+        if keller_count > 0:
+            strategy_mask |= int(rayd.RAYD_DFR_KELLER)
+        if suffix_count > 0:
+            strategy_mask |= int(rayd.RAYD_DFR_SUFFIX_REFL)
+        if strategy_mask == 0:
+            raise ValueError("accum_dfr_direct requires direct, Keller, or suffix samples.")
+
+        sequence = str(sample_sequence)
+        if sequence == "hash":
+            sample_sequence_id = int(rayd.RAYD_DFR_HASH)
+        elif sequence == "sobol":
+            sample_sequence_id = int(rayd.RAYD_DFR_SOBOL)
+        else:
+            raise ValueError("sample_sequence must be 'hash' or 'sobol'.")
+
+        options = rayd.DfrOptions()
+        options.wavelength = float(config.wavelength)
+        options.k = float(config.k)
+        options.seed = int(seed)
+        options.samples = int(samples)
+        options.max_order = 1
+        options.direct_samples = direct_count
+        options.keller_samples = keller_count
+        options.suffix_samples = suffix_count
+        options.strategy_mask = strategy_mask
+        options.sample_sequence = sample_sequence_id
+        options.receiver_model = int(rayd.RAYD_DFR_MATCHED_ISO)
+        options.collect_edge_use = True
+        options.collect_debug_counts = True
+
+        active_mask = _rayd_bool(self._broadcast_bool(active, state_count), ad=ad)
+        dr.eval(
+            state_table.edge_index,
+            state_table.edge_pos,
+            state_table.edge_dir,
+            state_table.edge_t_min,
+            state_table.edge_t_max,
+            state_table.n0,
+            state_table.n1,
+            state_table.prim0,
+            state_table.prim1,
+            state_table.exterior_angle,
+            state_table.src,
+            state_table.src_power,
+            state_table.wi,
+            state_table.d0,
+            state_table.prefix_depth,
+            material.eta_r,
+            material.sigma,
+            material.mu_r,
+            material.gain,
+            material.valid,
+            active_mask,
+        )
+        return _rayd_call(
+            trace,
+            state_table,
+            grid_desc,
+            material,
+            options,
+            active_mask,
+            ad=ad,
+        )
+
+    def accum_dfr_coherent_direct(
+        self,
+        *,
+        diffraction_states,
+        grid,
+        config,
+        active=True,
+        select_diffraction_point: bool = True,
+        prefilter_visibility: bool = False,
+        tx_polarization=None,
+    ):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "accum_dfr_coherent_direct", None)
+        if trace is None:
+            raise RuntimeError(
+                "RayD accum_dfr_coherent_direct is required for "
+                "diffraction_execution.accumulate_primal='rayd_exact_coherent'."
+            )
+        if self._symbolic_recording_active():
+            raise RuntimeError(
+                "RayD accum_dfr_coherent_direct uses native optixLaunch and "
+                "cannot be recorded inside a Dr.Jit symbolic scope."
+            )
+
+        ad = (
+            _dfr_states_grad_enabled(diffraction_states)
+            or scene_geometry_grad_enabled(self)
+            or scene_material_grad_enabled(self)
+            or _grad_enabled_value(active)
+        )
+        if ad:
+            raise RuntimeError(
+                "RayD exact coherent diffraction accumulation does not support AD inputs yet."
+            )
+
+        state_table = self._make_rayd_dfr_coherent_utd_states_from_arrays(
+            diffraction_states,
+            ad=False,
+        )
+        state_count = int(state_table.count)
+        if state_count <= 0:
+            raise ValueError(
+                "accum_dfr_coherent_direct requires at least one diffraction state."
+            )
+
+        grid_desc = rayd.DfrGrid()
+        grid_desc.axis = {"x": 0, "y": 1, "z": 2}[str(grid.axis)]
+        grid_desc.position = float(grid.position)
+        grid_desc.coord0_min = float(grid.bounds[0][0])
+        grid_desc.coord0_max = float(grid.bounds[0][1])
+        grid_desc.coord1_min = float(grid.bounds[1][0])
+        grid_desc.coord1_max = float(grid.bounds[1][1])
+        grid_shape = getattr(grid, "grid_shape", getattr(grid, "size", None))
+        if grid_shape is None:
+            raise ValueError(
+                "accum_dfr_coherent_direct grid must expose grid_shape or size."
+            )
+        grid_desc.resolution0 = int(grid_shape[0])
+        grid_desc.resolution1 = int(grid_shape[1])
+        grid_desc.cell_area = float(grid.cell_size[0] * grid.cell_size[1])
+
+        tri_data = self._triangle_runtime()
+        if tri_data is None:
+            raise RuntimeError(
+                "RayD exact coherent diffraction accumulation requires scene triangle material runtime data."
+            )
+        n_triangles = int(tri_data.get("n_triangles", 0))
+        if n_triangles <= 0:
+            raise RuntimeError(
+                "RayD exact coherent diffraction accumulation requires at least one triangle."
+            )
+
+        material = rayd.DfrMaterial()
+        material.eta_r = _rayd_float(tri_data["material_eps_r"], ad=False)
+        material.sigma = _rayd_float(tri_data["material_sigma_e"], ad=False)
+        material.mu_r = _rayd_float(tri_data["material_mu_r"], ad=False)
+        material.gain = _rayd_float(dr.full(wt.Float, 1.0, n_triangles), ad=False)
+        material.valid = _rayd_bool(
+            tri_data.get(
+                "material_specified",
+                dr.full(wt.Bool, True, n_triangles),
+            ),
+            ad=False,
+        )
+
+        options = rayd.DfrCoherentOptions()
+        options.wavelength = float(scalar(config.wavelength))
+        options.k = float(scalar(config.k))
+        options.max_order = 1
+        options.receiver_model = int(rayd.RAYD_DFR_MATCHED_ISO)
+        options.select_diffraction_point = bool(select_diffraction_point)
+        options.prefilter_visibility = bool(prefilter_visibility)
+        options.collect_debug_counts = True
+        if hasattr(options, "omega"):
+            options.omega = float(material_angular_frequency(options.wavelength)[0])
+        if hasattr(options, "tx_pol_x"):
+            active_tx_pol = (
+                getattr(config, "tx_polarization", (1.0, 0.0, 0.0))
+                if tx_polarization is None
+                else tx_polarization
+            )
+            options.tx_pol_x = float(
+                scalar(active_tx_pol.x if hasattr(active_tx_pol, "x") else active_tx_pol[0])
+            )
+            options.tx_pol_y = float(
+                scalar(active_tx_pol.y if hasattr(active_tx_pol, "y") else active_tx_pol[1])
+            )
+            options.tx_pol_z = float(
+                scalar(active_tx_pol.z if hasattr(active_tx_pol, "z") else active_tx_pol[2])
+            )
+
+        active_mask = _rayd_bool(self._broadcast_bool(active, state_count), ad=False)
+        dr.eval(
+            state_table.edge_pos,
+            state_table.edge_dir,
+            state_table.n0,
+            state_table.n_face_n,
+            state_table.wedge_n,
+            state_table.edge_line_min,
+            state_table.edge_line_max,
+            state_table.source_pos,
+            state_table.incident_field,
+            state_table.incident_normal_derivative,
+            state_table.r_face0,
+            state_table.r_face_n,
+            state_table.incident_vector_x,
+            state_table.incident_vector_y,
+            state_table.incident_vector_z,
+            state_table.incident_normal_derivative_vector_x,
+            state_table.incident_normal_derivative_vector_y,
+            state_table.incident_normal_derivative_vector_z,
+            state_table.incident_jones_u,
+            state_table.incident_jones_v,
+            state_table.incident_derivative_jones_u,
+            state_table.incident_derivative_jones_v,
+            state_table.incident_basis_u,
+            state_table.incident_basis_v,
+            state_table.incident_basis_k,
+            state_table.face0_operator_m00,
+            state_table.face0_operator_m01,
+            state_table.face0_operator_m10,
+            state_table.face0_operator_m11,
+            state_table.face1_operator_m00,
+            state_table.face1_operator_m01,
+            state_table.face1_operator_m10,
+            state_table.face1_operator_m11,
+            state_table.face0_eta_r,
+            state_table.face0_mu_r,
+            state_table.face0_sigma,
+            state_table.face0_gain,
+            state_table.face0_use_fresnel,
+            state_table.face1_eta_r,
+            state_table.face1_mu_r,
+            state_table.face1_sigma,
+            state_table.face1_gain,
+            state_table.face1_use_fresnel,
+            state_table.select_stationary_point,
+            state_table.owner_code,
+            state_table.adjacent_face0,
+            state_table.adjacent_face1,
+            material.eta_r,
+            material.sigma,
+            material.mu_r,
+            material.gain,
+            material.valid,
+            active_mask,
+        )
+        return _rayd_call(
+            trace,
+            state_table,
+            grid_desc,
+            material,
+            options,
+            active_mask,
+            ad=False,
+        )
+
+    def accum_dfr(
+        self,
+        *,
+        initial_states,
+        recursive_states,
+        grid,
+        config,
+        seed: int,
+        samples: int,
+        direct_samples: int,
+        max_order: int,
+        keller_samples: int = 0,
+        suffix_samples: int = 0,
+        sample_sequence: str = "hash",
+        active=True,
+    ):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "accum_dfr", None)
+        if trace is None:
+            raise RuntimeError(
+                "RayD accum_dfr is required for "
+                "BDPT chain diffraction with diffraction_execution.accumulate_primal='rayd_optix'."
+            )
+        if self._symbolic_recording_active():
+            raise RuntimeError(
+                "RayD accum_dfr uses native optixLaunch and "
+                "cannot be recorded inside a Dr.Jit symbolic scope."
+            )
+        order = int(max_order)
+        if order not in (2, 3):
+            raise ValueError("accum_dfr currently supports max_order 2 or 3 only.")
+
+        ad = (
+            _dfr_states_grad_enabled(initial_states)
+            or _dfr_states_grad_enabled(recursive_states)
+            or scene_geometry_grad_enabled(self)
+            or scene_material_grad_enabled(self)
+            or _grad_enabled_value(active)
+        )
+        initial_table = self._make_rayd_dfr_states(initial_states, ad=ad)
+        recursive_table = self._make_rayd_dfr_states(recursive_states, ad=ad)
+        initial_count = int(initial_table.count)
+        recursive_count = int(recursive_table.count)
+        if initial_count <= 0:
+            raise ValueError("accum_dfr requires at least one initial state.")
+        if recursive_count <= 0:
+            raise ValueError("accum_dfr requires at least one recursive state.")
+
+        direct_count = max(0, int(direct_samples))
+        keller_count = max(0, int(keller_samples))
+        suffix_count = max(0, int(suffix_samples))
+        if direct_count <= 0 and keller_count <= 0 and suffix_count <= 0:
+            raise ValueError("accum_dfr requires direct, Keller, or suffix samples.")
+
+        grid_desc = rayd.DfrGrid()
+        grid_desc.axis = {"x": 0, "y": 1, "z": 2}[str(grid.axis)]
+        grid_desc.position = float(grid.position)
+        grid_desc.coord0_min = float(grid.bounds[0][0])
+        grid_desc.coord0_max = float(grid.bounds[0][1])
+        grid_desc.coord1_min = float(grid.bounds[1][0])
+        grid_desc.coord1_max = float(grid.bounds[1][1])
+        grid_desc.resolution0 = int(grid.grid_shape[0])
+        grid_desc.resolution1 = int(grid.grid_shape[1])
+        grid_desc.cell_area = float(grid.cell_size[0] * grid.cell_size[1])
+
+        tri_data = self._triangle_runtime()
+        if tri_data is None:
+            raise RuntimeError(
+                "RayD diffraction chain accumulation requires scene triangle material runtime data."
+            )
+        n_triangles = int(tri_data.get("n_triangles", 0))
+        if n_triangles <= 0:
+            raise RuntimeError("RayD diffraction chain accumulation requires at least one triangle.")
+
+        material = rayd.DfrMaterialAD() if ad else rayd.DfrMaterial()
+        material.eta_r = _rayd_float(tri_data["material_eps_r"], ad=ad)
+        material.sigma = _rayd_float(tri_data["material_sigma_e"], ad=ad)
+        material.mu_r = _rayd_float(tri_data["material_mu_r"], ad=ad)
+        material.gain = _rayd_float(dr.full(wt.Float, 1.0, n_triangles), ad=ad)
+        material.valid = _rayd_bool(
+            tri_data.get(
+                "material_specified",
+                dr.full(wt.Bool, True, n_triangles),
+            ),
+            ad=ad,
+        )
+
+        sequence = str(sample_sequence)
+        if sequence == "hash":
+            sample_sequence_id = int(rayd.RAYD_DFR_HASH)
+        elif sequence == "sobol":
+            sample_sequence_id = int(rayd.RAYD_DFR_SOBOL)
+        else:
+            raise ValueError("sample_sequence must be 'hash' or 'sobol'.")
+
+        options = rayd.DfrOptions()
+        options.wavelength = float(config.wavelength)
+        options.k = float(config.k)
+        options.seed = int(seed)
+        options.samples = int(samples)
+        options.max_order = order
+        options.direct_samples = direct_count
+        options.keller_samples = keller_count
+        options.suffix_samples = suffix_count
+        options.strategy_mask = 0
+        if direct_count > 0:
+            options.strategy_mask |= int(rayd.RAYD_DFR_DIRECT)
+        if keller_count > 0:
+            options.strategy_mask |= int(rayd.RAYD_DFR_KELLER)
+        if suffix_count > 0:
+            options.strategy_mask |= int(rayd.RAYD_DFR_SUFFIX_REFL)
+        options.sample_sequence = sample_sequence_id
+        options.receiver_model = int(rayd.RAYD_DFR_MATCHED_ISO)
+        options.collect_edge_use = True
+        options.collect_debug_counts = True
+
+        active_mask = _rayd_bool(self._broadcast_bool(active, initial_count), ad=ad)
+        dr.eval(
+            initial_table.edge_index,
+            initial_table.edge_pos,
+            initial_table.edge_dir,
+            initial_table.edge_t_min,
+            initial_table.edge_t_max,
+            initial_table.n0,
+            initial_table.n1,
+            initial_table.prim0,
+            initial_table.prim1,
+            initial_table.exterior_angle,
+            initial_table.src,
+            initial_table.src_power,
+            initial_table.wi,
+            initial_table.d0,
+            initial_table.prefix_depth,
+            recursive_table.edge_index,
+            recursive_table.edge_pos,
+            recursive_table.edge_dir,
+            recursive_table.edge_t_min,
+            recursive_table.edge_t_max,
+            recursive_table.n0,
+            recursive_table.n1,
+            recursive_table.prim0,
+            recursive_table.prim1,
+            recursive_table.exterior_angle,
+            recursive_table.src,
+            recursive_table.src_power,
+            recursive_table.wi,
+            recursive_table.d0,
+            recursive_table.prefix_depth,
+            material.eta_r,
+            material.sigma,
+            material.mu_r,
+            material.gain,
+            material.valid,
+            active_mask,
+        )
+        return _rayd_call(
+            trace,
+            initial_table,
+            recursive_table,
+            grid_desc,
+            material,
+            options,
+            active_mask,
+            ad=ad,
+        )
+
+    def trace_dfr_paths(
+        self,
+        *,
+        tx_positions,
+        rx_positions,
+        state_arrays,
+        config,
+        max_order: int,
+        max_paths: int,
+        seed: int,
+        return_geometry: bool,
+        active=True,
+    ):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "trace_dfr_paths", None)
+        if trace is None:
+            raise RuntimeError(
+                "RayD trace_dfr_paths is required for "
+                "path diffraction with diffraction_execution.accumulate_primal='rayd_optix'."
+            )
+        if self._symbolic_recording_active():
+            raise RuntimeError(
+                "RayD trace_dfr_paths uses native optixLaunch and "
+                "cannot be recorded inside a Dr.Jit symbolic scope."
+            )
+        if int(max_order) != 1:
+            raise RuntimeError(
+                "RayD trace_dfr_paths currently supports first-order diffraction only."
+            )
+        ad = (
+            point_grad_enabled(tx_positions)
+            or point_grad_enabled(rx_positions)
+            or _dfr_states_grad_enabled(state_arrays)
+            or scene_geometry_grad_enabled(self)
+            or scene_material_grad_enabled(self)
+            or _grad_enabled_value(active)
+        )
+        state_table = self._make_rayd_dfr_states(state_arrays, ad=ad)
+        state_count = int(state_table.count)
+        if state_count <= 0:
+            raise ValueError("trace_dfr_paths requires at least one diffraction state.")
+        if int(max_paths) <= 0:
+            raise ValueError("trace_dfr_paths requires max_paths > 0.")
+
+        tri_data = self._triangle_runtime()
+        if tri_data is None:
+            raise RuntimeError(
+                "RayD diffraction path export requires scene triangle material runtime data."
+            )
+        n_triangles = int(tri_data.get("n_triangles", 0))
+        if n_triangles <= 0:
+            raise RuntimeError("RayD diffraction path export requires at least one triangle.")
+
+        material = rayd.DfrMaterialAD() if ad else rayd.DfrMaterial()
+        material.eta_r = _rayd_float(tri_data["material_eps_r"], ad=ad)
+        material.sigma = _rayd_float(tri_data["material_sigma_e"], ad=ad)
+        material.mu_r = _rayd_float(tri_data["material_mu_r"], ad=ad)
+        material.gain = _rayd_float(dr.full(wt.Float, 1.0, n_triangles), ad=ad)
+        material.valid = _rayd_bool(
+            tri_data.get(
+                "material_specified",
+                dr.full(wt.Bool, True, n_triangles),
+            ),
+            ad=ad,
+        )
+
+        options = rayd.DfrPathOptions()
+        options.wavelength = float(config.wavelength)
+        options.k = float(config.k)
+        options.seed = int(seed)
+        options.max_order = 1
+        options.max_paths = int(max_paths)
+        options.max_rx = int(dr.width(rx_positions.x))
+        options.strategy_mask = int(rayd.RAYD_DFR_DIRECT)
+        options.sample_count = int(max_paths)
+        options.return_geom = 1 if bool(return_geometry) else 0
+        options.receiver_model = int(rayd.RAYD_DFR_MATCHED_ISO)
+
+        active_mask = _rayd_bool(self._broadcast_bool(active, state_count), ad=ad)
+        tx_positions_rayd = _rayd_vector3(tx_positions, ad=ad)
+        rx_positions_rayd = _rayd_vector3(rx_positions, ad=ad)
+        dr.eval(
+            tx_positions_rayd,
+            rx_positions_rayd,
+            state_table.edge_index,
+            state_table.edge_pos,
+            state_table.edge_dir,
+            state_table.edge_t_min,
+            state_table.edge_t_max,
+            state_table.n0,
+            state_table.n1,
+            state_table.prim0,
+            state_table.prim1,
+            state_table.exterior_angle,
+            state_table.src,
+            state_table.src_power,
+            state_table.wi,
+            state_table.d0,
+            state_table.prefix_depth,
+            material.eta_r,
+            material.sigma,
+            material.mu_r,
+            material.gain,
+            material.valid,
+            active_mask,
+        )
+        return _rayd_call(
+            trace,
+            tx_positions_rayd,
+            rx_positions_rayd,
+            state_table,
+            material,
+            options,
+            active_mask,
+            ad=ad,
+        )
 
     # ------------------------------------------------------------------
     # Diffraction-path queries: triangle / ray / visibility / edge helpers
@@ -808,7 +1928,7 @@ class Scene(SceneBase):
 
     def intersect_rays_raw_with_prim(self, ray_origin, ray_dir, active, *, tmax=None):
         rayd_scene = self._require_rayd_scene()
-        ray = rayd.Ray(ray_origin, ray_dir)
+        ray = rayd.RayAD(ray_origin, ray_dir)
         if tmax is not None:
             ray.tmax = tmax
         with dr.suspend_grad():
@@ -820,7 +1940,7 @@ class Scene(SceneBase):
 
     def intersect_rays_with_prim(self, ray_origin, ray_dir, active):
         tri_data = self._triangle_runtime()
-        ray = rayd.Ray(ray_origin, ray_dir)
+        ray = rayd.RayAD(ray_origin, ray_dir)
         with dr.suspend_grad():
             flags = rayd.RayFlags.All if tri_data is None else getattr(rayd.RayFlags, "None")
             si = self.ray_intersect(ray, active=active, flags=flags)
@@ -860,7 +1980,7 @@ class Scene(SceneBase):
         if value_width == width:
             return value_i32
         if value_width == 1:
-            return broadcast_int(value_i32, width)
+            return broadcast(value_i32, width)
         raise ValueError(f"Expected scalar or width {width} Int32 input, got width {value_width}.")
 
     @staticmethod
@@ -878,15 +1998,35 @@ class Scene(SceneBase):
         return bool(dr.flag(dr.JitFlag.Recording)) or bool(dr.flag(dr.JitFlag.SymbolicScope))
 
     @staticmethod
+    def _detached_int32(value):
+        int_type = dr.detached_t(wt.Int32)
+        return int_type(dr.detach(wt.Int32(value)))
+
+    @staticmethod
     def _ignore_candidates(value):
         return value if isinstance(value, (tuple, list)) else (value,)
 
-    @staticmethod
-    def _interleave_native_ignore_slots(slots: list[wt.Int32], width: int):
+    def _native_segment_ignore_slot_count(self, ignore_prim_idx, ignore_surface_group_idx) -> int:
+        tri_data = self._triangle_runtime()
+        max_group_size = 0 if tri_data is None else int(tri_data.get("surface_max_group_size", 0))
+        group_count = 0 if tri_data is None else int(tri_data.get("surface_group_count", 0))
+        slot_count = 0
+        for surface_group_idx in self._ignore_candidates(ignore_surface_group_idx):
+            if surface_group_idx is None:
+                continue
+            slot_count += max_group_size if max_group_size > 1 and group_count > 0 else 1
+        for prim_idx in self._ignore_candidates(ignore_prim_idx):
+            if prim_idx is None:
+                continue
+            slot_count += max_group_size if max_group_size > 1 else 1
+        return slot_count
+
+    @classmethod
+    def _interleave_native_ignore_slots(cls, slots: list[wt.Int32], width: int):
         if len(slots) == 0 or width <= 0:
-            return dr.detach(dr.zeros(wt.Int32, 0))
+            return cls._detached_int32(dr.zeros(wt.Int32, 0))
         if len(slots) == 1:
-            return dr.detach(slots[0])
+            return cls._detached_int32(slots[0])
 
         slot_count = len(slots)
         slot_major = dr.concat(slots)
@@ -894,7 +2034,7 @@ class Scene(SceneBase):
         ray_idx = dst_idx // wt.UInt32(slot_count)
         slot_idx = dst_idx % wt.UInt32(slot_count)
         src_idx = slot_idx * wt.UInt32(width) + ray_idx
-        return dr.detach(dr.gather(wt.Int32, slot_major, src_idx))
+        return cls._detached_int32(dr.gather(wt.Int32, slot_major, src_idx))
 
     @staticmethod
     def _interleave_native_chain_points(point_slots: list[wt.Point3f], chain_count: int):
@@ -979,6 +2119,62 @@ class Scene(SceneBase):
         return self._interleave_native_ignore_slots(slots, width)
 
     @staticmethod
+    def _slice_point(point, idx):
+        return wt.Point3f(
+            dr.gather(wt.Float, point.x, idx),
+            dr.gather(wt.Float, point.y, idx),
+            dr.gather(wt.Float, point.z, idx),
+        )
+
+    @staticmethod
+    def _slice_bool(value, idx):
+        return dr.gather(wt.Bool, wt.Bool(value), idx)
+
+    def _slice_ignore_value(self, value, idx, width: int):
+        if isinstance(value, (tuple, list)):
+            return tuple(self._slice_ignore_value(item, idx, width) for item in value)
+        if value is None:
+            return None
+        value_i32 = wt.Int32(value)
+        value_width = int(dr.width(value_i32))
+        if value_width == width:
+            return dr.gather(wt.Int32, value_i32, idx)
+        if value_width == 1:
+            return value_i32
+        raise ValueError(f"Expected scalar or width {width} Int32 input, got width {value_width}.")
+
+    def _segment_visible_chunked(
+        self,
+        start_pos,
+        end_pos,
+        active,
+        *,
+        ignore_prim_idx,
+        ignore_surface_group_idx,
+        slot_count: int,
+        width: int,
+    ) -> wt.Bool:
+        chunk_width = max(1, int(_NATIVE_IGNORE_MAX_ENTRIES) // max(1, int(slot_count)))
+        chunks = []
+        for offset in range(0, int(width), chunk_width):
+            count = min(chunk_width, int(width) - offset)
+            idx = dr.arange(wt.UInt32, count) + wt.UInt32(offset)
+            native_ignore_ids = self._native_segment_ignore_ids(
+                width=count,
+                ignore_prim_idx=self._slice_ignore_value(ignore_prim_idx, idx, width),
+                ignore_surface_group_idx=self._slice_ignore_value(ignore_surface_group_idx, idx, width),
+            )
+            chunks.append(
+                self._visible_rayd(
+                    self._slice_point(start_pos, idx),
+                    self._slice_point(end_pos, idx),
+                    self._slice_bool(active, idx),
+                    native_ignore_ids,
+                )
+            )
+        return dr.concat(chunks) if len(chunks) > 1 else chunks[0]
+
+    @staticmethod
     def _per_segment_ignore_value(value, segment: int, max_segments: int, name: str):
         if value is None:
             return None
@@ -1027,7 +2223,7 @@ class Scene(SceneBase):
             max_slot_count = max(max_slot_count, len(slots))
 
         if max_slot_count == 0 or chain_count <= 0:
-            return dr.detach(dr.zeros(wt.Int32, 0))
+            return self._detached_int32(dr.zeros(wt.Int32, 0))
 
         invalid = dr.full(wt.Int32, -1, chain_count)
         segment_slot_major: list[wt.Int32] = []
@@ -1046,7 +2242,7 @@ class Scene(SceneBase):
             + slot_idx * wt.UInt32(chain_count)
             + chain_idx
         )
-        return dr.detach(dr.gather(wt.Int32, slot_major, src_idx))
+        return self._detached_int32(dr.gather(wt.Int32, slot_major, src_idx))
 
     @staticmethod
     def _coerce_chain_point_slots(point_slots) -> list[wt.Point3f]:
@@ -1074,20 +2270,20 @@ class Scene(SceneBase):
             if point_width == chain_count:
                 normalized.append(point)
             elif point_width == 1:
-                normalized.append(broadcast_point(point, chain_count))
+                normalized.append(broadcast(point, chain_count))
             else:
                 raise ValueError(f"Expected point slots to have width 1 or {chain_count}, got {point_width}.")
         return normalized, chain_count
 
-    def _trace_segment_visibility_rayd(self, start_pos, end_pos, active, ignore_prim_ids=None):
+    def _visible_rayd(self, start_pos, end_pos, active, ignore_prim_ids=None):
         rayd_scene = self._require_rayd_scene()
-        trace = getattr(rayd_scene, "trace_segment_visibility", None)
+        trace = getattr(rayd_scene, "visible", None)
         if trace is None:
-            raise RuntimeError("RayD trace_segment_visibility is required for segment_visible().")
+            raise RuntimeError("RayD visible is required for segment_visible().")
         has_ignores = ignore_prim_ids is not None and int(dr.width(ignore_prim_ids)) > 0
         if has_ignores and self._symbolic_recording_active():
             raise RuntimeError(
-                "RayD trace_segment_visibility with primitive ignores uses native optixLaunch and cannot be "
+                "RayD visible with primitive ignores uses native optixLaunch and cannot be "
                 "recorded inside a Dr.Jit symbolic scope."
             )
         with dr.suspend_grad():
@@ -1097,15 +2293,34 @@ class Scene(SceneBase):
                 result = trace(start_pos, end_pos, ignore_prim_ids, active)
         return active & wt.Bool(result.visible)
 
-    def _trace_segment_chain_visibility_rayd(self, points, chain_length, active, ignore_prim_ids=None):
+    def _warm_rayd_visibility_ignore_pipeline(self) -> None:
+        if self._rayd_visibility_ignore_pipeline_warmed:
+            return
         rayd_scene = self._require_rayd_scene()
-        trace = getattr(rayd_scene, "trace_segment_chain_visibility", None)
+        trace = getattr(rayd_scene, "visible", None)
         if trace is None:
-            raise RuntimeError("RayD trace_segment_chain_visibility is required for segment_chain_visible().")
+            raise RuntimeError("RayD visible is required for native visibility ignores.")
+
+        float_type = dr.detached_t(wt.Float)
+        bool_type = dr.detached_t(wt.Bool)
+        int_type = dr.detached_t(wt.Int32)
+        point_type = dr.detached_t(wt.Point3f)
+        start = point_type(float_type([0.0]), float_type([0.0]), float_type([0.0]))
+        end = point_type(float_type([0.0]), float_type([0.0]), float_type([1.0]))
+        with dr.suspend_grad():
+            result = trace(start, end, int_type([-1]), bool_type([False]))
+            dr.eval(result.visible)
+        self._rayd_visibility_ignore_pipeline_warmed = True
+
+    def _visible_chain_rayd(self, points, chain_length, active, ignore_prim_ids=None):
+        rayd_scene = self._require_rayd_scene()
+        trace = getattr(rayd_scene, "visible_chain", None)
+        if trace is None:
+            raise RuntimeError("RayD visible_chain is required for segment_chain_visible().")
         has_ignores = ignore_prim_ids is not None and int(dr.width(ignore_prim_ids)) > 0
         if has_ignores and self._symbolic_recording_active():
             raise RuntimeError(
-                "RayD trace_segment_chain_visibility with primitive ignores uses native optixLaunch and cannot be "
+                "RayD visible_chain with primitive ignores uses native optixLaunch and cannot be "
                 "recorded inside a Dr.Jit symbolic scope."
             )
         with dr.suspend_grad():
@@ -1129,19 +2344,19 @@ class Scene(SceneBase):
         width = int(dr.width(edge_pos.x))
         if width <= 0:
             return dr.zeros(wt.Bool, 0)
-        source_pos_b = broadcast_point(source_pos, width)
-        edge_dir_b = broadcast_vector(edge_dir, width)
-        edge_line_min_b = broadcast_float(wt.Float(edge_line_min), width)
-        edge_line_max_b = broadcast_float(wt.Float(edge_line_max), width)
+        source_pos_b = broadcast(source_pos, width)
+        edge_dir_b = broadcast(edge_dir, width)
+        edge_line_min_b = broadcast(wt.Float(edge_line_min), width)
+        edge_line_max_b = broadcast(wt.Float(edge_line_max), width)
         active_mask = (
             self._broadcast_bool(active, width)
             & (edge_line_max_b >= edge_line_min_b)
             & (dr.norm(edge_dir_b) > wt.Float(EPS))
         )
         rayd_scene = self._require_rayd_scene()
-        trace = getattr(rayd_scene, "trace_axial_edge_visibility", None)
+        trace = getattr(rayd_scene, "visible_edge", None)
         if trace is None:
-            raise RuntimeError("RayD trace_axial_edge_visibility is required for axial_edge_visible().")
+            raise RuntimeError("RayD visible_edge is required for axial_edge_visible().")
         with dr.suspend_grad():
             result = trace(
                 source_pos_b,
@@ -1159,29 +2374,44 @@ class Scene(SceneBase):
                         max_ignored_hits: int = 4) -> wt.Bool:
         del max_ignored_hits
         width = dr.width(end_pos.x)
-        start_pos_b = broadcast_point(start_pos, width)
+        start_pos_b = broadcast(start_pos, width)
         seg_vec = end_pos - start_pos_b
         seg_len = dr.norm(seg_vec)
         min_seg_len = wt.Float(2.0 * RAY_ORIGIN_BIAS + EPS)
         active = seg_len > min_seg_len
 
         if ignore_prim_idx is None and ignore_surface_group_idx is None and ignore_structure_idx is None:
-            return self._trace_segment_visibility_rayd(start_pos_b, end_pos, active)
+            return self._visible_rayd(start_pos_b, end_pos, active)
 
         ignore_structure_candidates = self._ignore_candidates(ignore_structure_idx)
         for structure_idx in ignore_structure_candidates:
             if structure_idx is not None:
                 raise ValueError(
-                    "segment_visible(ignore_structure_idx=...) is not supported by RayD trace_segment_visibility; "
+                    "segment_visible(ignore_structure_idx=...) is not supported by RayD visible; "
                     "pass primitive or surface-group ignores instead."
                 )
 
+        self._warm_rayd_visibility_ignore_pipeline()
+        slot_count = self._native_segment_ignore_slot_count(
+            ignore_prim_idx=ignore_prim_idx,
+            ignore_surface_group_idx=ignore_surface_group_idx,
+        )
+        if slot_count > 0 and int(width) * int(slot_count) > _NATIVE_IGNORE_MAX_ENTRIES:
+            return self._segment_visible_chunked(
+                start_pos_b,
+                end_pos,
+                active,
+                ignore_prim_idx=ignore_prim_idx,
+                ignore_surface_group_idx=ignore_surface_group_idx,
+                slot_count=slot_count,
+                width=width,
+            )
         native_ignore_ids = self._native_segment_ignore_ids(
             width=width,
             ignore_prim_idx=ignore_prim_idx,
             ignore_surface_group_idx=ignore_surface_group_idx,
         )
-        return self._trace_segment_visibility_rayd(start_pos_b, end_pos, active, native_ignore_ids)
+        return self._visible_rayd(start_pos_b, end_pos, active, native_ignore_ids)
 
     def segment_chain_visible(
         self,
@@ -1216,16 +2446,18 @@ class Scene(SceneBase):
             ignore_prim_idx_per_segment=ignore_prim_idx_per_segment,
             ignore_surface_group_idx_per_segment=ignore_surface_group_idx_per_segment,
         )
+        if int(dr.width(native_ignore_ids)) > 0:
+            self._warm_rayd_visibility_ignore_pipeline()
         points = self._interleave_native_chain_points(normalized_points, chain_count)
-        return self._trace_segment_chain_visibility_rayd(points, chain_length_i32, length_active, native_ignore_ids)
+        return self._visible_chain_rayd(points, chain_length_i32, length_active, native_ignore_ids)
 
     def segment_pair_visible(self, start_pos, end_pos, end_pos_offset, *, active=True) -> wt.Bool:
         width = dr.width(end_pos.x)
         if width <= 0:
             return dr.zeros(wt.Bool, 0)
-        start_pos_b = broadcast_point(start_pos, width)
-        end_pos_b = broadcast_point(end_pos, width)
-        end_pos_offset_b = broadcast_point(end_pos_offset, width)
+        start_pos_b = broadcast(start_pos, width)
+        end_pos_b = broadcast(end_pos, width)
+        end_pos_offset_b = broadcast(end_pos_offset, width)
         min_seg_len = wt.Float(2.0 * RAY_ORIGIN_BIAS + EPS)
         active_mask = (
             wt.Bool(active)
@@ -1233,9 +2465,9 @@ class Scene(SceneBase):
             & (dr.norm(end_pos_offset_b - start_pos_b) > min_seg_len)
         )
         rayd_scene = self._require_rayd_scene()
-        trace = getattr(rayd_scene, "trace_segment_pair_visibility", None)
+        trace = getattr(rayd_scene, "visible_pair", None)
         if trace is None:
-            raise RuntimeError("RayD trace_segment_pair_visibility is required for segment_pair_visible().")
+            raise RuntimeError("RayD visible_pair is required for segment_pair_visible().")
         with dr.suspend_grad():
             result = trace(start_pos_b, end_pos_b, end_pos_offset_b, active=active_mask)
         return active_mask & wt.Bool(result.visible_a) & wt.Bool(result.visible_b)
@@ -1253,7 +2485,7 @@ class Scene(SceneBase):
             return tuple(dr.zeros(wt.Bool, width) for width in widths)
 
         batched_start = concat_points([
-            broadcast_point(start_pos, width)
+            broadcast(start_pos, width)
             for start_pos, width in zip(segment_starts, widths, strict=True)
         ])
         batched_end = concat_points(segment_ends)
@@ -1285,8 +2517,8 @@ class Scene(SceneBase):
         if tri_data is None:
             return dr.full(wt.Bool, True, width)
 
-        image_source_b = broadcast_point(image_source, width)
-        prim_idx = broadcast_int(wt.Int32(prim_idx), width)
+        image_source_b = broadcast(image_source, width)
+        prim_idx = broadcast(wt.Int32(prim_idx), width)
         valid_prim = prim_idx >= 0
         safe_prim_idx = wt.UInt32(dr.select(valid_prim, prim_idx, wt.Int32(0)))
 
@@ -1312,8 +2544,8 @@ class Scene(SceneBase):
             zero_normal = wt.Vector3f(dr.zeros(wt.Float, width), dr.zeros(wt.Float, width), dr.zeros(wt.Float, width))
             return dr.zeros(wt.Bool, width), zero_point, zero_normal, wt.Int32(prim_idx)
 
-        image_source_b = broadcast_point(image_source, width)
-        prim_idx_i32 = broadcast_int(wt.Int32(prim_idx), width)
+        image_source_b = broadcast(image_source, width)
+        prim_idx_i32 = broadcast(wt.Int32(prim_idx), width)
         valid_prim = prim_idx_i32 >= 0
         safe_prim_idx = wt.UInt32(dr.select(valid_prim, prim_idx_i32, wt.Int32(0)))
 
@@ -1347,13 +2579,13 @@ class Scene(SceneBase):
             ray_origin = point + ray_dir_b * RAY_ORIGIN_BIAS
             with dr.suspend_grad():
                 si = self.ray_intersect(
-                    rayd.Ray(ray_origin, ray_dir_b),
+                    rayd.RayAD(ray_origin, ray_dir_b),
                     active=active,
                     flags=rayd.RayFlags.Geometric,
                 )
                 hit = si.is_valid() & active
             return active & hit & (dr.dot(si.geo_n, ray_dir_b) > wt.Float(0.0))
-        ray_dir_b = broadcast_vector(ray_dir, width)
+        ray_dir_b = broadcast(ray_dir, width)
         ray_origin = point + ray_dir_b * RAY_ORIGIN_BIAS
         hit, _, _, geom_n, _ = self.intersect_rays_with_prim(ray_origin, ray_dir_b, active)
         return active & hit & (dr.dot(geom_n, ray_dir_b) > wt.Float(0.0))

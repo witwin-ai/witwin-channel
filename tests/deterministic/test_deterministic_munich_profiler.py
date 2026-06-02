@@ -29,6 +29,8 @@ def test_parse_args_accepts_munich_scaling_controls():
             "fast_approximate",
             "--memory-profile",
             "memory_safe",
+            "--diffraction-accumulate-primal",
+            "rayd_exact_coherent",
             "--munich-xml",
             "E:/data/munich.xml",
             "--assert-peak-used-mib-below",
@@ -49,6 +51,7 @@ def test_parse_args_accepts_munich_scaling_controls():
     assert args.shadow_boundary_max_candidate_factor == 128
     assert args.solver_mode == "fast_approximate"
     assert args.memory_profile == "memory_safe"
+    assert args.diffraction_accumulate_primal == "rayd_exact_coherent"
     assert args.munich_xml.as_posix() == "E:/data/munich.xml"
     assert args.assert_peak_used_mib_below == 11000
     assert args.assert_finite is True

@@ -50,11 +50,7 @@ def complex_zero(width: int) -> wt.Complex2f:
     return dr.zeros(wt.Complex2f, width)
 
 
-def gather_point3(source, index):
-    return dr.gather(type(source), source, index)
-
-
-def gather_vector3(source, index):
+def gather(source, index):
     return dr.gather(type(source), source, index)
 
 
@@ -94,20 +90,13 @@ def concat_floats(values):
     return concat_arrays(wt.Float, values)
 
 
-def _broadcast(value, width):
+def broadcast(value, width):
     return value if dr.width(value) == width else dr.repeat(value, width)
-
-
-broadcast_float = _broadcast
-broadcast_int = _broadcast
-broadcast_complex = _broadcast
-broadcast_point = _broadcast
-broadcast_vector = _broadcast
 
 
 def broadcast_vector_dict(values: Mapping[str, object], width: int) -> dict[str, object]:
     """Broadcast every vector/Jones dictionary component to ``width`` lanes."""
-    return {str(key): broadcast_complex(value, width) for key, value in dict(values).items()}
+    return {str(key): broadcast(value, width) for key, value in dict(values).items()}
 
 
 def _repeat_typed(value, width, *, caster=None):
@@ -239,11 +228,7 @@ def barrier(*values):
 
 __all__ = [
     "barrier",
-    "broadcast_complex",
-    "broadcast_float",
-    "broadcast_int",
-    "broadcast_point",
-    "broadcast_vector",
+    "broadcast",
     "broadcast_vector_dict",
     "collect_eval_targets",
     "complex_abs_sqr",
@@ -262,8 +247,7 @@ __all__ = [
     "eval_and_sync",
     "eval_complex",
     "eval_nested",
-    "gather_point3",
-    "gather_vector3",
+    "gather",
     "mask_count",
     "safe_normalize",
     "scalar",

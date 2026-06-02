@@ -27,12 +27,14 @@ class ReceiverGridLike(Protocol):
 
 
 SuffixBackend = Literal["drjit", "native"]
+AccumulatePrimalMode = Literal["auto", "drjit", "rayd_optix", "rayd_exact_coherent"]
 ShadowBoundaryBackend = Literal["auto", "dense_native", "native_candidate"]
 ReflectionTransitionMode = Literal["hard", "f_weight_reference", "f_weight_native"]
 ReflectionSecondaryVisibilityMode = Literal["hard", "f_weight"]
 TraceExecutionIntent = Literal["field", "field_scalar_only", "path_export", "coherent"]
 
 _SUFFIX_BACKENDS = {"drjit", "native"}
+_ACCUMULATE_PRIMAL_MODES = {"auto", "drjit", "rayd_optix", "rayd_exact_coherent"}
 _SHADOW_BOUNDARY_BACKENDS = {"auto", "dense_native", "native_candidate"}
 _REFLECTION_TRANSITION_MODES = {"hard", "f_weight_reference", "f_weight_native"}
 _REFLECTION_SECONDARY_VISIBILITY_MODES = {"hard", "f_weight"}
@@ -63,10 +65,16 @@ def _quadrature(quadrature_mode: str, samples_per_cell: int | None) -> tuple[str
 
 @dataclass(slots=True)
 class DiffractionExecutionConfig:
+    accumulate_primal: AccumulatePrimalMode = "auto"
     suffix_backend: SuffixBackend = "native"
     suffix_russian_roulette: bool = False
 
     def __post_init__(self):
+        self.accumulate_primal = _validate_literal(
+            self.accumulate_primal,
+            name="accumulate_primal",
+            allowed=_ACCUMULATE_PRIMAL_MODES,
+        )
         self.suffix_backend = _validate_literal(
             self.suffix_backend, name="suffix_backend", allowed=_SUFFIX_BACKENDS,
         )
@@ -74,6 +82,7 @@ class DiffractionExecutionConfig:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "accumulate_primal": self.accumulate_primal,
             "suffix_backend": self.suffix_backend,
             "suffix_russian_roulette": self.suffix_russian_roulette,
         }
@@ -87,6 +96,7 @@ def coerce_diffraction_execution(
     if isinstance(execution, DiffractionExecutionConfig):
         return execution
     return DiffractionExecutionConfig(
+        accumulate_primal=execution.get("accumulate_primal", "auto"),
         suffix_backend=execution.get("suffix_backend", "native"),
         suffix_russian_roulette=execution.get("suffix_russian_roulette", False),
     )

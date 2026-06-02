@@ -1,19 +1,22 @@
 """State construction for diffraction solving."""
 import math
+import time
 import drjit as dr
 import rayd
 from witwin.channel.deterministic import types as wt
 from witwin.channel.core.runtime import Material, Tx, Wave
+from witwin.channel.core.runtime import point_grad_enabled, scene_geometry_grad_enabled, scene_material_grad_enabled
+from witwin.channel.core.physics.materials import FaceMaterial
 from ..reflection.detail import (
     coerce_material_context,
     coerce_trace_detail,
 )
-from witwin.channel.core.numerics.arrays import complex_abs_sqr, complex_zero, gather_point3
+from witwin.channel.core.numerics.arrays import complex_abs_sqr, complex_zero, gather
 from witwin.channel.core.physics.polarization import project_real_polarization_to_ray, reflect_field_vector, vector_from_scalar, vector_power, vector_scale, vector_select, vector_zero
 from witwin.channel.core.geometry.diffraction import wedge_exterior_mask
 from witwin.channel.core.geometry.raygen import generate_circle_directions, generate_sphere_directions
 from .forward import ForwardEval
-from .state import APPROX_MODE_DIRECT_FIRST_ORDER, APPROX_MODE_RECURSIVE_DIFFRACTION, APPROX_MODE_SAMPLED_INSERTED_REFLECTION, APPROX_MODE_SAMPLED_INSERTED_REFLECTION_CHAIN, APPROX_MODE_SAMPLED_REFLECTION_PREFIX, APPROX_MODE_SAMPLED_REFLECTION_PREFIX_CHAIN, SOURCE_TYPE_DIRECT_TX, SOURCE_TYPE_REFLECTION_PREFIX, SPEED_OF_LIGHT, Geo
+from .state import APPROX_MODE_DIRECT_FIRST_ORDER, APPROX_MODE_RECURSIVE_DIFFRACTION, APPROX_MODE_SAMPLED_INSERTED_REFLECTION, APPROX_MODE_SAMPLED_INSERTED_REFLECTION_CHAIN, APPROX_MODE_SAMPLED_REFLECTION_PREFIX, APPROX_MODE_SAMPLED_REFLECTION_PREFIX_CHAIN, PATH_EXPORT_REDUCED_STATE_LAYOUT, SOURCE_TYPE_DIRECT_TX, SOURCE_TYPE_REFLECTION_PREFIX, SPEED_OF_LIGHT, Geo
 from .state import State
 from witwin.channel.deterministic.kernels.cartesian_filter import compact_index_pairs
 from witwin.channel.deterministic.kernels.cartesian_filter.native_impl import deduplicate_cartesian_pairs
@@ -79,6 +82,10 @@ def _state_count(state_arrays) -> int:
     return 0 if state_arrays is None else int(state_arrays['n_states'])
 
 
+def _is_path_export_reduced_layout(state_layout) -> bool:
+    return str(state_layout) == PATH_EXPORT_REDUCED_STATE_LAYOUT
+
+
 def _prepare_report(*, max_order: int, state_layout: str, edge_count: int, candidate_backend: str, inserted_reflection_enabled: bool, pre_expansion_policy=None) -> dict[str, object]:
     return {
         'max_order': int(max_order),
@@ -115,6 +122,138 @@ def face_response(*, edge_pos, edge_dir, n0, nn, source_pos, adjacent_face0, adj
     face0_operator, face1_operator = Geo.face_reflection_operators(edge_state, width, material, wave, scene=scene)
     return (face0_operator, face1_operator, face0_material, face1_material)
 
+
+def _tx_first_rayd_supported(tx: Tx, scene, edge_data, active=True) -> bool:
+    if scene is None or edge_data is None or int(edge_data.get('n_edges', 0)) <= 0:
+        return False
+    if getattr(scene, '_rayd_scene', None) is None:
+        return False
+    if not hasattr(scene, 'build_dfr_coherent_tx_states'):
+        return False
+    return not (
+        point_grad_enabled(tx.position)
+        or scene_geometry_grad_enabled(scene)
+        or scene_material_grad_enabled(scene)
+        or _value_grad_enabled(getattr(tx, 'polarization', None))
+        or _value_grad_enabled(active)
+    )
+
+
+def _value_grad_enabled(value) -> bool:
+    if value is None:
+        return False
+    try:
+        return bool(dr.grad_enabled(value))
+    except (TypeError, RuntimeError):
+        pass
+    if isinstance(value, dict):
+        return any(_value_grad_enabled(item) for item in value.values())
+    if isinstance(value, (tuple, list)):
+        return any(_value_grad_enabled(item) for item in value)
+    if all(hasattr(value, axis) for axis in ("x", "y", "z")):
+        return any(_value_grad_enabled(getattr(value, axis)) for axis in ("x", "y", "z"))
+    if hasattr(value, "real") and hasattr(value, "imag"):
+        return _value_grad_enabled(value.real) or _value_grad_enabled(value.imag)
+    return False
+
+
+def _rayd_bool_to_mask(value):
+    return wt.Bool(wt.Float(value) > wt.Float(0.5))
+
+
+def _state_from_rayd_coherent_table(table, *, history_size: int, retain_lineage_state: bool):
+    n_states = int(table.count)
+    if n_states <= 0:
+        return State.empty(history_size=history_size, retain_lineage_state=retain_lineage_state)
+    incident_vector = {
+        "x": wt.Complex2f(table.incident_vector_x),
+        "y": wt.Complex2f(table.incident_vector_y),
+        "z": wt.Complex2f(table.incident_vector_z),
+    }
+    incident_normal_derivative_vector = {
+        "x": wt.Complex2f(table.incident_normal_derivative_vector_x),
+        "y": wt.Complex2f(table.incident_normal_derivative_vector_y),
+        "z": wt.Complex2f(table.incident_normal_derivative_vector_z),
+    }
+    incident_jones = {
+        "u": wt.Complex2f(table.incident_jones_u),
+        "v": wt.Complex2f(table.incident_jones_v),
+    }
+    incident_derivative_jones = {
+        "u": wt.Complex2f(table.incident_derivative_jones_u),
+        "v": wt.Complex2f(table.incident_derivative_jones_v),
+    }
+    incident_basis = {
+        "u": wt.Vector3f(table.incident_basis_u),
+        "v": wt.Vector3f(table.incident_basis_v),
+        "k": wt.Vector3f(table.incident_basis_k),
+    }
+    face0_operator = {
+        "m00": wt.Complex2f(table.face0_operator_m00),
+        "m01": wt.Complex2f(table.face0_operator_m01),
+        "m10": wt.Complex2f(table.face0_operator_m10),
+        "m11": wt.Complex2f(table.face0_operator_m11),
+    }
+    face1_operator = {
+        "m00": wt.Complex2f(table.face1_operator_m00),
+        "m01": wt.Complex2f(table.face1_operator_m01),
+        "m10": wt.Complex2f(table.face1_operator_m10),
+        "m11": wt.Complex2f(table.face1_operator_m11),
+    }
+    face0_material = FaceMaterial(
+        eta_r=wt.Float(table.face0_eta_r),
+        mu_r=wt.Float(table.face0_mu_r),
+        sigma=wt.Float(table.face0_sigma),
+        gain=wt.Float(table.face0_gain),
+        use_fresnel=_rayd_bool_to_mask(table.face0_use_fresnel),
+    )
+    face1_material = FaceMaterial(
+        eta_r=wt.Float(table.face1_eta_r),
+        mu_r=wt.Float(table.face1_mu_r),
+        sigma=wt.Float(table.face1_sigma),
+        gain=wt.Float(table.face1_gain),
+        use_fresnel=_rayd_bool_to_mask(table.face1_use_fresnel),
+    )
+    return State.make(
+        edge_idx=wt.UInt32(table.edge_index),
+        edge_pos=wt.Point3f(table.edge_pos),
+        edge_dir=wt.Vector3f(table.edge_dir),
+        n0=wt.Vector3f(table.n0),
+        nn=wt.Vector3f(table.n_face_n),
+        wedge_n=wt.Float(table.wedge_n),
+        adjacent_face0=wt.Int32(table.adjacent_face0),
+        adjacent_face1=wt.Int32(table.adjacent_face1),
+        source_pos=wt.Point3f(table.source_pos),
+        path_length_prefix=wt.Float(table.path_length_prefix),
+        first_interaction_pos=wt.Point3f(table.first_interaction_pos),
+        edge_line_min=wt.Float(table.edge_line_min),
+        edge_line_max=wt.Float(table.edge_line_max),
+        incident_field=wt.Complex2f(table.incident_field),
+        incident_normal_derivative=wt.Complex2f(table.incident_normal_derivative),
+        r0=wt.Complex2f(table.r_face0),
+        rn=wt.Complex2f(table.r_face_n),
+        incident_vector=incident_vector,
+        incident_normal_derivative_vector=incident_normal_derivative_vector,
+        is_direct_tx=dr.full(wt.Bool, True, n_states),
+        incident_jones=incident_jones,
+        incident_derivative_jones=incident_derivative_jones,
+        incident_basis=incident_basis,
+        face0_operator=face0_operator,
+        face1_operator=face1_operator,
+        face0_material=face0_material,
+        face1_material=face1_material,
+        source_type_code=wt.UInt32(table.source_type_code),
+        prefix_reflection_depth=wt.UInt32(table.prefix_reflection_depth),
+        intermediate_reflection_depth=wt.UInt32(table.intermediate_reflection_depth),
+        suffix_reflection_depth=wt.UInt32(table.suffix_reflection_depth),
+        approximation_mode_code=wt.UInt32(table.approximation_mode_code),
+        order=wt.UInt32(table.order),
+        lineage_parent_state_id=dr.full(wt.Int32, -1, n_states),
+        lineage_last_edge_idx=wt.Int32(table.edge_index),
+        lineage_last_reflection_depth_delta=dr.zeros(wt.UInt32, n_states),
+        retain_lineage_state=retain_lineage_state,
+    )
+
 def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Material, reflection_n_rays, reflection_max_bounces, reflection_material: Material, reflection_mode, max_diffractions, total_state_budget_per_order=None, inserted_state_budget_per_order=None, max_inserted_reflections_per_path=None, retain_lineage_state=True, solver_mode='accuracy', memory_profile='default', state_layout='full', preserve_higher_order_candidate_topology: bool=False, return_report: bool=False):
     max_order = max(1, int(max_diffractions))
     if max_inserted_reflections_per_path is None:
@@ -125,7 +264,7 @@ def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Materi
     edge_data = resolved_edge_cache.get('edge_data')
     if edge_data is None:
         empty_states = State.empty(history_size=max_order)
-        if str(state_layout) == 'path_export_reduced':
+        if _is_path_export_reduced_layout(state_layout):
             empty_states = State.reduce_for_path_export(empty_states)
         if return_report:
             report = _prepare_report(
@@ -141,6 +280,7 @@ def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Materi
     higher_order_candidate_backend = resolve_candidate_backend(scene, edge_data, global_to_local_idx, candidate_backend='auto') if max_order > 1 else 'not_used'
     inserted_reflection_enabled = scene is not None and reflection_n_rays > 0 and (reflection_max_bounces > 0) and (max_order > 1) and (max_inserted_reflections_per_path > 0)
     pre_expansion_policy = pre_expansion_pruning_policy(solver_mode=str(solver_mode), memory_profile=str(memory_profile), total_state_budget_per_order=total_state_budget_per_order, inserted_state_budget_per_order=inserted_state_budget_per_order)
+    path_export_reduced = _is_path_export_reduced_layout(state_layout)
     builder_report = _prepare_report(
         max_order=max_order,
         state_layout=str(state_layout),
@@ -163,65 +303,109 @@ def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Materi
         'prefix_first': _state_count(reflection_first_order),
         'first_order': _state_count(first_order_states),
     }
-    all_state_arrays = [first_order_states]
+    all_state_arrays = [
+        State.reduce_for_path_export(first_order_states)
+        if path_export_reduced
+        else first_order_states
+    ]
     prev_states = first_order_states
     reflection_context = coerce_material_context(reflection_detail, default_gain=reflection_material.gain_scalar)
-    for order in range(2, max_order + 1):
-        source_state_count = _state_count(prev_states)
-        higher_source_states = prev_states
-        inserted_source_states = prev_states
-        shared_pre_expansion = False
-        paired_pre_expansion_sort = False
-        if pre_expansion_policy['enabled']:
-            higher_budget_value = pre_expansion_policy['higher_order_source_budget']
-            inserted_budget_value = pre_expansion_policy['inserted_source_budget'] if inserted_reflection_enabled else None
+    rayd_mask_handle = (
+        scene._rayd_scene
+        if max_order > 1 and higher_order_candidate_backend == 'rayd_edge_bvh'
+        else None
+    )
+    saved_edge_mask = None
+    if rayd_mask_handle is not None:
+        saved_edge_mask = rayd_mask_handle.edge_mask()
+        rayd_mask_handle.set_edge_mask(selected_edge_mask(edge_data, saved_edge_mask))
+        rayd_mask_handle.sync()
+    try:
+        for order in range(2, max_order + 1):
+            order_start = time.perf_counter()
+            source_state_count = _state_count(prev_states)
+            higher_source_states = prev_states
+            inserted_source_states = prev_states
+            shared_pre_expansion = False
+            paired_pre_expansion_sort = False
+            pre_expansion_start = time.perf_counter()
+            if pre_expansion_policy['enabled']:
+                higher_budget_value = pre_expansion_policy['higher_order_source_budget']
+                inserted_budget_value = pre_expansion_policy['inserted_source_budget'] if inserted_reflection_enabled else None
+                if inserted_reflection_enabled:
+                    higher_source_states, higher_budget, inserted_source_states, inserted_budget = prune_state_arrays_by_budget_pair(prev_states, higher_budget_value, inserted_budget_value, higher_budget_name='pre_expansion_higher_order_source_budget', inserted_budget_name='pre_expansion_inserted_source_budget')
+                    pruning_reports.append(_tag_pruning_report(higher_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
+                    pruning_reports.append(_tag_pruning_report(inserted_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
+                    shared_pre_expansion = higher_budget_value == inserted_budget_value
+                    paired_pre_expansion_sort = bool(inserted_budget.get('paired_pre_expansion_sort', False))
+                else:
+                    higher_source_states, higher_budget = prune_for_pre_expansion(prev_states, higher_budget_value, budget_name='pre_expansion_higher_order_source_budget', policy=str(pre_expansion_policy['policy']))
+                    pruning_reports.append(_tag_pruning_report(higher_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
+            pre_expansion_seconds = time.perf_counter() - pre_expansion_start
+            higher_start = time.perf_counter()
+            direct_states = higher(higher_source_states, edge_data, wave, scene=scene, material=material, global_to_local_idx=global_to_local_idx, candidate_backend=higher_order_candidate_backend, tx=tx, retain_lineage_state=retain_lineage_state, preserve_candidate_topology=bool(preserve_higher_order_candidate_topology), manage_edge_mask=rayd_mask_handle is None)
+            higher_seconds = time.perf_counter() - higher_start
+            inserted_states = State.empty(history_size=max_order)
+            inserted_candidate_state_count = 0
+            inserted_start = time.perf_counter()
             if inserted_reflection_enabled:
-                higher_source_states, higher_budget, inserted_source_states, inserted_budget = prune_state_arrays_by_budget_pair(prev_states, higher_budget_value, inserted_budget_value, higher_budget_name='pre_expansion_higher_order_source_budget', inserted_budget_name='pre_expansion_inserted_source_budget')
-                pruning_reports.append(_tag_pruning_report(higher_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
-                pruning_reports.append(_tag_pruning_report(inserted_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
-                shared_pre_expansion = higher_budget_value == inserted_budget_value
-                paired_pre_expansion_sort = bool(inserted_budget.get('paired_pre_expansion_sort', False))
-            else:
-                higher_source_states, higher_budget = prune_for_pre_expansion(prev_states, higher_budget_value, budget_name='pre_expansion_higher_order_source_budget', policy=str(pre_expansion_policy['policy']))
-                pruning_reports.append(_tag_pruning_report(higher_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
-        direct_states = higher(higher_source_states, edge_data, wave, scene=scene, material=material, global_to_local_idx=global_to_local_idx, candidate_backend=higher_order_candidate_backend, tx=tx, retain_lineage_state=retain_lineage_state, preserve_candidate_topology=bool(preserve_higher_order_candidate_topology))
-        inserted_states = State.empty(history_size=max_order)
-        inserted_candidate_state_count = 0
-        if inserted_reflection_enabled:
-            if pre_expansion_policy['enabled'] and not (shared_pre_expansion or paired_pre_expansion_sort):
-                inserted_source_states, inserted_budget = prune_for_pre_expansion(prev_states, pre_expansion_policy['inserted_source_budget'], budget_name='pre_expansion_inserted_source_budget', policy=str(pre_expansion_policy['policy']))
-                pruning_reports.append(_tag_pruning_report(inserted_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
-            inserted_reflection_material = Material(
-                reflection_coef=reflection_context.reflection_gain,
+                if pre_expansion_policy['enabled'] and not (shared_pre_expansion or paired_pre_expansion_sort):
+                    inserted_source_states, inserted_budget = prune_for_pre_expansion(prev_states, pre_expansion_policy['inserted_source_budget'], budget_name='pre_expansion_inserted_source_budget', policy=str(pre_expansion_policy['policy']))
+                    pruning_reports.append(_tag_pruning_report(inserted_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
+                inserted_reflection_material = Material(
+                    reflection_coef=reflection_context.reflection_gain,
+                )
+                inserted_states = inserted(inserted_source_states, scene, edge_data, global_to_local_idx, wave, n_rays=reflection_n_rays, reflection_material=inserted_reflection_material, material=material, reflection_mode=reflection_mode, max_inserted_reflections_per_path=max_inserted_reflections_per_path, tx=tx, retain_lineage_state=retain_lineage_state)
+                inserted_candidate_state_count = _state_count(inserted_states)
+            inserted_seconds = time.perf_counter() - inserted_start
+            post_budget_start = time.perf_counter()
+            inserted_states, inserted_pruning_report = prune_state_arrays_by_budget(inserted_states, inserted_state_budget_per_order, 'inserted_state_budget_per_order')
+            pruning_reports.append(_tag_pruning_report(inserted_pruning_report, stage='post_inserted_budget', order=order))
+            combined_states = concat_state_arrays([direct_states, inserted_states])
+            combined_states, total_pruning_report = prune_state_arrays_by_budget(combined_states, total_state_budget_per_order, 'total_state_budget_per_order')
+            pruning_reports.append(_tag_pruning_report(total_pruning_report, stage='post_total_budget', order=order))
+            post_budget_seconds = time.perf_counter() - post_budget_start
+            lineage_start = time.perf_counter()
+            if retain_lineage_state:
+                combined_states, lineage_store, next_state_id = State.finalize_lineage(combined_states, lineage_store=lineage_store, next_state_id=next_state_id)
+            lineage_seconds = time.perf_counter() - lineage_start
+            order_reports.append({
+                'order': int(order),
+                'source_state_count': int(source_state_count),
+                'higher_source_state_count': _state_count(higher_source_states),
+                'inserted_source_state_count': (
+                    _state_count(inserted_source_states) if inserted_reflection_enabled else 0
+                ),
+                'higher_order_candidate_state_count': _state_count(direct_states),
+                'inserted_reflection_candidate_state_count': int(inserted_candidate_state_count),
+                'post_inserted_budget_state_count': _state_count(inserted_states),
+                'post_total_budget_state_count': _state_count(combined_states),
+                'stage_seconds': {
+                    'pre_expansion': float(pre_expansion_seconds),
+                    'higher_order': float(higher_seconds),
+                    'inserted_reflection': float(inserted_seconds),
+                    'post_budget': float(post_budget_seconds),
+                    'lineage_finalize': float(lineage_seconds),
+                    'total': float(time.perf_counter() - order_start),
+                },
+            })
+            prev_states = combined_states
+            if prev_states['n_states'] == 0:
+                break
+            all_state_arrays.append(
+                State.reduce_for_path_export(prev_states)
+                if path_export_reduced
+                else prev_states
             )
-            inserted_states = inserted(inserted_source_states, scene, edge_data, global_to_local_idx, wave, n_rays=reflection_n_rays, reflection_material=inserted_reflection_material, material=material, reflection_mode=reflection_mode, max_inserted_reflections_per_path=max_inserted_reflections_per_path, tx=tx, retain_lineage_state=retain_lineage_state)
-            inserted_candidate_state_count = _state_count(inserted_states)
-        inserted_states, inserted_pruning_report = prune_state_arrays_by_budget(inserted_states, inserted_state_budget_per_order, 'inserted_state_budget_per_order')
-        pruning_reports.append(_tag_pruning_report(inserted_pruning_report, stage='post_inserted_budget', order=order))
-        combined_states = concat_state_arrays([direct_states, inserted_states])
-        combined_states, total_pruning_report = prune_state_arrays_by_budget(combined_states, total_state_budget_per_order, 'total_state_budget_per_order')
-        pruning_reports.append(_tag_pruning_report(total_pruning_report, stage='post_total_budget', order=order))
-        if retain_lineage_state:
-            combined_states, lineage_store, next_state_id = State.finalize_lineage(combined_states, lineage_store=lineage_store, next_state_id=next_state_id)
-        order_reports.append({
-            'order': int(order),
-            'source_state_count': int(source_state_count),
-            'higher_source_state_count': _state_count(higher_source_states),
-            'inserted_source_state_count': (
-                _state_count(inserted_source_states) if inserted_reflection_enabled else 0
-            ),
-            'higher_order_candidate_state_count': _state_count(direct_states),
-            'inserted_reflection_candidate_state_count': int(inserted_candidate_state_count),
-            'post_inserted_budget_state_count': _state_count(inserted_states),
-            'post_total_budget_state_count': _state_count(combined_states),
-        })
-        prev_states = combined_states
-        if prev_states['n_states'] == 0:
-            break
-        all_state_arrays.append(prev_states)
-    final_state_arrays = concat_state_arrays(all_state_arrays)
-    if str(state_layout) == 'path_export_reduced':
-        final_state_arrays = State.reduce_for_path_export(final_state_arrays)
+    finally:
+        if rayd_mask_handle is not None and saved_edge_mask is not None:
+            rayd_mask_handle.set_edge_mask(saved_edge_mask)
+            rayd_mask_handle.sync()
+    final_state_arrays = (
+        State.concat_path_export_reduced(all_state_arrays)
+        if path_export_reduced
+        else concat_state_arrays(all_state_arrays)
+    )
     builder_report['orders'] = tuple(order_reports)
     builder_report['pruning_reports'] = tuple(pruning_reports)
     builder_report['final_state_count'] = _state_count(final_state_arrays)
@@ -235,6 +419,20 @@ def tx_first(tx: Tx, edge_data, wave: Wave, history_size=3, retain_lineage_state
     n_edges = edge_data['n_edges']
     if n_edges == 0:
         return State.empty(history_size=history_size)
+    if _tx_first_rayd_supported(tx, scene, edge_data):
+        table = scene.build_dfr_coherent_tx_states(
+            edge_data=edge_data,
+            tx_position=tx.position,
+            tx_polarization=tx.polarization,
+            wave=wave,
+            material_context=material,
+            active=True,
+        )
+        return _state_from_rayd_coherent_table(
+            table,
+            history_size=history_size,
+            retain_lineage_state=retain_lineage_state,
+        )
     line_min_all, line_max_all = Geo.data_line_bounds(edge_data, context='_build_tx_first_order_state_arrays')
     edge_idx = dr.arange(wt.UInt32, n_edges)
     edge_pos = edge_data['pos']
@@ -298,7 +496,7 @@ def prefix_first(reflection_detail, scene, edge_data, wave: Wave, global_to_loca
             pair_idx = dr.arange(wt.UInt32, n_pairs)
             path_idx = pair_idx // n_edges + wt.UInt32(path_start)
             local_edge_idx = pair_idx % n_edges
-            source_pos = gather_point3(paths.image_source, path_idx)
+            source_pos = gather(paths.image_source, path_idx)
             edge_pos = dr.gather(wt.Point3f, edge_data['pos'], local_edge_idx)
             edge_dir = dr.gather(wt.Vector3f, edge_data['edge_dir'], local_edge_idx)
             n0 = dr.gather(wt.Vector3f, edge_data['n0'], local_edge_idx)
@@ -314,7 +512,7 @@ def prefix_first(reflection_detail, scene, edge_data, wave: Wave, global_to_loca
             keep_idx = dr.compress(support_mask)
             if dr.width(keep_idx) == 0:
                 continue
-            source_pos_support = gather_point3(source_pos, keep_idx)
+            source_pos_support = gather(source_pos, keep_idx)
             edge_pos_support = dr.gather(wt.Point3f, edge_pos, keep_idx)
             chain_vector_support = {'x': dr.gather(wt.Complex2f, chain_vector['x'], keep_idx), 'y': dr.gather(wt.Complex2f, chain_vector['y'], keep_idx), 'z': dr.gather(wt.Complex2f, chain_vector['z'], keep_idx)}
             unit_incident_field = Geo.source_field(source_pos_support, wt.Complex2f(1.0, 0.0), edge_pos_support, wave)
@@ -333,7 +531,7 @@ def prefix_first(reflection_detail, scene, edge_data, wave: Wave, global_to_loca
             edge_line_max_keep = dr.gather(wt.Float, edge_line_max, final_idx)
             adjacent_face0_keep = dr.gather(wt.Int32, adjacent_face0, final_idx)
             adjacent_face1_keep = dr.gather(wt.Int32, adjacent_face1, final_idx)
-            source_pos_keep = gather_point3(source_pos, final_idx)
+            source_pos_keep = gather(source_pos, final_idx)
             first_interaction_pos_keep = dr.gather(wt.Point3f, chain_geometry['first_hit'], final_idx)
             path_length_prefix = dr.norm(edge_pos_keep - source_pos_keep)
             chain_vector_keep = {'x': dr.gather(wt.Complex2f, chain_vector_support['x'], valid_field_idx), 'y': dr.gather(wt.Complex2f, chain_vector_support['y'], valid_field_idx), 'z': dr.gather(wt.Complex2f, chain_vector_support['z'], valid_field_idx)}
@@ -399,9 +597,34 @@ def bruteforce_pairs(prev_state_arrays, prev_start, chunk_n_prev, n_edges):
     prev_idx, edge_idx = compact_index_pairs(prev_idx_all, edge_idx_all, distinct_edge)
     return (prev_idx, edge_idx, int(n_pairs))
 
-def bvh_pairs(prev_state_arrays, edge_data, prev_start, chunk_n_prev, scene, global_to_local_idx):
+def bvh_pairs(prev_state_arrays, edge_data, prev_start, chunk_n_prev, scene, global_to_local_idx, *, filter_visibility: bool=False):
     if chunk_n_prev <= 0:
-        return (dr.zeros(wt.UInt32, 0), dr.zeros(wt.UInt32, 0))
+        return (dr.zeros(wt.UInt32, 0), dr.zeros(wt.UInt32, 0), False)
+    native_candidates = (
+        getattr(scene, 'build_dfr_coherent_higher_candidates', None)
+        if scene is not None
+        else None
+    )
+    if (
+        native_candidates is not None
+        and not _value_grad_enabled(prev_state_arrays)
+        and not _value_grad_enabled(global_to_local_idx)
+        and not scene_geometry_grad_enabled(scene)
+    ):
+        pairs = native_candidates(
+            prev_state_arrays=prev_state_arrays,
+            edge_data=edge_data,
+            global_to_local_edge_index=global_to_local_idx,
+            prev_start=prev_start,
+            chunk_n_prev=chunk_n_prev,
+            filter_visibility=bool(filter_visibility),
+        )
+        if int(pairs.count) == 0:
+            return (dr.zeros(wt.UInt32, 0), dr.zeros(wt.UInt32, 0), bool(getattr(pairs, 'visibility_filtered', False)))
+        prev_idx = wt.UInt32(pairs.prev_index) + wt.UInt32(prev_start)
+        edge_idx = wt.UInt32(pairs.edge_index)
+        prev_idx, edge_idx = dedupe_pairs(prev_idx, edge_idx, edge_data['n_edges'])
+        return (prev_idx, edge_idx, bool(getattr(pairs, 'visibility_filtered', False)))
     n_probes = chunk_n_prev * _HIGHER_ORDER_EDGE_BVH_PROBE_COUNT
     probe_idx = dr.arange(wt.UInt32, n_probes)
     state_offset = probe_idx // _HIGHER_ORDER_EDGE_BVH_PROBE_COUNT
@@ -422,7 +645,7 @@ def bvh_pairs(prev_state_arrays, edge_data, prev_start, chunk_n_prev, scene, glo
     origin_offset = basis_u * (probe_radius * probe_u) + basis_v * (probe_radius * probe_v)
     ray_origin = edge_pos + origin_offset
     ray_dir = basis_k * probe_sign
-    nearest = scene.nearest_edge(rayd.Ray(ray_origin, ray_dir))
+    nearest = scene.nearest_edge(rayd.RayAD(ray_origin, ray_dir))
     valid = nearest.is_valid()
     global_edge_idx = wt.Int32(nearest.global_edge_id)
     valid = valid & (global_edge_idx >= 0)
@@ -432,12 +655,13 @@ def bvh_pairs(prev_state_arrays, edge_data, prev_start, chunk_n_prev, scene, glo
     valid = valid & (wt.Int32(prev_edge_idx) != local_edge_idx_i32)
     candidate_idx = dr.compress(valid)
     if dr.width(candidate_idx) == 0:
-        return (dr.zeros(wt.UInt32, 0), dr.zeros(wt.UInt32, 0))
+        return (dr.zeros(wt.UInt32, 0), dr.zeros(wt.UInt32, 0), False)
     prev_idx = dr.gather(wt.UInt32, prev_idx_all, candidate_idx)
     edge_idx = dr.gather(wt.UInt32, wt.UInt32(dr.select(valid, local_edge_idx_i32, wt.Int32(0))), candidate_idx)
-    return dedupe_pairs(prev_idx, edge_idx, edge_data['n_edges'])
+    prev_idx, edge_idx = dedupe_pairs(prev_idx, edge_idx, edge_data['n_edges'])
+    return (prev_idx, edge_idx, False)
 
-def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Material | None = None, global_to_local_idx=None, candidate_backend='auto', tx: Tx | None = None, retain_lineage_state=True, preserve_candidate_topology: bool=False):
+def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Material | None = None, global_to_local_idx=None, candidate_backend='auto', tx: Tx | None = None, retain_lineage_state=True, preserve_candidate_topology: bool=False, manage_edge_mask: bool=True):
     if material is None:
         material = Material()
     prev_state_arrays = ensure_source_lineage(prev_state_arrays)
@@ -449,7 +673,7 @@ def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Mater
     line_min_all, line_max_all = Geo.data_line_bounds(edge_data, context='_build_higher_order_state_arrays')
     resolved_candidate_backend = resolve_candidate_backend(scene, edge_data, global_to_local_idx, candidate_backend=candidate_backend)
     chunk_states = []
-    rayd_handle = scene._rayd_scene if resolved_candidate_backend == 'rayd_edge_bvh' else None
+    rayd_handle = scene._rayd_scene if resolved_candidate_backend == 'rayd_edge_bvh' and bool(manage_edge_mask) else None
     prev_chunk_size = Geo.cart_chunk(n_prev, n_edges if resolved_candidate_backend == 'bruteforce' else _HIGHER_ORDER_EDGE_BVH_PROBE_COUNT)
     saved_edge_mask = None
     if rayd_handle is not None:
@@ -461,17 +685,27 @@ def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Mater
             chunk_n_prev = min(prev_chunk_size, n_prev - prev_start)
             if resolved_candidate_backend == 'bruteforce':
                 prev_idx, edge_idx, _ = bruteforce_pairs(prev_state_arrays, prev_start, chunk_n_prev, n_edges)
+                pair_visibility_filtered = False
                 if dr.width(prev_idx) == 0:
                     continue
             else:
                 if chunk_n_prev * n_edges <= _HIGHER_ORDER_EDGE_BVH_EXACT_PAIR_LIMIT:
                     prev_idx, edge_idx, _ = bruteforce_pairs(prev_state_arrays, prev_start, chunk_n_prev, n_edges)
+                    pair_visibility_filtered = False
                 else:
-                    prev_idx, edge_idx = bvh_pairs(prev_state_arrays, edge_data, prev_start, chunk_n_prev, scene, global_to_local_idx)
+                    prev_idx, edge_idx, pair_visibility_filtered = bvh_pairs(
+                        prev_state_arrays,
+                        edge_data,
+                        prev_start,
+                        chunk_n_prev,
+                        scene,
+                        global_to_local_idx,
+                        filter_visibility=not bool(preserve_candidate_topology),
+                    )
                 if dr.width(prev_idx) == 0:
                     continue
             visibility_mask = None
-            if scene is not None:
+            if scene is not None and not pair_visibility_filtered:
                 if preserve_candidate_topology and candidate_backend == 'rayd_edge_bvh':
                     visible = dr.full(wt.Bool, True, dr.width(prev_idx))
                 else:
@@ -617,7 +851,7 @@ def inserted(prev_state_arrays, scene, edge_data, global_to_local_idx, wave: Wav
         field_at_hit, vector_at_hit = ForwardEval.to_targets(batch_states, hit_p, wave, return_vector=True, material=material, scene=scene, tx=tx, select_diffraction_point=False, enable_segment_visibility=False)
         reflection_weight, material_inputs = Geo.surface_coeff(incident_dir=ray_dir, normal=hit_n, scene=scene, prim_idx=prim_idx_i32, material=reflection_material, wave=wave, tx=tx, valid_mask=dr.full(wt.Bool, True, n_hit))
         reflected_field = field_at_hit * reflection_weight
-        reflected_vector = reflect_field_vector(vector_at_hit, ray_dir, hit_n, eta_r=material_inputs['eta_r'], sigma=material_inputs['sigma'], omega=wt.Float(2.0 * math.pi * SPEED_OF_LIGHT / wave.wavelength), gain=material_inputs['gain'], mu_r=material_inputs['mu_r'])
+        reflected_vector = reflect_field_vector(vector_at_hit, ray_dir, hit_n, eta_r=material_inputs.eta_r, sigma=material_inputs.sigma, omega=wt.Float(2.0 * math.pi * SPEED_OF_LIGHT / wave.wavelength), gain=material_inputs.gain, mu_r=material_inputs.mu_r)
         surface_edges = scene.get_triangle_surface_edge_candidates(prim_idx_i32)
         candidate_globals = list(surface_edges['slots'])
         candidate_valids = [edge_idx >= 0 for edge_idx in candidate_globals]

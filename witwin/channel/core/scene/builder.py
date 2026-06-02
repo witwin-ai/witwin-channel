@@ -54,6 +54,8 @@ class SceneBuilder:
                 scene._rayd_scene.sync()
             else:
                 scene._rayd_scene = SceneBuilder.build_rayd_scene(scene._structure_meshes)
+            if hasattr(scene, "_rayd_visibility_ignore_pipeline_warmed"):
+                scene._rayd_visibility_ignore_pipeline_warmed = False
         except Exception:
             scene._rayd_scene = None
             raise

@@ -16,7 +16,7 @@ import drjit as dr
 import numpy as np
 import torch
 
-from witwin.channel.core.numerics.tensors import drjit_to_torch_view
+from witwin.channel.core.numerics.tensors import to_torch_view
 from witwin.channel.deterministic import types as wt
 from witwin.channel.deterministic.reflection.detail import (
     coerce_trace_detail as coerce_reflection_trace_detail,
@@ -27,6 +27,7 @@ from .path_export import (
     _DIFFRACTION_STATE_REFS_PAYLOAD,
     _PATH_RESULT_REPLAY_CHUNK_SIZE,
     _REFLECTION_PATH_REFS_PAYLOAD,
+    _diffraction_state_ref_type_slots,
     _materialize_diffraction_state_path_refs,
     _materialize_reflection_path_refs,
 )
@@ -44,15 +45,15 @@ def _torch_tensor(value, *, dtype=None, device=None, detach: bool = False) -> to
                 try:
                     real, imag = value.real, value.imag
                 except Exception:
-                    tensor = drjit_to_torch_view(value, detach=detach, device=device)
+                    tensor = to_torch_view(value, detach=detach, device=device)
                 else:
-                    real_t = drjit_to_torch_view(
+                    real_t = to_torch_view(
                         real,
                         detach=detach,
                         dtype=torch.float32,
                         device=device,
                     )
-                    imag_t = drjit_to_torch_view(
+                    imag_t = to_torch_view(
                         imag,
                         detach=detach,
                         dtype=torch.float32,
@@ -60,13 +61,13 @@ def _torch_tensor(value, *, dtype=None, device=None, detach: bool = False) -> to
                     )
                     tensor = torch.complex(real_t, imag_t)
             else:
-                tensor = drjit_to_torch_view(value, detach=detach, device=device)
+                tensor = to_torch_view(value, detach=detach, device=device)
         else:
             tensor = torch.stack(
                 [
-                    drjit_to_torch_view(x, detach=detach, dtype=torch.float32, device=device),
-                    drjit_to_torch_view(y, detach=detach, dtype=torch.float32, device=device),
-                    drjit_to_torch_view(z, detach=detach, dtype=torch.float32, device=device),
+                    to_torch_view(x, detach=detach, dtype=torch.float32, device=device),
+                    to_torch_view(y, detach=detach, dtype=torch.float32, device=device),
+                    to_torch_view(z, detach=detach, dtype=torch.float32, device=device),
                 ],
                 dim=-1,
             )
@@ -255,6 +256,25 @@ def _summarize_raw_path_collection(
             device=device,
             detach=True,
         ).reshape(-1)
+    elif (
+        payload_kind == _DIFFRACTION_STATE_REFS_PAYLOAD
+        and raw.get("theta_t") is not None
+        and raw.get("phi_t") is not None
+        and raw.get("theta_r") is not None
+        and raw.get("phi_r") is not None
+        and raw.get("path_depth") is not None
+    ):
+        summary["direct_no_geometry_kind"] = "diffraction_cached"
+        summary["theta_t"] = _torch_tensor(raw["theta_t"], dtype=torch.float32, device=device, detach=False).reshape(-1)
+        summary["phi_t"] = _torch_tensor(raw["phi_t"], dtype=torch.float32, device=device, detach=False).reshape(-1)
+        summary["theta_r"] = _torch_tensor(raw["theta_r"], dtype=torch.float32, device=device, detach=False).reshape(-1)
+        summary["phi_r"] = _torch_tensor(raw["phi_r"], dtype=torch.float32, device=device, detach=False).reshape(-1)
+        summary["path_depth_torch"] = _torch_tensor(
+            raw["path_depth"],
+            dtype=torch.int32,
+            device=device,
+            detach=True,
+        ).reshape(-1)
     return summary
 
 
@@ -287,6 +307,22 @@ def _build_direct_no_geometry_chunk(
     direct_kind = str(summary["direct_no_geometry_kind"])
     if direct_kind == "materialized_dense":
         types = summary["types_torch"].index_select(0, selected_paths)
+        return packed_chunk, types
+    if direct_kind == "diffraction_cached":
+        type_slots = _diffraction_state_ref_type_slots(
+            summary["raw"],
+            path_indices=_torch_path_indices(selected_paths),
+        )
+        if len(type_slots) == 0:
+            types = torch.zeros((count, 1), device=selected_paths.device, dtype=torch.int32)
+        else:
+            types = torch.stack(
+                [
+                    _torch_tensor(slot, dtype=torch.int32, device=selected_paths.device, detach=True).reshape(-1)
+                    for slot in type_slots
+                ],
+                dim=1,
+            )
         return packed_chunk, types
     if direct_kind == "reflection_cached":
         path_depth = summary["path_depth_torch"].index_select(0, selected_paths)
@@ -651,7 +687,7 @@ def assemble_result_payload(
     metadata: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Pack heterogeneous raw path collections into a Result-ready payload dict."""
-    rx_positions_t = drjit_to_torch_view(rx_positions, dtype=torch.float32)
+    rx_positions_t = to_torch_view(rx_positions, dtype=torch.float32)
     device = rx_positions_t.device
     num_links = int(num_rx) * int(num_tx)
     summaries = []

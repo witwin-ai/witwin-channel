@@ -8,7 +8,7 @@ from typing import Literal
 import drjit as dr
 from witwin.channel import types as wt
 
-from witwin.channel.core.numerics.arrays import gather_point3, safe_normalize
+from witwin.channel.core.numerics.arrays import gather, safe_normalize
 
 
 BoundaryPolicy = Literal["exclude", "half_plane"]
@@ -167,8 +167,8 @@ class WedgeOps:
     @staticmethod
     def build_midpoint_anchors(selection: WedgeSelection) -> WedgeAnchorView:
         idx = selection.selected_idx
-        start = gather_point3(selection.geometry.start, idx)
-        end = gather_point3(selection.geometry.end, idx)
+        start = gather(selection.geometry.start, idx)
+        end = gather(selection.geometry.end, idx)
         n = selection.size()
         return WedgeAnchorView(
             wedge_idx=idx, anchor_pos=(start + end) * 0.5,
@@ -179,8 +179,8 @@ class WedgeOps:
     @staticmethod
     def build_anchors(selection: WedgeSelection, z: float, clamp_eps: float = 1e-6) -> WedgeAnchorView:
         idx = selection.selected_idx
-        start = gather_point3(selection.geometry.start, idx)
-        end = gather_point3(selection.geometry.end, idx)
+        start = gather(selection.geometry.start, idx)
+        end = gather(selection.geometry.end, idx)
         dz = end.z - start.z
         horizontal = dr.abs(dz) <= clamp_eps
         t = dr.select(horizontal, wt.Float(0.5), dr.clip((wt.Float(z) - start.z) / dz, 0.0, 1.0))
@@ -228,12 +228,12 @@ class WedgeOps:
         return WedgePack(
             n_wedges=n,
             pos=anchors.anchor_pos,
-            edge_dir=gather_point3(geometry.edge_dir, idx),
+            edge_dir=gather(geometry.edge_dir, idx),
             length=length,
             line_min=-t * length,
             line_max=(wt.Float(1.0) - t) * length,
-            n0=gather_point3(geometry.n0, idx),
-            nn=gather_point3(geometry.nn, idx),
+            n0=gather(geometry.n0, idx),
+            nn=gather(geometry.nn, idx),
             wedge_n=dr.gather(wt.Float, geometry.wedge_n, idx),
             adjacent_face0=wt.Int32(dr.gather(type(geometry.face0), geometry.face0, idx)),
             adjacent_face1=wt.Int32(dr.gather(type(geometry.face1), geometry.face1, idx)),

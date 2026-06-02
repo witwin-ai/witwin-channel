@@ -7,11 +7,12 @@ import drjit as dr
 
 from witwin.channel.deterministic import types as wt
 
-from witwin.channel.core.runtime import Material, Tx, Wave, material_angular_frequency, resolve_surface_material
+from witwin.channel.core.runtime import Material, Tx, Wave
+from witwin.channel.core.physics.materials import FaceMaterial, resolve_surface_material
 from witwin.channel.core.numerics.constants import EPS, SMALL_EPS
-from witwin.channel.core.numerics.arrays import broadcast_point, broadcast_vector
+from witwin.channel.core.numerics.arrays import broadcast
 from witwin.channel.core.numerics.arrays import repeat_complex, repeat_float, repeat_int
-from witwin.channel.core.physics.wave_math import complex_relative_permittivity, fresnel_reflection, scalar_fresnel_reflection
+from witwin.channel.core.physics.wave_math import complex_relative_permittivity, fresnel_reflection, material_angular_frequency, scalar_fresnel_reflection
 from witwin.channel.core.physics.polarization import basis_from_first_vector, jones_operator_add, jones_operator_diagonal, jones_operator_identity, jones_operator_in_basis, jones_operator_scale, stable_perpendicular_basis
 from witwin.channel.core.geometry.diffraction import normalize_in_wedge_plane, rotate_vector_around_axis
 from witwin.channel.core.physics.wave_math import cot, f_utd
@@ -289,11 +290,11 @@ class GeometrySupport:
 
     def face_operator(face_material, *, cos_theta, normal, incoming_hat, outgoing_hat, incoming_edge_basis, outgoing_edge_basis, wave: Wave):
         omega = material_angular_frequency(wave.wavelength)
-        eta = complex_relative_permittivity(face_material['eta_r'], face_material['sigma'], omega)
-        r_te, r_tm = fresnel_reflection(cos_theta, eta, mu_r=face_material['mu_r'])
+        eta = complex_relative_permittivity(face_material.eta_r, face_material.sigma, omega)
+        r_te, r_tm = fresnel_reflection(cos_theta, eta, mu_r=face_material.mu_r)
         r_te = wt.Complex2f(dr.select(dr.isfinite(r_te.real), r_te.real, wt.Float(0.0)), dr.select(dr.isfinite(r_te.imag), r_te.imag, wt.Float(0.0)))
         r_tm = wt.Complex2f(dr.select(dr.isfinite(r_tm.real), r_tm.real, wt.Float(0.0)), dr.select(dr.isfinite(r_tm.imag), r_tm.imag, wt.Float(0.0)))
-        gain = wt.Complex2f(face_material['gain'], wt.Float(0.0))
+        gain = wt.Complex2f(face_material.gain, wt.Float(0.0))
         diag_operator = jones_operator_diagonal(gain * r_te, gain * r_tm)
         face_s_in = dr.cross(normal, incoming_hat)
         face_s_out_raw = dr.cross(normal, outgoing_hat)
@@ -328,9 +329,9 @@ class GeometrySupport:
 
     def first_order_diffraction_parameter(source_pos, target_pos, edge_origin, edge_dir):
         width = dr.width(target_pos.x)
-        source_pos_b = broadcast_point(source_pos, width)
-        edge_origin_b = broadcast_point(edge_origin, width)
-        edge_dir_b = broadcast_vector(edge_dir, width)
+        source_pos_b = broadcast(source_pos, width)
+        edge_origin_b = broadcast(edge_origin, width)
+        edge_dir_b = broadcast(edge_dir, width)
         zeta = edge_dir_b / (dr.norm(edge_dir_b) + EPS)
 
         target_offset = target_pos - edge_origin_b
@@ -380,9 +381,9 @@ class GeometrySupport:
             edge_state,
             context='finite_edge_diffraction_point',
         )
-        edge_pos_b = broadcast_point(edge_state['edge_pos'], width)
-        source_pos_b = broadcast_point(edge_state['source_pos'], width)
-        edge_dir_b = broadcast_vector(edge_state['edge_dir'], width)
+        edge_pos_b = broadcast(edge_state['edge_pos'], width)
+        source_pos_b = broadcast(edge_state['source_pos'], width)
+        edge_dir_b = broadcast(edge_state['edge_dir'], width)
         edge_hat = edge_dir_b / (dr.norm(edge_dir_b) + EPS)
         line_min = repeat_float(edge_line_min, width)
         line_max = repeat_float(edge_line_max, width)
@@ -424,7 +425,7 @@ class GeometrySupport:
 
     def source_field(source_pos, source_weight, target_pos, wave: Wave):
         width = dr.width(target_pos.x)
-        source_pos_b = broadcast_point(source_pos, width)
+        source_pos_b = broadcast(source_pos, width)
         distance = dr.norm(target_pos - source_pos_b) + EPS
         phase = dr.exp(wt.Complex2f(0, -wave.k * distance))
         source_w = repeat_complex(source_weight, width)
@@ -433,8 +434,8 @@ class GeometrySupport:
 
     def source_field_normal_derivative(source_pos, source_weight, target_pos, normal_dir, wave: Wave):
         width = dr.width(target_pos.x)
-        source_pos_b = broadcast_point(source_pos, width)
-        normal_b = broadcast_vector(normal_dir, width)
+        source_pos_b = broadcast(source_pos, width)
+        normal_b = broadcast(normal_dir, width)
         offset = target_pos - source_pos_b
         distance = dr.norm(offset) + EPS
         ray_hat = offset / distance
@@ -447,7 +448,22 @@ class GeometrySupport:
         if 'face0_eta_r' in edge_state and 'face1_eta_r' in edge_state:
             face0_mu_r = edge_state.get('face0_mu_r', dr.ones(wt.Float, width))
             face1_mu_r = edge_state.get('face1_mu_r', dr.ones(wt.Float, width))
-            return ({'eta_r': repeat_float(edge_state['face0_eta_r'], width), 'mu_r': repeat_float(face0_mu_r, width), 'sigma': repeat_float(edge_state['face0_sigma'], width), 'gain': repeat_float(edge_state['face0_gain'], width), 'use_fresnel': dr.full(wt.Bool, True, width)}, {'eta_r': repeat_float(edge_state['face1_eta_r'], width), 'mu_r': repeat_float(face1_mu_r, width), 'sigma': repeat_float(edge_state['face1_sigma'], width), 'gain': repeat_float(edge_state['face1_gain'], width), 'use_fresnel': dr.full(wt.Bool, True, width)})
+            return (
+                FaceMaterial(
+                    eta_r=repeat_float(edge_state['face0_eta_r'], width),
+                    sigma=repeat_float(edge_state['face0_sigma'], width),
+                    gain=repeat_float(edge_state['face0_gain'], width),
+                    use_fresnel=dr.full(wt.Bool, True, width),
+                    mu_r=repeat_float(face0_mu_r, width),
+                ),
+                FaceMaterial(
+                    eta_r=repeat_float(edge_state['face1_eta_r'], width),
+                    sigma=repeat_float(edge_state['face1_sigma'], width),
+                    gain=repeat_float(edge_state['face1_gain'], width),
+                    use_fresnel=dr.full(wt.Bool, True, width),
+                    mu_r=repeat_float(face1_mu_r, width),
+                ),
+            )
         if scene is None:
             raise RuntimeError(
                 "Diffraction edge material resolution requires a scene material table. "
@@ -465,7 +481,7 @@ class GeometrySupport:
         incident_hat = incident_dir / dr.maximum(dr.norm(incident_dir), wt.Float(EPS))
         normal_hat = normal / dr.maximum(dr.norm(normal), wt.Float(EPS))
         cos_theta = dr.clip(dr.abs(dr.dot(incident_hat, normal_hat)), wt.Float(SMALL_EPS), wt.Float(1.0))
-        fresnel_coeff = scalar_fresnel_reflection(cos_theta=cos_theta, eta_r=material_inputs['eta_r'], sigma=material_inputs['sigma'], omega=material_angular_frequency(wave.wavelength), mu_r=material_inputs['mu_r'], gain=material_inputs['gain'])
+        fresnel_coeff = scalar_fresnel_reflection(cos_theta=cos_theta, eta_r=material_inputs.eta_r, sigma=material_inputs.sigma, omega=material_angular_frequency(wave.wavelength), mu_r=material_inputs.mu_r, gain=material_inputs.gain)
         return (fresnel_coeff, material_inputs)
 
     def diagonal_face_operator(coeff):
@@ -478,11 +494,11 @@ class GeometrySupport:
         incident_hat = incident_dir / dr.maximum(dr.norm(incident_dir), wt.Float(EPS))
         normal_hat = normal / dr.maximum(dr.norm(normal), wt.Float(EPS))
         cos_theta = dr.clip(dr.abs(dr.dot(incident_hat, normal_hat)), wt.Float(SMALL_EPS), wt.Float(1.0))
-        eta = complex_relative_permittivity(material_inputs['eta_r'], material_inputs['sigma'], material_angular_frequency(wave.wavelength))
-        r_te, r_tm = fresnel_reflection(cos_theta, eta, mu_r=material_inputs['mu_r'])
+        eta = complex_relative_permittivity(material_inputs.eta_r, material_inputs.sigma, material_angular_frequency(wave.wavelength))
+        r_te, r_tm = fresnel_reflection(cos_theta, eta, mu_r=material_inputs.mu_r)
         r_te = wt.Complex2f(dr.select(dr.isfinite(r_te.real), r_te.real, wt.Float(0.0)), dr.select(dr.isfinite(r_te.imag), r_te.imag, wt.Float(0.0)))
         r_tm = wt.Complex2f(dr.select(dr.isfinite(r_tm.real), r_tm.real, wt.Float(0.0)), dr.select(dr.isfinite(r_tm.imag), r_tm.imag, wt.Float(0.0)))
-        gain = wt.Complex2f(material_inputs['gain'], wt.Float(0.0))
+        gain = wt.Complex2f(material_inputs.gain, wt.Float(0.0))
         return jones_operator_diagonal(gain * r_te, gain * r_tm)
 
     def face_reflection_operators(edge_state, width, material: Material, wave: Wave, scene=None):
@@ -493,11 +509,11 @@ class GeometrySupport:
         if scene is None:
             pec = wt.Complex2f(-1.0, 0.0)
             return (Geo.diagonal_face_operator(repeat_complex(pec, width)), Geo.diagonal_face_operator(repeat_complex(pec, width)))
-        source_pos = broadcast_point(edge_state['source_pos'], width)
-        edge_pos = broadcast_point(edge_state['edge_pos'], width)
-        edge_dir = broadcast_vector(edge_state['edge_dir'], width)
-        n0 = broadcast_vector(edge_state['n0'], width)
-        nn = broadcast_vector(edge_state['n_face_n'], width)
+        source_pos = broadcast(edge_state['source_pos'], width)
+        edge_pos = broadcast(edge_state['edge_pos'], width)
+        edge_dir = broadcast(edge_state['edge_dir'], width)
+        n0 = broadcast(edge_state['n0'], width)
+        nn = broadcast(edge_state['n_face_n'], width)
         incoming = edge_pos - source_pos
         incoming = incoming / (dr.norm(incoming) + EPS)
         incoming_proj = normalize_in_wedge_plane(incoming, edge_dir)

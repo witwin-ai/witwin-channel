@@ -82,6 +82,7 @@ class BDPTDiffractionResult:
     order_counts: Mapping[int, Mapping[str, int]]
     order_samples: Mapping[int, Mapping[str, int]]
     tape: BDPTDiffractionTape | None = None
+    runtime_backend: Mapping[str, object] | None = None
 
     @classmethod
     def zero(
@@ -104,6 +105,7 @@ class BDPTDiffractionResult:
             order_counts=dict(order_counts or {}),
             order_samples=dict(order_samples or {}),
             tape=None,
+            runtime_backend=None,
         )
 
 
@@ -271,6 +273,18 @@ class BDPTDiffractionEdgeUseStore:
         return wt.UInt32(lanes)
 
 
+@dataclass(frozen=True, slots=True)
+class BDPTRaydAdaptiveBudget:
+    policy: str
+    prefix_state_sample_cap: int | None
+    suffix_sample_cap: int | None
+    edge_bucket_count: int
+    grid_cell_count: int
+    max_prefix_events: int
+    prefix_samples_per_bucket: int
+    suffix_samples_per_bucket: int
+
+
 class BDPTDiffractionMIS:
     """Wedge-diffraction balance-MIS strategies for BDPT path connections."""
 
@@ -282,6 +296,13 @@ class BDPTDiffractionMIS:
     SOBOL_SEQUENCE = "sobol"
     FIRST_ORDER_IMPORTANCE_MIX = 0.75
     FIRST_ORDER_IMPORTANCE_MAX = 16.0
+    RAYD_SUFFIX_SAMPLE_CAP = 1024
+    RAYD_PREFIX_STATE_SAMPLE_CAP = 1024
+    RAYD_SUFFIX_SAMPLE_SKIP_THRESHOLD = 262144
+    RAYD_PREFIX_STATE_SAMPLE_MAX = 32768
+    RAYD_SUFFIX_SAMPLE_MAX = 32768
+    RAYD_PREFIX_SAMPLES_PER_BUCKET = 2
+    RAYD_SUFFIX_SAMPLES_PER_BUCKET = 4
 
     @staticmethod
     def _zero_strategy_counts() -> dict[str, int]:
@@ -290,6 +311,101 @@ class BDPTDiffractionMIS:
             BDPTDiffractionMIS.KELLER_STRATEGY: 0,
             BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: 0,
         }
+
+    @staticmethod
+    def _grid_cell_count(grid) -> int:
+        if grid is None:
+            return 0
+        shape = getattr(grid, "grid_shape", None)
+        if shape is not None and len(shape) >= 2:
+            return max(0, int(shape[0])) * max(0, int(shape[1]))
+        resolution = getattr(grid, "resolution", None)
+        if resolution is not None and len(resolution) >= 2:
+            return max(0, int(resolution[0])) * max(0, int(resolution[1]))
+        return 0
+
+    @staticmethod
+    def _scene_edge_count(scene: Scene | None) -> int:
+        runtime_fn = getattr(scene, "_selected_edge_runtime", None)
+        if not callable(runtime_fn):
+            return 0
+        runtime = runtime_fn()
+        if runtime is None:
+            return 0
+        return max(0, int(runtime.get("n_edges", 0)))
+
+    @staticmethod
+    def rayd_adaptive_budget(
+        *,
+        samples_per_tx: int,
+        max_depth: int,
+        edge_count: int,
+        grid_cell_count: int,
+        reflection_max_bounces: int,
+        include_suffix_reflection: bool,
+    ) -> BDPTRaydAdaptiveBudget:
+        samples = max(0, int(samples_per_tx))
+        depth = max(1, min(int(max_depth), BDPTDiffractionMIS.MAX_SUPPORTED_DIFFRACTION_DEPTH))
+        edges = max(0, int(edge_count))
+        cells = max(0, int(grid_cell_count))
+        reflection_depth = max(0, int(reflection_max_bounces))
+        edge_buckets = min(edges, max(samples, 1)) if edges > 0 else 0
+        candidate_buckets = min(edge_buckets, cells) if cells > 0 else edge_buckets
+        max_prefix_events = samples * max(1, reflection_depth)
+
+        prefix_cap = None
+        suffix_cap = None
+        if include_suffix_reflection and edge_buckets > 0 and samples > 0:
+            prefix_target = edge_buckets * BDPTDiffractionMIS.RAYD_PREFIX_SAMPLES_PER_BUCKET
+            prefix_cap_value = min(
+                max_prefix_events,
+                max(
+                    BDPTDiffractionMIS.RAYD_PREFIX_STATE_SAMPLE_CAP,
+                    min(BDPTDiffractionMIS.RAYD_PREFIX_STATE_SAMPLE_MAX, prefix_target),
+                ),
+            )
+            prefix_cap = max(1, int(prefix_cap_value)) if prefix_cap_value > 0 else None
+
+            order_samples = (samples + depth - 1) // depth
+            suffix_target = max(
+                BDPTDiffractionMIS.RAYD_SUFFIX_SAMPLE_CAP,
+                candidate_buckets * BDPTDiffractionMIS.RAYD_SUFFIX_SAMPLES_PER_BUCKET,
+            )
+            suffix_cap_value = min(
+                max(1, order_samples),
+                min(BDPTDiffractionMIS.RAYD_SUFFIX_SAMPLE_MAX, suffix_target),
+            )
+            suffix_cap = max(1, int(suffix_cap_value)) if suffix_cap_value > 0 else None
+
+        return BDPTRaydAdaptiveBudget(
+            policy="adaptive_bucket_v1",
+            prefix_state_sample_cap=prefix_cap,
+            suffix_sample_cap=suffix_cap,
+            edge_bucket_count=int(edge_buckets),
+            grid_cell_count=int(cells),
+            max_prefix_events=int(max_prefix_events),
+            prefix_samples_per_bucket=BDPTDiffractionMIS.RAYD_PREFIX_SAMPLES_PER_BUCKET,
+            suffix_samples_per_bucket=BDPTDiffractionMIS.RAYD_SUFFIX_SAMPLES_PER_BUCKET,
+        )
+
+    @staticmethod
+    def rayd_adaptive_budget_for_scene(
+        *,
+        scene: Scene,
+        grid,
+        samples_per_tx: int,
+        max_depth: int,
+        reflection_max_bounces: int,
+        include_suffix_reflection: bool,
+    ) -> BDPTRaydAdaptiveBudget:
+        return BDPTDiffractionMIS.rayd_adaptive_budget(
+            samples_per_tx=samples_per_tx,
+            max_depth=max_depth,
+            edge_count=BDPTDiffractionMIS._scene_edge_count(scene),
+            grid_cell_count=BDPTDiffractionMIS._grid_cell_count(grid),
+            reflection_max_bounces=reflection_max_bounces,
+            include_suffix_reflection=include_suffix_reflection,
+        )
 
     @staticmethod
     def sample_uniform(
@@ -330,11 +446,11 @@ class BDPTDiffractionMIS:
         edge_mid = states.edge_pos + edge_hat * (
             wt.Float(0.5) * (states.edge_line_min + states.edge_line_max)
         )
-        grid_center = arrays.broadcast_point(wt.Point3f(*grid.center), n_states)
+        grid_center = arrays.broadcast(wt.Point3f(*grid.center), n_states)
         to_grid = grid_center - edge_mid
         dist2 = dr.maximum(dr.squared_norm(to_grid), wt.Float(1.0e-6))
         target_dir = to_grid * dr.rsqrt(dist2)
-        plane_normal = arrays.broadcast_vector(
+        plane_normal = arrays.broadcast(
             Sampler.axis_unit_normal(str(grid.axis)),
             n_states,
         )
@@ -391,7 +507,14 @@ class BDPTDiffractionMIS:
         )
 
     @staticmethod
-    def prepare_prefix_states(*, prefix_store, scene: Scene, config: ResolvedTraceConfig):
+    def prepare_prefix_states(
+        *,
+        prefix_store,
+        scene: Scene,
+        config: ResolvedTraceConfig,
+        max_states: int | None = None,
+        seed: int = 0,
+    ):
         if prefix_store is None:
             return None
         store_valid = getattr(prefix_store, "valid", None)
@@ -411,13 +534,6 @@ class BDPTDiffractionMIS:
         hit_n = dr.gather(wt.Vector3f, prefix_store.hit_n, lane)
         hit_geo_n = dr.gather(wt.Vector3f, prefix_store.hit_geo_n, lane)
         source_pos = dr.gather(wt.Point3f, prefix_store.source_pos, lane)
-        source_power = dr.gather(wt.Float, prefix_store.source_power, lane)
-        prefix_depth = dr.gather(wt.Int32, prefix_store.prefix_reflection_depth, lane)
-        prefix_initial_ray_dir = dr.gather(wt.Vector3f, prefix_store.prefix_initial_ray_dir, lane)
-        prefix_prim_by_bounce = tuple(
-            dr.gather(wt.Int32, prim_idx, lane)
-            for prim_idx in prefix_store.prefix_prim_by_bounce
-        )
         active = dr.full(wt.Bool, True, count)
         edge_idx = DiffractionEdgeSampler.best_edge_indices_from_hit_data(
             tx_pos=source_pos,
@@ -434,22 +550,157 @@ class BDPTDiffractionMIS:
             return None
         valid_lane = dr.compress(valid)
         compact_edge_idx = wt.UInt32(dr.gather(wt.Int32, edge_idx, valid_lane))
+        selected_lane = dr.gather(wt.UInt32, lane, valid_lane)
+        selected_edge_idx = compact_edge_idx
+        source_power_scale = dr.full(wt.Float, 1.0, int(dr.width(selected_lane)))
+        valid_count = int(dr.width(selected_lane))
+        if max_states is not None and valid_count > int(max_states):
+            selected_lane, selected_edge_idx, source_power_scale = (
+                BDPTDiffractionMIS._bucket_sample_prefix_lanes(
+                    lane=selected_lane,
+                    edge_idx=selected_edge_idx,
+                    max_states=int(max_states),
+                    scene=scene,
+                    seed=int(seed),
+                )
+            )
         return DiffractionStates.from_edge_indices_with_sources(
-            edge_idx=compact_edge_idx,
-            source_pos=dr.gather(wt.Point3f, source_pos, valid_lane),
-            source_power=dr.gather(wt.Float, source_power, valid_lane),
-            prefix_reflection_depth=dr.gather(wt.Int32, prefix_depth, valid_lane),
-            prefix_initial_ray_dir=dr.gather(wt.Vector3f, prefix_initial_ray_dir, valid_lane),
+            edge_idx=selected_edge_idx,
+            source_pos=dr.gather(wt.Point3f, prefix_store.source_pos, selected_lane),
+            source_power=(
+                dr.gather(wt.Float, prefix_store.source_power, selected_lane)
+                * source_power_scale
+            ),
+            prefix_reflection_depth=dr.gather(
+                wt.Int32,
+                prefix_store.prefix_reflection_depth,
+                selected_lane,
+            ),
+            prefix_initial_ray_dir=dr.gather(
+                wt.Vector3f,
+                prefix_store.prefix_initial_ray_dir,
+                selected_lane,
+            ),
             prefix_prim_by_bounce=tuple(
-                dr.gather(wt.Int32, prim_idx, valid_lane)
-                for prim_idx in prefix_prim_by_bounce
+                dr.gather(wt.Int32, prim_idx, selected_lane)
+                for prim_idx in prefix_store.prefix_prim_by_bounce
             ),
             scene=scene,
             config=config,
         )
 
     @staticmethod
-    def prepare_states(*, tx_pos, scene: Scene, config: ResolvedTraceConfig, prefix_store=None):
+    def _bucket_sample_prefix_lanes(
+        *,
+        lane,
+        edge_idx,
+        max_states: int,
+        scene,
+        seed: int,
+    ):
+        count = int(dr.width(lane))
+        cap = max(1, int(max_states))
+        if count <= cap:
+            return lane, edge_idx, dr.full(wt.Float, 1.0, count)
+
+        n_edges = BDPTDiffractionMIS._scene_edge_count(scene)
+        if n_edges <= 0 and count > 0:
+            n_edges = int(scalar(dr.max(edge_idx))) + 1
+        if n_edges <= 0:
+            sample_lane = dr.arange(wt.UInt32, cap)
+            sample_slot = Sampler._hash_uniform_bits(
+                sample_lane,
+                stream=509,
+                seed=int(seed),
+            ) % wt.UInt32(count)
+            return (
+                dr.gather(wt.UInt32, lane, sample_slot),
+                dr.gather(wt.UInt32, edge_idx, sample_slot),
+                dr.full(wt.Float, float(count) / float(cap), cap),
+            )
+
+        safe_edge = dr.minimum(wt.UInt32(edge_idx), wt.UInt32(n_edges - 1))
+        active = dr.full(wt.Bool, True, count)
+        bucket_counts = dr.zeros(wt.UInt32, n_edges)
+        dr.scatter_reduce(
+            dr.ReduceOp.Add,
+            bucket_counts,
+            wt.UInt32(1),
+            safe_edge,
+            active,
+        )
+        bucket_lanes = dr.compress(bucket_counts > wt.UInt32(0))
+        bucket_count = int(dr.width(bucket_lanes))
+        if bucket_count <= 0:
+            return dr.zeros(wt.UInt32, 0), dr.zeros(wt.UInt32, 0), dr.zeros(wt.Float, 0)
+
+        bucket_active = dr.full(wt.Bool, True, count)
+        quota = max(1, cap // bucket_count)
+        if bucket_count > cap:
+            selected_bucket_flags = dr.zeros(wt.UInt32, n_edges)
+            sample_lane = dr.arange(wt.UInt32, cap)
+            sample_slot = Sampler._hash_uniform_bits(
+                sample_lane,
+                stream=521,
+                seed=int(seed),
+            ) % wt.UInt32(bucket_count)
+            sampled_buckets = dr.gather(wt.UInt32, bucket_lanes, sample_slot)
+            dr.scatter(
+                selected_bucket_flags,
+                dr.full(wt.UInt32, 1, cap),
+                sampled_buckets,
+            )
+            bucket_active = dr.gather(wt.UInt32, selected_bucket_flags, safe_edge) > wt.UInt32(0)
+            quota = 1
+
+        quota_u32 = wt.UInt32(quota)
+        rank_counts = dr.zeros(wt.UInt32, n_edges)
+        rank = dr.scatter_inc(rank_counts, safe_edge, active)
+        keep = bucket_active & (rank < quota_u32)
+        selected_count = int(dr.width(dr.compress(keep)))
+        if selected_count <= 0:
+            sample_lane = dr.arange(wt.UInt32, min(cap, count))
+            sample_slot = Sampler._hash_uniform_bits(
+                sample_lane,
+                stream=509,
+                seed=int(seed),
+            ) % wt.UInt32(count)
+            sample_count = int(dr.width(sample_lane))
+            return (
+                dr.gather(wt.UInt32, lane, sample_slot),
+                dr.gather(wt.UInt32, edge_idx, sample_slot),
+                dr.full(wt.Float, float(count) / float(sample_count), sample_count),
+            )
+
+        selected_compact_lane = dr.compress(keep)
+        selected_lane = dr.gather(wt.UInt32, lane, selected_compact_lane)
+        selected_edge_idx = dr.gather(wt.UInt32, safe_edge, selected_compact_lane)
+        selected_counts = dr.zeros(wt.UInt32, n_edges)
+        dr.scatter_reduce(
+            dr.ReduceOp.Add,
+            selected_counts,
+            wt.UInt32(1),
+            safe_edge,
+            keep,
+        )
+        total_for_edge = dr.gather(wt.UInt32, bucket_counts, selected_edge_idx)
+        kept_for_edge = dr.maximum(
+            wt.UInt32(1),
+            dr.gather(wt.UInt32, selected_counts, selected_edge_idx),
+        )
+        scale = wt.Float(total_for_edge) / wt.Float(kept_for_edge)
+        return selected_lane, selected_edge_idx, scale
+
+    @staticmethod
+    def prepare_states(
+        *,
+        tx_pos,
+        scene: Scene,
+        config: ResolvedTraceConfig,
+        prefix_store=None,
+        prefix_state_sample_cap: int | None = None,
+        prefix_state_seed: int = 0,
+    ):
         direct_states = BDPTDiffractionMIS.prepare_direct_states(
             tx_pos=tx_pos,
             scene=scene,
@@ -459,10 +710,14 @@ class BDPTDiffractionMIS:
             prefix_store=prefix_store,
             scene=scene,
             config=config,
+            max_states=prefix_state_sample_cap,
+            seed=prefix_state_seed,
         )
         initial_states = DiffractionStates.concat((direct_states, prefix_states))
         return {
             "initial": initial_states,
+            "direct": direct_states,
+            "prefix": prefix_states,
             "recursive": direct_states,
             "prefix_state_count": 0 if prefix_states is None else int(dr.width(prefix_states.edge_index)),
         }
@@ -472,6 +727,7 @@ class BDPTDiffractionMIS:
         samples: int,
         *,
         include_suffix_reflection: bool = True,
+        suffix_sample_cap: int | None = None,
     ) -> dict[str, int]:
         total = max(0, int(samples))
         if total <= 0:
@@ -484,13 +740,23 @@ class BDPTDiffractionMIS:
                 BDPTDiffractionMIS.KELLER_STRATEGY: int(keller_samples),
                 BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: 0,
             }
-        direct_samples = (total + 2) // 3
-        keller_samples = (total + 1) // 3
-        suffix_samples = total - direct_samples - keller_samples
+        natural_direct = (total + 2) // 3
+        natural_keller = (total + 1) // 3
+        natural_suffix = total - natural_direct - natural_keller
+        if suffix_sample_cap is not None and natural_suffix > int(suffix_sample_cap):
+            suffix_samples = max(0, int(suffix_sample_cap))
+            remaining = max(0, total - suffix_samples)
+            direct_samples = (remaining + 1) // 2
+            keller_samples = remaining - direct_samples
+            return {
+                BDPTDiffractionMIS.DIRECT_STRATEGY: int(direct_samples),
+                BDPTDiffractionMIS.KELLER_STRATEGY: int(keller_samples),
+                BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: int(suffix_samples),
+            }
         return {
-            BDPTDiffractionMIS.DIRECT_STRATEGY: int(direct_samples),
-            BDPTDiffractionMIS.KELLER_STRATEGY: int(keller_samples),
-            BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: int(suffix_samples),
+            BDPTDiffractionMIS.DIRECT_STRATEGY: int(natural_direct),
+            BDPTDiffractionMIS.KELLER_STRATEGY: int(natural_keller),
+            BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: int(natural_suffix),
         }
 
     @staticmethod
@@ -499,6 +765,7 @@ class BDPTDiffractionMIS:
         max_depth: int = 1,
         *,
         include_suffix_reflection: bool = True,
+        suffix_sample_cap: int | None = None,
     ) -> dict[int, dict[str, int]]:
         total = max(0, int(samples_per_tx))
         depth = max(1, min(int(max_depth), BDPTDiffractionMIS.MAX_SUPPORTED_DIFFRACTION_DEPTH))
@@ -513,9 +780,324 @@ class BDPTDiffractionMIS:
             order: BDPTDiffractionMIS.allocate_samples_for_order(
                 base + (1 if order <= remainder else 0),
                 include_suffix_reflection=include_suffix_reflection,
+                suffix_sample_cap=suffix_sample_cap,
             )
             for order in range(1, depth + 1)
         }
+
+    @staticmethod
+    def _diffraction_accumulate_primal_mode(config, *, collect_ad_tapes: bool = False) -> str:
+        execution = getattr(config, "diffraction_execution", None)
+        mode = str(getattr(execution, "accumulate_primal", "auto"))
+        if mode == "auto":
+            return "rayd_optix"
+        return mode
+
+    @staticmethod
+    def _rayd_budget_metadata(rayd_budget: BDPTRaydAdaptiveBudget | None) -> dict[str, object] | None:
+        if rayd_budget is None:
+            return None
+        return {
+            "policy": rayd_budget.policy,
+            "prefix_state_sample_cap": rayd_budget.prefix_state_sample_cap,
+            "suffix_sample_cap": rayd_budget.suffix_sample_cap,
+            "edge_bucket_count": rayd_budget.edge_bucket_count,
+            "grid_cell_count": rayd_budget.grid_cell_count,
+            "max_prefix_events": rayd_budget.max_prefix_events,
+            "prefix_samples_per_bucket": rayd_budget.prefix_samples_per_bucket,
+            "suffix_samples_per_bucket": rayd_budget.suffix_samples_per_bucket,
+        }
+
+    @staticmethod
+    def _rayd_order1_runtime_backend(
+        *,
+        sample_sequence: str,
+        prefix_state_count: int,
+        suffix_enabled: bool,
+        rayd_budget: BDPTRaydAdaptiveBudget | None = None,
+    ) -> dict[str, object]:
+        return {
+            "implementation": "rayd_accum_dfr_direct",
+            "cell_scatter_backend": "rayd_optix_atomic_add",
+            "wedge_discovery_backend": (
+                "selected_scene_wedges_plus_forward_specular_prefix_wedges"
+                if int(prefix_state_count) > 0
+                else "selected_scene_wedges_only"
+            ),
+            "state_sampler": "rayd_order1_state_table_direct_receiver_cell_and_keller_cone",
+            "point_evaluation_backend": "rayd_order1_grid_direct_and_keller",
+            "source_field_contract": "sionna_iso_v_implicit_basis",
+            "mis_heuristic": "rayd_native_strategy_split",
+            "sample_sequence": str(sample_sequence),
+            "suffix_reflection": "rayd_optix_native" if bool(suffix_enabled) else "disabled_for_order1_rayd_optix",
+            "suffix_candidate_policy": (
+                "terminal_state_adjacent_faces"
+                if bool(suffix_enabled)
+                else "disabled"
+            ),
+            "native_scope": (
+                "direct_keller_on_tx_states_suffix_on_prefix_states"
+                if bool(suffix_enabled) and int(prefix_state_count) > 0
+                else "direct_keller_single_state_table"
+            ),
+            "prefix_suffix_budget": BDPTDiffractionMIS._rayd_budget_metadata(rayd_budget),
+            "ad_contract": "rayd_native_ad",
+        }
+
+    @staticmethod
+    def _rayd_strict_runtime_backend(
+        *,
+        sample_sequence: str,
+        max_order: int,
+        suffix_enabled: bool,
+        rayd_budget: BDPTRaydAdaptiveBudget | None = None,
+    ) -> dict[str, object]:
+        native_order = int(max_order)
+        native_scope = (
+            f"orders1_to_{native_order}_direct_keller_suffix_no_drjit_fallback"
+            if bool(suffix_enabled)
+            else f"orders1_to_{native_order}_direct_and_keller_no_drjit_fallback"
+        )
+        return {
+            "implementation": f"rayd_accum_dfr_native_orders1_to_{native_order}",
+            "cell_scatter_backend": "rayd_optix_atomic_add",
+            "wedge_discovery_backend": "selected_scene_wedges_only",
+            "state_sampler": f"rayd_orders1_to_{native_order}_state_tables",
+            "point_evaluation_backend": "rayd_grid_direct_receiver_cell_and_keller_cone",
+            "source_field_contract": "sionna_iso_v_implicit_basis",
+            "mis_heuristic": "rayd_native_strategy_split",
+            "sample_sequence": str(sample_sequence),
+            "max_native_order": native_order,
+            "native_scope": native_scope,
+            "suffix_reflection": "rayd_optix_native" if bool(suffix_enabled) else "disabled",
+            "suffix_candidate_policy": (
+                "terminal_state_adjacent_faces"
+                if bool(suffix_enabled)
+                else "disabled"
+            ),
+            "prefix_suffix_budget": BDPTDiffractionMIS._rayd_budget_metadata(rayd_budget),
+            "ad_contract": "rayd_native_ad",
+        }
+
+    @staticmethod
+    def _apply_rayd_diffraction_result(*, result, grid, weighted_diagnostics: dict) -> tuple[int, int, int]:
+        diffraction_power = wt.Float(result.power)
+        if int(dr.width(diffraction_power)) != int(grid.n_cells):
+            raise RuntimeError(
+                "RayD diffraction accumulation returned a grid width that does not match the receiver grid."
+            )
+        weighted_diagnostics["incoherent"]["diffraction"] = (
+            weighted_diagnostics["incoherent"]["diffraction"] + diffraction_power
+        )
+        direct_count = int(scalar(wt.Int32(result.direct_count)))
+        keller_count = int(scalar(wt.Int32(result.keller_count)))
+        suffix_count = int(scalar(wt.Int32(result.suffix_count)))
+        return direct_count, keller_count, suffix_count
+
+    @staticmethod
+    def _trace_order1_rayd_optix(
+        *,
+        scene,
+        grid,
+        initial_states,
+        direct_states=None,
+        prefix_states=None,
+        initial_sampler,
+        config,
+        samples_per_tx: int,
+        seed: int,
+        sample_sequence: str,
+        weighted_diagnostics: dict,
+        strategy_samples: Mapping[int, Mapping[str, int]],
+        prefix_state_count: int,
+        rayd_budget: BDPTRaydAdaptiveBudget | None = None,
+    ) -> BDPTDiffractionResult:
+        order_samples = strategy_samples[1]
+        direct_samples = int(order_samples[BDPTDiffractionMIS.DIRECT_STRATEGY])
+        keller_samples = int(order_samples[BDPTDiffractionMIS.KELLER_STRATEGY])
+        suffix_samples = int(order_samples[BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY])
+        direct_source_states = direct_states if direct_states is not None else initial_states
+        suffix_source_states = prefix_states if prefix_states is not None else initial_states
+        direct_count = 0
+        keller_count = 0
+        suffix_count = 0
+        if direct_samples > 0 or keller_samples > 0:
+            result = scene.accum_dfr_direct(
+                diffraction_states=direct_source_states,
+                grid=grid,
+                config=config,
+                seed=int(seed),
+                samples=int(direct_samples + keller_samples),
+                direct_samples=direct_samples,
+                keller_samples=keller_samples,
+                suffix_samples=0,
+                sample_sequence=str(sample_sequence),
+                active=True,
+            )
+            direct_count, keller_count, _ = BDPTDiffractionMIS._apply_rayd_diffraction_result(
+                result=result,
+                grid=grid,
+                weighted_diagnostics=weighted_diagnostics,
+            )
+        if suffix_samples > 0 and suffix_source_states is not None:
+            result = scene.accum_dfr_direct(
+                diffraction_states=suffix_source_states,
+                grid=grid,
+                config=config,
+                seed=int(seed) + 7919,
+                samples=int(suffix_samples),
+                direct_samples=0,
+                keller_samples=0,
+                suffix_samples=suffix_samples,
+                sample_sequence=str(sample_sequence),
+                active=True,
+            )
+            _, _, suffix_count = BDPTDiffractionMIS._apply_rayd_diffraction_result(
+                result=result,
+                grid=grid,
+                weighted_diagnostics=weighted_diagnostics,
+            )
+        total_count = direct_count + keller_count + suffix_count
+        zero_counts = BDPTDiffractionMIS._zero_strategy_counts()
+        order_counts = {
+            1: {
+                BDPTDiffractionMIS.DIRECT_STRATEGY: direct_count,
+                BDPTDiffractionMIS.KELLER_STRATEGY: keller_count,
+                BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: suffix_count,
+            }
+        }
+        flat_samples = {
+            strategy: sum(int(samples[strategy]) for samples in strategy_samples.values())
+            for strategy in zero_counts
+        }
+        return BDPTDiffractionResult(
+            path_count=wt.UInt32(total_count),
+            state_count=int(dr.width(initial_states.edge_index)),
+            prefix_state_count=int(prefix_state_count),
+            edge_indices=wt.UInt32(initial_states.edge_index),
+            total_edge_length=float(initial_sampler.total_length_scalar),
+            strategy_counts={
+                BDPTDiffractionMIS.DIRECT_STRATEGY: direct_count,
+                BDPTDiffractionMIS.KELLER_STRATEGY: keller_count,
+                BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: suffix_count,
+            },
+            strategy_samples=flat_samples,
+            order_counts=order_counts,
+            order_samples=strategy_samples,
+            tape=None,
+            runtime_backend=BDPTDiffractionMIS._rayd_order1_runtime_backend(
+                sample_sequence=str(sample_sequence),
+                prefix_state_count=int(prefix_state_count),
+                suffix_enabled=suffix_samples > 0,
+                rayd_budget=rayd_budget,
+            ),
+        )
+
+    @staticmethod
+    def _trace_rayd_optix_strict(
+        *,
+        scene,
+        grid,
+        initial_states,
+        recursive_states,
+        initial_sampler,
+        config,
+        samples_per_tx: int,
+        seed: int,
+        sample_sequence: str,
+        weighted_diagnostics: dict,
+        strategy_samples: Mapping[int, Mapping[str, int]],
+        max_depth: int,
+        rayd_budget: BDPTRaydAdaptiveBudget | None = None,
+    ) -> BDPTDiffractionResult:
+        depth = max(1, min(int(max_depth), BDPTDiffractionMIS.MAX_SUPPORTED_DIFFRACTION_DEPTH))
+        zero_counts = BDPTDiffractionMIS._zero_strategy_counts()
+        order_counts = {
+            order: BDPTDiffractionMIS._zero_strategy_counts()
+            for order in range(1, depth + 1)
+        }
+        total_direct_count = 0
+        total_keller_count = 0
+        total_suffix_count = 0
+        for order in range(1, depth + 1):
+            order_samples = strategy_samples[order]
+            direct_samples = int(order_samples[BDPTDiffractionMIS.DIRECT_STRATEGY])
+            keller_samples = int(order_samples[BDPTDiffractionMIS.KELLER_STRATEGY])
+            suffix_samples = int(order_samples[BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY])
+            if direct_samples <= 0 and keller_samples <= 0 and suffix_samples <= 0:
+                continue
+            if order == 1:
+                native_result = scene.accum_dfr_direct(
+                    diffraction_states=initial_states,
+                    grid=grid,
+                    config=config,
+                    seed=int(seed),
+                    samples=int(samples_per_tx),
+                    direct_samples=direct_samples,
+                    keller_samples=keller_samples,
+                    suffix_samples=suffix_samples,
+                    sample_sequence=str(sample_sequence),
+                    active=True,
+                )
+            else:
+                native_result = scene.accum_dfr(
+                    initial_states=initial_states,
+                    recursive_states=recursive_states,
+                    grid=grid,
+                    config=config,
+                    seed=int(seed),
+                    samples=int(samples_per_tx),
+                    direct_samples=direct_samples,
+                    keller_samples=keller_samples,
+                    suffix_samples=suffix_samples,
+                    max_order=int(order),
+                    sample_sequence=str(sample_sequence),
+                    active=True,
+                )
+            direct_count, keller_count, suffix_count = BDPTDiffractionMIS._apply_rayd_diffraction_result(
+                result=native_result,
+                grid=grid,
+                weighted_diagnostics=weighted_diagnostics,
+            )
+            order_counts[order] = {
+                BDPTDiffractionMIS.DIRECT_STRATEGY: direct_count,
+                BDPTDiffractionMIS.KELLER_STRATEGY: keller_count,
+                BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: suffix_count,
+            }
+            total_direct_count += direct_count
+            total_keller_count += keller_count
+            total_suffix_count += suffix_count
+
+        total_count = total_direct_count + total_keller_count + total_suffix_count
+        flat_samples = {
+            strategy: sum(int(samples[strategy]) for samples in strategy_samples.values())
+            for strategy in zero_counts
+        }
+        return BDPTDiffractionResult(
+            path_count=wt.UInt32(total_count),
+            state_count=int(dr.width(initial_states.edge_index)),
+            prefix_state_count=0,
+            edge_indices=wt.UInt32(initial_states.edge_index),
+            total_edge_length=float(initial_sampler.total_length_scalar),
+            strategy_counts={
+                BDPTDiffractionMIS.DIRECT_STRATEGY: total_direct_count,
+                BDPTDiffractionMIS.KELLER_STRATEGY: total_keller_count,
+                BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY: total_suffix_count,
+            },
+            strategy_samples=flat_samples,
+            order_counts=order_counts,
+            order_samples=strategy_samples,
+            tape=None,
+            runtime_backend=BDPTDiffractionMIS._rayd_strict_runtime_backend(
+                sample_sequence=str(sample_sequence),
+                max_order=depth,
+                suffix_enabled=any(
+                    int(samples[BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY]) > 0
+                    for samples in strategy_samples.values()
+                ),
+                rayd_budget=rayd_budget,
+            ),
+        )
 
     @staticmethod
     def exterior_angle(n0, nn):
@@ -1705,15 +2287,15 @@ class BDPTDiffractionMIS:
                 wt.Float(1.0),
             )
             eta = wave_math.complex_relative_permittivity(
-                material_inputs["eta_r"],
-                material_inputs["sigma"],
+                material_inputs.eta_r,
+                material_inputs.sigma,
                 material_omega,
             )
-            r_te, r_tm = wave_math.fresnel_reflection(cos_theta, eta, mu_r=material_inputs["mu_r"])
+            r_te, r_tm = wave_math.fresnel_reflection(cos_theta, eta, mu_r=material_inputs.mu_r)
             fresnel_power = wt.Float(0.5) * (
                 arrays.complex_abs_sqr(r_te) + arrays.complex_abs_sqr(r_tm)
             )
-            reflection_power = dr.square(material_inputs["gain"]) * fresnel_power
+            reflection_power = dr.square(material_inputs.gain) * fresnel_power
             suffix_fspl = dr.square(
                 wt.Float(config.wavelength / (4.0 * math.pi))
                 / dr.maximum(outgoing_dist, wt.Float(1.0e-6))
@@ -1799,14 +2381,43 @@ class BDPTDiffractionMIS:
         max_depth: int = 1,
         sample_sequence: str = SOBOL_SEQUENCE,
         prefix_store=None,
+        rayd_budget: BDPTRaydAdaptiveBudget | None = None,
         collect_ad_tapes: bool = False,
     ) -> BDPTDiffractionResult:
         depth = max(1, min(int(max_depth), BDPTDiffractionMIS.MAX_SUPPORTED_DIFFRACTION_DEPTH))
         include_reflection_coupled = bool(config.enable_bdpt_reflection_coupled_diffraction)
+        accumulate_mode = BDPTDiffractionMIS._diffraction_accumulate_primal_mode(
+            config,
+            collect_ad_tapes=collect_ad_tapes,
+        )
+        use_rayd_optix = accumulate_mode == "rayd_optix"
+        if rayd_budget is None and use_rayd_optix:
+            rayd_budget = BDPTDiffractionMIS.rayd_adaptive_budget_for_scene(
+                scene=scene,
+                grid=grid,
+                samples_per_tx=samples_per_tx,
+                max_depth=depth,
+                reflection_max_bounces=int(getattr(config, "reflection_max_bounces", 0)),
+                include_suffix_reflection=include_reflection_coupled,
+            )
         strategy_samples = BDPTDiffractionMIS.allocate_samples(
             samples_per_tx,
             depth,
             include_suffix_reflection=include_reflection_coupled,
+            suffix_sample_cap=(
+                rayd_budget.suffix_sample_cap
+                if use_rayd_optix and include_reflection_coupled and rayd_budget is not None
+                else None
+            ),
+        )
+        needs_prefix_states = bool(include_reflection_coupled) and any(
+            int(samples[BDPTDiffractionMIS.SUFFIX_REFLECTION_STRATEGY]) > 0
+            for samples in strategy_samples.values()
+        )
+        prefix_state_sample_cap = (
+            rayd_budget.prefix_state_sample_cap
+            if use_rayd_optix and needs_prefix_states and rayd_budget is not None
+            else None
         )
         zero_counts = BDPTDiffractionMIS._zero_strategy_counts()
         order_counts = {
@@ -1817,9 +2428,13 @@ class BDPTDiffractionMIS:
             tx_pos=tx_pos,
             scene=scene,
             config=config,
-            prefix_store=prefix_store if include_reflection_coupled else None,
+            prefix_store=prefix_store if needs_prefix_states else None,
+            prefix_state_sample_cap=prefix_state_sample_cap,
+            prefix_state_seed=int(seed),
         )
         initial_states = state_sets["initial"]
+        direct_states = state_sets.get("direct")
+        prefix_states = state_sets.get("prefix")
         recursive_states = state_sets["recursive"]
         prefix_state_count = int(state_sets["prefix_state_count"])
         if initial_states is None or recursive_states is None:
@@ -1850,6 +2465,39 @@ class BDPTDiffractionMIS:
             grid=grid,
             fallback_sampler=initial_sampler,
         )
+        if use_rayd_optix and depth == 1:
+            return BDPTDiffractionMIS._trace_order1_rayd_optix(
+                scene=scene,
+                grid=grid,
+                initial_states=initial_states,
+                direct_states=direct_states,
+                prefix_states=prefix_states,
+                initial_sampler=initial_sampler,
+                config=config,
+                samples_per_tx=samples_per_tx,
+                seed=seed,
+                sample_sequence=str(sample_sequence),
+                weighted_diagnostics=weighted_diagnostics,
+                strategy_samples=strategy_samples,
+                prefix_state_count=prefix_state_count,
+                rayd_budget=rayd_budget,
+            )
+        if use_rayd_optix:
+            return BDPTDiffractionMIS._trace_rayd_optix_strict(
+                scene=scene,
+                grid=grid,
+                initial_states=initial_states,
+                recursive_states=recursive_states,
+                initial_sampler=initial_sampler,
+                config=config,
+                samples_per_tx=samples_per_tx,
+                seed=seed,
+                sample_sequence=str(sample_sequence),
+                weighted_diagnostics=weighted_diagnostics,
+                strategy_samples=strategy_samples,
+                max_depth=depth,
+                rayd_budget=rayd_budget,
+            )
         edge_runtime = scene._selected_edge_runtime()
         edge_use_store = BDPTDiffractionEdgeUseStore(
             n_edges=0 if edge_runtime is None else int(edge_runtime.get("n_edges", 0))
@@ -1858,6 +2506,7 @@ class BDPTDiffractionMIS:
         total_keller_count = wt.UInt32(0)
         total_suffix_count = wt.UInt32(0)
         order_count_values = {}
+        runtime_backend = None
         contribution_store = GridContributionStore(
             capacity=max(0, int(samples_per_tx)),
             grid=grid,
@@ -2050,6 +2699,7 @@ class BDPTDiffractionMIS:
             order_counts=order_counts,
             order_samples=strategy_samples,
             tape=None if tape_store is None else tape_store.finalize(),
+            runtime_backend=runtime_backend,
         )
 
 

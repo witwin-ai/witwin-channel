@@ -6,7 +6,14 @@ import drjit as dr
 
 from ..config import ReflectionSuffixConfig
 from ..kernels.utd import utd_accumulate_forward
-from witwin.channel.core.runtime import Material, Rx, Tx, Wave
+from witwin.channel.core.runtime import (
+    Material,
+    Rx,
+    Tx,
+    Wave,
+    scene_geometry_grad_enabled,
+    scene_material_grad_enabled,
+)
 from witwin.channel.core.physics import polarization
 from witwin.channel.core.numerics.arrays import complex_zero, eval_complex, scalar
 from ..diffraction import accumulation as diffraction_accumulation
@@ -37,6 +44,106 @@ def _edge_anchor_coordinate(ctx) -> float:
     if getattr(sample_grid, "axis", "z") == "z":
         return float(sample_grid.position)
     return float(scalar(ctx.runtime.tx.position.z))
+
+
+def _value_grad_enabled(value) -> bool:
+    if value is None:
+        return False
+    try:
+        return bool(dr.grad_enabled(value))
+    except (TypeError, RuntimeError):
+        pass
+    if isinstance(value, dict):
+        return any(_value_grad_enabled(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_value_grad_enabled(item) for item in value)
+    if all(hasattr(value, axis) for axis in ("x", "y", "z")):
+        return any(_value_grad_enabled(getattr(value, axis)) for axis in ("x", "y", "z"))
+    if hasattr(value, "real") and hasattr(value, "imag"):
+        return _value_grad_enabled(value.real) or _value_grad_enabled(value.imag)
+    return False
+
+
+def _rayd_exact_coherent_auto_supported(
+    *,
+    state_arrays,
+    sample_grid,
+    scene,
+    tx,
+    suffix: ReflectionSuffixConfig,
+    shadow_support_cutoff_db,
+    allow_rayd_exact_coherent_auto: bool,
+) -> bool:
+    if not bool(allow_rayd_exact_coherent_auto):
+        return False
+    if sample_grid is None or suffix.enabled:
+        return False
+    if shadow_support_cutoff_db is not None:
+        return False
+    return not (
+        _value_grad_enabled(state_arrays)
+        or scene_geometry_grad_enabled(scene)
+        or scene_material_grad_enabled(scene)
+        or _value_grad_enabled(getattr(tx, "polarization", None))
+    )
+
+
+def _accumulate_rayd_exact_coherent(
+    *,
+    state_arrays,
+    sample_grid,
+    rx: Rx,
+    tx: Tx,
+    scene,
+    wave: Wave,
+    suffix: ReflectionSuffixConfig,
+    return_vector: bool,
+    return_scalar: bool,
+    receiver_axis: str,
+    ray_mode: str,
+):
+    if sample_grid is None:
+        raise RuntimeError(
+            "rayd_exact_coherent diffraction accumulation requires an axis-aligned receiver grid."
+        )
+    if suffix.enabled:
+        raise RuntimeError(
+            "rayd_exact_coherent currently supports first-order direct diffraction only."
+        )
+
+    result = scene.accum_dfr_coherent_direct(
+        diffraction_states=state_arrays,
+        grid=sample_grid,
+        config=wave,
+        active=True,
+        select_diffraction_point=str(ray_mode) != "2d",
+        prefilter_visibility=True,
+        tx_polarization=getattr(tx, "polarization", (1.0, 0.0, 0.0)),
+    )
+    direct_vector_total = polarization.vector_eval({
+        "x": result.direct_field_x,
+        "y": result.direct_field_y,
+        "z": result.direct_field_z,
+    })
+    multi_vector_total = polarization.vector_eval({
+        "x": result.multi_field_x,
+        "y": result.multi_field_y,
+        "z": result.multi_field_z,
+    })
+    total_vector = polarization.vector_eval(
+        polarization.vector_add(direct_vector_total, multi_vector_total)
+    )
+    total = None
+    if return_scalar:
+        active_rx_polarization = rx.effective_polarization(tx)
+        total = eval_complex(
+            polarization.scalarize_tangential_jones(
+                polarization.jones_tangential(total_vector, axis=receiver_axis),
+                active_rx_polarization,
+                axis=receiver_axis,
+            )
+        )
+    return total, total_vector if return_vector else None
 
 
 def trace(
@@ -316,6 +423,7 @@ def accumulate_coherent(
     receiver_axis: str | None = None,
     ray_mode: str = "3d",
     shadow_support_cutoff_db=None,
+    allow_rayd_exact_coherent_auto: bool = False,
 ):
     n_rx = int(dr.width(rx.positions.x))
     zero = complex_zero(n_rx)
@@ -326,6 +434,34 @@ def accumulate_coherent(
     resolved_receiver_axis = (
         str(receiver_axis) if receiver_axis is not None else str(sample_grid.axis)
     )
+    accumulate_mode = str(getattr(execution, "accumulate_primal", "auto"))
+    use_rayd_exact = accumulate_mode == "rayd_exact_coherent" or (
+        accumulate_mode == "auto"
+        and _rayd_exact_coherent_auto_supported(
+            state_arrays=state_arrays,
+            sample_grid=sample_grid,
+            scene=scene,
+            tx=tx,
+            suffix=suffix,
+            shadow_support_cutoff_db=shadow_support_cutoff_db,
+            allow_rayd_exact_coherent_auto=allow_rayd_exact_coherent_auto,
+        )
+    )
+    if use_rayd_exact:
+        return _accumulate_rayd_exact_coherent(
+            state_arrays=state_arrays,
+            sample_grid=sample_grid,
+            rx=rx,
+            tx=tx,
+            scene=scene,
+            wave=wave,
+            suffix=suffix,
+            return_vector=return_vector,
+            return_scalar=return_scalar,
+            receiver_axis=resolved_receiver_axis,
+            ray_mode=ray_mode,
+        )
+
     direct_total, multi_total, direct_vector_total, multi_vector_total, _ = (
         utd_accumulate_forward(
             state_arrays,

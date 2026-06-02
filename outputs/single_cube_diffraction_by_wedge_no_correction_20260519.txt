@@ -1,0 +1,17 @@
+n_edges=12
+raw_collection_count=1
+total_state_counts=[9]
+receiver_tile_metadata={'receiver_tiling_enabled': False, 'receiver_tile_size': 65536, 'receiver_tile_count': 1, 'receiver_tile_reports': ({'receiver_count': 65536, 'tile_size': 65536, 'tile_count': 1, 'enabled': False},)}
+max_abs_power_delta_between_total_and_sum=0.000000000000e+00
+edge=0 global=0 states=1 pos=(0,-1,0.5) dir=(1,0,0) db_min=-200 db_p95=-70.5728 db_max=-54.3392
+edge=1 global=2 states=1 pos=(-1,0,0.5) dir=(0,1,0) db_min=-200 db_p95=-78.031 db_max=-71.7422
+edge=2 global=3 states=1 pos=(-1,-1,1) dir=(0,0,1) db_min=-200 db_p95=-63.0922 db_max=-49.0841
+edge=3 global=6 states=0 pos=(1,0,0.5) dir=(0,1,0) db_min=-200 db_p95=-200 db_max=-200
+edge=4 global=7 states=1 pos=(1,-1,1) dir=(0,0,1) db_min=-200 db_p95=-62.2056 db_max=-52.0562
+edge=5 global=9 states=0 pos=(0,1,0.5) dir=(-1,0,0) db_min=-200 db_p95=-200 db_max=-200
+edge=6 global=10 states=0 pos=(1,1,1) dir=(0,0,1) db_min=-200 db_p95=-200 db_max=-200
+edge=7 global=12 states=1 pos=(-1,1,1) dir=(0,0,1) db_min=-200 db_p95=-63.4887 db_max=-51.2331
+edge=8 global=13 states=1 pos=(0,-1,2.5) dir=(1,0,0) db_min=-200 db_p95=-60.2792 db_max=-57.1508
+edge=9 global=15 states=1 pos=(-1,0,2.5) dir=(0,1,0) db_min=-200 db_p95=-64.7856 db_max=-56.5902
+edge=10 global=16 states=1 pos=(1,0,2.5) dir=(0,1,0) db_min=-200 db_p95=-62.3907 db_max=-58.5403
+edge=11 global=17 states=1 pos=(0,1,2.5) dir=(-1,0,0) db_min=-200 db_p95=-61.5463 db_max=-59.2746

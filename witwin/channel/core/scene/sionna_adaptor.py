@@ -16,7 +16,11 @@ from .edge_policy import EdgePolicy
 if TYPE_CHECKING:
     from .scene import Scene
 
-_LOCAL_SIONNA_CANDIDATES = (Path("sionna-rt-reference-2.0.0") / "src", Path("sionna-rt-reference") / "src")
+_LOCAL_SIONNA_CANDIDATES = (
+    Path("reference") / "sionna-rt-reference-2.0.1" / "src",
+    Path("sionna-rt-reference-2.0.0") / "src",
+    Path("sionna-rt-reference") / "src",
+)
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -189,7 +193,8 @@ class SionnaAdaptor:
                 searched = ", ".join(str(r) for r in roots) if roots else "<none>"
                 raise ImportError(
                     f"Unable to import sionna.rt. Checked local roots: {searched}. "
-                    "Install Sionna RT or place the source tree under `sionna-rt-reference-2.0.0/src`."
+                    "Install Sionna RT or place the source tree under "
+                    "`reference/sionna-rt-reference-2.0.1/src`."
                 ) from exc
             sionna_pkg = importlib.import_module("sionna")
 

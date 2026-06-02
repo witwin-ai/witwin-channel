@@ -20,11 +20,7 @@ from witwin.channel.core.scene import Mesh, Scene
 from witwin.channel.core.scene.builder import SceneBuilder
 from witwin.channel.core.numerics.arrays import (
     barrier,
-    broadcast_complex,
-    broadcast_float,
-    broadcast_int,
-    broadcast_point,
-    broadcast_vector,
+    broadcast,
     broadcast_vector_dict,
     complex_abs_sqr,
     complex_zero,
@@ -36,7 +32,7 @@ from witwin.channel.core.numerics.arrays import (
     eval_and_sync,
     eval_complex,
     eval_nested,
-    gather_point3,
+    gather,
     mask_count,
     safe_normalize,
     scalar,
@@ -64,7 +60,7 @@ def test_drjit_array_helpers_cover_init_concat_gather_and_normalize() -> None:
     assert _tolist(zeros_point3(2).x) == [0.0, 0.0]
     assert _tolist(zeros_vector3(2).y) == [0.0, 0.0]
     assert _tolist(concat_arrays(wt.Float, [wt.Float(), wt.Float([1.0, 2.0])])) == [1.0, 2.0]
-    assert _tolist(gather_point3(point, wt.UInt32([1, 0])).x) == [2.0, 1.0]
+    assert _tolist(gather(point, wt.UInt32([1, 0])).x) == [2.0, 1.0]
     assert _tolist(safe_normalize(vector).x) == pytest.approx([0.6, 0.0])
     assert _tolist(safe_normalize(vector).y) == pytest.approx([0.8, 0.0])
 
@@ -72,11 +68,11 @@ def test_drjit_array_helpers_cover_init_concat_gather_and_normalize() -> None:
 def test_broadcast_helpers_cover_scalar_complex_point_and_vector_dict() -> None:
     complex_value = wt.Complex2f(wt.Float([1.0]), wt.Float([2.0]))
 
-    assert _tolist(broadcast_float(wt.Float(2.0), 3)) == [2.0, 2.0, 2.0]
-    assert _tolist(broadcast_complex(complex_value, 2).real) == [1.0, 1.0]
-    assert _tolist(broadcast_int(wt.UInt32(7), 2)) == [7, 7]
-    assert _tolist(broadcast_point(wt.Point3f(1.0, 2.0, 3.0), 2).z) == [3.0, 3.0]
-    assert _tolist(broadcast_vector(wt.Vector3f(4.0, 5.0, 6.0), 2).x) == [4.0, 4.0]
+    assert _tolist(broadcast(wt.Float(2.0), 3)) == [2.0, 2.0, 2.0]
+    assert _tolist(broadcast(complex_value, 2).real) == [1.0, 1.0]
+    assert _tolist(broadcast(wt.UInt32(7), 2)) == [7, 7]
+    assert _tolist(broadcast(wt.Point3f(1.0, 2.0, 3.0), 2).z) == [3.0, 3.0]
+    assert _tolist(broadcast(wt.Vector3f(4.0, 5.0, 6.0), 2).x) == [4.0, 4.0]
 
     broadcast_dict = broadcast_vector_dict(
         {"x": complex_value, "y": complex_value, "z": complex_value}, 2,

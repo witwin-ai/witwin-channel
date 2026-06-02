@@ -31,7 +31,7 @@ def test_scene_rejects_invalid_modes_and_duplicate_structure_names(triangle_mesh
 
 
 def test_scene_ray_queries_material_queries_and_sync(triangle_scene: Scene, triangle_mesh: Mesh) -> None:
-    ray = rayd.Ray(wt.Point3f(0.2, 0.2, 1.0), wt.Vector3f(0.0, 0.0, -1.0))
+    ray = rayd.RayAD(wt.Point3f(0.2, 0.2, 1.0), wt.Vector3f(0.0, 0.0, -1.0))
     material = triangle_scene.triangle_material(wt.UInt32(0))
     intersection = triangle_scene.ray_intersect(ray)
 

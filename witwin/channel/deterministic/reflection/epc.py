@@ -17,15 +17,15 @@ from witwin.channel.deterministic import types as wt
 from witwin.channel.core.runtime import (
     Tx,
     Wave,
-    material_angular_frequency,
-    resolve_surface_material,
+    point_grad_enabled,
     scene_geometry_grad_enabled,
 )
+from witwin.channel.core.physics.materials import resolve_surface_material
+from witwin.channel.core.physics.wave_math import material_angular_frequency
 from witwin.channel.core.numerics.constants import EPS, RAY_ORIGIN_BIAS
 from witwin.channel.core.numerics.arrays import (
-    broadcast_point,
-    gather_point3,
-    gather_vector3,
+    broadcast,
+    gather,
     scalar,
     zeros_point3,
     zeros_vector3,
@@ -52,6 +52,7 @@ from .secondary_visibility import nearest_blocker_silhouette_edge
 
 RAYD_REFLECTION_EPC_MAX_BOUNCES = 8
 _RAYD_EPC_FINE_GEOMETRY_OPTIONS: bool | None = None
+_RAYD_EPC_FIELD_PIPELINE_AVAILABLE: bool | None = None
 
 
 # ---------- empty/zero return helpers --------------------------------------
@@ -144,6 +145,16 @@ def descriptor_material_has_grad(descriptor: Descriptor | None) -> bool:
             descriptor.slot_sigma,
             descriptor.slot_gain,
         )
+    )
+
+
+def descriptor_geometry_has_grad(descriptor: Descriptor | None) -> bool:
+    if descriptor is None:
+        return False
+    return (
+        point_has_grad(descriptor.image_source)
+        or point_has_grad(descriptor.slot_plane_point)
+        or point_has_grad(descriptor.slot_plane_normal)
     )
 
 
@@ -327,7 +338,7 @@ def build_descriptor(
     detail = coerce_trace_detail(reflection_detail)
     width = dr.width(path_idx)
     valid_mask = dr.full(wt.Bool, True, width)
-    img = gather_point3(paths.image_source, path_idx)
+    img = gather(paths.image_source, path_idx)
     image_source = wt.Point3f(img.x, img.y, img.z)
     slot_plane_points: list = []
     slot_plane_normals: list = []
@@ -336,8 +347,8 @@ def build_descriptor(
     slot_sigma: list = []
     slot_gain: list = []
     for slot in range(chain_depth):
-        pp = gather_point3(paths.plane_point(slot), path_idx)
-        pn = gather_vector3(paths.plane_normal(slot), path_idx)
+        pp = gather(paths.plane_point(slot), path_idx)
+        pn = gather(paths.plane_normal(slot), path_idx)
         slot_plane_points.append(wt.Point3f(pp.x, pp.y, pp.z))
         slot_plane_normals.append(wt.Vector3f(pn.x, pn.y, pn.z))
         prim_idx = wt.Int32(dr.gather(type(paths.prim_idx(slot)), paths.prim_idx(slot), path_idx))
@@ -347,10 +358,10 @@ def build_descriptor(
             default_gain=detail.reflection_gain,
             valid_mask=valid_mask,
         )
-        slot_eta_r.append(material_inputs["eta_r"])
-        slot_mu_r.append(material_inputs["mu_r"])
-        slot_sigma.append(material_inputs["sigma"])
-        slot_gain.append(material_inputs["gain"])
+        slot_eta_r.append(material_inputs.eta_r)
+        slot_mu_r.append(material_inputs.mu_r)
+        slot_sigma.append(material_inputs.sigma)
+        slot_gain.append(material_inputs.gain)
 
     return Descriptor(
         source_path_idx=wt.UInt32(path_idx),
@@ -770,7 +781,7 @@ def finalize_native_outputs(
             hit_p = gather_hit_point(slot_idx, hit_x_flat, hit_y_flat, hit_z_flat)
             prim_idx = dr.gather(wt.Int32, paths.prim_idx(slot), path_idx)
             valid_prim = prim_idx >= 0
-            geom_n = gather_vector3(paths.plane_normal(slot), path_idx)
+            geom_n = gather(paths.plane_normal(slot), path_idx)
             surface_hit = surface_contains(
                 hit_p,
                 prim_idx,
@@ -809,7 +820,7 @@ def finalize_native_outputs(
         slot_idx = slot_base + wt.UInt32(slot * width)
         hit_p = gather_hit_point(slot_idx, hit_x_flat, hit_y_flat, hit_z_flat)
         prim_idx = dr.gather(wt.Int32, paths.prim_idx(slot), path_idx)
-        geom_n = gather_vector3(paths.plane_normal(slot), path_idx)
+        geom_n = gather(paths.plane_normal(slot), path_idx)
         valid_prim = prim_idx >= 0
         surface_hit = surface_contains(
             hit_p,
@@ -899,8 +910,8 @@ def _reference_outputs_with_slot_override(
             plane_normal = override_plane_normal
             prim_idx = wt.Int32(override_prim_idx)
         else:
-            plane_point = gather_point3(paths.plane_point(slot), path_idx)
-            plane_normal = gather_vector3(paths.plane_normal(slot), path_idx)
+            plane_point = gather(paths.plane_point(slot), path_idx)
+            plane_normal = gather(paths.plane_normal(slot), path_idx)
             prim_idx = dr.gather(wt.Int32, paths.prim_idx(slot), path_idx)
         slot_plane_points.append(plane_point)
         slot_plane_normals.append(plane_normal)
@@ -910,12 +921,12 @@ def _reference_outputs_with_slot_override(
             default_gain=detail.reflection_gain,
             valid_mask=valid_mask & (prim_idx >= wt.Int32(0)),
         )
-        slot_eta_r.append(material_inputs["eta_r"])
-        slot_mu_r.append(material_inputs["mu_r"])
-        slot_sigma.append(material_inputs["sigma"])
-        slot_gain.append(material_inputs["gain"])
+        slot_eta_r.append(material_inputs.eta_r)
+        slot_mu_r.append(material_inputs.mu_r)
+        slot_sigma.append(material_inputs.sigma)
+        slot_gain.append(material_inputs.gain)
 
-    image_source = broadcast_point(tx.position, width)
+    image_source = broadcast(tx.position, width)
     for plane_point, plane_normal in zip(slot_plane_points, slot_plane_normals):
         image_source = reflect_point_across_plane(image_source, plane_point, plane_normal)
 
@@ -1003,7 +1014,7 @@ def _reference_branch_visibility(
             else dr.gather(wt.Int32, paths.prim_idx(slot), path_idx)
         )
         valid_prim = prim_idx >= wt.Int32(0)
-        geom_n = gather_vector3(paths.plane_normal(slot), path_idx)
+        geom_n = gather(paths.plane_normal(slot), path_idx)
         surface_hit = surface_contains(
             hit_p,
             prim_idx,
@@ -1092,8 +1103,8 @@ def finalize_reference_f_weight_outputs(
 
     for slot, hit_p in enumerate(hit_points):
         prim_idx = dr.gather(wt.Int32, paths.prim_idx(slot), path_idx)
-        plane_point = gather_point3(paths.plane_point(slot), path_idx)
-        geom_n = gather_vector3(paths.plane_normal(slot), path_idx)
+        plane_point = gather(paths.plane_point(slot), path_idx)
+        geom_n = gather(paths.plane_normal(slot), path_idx)
         valid_prim = prim_idx >= 0
         primary_side = surface_contains(
             hit_p,
@@ -1262,6 +1273,24 @@ def _detached_bool(value):
     return bool_type(dr.detach(value))
 
 
+def _rayd_point_arg(value, *, ad: bool):
+    if ad:
+        return wt.Point3f(value.x, value.y, value.z)
+    return _detached_point(value)
+
+
+def _rayd_bool_arg(value, *, ad: bool):
+    if ad:
+        return wt.Bool(value)
+    return _detached_bool(value)
+
+
+def _rayd_vector_arg(value, *, ad: bool):
+    if ad:
+        return wt.Vector3f(value.x, value.y, value.z)
+    return _detached_vector(value)
+
+
 def _detached_int(value):
     int_type = dr.detached_t(wt.Int32)
     return int_type(dr.detach(wt.Int32(value)))
@@ -1270,6 +1299,12 @@ def _detached_int(value):
 def _detached_float(value):
     float_type = dr.detached_t(wt.Float)
     return float_type(dr.detach(wt.Float(value)))
+
+
+def _rayd_float_arg(value, *, ad: bool):
+    if ad:
+        return wt.Float(value)
+    return _detached_float(value)
 
 
 def _point_from_rayd(value):
@@ -1371,73 +1406,83 @@ def _rayd_epc_field_options(
     tx: Tx,
     return_geometry: bool,
     return_endpoints: bool,
+    ad: bool,
 ):
+    if ad and not hasattr(rayd, "ReflEpcFieldOptionsAD"):
+        raise RuntimeError("RayD ReflEpcFieldOptionsAD is required for AD reflection EPC.")
+    options_type = rayd.ReflEpcFieldOptionsAD if ad else rayd.ReflEpcFieldOptions
     options = _populate_rayd_epc_options(
-        rayd.ReflectionEpcFieldOptions(),
+        options_type(),
         scene=scene,
         paths=paths,
         resolved_path_idx=resolved_path_idx,
         chain_depth=chain_depth,
         width=width,
     )
-    options.slot_plane_point = _detached_vector(
+    options.slot_plane_point = _rayd_vector_arg(
         _rayd_lane_major_slot_vector(
             descriptor.slot_plane_point,
             descriptor=descriptor,
             descriptor_path_idx=descriptor_path_idx,
             chain_depth=chain_depth,
             width=width,
-        )
+        ),
+        ad=ad,
     )
-    options.slot_plane_normal = _detached_vector(
+    options.slot_plane_normal = _rayd_vector_arg(
         _rayd_lane_major_slot_vector(
             descriptor.slot_plane_normal,
             descriptor=descriptor,
             descriptor_path_idx=descriptor_path_idx,
             chain_depth=chain_depth,
             width=width,
-        )
+        ),
+        ad=ad,
     )
-    options.slot_eta_r = _detached_float(
+    options.slot_eta_r = _rayd_float_arg(
         _rayd_lane_major_slot_float(
             descriptor.slot_eta_r,
             descriptor=descriptor,
             descriptor_path_idx=descriptor_path_idx,
             chain_depth=chain_depth,
             width=width,
-        )
+        ),
+        ad=ad,
     )
-    options.slot_mu_r = _detached_float(
+    options.slot_mu_r = _rayd_float_arg(
         _rayd_lane_major_slot_float(
             descriptor.slot_mu_r,
             descriptor=descriptor,
             descriptor_path_idx=descriptor_path_idx,
             chain_depth=chain_depth,
             width=width,
-        )
+        ),
+        ad=ad,
     )
-    options.slot_sigma = _detached_float(
+    options.slot_sigma = _rayd_float_arg(
         _rayd_lane_major_slot_float(
             descriptor.slot_sigma,
             descriptor=descriptor,
             descriptor_path_idx=descriptor_path_idx,
             chain_depth=chain_depth,
             width=width,
-        )
+        ),
+        ad=ad,
     )
-    options.slot_gain = _detached_float(
+    options.slot_gain = _rayd_float_arg(
         _rayd_lane_major_slot_float(
             descriptor.slot_gain,
             descriptor=descriptor,
             descriptor_path_idx=descriptor_path_idx,
             chain_depth=chain_depth,
             width=width,
-        )
+        ),
+        ad=ad,
     )
-    options.tx_polarization = _detached_vector(tx.polarization)
+    options.tx_polarization = _rayd_vector_arg(tx.polarization, ad=ad)
     options.omega = float(material_angular_frequency(wave.wavelength_scalar)[0])
     options.wavelength = float(wave.wavelength_scalar)
-    options.return_geometry = bool(return_geometry)
+    options.return_geom = bool(return_geometry)
     options.return_endpoints = bool(return_endpoints)
     options.return_hit_points = bool(return_geometry)
     options.return_normals = bool(return_geometry)
@@ -1455,7 +1500,7 @@ def _target_adjacent_faces_present(target_adjacent_faces) -> bool:
 def _rayd_epc_supports_fine_geometry_options() -> bool:
     global _RAYD_EPC_FINE_GEOMETRY_OPTIONS
     if _RAYD_EPC_FINE_GEOMETRY_OPTIONS is None:
-        field_options = rayd.ReflectionEpcFieldOptions()
+        field_options = rayd.ReflEpcFieldOptions()
         _RAYD_EPC_FINE_GEOMETRY_OPTIONS = all(
             hasattr(field_options, attr)
             for attr in (
@@ -1470,35 +1515,25 @@ def _rayd_epc_supports_fine_geometry_options() -> bool:
 
 def rayd_epc_eligible(
     *,
-    paths,
-    target_pos,
     chain_depth: int,
     scene,
     target_adjacent_faces,
-    descriptor: Descriptor | None,
-    native_eligible: bool | None = None,
 ) -> bool:
     if chain_depth <= 0 or chain_depth > RAYD_REFLECTION_EPC_MAX_BOUNCES:
+        return False
+    if _RAYD_EPC_FIELD_PIPELINE_AVAILABLE is False:
         return False
     if _target_adjacent_faces_present(target_adjacent_faces):
         return False
     if scene is None or getattr(scene, "_rayd_scene", None) is None:
         return False
-    if not hasattr(scene._rayd_scene, "trace_reflection_epc_field_direct"):
+    if not hasattr(scene._rayd_scene, "trace_refl_epc_field"):
         return False
     if not _rayd_epc_supports_fine_geometry_options():
         return False
     if hasattr(scene, "_symbolic_recording_active") and scene._symbolic_recording_active():
         return False
-    if native_eligible is not None:
-        return bool(native_eligible)
-    return native_epc_eligible(
-        paths,
-        target_pos,
-        chain_depth,
-        scene=scene,
-        descriptor=descriptor,
-    )
+    return True
 
 
 def chain_to_target_rayd(
@@ -1538,8 +1573,15 @@ def chain_to_target_rayd(
     if int(descriptor.n_paths) <= 0:
         return empty_return(width, chain_depth, return_geometry, return_endpoints)
 
-    tx_pos = broadcast_point(tx.position, width)
+    tx_pos = broadcast(tx.position, width)
     slot_base = dr.arange(wt.UInt32, width) * wt.UInt32(chain_depth)
+    use_rayd_ad = (
+        point_grad_enabled(tx_pos)
+        or point_grad_enabled(target_pos)
+        or descriptor_geometry_has_grad(descriptor)
+        or descriptor_material_has_grad(descriptor)
+        or point_has_grad(tx.polarization)
+    )
     options = _rayd_epc_field_options(
         scene=scene,
         paths=paths,
@@ -1552,15 +1594,16 @@ def chain_to_target_rayd(
         tx=tx,
         return_geometry=return_geometry,
         return_endpoints=return_endpoints and not return_geometry,
+        ad=use_rayd_ad,
     )
     active = dr.full(wt.Bool, True, width)
     with dr.scoped_set_flag(dr.JitFlag.Recording, False):
-        rayd_result = scene._rayd_scene.trace_reflection_epc_field_direct(
-            _detached_point(tx_pos),
-            _detached_point(target_pos),
+        rayd_result = scene._rayd_scene.trace_refl_epc_field(
+            _rayd_point_arg(tx_pos, ad=use_rayd_ad),
+            _rayd_point_arg(target_pos, ad=use_rayd_ad),
             int(chain_depth),
             options=options,
-            active=_detached_bool(active),
+            active=_rayd_bool_arg(active, ad=use_rayd_ad),
         )
 
     valid = wt.Bool(rayd_result.valid) & (wt.Int32(rayd_result.bounce_count) == wt.Int32(chain_depth))
@@ -1587,8 +1630,8 @@ def chain_to_target_rayd(
         prim_indices: list = []
         for slot in range(chain_depth):
             rayd_slot_idx = slot_base + wt.UInt32(slot)
-            hit_points.append(_point_from_rayd(gather_point3(rayd_result.hit_points, rayd_slot_idx)))
-            normals.append(_vector_from_rayd(gather_point3(rayd_result.normals, rayd_slot_idx)))
+            hit_points.append(_point_from_rayd(gather(rayd_result.hit_points, rayd_slot_idx)))
+            normals.append(_vector_from_rayd(gather(rayd_result.normals, rayd_slot_idx)))
             prim_indices.append(dr.gather(wt.Int32, paths.prim_idx(slot), resolved_path_idx))
         return valid, chain_vector, {
             "tx_pos": tx_pos,
@@ -1763,6 +1806,7 @@ def chain_to_target(
     return_endpoints: bool = False,
     epc_descriptor: Descriptor | None = None,
     prefer_rayd_epc: bool = True,
+    require_rayd_epc: bool = False,
 ):
     """Image-source EPC of a reflection chain to ``target_pos``."""
     width = dr.width(target_pos.x)
@@ -1773,7 +1817,6 @@ def chain_to_target(
     n_paths = int(paths.n_paths)
     if chain_depth <= 0 or n_paths <= 0:
         return empty_return(width, chain_depth, return_geometry, return_endpoints)
-
     detail = coerce_trace_detail(reflection_detail)
     if (
         detail.reflection_transition_mode in {"f_weight_reference", "f_weight_native"}
@@ -1793,6 +1836,35 @@ def chain_to_target(
             epc_descriptor=epc_descriptor,
         )
 
+    rayd_eligible = prefer_rayd_epc and rayd_epc_eligible(
+        chain_depth=chain_depth,
+        scene=scene,
+        target_adjacent_faces=target_adjacent_faces,
+    )
+    if rayd_eligible:
+        try:
+            return chain_to_target_rayd(
+                paths=paths,
+                path_idx=path_idx,
+                target_pos=target_pos,
+                scene=scene,
+                reflection_detail=detail,
+                wave=wave,
+                tx=tx,
+                return_geometry=return_geometry,
+                return_endpoints=return_endpoints,
+                epc_descriptor=epc_descriptor,
+            )
+        except RuntimeError as exc:
+            if require_rayd_epc or "optixPipelineCreate" not in str(exc):
+                raise
+            global _RAYD_EPC_FIELD_PIPELINE_AVAILABLE
+            _RAYD_EPC_FIELD_PIPELINE_AVAILABLE = False
+    if require_rayd_epc:
+        raise RuntimeError(
+            "RayD reflection EPC was required for this path solve, but the workload "
+            "is not eligible for scene._rayd_scene.trace_refl_epc_field()."
+        )
     native_eligible = native_epc_eligible(
         paths,
         target_pos,
@@ -1800,28 +1872,6 @@ def chain_to_target(
         scene=scene,
         descriptor=epc_descriptor,
     )
-    use_custom_op = not native_eligible
-    if prefer_rayd_epc and native_eligible and rayd_epc_eligible(
-        paths=paths,
-        target_pos=target_pos,
-        chain_depth=chain_depth,
-        scene=scene,
-        target_adjacent_faces=target_adjacent_faces,
-        descriptor=epc_descriptor,
-        native_eligible=native_eligible,
-    ):
-        return chain_to_target_rayd(
-            paths=paths,
-            path_idx=path_idx,
-            target_pos=target_pos,
-            scene=scene,
-            reflection_detail=detail,
-            wave=wave,
-            tx=tx,
-            return_geometry=return_geometry,
-            return_endpoints=return_endpoints,
-            epc_descriptor=epc_descriptor,
-        )
     return chain_to_target_native(
         paths=paths,
         path_idx=path_idx,
@@ -1833,7 +1883,7 @@ def chain_to_target(
         tx=tx,
         return_geometry=return_geometry,
         return_endpoints=return_endpoints,
-        use_custom_op=use_custom_op,
+        use_custom_op=not native_eligible,
         epc_descriptor=epc_descriptor,
     )
 

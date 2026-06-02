@@ -156,7 +156,7 @@ def _profile_once(*, scene, n_rays: int, max_bounces: int, frequency_hz: float) 
             stats,
             "rayd.trace_reflections",
             lambda: scene._rayd_scene.trace_reflections(
-                rayd.RayDetached(ray_origin_detached, ray_dir_detached),
+                rayd.Ray(ray_origin_detached, ray_dir_detached),
                 int(max_bounces),
                 options,
                 dr.full(dr.detached_t(wt.Bool), True, int(n_rays)),

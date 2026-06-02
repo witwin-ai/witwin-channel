@@ -274,6 +274,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=("default", "memory_safe"),
         default="default",
     )
+    parser.add_argument(
+        "--diffraction-accumulate-primal",
+        choices=("auto", "drjit", "rayd_optix", "rayd_exact_coherent"),
+        default="auto",
+    )
     parser.add_argument("--frequency-hz", type=float, default=DEFAULT_FREQUENCY_HZ)
     parser.add_argument("--plane-z", type=float, default=DEFAULT_PLANE_Z)
     parser.add_argument("--tx-x", type=float, default=DEFAULT_TX_POS[0])
@@ -358,6 +363,9 @@ def run_profile(args: argparse.Namespace) -> dict[str, Any]:
             enable_rd_diffraction=int(args.max_diffractions) > 0,
             solver_mode=str(args.solver_mode),
             memory_profile=str(args.memory_profile),
+            diffraction_execution={
+                "accumulate_primal": str(args.diffraction_accumulate_primal),
+            },
         ),
     )
 

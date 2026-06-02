@@ -166,7 +166,7 @@ class ShadowBoundary:
         tri_data = None if scene is None else scene._triangle_runtime()
         if tri_data is None:
             return dr.full(wt.Bool, True, n_cells), dr.full(wt.Int32, -1, n_cells)
-        source_pos = arrays.broadcast_point(tx_pos, n_cells)
+        source_pos = arrays.broadcast(tx_pos, n_cells)
         seg_vec = grid.cell_centers - source_pos
         seg_len = dr.norm(seg_vec)
         min_seg_len = wt.Float(2.0 * RAY_ORIGIN_BIAS + EPS)
@@ -213,14 +213,14 @@ class ShadowBoundary:
         k: float,
     ):
         width = int(dr.width(target_pos.x))
-        edge_pos_b = arrays.broadcast_point(edge_pos, width)
+        edge_pos_b = arrays.broadcast(edge_pos, width)
         edge_hat = normalize_real_with_fallback(
-            arrays.broadcast_vector(edge_dir, width),
+            arrays.broadcast(edge_dir, width),
             wt.Vector3f(0.0, 0.0, 1.0),
         )
-        source_pos_b = arrays.broadcast_point(source_pos, width)
-        line_min = arrays.broadcast_float(edge_line_min, width)
-        line_max = arrays.broadcast_float(edge_line_max, width)
+        source_pos_b = arrays.broadcast(source_pos, width)
+        line_min = arrays.broadcast(edge_line_min, width)
+        line_max = arrays.broadcast(edge_line_max, width)
 
         source_axial = dr.dot(source_pos_b - edge_pos_b, edge_hat)
         target_axial = dr.dot(target_pos - edge_pos_b, edge_hat)
@@ -328,11 +328,11 @@ class ShadowBoundary:
 
         for state_index in range(n_states):
             state = states.gather(wt.UInt32(state_index))
-            edge_pos = arrays.broadcast_point(state.edge_pos, n_cells)
-            edge_dir = arrays.broadcast_vector(state.edge_dir, n_cells)
-            n0 = arrays.broadcast_vector(state.n0, n_cells)
-            nn = arrays.broadcast_vector(state.n_face_n, n_cells)
-            source_pos = arrays.broadcast_point(state.source_pos, n_cells)
+            edge_pos = arrays.broadcast(state.edge_pos, n_cells)
+            edge_dir = arrays.broadcast(state.edge_dir, n_cells)
+            n0 = arrays.broadcast(state.n0, n_cells)
+            nn = arrays.broadcast(state.n_face_n, n_cells)
+            source_pos = arrays.broadcast(state.source_pos, n_cells)
             incident_dir = edge_pos - source_pos
             flip = dr.dot(incident_dir, n0) > wt.Float(0.0)
             oriented_edge_dir = dr.select(flip, -edge_dir, edge_dir)
@@ -392,11 +392,11 @@ class ShadowBoundary:
                 finite_amplitude,
                 wt.Float(0.0),
             )
-            adjacent_group0 = arrays.broadcast_int(
+            adjacent_group0 = arrays.broadcast(
                 dr.gather(wt.Int32, edge_adjacent_group0, wt.UInt32(state_index)),
                 n_cells,
             )
-            adjacent_group1 = arrays.broadcast_int(
+            adjacent_group1 = arrays.broadcast(
                 dr.gather(wt.Int32, edge_adjacent_group1, wt.UInt32(state_index)),
                 n_cells,
             )

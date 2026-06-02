@@ -14,7 +14,7 @@ from witwin.channel.core.results import (
     RadioMapPowerPayload,
     RadioMapResult,
 )
-from witwin.channel.core.numerics.tensors import drjit_to_torch_view, to_float_tensor
+from witwin.channel.core.numerics.tensors import to_torch_view, to_float_tensor
 from witwin.core import Box, Material, Structure
 
 
@@ -239,8 +239,8 @@ def test_radiomap_multi_tx_contract_and_helpers():
     assert tuple(result.sinr.shape) == (2, 2, 3)
     assert tuple(result.best_tx_index.shape) == (2, 3)
     assert tuple(result.cell_association().shape) == (2, 3)
-    rss = drjit_to_torch_view(result.rss, dtype=torch.float32)
-    best = drjit_to_torch_view(result.cell_association(), dtype=torch.int32)
+    rss = to_torch_view(result.rss, dtype=torch.float32)
+    best = to_torch_view(result.cell_association(), dtype=torch.int32)
     assert torch.equal(best, torch.argmax(rss, dim=0).to(dtype=torch.int32))
 
     single = result.squeeze_tx(0)
@@ -274,8 +274,8 @@ def test_radiomap_squeeze_tx_resets_single_tx_association_map():
     )
 
     squeezed = crafted.squeeze_tx(0)
-    best = drjit_to_torch_view(squeezed.best_tx_index, dtype=torch.int32)
-    association = drjit_to_torch_view(squeezed.cell_association(), dtype=torch.int32)
+    best = to_torch_view(squeezed.best_tx_index, dtype=torch.int32)
+    association = to_torch_view(squeezed.cell_association(), dtype=torch.int32)
 
     assert tuple(squeezed.rss.shape) == (2, 3)
     assert torch.count_nonzero(best).item() == 0

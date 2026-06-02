@@ -9,7 +9,7 @@ from ..kernels.radio_map_accumulate.native_impl import (
     accumulate_vector_power_pairs,
 )
 from witwin.channel.core.runtime import Material, Rx, Tx, Wave
-from witwin.channel.core.numerics.arrays import gather_point3
+from witwin.channel.core.numerics.arrays import gather
 from witwin.channel.core.physics.polarization import (
     jones_tangential,
     scalarize_tangential_jones,
@@ -204,12 +204,12 @@ def accumulate_chunk_vector(
     local_path_idx = pair_idx // local_n_rx
     local_rx_slot = pair_idx % local_n_rx
     rx_idx = dr.gather(type(receiver_idx), receiver_idx, local_rx_slot)
-    target_pos = gather_point3(rx_pos, rx_idx)
+    target_pos = gather(rx_pos, rx_idx)
     descriptor_path_idx = (
         dr.gather(type(chunk_path_idx), chunk_path_idx, local_path_idx)
         if descriptor_full_paths else local_path_idx
     )
-    image_source = gather_point3(epc_descriptor.image_source, descriptor_path_idx)
+    image_source = gather(epc_descriptor.image_source, descriptor_path_idx)
     valid, chain_vector, geometry = epc.chain_to_target(
         paths=paths_set, path_idx=descriptor_path_idx, target_pos=target_pos,
         scene=scene, target_adjacent_faces=(),
@@ -221,9 +221,9 @@ def accumulate_chunk_vector(
         return
 
     rx_idx_keep = dr.gather(type(rx_idx), rx_idx, keep_idx)
-    target_pos_keep = gather_point3(target_pos, keep_idx)
-    image_source_keep = gather_point3(image_source, keep_idx)
-    last_hit_keep = gather_point3(geometry["last_hit"], keep_idx)
+    target_pos_keep = gather(target_pos, keep_idx)
+    image_source_keep = gather(image_source, keep_idx)
+    last_hit_keep = gather(geometry["last_hit"], keep_idx)
     field_vector = {
         axis: dr.gather(wt.Complex2f, chain_vector[axis], keep_idx)
         for axis in ("x", "y", "z")

@@ -6,7 +6,8 @@ from dataclasses import replace
 
 from witwin.channel.core.scene import ReceiverGrid, Scene, Transmitter
 from witwin.channel.core.results import RadioMapResult, stack_radiomap_results
-from witwin.channel.core.runtime import assert_scene_materials_complete, to_point3f
+from witwin.channel.core.runtime import assert_scene_materials_complete
+from witwin.channel.core.geometry.mesh_buffers import to_point3f
 from witwin.channel.core.numerics.tensors import to_mapping_proxy
 from witwin.channel.montecarlo import types as wt
 

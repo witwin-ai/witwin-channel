@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import drjit as dr
 from witwin.channel.montecarlo import types as wt
 
-from witwin.channel.core.numerics.arrays import broadcast_complex, broadcast_point
+from witwin.channel.core.numerics.arrays import broadcast
 from witwin.channel.core.numerics.constants import EPS, RAY_ORIGIN_BIAS
 from witwin.channel.core.geometry import point_on_axis_aligned_plane
 
@@ -226,10 +226,10 @@ def scatter(
 def point_source(source_pos, source_weight, target_pos, wavelength, k):
     """Free-space point-source field (Green's function) with phase."""
     width = dr.width(target_pos.x)
-    source_pos_b = broadcast_point(source_pos, width)
+    source_pos_b = broadcast(source_pos, width)
     distance = dr.norm(target_pos - source_pos_b) + EPS
     phase = dr.exp(wt.Complex2f(0, -wt.Float(k) * distance))
-    source_w = broadcast_complex(source_weight, width)
+    source_w = broadcast(source_weight, width)
     fspl = wt.Float(wavelength / (4.0 * math.pi)) / distance
     return source_w * fspl * phase
 

@@ -11,7 +11,7 @@ from witwin.channel.core.numerics.tensors import (
     BoolTensor,
     FloatTensor,
     IntTensor,
-    drjit_to_torch_view,
+    to_torch_view,
     to_bool_tensor,
     to_complex_array,
     to_float_tensor,
@@ -87,7 +87,7 @@ class PathResult:
         return (*self.path_shape, self.max_depth)
 
     def coeff_tensor(self) -> torch.Tensor:
-        return drjit_to_torch_view(self.a, dtype=torch.complex64).reshape(self.coeff_shape)
+        return to_torch_view(self.a, dtype=torch.complex64).reshape(self.coeff_shape)
 
     @classmethod
     def _from_payload(cls, payload: Mapping[str, object]) -> "PathResult":
@@ -140,8 +140,8 @@ class PathResult:
         )
 
     def cir(self, *, normalize_delays: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
-        tau = drjit_to_torch_view(self.tau, dtype=torch.float32)
-        valid = drjit_to_torch_view(self.valid, dtype=torch.bool)
+        tau = to_torch_view(self.tau, dtype=torch.float32)
+        valid = to_torch_view(self.valid, dtype=torch.bool)
         coeff = self.coeff_tensor()
         if normalize_delays:
             tau = tau - _masked_min(tau, valid)
@@ -150,10 +150,10 @@ class PathResult:
         return torch.where(coeff_valid, coeff, torch.zeros_like(coeff)), tau
 
     def cfr(self, frequencies: torch.Tensor, *, normalize_delays: bool = True) -> torch.Tensor:
-        freq_tensor = drjit_to_torch_view(frequencies)
+        freq_tensor = to_torch_view(frequencies)
         coeff = self.coeff_tensor()
-        valid = drjit_to_torch_view(self.valid, dtype=torch.bool)
-        tau = drjit_to_torch_view(self.tau, dtype=torch.float32)
+        valid = to_torch_view(self.valid, dtype=torch.bool)
+        tau = to_torch_view(self.tau, dtype=torch.float32)
         freq = freq_tensor.to(
             device=coeff.device,
             dtype=freq_tensor.dtype if torch.is_complex(freq_tensor) else torch.float32,
@@ -172,8 +172,8 @@ class PathResult:
         if int(num_taps) <= 0:
             raise ValueError("num_taps must be > 0.")
         coeff = self.coeff_tensor()
-        tau = drjit_to_torch_view(self.tau, dtype=torch.float32)
-        valid = drjit_to_torch_view(self.valid, dtype=torch.bool)
+        tau = to_torch_view(self.tau, dtype=torch.float32)
+        valid = to_torch_view(self.valid, dtype=torch.bool)
         if normalize_delays:
             tau = tau - _masked_min(tau, valid)
         tap_idx = torch.round(tau * float(bandwidth)).to(dtype=torch.int64)
@@ -204,16 +204,16 @@ class PathResult:
         if len(interaction_types) == 0:
             return self
         coeff = self.coeff_tensor()
-        tau = drjit_to_torch_view(self.tau, dtype=torch.float32)
-        theta_t = drjit_to_torch_view(self.theta_t, dtype=torch.float32)
-        phi_t = drjit_to_torch_view(self.phi_t, dtype=torch.float32)
-        theta_r = drjit_to_torch_view(self.theta_r, dtype=torch.float32)
-        phi_r = drjit_to_torch_view(self.phi_r, dtype=torch.float32)
-        valid = drjit_to_torch_view(self.valid, dtype=torch.bool)
-        types = drjit_to_torch_view(self.types, dtype=torch.int32)
-        vertices = None if self.vertices is None else drjit_to_torch_view(self.vertices, dtype=torch.float32)
-        normals = None if self.normals is None else drjit_to_torch_view(self.normals, dtype=torch.float32)
-        objects = None if self.objects is None else drjit_to_torch_view(self.objects, dtype=torch.int32)
+        tau = to_torch_view(self.tau, dtype=torch.float32)
+        theta_t = to_torch_view(self.theta_t, dtype=torch.float32)
+        phi_t = to_torch_view(self.phi_t, dtype=torch.float32)
+        theta_r = to_torch_view(self.theta_r, dtype=torch.float32)
+        phi_r = to_torch_view(self.phi_r, dtype=torch.float32)
+        valid = to_torch_view(self.valid, dtype=torch.bool)
+        types = to_torch_view(self.types, dtype=torch.int32)
+        vertices = None if self.vertices is None else to_torch_view(self.vertices, dtype=torch.float32)
+        normals = None if self.normals is None else to_torch_view(self.normals, dtype=torch.float32)
+        objects = None if self.objects is None else to_torch_view(self.objects, dtype=torch.int32)
 
         type_values = {int(v) for v in interaction_types}
         non_empty = types != 0

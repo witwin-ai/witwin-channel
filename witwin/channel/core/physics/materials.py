@@ -37,8 +37,8 @@ def resolve_surface_material(
     prim_idx,
     default_gain: float,
     valid_mask=None,
-) -> dict[str, object]:
-    """Resolve per-triangle material inputs.
+) -> FaceMaterial:
+    """Resolve per-triangle Fresnel material parameters.
 
     Materials must come from the scene's triangle material table. Solver-local
     material fallback is intentionally not supported.
@@ -55,15 +55,13 @@ def resolve_surface_material(
         )
 
     triangle_material = scene.triangle_material(prim_idx_i32, valid_mask=valid_mask)
-    return {
-        "eta_r": triangle_material["eps_r"],
-        "sigma": triangle_material["sigma_e"],
-        "gain": dr.full(wt.Float, float(default_gain), width),
-        "use_fresnel": triangle_material["valid"],
-        "mu_r": triangle_material["mu_r"],
-        "structure_idx": triangle_material["structure_idx"],
-        "valid": triangle_material["valid"],
-    }
+    return FaceMaterial(
+        eta_r=triangle_material["eps_r"],
+        sigma=triangle_material["sigma_e"],
+        gain=dr.full(wt.Float, float(default_gain), width),
+        use_fresnel=triangle_material["valid"],
+        mu_r=triangle_material["mu_r"],
+    )
 
 
 __all__ = [

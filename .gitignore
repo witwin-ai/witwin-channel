@@ -15,6 +15,7 @@ sionna-rt-reference/
 sionna-rt-reference
 sionna-rt-reference-2.0.0/
 sionna-rt-reference-2.0.0
+reference/
 
 # C extensions
 *.so

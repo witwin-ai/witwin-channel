@@ -21,9 +21,7 @@ class ReceiverGridLike(Protocol):
     n_cells: int
 
 
-AccumulatePrimalMode = Literal["drjit"]
-AccumulateJvpMode = Literal["drjit_replay"]
-AccumulateBackwardMode = Literal["drjit_replay"]
+AccumulatePrimalMode = Literal["auto", "drjit", "rayd_optix"]
 SuffixBackend = Literal["drjit", "native"]
 SuffixDdaMode = Literal["symbolic"]
 ShadowBoundaryMode = Literal["none", "utd_power_smoothing"]
@@ -92,12 +90,18 @@ class FilterConfig:
 
 @dataclass(slots=True)
 class DiffractionExecutionConfig:
-    accumulate_primal: AccumulatePrimalMode = "drjit"
-    accumulate_jvp: AccumulateJvpMode = "drjit_replay"
-    accumulate_backward: AccumulateBackwardMode = "drjit_replay"
+    accumulate_primal: AccumulatePrimalMode = "auto"
     suffix_backend: SuffixBackend = "native"
     suffix_dda: SuffixDdaMode = "symbolic"
     suffix_russian_roulette: bool = False
+
+    def __post_init__(self):
+        if self.accumulate_primal not in _ALLOWED_DIFFRACTION_ACCUMULATE_PRIMAL:
+            raise ValueError(
+                "accumulate_primal must be one of "
+                f"{sorted(_ALLOWED_DIFFRACTION_ACCUMULATE_PRIMAL)}; "
+                f"got {self.accumulate_primal!r}."
+            )
 
 
 def _coerce_diffraction_execution(
@@ -134,6 +138,7 @@ class TraceConfig:
 
 _ALLOWED_INTEGRATORS = {"basic", "bdpt"}
 _ALLOWED_ACCUMULATION = {"auto", "native_monte_carlo", "rayd_reflection_accumulation"}
+_ALLOWED_DIFFRACTION_ACCUMULATE_PRIMAL = {"auto", "drjit", "rayd_optix"}
 _ALLOWED_SHADOW_MODES = {"none", "utd_power_smoothing"}
 _ALLOWED_SHADOW_BACKENDS = {"auto", "drjit", "native_candidate"}
 _ALLOWED_BDPT_SAMPLING = {"hash", "sobol"}
@@ -402,8 +407,6 @@ class ResolvedTraceConfig(ResolvedTraceBase):
 
 
 __all__ = [
-    "AccumulateBackwardMode",
-    "AccumulateJvpMode",
     "AccumulatePrimalMode",
     "AccumulationBackend",
     "BDPTDiffractionSampling",

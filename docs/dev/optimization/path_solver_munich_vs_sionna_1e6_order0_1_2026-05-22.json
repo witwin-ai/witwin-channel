@@ -1,0 +1,452 @@
+{
+  "cases": [
+    {
+      "max_diffraction_order": 0,
+      "samples": 1000000,
+      "sionna": {
+        "error": null,
+        "ok": true,
+        "profile": {
+          "mean_ms": 18.420099998669077,
+          "median_ms": 18.546699997386895,
+          "samples_ms": [
+            18.71699999901466,
+            17.996599999605678,
+            18.546699997386895
+          ]
+        },
+        "stats": {
+          "finite_tau": true,
+          "label": "sionna_path",
+          "per_pair_counts": [
+            [
+              4,
+              6
+            ],
+            [
+              4,
+              6
+            ],
+            [
+              4,
+              4
+            ]
+          ],
+          "valid_paths": 28
+        },
+        "supported": true
+      },
+      "speed": {
+        "sionna_over_witwin_median": 2.3071191309394723,
+        "witwin_over_sionna_median": 0.43344098992963326
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [],
+          "path_counts": {
+            "diffraction": 0,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": null,
+              "inserted_reflection_state_budget": null,
+              "max_diffractions": 0,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 1000000
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": null,
+              "inserted_reflection_state_budget": null,
+              "max_diffractions": 0,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 1000000
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 2.00001522898674e-07,
+            "los": 0.00040750000334810466,
+            "reflection": 0.002631900002597831
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 8.17533333611209,
+          "median_ms": 8.038900006795302,
+          "samples_ms": [
+            8.55779999983497,
+            8.038900006795302,
+            7.929300001705997
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 24,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  4
+                ],
+                [
+                  4
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  4
+                ],
+                [
+                  4
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  4
+                ],
+                [
+                  4
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 24
+        }
+      }
+    },
+    {
+      "max_diffraction_order": 1,
+      "samples": 1000000,
+      "sionna": {
+        "error": null,
+        "ok": true,
+        "profile": {
+          "mean_ms": 46.215866668111026,
+          "median_ms": 46.48849999648519,
+          "samples_ms": [
+            46.48849999648519,
+            44.9436000053538,
+            47.21550000249408
+          ]
+        },
+        "stats": {
+          "finite_tau": true,
+          "label": "sionna_path",
+          "per_pair_counts": [
+            [
+              44,
+              61
+            ],
+            [
+              50,
+              62
+            ],
+            [
+              34,
+              53
+            ]
+          ],
+          "valid_paths": 304
+        },
+        "supported": true
+      },
+      "speed": {
+        "sionna_over_witwin_median": 2.039640233036404,
+        "witwin_over_sionna_median": 0.49028254287340867
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 4164,
+              "n_paths": 0,
+              "path_collection": {
+                "backend": "rayd_optix_compact_paths",
+                "input_states": 4164,
+                "materialization_deferred": false,
+                "output_paths": 0,
+                "receiver_count": 3
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 0
+            },
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 1112,
+              "n_paths": 52,
+              "path_collection": {
+                "backend": "rayd_optix_compact_paths",
+                "input_states": 1112,
+                "materialization_deferred": false,
+                "output_paths": 52,
+                "receiver_count": 3
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 1
+            }
+          ],
+          "path_counts": {
+            "diffraction": 52,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "diffraction": {
+              "implementation": "rayd_trace_diffraction_paths_order1",
+              "max_order": 1,
+              "path_export_backend": "rayd_optix_compact_paths"
+            },
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 1,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 1000000
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 1,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 1000000
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 0.013211899989983067,
+            "los": 0.0005071000050520524,
+            "reflection": 0.0026058000075863674
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 22.573333325757023,
+          "median_ms": 22.79249999264721,
+          "samples_ms": [
+            23.23249999608379,
+            21.694999988540076,
+            22.79249999264721
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 76,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  4
+                ],
+                [
+                  17
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  4
+                ],
+                [
+                  11
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  4
+                ],
+                [
+                  36
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 76
+        }
+      }
+    }
+  ],
+  "environment": {
+    "drjit_version": "1.2.0",
+    "gpu": {
+      "available": true,
+      "driver_version": "596.49",
+      "memory_total_mib": 16303,
+      "memory_used_mib": 8149,
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "sionna_file": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\__init__.py",
+    "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src"
+  },
+  "notes": [
+    "Order 0 is LoS plus requested specular reflection depth.",
+    "Order 1 is comparable to Sionna first-order edge diffraction, but path counts are not expected to match exactly because candidate policies differ.",
+    "Order 2 and 3 are Witwin capability and scale checks; Sionna RT 2.0.1 has no comparable higher-order diffraction path mode."
+  ],
+  "scenario": {
+    "accumulate_primal": "auto",
+    "diffraction_state_budget": 4096,
+    "enable_rd_diffraction": false,
+    "frequency_hz": 3500000000.0,
+    "inserted_reflection_state_budget": 2048,
+    "max_bounces": 1,
+    "max_num_paths": 64,
+    "munich_xml": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml",
+    "orders": [
+      0,
+      1
+    ],
+    "rx_positions": [
+      [
+        45.0,
+        90.0,
+        1.5
+      ],
+      [
+        30.0,
+        55.0,
+        1.5
+      ],
+      [
+        60.0,
+        20.0,
+        1.5
+      ]
+    ],
+    "sample_counts": [
+      1000000
+    ],
+    "scene": "munich",
+    "tx_positions": [
+      [
+        8.5,
+        21.0,
+        27.0
+      ],
+      [
+        45.0,
+        15.0,
+        22.0
+      ]
+    ]
+  }
+}

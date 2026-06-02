@@ -41,11 +41,6 @@ from witwin.channel.core.numerics.arrays import scalar
 from witwin.channel.core.numerics import arrays
 from witwin.channel.core.physics import polarization
 from witwin.channel.core.numerics.arrays import complex_zero
-from witwin.channel.core.runtime import (
-    point_grad_enabled,
-    scene_geometry_grad_enabled,
-    scene_material_grad_enabled,
-)
 from witwin.channel.core.physics.wave_math import material_angular_frequency
 from witwin.channel.core.numerics.tensors import (
     to_complex_array,
@@ -396,7 +391,7 @@ class Basic(Integrator):
         return 0.0
 
     @staticmethod
-    def resolve_accumulation(requested_backend: str) -> str:
+    def resolve_accumulation(requested_backend: str, *, prefer_rayd: bool = False) -> str:
         backend = str(requested_backend).lower()
         if backend not in {"auto", "native_monte_carlo", _RAYD_REFLECTION_ACCUMULATION_BACKEND}:
             raise ValueError(
@@ -409,6 +404,8 @@ class Basic(Integrator):
             )
         if backend == _RAYD_REFLECTION_ACCUMULATION_BACKEND:
             return _RAYD_REFLECTION_ACCUMULATION_BACKEND
+        if backend == "auto" and bool(prefer_rayd):
+            return _RAYD_REFLECTION_ACCUMULATION_BACKEND
         return "native_monte_carlo"
 
     @staticmethod
@@ -417,6 +414,7 @@ class Basic(Integrator):
         events,
         tx_pos,
         max_bounces: int,
+        collect_wedge_prefixes: bool = False,
     ) -> DiffractionHitStore:
         capacity = int(getattr(events, "capacity", 0))
         count = int(scalar(wt.Int32(events.count)))
@@ -434,14 +432,47 @@ class Basic(Integrator):
         normals_all = wt.Vector3f(events.normals)
         prim_all = wt.Int32(events.prim_id)
         depth_all = wt.Int32(events.bounce_depth)
+        source_points_all = (
+            wt.Point3f(events.source_points)
+            if hasattr(events, "source_points")
+            else None
+        )
+        source_power_all = (
+            wt.Float(events.src_power)
+            if hasattr(events, "src_power")
+            else None
+        )
+        initial_directions_all = (
+            wt.Vector3f(events.initial_directions)
+            if hasattr(events, "initial_directions")
+            else None
+        )
 
         directions = dr.gather(wt.Vector3f, directions_all, indices)
         hit_points = dr.gather(wt.Point3f, hit_points_all, indices)
         normals = dr.gather(wt.Vector3f, normals_all, indices)
         prim_id = dr.gather(wt.Int32, prim_all, indices)
         depth = dr.gather(wt.Int32, depth_all, indices)
-        active = (prim_id >= wt.Int32(0)) & (depth == wt.Int32(0))
+        source_pos = (
+            dr.gather(wt.Point3f, source_points_all, indices)
+            if source_points_all is not None
+            else arrays.broadcast(tx_pos, count)
+        )
+        source_power = (
+            dr.gather(wt.Float, source_power_all, indices)
+            if source_power_all is not None
+            else dr.full(wt.Float, 1.0, count)
+        )
+        initial_directions = (
+            dr.gather(wt.Vector3f, initial_directions_all, indices)
+            if initial_directions_all is not None
+            else directions
+        )
+        active = (prim_id >= wt.Int32(0)) & (depth >= wt.Int32(0))
+        if not collect_wedge_prefixes:
+            active &= depth == wt.Int32(0)
 
+        del max_bounces
         store = DiffractionHitStore(capacity=count, max_bounces=0)
         store.store(
             ray_directions=directions,
@@ -449,10 +480,10 @@ class Basic(Integrator):
             hit_p=hit_points,
             hit_n=normals,
             hit_geo_n=normals,
-            source_pos=arrays.broadcast_point(tx_pos, count),
-            source_power=dr.full(wt.Float, 1.0, count),
+            source_pos=source_pos,
+            source_power=source_power,
             prefix_reflection_depth=depth,
-            initial_ray_dir=directions,
+            initial_ray_dir=initial_directions,
             prim_history=(),
             slot_index=None,
             active=active,
@@ -505,25 +536,13 @@ class Basic(Integrator):
         collect_wedges: bool,
         collect_ad_tapes: bool,
         collect_wedge_prefixes: bool,
+        prefix_wedge_sample_cap: int | None = None,
     ) -> wt.ReflectionPhaseResult:
-        if collect_wedge_prefixes:
-            raise RuntimeError(
-                "accumulation_backend='rayd_reflection_accumulation' does not support prefix wedge events yet."
-            )
-        scene_grad_enabled = (
-            hasattr(scene, "_triangle_runtime")
-            and (scene_geometry_grad_enabled(scene) or scene_material_grad_enabled(scene))
-        )
-        if collect_ad_tapes or point_grad_enabled(tx_pos) or scene_grad_enabled:
-            raise RuntimeError(
-                "accumulation_backend='rayd_reflection_accumulation' does not support AD; "
-                "use the existing AD tape path explicitly."
-            )
-        trace = getattr(scene, "trace_reflections_accumulating", None)
+        trace = getattr(scene, "accumulate_reflections", None)
         if trace is None:
             raise RuntimeError(
                 "accumulation_backend='rayd_reflection_accumulation' requires "
-                "Scene.trace_reflections_accumulating."
+                "Scene.accumulate_reflections."
             )
 
         max_bounces = int(effective["reflection_max_bounces"])
@@ -550,8 +569,21 @@ class Basic(Integrator):
 
         ray_index = dr.arange(wt.UInt32, int(samples_per_tx))
         ray_dir = Sampler.directions(samples_per_tx, ray_index=ray_index)
-        ray_origin = arrays.broadcast_point(tx_pos, int(samples_per_tx))
+        ray_origin = arrays.broadcast(tx_pos, int(samples_per_tx))
         wedge_capacity = int(samples_per_tx) if collect_wedges else 0
+        wedge_sample_stride = 1
+        if collect_wedges and collect_wedge_prefixes:
+            max_prefix_events = int(samples_per_tx) * max(1, max_bounces)
+            if prefix_wedge_sample_cap is not None:
+                requested_cap = int(prefix_wedge_sample_cap)
+                if requested_cap <= 0:
+                    raise RuntimeError(
+                        "prefix_wedge_sample_cap must be positive when prefix wedge sampling is enabled."
+                    )
+                wedge_capacity = min(max_prefix_events, requested_cap)
+                wedge_sample_stride = max(1, math.ceil(max_prefix_events / wedge_capacity))
+            else:
+                wedge_capacity *= max_bounces + 1
         result = trace(
             ray_origin=ray_origin,
             ray_dir=ray_dir,
@@ -566,7 +598,9 @@ class Basic(Integrator):
             solid_angle_per_ray=float(solid_angle_per_ray),
             cell_area=float(cell_area),
             collect_wedges=bool(collect_wedges),
+            collect_wedge_prefixes=bool(collect_wedge_prefixes),
             wedge_capacity=wedge_capacity,
+            wedge_sample_stride=wedge_sample_stride,
             tx_polarization=getattr(config, "tx_polarization", (1.0, 0.0, 0.0)),
             active=dr.full(wt.Bool, True, int(samples_per_tx)),
         )
@@ -605,6 +639,7 @@ class Basic(Integrator):
                 events=result.wedge_events,
                 tx_pos=tx_pos,
                 max_bounces=max_bounces,
+                collect_wedge_prefixes=bool(collect_wedge_prefixes),
             )
             if collect_wedges
             else None
@@ -637,6 +672,7 @@ class Basic(Integrator):
         collect_wedges: bool,
         collect_ad_tapes: bool,
         collect_wedge_prefixes: bool = False,
+        prefix_wedge_sample_cap: int | None = None,
         loop_mode: str,
         resolved_accumulation_backend: str,
     ) -> wt.ReflectionPhaseResult:
@@ -659,6 +695,7 @@ class Basic(Integrator):
                 collect_wedges=collect_wedges,
                 collect_ad_tapes=collect_ad_tapes,
                 collect_wedge_prefixes=collect_wedge_prefixes,
+                prefix_wedge_sample_cap=prefix_wedge_sample_cap,
             )
         # Trace emitted rays in one symbolic batch; Dr.Jit, not Python, owns the loop body.
         path_counts = wt.PathCounts()
@@ -802,6 +839,96 @@ class Basic(Integrator):
         }
         return diffraction_states, diffraction_edge_indices, state_pool, diffraction_runtime_backend
 
+    @staticmethod
+    def _diffraction_accumulate_primal_mode(config, *, collect_ad_tapes: bool = False) -> str:
+        execution = getattr(config, "diffraction_execution", None)
+        mode = str(getattr(execution, "accumulate_primal", "auto"))
+        if mode == "auto":
+            return "rayd_optix"
+        return mode
+
+    @staticmethod
+    def _rayd_diffraction_runtime_backend(*, base: Mapping[str, object], sample_sequence: str) -> dict[str, object]:
+        return {
+            **dict(base),
+            "implementation": "rayd_accum_dfr_direct",
+            "cell_scatter_backend": "rayd_optix_atomic_add",
+            "point_evaluation_backend": "rayd_order1_grid_direct_and_keller",
+            "sample_sequence": str(sample_sequence),
+            "ad_contract": "rayd_native_ad",
+        }
+
+    @staticmethod
+    def _apply_rayd_diffraction_result(
+        *,
+        result,
+        grid,
+        weighted_diagnostics: dict,
+    ) -> tuple[int, int, int]:
+        diffraction_power = wt.Float(result.power)
+        if int(dr.width(diffraction_power)) != int(grid.n_cells):
+            raise RuntimeError(
+                "RayD diffraction accumulation returned a grid width that does not match the receiver grid."
+            )
+        weighted_diagnostics["incoherent"]["diffraction"] = (
+            weighted_diagnostics["incoherent"]["diffraction"] + diffraction_power
+        )
+        direct_count = int(scalar(wt.Int32(result.direct_count)))
+        keller_count = int(scalar(wt.Int32(result.keller_count)))
+        suffix_count = int(scalar(wt.Int32(result.suffix_count)))
+        return direct_count, keller_count, suffix_count
+
+    @staticmethod
+    def _native_diffraction_batch_plan(
+        batch_plan: wt.BatchPlan,
+        *,
+        samples_per_tx: int,
+    ) -> wt.BatchPlan:
+        return wt.BatchPlan(
+            ray_batch_size=int(batch_plan.ray_batch_size),
+            ray_batch_count=int(batch_plan.ray_batch_count),
+            ray_policy=str(batch_plan.ray_policy),
+            diffraction_batch_size=int(samples_per_tx),
+            diffraction_batch_count=1,
+            diffraction_policy="rayd_optix_single_launch",
+            free_cuda_bytes=int(batch_plan.free_cuda_bytes),
+            scatter_safe_batch_cap=int(batch_plan.scatter_safe_batch_cap),
+        )
+
+    @staticmethod
+    def _run_rayd_order1_diffraction(
+        *,
+        scene,
+        grid,
+        config,
+        diffraction_states,
+        samples_per_tx: int,
+        seed: int,
+        weighted_diagnostics: dict,
+        path_counts: wt.PathCounts,
+        sample_sequence: str,
+        direct_samples: int,
+        keller_samples: int,
+    ) -> tuple[int, int, int]:
+        result = scene.accum_dfr_direct(
+            diffraction_states=diffraction_states,
+            grid=grid,
+            config=config,
+            seed=int(seed),
+            samples=int(samples_per_tx),
+            direct_samples=int(direct_samples),
+            keller_samples=int(keller_samples),
+            sample_sequence=str(sample_sequence),
+            active=True,
+        )
+        direct_count, keller_count, suffix_count = Basic._apply_rayd_diffraction_result(
+            result=result,
+            grid=grid,
+            weighted_diagnostics=weighted_diagnostics,
+        )
+        path_counts.diffraction += wt.UInt32(direct_count + keller_count + suffix_count)
+        return direct_count, keller_count, suffix_count
+
     # Run the diffraction phase: state preparation, sampling, and batched trace.
     @staticmethod
     def run_diffraction(
@@ -890,6 +1017,48 @@ class Basic(Integrator):
                 diff_length_weight = (
                     sampler.total_length_scalar / float(max(1, samples_per_tx))
                 )
+                accumulate_mode = Basic._diffraction_accumulate_primal_mode(
+                    config,
+                    collect_ad_tapes=collect_ad_tapes,
+                )
+                use_rayd_optix = accumulate_mode == "rayd_optix"
+                if use_rayd_optix:
+                    if return_timing and timing is not None:
+                        arrays.sync_thread()
+                        t0 = time.perf_counter()
+                    Basic._run_rayd_order1_diffraction(
+                        scene=scene,
+                        grid=grid,
+                        config=config,
+                        diffraction_states=diffraction_states,
+                        samples_per_tx=samples_per_tx,
+                        seed=seed,
+                        weighted_diagnostics=weighted_diagnostics,
+                        path_counts=path_counts,
+                        sample_sequence="hash",
+                        direct_samples=0,
+                        keller_samples=samples_per_tx,
+                    )
+                    diffraction_runtime_backend = Basic._rayd_diffraction_runtime_backend(
+                        base=diffraction_runtime_backend,
+                        sample_sequence="hash",
+                    )
+                    batch_plan = Basic._native_diffraction_batch_plan(
+                        batch_plan,
+                        samples_per_tx=samples_per_tx,
+                    )
+                    if return_timing and timing is not None:
+                        arrays.sync_thread()
+                        timing.diffraction_seconds += time.perf_counter() - t0
+                    return wt.DiffractionPhaseResult(
+                        runtime_reuse=runtime_reuse,
+                        state_pool=state_pool,
+                        runtime_backend=diffraction_runtime_backend,
+                        edge_indices=diffraction_edge_indices,
+                        diff_length_weight=diff_length_weight,
+                        diffraction_tape_store=None,
+                        batch_plan=batch_plan,
+                    )
                 diffraction_tape_store = (
                     DiffractionTapeStore(capacity=max(0, int(samples_per_tx)))
                     if collect_ad_tapes
@@ -955,9 +1124,13 @@ class Basic(Integrator):
         return_timing: bool,
         loop_mode: str,
         effective: dict,
+        prefer_rayd_accumulation: bool = False,
     ) -> IntegratorSetting:
         grid = Grid.from_spec(grid_spec, default_cell_size=config.cell_size)
-        resolved_accumulation_backend = Basic.resolve_accumulation(accumulation_backend)
+        resolved_accumulation_backend = Basic.resolve_accumulation(
+            accumulation_backend,
+            prefer_rayd=prefer_rayd_accumulation,
+        )
 
         integrator_options = mc_config.integrator_options
         samples_per_tx = int(integrator_options.samples_per_tx)
@@ -981,10 +1154,18 @@ class Basic(Integrator):
         material_omega = material_angular_frequency(config.wavelength)
         timing = wt.TraceTiming() if return_timing else None
 
-        ray_sampling_metadata = Sampler.metadata(
-            axis=str(grid.axis),
-            plane_position=float(grid.position),
-            tx_pos=tx_pos,
+        ray_sampling_metadata = (
+            {
+                "requested_ray_sampling": "full_sphere",
+                "selected_ray_sampling": "full_sphere",
+                "sampling_sequence": "rayd_native_sampler",
+            }
+            if resolved_accumulation_backend == _RAYD_REFLECTION_ACCUMULATION_BACKEND
+            else Sampler.metadata(
+                axis=str(grid.axis),
+                plane_position=float(grid.position),
+                tx_pos=tx_pos,
+            )
         )
         solid_angle_per_ray = Sampler.solid_angle(ray_sampling_metadata, samples_per_tx)
         reflection_solid_angle_per_ray = Sampler.solid_angle(
@@ -1006,11 +1187,11 @@ class Basic(Integrator):
         if resolved_accumulation_backend == _RAYD_REFLECTION_ACCUMULATION_BACKEND:
             reflection_runtime_backend = {
                 **reflection_runtime_backend,
-                "implementation": "rayd_trace_reflections_accumulating_complex_polarized_non_ad",
+                "implementation": "rayd_accumulate_reflections_complex_polarized_native_ad",
                 "cell_scatter_backend": "rayd_optix_atomic_add",
                 "point_evaluation_backend": "rayd_complex_image_source_field",
                 "reflection_model": "rayd_complex_polarized_fresnel",
-                "ad_contract": "explicit_non_ad_backend_raises_on_ad_inputs",
+                "ad_contract": "rayd_native_ad",
             }
         collect_wedges = int(effective["max_diffractions"]) > 0
         free_bytes = _capture_free_bytes(release_reclaimable_caches=collect_wedges)
@@ -1086,6 +1267,7 @@ class Basic(Integrator):
             tx_pos=tx_pos, grid_spec=grid_spec, mc_config=mc_config, scene=scene,
             config=config, tx_power=float(tx_power), accumulation_backend=accumulation_backend,
             return_timing=return_timing, loop_mode=loop_mode, effective=effective,
+            prefer_rayd_accumulation=True,
         )
         grid, timing = setup.grid, setup.timing
         weighted_diagnostics = setup.weighted_diagnostics
@@ -1265,11 +1447,6 @@ class Basic(Integrator):
         tx_power = float(tx_power)
 
         if resolved_ad_mode:
-            if str(accumulation_backend).lower() == _RAYD_REFLECTION_ACCUMULATION_BACKEND:
-                raise RuntimeError(
-                    "accumulation_backend='rayd_reflection_accumulation' does not support AD. "
-                    "Use accumulation_backend='native_monte_carlo' explicitly for the Monte Carlo AD tape path."
-                )
             if not SparseCoeffKernel.available():
                 raise RuntimeError(
                     "IntegratorOptions(ad=True) requires the Monte Carlo "

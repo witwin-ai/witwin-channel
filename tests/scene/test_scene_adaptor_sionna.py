@@ -9,7 +9,7 @@ import pytest
 import torch
 
 from witwin.channel.core.scene import Mesh, Scene
-from witwin.channel.core.scene.sionna_adaptor import SionnaAdaptor
+from witwin.channel.core.scene.sionna_adaptor import SionnaAdaptor, _source_roots
 from witwin.core import Material, Structure
 
 
@@ -156,6 +156,17 @@ def test_sionna_adaptor_load_rt_prefers_explicit_local_root(monkeypatch: pytest.
 
     assert loaded is rt_module
     assert str(source_root) in sys.path
+
+
+def test_sionna_adaptor_default_roots_include_bundled_reference() -> None:
+    roots = _source_roots(None)
+
+    assert (
+        Path(__file__).resolve().parents[2]
+        / "reference"
+        / "sionna-rt-reference-2.0.1"
+        / "src"
+    ) in roots
 
 
 def test_sionna_adaptor_load_rt_rejects_wrong_resolved_package(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

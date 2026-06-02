@@ -38,7 +38,6 @@ from witwin.channel.deterministic.reflection.epc import (
 )
 from witwin.channel.core.runtime import Material, Tx, Wave
 
-from witwin.channel.core.numerics.tensors import drjit_to_torch_view
 from witwin.channel.deterministic import types as wt
 from witwin.channel.deterministic.types import InteractionType
 
@@ -75,7 +74,7 @@ def _los_blocked(scene, tx_pos, rx_positions):
     ray_dir = rx_positions - tx_pos
     ray_length = dr.norm(ray_dir)
     ray_dir_normalized = ray_dir / (ray_length + wt.Float(EPS))
-    rays = rayd.Ray(tx_pos, ray_dir_normalized)
+    rays = rayd.RayAD(tx_pos, ray_dir_normalized)
     rays.tmax = ray_length - wt.Float(RAY_EPS)
     with dr.suspend_grad():
         return scene.ray_test(rays)
@@ -93,8 +92,8 @@ def _compute_los_field(scene, rx_positions, tx_pos, wavelength, k):
 
 def _point_source_field(source_pos, source_weight, target_pos, wavelength, k):
     width = dr.width(target_pos.x)
-    source_pos_b = arrays.broadcast_point(source_pos, width)
-    source_weight_b = arrays.broadcast_complex(source_weight, width)
+    source_pos_b = arrays.broadcast(source_pos, width)
+    source_weight_b = arrays.broadcast(source_weight, width)
     distance = dr.norm(target_pos - source_pos_b)
     coeff = wt.Float(wavelength) / (wt.Float(4.0) * dr.pi * (distance + wt.Float(EPS)))
     phase = dr.exp(wt.Complex2f(0.0, -wt.Float(k) * distance))
@@ -203,9 +202,14 @@ def _finalize_diffraction_state_ref_paths(
     state_arrays,
     edge_data,
     edge_object_idx,
+    theta_t=None,
+    phi_t=None,
+    theta_r=None,
+    phi_r=None,
+    path_depth=None,
     metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    return {
+    payload = {
         "payload_kind": _DIFFRACTION_STATE_REFS_PAYLOAD,
         "rx_index": rx_index,
         "tx_index": dr.zeros(wt.UInt32, dr.width(rx_index)) if tx_index is None else tx_index,
@@ -220,6 +224,17 @@ def _finalize_diffraction_state_ref_paths(
         "edge_object_idx": edge_object_idx,
         "metadata": dict(metadata or {}),
     }
+    if theta_t is not None:
+        payload["theta_t"] = theta_t
+    if phi_t is not None:
+        payload["phi_t"] = phi_t
+    if theta_r is not None:
+        payload["theta_r"] = theta_r
+    if phi_r is not None:
+        payload["phi_r"] = phi_r
+    if path_depth is not None:
+        payload["path_depth"] = path_depth
+    return payload
 
 
 def _finalize_reflection_path_refs(
@@ -327,6 +342,11 @@ def _take_diffraction_state_path_refs(
         state_arrays=raw["state_arrays"],
         edge_data=raw.get("edge_data"),
         edge_object_idx=raw.get("edge_object_idx"),
+        theta_t=None if raw.get("theta_t") is None else _take_raw_path_value(raw["theta_t"], indices),
+        phi_t=None if raw.get("phi_t") is None else _take_raw_path_value(raw["phi_t"], indices),
+        theta_r=None if raw.get("theta_r") is None else _take_raw_path_value(raw["theta_r"], indices),
+        phi_r=None if raw.get("phi_r") is None else _take_raw_path_value(raw["phi_r"], indices),
+        path_depth=None if raw.get("path_depth") is None else _take_raw_path_value(raw["path_depth"], indices),
         metadata=dict(raw.get("metadata", {})),
     )
 
@@ -788,6 +808,14 @@ def _gather_tx_position(tx_positions, tx_index: int) -> wt.Point3f:
     )
 
 
+def _gather_tx_positions(tx_positions, tx_index) -> wt.Point3f:
+    return wt.Point3f(
+        dr.gather(wt.Float, tx_positions.x, tx_index),
+        dr.gather(wt.Float, tx_positions.y, tx_index),
+        dr.gather(wt.Float, tx_positions.z, tx_index),
+    )
+
+
 def _discover_reflection_detail(
     *,
     scene,
@@ -941,6 +969,8 @@ def collect_reflection_paths(
     use_scene_materials,
     return_geometry: bool,
     reflection_detail=None,
+    prefer_rayd_epc: bool = True,
+    require_rayd_epc: bool = False,
 ):
     del min_ray_contribution_threshold
     if n_rays <= 0 or max_reflections <= 0:
@@ -1004,7 +1034,7 @@ def collect_reflection_paths(
             local_path_idx = pair_idx // num_rx
             path_idx = local_path_idx + wt.UInt32(path_start)
             rx_idx = pair_idx % num_rx
-            image_source = arrays.gather_point3(paths.image_source, path_idx)
+            image_source = arrays.gather(paths.image_source, path_idx)
             target_pos = wt.Point3f(
                 dr.gather(wt.Float, rx_positions.x, rx_idx),
                 dr.gather(wt.Float, rx_positions.y, rx_idx),
@@ -1022,6 +1052,8 @@ def collect_reflection_paths(
                 return_geometry=return_geometry,
                 return_endpoints=not return_geometry,
                 epc_descriptor=epc_descriptor,
+                prefer_rayd_epc=bool(prefer_rayd_epc),
+                require_rayd_epc=bool(require_rayd_epc),
             )
             keep_idx = dr.compress(valid)
             if dr.width(keep_idx) == 0:
@@ -1029,7 +1061,7 @@ def collect_reflection_paths(
 
             rx_idx_keep = dr.gather(wt.UInt32, rx_idx, keep_idx)
             path_idx_keep = dr.gather(wt.UInt32, path_idx, keep_idx)
-            image_source_keep = arrays.gather_point3(image_source, keep_idx)
+            image_source_keep = arrays.gather(image_source, keep_idx)
             target_pos_keep = dr.gather(wt.Point3f, target_pos, keep_idx)
             tx_pos_keep = dr.gather(wt.Point3f, geometry["tx_pos"], keep_idx)
             if return_geometry:
@@ -1163,6 +1195,8 @@ def collect_reflection_paths_for_transmitters(
     use_scene_materials,
     return_geometry: bool,
     reflection_details=None,
+    prefer_rayd_epc: bool = True,
+    require_rayd_epc: bool = False,
 ):
     del min_ray_contribution_threshold, use_scene_materials
     tx_count = int(dr.width(tx_positions.x))
@@ -1212,6 +1246,8 @@ def collect_reflection_paths_for_transmitters(
                 use_scene_materials=True,
                 return_geometry=return_geometry,
                 reflection_detail=detail_payload,
+                prefer_rayd_epc=bool(prefer_rayd_epc),
+                require_rayd_epc=bool(require_rayd_epc),
             )
             raw_collections.append(_raw_with_tx_index(raw, tx_index))
         return tuple(raw_collections), tuple(details)
@@ -1266,7 +1302,8 @@ def collect_reflection_paths_for_transmitters(
             path_idx = local_path_idx + wt.UInt32(path_start)
             rx_idx = pair_idx % num_rx
             tx_idx = dr.gather(wt.UInt32, path_tx_index_lookup, path_idx)
-            image_source = arrays.gather_point3(paths.image_source, path_idx)
+            pair_tx_pos = _gather_tx_positions(tx_positions, tx_idx)
+            image_source = arrays.gather(paths.image_source, path_idx)
             target_pos = wt.Point3f(
                 dr.gather(wt.Float, rx_positions.x, rx_idx),
                 dr.gather(wt.Float, rx_positions.y, rx_idx),
@@ -1280,10 +1317,12 @@ def collect_reflection_paths_for_transmitters(
                 target_adjacent_faces=(),
                 reflection_detail=detail_payload,
                 wave=Wave(wavelength=wavelength, k=k),
-                tx=Tx(position=_gather_tx_position(tx_positions, 0), polarization=tx_polarization),
+                tx=Tx(position=pair_tx_pos, polarization=tx_polarization),
                 return_geometry=return_geometry,
                 return_endpoints=not return_geometry,
                 epc_descriptor=epc_descriptor,
+                prefer_rayd_epc=bool(prefer_rayd_epc),
+                require_rayd_epc=bool(require_rayd_epc),
             )
             keep_idx = dr.compress(valid)
             if dr.width(keep_idx) == 0:
@@ -1292,7 +1331,7 @@ def collect_reflection_paths_for_transmitters(
             rx_idx_keep = dr.gather(wt.UInt32, rx_idx, keep_idx)
             tx_idx_keep = dr.gather(wt.UInt32, tx_idx, keep_idx)
             path_idx_keep = dr.gather(wt.UInt32, path_idx, keep_idx)
-            image_source_keep = arrays.gather_point3(image_source, keep_idx)
+            image_source_keep = arrays.gather(image_source, keep_idx)
             target_pos_keep = dr.gather(wt.Point3f, target_pos, keep_idx)
             tx_pos_keep = dr.gather(wt.Point3f, geometry["tx_pos"], keep_idx)
             if return_geometry:
@@ -1458,6 +1497,27 @@ def _gather_path_replay_state_fields(state_arrays, indices):
     return gather_inserted_reflection_state_fields(state_arrays, indices)
 
 
+def _gather_path_type_state_fields(state_arrays, indices):
+    return State.gather_path_export_types(state_arrays, indices)
+
+
+def _diffraction_state_ref_type_slots(raw: Mapping[str, object], path_indices=None):
+    if raw.get("payload_kind") != _DIFFRACTION_STATE_REFS_PAYLOAD:
+        return tuple()
+    if path_indices is None:
+        state_idx = raw["state_idx"]
+    else:
+        state_idx = dr.gather(wt.UInt32, raw["state_idx"], path_indices)
+    keep_states = _gather_path_type_state_fields(raw["state_arrays"], state_idx)
+    type_slots, _, _, _, _ = _build_type_and_geometry_slots(
+        keep_states=keep_states,
+        edge_data=None,
+        edge_object_idx=None,
+        return_geometry=False,
+    )
+    return tuple(type_slots)
+
+
 def collect_diffraction_state_paths(
     *,
     state_arrays,
@@ -1518,6 +1578,11 @@ def collect_diffraction_state_paths(
     state_idx_parts = []
     a_parts = []
     tau_parts = []
+    theta_t_parts = []
+    phi_t_parts = []
+    theta_r_parts = []
+    phi_r_parts = []
+    path_depth_parts = []
     total_paths = 0
 
     n_states = state_arrays["n_states"]
@@ -1583,28 +1648,58 @@ def collect_diffraction_state_paths(
         keep_rx = dr.gather(wt.Point3f, batch_rx, keep_idx)
         keep_rx_idx = dr.gather(wt.UInt32, rx_idx, keep_idx)
         keep_edge_pos = dr.gather(wt.Point3f, batch_states["edge_pos"], keep_idx)
+        keep_first_interaction_pos = dr.gather(
+            wt.Point3f,
+            state_arrays["first_interaction_pos"],
+            keep_state_idx,
+        )
         keep_path_length_prefix = dr.gather(
             wt.Float,
             state_arrays["path_length_prefix"],
             keep_state_idx,
         )
+        keep_prefix_depth = dr.gather(
+            wt.UInt32,
+            state_arrays["prefix_reflection_depth"],
+            keep_state_idx,
+        )
+        keep_intermediate_depth = dr.gather(
+            wt.UInt32,
+            state_arrays["intermediate_reflection_depth"],
+            keep_state_idx,
+        )
+        keep_suffix_depth = dr.gather(
+            wt.UInt32,
+            state_arrays["suffix_reflection_depth"],
+            keep_state_idx,
+        )
+        keep_order = dr.gather(wt.UInt32, state_arrays["order"], keep_state_idx)
         keep_vector = {
             axis: dr.gather(wt.Complex2f, pair_vector[axis], keep_idx)
             for axis in ("x", "y", "z")
         }
         arrival_dir = keep_rx - keep_edge_pos
+        departure_dir = keep_first_interaction_pos - tx_pos
+        theta_t, phi_t = spherical_angles(departure_dir)
+        theta_r, phi_r = spherical_angles(arrival_dir)
         scalar_coeff = scalarize_vector_to_polarization(
             keep_vector,
             arrival_dir,
             active_rx_polarization,
         )
         tau = (keep_path_length_prefix + dr.norm(arrival_dir)) / 299792458.0
+        path_depth = keep_prefix_depth + keep_intermediate_depth + keep_suffix_depth + keep_order
         keep_count = int(dr.width(keep_rx_idx))
         rx_index_parts.append(keep_rx_idx)
         local_rx_index_parts.append(keep_rx_idx)
         state_idx_parts.append(keep_state_idx)
         a_parts.append(scalar_coeff)
         tau_parts.append(tau)
+        theta_t_parts.append(theta_t)
+        phi_t_parts.append(phi_t)
+        theta_r_parts.append(theta_r)
+        phi_r_parts.append(phi_r)
+        path_depth_parts.append(path_depth)
         total_paths += keep_count
         stats["sparse_reference_count"] += keep_count
 
@@ -1618,6 +1713,11 @@ def collect_diffraction_state_paths(
     state_idx = arrays.concat_uints(state_idx_parts)
     a = arrays.concat_complex(a_parts)
     tau = arrays.concat_floats(tau_parts)
+    theta_t = arrays.concat_floats(theta_t_parts)
+    phi_t = arrays.concat_floats(phi_t_parts)
+    theta_r = arrays.concat_floats(theta_r_parts)
+    phi_r = arrays.concat_floats(phi_r_parts)
+    path_depth = arrays.concat_uints(path_depth_parts)
     stats["timing"]["concat_seconds"] = time.perf_counter() - concat_start
     stats["output_paths"] = int(total_paths)
     stats["timing"]["total_seconds"] = time.perf_counter() - total_start
@@ -1633,6 +1733,11 @@ def collect_diffraction_state_paths(
         state_arrays=state_arrays,
         edge_data=edge_data,
         edge_object_idx=edge_object_idx,
+        theta_t=theta_t,
+        phi_t=phi_t,
+        theta_r=theta_r,
+        phi_r=phi_r,
+        path_depth=path_depth,
         metadata={"n_paths": total_paths},
     )
 

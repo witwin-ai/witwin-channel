@@ -12,9 +12,8 @@ from witwin.channel.deterministic import types as wt
 from ..kernels.reflection import native_impl as reflection_epc_native
 from witwin.channel.core.runtime import Material, Tx, Wave
 from witwin.channel.core.numerics.arrays import (
-    broadcast_point,
-    gather_point3,
-    gather_vector3,
+    broadcast,
+    gather,
     scalar,
     zeros_point3,
     zeros_vector3,
@@ -124,7 +123,7 @@ def trace_paths(
     options.image_source_tolerance = float(PATH_IMAGE_SOURCE_TOL)
     if symbolic_workload:
         chain = rayd_scene.trace_reflections(
-            rayd.Ray(ray_origin, ray_dir),
+            rayd.RayAD(ray_origin, ray_dir),
             int(max_reflections),
             options,
             dr.full(wt.Bool, True, n_rays),
@@ -133,7 +132,7 @@ def trace_paths(
     else:
         with dr.scoped_set_flag(dr.JitFlag.Recording, False):
             chain = rayd_scene.trace_reflections(
-                rayd.RayDetached(ray_origin_detached, ray_dir_detached),
+                rayd.Ray(ray_origin_detached, ray_dir_detached),
                 int(max_reflections),
                 options,
                 dr.full(dr.detached_t(wt.Bool), True, n_rays),
@@ -236,14 +235,14 @@ def enumerate_first_bounce_surface_paths(*, tx: Tx, tri_data) -> SourcePathSet:
         return empty_source_path_data(1)
 
     safe_prim = wt.UInt32(dr.maximum(prim_idx, wt.Int32(0)))
-    plane_point = gather_point3(tri_data["v0"], safe_prim)
-    v1 = gather_point3(tri_data["v1"], safe_prim)
-    v2 = gather_point3(tri_data["v2"], safe_prim)
+    plane_point = gather(tri_data["v0"], safe_prim)
+    v1 = gather(tri_data["v1"], safe_prim)
+    v2 = gather(tri_data["v2"], safe_prim)
     rayd_anchor = (plane_point + v1 + v2) * wt.Float(1.0 / 3.0)
     plane_normal = dr.cross(v1 - plane_point, v2 - plane_point)
     plane_normal = plane_normal / (dr.norm(plane_normal) + wt.Float(1e-12))
     image_source = reflect_point_across_plane(
-        broadcast_point(tx.position, n_paths),
+        broadcast(tx.position, n_paths),
         plane_point,
         plane_normal,
     )
@@ -368,7 +367,7 @@ def _collect_prefix_paths_channel_native(
         rep_idx_i32 = wt.Int32(dr.gather(type(rep_full), rep_full, compact_idx))
         rep_idx = wt.UInt32(rep_idx_i32)
         discovery_count = wt.UInt32(dr.gather(type(discovery_full), discovery_full, compact_idx))
-        img = gather_point3(
+        img = gather(
             chain.image_sources,
             _flat_chain_slot_indices(rep_idx, max_bounces=max_bounces, slot=depth - 1),
         )
@@ -382,9 +381,9 @@ def _collect_prefix_paths_channel_native(
             slot_idx = _flat_chain_slot_indices(rep_idx, max_bounces=max_bounces, slot=slot)
             prim_idx = wt.Int32(dr.gather(type(chain.global_prim_ids), chain.global_prim_ids, slot_idx))
             prim_idx_slots.append(_canonicalize_prim_indices(prim_idx, surface_canonical_prims))
-            pp = gather_point3(chain.plane_points, slot_idx)
-            pn = gather_vector3(chain.plane_normals, slot_idx)
-            hp = gather_point3(chain.hit_points, slot_idx)
+            pp = gather(chain.plane_points, slot_idx)
+            pn = gather(chain.plane_normals, slot_idx)
+            hp = gather(chain.hit_points, slot_idx)
             plane_point_slots.append(wt.Point3f(pp.x, pp.y, pp.z))
             plane_normal_slots.append(wt.Vector3f(pn.x, pn.y, pn.z))
             hit_point_slots.append(wt.Point3f(hp.x, hp.y, hp.z))
@@ -463,9 +462,9 @@ class _NormalizedChain:
 
     ``rayd_scene.trace_reflections()`` returns one of two layouts:
 
-    - Symbolic mode -> ``ReflectionTrace[Detached]``: per-bounce data via
+    - Symbolic mode -> ``ReflectionTraceAD``: per-bounce data via
       ``chain.bounce(slot)`` and a real ``dedup_keep_mask``.
-    - Recording-disabled mode -> ``ReflectionChain[Detached]``: flat arrays of
+    - Recording-disabled mode -> ``ReflectionChain``: flat arrays of
       length ``ray_count * max_bounces``, no dedup mask.
 
     This class slices the flat layout into per-bounce arrays once so the
@@ -506,10 +505,10 @@ def _normalize_chain(chain) -> _NormalizedChain:
             wt.Int32(chain.global_prim_ids),
             lambda f, idx: dr.gather(wt.Int32, f, idx),
         )
-        image_sources = per_bounce(chain.image_sources, gather_point3)
-        plane_points = per_bounce(chain.plane_points, gather_point3)
-        plane_normals = per_bounce(chain.plane_normals, gather_vector3)
-        hit_points = per_bounce(chain.hit_points, gather_point3)
+        image_sources = per_bounce(chain.image_sources, gather)
+        plane_points = per_bounce(chain.plane_points, gather)
+        plane_normals = per_bounce(chain.plane_normals, gather)
+        hit_points = per_bounce(chain.hit_points, gather)
 
     return _NormalizedChain(
         ray_count=ray_count,
@@ -589,7 +588,7 @@ def collect_prefix_paths(
 
         ordered = sorted(bucket_map.values(), key=lambda b: int(b["first_seen"]))
         rep_idx = wt.UInt32([int(b["representative_chain_idx"]) for b in ordered])
-        img = gather_point3(ch.image_sources[depth - 1], rep_idx)
+        img = gather(ch.image_sources[depth - 1], rep_idx)
         image_source_dr = wt.Point3f(img.x, img.y, img.z)
         discovery_count_dr = wt.UInt32([int(b["discovery_count"]) for b in ordered])
 
@@ -599,11 +598,11 @@ def collect_prefix_paths(
         hit_point_slots: list[wt.Point3f] = []
         for slot in range(depth):
             prim_idx_slots.append(wt.Int32([int(b["chain"][slot]) for b in ordered]))
-            pp = gather_point3(ch.plane_points[slot], rep_idx)
+            pp = gather(ch.plane_points[slot], rep_idx)
             plane_point_slots.append(wt.Point3f(pp.x, pp.y, pp.z))
-            pn = gather_vector3(ch.plane_normals[slot], rep_idx)
+            pn = gather(ch.plane_normals[slot], rep_idx)
             plane_normal_slots.append(wt.Vector3f(pn.x, pn.y, pn.z))
-            hp = gather_point3(ch.hit_points[slot], rep_idx)
+            hp = gather(ch.hit_points[slot], rep_idx)
             hit_point_slots.append(wt.Point3f(hp.x, hp.y, hp.z))
 
         dr.eval(

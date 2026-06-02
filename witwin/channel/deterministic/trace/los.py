@@ -19,7 +19,7 @@ def _los_blocked_field(*, scene, runtime):
     ray_dir = runtime.rx.positions - tx.position
     distance = dr.norm(ray_dir)
     ray_dir_normalized = ray_dir / distance
-    rays = rayd.Ray(tx.position, ray_dir_normalized)
+    rays = rayd.RayAD(tx.position, ray_dir_normalized)
     rays.tmax = distance - RAY_EPS
     with dr.suspend_grad():
         blocked = scene.ray_test(rays)

@@ -20,10 +20,11 @@ import drjit as dr
 from witwin.channel.deterministic import types as wt
 from witwin.channel._native.deterministic import NativeExtension
 from witwin.channel.core.runtime import Rx, Tx, Wave
-from witwin.channel.core.numerics.arrays import gather_point3, gather_vector3, scalar as scalar_value
+from witwin.channel.core.numerics.arrays import gather, scalar as scalar_value
 from witwin.channel.core.physics.polarization import vector_eval, vector_scale, vector_zero
 from witwin.channel.deterministic.diffraction.state import Geo
-from witwin.channel.core.runtime import material_angular_frequency, resolve_surface_material
+from witwin.channel.core.physics.materials import resolve_surface_material
+from witwin.channel.core.physics.wave_math import material_angular_frequency
 from witwin.channel.deterministic.reflection.boundary import nearest_surface_boundary_edge
 from witwin.channel.deterministic.reflection.detail import coerce_trace_detail
 
@@ -37,11 +38,11 @@ def _pack_reflection_chunk_arrays(
     default_gain: float,
 ):
     chunk_n = dr.width(chunk_path_idx)
-    image_src = gather_point3(paths.image_source, chunk_path_idx)
+    image_src = gather(paths.image_source, chunk_path_idx)
     slot_arrays = []
     for slot in range(chain_depth):
-        plane_point = gather_point3(paths.plane_point(slot), chunk_path_idx)
-        plane_normal = gather_vector3(paths.plane_normal(slot), chunk_path_idx)
+        plane_point = gather(paths.plane_point(slot), chunk_path_idx)
+        plane_normal = gather(paths.plane_normal(slot), chunk_path_idx)
         prim_idx = dr.gather(wt.Int32, paths.prim_idx(slot), chunk_path_idx)
         material_inputs = resolve_surface_material(
             scene=scene,
@@ -53,10 +54,10 @@ def _pack_reflection_chunk_arrays(
             (
                 plane_point,
                 plane_normal,
-                material_inputs["eta_r"],
-                material_inputs["mu_r"],
-                material_inputs["sigma"],
-                material_inputs["gain"],
+                material_inputs.eta_r,
+                material_inputs.mu_r,
+                material_inputs.sigma,
+                material_inputs.gain,
             )
         )
 
@@ -582,10 +583,10 @@ def _pack_f_weight_transition_chunk_arrays(
         adjacent_valid_i.append(wt.Int32(dr.select(adjacent_ok, wt.Int32(1), wt.Int32(0))))
         adjacent_points.append(_select_point(adjacent_ok, support.edge_pos, zero_point))
         adjacent_normals.append(_select_vector(adjacent_ok, adjacent_normal, zero_vector))
-        adjacent_eta.append(material_inputs["eta_r"])
-        adjacent_mu.append(material_inputs["mu_r"])
-        adjacent_sigma.append(material_inputs["sigma"])
-        adjacent_gain.append(material_inputs["gain"])
+        adjacent_eta.append(material_inputs.eta_r)
+        adjacent_mu.append(material_inputs.mu_r)
+        adjacent_sigma.append(material_inputs.sigma)
+        adjacent_gain.append(material_inputs.gain)
 
     return {
         "support_any": support_any,
@@ -666,9 +667,9 @@ def _scatter_f_weight_reference_pairs(
         return vector_coherent
 
     rx_idx_keep = dr.gather(type(rx_idx), rx_idx, keep_idx)
-    target_pos_keep = gather_point3(target_pos, keep_idx)
-    image_source = gather_point3(paths.image_source, path_idx)
-    image_source_keep = gather_point3(image_source, keep_idx)
+    target_pos_keep = gather(target_pos, keep_idx)
+    image_source = gather(paths.image_source, path_idx)
+    image_source_keep = gather(image_source, keep_idx)
     field_vector = {
         axis: dr.gather(wt.Complex2f, chain_vector[axis], keep_idx)
         for axis in ("x", "y", "z")

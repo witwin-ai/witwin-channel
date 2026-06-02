@@ -11,7 +11,7 @@ from witwin.channel.core.scene import EdgePolicy, ReceiverGrid, Scene, Transmitt
 from witwin.channel.core.grid import Grid, GridSpec
 from witwin.core import Box, Material, Mesh, Structure
 from witwin.channel.montecarlo import Config, IntegratorOptions, NativeExtension, Tuning, solve
-from witwin.channel.montecarlo.config import ResolvedTraceConfig
+from witwin.channel.montecarlo.config import DiffractionExecutionConfig, ResolvedTraceConfig
 from witwin.channel.montecarlo.trace.diffraction import DiffractionStates
 from witwin.channel.montecarlo.trace.postprocessing import ShadowBoundary
 from witwin.channel.montecarlo import types as mc_types
@@ -410,6 +410,7 @@ def test_bdpt_shadow_boundary_uses_accepted_first_order_edges():
                 shadow_boundary_tile_shape=(3, 3),
                 shadow_boundary_band_width_wavelengths=1.0e9,
                 shadow_boundary_max_candidate_factor=1.0e9,
+                diffraction_execution=DiffractionExecutionConfig(accumulate_primal="drjit"),
             ),
             integrator_options=IntegratorOptions(
                 integrator="bdpt",

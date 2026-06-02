@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 import witwin.channel as wc
-from witwin.channel.core.numerics.tensors import drjit_to_torch_view
+from witwin.channel.core.numerics.tensors import to_torch_view
 
 
 def _wall_scene(material: wc.Material, *, frequency: float) -> wc.Scene:
@@ -39,7 +39,7 @@ def _reflection_amplitude(scene: wc.Scene) -> torch.Tensor:
     )
     reflection = result.filter_by_type(wc.path.InteractionType.REFLECTION)
     coeff = reflection.coeff_tensor()
-    valid = drjit_to_torch_view(reflection.valid, dtype=torch.bool).unsqueeze(-1)
+    valid = to_torch_view(reflection.valid, dtype=torch.bool).unsqueeze(-1)
     return torch.abs(torch.where(valid, coeff, torch.zeros_like(coeff))).sum()
 
 

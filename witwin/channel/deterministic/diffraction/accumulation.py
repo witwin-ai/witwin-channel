@@ -108,6 +108,7 @@ def baseline_matched_isotropic_diffraction_vector(
     from witwin.channel.deterministic.trace import diffraction
     diffraction_vector_coherent = vector_zero(n_rx)
     tile_reports = []
+    used_rayd_exact_grid_accumulation = False
     for raw in diffraction_raw_collections:
         receiver_index_map = raw.get("receiver_index_map")
         local_positions = raw.get("rx_positions")
@@ -116,6 +117,27 @@ def baseline_matched_isotropic_diffraction_vector(
             continue
         local_rx_count = int(dr.width(local_positions.x))
         plan = receiver_tile_plan(config, n_rx=local_rx_count)
+        accumulate_mode = str(getattr(config.diffraction_execution, "accumulate_primal", "auto"))
+        rayd_exact_auto_allowed = (
+            accumulate_mode == "auto"
+            and sample_grid is not None
+            and config.shadow_support_cutoff_db is None
+        )
+        rayd_exact_grid_accumulation = accumulate_mode == "rayd_exact_coherent" or (
+            rayd_exact_auto_allowed
+            and diffraction._rayd_exact_coherent_auto_supported(
+                state_arrays=state_arrays,
+                sample_grid=sample_grid,
+                scene=scene,
+                tx=raw["runtime"].tx,
+                suffix=ReflectionSuffixConfig(),
+                shadow_support_cutoff_db=config.shadow_support_cutoff_db,
+                allow_rayd_exact_coherent_auto=True,
+            )
+        )
+        if rayd_exact_grid_accumulation:
+            used_rayd_exact_grid_accumulation = True
+            plan = {"enabled": False, "tile_size": local_rx_count, "tile_count": 1}
         tile_reports.append({
             "receiver_count": int(local_rx_count),
             "tile_size": int(plan["tile_size"]),
@@ -146,6 +168,7 @@ def baseline_matched_isotropic_diffraction_vector(
                 receiver_axis=str(receiver_axis),
                 ray_mode=ray_mode,
                 shadow_support_cutoff_db=config.shadow_support_cutoff_db,
+                allow_rayd_exact_coherent_auto=rayd_exact_auto_allowed,
             )
             if local_vector is not None:
                 for axis in ("x", "y", "z"):
@@ -177,7 +200,7 @@ def baseline_matched_isotropic_diffraction_vector(
             accumulate_tile(tile_positions, tile_receiver_index_map)
     if not return_metadata:
         return diffraction_vector_coherent
-    return diffraction_vector_coherent, {
+    metadata = {
         "receiver_tiling_enabled": any(report["enabled"] for report in tile_reports),
         "receiver_tile_size": (
             max((int(report["tile_size"]) for report in tile_reports), default=0)
@@ -185,6 +208,18 @@ def baseline_matched_isotropic_diffraction_vector(
         "receiver_tile_count": int(sum(int(report["tile_count"]) for report in tile_reports)),
         "receiver_tile_reports": tuple(tile_reports),
     }
+    if (
+        str(getattr(config.diffraction_execution, "accumulate_primal", "auto"))
+        == "rayd_exact_coherent"
+        or used_rayd_exact_grid_accumulation
+    ):
+        metadata.update({
+            "implementation": "rayd_accum_dfr_coherent_direct_exact",
+            "coherence": "complex_vector_sum",
+            "estimator": "exact_state_receiver_sum",
+            "ad_contract": "primal_non_ad_only",
+        })
+    return diffraction_vector_coherent, metadata
 
 
 def trace_diffraction_raw_collections(

@@ -26,7 +26,7 @@ def _triangle_mesh_dict() -> dict:
 
 def test_build_rayd_scene_constructs_queryable_runtime() -> None:
     rayd_scene = SceneBuilder.build_rayd_scene([_triangle_mesh_dict()])
-    ray = rayd.Ray(wt.Point3f(0.2, 0.2, 1.0), wt.Vector3f(0.0, 0.0, -1.0))
+    ray = rayd.RayAD(wt.Point3f(0.2, 0.2, 1.0), wt.Vector3f(0.0, 0.0, -1.0))
 
     assert np.asarray(rayd_scene.shadow_test(ray)).reshape(-1).tolist() == [True]
 
@@ -34,7 +34,7 @@ def test_build_rayd_scene_constructs_queryable_runtime() -> None:
 def test_configure_runtime_backends_rebuilds_and_updates_vertices() -> None:
     mesh = _triangle_mesh_dict()
     runtime = SimpleNamespace(_structure_meshes=[mesh], _rayd_scene=None)
-    ray = rayd.Ray(wt.Point3f(0.2, 0.2, 1.0), wt.Vector3f(0.0, 0.0, -1.0))
+    ray = rayd.RayAD(wt.Point3f(0.2, 0.2, 1.0), wt.Vector3f(0.0, 0.0, -1.0))
 
     SceneBuilder.configure_runtime_backends(runtime)
     assert np.asarray(runtime._rayd_scene.shadow_test(ray)).reshape(-1).tolist() == [True]

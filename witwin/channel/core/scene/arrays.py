@@ -7,7 +7,7 @@ from typing import Sequence
 import drjit as dr
 from witwin.channel import types as wt
 
-from witwin.channel.core.runtime import to_point3f
+from witwin.channel.core.geometry.mesh_buffers import to_point3f
 
 
 _PATTERNS = {"iso", "dipole", "tr38901"}

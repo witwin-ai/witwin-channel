@@ -101,11 +101,11 @@ class UTD:
     def setup_edge_geometry(source_pos, sampled_edge_pos, edge_dir, n0, nn, target_pos, wedge_n) -> EdgeGeometrySetup:
         width = dr.width(target_pos.x)
         edge_geometry = wedge_geometry(source_pos, sampled_edge_pos, edge_dir, n0, target_pos)
-        wedge_n_b = arrays.broadcast_float(wedge_n, width)
-        edge_dir_b = arrays.broadcast_vector(edge_dir, width)
-        n0_b = arrays.broadcast_vector(n0, width)
-        nn_b = arrays.broadcast_vector(nn, width)
-        source_pos_b = arrays.broadcast_point(source_pos, width)
+        wedge_n_b = arrays.broadcast(wedge_n, width)
+        edge_dir_b = arrays.broadcast(edge_dir, width)
+        n0_b = arrays.broadcast(n0, width)
+        nn_b = arrays.broadcast(nn, width)
+        source_pos_b = arrays.broadcast(source_pos, width)
         edge_hat = polarization.normalize_real_with_fallback(edge_geometry.edge_hat, wt.Vector3f(0.0, 0.0, 1.0))
         source_exterior = wedge_exterior_mask(
             source_pos_b - sampled_edge_pos, edge_dir_b, n0_b, nn_b,
@@ -122,7 +122,7 @@ class UTD:
         incident_basis = polarization.basis_from_first_vector(incident_hat, polarization.implicit_basis_vector(incident_hat))
         outgoing_basis = polarization.basis_from_first_vector(outgoing_hat, polarization.implicit_basis_vector(outgoing_hat))
         incident_jones = {
-            "u": arrays.broadcast_complex(wt.Complex2f(1.0, 0.0), width),
+            "u": arrays.broadcast(wt.Complex2f(1.0, 0.0), width),
             "v": arrays.complex_zero(width),
         }
         return EdgeGeometrySetup(
@@ -190,11 +190,11 @@ class UTD:
     @staticmethod
     def integration_weight(*, edge_origin, edge_dir, n0, source_pos, diff_point, k_world, target_pos, plane_normal):
         width = int(dr.width(target_pos.x))
-        edge_origin_b = arrays.broadcast_point(edge_origin, width)
-        edge_hat = arrays.broadcast_vector(edge_dir / (dr.norm(edge_dir) + wt.Float(EPS)), width)
-        n0_b = arrays.broadcast_vector(n0 / (dr.norm(n0) + wt.Float(EPS)), width)
-        plane_normal_b = arrays.broadcast_vector(plane_normal, width)
-        source_pos_b = arrays.broadcast_point(source_pos, width)
+        edge_origin_b = arrays.broadcast(edge_origin, width)
+        edge_hat = arrays.broadcast(edge_dir / (dr.norm(edge_dir) + wt.Float(EPS)), width)
+        n0_b = arrays.broadcast(n0 / (dr.norm(n0) + wt.Float(EPS)), width)
+        plane_normal_b = arrays.broadcast(plane_normal, width)
+        source_pos_b = arrays.broadcast(source_pos, width)
         incident_dir = diff_point - source_pos_b
         e_fwd = dr.select(dr.dot(edge_hat, incident_dir) > 0.0, edge_hat, -edge_hat)
         t0 = dr.normalize(dr.cross(n0_b, edge_hat))
@@ -426,23 +426,23 @@ class UTD:
             wt.Float(1.0),
         )
         frd = polarization.fresnel_diagonal_operator
-        face0_gain_b = arrays.broadcast_float(face0.gain, width)
-        face1_gain_b = arrays.broadcast_float(face1.gain, width)
+        face0_gain_b = arrays.broadcast(face0.gain, width)
+        face1_gain_b = arrays.broadcast(face1.gain, width)
         face0_diag = frd(
-            eta_r=arrays.broadcast_float(face0.eta_r, width),
-            sigma=arrays.broadcast_float(face0.sigma, width),
+            eta_r=arrays.broadcast(face0.eta_r, width),
+            sigma=arrays.broadcast(face0.sigma, width),
             gain=face0_gain_b,
-            use_fresnel=arrays.broadcast_float(face0.use_fresnel, width),
+            use_fresnel=arrays.broadcast(face0.use_fresnel, width),
             cos_theta=cos_theta0, wavelength=wavelength,
-            mu_r=arrays.broadcast_float(face0.mu_r, width),
+            mu_r=arrays.broadcast(face0.mu_r, width),
         )
         face1_diag = frd(
-            eta_r=arrays.broadcast_float(face1.eta_r, width),
-            sigma=arrays.broadcast_float(face1.sigma, width),
+            eta_r=arrays.broadcast(face1.eta_r, width),
+            sigma=arrays.broadcast(face1.sigma, width),
             gain=face1_gain_b,
-            use_fresnel=arrays.broadcast_float(face1.use_fresnel, width),
+            use_fresnel=arrays.broadcast(face1.use_fresnel, width),
             cos_theta=cos_theta1, wavelength=wavelength,
-            mu_r=arrays.broadcast_float(face1.mu_r, width),
+            mu_r=arrays.broadcast(face1.mu_r, width),
         )
         jm = polarization.jones_operator_matmul
         edge_gain = wt.Complex2f(

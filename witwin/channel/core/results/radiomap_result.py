@@ -10,7 +10,7 @@ import torch
 
 from witwin.channel.core.numerics.tensors import (
     FloatTensor,
-    drjit_to_torch_view,
+    to_torch_view,
     to_float_tensor,
     to_int_tensor,
     to_mapping_proxy,
@@ -83,7 +83,7 @@ class RadioMapResult:
         """Return the strongest transmitter index per cell for ``metric``."""
         if not hasattr(self, metric):
             raise ValueError(f"Unknown radio map metric {metric!r}.")
-        values = drjit_to_torch_view(getattr(self, metric), dtype=torch.float32)
+        values = to_torch_view(getattr(self, metric), dtype=torch.float32)
         if values.ndim == 2:
             best = torch.zeros_like(values, dtype=torch.int32)
         elif values.ndim == 3:
@@ -98,7 +98,7 @@ class RadioMapResult:
         tensor_shape = (int(self.grid_shape[1]), int(self.grid_shape[0]))
 
         def _squeeze_float(value):
-            tensor = drjit_to_torch_view(value, dtype=torch.float32)
+            tensor = to_torch_view(value, dtype=torch.float32)
             if tensor.ndim == 3:
                 tensor = tensor[tx_index]
             return to_float_tensor(tensor, shape=tensor_shape)
@@ -167,7 +167,7 @@ def stack_radiomap_results(results, *, noise_power: float) -> RadioMapResult:
         rss / denominator,
         dr.full(FloatTensor, float("inf"), tensor_shape),
     )
-    best = torch.argmax(drjit_to_torch_view(rss, dtype=torch.float32), dim=0).to(dtype=torch.int32)
+    best = torch.argmax(to_torch_view(rss, dtype=torch.float32), dim=0).to(dtype=torch.int32)
 
     metadata = dict(first.metadata)
     metadata["transmitter_count"] = int(len(resolved))

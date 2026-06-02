@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import drjit as dr
 
-from witwin.channel.core.numerics.arrays import broadcast_int
+from witwin.channel.core.numerics.arrays import broadcast
 from witwin.channel.core.numerics.constants import EPS, RAY_ORIGIN_BIAS
 from witwin.channel.deterministic import types as wt
 
@@ -102,7 +102,7 @@ def _ignore_entries(scene, groups, width: int) -> list[tuple[wt.Int32, wt.Bool]]
     for group in candidates:
         if group is None:
             continue
-        group_i32 = broadcast_int(wt.Int32(group), width)
+        group_i32 = broadcast(wt.Int32(group), width)
         entries.append((group_i32, group_i32 >= wt.Int32(0)))
     return entries
 

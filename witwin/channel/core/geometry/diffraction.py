@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import drjit as dr
 from witwin.channel import types as wt
 
-from witwin.channel.core.numerics.arrays import broadcast_float, broadcast_point, broadcast_vector
+from witwin.channel.core.numerics.arrays import broadcast
 from witwin.channel.core.numerics.constants import EPS, SMALL_EPS
 
 
@@ -55,9 +55,9 @@ def edge_angles(source_pos, edge_pos, edge_dir, n0, target_pos):
 0`` face in the plane perpendicular to ``edge_dir``. ``s_proj`` and
     ``s_prime_proj`` are the in-plane source/target distances."""
     target_width = dr.width(target_pos.x)
-    edge_pos_b = broadcast_point(edge_pos, target_width)
-    edge_dir_b = broadcast_vector(edge_dir, target_width)
-    n0_b = broadcast_vector(n0, target_width)
+    edge_pos_b = broadcast(edge_pos, target_width)
+    edge_dir_b = broadcast(edge_dir, target_width)
+    n0_b = broadcast(n0, target_width)
 
     source_to_edge = edge_pos - source_pos
     source_to_edge_proj = project_to_wedge_plane(source_to_edge, edge_dir)
@@ -73,23 +73,23 @@ def edge_angles(source_pos, edge_pos, edge_dir, n0, target_pos):
     edge_to_target_proj = project_to_wedge_plane(edge_to_target, edge_dir_b)
     s = dr.norm(edge_to_target_proj) + EPS
 
-    to_hat_b = broadcast_vector(to_hat, target_width)
+    to_hat_b = broadcast(to_hat, target_width)
     ko_proj = edge_to_target_proj / s
 
     phi = dr.pi - dr.safe_acos(dr.clip(dr.dot(ko_proj, to_hat_b), -1.0, 1.0))
     phi = phi * (-dr.sign(dr.dot(ko_proj, n0_b)))
     phi = phi + dr.pi
 
-    return phi, broadcast_float(phi_prime, target_width), s, broadcast_float(s_prime, target_width)
+    return phi, broadcast(phi_prime, target_width), s, broadcast(s_prime, target_width)
 
 
 def wedge_geometry(source_pos, edge_pos, edge_dir, n0, target_pos) -> WedgeGeometry:
     """Full wedge geometry: angles, distances, projected sines, edge unit vector."""
     phi, phi_prime, s_proj, s_prime_proj = edge_angles(source_pos, edge_pos, edge_dir, n0, target_pos)
     width = dr.width(target_pos.x)
-    edge_pos_b = broadcast_point(edge_pos, width)
-    edge_dir_b = broadcast_vector(edge_dir, width)
-    source_pos_b = broadcast_point(source_pos, width)
+    edge_pos_b = broadcast(edge_pos, width)
+    edge_dir_b = broadcast(edge_dir, width)
+    source_pos_b = broadcast(source_pos, width)
     edge_hat = edge_dir_b / (dr.norm(edge_dir_b) + EPS)
     source_to_edge = edge_pos_b - source_pos_b
     edge_to_target = target_pos - edge_pos_b

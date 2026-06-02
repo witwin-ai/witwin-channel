@@ -54,9 +54,6 @@ def to_torch_view(
     return tensor
 
 
-drjit_to_torch_view = to_torch_view
-
-
 def reshape_or_broadcast(tensor: torch.Tensor, *, shape: tuple[int, ...], dtype) -> torch.Tensor:
     if shape_tuple(tensor.shape) == shape:
         return tensor.contiguous()
@@ -131,7 +128,6 @@ __all__ = [
     "BoolTensor",
     "FloatTensor",
     "IntTensor",
-    "drjit_to_torch_view",
     "reshape_or_broadcast",
     "shape_tuple",
     "to_bool_tensor",

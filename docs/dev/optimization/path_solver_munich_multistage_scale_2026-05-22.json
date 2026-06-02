@@ -1,0 +1,917 @@
+{
+  "cases": [
+    {
+      "max_diffraction_order": 2,
+      "samples": 65536,
+      "sionna": {
+        "error": "Sionna run skipped by --skip-sionna.",
+        "ok": false,
+        "profile": null,
+        "stats": null,
+        "supported": false
+      },
+      "speed": {
+        "sionna_over_witwin_median": null,
+        "witwin_over_sionna_median": null
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 8260,
+              "n_paths": 2006,
+              "path_collection": {
+                "candidate_pairs": 24780,
+                "chunk_count": 1,
+                "field_kept_count": 2006,
+                "input_states": 8260,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 24780,
+                "output_paths": 2006,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 2006,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 1.0100004146806896e-05,
+                  "field_eval_seconds": 0.03413850000652019,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.047736600012285635,
+                  "visibility_seconds": 2.5000044843181968e-06
+                },
+                "visibility_kept_count": 24780
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 0
+            },
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 4667,
+              "n_paths": 5021,
+              "path_collection": {
+                "candidate_pairs": 14001,
+                "chunk_count": 1,
+                "field_kept_count": 5021,
+                "input_states": 4667,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 14001,
+                "output_paths": 5021,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 5021,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 1.2999997125007212e-05,
+                  "field_eval_seconds": 0.031141700004809536,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04558159998850897,
+                  "visibility_seconds": 2.5000044843181968e-06
+                },
+                "visibility_kept_count": 14001
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 1
+            }
+          ],
+          "path_counts": {
+            "diffraction": 7027,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "diffraction": {
+              "implementation": "drjit_diffraction_state_path_export",
+              "max_order": 2,
+              "path_export_backend": "drjit_state_materialization"
+            },
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 2,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 65536
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 2,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 65536
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 0.39461889999802224,
+            "los": 0.00043030000233557075,
+            "reflection": 0.003155700003844686
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 409.34650000417605,
+          "median_ms": 409.34650000417605,
+          "samples_ms": [
+            405.8342000062112,
+            412.8588000021409
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 384,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 384
+        }
+      }
+    },
+    {
+      "max_diffraction_order": 3,
+      "samples": 65536,
+      "sionna": {
+        "error": "Sionna run skipped by --skip-sionna.",
+        "ok": false,
+        "profile": null,
+        "stats": null,
+        "supported": false
+      },
+      "speed": {
+        "sionna_over_witwin_median": null,
+        "witwin_over_sionna_median": null
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 12356,
+              "n_paths": 3010,
+              "path_collection": {
+                "candidate_pairs": 37068,
+                "chunk_count": 1,
+                "field_kept_count": 3010,
+                "input_states": 12356,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 37068,
+                "output_paths": 3010,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 3010,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 9.60000033956021e-06,
+                  "field_eval_seconds": 0.03452539999852888,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04854200000409037,
+                  "visibility_seconds": 1.8999999156221747e-06
+                },
+                "visibility_kept_count": 37068
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 0
+            },
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 8763,
+              "n_paths": 7454,
+              "path_collection": {
+                "candidate_pairs": 26289,
+                "chunk_count": 1,
+                "field_kept_count": 7454,
+                "input_states": 8763,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 26289,
+                "output_paths": 7454,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 7454,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 9.700001101009548e-06,
+                  "field_eval_seconds": 0.03380750000360422,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04737829999066889,
+                  "visibility_seconds": 2.1000014385208488e-06
+                },
+                "visibility_kept_count": 26289
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 1
+            }
+          ],
+          "path_counts": {
+            "diffraction": 10464,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "diffraction": {
+              "implementation": "drjit_diffraction_state_path_export",
+              "max_order": 3,
+              "path_export_backend": "drjit_state_materialization"
+            },
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 3,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 65536
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 3,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 65536
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 0.7546385000023292,
+            "los": 0.00042830000165849924,
+            "reflection": 0.00285059999441728
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 774.7600000002421,
+          "median_ms": 774.7600000002421,
+          "samples_ms": [
+            779.6672999975272,
+            769.8527000029571
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 384,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 384
+        }
+      }
+    },
+    {
+      "max_diffraction_order": 2,
+      "samples": 262144,
+      "sionna": {
+        "error": "Sionna run skipped by --skip-sionna.",
+        "ok": false,
+        "profile": null,
+        "stats": null,
+        "supported": false
+      },
+      "speed": {
+        "sionna_over_witwin_median": null,
+        "witwin_over_sionna_median": null
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 8260,
+              "n_paths": 2006,
+              "path_collection": {
+                "candidate_pairs": 24780,
+                "chunk_count": 1,
+                "field_kept_count": 2006,
+                "input_states": 8260,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 24780,
+                "output_paths": 2006,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 2006,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 9.399998816661537e-06,
+                  "field_eval_seconds": 0.03227419999893755,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04572740000730846,
+                  "visibility_seconds": 1.8999999156221747e-06
+                },
+                "visibility_kept_count": 24780
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 0
+            },
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 4667,
+              "n_paths": 5021,
+              "path_collection": {
+                "candidate_pairs": 14001,
+                "chunk_count": 1,
+                "field_kept_count": 5021,
+                "input_states": 4667,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 14001,
+                "output_paths": 5021,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 5021,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 8.899995009414852e-06,
+                  "field_eval_seconds": 0.030910100002074614,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.04440860000613611,
+                  "visibility_seconds": 2.2000021999701858e-06
+                },
+                "visibility_kept_count": 14001
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 1
+            }
+          ],
+          "path_counts": {
+            "diffraction": 7027,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "diffraction": {
+              "implementation": "drjit_diffraction_state_path_export",
+              "max_order": 2,
+              "path_export_backend": "drjit_state_materialization"
+            },
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 2,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 262144
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 2,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 262144
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 0.37930970000161324,
+            "los": 0.0004293999954825267,
+            "reflection": 0.00254539999878034
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 402.045700007875,
+          "median_ms": 402.045700007875,
+          "samples_ms": [
+            408.1801000138512,
+            395.9113000018988
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 384,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 384
+        }
+      }
+    },
+    {
+      "max_diffraction_order": 3,
+      "samples": 262144,
+      "sionna": {
+        "error": "Sionna run skipped by --skip-sionna.",
+        "ok": false,
+        "profile": null,
+        "stats": null,
+        "supported": false
+      },
+      "speed": {
+        "sionna_over_witwin_median": null,
+        "witwin_over_sionna_median": null
+      },
+      "witwin": {
+        "error": null,
+        "metadata": {
+          "diffraction_groups": [
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 12356,
+              "n_paths": 3010,
+              "path_collection": {
+                "candidate_pairs": 37068,
+                "chunk_count": 1,
+                "field_kept_count": 3010,
+                "input_states": 12356,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 37068,
+                "output_paths": 3010,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 3010,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 9.099996532313526e-06,
+                  "field_eval_seconds": 0.031868499994743615,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.045303100007004105,
+                  "visibility_seconds": 1.6999983927235007e-06
+                },
+                "visibility_kept_count": 37068
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 0
+            },
+            {
+              "grouping_axis": "z",
+              "grouping_rule": "shared_z_height_slice",
+              "n_edge_states": 8763,
+              "n_paths": 7454,
+              "path_collection": {
+                "candidate_pairs": 26289,
+                "chunk_count": 1,
+                "field_kept_count": 7454,
+                "input_states": 8763,
+                "materialization_deferred": true,
+                "max_candidate_pairs_per_chunk": 26289,
+                "output_paths": 7454,
+                "payload_kind": "diffraction_state_refs_v1",
+                "receiver_count": 3,
+                "sparse_reference_count": 7454,
+                "state_layout": "full",
+                "timing": {
+                  "concat_seconds": 1.0200004908256233e-05,
+                  "field_eval_seconds": 0.03197180001006927,
+                  "slot_assembly_seconds": 0.0,
+                  "total_seconds": 0.045606200001202524,
+                  "visibility_seconds": 1.5999976312741637e-06
+                },
+                "visibility_kept_count": 26289
+              },
+              "receiver_count": 3,
+              "state_layout": "full",
+              "tx_index": 1
+            }
+          ],
+          "path_counts": {
+            "diffraction": 10464,
+            "los": 6,
+            "reflection": 18
+          },
+          "runtime_backends": {
+            "diffraction": {
+              "implementation": "drjit_diffraction_state_path_export",
+              "max_order": 3,
+              "path_export_backend": "drjit_state_materialization"
+            },
+            "reflection": {
+              "ad_inputs": false,
+              "epc_backend": "rayd_optix",
+              "field_backend_requested": "native",
+              "rayd_epc_preferred": true,
+              "rayd_epc_required": true
+            }
+          },
+          "solver_mode": {
+            "changes": [],
+            "effective": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 3,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 262144
+            },
+            "execution_intent": {
+              "field_payload": "none",
+              "geometry_enabled": false,
+              "kind": "path_export",
+              "map_enabled": false,
+              "path_export_enabled": true
+            },
+            "guarantees": "Enumerate all currently implemented diffraction families allowed by the requested depth limits; do not apply additional automatic pruning beyond explicit user budgets.",
+            "requested": {
+              "diffraction_state_budget": 4096,
+              "inserted_reflection_state_budget": 2048,
+              "max_diffractions": 3,
+              "max_inserted_reflections_per_path": null,
+              "memory_profile": "default",
+              "reflection_max_bounces": 1,
+              "reflection_n_rays": 262144
+            },
+            "selected": "accuracy"
+          },
+          "timing": {
+            "diffraction": 0.7129106000065804,
+            "los": 0.0005394000036176294,
+            "reflection": 0.00345660001039505
+          }
+        },
+        "ok": true,
+        "profile": {
+          "mean_ms": 740.205350004544,
+          "median_ms": 740.205350004544,
+          "samples_ms": [
+            742.31490000966,
+            738.095799999428
+          ]
+        },
+        "stats": {
+          "finite_field": true,
+          "finite_tau": true,
+          "num_paths_sum": 384,
+          "per_pair_counts": [
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  64
+                ],
+                [
+                  64
+                ]
+              ]
+            ]
+          ],
+          "shape": {
+            "a": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "num_paths": [
+              3,
+              1,
+              2,
+              1
+            ],
+            "tau": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ],
+            "valid": [
+              3,
+              1,
+              2,
+              1,
+              64
+            ]
+          },
+          "valid_paths": 384
+        }
+      }
+    }
+  ],
+  "environment": {
+    "drjit_version": "1.2.0",
+    "gpu": {
+      "available": true,
+      "driver_version": "596.49",
+      "memory_total_mib": 16303,
+      "memory_used_mib": 8344,
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "sionna_file": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\__init__.py",
+    "sionna_source_root": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src"
+  },
+  "notes": [
+    "Order 0 is LoS plus requested specular reflection depth.",
+    "Order 1 is comparable to Sionna first-order edge diffraction, but path counts are not expected to match exactly because candidate policies differ.",
+    "Order 2 and 3 are Witwin capability and scale checks; Sionna RT 2.0.1 has no comparable higher-order diffraction path mode."
+  ],
+  "scenario": {
+    "accumulate_primal": "auto",
+    "diffraction_state_budget": 4096,
+    "enable_rd_diffraction": false,
+    "frequency_hz": 3500000000.0,
+    "inserted_reflection_state_budget": 2048,
+    "max_bounces": 1,
+    "max_num_paths": 64,
+    "munich_xml": "E:\\Code\\witwin-platform\\channel\\reference\\sionna-rt-reference-2.0.1\\src\\sionna\\rt\\scenes\\munich\\munich.xml",
+    "orders": [
+      2,
+      3
+    ],
+    "rx_positions": [
+      [
+        45.0,
+        90.0,
+        1.5
+      ],
+      [
+        30.0,
+        55.0,
+        1.5
+      ],
+      [
+        60.0,
+        20.0,
+        1.5
+      ]
+    ],
+    "sample_counts": [
+      65536,
+      262144
+    ],
+    "scene": "munich",
+    "tx_positions": [
+      [
+        8.5,
+        21.0,
+        27.0
+      ],
+      [
+        45.0,
+        15.0,
+        22.0
+      ]
+    ]
+  }
+}

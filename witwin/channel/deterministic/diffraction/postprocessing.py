@@ -13,11 +13,10 @@ from ..kernels.radio_map_accumulate.native_impl import (
 from witwin.channel.core.runtime import Rx, Tx, Wave
 from witwin.channel.core.numerics.constants import EPS
 from witwin.channel.core.numerics.arrays import (
-    broadcast_point,
+    broadcast,
     complex_abs_sqr,
     complex_zero,
-    gather_point3,
-    gather_vector3,
+    gather,
 )
 from witwin.channel.core.physics.polarization import project_real_polarization_to_ray, vector_eval, vector_power, vector_zero
 from witwin.channel.core.geometry.diffraction import wedge_exterior_mask
@@ -424,14 +423,14 @@ def _candidate_pruned_shadow_boundary_incident_statistics(
         context="_candidate_pruned_shadow_boundary_incident_statistics",
     )
     states = _CandidateShadowBoundaryStates(
-        edge_pos=gather_point3(edge_runtime["pos"], visible_slots),
-        edge_dir=gather_vector3(edge_runtime["edge_dir"], visible_slots),
-        n0=gather_vector3(edge_runtime["n0"], visible_slots),
-        n_face_n=gather_vector3(edge_runtime["n_face_n"], visible_slots),
+        edge_pos=gather(edge_runtime["pos"], visible_slots),
+        edge_dir=gather(edge_runtime["edge_dir"], visible_slots),
+        n0=gather(edge_runtime["n0"], visible_slots),
+        n_face_n=gather(edge_runtime["n_face_n"], visible_slots),
         wedge_n=dr.gather(wt.Float, edge_runtime["wedge_n"], visible_slots),
         edge_line_min=dr.gather(wt.Float, edge_line_min, visible_slots),
         edge_line_max=dr.gather(wt.Float, edge_line_max, visible_slots),
-        source_pos=broadcast_point(tx.position, source_visible_edges),
+        source_pos=broadcast(tx.position, source_visible_edges),
     )
     direct_los_visible = dr.full(wt.UInt32, 1, n_rx)
     direct_blocker_group = dr.full(wt.Int32, -1, n_rx)

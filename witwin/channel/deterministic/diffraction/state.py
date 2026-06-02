@@ -6,6 +6,7 @@ from witwin.channel.deterministic import types as wt
 
 from witwin.channel.core.numerics.constants import DIFFRACTION_MIN_DISTANCE, SPEED_OF_LIGHT
 from witwin.channel.core.numerics.arrays import complex_zero, concat_arrays
+from witwin.channel.core.physics.materials import FaceMaterial
 from witwin.channel.core.physics.polarization import jones_from_vector, path_basis, vector_from_jones
 from .math import GeometrySupport
 SOURCE_TYPE_DIRECT_TX = 0
@@ -112,8 +113,9 @@ _META_LINEAGE_STORE = 'lineage_store'
 _PATH_EXPORT_STATE_LAYOUT_KEY = '__path_export_state_layout__'
 _PATH_EXPORT_LINEAGE_KEY = '__path_export_lineage__'
 PATH_EXPORT_REDUCED_STATE_LAYOUT = 'reduced_v2'
-_PATH_EXPORT_EVAL_KEYS = (SK_EDGE_POS, SK_EDGE_DIR, SK_N0, SK_NN, SK_WEDGE_N, SK_ADJACENT_FACE0, SK_ADJACENT_FACE1, SK_EDGE_LINE_MIN, SK_EDGE_LINE_MAX, SK_SOURCE_POS, SK_INCIDENT_FIELD, SK_INCIDENT_NORMAL_DERIVATIVE, SK_INCIDENT_JONES_U, SK_INCIDENT_JONES_V, SK_INCIDENT_DERIVATIVE_JONES_U, SK_INCIDENT_DERIVATIVE_JONES_V, SK_INCIDENT_BASIS_U, SK_INCIDENT_BASIS_V, SK_INCIDENT_BASIS_K, SK_R0, SK_RN, SK_INCIDENT_VECTOR_X, SK_INCIDENT_VECTOR_Y, SK_INCIDENT_VECTOR_Z, SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_X, SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Y, SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Z, SK_FACE0_OPERATOR_M00, SK_FACE0_OPERATOR_M01, SK_FACE0_OPERATOR_M10, SK_FACE0_OPERATOR_M11, SK_FACE1_OPERATOR_M00, SK_FACE1_OPERATOR_M01, SK_FACE1_OPERATOR_M10, SK_FACE1_OPERATOR_M11, SK_FACE0_ETA_R, SK_FACE0_MU_R, SK_FACE0_SIGMA, SK_FACE0_GAIN, SK_FACE0_USE_FRESNEL, SK_FACE1_ETA_R, SK_FACE1_MU_R, SK_FACE1_SIGMA, SK_FACE1_GAIN, SK_FACE1_USE_FRESNEL, SK_PATH_LENGTH_PREFIX)
+_PATH_EXPORT_EVAL_KEYS = (SK_EDGE_IDX, SK_EDGE_POS, SK_EDGE_DIR, SK_N0, SK_NN, SK_WEDGE_N, SK_ADJACENT_FACE0, SK_ADJACENT_FACE1, SK_EDGE_LINE_MIN, SK_EDGE_LINE_MAX, SK_SOURCE_POS, SK_INCIDENT_FIELD, SK_INCIDENT_NORMAL_DERIVATIVE, SK_INCIDENT_JONES_U, SK_INCIDENT_JONES_V, SK_INCIDENT_DERIVATIVE_JONES_U, SK_INCIDENT_DERIVATIVE_JONES_V, SK_INCIDENT_BASIS_U, SK_INCIDENT_BASIS_V, SK_INCIDENT_BASIS_K, SK_R0, SK_RN, SK_INCIDENT_VECTOR_X, SK_INCIDENT_VECTOR_Y, SK_INCIDENT_VECTOR_Z, SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_X, SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Y, SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Z, SK_FACE0_OPERATOR_M00, SK_FACE0_OPERATOR_M01, SK_FACE0_OPERATOR_M10, SK_FACE0_OPERATOR_M11, SK_FACE1_OPERATOR_M00, SK_FACE1_OPERATOR_M01, SK_FACE1_OPERATOR_M10, SK_FACE1_OPERATOR_M11, SK_FACE0_ETA_R, SK_FACE0_MU_R, SK_FACE0_SIGMA, SK_FACE0_GAIN, SK_FACE0_USE_FRESNEL, SK_FACE1_ETA_R, SK_FACE1_MU_R, SK_FACE1_SIGMA, SK_FACE1_GAIN, SK_FACE1_USE_FRESNEL, SK_PATH_LENGTH_PREFIX)
 _PATH_EXPORT_REPLAY_KEYS = (SK_EDGE_POS, SK_PATH_LENGTH_PREFIX, SK_FIRST_INTERACTION_POS, SK_SOURCE_TYPE_CODE, SK_PREFIX_REFLECTION_DEPTH, SK_INTERMEDIATE_REFLECTION_DEPTH, SK_SUFFIX_REFLECTION_DEPTH, SK_ORDER)
+_PATH_EXPORT_TYPE_KEYS = (SK_ORDER,)
 _PATH_EXPORT_REDUCED_KEYS = tuple(dict.fromkeys(_PATH_EXPORT_EVAL_KEYS + _PATH_EXPORT_REPLAY_KEYS))
 
 class State:
@@ -154,7 +156,13 @@ class State:
     def default_face_material(width: int, gain=None):
         if gain is None:
             gain = dr.ones(wt.Float, width)
-        return {'eta_r': dr.full(wt.Float, 5.0, width), 'mu_r': dr.ones(wt.Float, width), 'sigma': dr.zeros(wt.Float, width), 'gain': gain, 'use_fresnel': dr.full(wt.Bool, True, width)}
+        return FaceMaterial(
+            eta_r=dr.full(wt.Float, 5.0, width),
+            sigma=dr.zeros(wt.Float, width),
+            gain=gain,
+            use_fresnel=dr.full(wt.Bool, True, width),
+            mu_r=dr.ones(wt.Float, width),
+        )
 
     def canonicalize_transport(*, edge_pos, edge_dir, source_pos, r0, rn, incident_vector, incident_normal_derivative_vector, incident_jones, incident_derivative_jones, incident_basis, face0_operator, face1_operator):
         if incident_basis is None:
@@ -309,6 +317,69 @@ class State:
                 merged[_META_STATE_ID] = concat_arrays(wt.Int32, [lineage[_META_STATE_ID] for lineage in lineage_list])
         return merged
 
+    def concat_path_export_lineage(state_arrays_list):
+        non_empty = [
+            state_arrays
+            for state_arrays in state_arrays_list
+            if state_arrays is not None and int(state_arrays[SK_N_STATES]) >= 0
+        ]
+        if len(non_empty) == 0:
+            return None
+        lineage_list = [
+            state_arrays.get(_PATH_EXPORT_LINEAGE_KEY, state_arrays.get(_STATE_LINEAGE_KEY))
+            for state_arrays in non_empty
+        ]
+        if not any((lineage is not None for lineage in lineage_list)):
+            return None
+
+        def _concat_optional_int(key, fill_value):
+            parts = []
+            for state_arrays, lineage in zip(non_empty, lineage_list):
+                width = int(state_arrays[SK_N_STATES])
+                if lineage is not None and key in lineage:
+                    parts.append(lineage[key])
+                else:
+                    parts.append(dr.full(wt.Int32, fill_value, width))
+            return concat_arrays(wt.Int32, parts)
+
+        def _concat_optional_uint(key):
+            parts = []
+            for state_arrays, lineage in zip(non_empty, lineage_list):
+                width = int(state_arrays[SK_N_STATES])
+                if lineage is not None and key in lineage:
+                    parts.append(lineage[key])
+                else:
+                    parts.append(dr.zeros(wt.UInt32, width))
+            return concat_arrays(wt.UInt32, parts)
+
+        merged = {
+            _META_PARENT_STATE_ID: _concat_optional_int(_META_PARENT_STATE_ID, -1),
+            _META_LAST_EDGE_IDX: _concat_optional_int(_META_LAST_EDGE_IDX, -1),
+            _META_LAST_REFLECTION_DEPTH_DELTA: _concat_optional_uint(
+                _META_LAST_REFLECTION_DEPTH_DELTA
+            ),
+        }
+        stores = [
+            lineage.get(_META_LINEAGE_STORE)
+            for lineage in lineage_list
+            if lineage is not None and lineage.get(_META_LINEAGE_STORE) is not None
+        ]
+        shared_store = None
+        if stores and all((store is stores[0] for store in stores)):
+            shared_store = stores[0]
+        elif len(stores) > 0:
+            raise RuntimeError(
+                "Concatenating path-export diffraction state arrays from different lineage stores is not supported."
+            )
+        if shared_store is not None:
+            merged[_META_LINEAGE_STORE] = shared_store
+            if all((lineage is not None and _META_STATE_ID in lineage for lineage in lineage_list)):
+                merged[_META_STATE_ID] = concat_arrays(
+                    wt.Int32,
+                    [lineage[_META_STATE_ID] for lineage in lineage_list],
+                )
+        return merged
+
     def finalize_lineage(state_arrays, lineage_store=None, next_state_id=0):
         lineage = None if state_arrays is None else state_arrays.get(_STATE_LINEAGE_KEY)
         if lineage is None or state_arrays[SK_N_STATES] == 0:
@@ -359,14 +430,8 @@ class State:
             face0_material = State.default_face_material(n_states)
         if face1_material is None:
             face1_material = State.default_face_material(n_states)
-        if 'mu_r' not in face0_material:
-            face0_material = dict(face0_material)
-            face0_material['mu_r'] = dr.ones(wt.Float, n_states)
-        if 'mu_r' not in face1_material:
-            face1_material = dict(face1_material)
-            face1_material['mu_r'] = dr.ones(wt.Float, n_states)
-        dr.eval(edge_idx, edge_pos, edge_dir, n0, nn, wedge_n, edge_line_min, edge_line_max, adjacent_face0, adjacent_face1, source_pos, incident_field, incident_normal_derivative, r0, rn, incident_jones['u'], incident_jones['v'], incident_derivative_jones['u'], incident_derivative_jones['v'], incident_basis['u'], incident_basis['v'], incident_basis['k'], face0_operator['m00'], face0_operator['m01'], face0_operator['m10'], face0_operator['m11'], face1_operator['m00'], face1_operator['m01'], face1_operator['m10'], face1_operator['m11'], face0_material['eta_r'], face0_material['mu_r'], face0_material['sigma'], face0_material['gain'], face0_material['use_fresnel'], face1_material['eta_r'], face1_material['mu_r'], face1_material['sigma'], face1_material['gain'], face1_material['use_fresnel'], incident_vector['x'], incident_vector['y'], incident_vector['z'], incident_normal_derivative_vector['x'], incident_normal_derivative_vector['y'], incident_normal_derivative_vector['z'], prefix_reflection_depth, intermediate_reflection_depth, suffix_reflection_depth, order)
-        state_arrays = {SK_EDGE_IDX: edge_idx, SK_EDGE_POS: edge_pos, SK_EDGE_DIR: edge_dir, SK_N0: n0, SK_NN: nn, SK_WEDGE_N: wedge_n, SK_ADJACENT_FACE0: adjacent_face0, SK_ADJACENT_FACE1: adjacent_face1, SK_SOURCE_POS: source_pos, SK_INCIDENT_FIELD: incident_field, SK_INCIDENT_NORMAL_DERIVATIVE: incident_normal_derivative, SK_INCIDENT_JONES_U: incident_jones['u'], SK_INCIDENT_JONES_V: incident_jones['v'], SK_INCIDENT_DERIVATIVE_JONES_U: incident_derivative_jones['u'], SK_INCIDENT_DERIVATIVE_JONES_V: incident_derivative_jones['v'], SK_R0: r0, SK_RN: rn, SK_INCIDENT_BASIS_U: incident_basis['u'], SK_INCIDENT_BASIS_V: incident_basis['v'], SK_INCIDENT_BASIS_K: incident_basis['k'], SK_FACE0_OPERATOR_M00: face0_operator['m00'], SK_FACE0_OPERATOR_M01: face0_operator['m01'], SK_FACE0_OPERATOR_M10: face0_operator['m10'], SK_FACE0_OPERATOR_M11: face0_operator['m11'], SK_FACE1_OPERATOR_M00: face1_operator['m00'], SK_FACE1_OPERATOR_M01: face1_operator['m01'], SK_FACE1_OPERATOR_M10: face1_operator['m10'], SK_FACE1_OPERATOR_M11: face1_operator['m11'], SK_FACE0_ETA_R: face0_material['eta_r'], SK_FACE0_MU_R: face0_material['mu_r'], SK_FACE0_SIGMA: face0_material['sigma'], SK_FACE0_GAIN: face0_material['gain'], SK_FACE0_USE_FRESNEL: face0_material['use_fresnel'], SK_FACE1_ETA_R: face1_material['eta_r'], SK_FACE1_MU_R: face1_material['mu_r'], SK_FACE1_SIGMA: face1_material['sigma'], SK_FACE1_GAIN: face1_material['gain'], SK_FACE1_USE_FRESNEL: face1_material['use_fresnel'], SK_INCIDENT_VECTOR_X: incident_vector['x'], SK_INCIDENT_VECTOR_Y: incident_vector['y'], SK_INCIDENT_VECTOR_Z: incident_vector['z'], SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_X: incident_normal_derivative_vector['x'], SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Y: incident_normal_derivative_vector['y'], SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Z: incident_normal_derivative_vector['z'], SK_PREFIX_REFLECTION_DEPTH: prefix_reflection_depth, SK_INTERMEDIATE_REFLECTION_DEPTH: intermediate_reflection_depth, SK_SUFFIX_REFLECTION_DEPTH: suffix_reflection_depth, SK_ORDER: order, SK_N_STATES: n_states, SK_EDGE_LINE_MIN: edge_line_min, SK_EDGE_LINE_MAX: edge_line_max}
+        dr.eval(edge_idx, edge_pos, edge_dir, n0, nn, wedge_n, edge_line_min, edge_line_max, adjacent_face0, adjacent_face1, source_pos, incident_field, incident_normal_derivative, r0, rn, incident_jones['u'], incident_jones['v'], incident_derivative_jones['u'], incident_derivative_jones['v'], incident_basis['u'], incident_basis['v'], incident_basis['k'], face0_operator['m00'], face0_operator['m01'], face0_operator['m10'], face0_operator['m11'], face1_operator['m00'], face1_operator['m01'], face1_operator['m10'], face1_operator['m11'], face0_material.eta_r, face0_material.mu_r, face0_material.sigma, face0_material.gain, face0_material.use_fresnel, face1_material.eta_r, face1_material.mu_r, face1_material.sigma, face1_material.gain, face1_material.use_fresnel, incident_vector['x'], incident_vector['y'], incident_vector['z'], incident_normal_derivative_vector['x'], incident_normal_derivative_vector['y'], incident_normal_derivative_vector['z'], prefix_reflection_depth, intermediate_reflection_depth, suffix_reflection_depth, order)
+        state_arrays = {SK_EDGE_IDX: edge_idx, SK_EDGE_POS: edge_pos, SK_EDGE_DIR: edge_dir, SK_N0: n0, SK_NN: nn, SK_WEDGE_N: wedge_n, SK_ADJACENT_FACE0: adjacent_face0, SK_ADJACENT_FACE1: adjacent_face1, SK_SOURCE_POS: source_pos, SK_INCIDENT_FIELD: incident_field, SK_INCIDENT_NORMAL_DERIVATIVE: incident_normal_derivative, SK_INCIDENT_JONES_U: incident_jones['u'], SK_INCIDENT_JONES_V: incident_jones['v'], SK_INCIDENT_DERIVATIVE_JONES_U: incident_derivative_jones['u'], SK_INCIDENT_DERIVATIVE_JONES_V: incident_derivative_jones['v'], SK_R0: r0, SK_RN: rn, SK_INCIDENT_BASIS_U: incident_basis['u'], SK_INCIDENT_BASIS_V: incident_basis['v'], SK_INCIDENT_BASIS_K: incident_basis['k'], SK_FACE0_OPERATOR_M00: face0_operator['m00'], SK_FACE0_OPERATOR_M01: face0_operator['m01'], SK_FACE0_OPERATOR_M10: face0_operator['m10'], SK_FACE0_OPERATOR_M11: face0_operator['m11'], SK_FACE1_OPERATOR_M00: face1_operator['m00'], SK_FACE1_OPERATOR_M01: face1_operator['m01'], SK_FACE1_OPERATOR_M10: face1_operator['m10'], SK_FACE1_OPERATOR_M11: face1_operator['m11'], SK_FACE0_ETA_R: face0_material.eta_r, SK_FACE0_MU_R: face0_material.mu_r, SK_FACE0_SIGMA: face0_material.sigma, SK_FACE0_GAIN: face0_material.gain, SK_FACE0_USE_FRESNEL: face0_material.use_fresnel, SK_FACE1_ETA_R: face1_material.eta_r, SK_FACE1_MU_R: face1_material.mu_r, SK_FACE1_SIGMA: face1_material.sigma, SK_FACE1_GAIN: face1_material.gain, SK_FACE1_USE_FRESNEL: face1_material.use_fresnel, SK_INCIDENT_VECTOR_X: incident_vector['x'], SK_INCIDENT_VECTOR_Y: incident_vector['y'], SK_INCIDENT_VECTOR_Z: incident_vector['z'], SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_X: incident_normal_derivative_vector['x'], SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Y: incident_normal_derivative_vector['y'], SK_INCIDENT_NORMAL_DERIVATIVE_VECTOR_Z: incident_normal_derivative_vector['z'], SK_PREFIX_REFLECTION_DEPTH: prefix_reflection_depth, SK_INTERMEDIATE_REFLECTION_DEPTH: intermediate_reflection_depth, SK_SUFFIX_REFLECTION_DEPTH: suffix_reflection_depth, SK_ORDER: order, SK_N_STATES: n_states, SK_EDGE_LINE_MIN: edge_line_min, SK_EDGE_LINE_MAX: edge_line_max}
         lineage = None
         if retain_lineage_state:
             if source_type_code is None:
@@ -453,6 +518,49 @@ class State:
             reduced[_PATH_EXPORT_LINEAGE_KEY] = lineage
         return reduced
 
+    def concat_path_export_reduced(state_arrays_list: list[dict]) -> dict:
+        reduced_parts = [
+            State.reduce_for_path_export(state_arrays)
+            for state_arrays in state_arrays_list
+            if state_arrays is not None and int(state_arrays[SK_N_STATES]) > 0
+        ]
+        if len(reduced_parts) == 0:
+            history_size = 0
+            for state_arrays in state_arrays_list:
+                if state_arrays is not None:
+                    history_size = max(history_size, Geo.history_size(state_arrays))
+            return State.reduce_for_path_export(State.empty(history_size=history_size))
+        if len(reduced_parts) == 1:
+            return reduced_parts[0]
+
+        def _concat_values(values):
+            sample = values[0]
+            if isinstance(sample, wt.Point3f):
+                return wt.Point3f(
+                    concat_arrays(wt.Float, [value.x for value in values]),
+                    concat_arrays(wt.Float, [value.y for value in values]),
+                    concat_arrays(wt.Float, [value.z for value in values]),
+                )
+            if isinstance(sample, wt.Complex2f):
+                return wt.Complex2f(
+                    concat_arrays(wt.Float, [value.real for value in values]),
+                    concat_arrays(wt.Float, [value.imag for value in values]),
+                )
+            return concat_arrays(type(sample), values)
+
+        history_size = max(Geo.history_size(state_arrays) for state_arrays in reduced_parts)
+        concatenated = {}
+        for key in _PATH_EXPORT_REDUCED_KEYS:
+            if all(key in state_arrays for state_arrays in reduced_parts):
+                concatenated[key] = _concat_values([state_arrays[key] for state_arrays in reduced_parts])
+        concatenated[SK_N_STATES] = sum(int(state_arrays[SK_N_STATES]) for state_arrays in reduced_parts)
+        concatenated[_PATH_EXPORT_STATE_LAYOUT_KEY] = PATH_EXPORT_REDUCED_STATE_LAYOUT
+        State.attach_lineage(concatenated, None, history_size)
+        lineage = State.concat_path_export_lineage(reduced_parts)
+        if lineage is not None:
+            concatenated[_PATH_EXPORT_LINEAGE_KEY] = lineage
+        return concatenated
+
     def gather_path_export_keys(state_arrays: dict, indices, keys, *, attach_lineage: bool) -> dict:
         gathered = {}
         for key in keys:
@@ -488,6 +596,22 @@ class State:
             from ..kernels.packed_state.drjit_impl import gather_inserted_reflection_state_fields
             return gather_inserted_reflection_state_fields(state_arrays, indices)
         return State.gather_path_export_keys(state_arrays, indices, _PATH_EXPORT_REPLAY_KEYS, attach_lineage=True)
+
+    def gather_path_export_types(state_arrays: dict, indices) -> dict:
+        if state_arrays.get(_PATH_EXPORT_STATE_LAYOUT_KEY) == PATH_EXPORT_REDUCED_STATE_LAYOUT:
+            return State.gather_path_export_keys(
+                state_arrays,
+                indices,
+                _PATH_EXPORT_TYPE_KEYS,
+                attach_lineage=True,
+            )
+        gathered = {SK_ORDER: dr.gather(wt.UInt32, state_arrays[SK_ORDER], indices)}
+        gathered[SK_N_STATES] = int(dr.width(indices))
+        return State.attach_lineage(
+            gathered,
+            State.gather_lineage(state_arrays, indices),
+            Geo.history_size(state_arrays),
+        )
 
 
 __all__ = ["State", "PATH_EXPORT_REDUCED_STATE_LAYOUT", "Geo"]

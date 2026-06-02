@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import drjit as dr
 import torch
 
+from witwin.channel.core.numerics import arrays
 from witwin.channel.core.scene import Receiver, Scene, Transmitter
 from witwin.channel.core.numerics.arrays import scalar
 from witwin.channel.core.physics.polarization import effective_rx_polarization
@@ -14,9 +15,12 @@ from witwin.channel.core.results.ray_mode import DEFAULT_RAY_MODE
 from witwin.channel.core.runtime import (
     TraceContext,
     assert_scene_materials_complete,
-    to_point3f,
+    point_grad_enabled,
+    scene_geometry_grad_enabled,
+    scene_material_grad_enabled,
 )
-from witwin.channel.core.numerics.tensors import drjit_to_torch_view
+from witwin.channel.core.geometry.mesh_buffers import to_point3f
+from witwin.channel.core.numerics.tensors import to_torch_view
 from witwin.channel.deterministic import types as wt
 from witwin.channel.deterministic.diffraction.accumulation import (
     trace_diffraction_raw_collections,
@@ -27,7 +31,10 @@ from witwin.channel.deterministic.trace.path_export import (
     collect_los_paths,
     collect_reflection_paths,
     collect_reflection_paths_for_transmitters,
+    empty_raw_paths,
+    finalize_raw_paths,
     path_export_state_layout,
+    spherical_angles,
 )
 from witwin.channel.deterministic.trace.path_export_assembly import assemble_result_payload
 from .config import Config, PathSolveSpec, derive_wave_params, resolve_solver_controls
@@ -112,6 +119,210 @@ def _stamp_raw(raw: dict[str, object], *, tx_index: int, receiver_index_map=None
     if receiver_index_map is not None and n > 0:
         raw["rx_index"] = dr.gather(wt.UInt32, receiver_index_map, raw["rx_index"])
     raw["tx_index"] = dr.full(wt.UInt32, int(tx_index), n)
+
+
+def _rayd_diffraction_path_backend_metadata() -> dict[str, object]:
+    return {
+        "implementation": "rayd_trace_dfr_paths_order1",
+        "path_export_backend": "rayd_optix_compact_paths",
+        "max_order": 1,
+    }
+
+
+def _drjit_diffraction_path_backend_metadata(max_order: int) -> dict[str, object]:
+    return {
+        "implementation": "drjit_diffraction_state_path_export",
+        "path_export_backend": "drjit_state_materialization",
+        "max_order": int(max_order),
+    }
+
+
+def _path_has_ad_inputs(*, scene: Scene, tx_positions, rx_positions) -> bool:
+    return (
+        point_grad_enabled(tx_positions)
+        or point_grad_enabled(rx_positions)
+        or scene_geometry_grad_enabled(scene)
+        or scene_material_grad_enabled(scene)
+    )
+
+
+def _resolve_reflection_path_backend(
+    *,
+    config: Config,
+    scene: Scene,
+    tx_positions,
+    rx_positions,
+) -> dict[str, object]:
+    requested = str(config.tuning.reflection_field_backend)
+    ad_inputs = _path_has_ad_inputs(
+        scene=scene,
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+    )
+    if requested == "native":
+        return {
+            "requested": requested,
+            "epc_backend": "rayd_optix",
+            "prefer_rayd_epc": True,
+            "require_rayd_epc": True,
+            "rayd_epc_required": True,
+            "ad_inputs": bool(ad_inputs),
+        }
+    return {
+        "requested": requested,
+        "epc_backend": "drjit",
+        "prefer_rayd_epc": False,
+        "require_rayd_epc": False,
+        "rayd_epc_required": False,
+        "ad_inputs": bool(ad_inputs),
+    }
+
+
+def _resolve_diffraction_path_accumulate_primal(
+    *,
+    config: Config,
+    scene: Scene,
+    tx_positions,
+    rx_positions,
+    max_order: int,
+) -> str:
+    mode = str(getattr(config.tuning.diffraction_execution, "accumulate_primal", "auto"))
+    if mode != "auto":
+        return mode
+    if int(max_order) == 1:
+        return "rayd_optix"
+    return "drjit"
+
+
+def _edge_object_indices_for_native_paths(scene: Scene, edge_data, edge_idx):
+    count = int(dr.width(edge_idx))
+    if edge_data is None or int(edge_data.get("n_edges", 0)) <= 0:
+        return dr.full(wt.Int32, -1, count)
+    n_edges = int(edge_data["n_edges"])
+    valid_edge = (edge_idx >= wt.Int32(0)) & (edge_idx < wt.Int32(n_edges))
+    safe_edge = wt.UInt32(dr.select(valid_edge, edge_idx, wt.Int32(0)))
+    face0 = dr.gather(wt.Int32, edge_data["adjacent_face0"], safe_edge)
+    face1 = dr.gather(wt.Int32, edge_data["adjacent_face1"], safe_edge)
+    use_face0 = face0 >= wt.Int32(0)
+    face = dr.select(use_face0, face0, face1)
+    valid_face = valid_edge & (face >= wt.Int32(0))
+    safe_face = wt.UInt32(dr.select(valid_face, face, wt.Int32(0)))
+    return scene.gather_structure_indices(safe_face, valid_mask=valid_face)
+
+
+def collect_native_diffraction_paths(
+    *,
+    state_arrays,
+    edge_data,
+    scene: Scene,
+    rx_positions,
+    tx_pos,
+    wavelength: float,
+    k: float,
+    max_paths: int,
+    seed: int,
+    return_geometry: bool,
+    stats: dict[str, object] | None = None,
+) -> dict[str, object]:
+    if stats is None:
+        stats = {}
+    stats.clear()
+    stats.update(
+        {
+            "backend": "rayd_optix_compact_paths",
+            "input_states": 0 if state_arrays is None else int(state_arrays.get("n_states", 0)),
+            "receiver_count": int(dr.width(rx_positions.x)) if rx_positions is not None else 0,
+            "output_paths": 0,
+            "materialization_deferred": False,
+        }
+    )
+    backend_metadata = _rayd_diffraction_path_backend_metadata()
+    if (
+        state_arrays is None
+        or int(state_arrays.get("n_states", 0)) == 0
+        or rx_positions is None
+        or int(dr.width(rx_positions.x)) == 0
+    ):
+        raw = empty_raw_paths(depth=1, return_geometry=return_geometry)
+        raw["metadata"] = {"n_paths": 0, "runtime_backend": backend_metadata}
+        return raw
+
+    native = scene.trace_dfr_paths(
+        tx_positions=tx_pos,
+        rx_positions=rx_positions,
+        state_arrays=state_arrays,
+        config=SimpleNamespace(wavelength=float(wavelength), k=float(k)),
+        max_order=1,
+        max_paths=int(max_paths),
+        seed=int(seed),
+        return_geometry=bool(return_geometry),
+        active=True,
+    )
+    capacity = int(getattr(native, "capacity", int(dr.width(native.rx_id))))
+    count = max(0, min(capacity, int(scalar(wt.Int32(native.count)))))
+    stats["output_paths"] = count
+    if count == 0:
+        raw = empty_raw_paths(depth=1, return_geometry=return_geometry)
+        raw["metadata"] = {"n_paths": 0, "runtime_backend": backend_metadata}
+        return raw
+
+    idx = dr.arange(wt.UInt32, count)
+    rx_i32 = dr.gather(wt.Int32, wt.Int32(native.rx_id), idx)
+    rx_index = wt.UInt32(dr.maximum(rx_i32, wt.Int32(0)))
+    edge_idx = dr.gather(wt.Int32, wt.Int32(native.edge0), idx)
+    native_point_0 = wt.Point3f(native.p0)
+    point_0 = dr.gather(wt.Point3f, native_point_0, idx)
+    rx_point = wt.Point3f(
+        dr.gather(wt.Float, rx_positions.x, rx_index),
+        dr.gather(wt.Float, rx_positions.y, rx_index),
+        dr.gather(wt.Float, rx_positions.z, rx_index),
+    )
+    departure_dir = point_0 - tx_pos
+    arrival_dir = rx_point - point_0
+    theta_t, phi_t = spherical_angles(departure_dir)
+    theta_r, phi_r = spherical_angles(arrival_dir)
+    field_x = wt.Complex2f(native.field_x)
+    a = wt.Complex2f(
+        dr.gather(wt.Float, wt.Float(field_x.real), idx),
+        dr.gather(wt.Float, wt.Float(field_x.imag), idx),
+    )
+    tau = dr.gather(wt.Float, wt.Float(native.delay), idx)
+    type_slots = (dr.full(wt.Int32, wt.InteractionType.DIFFRACTION, count),)
+    vertex_slots = normal_slots = object_slots = None
+    if return_geometry:
+        vertex_slots = (point_0,)
+        if edge_data is None or int(edge_data.get("n_edges", 0)) <= 0:
+            normal_slots = (arrays.zeros_vector3(count),)
+            object_slots = (dr.full(wt.Int32, -1, count),)
+        else:
+            n_edges = int(edge_data["n_edges"])
+            valid_edge = (edge_idx >= wt.Int32(0)) & (edge_idx < wt.Int32(n_edges))
+            safe_edge = wt.UInt32(dr.select(valid_edge, edge_idx, wt.Int32(0)))
+            normal_slots = (
+                dr.select(
+                    valid_edge,
+                    dr.gather(wt.Vector3f, edge_data["n0"], safe_edge),
+                    arrays.zeros_vector3(count),
+                ),
+            )
+            object_slots = (
+                _edge_object_indices_for_native_paths(scene, edge_data, edge_idx),
+            )
+
+    return finalize_raw_paths(
+        rx_index=rx_index,
+        a=a,
+        tau=tau,
+        theta_t=theta_t,
+        phi_t=phi_t,
+        theta_r=theta_r,
+        phi_r=phi_r,
+        type_slots=type_slots,
+        vertex_slots=vertex_slots,
+        normal_slots=normal_slots,
+        object_slots=object_slots,
+        metadata={"n_paths": count, "runtime_backend": backend_metadata},
+    )
 
 
 def _resolved_endpoint_arrays(scene: Scene, endpoints: list, *, role: str) -> list:
@@ -203,9 +414,9 @@ def _array_slot_positions_tensor(arrays: list, endpoints: list, *, device, dtype
     for endpoint_index, array in enumerate(arrays):
         positions = torch.stack(
             [
-                drjit_to_torch_view(array.element_positions.x, dtype=torch.float32, device=device),
-                drjit_to_torch_view(array.element_positions.y, dtype=torch.float32, device=device),
-                drjit_to_torch_view(array.element_positions.z, dtype=torch.float32, device=device),
+                to_torch_view(array.element_positions.x, dtype=torch.float32, device=device),
+                to_torch_view(array.element_positions.y, dtype=torch.float32, device=device),
+                to_torch_view(array.element_positions.z, dtype=torch.float32, device=device),
             ],
             dim=-1,
         ).to(device=device, dtype=dtype)
@@ -224,9 +435,9 @@ def _array_slot_orientations_tensor(arrays: list, endpoints: list, *, device, dt
         else:
             element_orientations = torch.stack(
                 [
-                    drjit_to_torch_view(array.element_orientations.x, dtype=torch.float32, device=device),
-                    drjit_to_torch_view(array.element_orientations.y, dtype=torch.float32, device=device),
-                    drjit_to_torch_view(array.element_orientations.z, dtype=torch.float32, device=device),
+                    to_torch_view(array.element_orientations.x, dtype=torch.float32, device=device),
+                    to_torch_view(array.element_orientations.y, dtype=torch.float32, device=device),
+                    to_torch_view(array.element_orientations.z, dtype=torch.float32, device=device),
                 ],
                 dim=-1,
             ).to(device=device, dtype=dtype)
@@ -550,6 +761,12 @@ def solve(
     trace_num_rx = int(dr.width(trace_rx_positions.x))
     trace_num_tx = int(dr.width(trace_tx_positions.x))
     effective = solver_controls["effective"]
+    reflection_backend = _resolve_reflection_path_backend(
+        config=config,
+        scene=scene,
+        tx_positions=trace_tx_positions,
+        rx_positions=trace_rx_positions,
+    )
 
     assert_scene_materials_complete(scene)
     scene.diffraction_edge_count(edge_policy=config.edge_policy)
@@ -599,6 +816,8 @@ def solve(
         use_scene_materials=True,
         return_geometry=config.return_geometry,
         reflection_details=None,
+        prefer_rayd_epc=bool(reflection_backend["prefer_rayd_epc"]),
+        require_rayd_epc=bool(reflection_backend["require_rayd_epc"]),
     )
     reflection_raw_collections = list(reflection_raw_collections)
     reflection_details = list(reflection_details)
@@ -606,8 +825,28 @@ def solve(
 
     diffraction_raw_collections: list[Mapping[str, object]] = []
     diffraction_group_metadata: list[dict] = []
+    diffraction_runtime_backend: dict[str, object] | None = None
     t0 = time.perf_counter()
     if effective["max_diffractions"] > 0:
+        diffraction_accumulate_mode = _resolve_diffraction_path_accumulate_primal(
+            config=config,
+            scene=scene,
+            tx_positions=trace_tx_positions,
+            rx_positions=trace_rx_positions,
+            max_order=int(effective["max_diffractions"]),
+        )
+        use_native_diffraction_paths = diffraction_accumulate_mode == "rayd_optix"
+        if use_native_diffraction_paths and int(effective["max_diffractions"]) != 1:
+            raise RuntimeError(
+                "path diffraction_execution.accumulate_primal='rayd_optix' currently supports "
+                "first-order diffraction path export only."
+            )
+        if use_native_diffraction_paths:
+            diffraction_runtime_backend = _rayd_diffraction_path_backend_metadata()
+        else:
+            diffraction_runtime_backend = _drjit_diffraction_path_backend_metadata(
+                int(effective["max_diffractions"])
+            )
         spec = PathSolveSpec(ray_mode=DEFAULT_RAY_MODE, name=receiver_name)
         diffraction_config = SimpleNamespace(
             enable_rd_diffraction=bool(config.tuning.enable_rd_diffraction),
@@ -627,20 +866,41 @@ def solve(
             )
             for state_raw in raw_state_collections:
                 path_collection_stats: dict = {}
-                raw = collect_diffraction_state_paths(
-                    state_arrays=state_raw.get("state_arrays"),
-                    edge_data=state_raw.get("edge_data"),
-                    scene=scene,
-                    rx_positions=state_raw.get("rx_positions"),
-                    tx_pos=runtime.tx.position,
-                    wavelength=wavelength,
-                    k=k,
-                    tx_polarization=tx_polarization,
-                    rx_polarization=rx_polarization,
-                    material_detail=None,
-                    return_geometry=config.return_geometry,
-                    stats=path_collection_stats,
-                )
+                if use_native_diffraction_paths:
+                    state_arrays_for_limit = state_raw.get("state_arrays")
+                    state_count_for_limit = (
+                        0
+                        if state_arrays_for_limit is None
+                        else int(state_arrays_for_limit.get("n_states", 0))
+                    )
+                    raw = collect_native_diffraction_paths(
+                        state_arrays=state_raw.get("state_arrays"),
+                        edge_data=state_raw.get("edge_data"),
+                        scene=scene,
+                        rx_positions=state_raw.get("rx_positions"),
+                        tx_pos=runtime.tx.position,
+                        wavelength=wavelength,
+                        k=k,
+                        max_paths=int(config.max_num_paths or max(1, state_count_for_limit)),
+                        seed=0,
+                        return_geometry=config.return_geometry,
+                        stats=path_collection_stats,
+                    )
+                else:
+                    raw = collect_diffraction_state_paths(
+                        state_arrays=state_raw.get("state_arrays"),
+                        edge_data=state_raw.get("edge_data"),
+                        scene=scene,
+                        rx_positions=state_raw.get("rx_positions"),
+                        tx_pos=runtime.tx.position,
+                        wavelength=wavelength,
+                        k=k,
+                        tx_polarization=tx_polarization,
+                        rx_polarization=rx_polarization,
+                        material_detail=None,
+                        return_geometry=config.return_geometry,
+                        stats=path_collection_stats,
+                    )
                 _stamp_raw(raw, tx_index=tx_index, receiver_index_map=state_raw["receiver_index_map"])
                 diffraction_raw_collections.append(raw)
                 state_arrays = state_raw.get("state_arrays")
@@ -718,6 +978,18 @@ def solve(
         },
         "diffraction_groups": tuple(diffraction_group_metadata),
     }
+    runtime_backends = {
+        "reflection": {
+            "field_backend_requested": str(reflection_backend["requested"]),
+            "epc_backend": str(reflection_backend["epc_backend"]),
+            "rayd_epc_preferred": bool(reflection_backend["prefer_rayd_epc"]),
+            "rayd_epc_required": bool(reflection_backend["rayd_epc_required"]),
+            "ad_inputs": bool(reflection_backend["ad_inputs"]),
+        },
+    }
+    if diffraction_runtime_backend is not None:
+        runtime_backends["diffraction"] = dict(diffraction_runtime_backend)
+    metadata["runtime_backends"] = runtime_backends
     if reflection_detail_for_metadata is not None:
         metadata["reflection_sampling"] = dict(
             getattr(reflection_detail_for_metadata, "reflection_sampling", {}) or {}

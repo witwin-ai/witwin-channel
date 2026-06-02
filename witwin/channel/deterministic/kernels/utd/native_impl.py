@@ -27,7 +27,8 @@ from witwin.channel.core.physics.polarization import (
     vector_select,
     vector_zero,
 )
-from witwin.channel.core.runtime import Material, Rx, Tx, Wave, material_angular_frequency
+from witwin.channel.core.runtime import Material, Rx, Tx, Wave
+from witwin.channel.core.physics.wave_math import material_angular_frequency
 from witwin.channel.core.geometry.diffraction import wedge_exterior_mask, wedge_geometry
 from witwin.channel.core.physics.wave_math import shadow_support_angle_from_cutoff_db
 from witwin.channel.deterministic.diffraction.state import (

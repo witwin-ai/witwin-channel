@@ -4,7 +4,7 @@ import math
 
 import torch
 import witwin.channel as wc
-from witwin.channel.core.numerics.tensors import drjit_to_torch_view
+from witwin.channel.core.numerics.tensors import to_torch_view
 
 
 def _solve_los(scene: wc.Scene, *, synthetic_array: bool = True):
@@ -184,7 +184,7 @@ def test_explicit_array_mode_rotates_element_positions_by_endpoint_orientation()
     )
 
     result = _solve_los(scene, synthetic_array=False)
-    tau = drjit_to_torch_view(result.tau, dtype=torch.float32)
+    tau = to_torch_view(result.tau, dtype=torch.float32)
     per_tx_antenna_tau = tau[0, 0, 0, :, 0]
 
     assert float(torch.abs(per_tx_antenna_tau[0] - per_tx_antenna_tau[1]).item()) < 1.0e-11
