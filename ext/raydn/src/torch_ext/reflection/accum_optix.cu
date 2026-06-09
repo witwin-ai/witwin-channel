@@ -27,6 +27,12 @@ struct HitPayload {
     unsigned int instance = 0u;
 };
 
+struct PlaneHit {
+    float t = 0.f;
+    float coord0 = 0.f;
+    float coord1 = 0.f;
+};
+
 static __forceinline__ __device__ float3 fallback_axis(float3 direction) {
     return fabsf(direction.z) < 0.9f
                ? make_f3(0.f, 0.f, 1.f)
@@ -190,7 +196,7 @@ static __forceinline__ __device__ float3 axis_plane_point(int axis,
 
 static __forceinline__ __device__ bool plane_hit_in_bounds(float3 origin,
                                                            float3 direction,
-                                                           float &t_plane) {
+                                                           PlaneHit &plane_hit) {
     const int axis = params.grid_axis;
     const float axis_dir = component(direction, axis);
     if (fabsf(axis_dir) <= kReflEps) {
@@ -198,17 +204,17 @@ static __forceinline__ __device__ bool plane_hit_in_bounds(float3 origin,
     }
     const float safe_axis_dir =
         axis_dir + (axis_dir >= 0.f ? kReflEps : -kReflEps);
-    t_plane = (params.grid_position - component(origin, axis)) / safe_axis_dir;
-    if (!(t_plane > kRayBias)) {
+    plane_hit.t = (params.grid_position - component(origin, axis)) / safe_axis_dir;
+    if (!(plane_hit.t > kRayBias)) {
         return false;
     }
 
-    const float3 target = origin + t_plane * direction;
-    float coord0 = 0.f;
-    float coord1 = 0.f;
-    plane_coords(target, axis, coord0, coord1);
-    return coord0 >= params.grid_coord0_min && coord0 < params.grid_coord0_max &&
-           coord1 >= params.grid_coord1_min && coord1 < params.grid_coord1_max;
+    const float3 target = origin + plane_hit.t * direction;
+    plane_coords(target, axis, plane_hit.coord0, plane_hit.coord1);
+    return plane_hit.coord0 >= params.grid_coord0_min &&
+           plane_hit.coord0 < params.grid_coord0_max &&
+           plane_hit.coord1 >= params.grid_coord1_min &&
+           plane_hit.coord1 < params.grid_coord1_max;
 }
 
 static __forceinline__ __device__ unsigned int hash_u32(unsigned int x) {
@@ -361,35 +367,28 @@ static __forceinline__ __device__ void store_wedge_event(unsigned int ray_index,
     params.out_wedge_bounce_depth[slot] = depth;
 }
 
-static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
-                                                        int depth,
-                                                        float3 origin,
-                                                        float3 direction,
-                                                        float blocker_t,
-                                                        float3 image_source,
-                                                        Complex3 field) {
+static __forceinline__ __device__ bool accumulate_plane_hit(unsigned int ray_index,
+                                                            int depth,
+                                                            float3 direction,
+                                                            const PlaneHit &plane_hit,
+                                                            float blocker_t,
+                                                            float3 image_source,
+                                                            Complex3 field) {
     const int axis = params.grid_axis;
     const float axis_dir = component(direction, axis);
     if (fabsf(axis_dir) <= kReflEps) {
         return false;
     }
-    const float safe_axis_dir =
-        axis_dir + (axis_dir >= 0.f ? kReflEps : -kReflEps);
-    const float t_plane =
-        (params.grid_position - component(origin, axis)) / safe_axis_dir;
-    if (!(t_plane > kRayBias)) {
+    if (!(plane_hit.t > kRayBias)) {
         return false;
     }
-
-    const float3 target = origin + t_plane * direction;
-    float coord0 = 0.f;
-    float coord1 = 0.f;
-    plane_coords(target, axis, coord0, coord1);
-    if (coord0 < params.grid_coord0_min || coord0 >= params.grid_coord0_max ||
-        coord1 < params.grid_coord1_min || coord1 >= params.grid_coord1_max) {
+    if (plane_hit.coord0 < params.grid_coord0_min ||
+        plane_hit.coord0 >= params.grid_coord0_max ||
+        plane_hit.coord1 < params.grid_coord1_min ||
+        plane_hit.coord1 >= params.grid_coord1_max) {
         return false;
     }
-    if (!(t_plane < blocker_t)) {
+    if (!(plane_hit.t < blocker_t)) {
         return false;
     }
 
@@ -400,8 +399,8 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
         return false;
     }
 
-    const float u = (coord0 - params.grid_coord0_min) / span0;
-    const float v = (coord1 - params.grid_coord1_min) / span1;
+    const float u = (plane_hit.coord0 - params.grid_coord0_min) / span0;
+    const float v = (plane_hit.coord1 - params.grid_coord1_min) / span1;
     const int ix = min(max(static_cast<int>(u * params.grid_resolution0), 0),
                        params.grid_resolution0 - 1);
     const int iy = min(max(static_cast<int>(v * params.grid_resolution1), 0),
@@ -415,7 +414,7 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
     }
 
     const float3 target_plane =
-        axis_plane_point(axis, params.grid_position, coord0, coord1);
+        axis_plane_point(axis, params.grid_position, plane_hit.coord0, plane_hit.coord1);
     const float unfolded_distance = norm3(target_plane - image_source);
     const float fspl =
         params.wavelength / (4.f * kPi * fmaxf(unfolded_distance, kReflEps));
@@ -486,6 +485,26 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
     atomic_add_same_cell(params.out_reflection_power, cell, contribution_power, cell_group);
     atomic_add_warp(params.out_reflection_count, 1);
     return true;
+}
+
+static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
+                                                        int depth,
+                                                        float3 origin,
+                                                        float3 direction,
+                                                        float blocker_t,
+                                                        float3 image_source,
+                                                        Complex3 field) {
+    PlaneHit plane_hit;
+    if (!plane_hit_in_bounds(origin, direction, plane_hit)) {
+        return false;
+    }
+    return accumulate_plane_hit(ray_index,
+                                depth,
+                                direction,
+                                plane_hit,
+                                blocker_t,
+                                image_source,
+                                field);
 }
 
 } // namespace
@@ -564,18 +583,18 @@ extern "C" __global__ void __raygen__reflection_accumulation() {
     for (int depth = 0; depth <= params.max_bounces; ++depth) {
         if (depth >= params.max_bounces) {
             if (depth > 0 || params.los_enabled != 0) {
-                float t_plane = 0.f;
-                if (plane_hit_in_bounds(origin, direction, t_plane)) {
-                    const float trace_tmax = fmaxf(t_plane - kRayBias, kRayTMin);
+                PlaneHit plane_hit;
+                if (plane_hit_in_bounds(origin, direction, plane_hit)) {
+                    const float trace_tmax = fmaxf(plane_hit.t - kRayBias, kRayTMin);
                     const HitPayload blocker = trace_scene(origin, direction, trace_tmax);
                     const float blocker_t = blocker.hit != 0u ? __uint_as_float(blocker.t) : kRayTMax;
-                    (void)accumulate_plane(ray_index,
-                                           depth,
-                                           origin,
-                                           direction,
-                                           blocker_t,
-                                           image_source,
-                                           field);
+                    (void)accumulate_plane_hit(ray_index,
+                                               depth,
+                                               direction,
+                                               plane_hit,
+                                               blocker_t,
+                                               image_source,
+                                               field);
                 }
             }
             break;

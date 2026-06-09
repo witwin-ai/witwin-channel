@@ -60,7 +60,7 @@ OptixPipelineConfig refl_epc_pipeline_config() {
 
 OptixPipelineConfig refl_accum_pipeline_config() {
     OptixPipelineConfig config;
-    // Embed regenerated reflection-accumulation PTX for the current streaming launch layout.
+    // Embed regenerated reflection-accumulation PTX for the current streaming plane-hit layout.
     config.ptx = raydn_reflection_accumulation_optix_ptx;
     config.ptx_size = sizeof(raydn_reflection_accumulation_optix_ptx);
     config.raygen_entries = {"__raygen__reflection_accumulation"};

@@ -71,6 +71,7 @@ Measured on the same SF planar 2D grid 100M problem:
 - Earlier stable warm run: Sionna `23.49 ms`, Native `23.91 ms`.
 - After power-only fast path, current GPU clock/load state was slower for both backends: Sionna-only median `29.73 ms`, Native-only median `28.06 ms`.
 - Same-run both comparison after the fast path: Sionna `30.26 ms`, Native `29.76 ms`.
+- After terminal plane-hit reuse: Native-only median `24.31 ms` over 7 repeats; same-run both comparison was Sionna `23.48 ms`, Native `24.38 ms`.
 - Native peak allocation is about `192 MB`, far below the previous `37.75 GB` staged path.
 
 Sionna 25ms mechanism:
@@ -81,9 +82,10 @@ Sionna 25ms mechanism:
 
 Remaining Native bottlenecks:
 
-- Terminal reflected rays still use a full closest-hit OptiX trace with six payload registers for blocker visibility. A dedicated shadow/visibility trace with `TERMINATE_ON_FIRST_HIT | DISABLE_ANYHIT | DISABLE_CLOSESTHIT` is the next highest-value OptiX change.
-- The raygen still carries both general accumulation state and streaming-planar state in one kernel. Specializing the `max_depth=1` streaming radiomap kernel should reduce live registers and branch pressure.
+- Terminal reflected rays still use a full closest-hit OptiX trace with six payload registers for blocker visibility. A trial dedicated shadow trace with `TERMINATE_ON_FIRST_HIT | DISABLE_ANYHIT | DISABLE_CLOSESTHIT` preserved the result but slowed Native to about `33 ms`, so this must be revisited only with a separately compiled visibility pipeline or profiler evidence.
+- The raygen still carries both general accumulation state and streaming-planar state in one kernel. A naïve in-kernel `max_depth=1` fast path preserved the result but did not improve median time, likely due code-size/register pressure. The next version should use a separate raygen entry/pipeline if specializing.
 - Result parity is not solved: Sionna reports `142` nonzero cells and path-gain sum about `2.93e-10`; Native reports `95` nonzero cells and path-gain sum about `8.75e-11`. LoS is zero for both in this SF setup, so the mismatch is in first-order reflection geometry/material/field semantics, not in direct LoS.
+- Parity diagnostics: Sionna and Native share the same SF material parameters and object order (`terrain/concrete`, `marble`, `metal`). Nonzero cell coordinates are not simply transposed or shifted: both cover `y=117..255`, but Sionna spans `x=0..253` and Native spans `x=55..253`; shared bottom-edge cells match spatially while right-half cells are much weaker in Native. This points to reflection field/Jones basis or surface-hit semantics rather than grid bounds or material assignment.
 
 Critical files:
 
