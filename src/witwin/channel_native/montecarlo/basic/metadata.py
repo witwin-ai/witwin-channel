@@ -37,14 +37,19 @@ def make_solver_metadata(
     backward_launch_count = 1 if config.ad_mode == "vjp" and valid_contribution_count else 0
     jvp_launch_count = 1 if config.ad_mode == "jvp" and valid_contribution_count else 0
     tape_bytes = valid_contribution_count * 16 if config.ad_mode in {"vjp", "jvp"} else 0
+    raydn_component_enabled = (
+        ("reflection" in config.components and reflection_available)
+        or ("diffraction" in config.components and diffraction_available)
+    )
     kernel_metadata = make_metadata(
         primitive="montecarlo_basic_primal",
         forward_launch_count=forward_launch_count,
         backward_launch_count=backward_launch_count,
         jvp_launch_count=jvp_launch_count,
         tape_bytes=tape_bytes,
+        fused_stages=1 if raydn_component_enabled else 0,
         accumulation_strategy=config.accumulation_strategy,
-        scheduling_strategy="torch_cuda",
+        scheduling_strategy="native_fused" if raydn_component_enabled else "torch_cuda",
         raydn_native=reflection_available or diffraction_available,
         ad_status=config.ad_mode if config.ad_mode != "none" else "unsupported",
     )

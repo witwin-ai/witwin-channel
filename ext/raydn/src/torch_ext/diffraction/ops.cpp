@@ -1156,9 +1156,17 @@ py::tuple diffraction_accumulation_forward_op(
     if (use_recursive) {
         pipeline->launch(13, params, static_cast<unsigned int>(launch_count), torch_ctx.stream);
     } else {
-        pipeline->launch(6, params, static_cast<unsigned int>(launch_count), torch_ctx.stream);
-        if (direct_launch_count + keller_launch_count > 0)
-            pipeline->launch(7, params, static_cast<unsigned int>(launch_count), torch_ctx.stream);
+        const bool use_fused_no_suffix =
+            suffix_launch_count == 0 &&
+            direct_launch_count + keller_launch_count > 0 &&
+            !write_tape;
+        if (use_fused_no_suffix) {
+            pipeline->launch(3, params, static_cast<unsigned int>(launch_count), torch_ctx.stream);
+        } else {
+            pipeline->launch(6, params, static_cast<unsigned int>(launch_count), torch_ctx.stream);
+            if (direct_launch_count + keller_launch_count > 0)
+                pipeline->launch(7, params, static_cast<unsigned int>(launch_count), torch_ctx.stream);
+        }
         if (staged_no_suffix_accum) {
             reduce_dfr_accum_staged_cuda(
                 launch_count,
@@ -2626,6 +2634,87 @@ at::Tensor diffraction_discover_edges_op(
         hit_p,
         hit_n,
         hit_geo_n,
+        triangle_edge_count,
+        triangle_edge_indices,
+        edge_pos,
+        edge_dir,
+        edge_n0,
+        edge_nn,
+        edge_line_min,
+        edge_line_max,
+        edge_adjacent_face1,
+        seen);
+    return at::nonzero(seen).reshape({-1}).to(at::kInt).contiguous();
+}
+
+at::Tensor diffraction_discover_edges_counted_op(
+    at::Tensor tx_pos,
+    at::Tensor ray_dir,
+    at::Tensor prim_index,
+    at::Tensor hit_p,
+    at::Tensor hit_n,
+    at::Tensor hit_geo_n,
+    at::Tensor hit_count,
+    at::Tensor triangle_edge_count,
+    at::Tensor triangle_edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_n0,
+    at::Tensor edge_nn,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
+    at::Tensor edge_adjacent_face1) {
+    require_cuda(tx_pos, "tx_pos");
+    require_dtype(tx_pos, at::kFloat, "tx_pos");
+    require_rank(tx_pos, 1, "tx_pos");
+    if (tx_pos.size(0) != 3)
+        throw std::runtime_error("tx_pos must have shape (3,).");
+    require_vec3f(ray_dir, "ray_dir");
+    require_flat_i32(prim_index, "prim_index");
+    require_vec3f(hit_p, "hit_p");
+    require_vec3f(hit_n, "hit_n");
+    require_vec3f(hit_geo_n, "hit_geo_n");
+    require_flat_i32(hit_count, "hit_count");
+    if (hit_count.size(0) < 1)
+        throw std::runtime_error("hit_count must contain at least one element.");
+    require_flat_i32(triangle_edge_count, "triangle_edge_count");
+    require_cuda(triangle_edge_indices, "triangle_edge_indices");
+    require_contiguous(triangle_edge_indices, "triangle_edge_indices");
+    require_dtype(triangle_edge_indices, at::kInt, "triangle_edge_indices");
+    require_rank(triangle_edge_indices, 2, "triangle_edge_indices");
+    require_vec3f(edge_pos, "edge_pos");
+    require_vec3f(edge_dir, "edge_dir");
+    require_vec3f(edge_n0, "edge_n0");
+    require_vec3f(edge_nn, "edge_nn");
+    require_flat_f32(edge_line_min, "edge_line_min");
+    require_flat_f32(edge_line_max, "edge_line_max");
+    require_flat_i32(edge_adjacent_face1, "edge_adjacent_face1");
+
+    const int64_t hit_capacity = ray_dir.size(0);
+    if (prim_index.size(0) != hit_capacity || hit_p.size(0) != hit_capacity ||
+        hit_n.size(0) != hit_capacity || hit_geo_n.size(0) != hit_capacity)
+        throw std::runtime_error("diffraction_discover_edges_counted hit tensors must share the same capacity.");
+    const int64_t n_edges = edge_pos.size(0);
+    if (edge_dir.size(0) != n_edges || edge_n0.size(0) != n_edges ||
+        edge_nn.size(0) != n_edges || edge_line_min.size(0) != n_edges ||
+        edge_line_max.size(0) != n_edges || edge_adjacent_face1.size(0) != n_edges)
+        throw std::runtime_error("diffraction_discover_edges_counted edge tensors must share the same width.");
+    if (triangle_edge_indices.size(0) != triangle_edge_count.size(0))
+        throw std::runtime_error("triangle_edge_indices rows must match triangle_edge_count width.");
+
+    if (hit_capacity <= 0 || n_edges <= 0) {
+        return at::empty({0}, prim_index.options());
+    }
+
+    at::Tensor seen = at::zeros({n_edges}, prim_index.options());
+    diffraction_discover_edges_counted_cuda(
+        tx_pos.contiguous(),
+        ray_dir,
+        prim_index,
+        hit_p,
+        hit_n,
+        hit_geo_n,
+        hit_count,
         triangle_edge_count,
         triangle_edge_indices,
         edge_pos,

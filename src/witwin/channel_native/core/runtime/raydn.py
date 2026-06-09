@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 
 from witwin.channel_native.core.kernels import raydn_backend
+from witwin.channel_native.core.kernels.ops import mc_pack_vec3
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,7 @@ class RayDNScene:
     handle: object | None = None
     mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
     reason: str | None = None
+    runtime_cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     @property
     def available(self) -> bool:
@@ -40,11 +42,14 @@ class RayDNScene:
         return self.handle
 
     def edge_records(self) -> RayDNEdgeRecords:
+        cached = self.runtime_cache.get("edge_records")
+        if cached is not None:
+            return cached  # type: ignore[return-value]
         values = self.require_handle().edge_records()
         if len(values) != 12:
             raise RuntimeError(f"RayDN edge_records returned {len(values)} tensors, expected 12")
-        face_normals = torch.stack((values[2], values[3], values[4]), dim=1).contiguous()
-        return RayDNEdgeRecords(
+        face_normals = mc_pack_vec3(values[2], values[3], values[4])
+        records = RayDNEdgeRecords(
             vertices=values[0],
             faces=values[1],
             face_normals=face_normals,
@@ -56,6 +61,8 @@ class RayDNScene:
             local_edge_id=values[10],
             opposite=values[11],
         )
+        self.runtime_cache["edge_records"] = records
+        return records
 
 
 def _empty_tensor(shape: tuple[int, ...], *, dtype: torch.dtype, device: torch.device) -> torch.Tensor:

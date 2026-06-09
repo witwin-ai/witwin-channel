@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from itertools import combinations
 
 import torch
@@ -31,6 +31,7 @@ class Scene:
     _geometry_version: int = 0
     _material_version: int = 0
     _assignment_version: int = 0
+    _compiled_cache: CompiledScene | None = field(default=None, init=False, compare=False, repr=False)
 
     def __init__(
         self,
@@ -54,6 +55,7 @@ class Scene:
         object.__setattr__(self, "_geometry_version", _geometry_version)
         object.__setattr__(self, "_material_version", _material_version)
         object.__setattr__(self, "_assignment_version", _assignment_version)
+        object.__setattr__(self, "_compiled_cache", None)
 
     @classmethod
     def load_mitsuba(cls, filename: str, **kwargs) -> Scene:
@@ -98,6 +100,14 @@ class Scene:
         return self.diffraction_edge_count()
 
     def compile(self) -> CompiledScene:
+        cached = self._compiled_cache
+        if (
+            cached is not None
+            and cached.geometry_version == self._geometry_version
+            and cached.material_version == self._material_version
+            and cached.assignment_version == self._assignment_version
+        ):
+            return cached
         geometry = _compile_geometry(self.structures, self._geometry_version)
         materials = _compile_materials(self.structures, self.frequency, self._material_version)
         assignments = _compile_assignments(
@@ -106,7 +116,7 @@ class Scene:
             num_edges=geometry.edges.shape[0],
             version=self._assignment_version,
         )
-        return CompiledScene(
+        compiled = CompiledScene(
             geometry=geometry,
             materials=materials,
             assignments=assignments,
@@ -116,6 +126,8 @@ class Scene:
             material_version=materials.version,
             assignment_version=assignments.version,
         )
+        object.__setattr__(self, "_compiled_cache", compiled)
+        return compiled
 
 
 def _opposite_vertex(face: torch.Tensor, shared0: torch.Tensor, shared1: torch.Tensor) -> torch.Tensor:

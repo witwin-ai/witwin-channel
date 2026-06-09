@@ -3,54 +3,35 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
+from witwin.channel_native.core.kernels.ops import mc_face_material_tensors
+
 if TYPE_CHECKING:
     from .scene import Scene
-
-
-def _material_parameters(material) -> dict[str, float | int]:
-    if hasattr(material, "parameters"):
-        return material.parameters()
-    return {
-        "eps_r": 1.0,
-        "mu_r": 1.0,
-        "sigma_e": 0.0,
-        "gain": 1.0,
-        "model_id": 0,
-    }
+    from .runtime.compiled_scene import CompiledScene
 
 
 def face_material_tensors(
-    scene: "Scene",
+    scene_or_compiled: "Scene | CompiledScene",
     *,
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    eps_r: list[torch.Tensor] = []
-    sigma_e: list[torch.Tensor] = []
-    mu_r: list[torch.Tensor] = []
-    gain: list[torch.Tensor] = []
-    valid: list[torch.Tensor] = []
-    for structure in scene.structures:
-        face_count = int(structure.faces.shape[0])
-        params = _material_parameters(structure.material)
-        eps_r.append(torch.full((face_count,), float(params.get("eps_r", 1.0)), device=device, dtype=torch.float32))
-        sigma_e.append(
-            torch.full((face_count,), float(params.get("sigma_e", 0.0)), device=device, dtype=torch.float32)
-        )
-        mu_r.append(torch.full((face_count,), float(params.get("mu_r", 1.0)), device=device, dtype=torch.float32))
-        gain.append(torch.full((face_count,), float(params.get("gain", 1.0)), device=device, dtype=torch.float32))
-        valid.append(torch.ones((face_count,), device=device, dtype=torch.bool))
-    if not eps_r:
-        return (
-            torch.ones((1,), device=device, dtype=torch.float32),
-            torch.zeros((1,), device=device, dtype=torch.float32),
-            torch.ones((1,), device=device, dtype=torch.float32),
-            torch.ones((1,), device=device, dtype=torch.float32),
-            torch.ones((1,), device=device, dtype=torch.bool),
-        )
+    compiled = scene_or_compiled if hasattr(scene_or_compiled, "materials") else scene_or_compiled.compile()
+    materials = compiled.materials
+    assignments = compiled.assignments
+    material_eps_r = materials.eps_r.to(device=device, dtype=torch.float32).contiguous()
+    material_sigma_e = materials.sigma_e.to(device=device, dtype=torch.float32).contiguous()
+    material_mu_r = materials.mu_r.to(device=device, dtype=torch.float32).contiguous()
+    face_material_id = assignments.face_material_id.to(device=device, dtype=torch.int32).contiguous()
+    exported = mc_face_material_tensors(
+        material_eps_r,
+        material_sigma_e,
+        material_mu_r,
+        face_material_id,
+    )
     return (
-        torch.cat(eps_r).contiguous(),
-        torch.cat(sigma_e).contiguous(),
-        torch.cat(mu_r).contiguous(),
-        torch.cat(gain).contiguous(),
-        torch.cat(valid).contiguous(),
+        exported["eps_r"],
+        exported["sigma_e"],
+        exported["mu_r"],
+        exported["gain"],
+        exported["valid"],
     )

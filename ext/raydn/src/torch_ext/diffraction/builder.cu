@@ -237,6 +237,58 @@ __global__ void discover_edges_kernel(
     }
 }
 
+__global__ void discover_edges_counted_kernel(
+    const float *tx_pos,
+    const float *ray_dir,
+    const int *prim_index,
+    const float *hit_p,
+    const float *hit_n,
+    const float *hit_geo_n,
+    const int *hit_count,
+    int hit_capacity,
+    const int *triangle_edge_count,
+    const int *triangle_edge_indices,
+    int max_triangle_edge_slots,
+    int n_triangles,
+    const float *edge_pos,
+    const float *edge_dir,
+    const float *edge_n0,
+    const float *edge_nn,
+    const float *edge_line_min,
+    const float *edge_line_max,
+    const int *edge_adjacent_face1,
+    int n_edges,
+    int *out_seen_edge_mask) {
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const int n_hits = max(0, min(hit_count[0], hit_capacity));
+    if (tid >= n_hits) {
+        return;
+    }
+    const Vec3 tx = make_v3(tx_pos[0], tx_pos[1], tx_pos[2]);
+    const int edge_idx = best_edge_for_hit(
+        tx,
+        make_v3(ray_dir[tid * 3 + 0], ray_dir[tid * 3 + 1], ray_dir[tid * 3 + 2]),
+        make_v3(hit_p[tid * 3 + 0], hit_p[tid * 3 + 1], hit_p[tid * 3 + 2]),
+        make_v3(hit_n[tid * 3 + 0], hit_n[tid * 3 + 1], hit_n[tid * 3 + 2]),
+        make_v3(hit_geo_n[tid * 3 + 0], hit_geo_n[tid * 3 + 1], hit_geo_n[tid * 3 + 2]),
+        prim_index[tid],
+        triangle_edge_count,
+        triangle_edge_indices,
+        max_triangle_edge_slots,
+        n_triangles,
+        edge_pos,
+        edge_dir,
+        edge_n0,
+        edge_nn,
+        edge_line_min,
+        edge_line_max,
+        edge_adjacent_face1,
+        n_edges);
+    if (edge_idx >= 0 && edge_idx < n_edges) {
+        atomicExch(out_seen_edge_mask + edge_idx, 1);
+    }
+}
+
 } // namespace
 
 void diffraction_discover_edges_cuda(
@@ -271,6 +323,55 @@ void diffraction_discover_edges_cuda(
         hit_n.data_ptr<float>(),
         hit_geo_n.data_ptr<float>(),
         n_hits,
+        triangle_edge_count.data_ptr<int>(),
+        triangle_edge_indices.data_ptr<int>(),
+        static_cast<int>(triangle_edge_indices.size(1)),
+        static_cast<int>(triangle_edge_count.size(0)),
+        edge_pos.data_ptr<float>(),
+        edge_dir.data_ptr<float>(),
+        edge_n0.data_ptr<float>(),
+        edge_nn.data_ptr<float>(),
+        edge_line_min.data_ptr<float>(),
+        edge_line_max.data_ptr<float>(),
+        edge_adjacent_face1.data_ptr<int>(),
+        n_edges,
+        out_seen_edge_mask.data_ptr<int>());
+}
+
+void diffraction_discover_edges_counted_cuda(
+    const at::Tensor &tx_pos,
+    const at::Tensor &ray_dir,
+    const at::Tensor &prim_index,
+    const at::Tensor &hit_p,
+    const at::Tensor &hit_n,
+    const at::Tensor &hit_geo_n,
+    const at::Tensor &hit_count,
+    const at::Tensor &triangle_edge_count,
+    const at::Tensor &triangle_edge_indices,
+    const at::Tensor &edge_pos,
+    const at::Tensor &edge_dir,
+    const at::Tensor &edge_n0,
+    const at::Tensor &edge_nn,
+    const at::Tensor &edge_line_min,
+    const at::Tensor &edge_line_max,
+    const at::Tensor &edge_adjacent_face1,
+    at::Tensor &out_seen_edge_mask) {
+    const int hit_capacity = static_cast<int>(ray_dir.size(0));
+    const int n_edges = static_cast<int>(edge_pos.size(0));
+    if (hit_capacity <= 0 || n_edges <= 0) {
+        return;
+    }
+    const dim3 block(kBlockSize);
+    const dim3 grid((hit_capacity + kBlockSize - 1) / kBlockSize);
+    discover_edges_counted_kernel<<<grid, block, 0, at::cuda::getCurrentCUDAStream()>>>(
+        tx_pos.data_ptr<float>(),
+        ray_dir.data_ptr<float>(),
+        prim_index.data_ptr<int>(),
+        hit_p.data_ptr<float>(),
+        hit_n.data_ptr<float>(),
+        hit_geo_n.data_ptr<float>(),
+        hit_count.data_ptr<int>(),
+        hit_capacity,
         triangle_edge_count.data_ptr<int>(),
         triangle_edge_indices.data_ptr<int>(),
         static_cast<int>(triangle_edge_indices.size(1)),

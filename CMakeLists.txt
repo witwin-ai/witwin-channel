@@ -36,6 +36,13 @@ Python_add_library(
     WITH_SOABI
     native/channel_native/bindings.cpp
     native/channel_native/build_info.cpp
+    native/channel_native/kernels/accum.cu
+    native/channel_native/kernels/diffraction.cu
+    native/channel_native/kernels/los.cu
+    native/channel_native/kernels/material.cu
+    native/channel_native/kernels/reflection.cu
+    native/channel_native/kernels/sampling.cu
+    native/channel_native/montecarlo_basic.cpp
     native/channel_native/path_solver.cpp
 )
 

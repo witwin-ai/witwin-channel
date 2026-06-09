@@ -25,16 +25,21 @@ def native_extension() -> object | None:
         pass
 
     repo_root = pathlib.Path(__file__).resolve().parents[5]
-    artifact_dir = repo_root / "artifacts" / "cmake-witwin2-explicit-release"
-    if not artifact_dir.is_dir():
-        return None
-    artifact_path = str(artifact_dir)
-    if artifact_path not in sys.path:
-        sys.path.insert(0, artifact_path)
-    try:
-        return importlib.import_module("_channel_native")
-    except ModuleNotFoundError:
-        return None
+    artifact_dirs = (
+        repo_root / "artifacts" / "cmake-channel-native-raydn-witwin2-release",
+        repo_root / "artifacts" / "cmake-witwin2-explicit-release",
+    )
+    for artifact_dir in artifact_dirs:
+        if not artifact_dir.is_dir():
+            continue
+        artifact_path = str(artifact_dir)
+        if artifact_path not in sys.path:
+            sys.path.insert(0, artifact_path)
+        try:
+            return importlib.import_module("_channel_native")
+        except ModuleNotFoundError:
+            continue
+    return None
 
 
 def build_info() -> dict[str, bool | str]:

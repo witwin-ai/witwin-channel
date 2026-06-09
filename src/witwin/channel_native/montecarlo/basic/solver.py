@@ -5,9 +5,11 @@ from typing import Any
 import torch
 
 from witwin.channel_native import Scene
+from witwin.channel_native.core.material_runtime import face_material_tensors
 from witwin.channel_native.core.kernels.extension import build_info
+from witwin.channel_native.core.kernels.ops import mc_component_map_buffer, mc_finalize_component_maps
 
-from .backend import los_path_gain
+from .backend import los_path_gain, los_path_gain_autograd
 from .config import Config
 from .metadata import make_solver_metadata
 from .raydn_components import (
@@ -50,7 +52,8 @@ def solve(scene: Scene, config: Config) -> Result:
     compiled = scene.compile()
     grid = first_receiver_grid(scene)
     if "los" in config.components:
-        los = los_path_gain(scene, device=device)
+        los_gain = los_path_gain_autograd if config.ad_mode != "none" else los_path_gain
+        los = los_gain(scene, device=device)
         path_count = config.samples
         valid_contribution_count = config.samples
     else:
@@ -67,20 +70,31 @@ def solve(scene: Scene, config: Config) -> Result:
     component_maps: dict[str, torch.Tensor] | None = None
     if grid is not None:
         component_maps = {}
-        if "los" in config.components:
-            component_maps["los"] = los_component_map(scene, compiled.raydn, grid, device=device)
-        else:
-            component_maps["los"] = torch.zeros(
-                (len(scene.transmitters), *component_grid_shape(grid)),
-                device=device,
-                dtype=torch.float32,
+        grid_dim0, grid_dim1 = component_grid_shape(grid)
+
+        def zero_component_map() -> torch.Tensor:
+            return mc_component_map_buffer(
+                los,
+                tx_count=len(scene.transmitters),
+                dim0=grid_dim0,
+                dim1=grid_dim1,
             )
+
+        if "los" in config.components:
+            component_maps["los"] = los_component_map(scene, compiled.raydn, grid, device=device, los=los)
+        else:
+            component_maps["los"] = zero_component_map()
         needs_reflection_launch = (
             reflection_available
             and (("reflection" in config.components) or ("diffraction" in config.components and diffraction_available))
         )
+        material_tensors = None
+        if needs_reflection_launch or ("diffraction" in config.components and diffraction_available):
+            material_tensors = face_material_tensors(compiled, device=device)
         reflection_result = None
         if needs_reflection_launch:
+            if material_tensors is None:
+                raise RuntimeError("material tensors are required for native reflection")
             reflection_result = reflection_component_maps_with_wedges(
                 scene,
                 compiled.raydn,
@@ -89,6 +103,7 @@ def solve(scene: Scene, config: Config) -> Result:
                 max_depth=config.max_depth,
                 seed=config.seed,
                 device=device,
+                material_tensors=material_tensors,
                 collect_wedges=("diffraction" in config.components and diffraction_available),
             )
         if "reflection" in config.components and reflection_available and reflection_result is not None:
@@ -96,8 +111,10 @@ def solve(scene: Scene, config: Config) -> Result:
             path_count += config.samples
             valid_contribution_count += int(component_maps["reflection"].numel())
         else:
-            component_maps["reflection"] = torch.zeros_like(component_maps["los"])
+            component_maps["reflection"] = zero_component_map()
         if "diffraction" in config.components and diffraction_available:
+            if material_tensors is None:
+                raise RuntimeError("material tensors are required for native diffraction")
             component_maps["diffraction"] = diffraction_component_map(
                 scene,
                 compiled.raydn,
@@ -105,30 +122,33 @@ def solve(scene: Scene, config: Config) -> Result:
                 samples=config.samples,
                 seed=config.seed,
                 device=device,
+                material_tensors=material_tensors,
                 wedge_events=None if reflection_result is None else reflection_result.wedge_events,
             )
             path_count += config.samples
             valid_contribution_count += int(component_maps["diffraction"].numel())
         else:
-            component_maps["diffraction"] = torch.zeros_like(component_maps["los"])
+            component_maps["diffraction"] = zero_component_map()
 
-    component_power = {
-        "los": (component_maps["los"].sum() if component_maps is not None else los.sum()),
-        "reflection": (
-            component_maps["reflection"].sum()
-            if component_maps is not None
-            else zero.clone()
-        ),
-        "diffraction": (
-            component_maps["diffraction"].sum()
-            if component_maps is not None
-            else zero.clone()
-        ),
-    }
     path_gain = los
     if component_maps is not None:
-        total_map = component_maps["los"] + component_maps["reflection"] + component_maps["diffraction"]
-        path_gain = total_map.reshape(len(scene.transmitters), -1).contiguous()
+        finalized = mc_finalize_component_maps(
+            component_maps["los"],
+            component_maps["reflection"],
+            component_maps["diffraction"],
+        )
+        path_gain = finalized["path_gain"]
+        component_power = {
+            "los": finalized["los_power"],
+            "reflection": finalized["reflection_power"],
+            "diffraction": finalized["diffraction_power"],
+        }
+    else:
+        component_power = {
+            "los": los.sum(),
+            "reflection": zero.clone(),
+            "diffraction": zero.clone(),
+        }
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,
