@@ -203,7 +203,11 @@ def reflection_component_maps_with_wedges(
     device: torch.device,
     material_tensors: MaterialTensors,
     collect_wedges: bool = False,
+    reflection_accumulation_strategy: str = "auto",
+    reflection_compact_min_samples: int = 262_144,
+    reflection_staged_min_samples_per_cell: int = 64,
 ) -> ReflectionComponentResult:
+    del reflection_accumulation_strategy, reflection_compact_min_samples, reflection_staged_min_samples_per_cell
     if not raydn.available or not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)

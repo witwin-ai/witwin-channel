@@ -105,6 +105,9 @@ def solve(scene: Scene, config: Config) -> Result:
                 device=device,
                 material_tensors=material_tensors,
                 collect_wedges=("diffraction" in config.components and diffraction_available),
+                reflection_accumulation_strategy=config.reflection_accumulation_strategy,
+                reflection_compact_min_samples=config.reflection_compact_min_samples,
+                reflection_staged_min_samples_per_cell=config.reflection_staged_min_samples_per_cell,
             )
         if "reflection" in config.components and reflection_available and reflection_result is not None:
             component_maps["reflection"] = reflection_result.maps

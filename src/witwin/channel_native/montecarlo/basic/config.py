@@ -7,6 +7,7 @@ from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
 
 _VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
 _VALID_AD_MODES = frozenset({"none", "vjp", "jvp"})
+_VALID_REFLECTION_ACCUMULATION_STRATEGIES = frozenset({"auto", "atomic", "staged", "compact"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +20,9 @@ class Config:
     diagnostics: bool = False
     require_reflection: bool = False
     require_diffraction: bool = False
+    reflection_accumulation_strategy: str = "auto"
+    reflection_compact_min_samples: int = 262_144
+    reflection_staged_min_samples_per_cell: int = 64
     ad_mode: str = "none"
     fixed_topology: bool = True
     requires_fixed_seed: bool = True
@@ -35,6 +39,12 @@ class Config:
             raise ValueError(f"components must be a subset of {sorted(_VALID_COMPONENTS)}")
         if self.accumulation_strategy not in ACCUMULATION_STRATEGIES - {"none"}:
             raise ValueError("accumulation_strategy is not supported for MC basic")
+        if self.reflection_accumulation_strategy not in _VALID_REFLECTION_ACCUMULATION_STRATEGIES:
+            raise ValueError("reflection_accumulation_strategy is not supported")
+        if self.reflection_compact_min_samples < 0:
+            raise ValueError("reflection_compact_min_samples must be non-negative")
+        if self.reflection_staged_min_samples_per_cell < 0:
+            raise ValueError("reflection_staged_min_samples_per_cell must be non-negative")
         if self.ad_mode not in _VALID_AD_MODES:
             raise ValueError(f"ad_mode must be one of {sorted(_VALID_AD_MODES)}")
         object.__setattr__(self, "components", components)

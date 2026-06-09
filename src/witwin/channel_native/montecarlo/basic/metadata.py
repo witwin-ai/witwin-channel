@@ -60,6 +60,9 @@ def make_solver_metadata(
         "ad_mode": config.ad_mode,
         "fixed_topology": config.fixed_topology,
         "requires_fixed_seed": config.requires_fixed_seed,
+        "reflection_accumulation_strategy": config.reflection_accumulation_strategy,
+        "reflection_compact_min_samples": config.reflection_compact_min_samples,
+        "reflection_staged_min_samples_per_cell": config.reflection_staged_min_samples_per_cell,
         "path_count": path_count,
         "valid_contribution_count": valid_contribution_count,
         "components": component_status(
