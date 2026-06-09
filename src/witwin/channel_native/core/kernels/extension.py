@@ -1,26 +1,48 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import importlib
+import pathlib
+import sys
 
 
 _DEFAULT_BUILD_INFO = {
     "backend": "channel-native",
     "uses_dr_jit": False,
     "uses_raydn_native": False,
+    "uses_path_native": False,
     "cuda_available": False,
     "optix_available": False,
 }
 
 
+def native_extension() -> object | None:
+    try:
+        return importlib.import_module("_channel_native")
+    except ModuleNotFoundError:
+        pass
+
+    repo_root = pathlib.Path(__file__).resolve().parents[5]
+    artifact_dir = repo_root / "artifacts" / "cmake-witwin2-explicit-release"
+    if not artifact_dir.is_dir():
+        return None
+    artifact_path = str(artifact_dir)
+    if artifact_path not in sys.path:
+        sys.path.insert(0, artifact_path)
+    try:
+        return importlib.import_module("_channel_native")
+    except ModuleNotFoundError:
+        return None
+
+
 def build_info() -> dict[str, bool | str]:
     """Return native capability metadata without importing RayDN Python APIs."""
 
-    try:
-        import _channel_native
-    except ModuleNotFoundError:
+    native = native_extension()
+    if native is None:
         return dict(_DEFAULT_BUILD_INFO)
 
-    native_info = _channel_native.build_info()
+    native_info = native.build_info()
     if not isinstance(native_info, Mapping):
         raise TypeError("_channel_native.build_info() must return a mapping")
 

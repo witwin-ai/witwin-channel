@@ -17,7 +17,6 @@ def _empty_scene() -> Scene:
     ("module_name", "message"),
     [
         ("witwin.channel_native.deterministic", "deterministic solver is reserved"),
-        ("witwin.channel_native.path", "path solver is reserved"),
         ("witwin.channel_native.psdr", "PSDR solver is reserved"),
     ],
 )

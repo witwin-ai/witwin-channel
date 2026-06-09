@@ -7,5 +7,6 @@ def test_build_info_contract():
     assert info["backend"] == "channel-native"
     assert info["uses_dr_jit"] is False
     assert isinstance(info["uses_raydn_native"], bool)
+    assert isinstance(info["uses_path_native"], bool)
     assert isinstance(info["cuda_available"], bool)
     assert isinstance(info["optix_available"], bool)

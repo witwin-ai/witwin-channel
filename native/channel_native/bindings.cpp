@@ -1,20 +1,17 @@
-#include <Python.h>
+#include <torch/extension.h>
 
-extern PyObject* cn_build_info(PyObject* self, PyObject* args);
+pybind11::dict cn_build_info();
+pybind11::dict cn_path_los_export(
+    torch::Tensor tx_positions,
+    torch::Tensor tx_power,
+    torch::Tensor rx_positions,
+    double frequency_hz);
 
-static PyMethodDef ChannelNativeMethods[] = {
-    {"build_info", cn_build_info, METH_NOARGS, "Return Channel Native build metadata."},
-    {nullptr, nullptr, 0, nullptr},
-};
-
-static struct PyModuleDef ChannelNativeModule = {
-    PyModuleDef_HEAD_INIT,
-    "_channel_native",
-    "Channel Native C++ extension.",
-    -1,
-    ChannelNativeMethods,
-};
-
-PyMODINIT_FUNC PyInit__channel_native() {
-    return PyModule_Create(&ChannelNativeModule);
+PYBIND11_MODULE(_channel_native, module) {
+    module.doc() = "Channel Native Torch/CUDA extension.";
+    module.def("build_info", &cn_build_info, "Return Channel Native build metadata.");
+    module.def(
+        "path_los_export",
+        &cn_path_los_export,
+        "Export empty-space LoS paths from CUDA tensors.");
 }

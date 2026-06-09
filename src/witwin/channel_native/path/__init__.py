@@ -1,4 +1,4 @@
-"""Reserved explicit path solver API for future path export and diagnostics."""
+"""Explicit path solver API for path export and diagnostics."""
 
 from .config import Config
 from .result import Result
