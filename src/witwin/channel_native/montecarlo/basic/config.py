@@ -7,7 +7,9 @@ from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
 
 _VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
 _VALID_AD_MODES = frozenset({"none", "vjp", "jvp"})
-_VALID_REFLECTION_ACCUMULATION_STRATEGIES = frozenset({"auto", "atomic", "staged", "compact"})
+_VALID_REFLECTION_ACCUMULATION_STRATEGIES = frozenset(
+    {"auto", "atomic", "staged", "compact", "streaming_planar"}
+)
 
 
 @dataclass(frozen=True, slots=True)

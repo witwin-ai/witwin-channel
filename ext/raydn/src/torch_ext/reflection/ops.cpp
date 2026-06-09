@@ -1072,11 +1072,10 @@ py::tuple reflection_accumulation_forward_op(
     int64_t wedge_sample_stride,
     int64_t accumulation_strategy,
     int64_t compact_min_samples,
-    int64_t staged_min_samples_per_cell) {
+    int64_t staged_min_samples_per_cell,
+    int64_t procedural_sample_count,
+    bool streaming_los_enabled) {
     require_vec3f(ray_o, "ray_o");
-    require_vec3f(ray_d, "ray_d");
-    require_ray_tmax(ray_tmax, ray_o.size(0), "reflection_accumulation");
-    require_mask(active, "active");
     require_vec3f(tx, "tx");
     require_vec3f(tx_pol, "tx_pol");
     require_flat_f32(material_eta_r, "material_eta_r");
@@ -1084,11 +1083,6 @@ py::tuple reflection_accumulation_forward_op(
     require_flat_f32(material_mu_r, "material_mu_r");
     require_flat_f32(material_gain, "material_gain");
     require_mask(material_valid, "material_valid");
-    require_same_batch(ray_o, ray_d, "reflection_accumulation");
-    require_same_batch(ray_o, tx, "reflection_accumulation");
-    require_same_batch(ray_o, tx_pol, "reflection_accumulation");
-    if (active.size(0) != ray_o.size(0))
-        throw std::runtime_error("ray_tmax and active must match the ray batch size.");
     if (max_bounces < 0)
         throw std::runtime_error("max_bounces must be non-negative.");
     if (grid_axis < 0 || grid_axis > 2)
@@ -1104,15 +1098,34 @@ py::tuple reflection_accumulation_forward_op(
     if (wedge_sample_stride <= 0)
         throw std::runtime_error("wedge_sample_stride must be positive.");
     if (accumulation_strategy < RAYDN_REFL_ACCUM_AUTO ||
-        accumulation_strategy > RAYDN_REFL_ACCUM_COMPACT)
+        accumulation_strategy > RAYDN_REFL_ACCUM_STREAMING_PLANAR)
         throw std::runtime_error("accumulation_strategy is not supported.");
     if (compact_min_samples < 0)
         throw std::runtime_error("compact_min_samples must be non-negative.");
     if (staged_min_samples_per_cell < 0)
         throw std::runtime_error("staged_min_samples_per_cell must be non-negative.");
+    if (procedural_sample_count < 0)
+        throw std::runtime_error("procedural_sample_count must be non-negative.");
 
     SceneCache &scene = get_scene(scene_handle);
-    const int64_t ray_count = ray_o.size(0);
+    const bool streaming_planar =
+        accumulation_strategy == RAYDN_REFL_ACCUM_STREAMING_PLANAR;
+    if (streaming_planar) {
+        if (ray_o.size(0) != 1 || tx.size(0) != 1 || tx_pol.size(0) != 1)
+            throw std::runtime_error("streaming_planar expects broadcast ray_o, tx, and tx_pol tensors.");
+        if (procedural_sample_count <= 0)
+            throw std::runtime_error("streaming_planar requires a positive procedural_sample_count.");
+    } else {
+        require_vec3f(ray_d, "ray_d");
+        require_ray_tmax(ray_tmax, ray_o.size(0), "reflection_accumulation");
+        require_mask(active, "active");
+        require_same_batch(ray_o, ray_d, "reflection_accumulation");
+        require_same_batch(ray_o, tx, "reflection_accumulation");
+        require_same_batch(ray_o, tx_pol, "reflection_accumulation");
+        if (active.size(0) != ray_o.size(0))
+            throw std::runtime_error("ray_tmax and active must match the ray batch size.");
+    }
+    const int64_t ray_count = streaming_planar ? procedural_sample_count : ray_o.size(0);
     const int64_t cell_count = grid_resolution0 * grid_resolution1;
     const int32_t max_bounces_i = checked_i32(max_bounces, "max_bounces");
     const int64_t stage_depth_count = max_bounces + 1;
@@ -1128,7 +1141,8 @@ py::tuple reflection_accumulation_forward_op(
     const bool force_staged =
         accumulation_strategy == RAYDN_REFL_ACCUM_STAGED;
     const bool force_atomic =
-        accumulation_strategy == RAYDN_REFL_ACCUM_ATOMIC;
+        accumulation_strategy == RAYDN_REFL_ACCUM_ATOMIC ||
+        accumulation_strategy == RAYDN_REFL_ACCUM_STREAMING_PLANAR;
     const bool auto_staged =
         accumulation_strategy == RAYDN_REFL_ACCUM_AUTO &&
         stage_sample_count_fits &&
@@ -1197,11 +1211,12 @@ py::tuple reflection_accumulation_forward_op(
 
     TriangleSoA tri = make_scene_triangle_soa(scene);
     Vec3SoA ray_o_soa = split_vec3(ray_o);
-    Vec3SoA ray_d_soa = split_vec3(ray_d);
+    Vec3SoA ray_d_soa = streaming_planar ? Vec3SoA{} : split_vec3(ray_d);
     Vec3SoA tx_soa = split_vec3(tx);
     Vec3SoA tx_pol_soa = split_vec3(tx_pol);
-    at::Tensor ray_tmax_contig = ray_tmax.numel() == 0 ? ray_tmax : ray_tmax.contiguous();
-    at::Tensor active_contig = active.contiguous();
+    at::Tensor ray_tmax_contig =
+        streaming_planar || ray_tmax.numel() == 0 ? ray_tmax : ray_tmax.contiguous();
+    at::Tensor active_contig = streaming_planar ? active : active.contiguous();
     const int64_t material_count = material_eta_r.size(0);
     if (material_count != tri.n_triangles ||
         material_sigma.size(0) != material_count ||
@@ -1217,6 +1232,7 @@ py::tuple reflection_accumulation_forward_op(
         ? at::zeros({stage_sample_count, 8}, fopts)
         : at::Tensor();
 
+    // Keep host launch params in lockstep with the OptiX constant params.
     AccumParams params = {};
     params.primary_handle = scene.triangle_ias.traversable;
     params.secondary_handle = 0;
@@ -1239,12 +1255,14 @@ py::tuple reflection_accumulation_forward_op(
     params.ray_ox = ray_o_soa.x.data_ptr<float>();
     params.ray_oy = ray_o_soa.y.data_ptr<float>();
     params.ray_oz = ray_o_soa.z.data_ptr<float>();
-    params.ray_dx = ray_d_soa.x.data_ptr<float>();
-    params.ray_dy = ray_d_soa.y.data_ptr<float>();
-    params.ray_dz = ray_d_soa.z.data_ptr<float>();
+    params.ray_dx = streaming_planar ? nullptr : ray_d_soa.x.data_ptr<float>();
+    params.ray_dy = streaming_planar ? nullptr : ray_d_soa.y.data_ptr<float>();
+    params.ray_dz = streaming_planar ? nullptr : ray_d_soa.z.data_ptr<float>();
     params.ray_tmax = ray_tmax_contig.numel() == 0 ? nullptr : ray_tmax_contig.data_ptr<float>();
-    params.active_mask = optional_mask_ptr(active_contig);
+    params.active_mask = streaming_planar ? nullptr : optional_mask_ptr(active_contig);
     params.n_rays = static_cast<int32_t>(ray_count);
+    params.procedural_rays = streaming_planar ? 1 : 0;
+    params.los_enabled = streaming_los_enabled ? 1 : 0;
     params.tx_x = tx_soa.x.data_ptr<float>();
     params.tx_y = tx_soa.y.data_ptr<float>();
     params.tx_z = tx_soa.z.data_ptr<float>();
@@ -1283,12 +1301,13 @@ py::tuple reflection_accumulation_forward_op(
     params.wedge_capacity = wedge_capacity_i;
     params.wedge_sample_stride = wedge_sample_stride_i;
     params.out_reflection_power = power.data_ptr<float>();
-    params.out_field_x_re = field_x_re.data_ptr<float>();
-    params.out_field_x_im = field_x_im.data_ptr<float>();
-    params.out_field_y_re = field_y_re.data_ptr<float>();
-    params.out_field_y_im = field_y_im.data_ptr<float>();
-    params.out_field_z_re = field_z_re.data_ptr<float>();
-    params.out_field_z_im = field_z_im.data_ptr<float>();
+    const bool store_field_maps = !streaming_planar;
+    params.out_field_x_re = store_field_maps ? field_x_re.data_ptr<float>() : nullptr;
+    params.out_field_x_im = store_field_maps ? field_x_im.data_ptr<float>() : nullptr;
+    params.out_field_y_re = store_field_maps ? field_y_re.data_ptr<float>() : nullptr;
+    params.out_field_y_im = store_field_maps ? field_y_im.data_ptr<float>() : nullptr;
+    params.out_field_z_re = store_field_maps ? field_z_re.data_ptr<float>() : nullptr;
+    params.out_field_z_im = store_field_maps ? field_z_im.data_ptr<float>() : nullptr;
     params.out_reflection_count = reflection_count.data_ptr<int>();
     params.stage_cell = staged_accum ? stage_cell.data_ptr<int>() : nullptr;
     params.stage_value = staged_accum

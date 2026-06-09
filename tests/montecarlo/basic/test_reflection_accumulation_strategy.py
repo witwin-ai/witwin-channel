@@ -5,7 +5,7 @@ from witwin.channel_native.montecarlo.basic.metadata import make_solver_metadata
 
 
 def test_reflection_accumulation_strategy_accepts_known_values():
-    for strategy in ("auto", "atomic", "staged", "compact"):
+    for strategy in ("auto", "atomic", "staged", "compact", "streaming_planar"):
         config = Config(reflection_accumulation_strategy=strategy)
 
         assert config.reflection_accumulation_strategy == strategy

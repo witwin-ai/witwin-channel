@@ -56,6 +56,35 @@ Root cause:
 - The path then runs CUB radix sort and reduce-by-key over all staged slots.
 - The workload is sparse, so this sorts mostly invalid or useless entries.
 
+### Latest Streaming-Planar Evidence
+
+Current optimized Native path:
+
+- Adds `streaming_planar`, which generates the Fibonacci rays inside the OptiX raygen and avoids the 100M ray-direction tensor.
+- Avoids staged sort/reduce for the SF planar workload.
+- Treats the planar measurement surface like Sionna: analytical plane hit before the scene blocker and transparent continuation after measurement-plane hits.
+- Skips unused complex field-map atomics for streaming radiomap-only output.
+- Uses a power-only fast path when no field maps or staged values are requested.
+
+Measured on the same SF planar 2D grid 100M problem:
+
+- Earlier stable warm run: Sionna `23.49 ms`, Native `23.91 ms`.
+- After power-only fast path, current GPU clock/load state was slower for both backends: Sionna-only median `29.73 ms`, Native-only median `28.06 ms`.
+- Same-run both comparison after the fast path: Sionna `30.26 ms`, Native `29.76 ms`.
+- Native peak allocation is about `192 MB`, far below the previous `37.75 GB` staged path.
+
+Sionna 25ms mechanism:
+
+- `RadioMapSolver._shoot_and_bounce()` spawns source rays with `fibonacci_lattice`, initializes antenna fields, traces the scene, intersects the planar measurement rectangle, and scatters `PlanarRadioMap.add_paths()` in one Dr.Jit/Mitsuba fused loop.
+- For planar path gain, `PlanarRadioMap.add_paths()` only needs `squared_norm(e_field)` multiplied by `solid_angle / cos(theta)` and the normalization factor; it does not need to materialize a complex field map per cell.
+- It keeps ray state resident and does not allocate per-sample direction, per-depth staged cell, or per-depth staged value arrays.
+
+Remaining Native bottlenecks:
+
+- Terminal reflected rays still use a full closest-hit OptiX trace with six payload registers for blocker visibility. A dedicated shadow/visibility trace with `TERMINATE_ON_FIRST_HIT | DISABLE_ANYHIT | DISABLE_CLOSESTHIT` is the next highest-value OptiX change.
+- The raygen still carries both general accumulation state and streaming-planar state in one kernel. Specializing the `max_depth=1` streaming radiomap kernel should reduce live registers and branch pressure.
+- Result parity is not solved: Sionna reports `142` nonzero cells and path-gain sum about `2.93e-10`; Native reports `95` nonzero cells and path-gain sum about `8.75e-11`. LoS is zero for both in this SF setup, so the mismatch is in first-order reflection geometry/material/field semantics, not in direct LoS.
+
 Critical files:
 
 - `src/witwin/channel_native/montecarlo/basic/raydn_components.py`

@@ -24,7 +24,7 @@ GRID = (256, 256)
 PLANE_Z = 1.5
 FREQUENCY = 3.5e9
 MAX_DEPTH = 1
-COMPONENTS = {"los", "reflection"}
+COMPONENTS = ("los", "reflection")
 
 
 def _median(values: list[float]) -> float:
@@ -59,7 +59,7 @@ def _sionna_scene() -> Any:
     return scene
 
 
-def run_sionna_planar_benchmark(*, samples: int, repeats: int) -> dict[str, Any]:
+def run_sionna_planar_benchmark(*, samples: int, repeats: int, components: set[str]) -> dict[str, Any]:
     sys.path.insert(0, str(_SIONNA_SOURCE_ROOT))
     import drjit as dr
     from sionna.rt import RadioMapSolver
@@ -83,8 +83,8 @@ def run_sionna_planar_benchmark(*, samples: int, repeats: int) -> dict[str, Any]
         "cell_size": cell_size,
         "samples_per_tx": int(samples),
         "max_depth": MAX_DEPTH,
-        "los": True,
-        "specular_reflection": True,
+        "los": "los" in components,
+        "specular_reflection": "reflection" in components,
         "diffuse_reflection": False,
         "refraction": False,
         "diffraction": False,
@@ -120,7 +120,7 @@ def run_sionna_planar_benchmark(*, samples: int, repeats: int) -> dict[str, Any]
     }
 
 
-def _run_sionna_in_child(*, samples: int, repeats: int, json_path: pathlib.Path) -> dict[str, Any]:
+def _run_sionna_in_child(*, samples: int, repeats: int, json_path: pathlib.Path, components: set[str]) -> dict[str, Any]:
     child_json = json_path.with_name(f"{json_path.stem}.sionna_child{json_path.suffix}")
     if child_json.exists():
         child_json.unlink()
@@ -133,6 +133,8 @@ def _run_sionna_in_child(*, samples: int, repeats: int, json_path: pathlib.Path)
         str(int(samples)),
         "--repeats",
         str(int(repeats)),
+        "--components",
+        *sorted(components),
         "--json",
         str(child_json),
         "--_sionna-child",
@@ -175,7 +177,13 @@ def _native_scene() -> Any:
     )
 
 
-def run_native_planar_benchmark(*, samples: int, repeats: int, strategy: str = "auto") -> dict[str, Any]:
+def run_native_planar_benchmark(
+    *,
+    samples: int,
+    repeats: int,
+    components: set[str],
+    strategy: str = "auto",
+) -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
@@ -189,14 +197,15 @@ def run_native_planar_benchmark(*, samples: int, repeats: int, strategy: str = "
         samples=int(samples),
         max_depth=MAX_DEPTH,
         seed=0,
-        components=COMPONENTS,
-        require_reflection=True,
+        components=components,
+        require_reflection="reflection" in components,
         reflection_accumulation_strategy=strategy,
     )
 
     times_ms: list[float] = []
     sums: list[float] = []
     nonzero: list[int] = []
+    component_power: dict[str, list[float]] = {}
     shape: list[int] | None = None
     peak_allocated_bytes = 0
     for _ in range(int(repeats)):
@@ -214,6 +223,8 @@ def run_native_planar_benchmark(*, samples: int, repeats: int, strategy: str = "
         path_gain = result.path_gain.detach()
         torch.cuda.synchronize()
         current_shape, current_sum, current_nonzero = _summarize_path_gain(path_gain.cpu().numpy())
+        for key, value in result.component_power.items():
+            component_power.setdefault(key, []).append(float(value.detach().cpu().item()))
         times_ms.append(elapsed_ms)
         sums.append(current_sum)
         nonzero.append(current_nonzero)
@@ -228,6 +239,7 @@ def run_native_planar_benchmark(*, samples: int, repeats: int, strategy: str = "
         "shape": shape or [],
         "path_gain_sum": sums,
         "nonzero": nonzero,
+        "component_power": component_power,
         "peak_allocated_bytes": int(peak_allocated_bytes),
     }
 
@@ -237,19 +249,44 @@ def main() -> None:
     parser.add_argument("--samples", type=int, default=100_000_000)
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--backend", choices=("sionna", "native", "both"), default="both")
-    parser.add_argument("--strategy", choices=("auto", "atomic", "staged", "compact"), default="auto")
+    parser.add_argument(
+        "--components",
+        nargs="+",
+        choices=("los", "reflection"),
+        default=list(COMPONENTS),
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=("auto", "atomic", "staged", "compact", "streaming_planar"),
+        default="auto",
+    )
     parser.add_argument("--json", type=pathlib.Path, default=pathlib.Path("artifacts/sf_planar_radiomap_benchmark.json"))
     parser.add_argument("--_sionna-child", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    components = set(args.components)
 
     results = []
     if args.backend in {"sionna", "both"}:
         if args._sionna_child:
-            results.append(run_sionna_planar_benchmark(samples=args.samples, repeats=args.repeats))
+            results.append(run_sionna_planar_benchmark(samples=args.samples, repeats=args.repeats, components=components))
         else:
-            results.append(_run_sionna_in_child(samples=args.samples, repeats=args.repeats, json_path=args.json))
+            results.append(
+                _run_sionna_in_child(
+                    samples=args.samples,
+                    repeats=args.repeats,
+                    json_path=args.json,
+                    components=components,
+                )
+            )
     if args.backend in {"native", "both"}:
-        results.append(run_native_planar_benchmark(samples=args.samples, repeats=args.repeats, strategy=args.strategy))
+        results.append(
+            run_native_planar_benchmark(
+                samples=args.samples,
+                repeats=args.repeats,
+                components=components,
+                strategy=args.strategy,
+            )
+        )
     payload = {
         "benchmark": "sf_planar_radiomap",
         "config": {
@@ -261,7 +298,7 @@ def main() -> None:
             "plane_z": PLANE_Z,
             "frequency": FREQUENCY,
             "max_depth": MAX_DEPTH,
-            "components": sorted(COMPONENTS),
+            "components": sorted(components),
             "native_strategy": args.strategy,
         },
         "results": results,

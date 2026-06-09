@@ -24,6 +24,7 @@ enum ReflAccumStrategy : int {
     RAYDN_REFL_ACCUM_ATOMIC = 1,
     RAYDN_REFL_ACCUM_STAGED = 2,
     RAYDN_REFL_ACCUM_COMPACT = 3,
+    RAYDN_REFL_ACCUM_STREAMING_PLANAR = 4,
 };
 
 /// Launch parameters for the native reflection-accumulation pipeline (flat SoA device pointers).
@@ -60,6 +61,8 @@ struct AccumParams {
     const float *ray_tmax;
     const uint8_t *active_mask;
     int n_rays;
+    int procedural_rays; ///< Nonzero = generate Fibonacci rays in raygen from broadcast TX.
+    int los_enabled;     ///< Nonzero = accumulate depth-0 measurement-plane hits.
 
     // Transmitter position and polarization (per ray or broadcast).
     const float *tx_x;

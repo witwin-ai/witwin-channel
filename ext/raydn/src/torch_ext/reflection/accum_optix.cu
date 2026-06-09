@@ -16,6 +16,7 @@ namespace {
 constexpr float kReflEps = 1e-6f;
 constexpr float kEpsilon0 = 8.854187817e-12f;
 constexpr float kSpeedOfLight = 299792458.0f;
+constexpr double kGoldenRatio = 1.618033988749894848204586834365638118;
 
 struct HitPayload {
     unsigned int hit = 0u;
@@ -42,6 +43,45 @@ static __forceinline__ __device__ float3 stable_perpendicular(float3 direction,
     const float3 axis = fallback_axis(dir);
     projected = axis - dot3(axis, dir) * dir;
     return normalize3(projected);
+}
+
+static __forceinline__ __device__ float max_abs_component(float3 value) {
+    return fmaxf(fabsf(value.x), fmaxf(fabsf(value.y), fabsf(value.z)));
+}
+
+static __forceinline__ __device__ float3 offset_surface_point(float3 point,
+                                                             float3 direction,
+                                                             float3 normal) {
+    const float offset = kRayBias * (1.f + max_abs_component(point));
+    const float signed_offset = dot3(direction, normal) >= 0.f ? offset : -offset;
+    return point + signed_offset * normal;
+}
+
+static __forceinline__ __device__ float3 vertical_iso_polarization(float3 direction) {
+    const float3 dir = normalize3(direction);
+    const float radial = sqrtf(fmaxf(dir.x * dir.x + dir.y * dir.y, 0.f));
+    if (radial <= kReflEps) {
+        return make_f3(dir.z >= 0.f ? 1.f : -1.f, 0.f, 0.f);
+    }
+    return make_f3(dir.z * dir.x / radial,
+                   dir.z * dir.y / radial,
+                   -radial);
+}
+
+static __forceinline__ __device__ float3 fibonacci_sphere_direction(unsigned int ray_index,
+                                                                    unsigned int ray_count) {
+    const double index = static_cast<double>(ray_index);
+    const double azimuth = index / kGoldenRatio;
+    const double azimuth_u = azimuth - floor(azimuth);
+    const double elevation_v = ray_count <= 1u
+                                   ? 0.0
+                                   : index / static_cast<double>(ray_count - 1u);
+    const double phi = 2.0 * static_cast<double>(kPi) * azimuth_u;
+    const double z = 1.0 - 2.0 * elevation_v;
+    const double radial = sqrt(fmax(1.0 - z * z, 0.0));
+    return make_f3(static_cast<float>(radial * cos(phi)),
+                   static_cast<float>(radial * sin(phi)),
+                   static_cast<float>(z));
 }
 
 static __forceinline__ __device__ void clear_payload(HitPayload &payload) {
@@ -146,6 +186,29 @@ static __forceinline__ __device__ float3 axis_plane_point(int axis,
         return make_f3(coord0, position, coord1);
     }
     return make_f3(coord0, coord1, position);
+}
+
+static __forceinline__ __device__ bool plane_hit_in_bounds(float3 origin,
+                                                           float3 direction,
+                                                           float &t_plane) {
+    const int axis = params.grid_axis;
+    const float axis_dir = component(direction, axis);
+    if (fabsf(axis_dir) <= kReflEps) {
+        return false;
+    }
+    const float safe_axis_dir =
+        axis_dir + (axis_dir >= 0.f ? kReflEps : -kReflEps);
+    t_plane = (params.grid_position - component(origin, axis)) / safe_axis_dir;
+    if (!(t_plane > kRayBias)) {
+        return false;
+    }
+
+    const float3 target = origin + t_plane * direction;
+    float coord0 = 0.f;
+    float coord1 = 0.f;
+    plane_coords(target, axis, coord0, coord1);
+    return coord0 >= params.grid_coord0_min && coord0 < params.grid_coord0_max &&
+           coord1 >= params.grid_coord1_min && coord1 < params.grid_coord1_max;
 }
 
 static __forceinline__ __device__ unsigned int hash_u32(unsigned int x) {
@@ -305,9 +368,6 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
                                                         float blocker_t,
                                                         float3 image_source,
                                                         Complex3 field) {
-    if (depth <= 0 || c3_power(field) <= 0.f) {
-        return false;
-    }
     const int axis = params.grid_axis;
     const float axis_dir = component(direction, axis);
     if (fabsf(axis_dir) <= kReflEps) {
@@ -317,7 +377,7 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
         axis_dir + (axis_dir >= 0.f ? kReflEps : -kReflEps);
     const float t_plane =
         (params.grid_position - component(origin, axis)) / safe_axis_dir;
-    if (!(t_plane > kRayBias && t_plane < blocker_t)) {
+    if (!(t_plane > kRayBias)) {
         return false;
     }
 
@@ -327,6 +387,9 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
     plane_coords(target, axis, coord0, coord1);
     if (coord0 < params.grid_coord0_min || coord0 >= params.grid_coord0_max ||
         coord1 < params.grid_coord1_min || coord1 >= params.grid_coord1_max) {
+        return false;
+    }
+    if (!(t_plane < blocker_t)) {
         return false;
     }
 
@@ -344,6 +407,12 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
     const int iy = min(max(static_cast<int>(v * params.grid_resolution1), 0),
                        params.grid_resolution1 - 1);
     const int cell = iy * params.grid_resolution0 + ix;
+    if (depth <= 0 && params.los_enabled == 0) {
+        return true;
+    }
+    if (c3_power(field) <= 0.f) {
+        return true;
+    }
 
     const float3 target_plane =
         axis_plane_point(axis, params.grid_position, coord0, coord1);
@@ -356,6 +425,20 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
         unfolded_distance * unfolded_distance / cos_theta;
     const float amplitude_scale =
         fspl * sqrtf(fmaxf(geometry_power_scale, 0.f));
+
+    if (params.out_field_x_re == nullptr && params.stage_cell == nullptr &&
+        params.stage_value == nullptr) {
+        const float contribution_power =
+            c3_power(field) * amplitude_scale * amplitude_scale;
+        if (!(contribution_power > 0.f) || !isfinite(contribution_power)) {
+            return false;
+        }
+        const WarpCellGroup cell_group = warp_cell_group(cell);
+        atomic_add_same_cell(params.out_reflection_power, cell, contribution_power, cell_group);
+        atomic_add_warp(params.out_reflection_count, 1);
+        return true;
+    }
+
     const float wave_k = fabsf(params.k) > kReflEps
                              ? params.k
                              : (2.f * kPi / fmaxf(params.wavelength, kReflEps));
@@ -373,7 +456,6 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
     if (!(contribution_power > 0.f) || !isfinite(contribution_power)) {
         return false;
     }
-
     if (params.stage_cell != nullptr && params.stage_value != nullptr) {
         const long long stage_stride = static_cast<long long>(params.max_bounces) + 1ll;
         const long long slot = static_cast<long long>(ray_index) * stage_stride +
@@ -393,12 +475,14 @@ static __forceinline__ __device__ bool accumulate_plane(unsigned int ray_index,
     }
 
     const WarpCellGroup cell_group = warp_cell_group(cell);
-    atomic_add_same_cell(params.out_field_x_re, cell, contribution_field.x.r, cell_group);
-    atomic_add_same_cell(params.out_field_x_im, cell, contribution_field.x.i, cell_group);
-    atomic_add_same_cell(params.out_field_y_re, cell, contribution_field.y.r, cell_group);
-    atomic_add_same_cell(params.out_field_y_im, cell, contribution_field.y.i, cell_group);
-    atomic_add_same_cell(params.out_field_z_re, cell, contribution_field.z.r, cell_group);
-    atomic_add_same_cell(params.out_field_z_im, cell, contribution_field.z.i, cell_group);
+    if (params.out_field_x_re != nullptr) {
+        atomic_add_same_cell(params.out_field_x_re, cell, contribution_field.x.r, cell_group);
+        atomic_add_same_cell(params.out_field_x_im, cell, contribution_field.x.i, cell_group);
+        atomic_add_same_cell(params.out_field_y_re, cell, contribution_field.y.r, cell_group);
+        atomic_add_same_cell(params.out_field_y_im, cell, contribution_field.y.i, cell_group);
+        atomic_add_same_cell(params.out_field_z_re, cell, contribution_field.z.r, cell_group);
+        atomic_add_same_cell(params.out_field_z_im, cell, contribution_field.z.i, cell_group);
+    }
     atomic_add_same_cell(params.out_reflection_power, cell, contribution_power, cell_group);
     atomic_add_warp(params.out_reflection_count, 1);
     return true;
@@ -441,43 +525,74 @@ extern "C" __global__ void __raygen__reflection_accumulation() {
         return;
     }
 
-    float3 origin = make_f3(params.ray_ox[ray_index],
-                              params.ray_oy[ray_index],
-                              params.ray_oz[ray_index]);
-    float3 direction = normalize3(make_f3(params.ray_dx[ray_index],
-                                            params.ray_dy[ray_index],
-                                            params.ray_dz[ray_index]));
-    const float3 d0 = direction;
-    float3 image_source = make_f3(params.tx_x[ray_index],
-                                    params.tx_y[ray_index],
-                                    params.tx_z[ray_index]);
-    float3 tx_polarization = make_f3(params.tx_pol_x[ray_index],
-                                       params.tx_pol_y[ray_index],
-                                       params.tx_pol_z[ray_index]);
-    float3 transverse_polarization =
-        tx_polarization - dot3(tx_polarization, direction) * direction;
-    if (dot3(transverse_polarization, transverse_polarization) <= 1e-12f) {
-        transverse_polarization = stable_perpendicular(direction, tx_polarization);
+    float3 origin;
+    float3 direction;
+    if (params.procedural_rays != 0) {
+        origin = make_f3(params.tx_x[0], params.tx_y[0], params.tx_z[0]);
+        direction = fibonacci_sphere_direction(ray_index, static_cast<unsigned int>(params.n_rays));
     } else {
-        transverse_polarization = normalize3(transverse_polarization);
+        origin = make_f3(params.ray_ox[ray_index],
+                         params.ray_oy[ray_index],
+                         params.ray_oz[ray_index]);
+        direction = normalize3(make_f3(params.ray_dx[ray_index],
+                                       params.ray_dy[ray_index],
+                                       params.ray_dz[ray_index]));
+    }
+    const float3 d0 = direction;
+    const unsigned int tx_index = params.procedural_rays != 0 ? 0u : ray_index;
+    float3 image_source = make_f3(params.tx_x[tx_index],
+                                  params.tx_y[tx_index],
+                                  params.tx_z[tx_index]);
+    float3 transverse_polarization;
+    if (params.procedural_rays != 0) {
+        transverse_polarization = vertical_iso_polarization(direction);
+    } else {
+        float3 tx_polarization = make_f3(params.tx_pol_x[tx_index],
+                                         params.tx_pol_y[tx_index],
+                                         params.tx_pol_z[tx_index]);
+        transverse_polarization =
+            tx_polarization - dot3(tx_polarization, direction) * direction;
+        if (dot3(transverse_polarization, transverse_polarization) <= 1e-12f) {
+            transverse_polarization = stable_perpendicular(direction, tx_polarization);
+        } else {
+            transverse_polarization = normalize3(transverse_polarization);
+        }
     }
     Complex3 field = c3_from_real(transverse_polarization);
     float path_length = 0.f;
 
     for (int depth = 0; depth <= params.max_bounces; ++depth) {
+        if (depth >= params.max_bounces) {
+            if (depth > 0 || params.los_enabled != 0) {
+                float t_plane = 0.f;
+                if (plane_hit_in_bounds(origin, direction, t_plane)) {
+                    const float trace_tmax = fmaxf(t_plane - kRayBias, kRayTMin);
+                    const HitPayload blocker = trace_scene(origin, direction, trace_tmax);
+                    const float blocker_t = blocker.hit != 0u ? __uint_as_float(blocker.t) : kRayTMax;
+                    (void)accumulate_plane(ray_index,
+                                           depth,
+                                           origin,
+                                           direction,
+                                           blocker_t,
+                                           image_source,
+                                           field);
+                }
+            }
+            break;
+        }
+
         const float tmax_input =
             depth == 0 && params.ray_tmax != nullptr ? params.ray_tmax[ray_index] : kRayTMax;
         const float trace_tmax = isfinite(tmax_input) ? tmax_input : kRayTMax;
         const HitPayload hit = trace_scene(origin, direction, trace_tmax);
         const float blocker_t = hit.hit != 0u ? __uint_as_float(hit.t) : kRayTMax;
-
-        accumulate_plane(ray_index,
-                         depth,
-                         origin,
-                          direction,
-                          blocker_t,
-                          image_source,
-                          field);
+        const bool mp_int = accumulate_plane(ray_index,
+                                             depth,
+                                             origin,
+                                             direction,
+                                             blocker_t,
+                                             image_source,
+                                             field);
 
         if (hit.hit == 0u || depth >= params.max_bounces) {
             break;
@@ -516,7 +631,6 @@ extern "C" __global__ void __raygen__reflection_accumulation() {
         if (c3_power(reflected_field) <= 0.f) {
             break;
         }
-
         store_wedge_event(ray_index,
                           depth,
                           global_prim,
@@ -533,7 +647,7 @@ extern "C" __global__ void __raygen__reflection_accumulation() {
 
         field = reflected_field;
         direction = reflected_dir;
-        origin = hit_point + kRayBias * direction;
+        origin = offset_surface_point(hit_point, direction, geo_normal);
 
         const int next_depth = depth + 1;
         if (params.rr_depth > 0 && params.rr_prob < 1.f && next_depth >= params.rr_depth) {

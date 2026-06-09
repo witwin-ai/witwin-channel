@@ -123,22 +123,33 @@ def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int, strategy
         "atomic": 1,
         "staged": 2,
         "compact": 3,
+        "streaming_planar": 4,
     }[strategy]
 
     stage_times: dict[str, float] = {}
-    stage_times["sample_directions"], ray_d = _time_event(
-        torch,
-        lambda: _sample_directions(samples, reference=tx_pos),
-    )
-    stage_times["launch_inputs"], launch_inputs = _time_event(
-        torch,
-        lambda: mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples),
-    )
-    ray_o = launch_inputs["ray_o"]
-    ray_tmax = launch_inputs["ray_tmax"]
-    active = launch_inputs["active"]
-    tx_batch = ray_o
-    tx_pol = launch_inputs["tx_pol"]
+    if strategy == "streaming_planar":
+        ray_o = tx_pos[tx_index : tx_index + 1].contiguous()
+        ray_d = torch.empty((0, 3), device=device, dtype=torch.float32)
+        ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
+        active = torch.empty((0,), device=device, dtype=torch.bool)
+        tx_batch = ray_o
+        tx_pol = torch.tensor([[1.0, 0.0, 0.0]], device=device, dtype=torch.float32)
+        stage_times["sample_directions"] = 0.0
+        stage_times["launch_inputs"] = 0.0
+    else:
+        stage_times["sample_directions"], ray_d = _time_event(
+            torch,
+            lambda: _sample_directions(samples, reference=tx_pos),
+        )
+        stage_times["launch_inputs"], launch_inputs = _time_event(
+            torch,
+            lambda: mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples),
+        )
+        ray_o = launch_inputs["ray_o"]
+        ray_tmax = launch_inputs["ray_tmax"]
+        active = launch_inputs["active"]
+        tx_batch = ray_o
+        tx_pol = launch_inputs["tx_pol"]
 
     def reflection_forward() -> Any:
         return torch.ops.raydn.reflection_accumulation_forward(
@@ -172,6 +183,8 @@ def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int, strategy
             strategy_id,
             262_144,
             64,
+            int(samples) if strategy == "streaming_planar" else 0,
+            True,
         )
 
     stage_times["reflection_accumulation_forward"], out = _time_event(torch, reflection_forward)
@@ -197,6 +210,7 @@ def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int, strategy
         "shape": list(path_gain.shape),
         "path_gain_sum": float(path_gain.sum().item()),
         "nonzero": int(torch.count_nonzero(path_gain).item()),
+        "reflection_count": int(out[7].detach().cpu().item()),
     }
 
 
@@ -260,6 +274,7 @@ def run_native_reflection_benchmark(
                         "shape": last["shape"],
                         "path_gain_sum": [summary["path_gain_sum"] for summary in summaries],
                         "nonzero": [summary["nonzero"] for summary in summaries],
+                        "reflection_count": [summary["reflection_count"] for summary in summaries],
                         "peak_allocated_bytes": int(peak_allocated_bytes),
                     }
                 )
@@ -271,7 +286,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", type=int, nargs="+", default=[1_000_000, 10_000_000, 100_000_000])
     parser.add_argument("--max-depths", type=int, nargs="+", default=[1, 3, 5])
-    parser.add_argument("--strategy", choices=("auto", "atomic", "staged", "compact"), default="auto")
+    parser.add_argument(
+        "--strategy",
+        choices=("auto", "atomic", "staged", "compact", "streaming_planar"),
+        default="auto",
+    )
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
         "--json",

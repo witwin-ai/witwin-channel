@@ -71,6 +71,7 @@ def solve(scene: Scene, config: Config) -> Result:
     if grid is not None:
         component_maps = {}
         grid_dim0, grid_dim1 = component_grid_shape(grid)
+        streaming_planar = config.reflection_accumulation_strategy == "streaming_planar"
 
         def zero_component_map() -> torch.Tensor:
             return mc_component_map_buffer(
@@ -80,7 +81,7 @@ def solve(scene: Scene, config: Config) -> Result:
                 dim1=grid_dim1,
             )
 
-        if "los" in config.components:
+        if "los" in config.components and not streaming_planar:
             component_maps["los"] = los_component_map(scene, compiled.raydn, grid, device=device, los=los)
         else:
             component_maps["los"] = zero_component_map()
@@ -108,6 +109,7 @@ def solve(scene: Scene, config: Config) -> Result:
                 reflection_accumulation_strategy=config.reflection_accumulation_strategy,
                 reflection_compact_min_samples=config.reflection_compact_min_samples,
                 reflection_staged_min_samples_per_cell=config.reflection_staged_min_samples_per_cell,
+                streaming_los_enabled=("los" in config.components),
             )
         if "reflection" in config.components and reflection_available and reflection_result is not None:
             component_maps["reflection"] = reflection_result.maps

@@ -206,12 +206,14 @@ def reflection_component_maps_with_wedges(
     reflection_accumulation_strategy: str = "auto",
     reflection_compact_min_samples: int = 262_144,
     reflection_staged_min_samples_per_cell: int = 64,
+    streaming_los_enabled: bool = False,
 ) -> ReflectionComponentResult:
     strategy_id = {
         "auto": 0,
         "atomic": 1,
         "staged": 2,
         "compact": 3,
+        "streaming_planar": 4,
     }[reflection_accumulation_strategy]
     if not raydn.available or not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
@@ -231,13 +233,24 @@ def reflection_component_maps_with_wedges(
     maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
-        ray_d = _sample_directions(samples, reference=tx_pos)
-        launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples)
-        ray_o = launch_inputs["ray_o"]
-        ray_tmax = launch_inputs["ray_tmax"]
-        active = launch_inputs["active"]
-        tx_batch = ray_o
-        tx_pol = launch_inputs["tx_pol"]
+        if reflection_accumulation_strategy == "streaming_planar":
+            ray_o = tx.reshape(1, 3).contiguous()
+            ray_d = torch.empty((0, 3), device=device, dtype=torch.float32)
+            ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
+            active = torch.empty((0,), device=device, dtype=torch.bool)
+            tx_batch = ray_o
+            tx_pol = torch.empty((1, 3), device=device, dtype=torch.float32)
+            tx_pol[0, 0] = 1.0
+            tx_pol[0, 1] = 0.0
+            tx_pol[0, 2] = 0.0
+        else:
+            ray_d = _sample_directions(samples, reference=tx_pos)
+            launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples)
+            ray_o = launch_inputs["ray_o"]
+            ray_tmax = launch_inputs["ray_tmax"]
+            active = launch_inputs["active"]
+            tx_batch = ray_o
+            tx_pol = launch_inputs["tx_pol"]
         out = torch.ops.raydn.reflection_accumulation_forward(
             handle,
             ray_o,
@@ -269,6 +282,8 @@ def reflection_component_maps_with_wedges(
             strategy_id,
             int(reflection_compact_min_samples),
             int(reflection_staged_min_samples_per_cell),
+            int(samples) if reflection_accumulation_strategy == "streaming_planar" else 0,
+            bool(streaming_los_enabled),
         )
         mc_store_scaled_component_map(
             maps,
