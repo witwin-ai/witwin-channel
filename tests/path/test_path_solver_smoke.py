@@ -1,7 +1,12 @@
 import pytest
 import torch
 
-from tests.support.scenes import empty_space_los_scene, single_wall_reflection_scene
+from tests.support.scenes import (
+    empty_space_los_scene,
+    same_side_wall_reflection_scene,
+    single_wall_reflection_scene,
+    wedge_diffraction_scene,
+)
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.path import Config, Result, solve
@@ -37,6 +42,34 @@ def test_path_solver_reflection_is_capability_gated():
     else:
         assert result.metadata["components"]["reflection"] == "capability-disabled"
         assert result.valid.numel() == 0
+
+
+def test_path_solver_exports_native_reflection_paths_when_available():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for path solver")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native reflection is not built")
+
+    result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}))
+
+    assert result.metadata["components"]["reflection"] == "enabled"
+    assert int((result.component_id == 1).sum().item()) >= 1
+    assert torch.all(result.depth[result.component_id == 1] == 1)
+    assert torch.all(result.path_gain[result.component_id == 1] > 0)
+
+
+def test_path_solver_exports_native_diffraction_paths_when_available():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for path solver")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native diffraction is not built")
+
+    result = solve(wedge_diffraction_scene(), Config(components={"diffraction"}))
+
+    assert result.metadata["components"]["diffraction"] == "enabled"
+    assert int((result.component_id == 2).sum().item()) >= 1
+    assert torch.all(result.edge_id[result.component_id == 2] >= 0)
+    assert torch.all(result.path_gain[result.component_id == 2] > 0)
 
 
 def test_path_solver_calls_kernel_facade(monkeypatch):

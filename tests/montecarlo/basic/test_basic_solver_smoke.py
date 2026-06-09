@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from witwin.channel_native import ReceiverPoint, Scene, Transmitter
+from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.montecarlo.basic import Config, Result, solve
 
 
@@ -46,5 +47,9 @@ def test_basic_solver_required_reflection_errors_when_capability_missing():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
 
-    with pytest.raises(RuntimeError, match="reflection.*RayDN"):
-        solve(_empty_space_scene(), Config(components={"reflection"}, require_reflection=True))
+    if build_info()["uses_raydn_native"]:
+        result = solve(_empty_space_scene(), Config(components={"reflection"}, require_reflection=True))
+        assert result.metadata["components"]["reflection"] == "enabled"
+    else:
+        with pytest.raises(RuntimeError, match="reflection.*RayDN"):
+            solve(_empty_space_scene(), Config(components={"reflection"}, require_reflection=True))

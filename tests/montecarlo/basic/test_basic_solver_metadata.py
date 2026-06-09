@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from witwin.channel_native import ReceiverPoint, Scene, Transmitter
+from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import validate_metadata
 from witwin.channel_native.montecarlo.basic import Config, solve
 
@@ -26,9 +27,14 @@ def test_basic_solver_metadata_reports_counts_and_capabilities():
     assert result.metadata["samples"] == 32
     assert result.metadata["path_count"] == 32
     assert result.metadata["valid_contribution_count"] == 32
-    assert result.metadata["raydn"]["reflection"] is False
-    assert result.metadata["raydn"]["diffraction"] is False
+    raydn_native = build_info()["uses_raydn_native"]
+    assert result.metadata["raydn"]["reflection"] is raydn_native
+    assert result.metadata["raydn"]["diffraction"] is raydn_native
     assert result.metadata["components"]["los"] == "enabled"
-    assert result.metadata["components"]["reflection"] == "capability-disabled"
-    assert result.metadata["components"]["diffraction"] == "capability-disabled"
+    assert result.metadata["components"]["reflection"] == (
+        "enabled" if raydn_native else "capability-disabled"
+    )
+    assert result.metadata["components"]["diffraction"] == (
+        "enabled" if raydn_native else "capability-disabled"
+    )
     assert result.diagnostics is not None

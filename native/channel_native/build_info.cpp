@@ -6,9 +6,17 @@ pybind11::dict cn_build_info() {
     pybind11::dict info;
     info["backend"] = "channel-native";
     info["uses_dr_jit"] = false;
+#if CHANNEL_NATIVE_WITH_RAYDN
+    info["uses_raydn_native"] = true;
+#else
     info["uses_raydn_native"] = false;
+#endif
     info["uses_path_native"] = true;
     info["cuda_available"] = torch::cuda::is_available();
+#if CHANNEL_NATIVE_WITH_OPTIX
+    info["optix_available"] = true;
+#else
     info["optix_available"] = false;
+#endif
     return info;
 }

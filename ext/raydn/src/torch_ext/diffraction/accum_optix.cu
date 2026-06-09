@@ -229,6 +229,17 @@ static __forceinline__ __device__ uint8_t read_u8(const uint8_t *ptr, int stride
     return ptr[idx * stride];
 }
 
+static __forceinline__ __device__ int sample_state_index_for_lane(unsigned int lane) {
+    if (params.sample_state_index == nullptr) {
+        return static_cast<int>(lane % static_cast<unsigned int>(params.state_count));
+    }
+    const int state_idx = read_i32(
+        params.sample_state_index,
+        params.sample_state_index_stride,
+        static_cast<int>(lane));
+    return (state_idx >= 0 && state_idx < params.state_count) ? state_idx : -1;
+}
+
 static __forceinline__ __device__ int state_edge_index_at(int idx) {
     return read_i32(params.state_edge_index, params.state_edge_index_stride, idx);
 }
@@ -255,6 +266,21 @@ static __forceinline__ __device__ float state_edge_t_min_at(int idx) {
 
 static __forceinline__ __device__ float state_edge_t_max_at(int idx) {
     return read_f32(params.state_edge_t_max, params.state_edge_t_max_stride, idx);
+}
+
+static __forceinline__ __device__ float sample_edge_weight_for_lane(int state_idx,
+                                                                    unsigned int lane,
+                                                                    int sample_count) {
+    if (params.sample_edge_weight != nullptr) {
+        return fmaxf(read_f32(
+            params.sample_edge_weight,
+            params.sample_edge_weight_stride,
+            static_cast<int>(lane)), 0.f);
+    }
+    const float edge_length = fmaxf(
+        state_edge_t_max_at(state_idx) - state_edge_t_min_at(state_idx),
+        0.f);
+    return edge_length / fmaxf(static_cast<float>(sample_count), 1.f);
 }
 
 static __forceinline__ __device__ int state_prim0_at(int idx) {
@@ -673,7 +699,13 @@ static __forceinline__ __device__ bool keller_grid_hit(int state_idx,
                                                        float3 edge_dir,
                                                        float3 &target,
                                                        int &cell) {
-    const float3 incident = state_wi_at(state_idx);
+    const bool has_state_wi =
+        params.state_wi_x != nullptr &&
+        params.state_wi_y != nullptr &&
+        params.state_wi_z != nullptr;
+    const float3 incident = has_state_wi
+        ? state_wi_at(state_idx)
+        : edge_point - state_src_at(state_idx);
     return keller_grid_hit_from_incident(incident, lane, 1u, edge_point, edge_dir, target, cell);
 }
 
@@ -922,24 +954,19 @@ static __forceinline__ __device__ float first_order_diffraction_parameter(
 static __forceinline__ __device__ float diffraction_weight(int state_idx,
                                                            float3 edge_point,
                                                            float3 target,
-                                                           int sample_count) {
+                                                           float edge_measure_weight) {
     const float3 source = state_src_at(state_idx);
     const float source_distance = fmaxf(norm3(edge_point - source), kDfrEps);
     const float target_distance = fmaxf(norm3(target - edge_point), kDfrEps);
-    const float edge_length = fmaxf(
-        state_edge_t_max_at(state_idx) - state_edge_t_min_at(state_idx),
-        0.f);
     const float exterior_angle =
         fmaxf(state_exterior_angle_at(state_idx), 0.25f * kPi);
     const float wedge_scale = fminf(exterior_angle / (2.f * kPi), 2.f);
     const float material_gain = material_gain_for_state(state_idx);
-    const float sample_norm = 1.f / fmaxf(static_cast<float>(sample_count), 1.f);
     return state_src_power_at(state_idx) *
            material_gain *
-           edge_length *
+           fmaxf(edge_measure_weight, 0.f) *
            params.grid_cell_area *
-           wedge_scale *
-           sample_norm /
+           wedge_scale /
            (source_distance * source_distance * target_distance * target_distance);
 }
 
@@ -1020,8 +1047,9 @@ static __forceinline__ __device__ void run_diffraction_order1_accumulation_rayge
         return;
     }
 
-    const int state_idx = static_cast<int>(lane % static_cast<unsigned int>(params.state_count));
-    if (!active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
+    const int state_idx = sample_state_index_for_lane(lane);
+    if (state_idx < 0 ||
+        !active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
         return;
     }
 
@@ -1102,8 +1130,10 @@ static __forceinline__ __device__ void run_diffraction_order1_accumulation_rayge
 
     const int strategy_sample_count =
         is_direct ? direct_limit : (is_keller ? keller_limit : suffix_limit);
+    const float edge_measure_weight =
+        sample_edge_weight_for_lane(state_idx, lane, strategy_sample_count);
     float contribution =
-        diffraction_weight(state_idx, edge_point, connection_target, strategy_sample_count);
+        diffraction_weight(state_idx, edge_point, connection_target, edge_measure_weight);
     if constexpr (IncludeSuffix) {
         if (is_suffix) {
             contribution *= suffix_reflection_gain *
@@ -1214,8 +1244,9 @@ static __forceinline__ __device__ void run_diffraction_order1_source_visibility_
         return;
     }
 
-    const int state_idx = static_cast<int>(lane % static_cast<unsigned int>(params.state_count));
-    if (!active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
+    const int state_idx = sample_state_index_for_lane(lane);
+    if (state_idx < 0 ||
+        !active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
         return;
     }
 
@@ -1263,8 +1294,9 @@ static __forceinline__ __device__ void run_diffraction_order1_no_suffix_target_a
     const bool is_keller =
         !is_direct && static_cast<int>(lane) < direct_limit + keller_limit;
 
-    const int state_idx = static_cast<int>(lane % static_cast<unsigned int>(params.state_count));
-    if (!active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
+    const int state_idx = sample_state_index_for_lane(lane);
+    if (state_idx < 0 ||
+        !active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
         return;
     }
 
@@ -1294,8 +1326,10 @@ static __forceinline__ __device__ void run_diffraction_order1_no_suffix_target_a
     }
 
     const int strategy_sample_count = is_direct ? direct_limit : keller_limit;
+    const float edge_measure_weight =
+        sample_edge_weight_for_lane(state_idx, lane, strategy_sample_count);
     const float contribution =
-        diffraction_weight(state_idx, edge_point, target, strategy_sample_count);
+        diffraction_weight(state_idx, edge_point, target, edge_measure_weight);
     if (!(contribution > 0.f) || !isfinite(contribution)) {
         if (params.collect_debug_counts != 0) {
             atomicAdd(params.out_utd_rejects, 1);
@@ -1377,8 +1411,9 @@ static __forceinline__ __device__ void run_diffraction_order1_suffix_first_visib
         return;
     }
 
-    const int state_idx = static_cast<int>(lane % static_cast<unsigned int>(params.state_count));
-    if (!active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
+    const int state_idx = sample_state_index_for_lane(lane);
+    if (state_idx < 0 ||
+        !active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
         params.temp_visibility[lane] = 0u;
         return;
     }
@@ -1460,8 +1495,9 @@ static __forceinline__ __device__ void run_diffraction_order1_suffix_target_accu
         return;
     }
 
-    const int state_idx = static_cast<int>(lane % static_cast<unsigned int>(params.state_count));
-    if (!active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
+    const int state_idx = sample_state_index_for_lane(lane);
+    if (state_idx < 0 ||
+        !active_for_state(params.active_mask, params.active_width, params.active_stride, state_idx)) {
         return;
     }
 
@@ -1506,8 +1542,10 @@ static __forceinline__ __device__ void run_diffraction_order1_suffix_target_accu
         return;
     }
 
+    const float edge_measure_weight =
+        sample_edge_weight_for_lane(state_idx, lane, suffix_limit);
     float contribution =
-        diffraction_weight(state_idx, edge_point, connection_target, suffix_limit);
+        diffraction_weight(state_idx, edge_point, connection_target, edge_measure_weight);
     contribution *= suffix_reflection_gain *
                     suffix_fspl *
                     fmaxf(suffix_candidate_count, 1.f);
@@ -1611,8 +1649,10 @@ static __forceinline__ __device__ void run_diffraction_order1_coherent_accumulat
         }
     }
 
+    const float edge_measure_weight =
+        sample_edge_weight_for_lane(state_idx, lane, 1);
     const float contribution =
-        diffraction_weight(state_idx, edge_point, target, 1);
+        diffraction_weight(state_idx, edge_point, target, edge_measure_weight);
     if (!(contribution > 0.f) || !isfinite(contribution)) {
         if (params.collect_debug_counts != 0 &&
             params.out_utd_reject_count != nullptr) {
@@ -1702,8 +1742,10 @@ static __forceinline__ __device__ void run_diffraction_chain_accumulation_raygen
         static_cast<int>(lane) >= direct_limit + keller_limit &&
         static_cast<int>(lane) < total_samples;
 
-    const int first_idx = static_cast<int>(
-        lane % static_cast<unsigned int>(params.state_count));
+    const int first_idx = sample_state_index_for_lane(lane);
+    if (first_idx < 0) {
+        return;
+    }
     const unsigned int second_hash = hash_u32(
         lane ^ (static_cast<unsigned int>(params.seed) * 0x9e3779b9u) ^ 0x51ed270bu);
     const int second_idx = static_cast<int>(

@@ -62,6 +62,11 @@ class DispatcherBindingTests(unittest.TestCase):
         ray_tmax = torch.tensor([2.0], device="cuda", dtype=torch.float32)
         active = torch.ones((1,), device="cuda", dtype=torch.bool)
         tx_pol = torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+        material_eta_r = torch.ones((1,), device="cuda", dtype=torch.float32)
+        material_sigma = torch.zeros((1,), device="cuda", dtype=torch.float32)
+        material_mu_r = torch.ones((1,), device="cuda", dtype=torch.float32)
+        material_gain = torch.ones((1,), device="cuda", dtype=torch.float32)
+        material_valid = torch.ones((1,), device="cuda", dtype=torch.bool)
 
         out = torch.ops.raydn.reflection_accumulation_forward(
             scene._native_scene,
@@ -71,6 +76,11 @@ class DispatcherBindingTests(unittest.TestCase):
             active,
             ray_o,
             tx_pol,
+            material_eta_r,
+            material_sigma,
+            material_mu_r,
+            material_gain,
+            material_valid,
             1,
             2,
             -1.0,
@@ -81,6 +91,7 @@ class DispatcherBindingTests(unittest.TestCase):
             4,
             4,
             1.0,
+            0.25,
         )
 
         self.assertEqual(out[0].shape, (4, 4))

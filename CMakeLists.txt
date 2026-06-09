@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.26)
-project(channel_native LANGUAGES CXX)
+project(channel_native LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,6 +9,13 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+
+option(CHANNEL_NATIVE_BUILD_RAYDN "Build vendored RayDN native backend." ON)
+
+if(CHANNEL_NATIVE_BUILD_RAYDN)
+    set(RAYDN_BUILD_NATIVE ON CACHE BOOL "Build RayDN native extension for Channel Native." FORCE)
+    add_subdirectory(ext/raydn)
+endif()
 
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c "import torch; print(torch.utils.cmake_prefix_path)"
@@ -34,5 +41,14 @@ Python_add_library(
 
 target_compile_features(_channel_native PRIVATE cxx_std_17)
 target_link_libraries(_channel_native PRIVATE "${TORCH_LIBRARIES}" "${TORCH_PYTHON_LIBRARY}")
+if(TARGET _raydn)
+    add_dependencies(_channel_native _raydn)
+    target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYDN=1 CHANNEL_NATIVE_WITH_OPTIX=1)
+else()
+    target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYDN=0 CHANNEL_NATIVE_WITH_OPTIX=0)
+endif()
 
 install(TARGETS _channel_native LIBRARY DESTINATION witwin/channel_native)
+if(TARGET _raydn)
+    install(TARGETS _raydn LIBRARY DESTINATION witwin/channel_native/_native RUNTIME DESTINATION witwin/channel_native/_native)
+endif()

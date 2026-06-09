@@ -10,6 +10,12 @@ from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels import ops
 
 from .config import Config
+from .raydn_export import (
+    concatenate_path_blocks,
+    diffraction_paths_order1,
+    los_visibility_mask,
+    reflection_paths_order1,
+)
 from .result import Result
 
 
@@ -143,7 +149,7 @@ def solve(scene: Scene, config: Config) -> Result:
         raise RuntimeError("diffraction paths require RayDN native capability")
 
     device = torch.device("cuda")
-    if "los" not in config.components or not scene.transmitters:
+    if not scene.transmitters:
         return _empty_result(
             device=device,
             config=config,
@@ -152,27 +158,93 @@ def solve(scene: Scene, config: Config) -> Result:
             path_native_available=path_native_available,
         )
 
+    compiled = scene.compile()
     tx_positions = torch.stack([tx.position for tx in scene.transmitters], dim=0).to(
         device=device, dtype=torch.float32
     )
     tx_power = torch.tensor([tx.power_w for tx in scene.transmitters], device=device, dtype=torch.float32)
     rx_positions = _receiver_positions(scene, device=device)
-    exported = ops.path_los_export(
-        tx_positions,
-        tx_power,
-        rx_positions,
-        frequency_hz=scene.frequency,
+    blocks: list[dict[str, torch.Tensor]] = []
+    if "los" in config.components:
+        exported = ops.path_los_export(
+            tx_positions,
+            tx_power,
+            rx_positions,
+            frequency_hz=scene.frequency,
+        )
+        tx_id = exported["tx_id"]
+        rx_id = exported["rx_id"]
+        tx_for_path = tx_positions.index_select(0, tx_id.to(dtype=torch.long))
+        rx_for_path = rx_positions.index_select(0, rx_id.to(dtype=torch.long))
+        visible = los_visibility_mask(
+            compiled.raydn,
+            tx_for_path,
+            rx_for_path,
+            has_structures=bool(scene.structures),
+        )
+        keep = visible.nonzero(as_tuple=False).flatten()
+        blocks.append(
+            {
+                "valid": torch.ones((int(keep.numel()),), device=device, dtype=torch.bool),
+                "tx_id": tx_id[keep].to(dtype=torch.int32).contiguous(),
+                "rx_id": rx_id[keep].to(dtype=torch.int32).contiguous(),
+                "depth": torch.zeros((int(keep.numel()),), device=device, dtype=torch.int32),
+                "component_id": torch.full(
+                    (int(keep.numel()),), _COMPONENT_ID["los"], device=device, dtype=torch.int32
+                ),
+                "primitive_id": torch.full((int(keep.numel()),), -1, device=device, dtype=torch.int32),
+                "edge_id": torch.full((int(keep.numel()),), -1, device=device, dtype=torch.int32),
+                "path_length_m": exported["path_length_m"][keep].to(dtype=torch.float32).contiguous(),
+                "delay_s": exported["delay_s"][keep].to(dtype=torch.float32).contiguous(),
+                "path_gain": exported["path_gain"][keep].to(dtype=torch.float32).contiguous(),
+            }
+        )
+    if "reflection" in config.components and reflection_available and config.max_depth >= 1:
+        blocks.append(
+            reflection_paths_order1(
+                scene,
+                compiled.raydn,
+                tx_positions,
+                tx_power,
+                rx_positions,
+                frequency_hz=scene.frequency,
+            )
+        )
+    if "diffraction" in config.components and diffraction_available and config.max_depth >= 1:
+        blocks.append(
+            diffraction_paths_order1(
+                scene,
+                compiled.raydn,
+                tx_positions,
+                tx_power,
+                rx_positions,
+                frequency_hz=scene.frequency,
+            )
+        )
+
+    exported_paths = concatenate_path_blocks(blocks, device=device)
+    path_count = int(exported_paths["path_gain"].numel())
+    if path_count == 0:
+        return _empty_result(
+            device=device,
+            config=config,
+            reflection_available=reflection_available,
+            diffraction_available=diffraction_available,
+            path_native_available=path_native_available,
+        )
+    sort_key = (
+        (((exported_paths["rx_id"].to(dtype=torch.long) * max(len(scene.transmitters), 1))
+          + exported_paths["tx_id"].to(dtype=torch.long))
+         * (max(int(config.max_depth), 1) + 1)
+         + exported_paths["depth"].to(dtype=torch.long))
+        * len(_COMPONENT_ID)
+        + exported_paths["component_id"].to(dtype=torch.long)
     )
-    tx_id = exported["tx_id"]
-    rx_id = exported["rx_id"]
-    path_length = exported["path_length_m"]
-    delay = exported["delay_s"]
-    path_gain = exported["path_gain"]
-    path_count = int(path_gain.numel())
+    order = torch.argsort(sort_key, stable=True)
     if config.max_paths is not None:
         path_count = min(path_count, config.max_paths)
+        order = order[:path_count]
 
-    sl = slice(0, path_count)
     metadata = _metadata(
         config=config,
         path_count=path_count,
@@ -190,15 +262,15 @@ def solve(scene: Scene, config: Config) -> Result:
         }
     return Result(
         valid=torch.ones((path_count,), device=device, dtype=torch.bool),
-        tx_id=tx_id[sl].contiguous(),
-        rx_id=rx_id[sl].contiguous(),
-        depth=torch.zeros((path_count,), device=device, dtype=torch.int32),
-        component_id=torch.full((path_count,), _COMPONENT_ID["los"], device=device, dtype=torch.int32),
-        primitive_id=torch.full((path_count,), -1, device=device, dtype=torch.int32),
-        edge_id=torch.full((path_count,), -1, device=device, dtype=torch.int32),
-        path_length_m=path_length[sl].to(dtype=torch.float32).contiguous(),
-        delay_s=delay[sl].to(dtype=torch.float32).contiguous(),
-        path_gain=path_gain[sl].to(dtype=torch.float32).contiguous(),
+        tx_id=exported_paths["tx_id"][order].contiguous(),
+        rx_id=exported_paths["rx_id"][order].contiguous(),
+        depth=exported_paths["depth"][order].contiguous(),
+        component_id=exported_paths["component_id"][order].contiguous(),
+        primitive_id=exported_paths["primitive_id"][order].contiguous(),
+        edge_id=exported_paths["edge_id"][order].contiguous(),
+        path_length_m=exported_paths["path_length_m"][order].to(dtype=torch.float32).contiguous(),
+        delay_s=exported_paths["delay_s"][order].to(dtype=torch.float32).contiguous(),
+        path_gain=exported_paths["path_gain"][order].to(dtype=torch.float32).contiguous(),
         metadata=metadata,
         diagnostics=diagnostics,
     )

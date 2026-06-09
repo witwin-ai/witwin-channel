@@ -5,6 +5,8 @@ import importlib
 import pathlib
 import sys
 
+from . import raydn_backend
+
 
 _DEFAULT_BUILD_INFO = {
     "backend": "channel-native",
@@ -48,4 +50,5 @@ def build_info() -> dict[str, bool | str]:
 
     info = dict(_DEFAULT_BUILD_INFO)
     info.update(native_info)
+    info.update(raydn_backend.capability_info())
     return info

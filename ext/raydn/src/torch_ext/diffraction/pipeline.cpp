@@ -26,6 +26,7 @@ OptixPipelineConfig dfr_paths_pipeline_config() {
 
 OptixPipelineConfig dfr_accum_pipeline_config() {
     OptixPipelineConfig config;
+    // Keep this translation unit sensitive to the generated accumulation PTX.
     config.ptx = raydn_diffraction_accumulation_optix_ptx;
     config.ptx_size = sizeof(raydn_diffraction_accumulation_optix_ptx);
     config.raygen_entries = {

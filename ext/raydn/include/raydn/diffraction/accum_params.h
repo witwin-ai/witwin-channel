@@ -31,6 +31,10 @@ struct DfrAccumParams {
     const uint8_t *active_mask;
     int active_width;
     int active_stride;
+    const int *sample_state_index;
+    int sample_state_index_stride;
+    const float *sample_edge_weight;
+    int sample_edge_weight_stride;
     int state_count;
     const int *state_edge_index;
     int state_edge_index_stride;

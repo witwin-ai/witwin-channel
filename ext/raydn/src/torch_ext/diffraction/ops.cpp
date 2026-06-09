@@ -5,6 +5,7 @@
 #include <raydn/diffraction/accum_params.h>
 #include <raydn/diffraction/accum_ad.h>
 #include <raydn/diffraction/accum_reduce.h>
+#include <raydn/diffraction/builder.h>
 #include <raydn/diffraction/paths_init.h>
 #include <raydn/diffraction/paths_params.h>
 #include <raydn/diffraction/pipeline.h>
@@ -726,7 +727,9 @@ py::tuple diffraction_accumulation_forward_op(
     c10::optional<at::Tensor> recursive_state_prim0,
     c10::optional<at::Tensor> recursive_state_prim1,
     c10::optional<at::Tensor> recursive_state_exterior_angle,
-    int64_t export_tape) {
+    int64_t export_tape,
+    c10::optional<at::Tensor> sample_state_index,
+    c10::optional<at::Tensor> sample_edge_weight) {
     require_optional_mask(active, "active");
     require_flat_i32_strided(state_edge_index, "state_edge_index");
     require_vec3f_strided(state_edge_pos, "state_edge_pos");
@@ -864,6 +867,18 @@ py::tuple diffraction_accumulation_forward_op(
     const int32_t keller_launch_count = checked_i32(keller_samples, "keller_samples");
     const int32_t suffix_launch_count = checked_i32(suffix_samples, "suffix_samples");
     const int32_t launch_count = checked_i32(direct_samples + keller_samples + suffix_samples, "launch_count");
+    const bool use_sample_state_index = has_optional_tensor(sample_state_index);
+    const bool use_sample_edge_weight = has_optional_tensor(sample_edge_weight);
+    if (use_sample_state_index) {
+        require_flat_i32_strided(*sample_state_index, "sample_state_index");
+        if (sample_state_index->size(0) < launch_count)
+            throw std::runtime_error("sample_state_index must cover launch_count.");
+    }
+    if (use_sample_edge_weight) {
+        require_flat_f32_strided(*sample_edge_weight, "sample_edge_weight");
+        if (sample_edge_weight->size(0) < launch_count)
+            throw std::runtime_error("sample_edge_weight must cover launch_count.");
+    }
     auto fopts = state_src.options();
     auto iopts = state_edge_index.options();
     auto bopts = state_edge_index.options().dtype(at::kBool);
@@ -965,6 +980,12 @@ py::tuple diffraction_accumulation_forward_op(
     params.active_mask = optional_mask_ptr(active_contig);
     params.active_width = active_width_for_states(active_contig, "active_width");
     params.active_stride = active_stride_for_states(active_contig, "active_stride");
+    params.sample_state_index = use_sample_state_index ? sample_state_index->data_ptr<int>() : nullptr;
+    params.sample_state_index_stride =
+        use_sample_state_index ? stride_i32(*sample_state_index, 0, "sample_state_index_stride") : 0;
+    params.sample_edge_weight = use_sample_edge_weight ? sample_edge_weight->data_ptr<float>() : nullptr;
+    params.sample_edge_weight_stride =
+        use_sample_edge_weight ? stride_i32(*sample_edge_weight, 0, "sample_edge_weight_stride") : 0;
     params.state_count = checked_i32(state_count, "state_count");
     params.state_edge_index = state_edge_index.data_ptr<int>();
     params.state_edge_index_stride = stride_i32(state_edge_index, 0, "state_edge_index_stride");
@@ -2539,6 +2560,83 @@ py::tuple diffraction_coherent_accumulation_forward_op(
         multi_count.reshape({grid_resolution1, grid_resolution0}),
         visibility_reject_count.reshape({grid_resolution1, grid_resolution0}),
         utd_reject_count.reshape({grid_resolution1, grid_resolution0}));
+}
+
+
+at::Tensor diffraction_discover_edges_op(
+    at::Tensor tx_pos,
+    at::Tensor ray_dir,
+    at::Tensor prim_index,
+    at::Tensor hit_p,
+    at::Tensor hit_n,
+    at::Tensor hit_geo_n,
+    at::Tensor triangle_edge_count,
+    at::Tensor triangle_edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_n0,
+    at::Tensor edge_nn,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
+    at::Tensor edge_adjacent_face1) {
+    require_cuda(tx_pos, "tx_pos");
+    require_dtype(tx_pos, at::kFloat, "tx_pos");
+    require_rank(tx_pos, 1, "tx_pos");
+    if (tx_pos.size(0) != 3)
+        throw std::runtime_error("tx_pos must have shape (3,).");
+    require_vec3f(ray_dir, "ray_dir");
+    require_flat_i32(prim_index, "prim_index");
+    require_vec3f(hit_p, "hit_p");
+    require_vec3f(hit_n, "hit_n");
+    require_vec3f(hit_geo_n, "hit_geo_n");
+    require_flat_i32(triangle_edge_count, "triangle_edge_count");
+    require_cuda(triangle_edge_indices, "triangle_edge_indices");
+    require_contiguous(triangle_edge_indices, "triangle_edge_indices");
+    require_dtype(triangle_edge_indices, at::kInt, "triangle_edge_indices");
+    require_rank(triangle_edge_indices, 2, "triangle_edge_indices");
+    require_vec3f(edge_pos, "edge_pos");
+    require_vec3f(edge_dir, "edge_dir");
+    require_vec3f(edge_n0, "edge_n0");
+    require_vec3f(edge_nn, "edge_nn");
+    require_flat_f32(edge_line_min, "edge_line_min");
+    require_flat_f32(edge_line_max, "edge_line_max");
+    require_flat_i32(edge_adjacent_face1, "edge_adjacent_face1");
+
+    const int64_t n_hits = ray_dir.size(0);
+    if (prim_index.size(0) != n_hits || hit_p.size(0) != n_hits ||
+        hit_n.size(0) != n_hits || hit_geo_n.size(0) != n_hits)
+        throw std::runtime_error("diffraction_discover_edges hit tensors must share the same width.");
+    const int64_t n_edges = edge_pos.size(0);
+    if (edge_dir.size(0) != n_edges || edge_n0.size(0) != n_edges ||
+        edge_nn.size(0) != n_edges || edge_line_min.size(0) != n_edges ||
+        edge_line_max.size(0) != n_edges || edge_adjacent_face1.size(0) != n_edges)
+        throw std::runtime_error("diffraction_discover_edges edge tensors must share the same width.");
+    if (triangle_edge_indices.size(0) != triangle_edge_count.size(0))
+        throw std::runtime_error("triangle_edge_indices rows must match triangle_edge_count width.");
+
+    if (n_hits <= 0 || n_edges <= 0) {
+        return at::empty({0}, prim_index.options());
+    }
+
+    at::Tensor seen = at::zeros({n_edges}, prim_index.options());
+    diffraction_discover_edges_cuda(
+        tx_pos.contiguous(),
+        ray_dir,
+        prim_index,
+        hit_p,
+        hit_n,
+        hit_geo_n,
+        triangle_edge_count,
+        triangle_edge_indices,
+        edge_pos,
+        edge_dir,
+        edge_n0,
+        edge_nn,
+        edge_line_min,
+        edge_line_max,
+        edge_adjacent_face1,
+        seen);
+    return at::nonzero(seen).reshape({-1}).to(at::kInt).contiguous();
 }
 
 

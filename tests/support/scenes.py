@@ -44,6 +44,29 @@ def single_wall_reflection_scene() -> Scene:
     )
 
 
+def same_side_wall_reflection_scene() -> Scene:
+    wall = Structure(
+        vertices=torch.tensor(
+            [
+                [2.5, -3.0, -1.0],
+                [2.5, 3.0, -1.0],
+                [2.5, -3.0, 2.0],
+                [2.5, 3.0, 2.0],
+            ]
+        ),
+        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
+        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        name="same-side-wall",
+        surface_id=4,
+    )
+    return Scene(
+        structures=[wall],
+        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
+        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.5]))],
+        frequency=3.0e9,
+    )
+
+
 def wedge_diffraction_scene() -> Scene:
     face_a = Structure(
         vertices=torch.tensor(

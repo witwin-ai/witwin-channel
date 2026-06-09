@@ -123,6 +123,7 @@ void sync_scene(int64_t handle);
 int64_t scene_version(c10::intrusive_ptr<SceneHandle> scene);
 int64_t scene_num_meshes(c10::intrusive_ptr<SceneHandle> scene);
 int64_t scene_edge_count(c10::intrusive_ptr<SceneHandle> scene);
+std::vector<at::Tensor> scene_edge_records(c10::intrusive_ptr<SceneHandle> scene);
 void update_mesh_vertices(c10::intrusive_ptr<SceneHandle> scene, int64_t mesh_id, at::Tensor vertices);
 void sync_scene(c10::intrusive_ptr<SceneHandle> scene);
 std::vector<at::Tensor> split_scene_vertex_grad(c10::intrusive_ptr<SceneHandle> scene, at::Tensor grad_vertices);

@@ -846,6 +846,32 @@ int64_t scene_edge_count(c10::intrusive_ptr<SceneHandle> scene) {
     return scene_edge_count(scene->handle);
 }
 
+std::vector<at::Tensor> scene_edge_records(c10::intrusive_ptr<SceneHandle> scene_handle) {
+    SceneCache &scene = get_scene(scene_handle->handle);
+    at::Tensor edge_shape_index = scene.edge_shape_id.to(at::kLong);
+    at::Tensor face_offsets = scene.face_offsets.index_select(0, edge_shape_index);
+    at::Tensor edge_face0_global = scene.edge_face0 + face_offsets;
+    at::Tensor edge_face1_global = at::where(
+        scene.edge_face1.ge(0),
+        scene.edge_face1 + face_offsets,
+        scene.edge_face1);
+
+    return {
+        scene.global_vertices,
+        scene.global_faces,
+        scene.tri_fn_x,
+        scene.tri_fn_y,
+        scene.tri_fn_z,
+        scene.edge_v0,
+        scene.edge_v1,
+        edge_face0_global,
+        edge_face1_global,
+        scene.edge_shape_id,
+        scene.edge_local_id,
+        scene.edge_opposite,
+    };
+}
+
 void update_mesh_vertices(c10::intrusive_ptr<SceneHandle> scene, int64_t mesh_id, at::Tensor vertices) {
     update_mesh_vertices(scene->handle, mesh_id, std::move(vertices));
 }

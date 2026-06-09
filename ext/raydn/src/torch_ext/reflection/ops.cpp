@@ -1050,6 +1050,11 @@ py::tuple reflection_accumulation_forward_op(
     at::Tensor active,
     at::Tensor tx,
     at::Tensor tx_pol,
+    at::Tensor material_eta_r,
+    at::Tensor material_sigma,
+    at::Tensor material_mu_r,
+    at::Tensor material_gain,
+    at::Tensor material_valid,
     int64_t max_bounces,
     int64_t grid_axis,
     double grid_position,
@@ -1059,13 +1064,23 @@ py::tuple reflection_accumulation_forward_op(
     double grid_coord1_max,
     int64_t grid_resolution0,
     int64_t grid_resolution1,
-    double wavelength) {
+    double wavelength,
+    double solid_angle_per_ray,
+    bool collect_wedges,
+    bool collect_wedge_prefixes,
+    int64_t wedge_capacity,
+    int64_t wedge_sample_stride) {
     require_vec3f(ray_o, "ray_o");
     require_vec3f(ray_d, "ray_d");
     require_ray_tmax(ray_tmax, ray_o.size(0), "reflection_accumulation");
     require_mask(active, "active");
     require_vec3f(tx, "tx");
     require_vec3f(tx_pol, "tx_pol");
+    require_flat_f32(material_eta_r, "material_eta_r");
+    require_flat_f32(material_sigma, "material_sigma");
+    require_flat_f32(material_mu_r, "material_mu_r");
+    require_flat_f32(material_gain, "material_gain");
+    require_mask(material_valid, "material_valid");
     require_same_batch(ray_o, ray_d, "reflection_accumulation");
     require_same_batch(ray_o, tx, "reflection_accumulation");
     require_same_batch(ray_o, tx_pol, "reflection_accumulation");
@@ -1079,6 +1094,12 @@ py::tuple reflection_accumulation_forward_op(
         throw std::runtime_error("grid resolutions must be positive.");
     if (!(wavelength > 0.0))
         throw std::runtime_error("wavelength must be positive.");
+    if (!(solid_angle_per_ray >= 0.0))
+        throw std::runtime_error("solid_angle_per_ray must be non-negative.");
+    if (wedge_capacity < 0)
+        throw std::runtime_error("wedge_capacity must be non-negative.");
+    if (wedge_sample_stride <= 0)
+        throw std::runtime_error("wedge_sample_stride must be positive.");
 
     SceneCache &scene = get_scene(scene_handle);
     const int64_t ray_count = ray_o.size(0);
@@ -1104,6 +1125,29 @@ py::tuple reflection_accumulation_forward_op(
     at::Tensor field_z_re = at::zeros({cell_count}, fopts);
     at::Tensor field_z_im = at::zeros({cell_count}, fopts);
     at::Tensor reflection_count = at::zeros({1}, iopts);
+    const int64_t wedge_capacity64 = collect_wedges ? wedge_capacity : 0;
+    const int32_t wedge_capacity_i = checked_i32(wedge_capacity64, "wedge_capacity");
+    const int32_t wedge_sample_stride_i = checked_i32(wedge_sample_stride, "wedge_sample_stride");
+    at::Tensor wedge_count = at::zeros({1}, iopts);
+    at::Tensor wedge_ray_index = at::full({wedge_capacity64}, -1, iopts);
+    at::Tensor wedge_prim_id = at::full({wedge_capacity64}, -1, iopts);
+    at::Tensor wedge_bounce_depth = at::full({wedge_capacity64}, -1, iopts);
+    at::Tensor wedge_source_power = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_hit_x = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_hit_y = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_hit_z = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_normal_x = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_normal_y = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_normal_z = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_dir_x = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_dir_y = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_dir_z = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_source_x = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_source_y = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_source_z = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_initial_dir_x = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_initial_dir_y = at::zeros({wedge_capacity64}, fopts);
+    at::Tensor wedge_initial_dir_z = at::zeros({wedge_capacity64}, fopts);
     if (ray_count == 0) {
         return py::make_tuple(
             power.reshape({grid_resolution1, grid_resolution0}),
@@ -1113,7 +1157,17 @@ py::tuple reflection_accumulation_forward_op(
             field_y_im.reshape({grid_resolution1, grid_resolution0}),
             field_z_re.reshape({grid_resolution1, grid_resolution0}),
             field_z_im.reshape({grid_resolution1, grid_resolution0}),
-            reflection_count);
+            reflection_count,
+            wedge_count,
+            wedge_ray_index,
+            stack_vec3(wedge_hit_x, wedge_hit_y, wedge_hit_z),
+            stack_vec3(wedge_normal_x, wedge_normal_y, wedge_normal_z),
+            wedge_prim_id,
+            stack_vec3(wedge_dir_x, wedge_dir_y, wedge_dir_z),
+            stack_vec3(wedge_source_x, wedge_source_y, wedge_source_z),
+            wedge_source_power,
+            stack_vec3(wedge_initial_dir_x, wedge_initial_dir_y, wedge_initial_dir_z),
+            wedge_bounce_depth);
     }
 
     TriangleSoA tri = make_scene_triangle_soa(scene);
@@ -1123,11 +1177,14 @@ py::tuple reflection_accumulation_forward_op(
     Vec3SoA tx_pol_soa = split_vec3(tx_pol);
     at::Tensor ray_tmax_contig = ray_tmax.numel() == 0 ? ray_tmax : ray_tmax.contiguous();
     at::Tensor active_contig = active.contiguous();
-    at::Tensor material_eta_r = at::ones({tri.n_triangles}, fopts);
-    at::Tensor material_sigma = at::zeros({tri.n_triangles}, fopts);
-    at::Tensor material_gain = at::ones({tri.n_triangles}, fopts);
-    at::Tensor material_mu_r = at::ones({tri.n_triangles}, fopts);
-    at::Tensor material_valid = at::ones({tri.n_triangles}, active.options());
+    const int64_t material_count = material_eta_r.size(0);
+    if (material_count != tri.n_triangles ||
+        material_sigma.size(0) != material_count ||
+        material_mu_r.size(0) != material_count ||
+        material_gain.size(0) != material_count ||
+        material_valid.size(0) != material_count) {
+        throw std::runtime_error("reflection material payload must match the scene triangle count.");
+    }
     at::Tensor stage_cell = staged_accum
         ? at::full({stage_sample_count}, -1, iopts)
         : at::Tensor();
@@ -1172,7 +1229,7 @@ py::tuple reflection_accumulation_forward_op(
     params.max_bounces = max_bounces_i;
     params.wavelength = static_cast<float>(wavelength);
     params.k = static_cast<float>(2.0 * 3.14159265358979323846 / wavelength);
-    params.solid_angle_per_ray = 1.0f;
+    params.solid_angle_per_ray = static_cast<float>(solid_angle_per_ray);
     const double span0 = grid_coord0_max - grid_coord0_min;
     const double span1 = grid_coord1_max - grid_coord1_min;
     params.cell_area = static_cast<float>(
@@ -1195,11 +1252,11 @@ py::tuple reflection_accumulation_forward_op(
     params.material_gain = material_gain.data_ptr<float>();
     params.material_mu_r = material_mu_r.data_ptr<float>();
     params.material_valid = mask_ptr(material_valid);
-    params.material_count = tri.n_triangles;
-    params.collect_wedges = 0;
-    params.collect_wedge_prefixes = 0;
-    params.wedge_capacity = 0;
-    params.wedge_sample_stride = 1;
+    params.material_count = static_cast<int32_t>(material_count);
+    params.collect_wedges = collect_wedges ? 1 : 0;
+    params.collect_wedge_prefixes = collect_wedge_prefixes ? 1 : 0;
+    params.wedge_capacity = wedge_capacity_i;
+    params.wedge_sample_stride = wedge_sample_stride_i;
     params.out_reflection_power = power.data_ptr<float>();
     params.out_field_x_re = field_x_re.data_ptr<float>();
     params.out_field_x_im = field_x_im.data_ptr<float>();
@@ -1212,6 +1269,26 @@ py::tuple reflection_accumulation_forward_op(
     params.stage_value = staged_accum
         ? reinterpret_cast<ReflAccumStagedValue *>(stage_value.data_ptr<float>())
         : nullptr;
+    params.out_wedge_count = collect_wedges ? wedge_count.data_ptr<int>() : nullptr;
+    params.out_wedge_ray_index = collect_wedges ? wedge_ray_index.data_ptr<int>() : nullptr;
+    params.out_wedge_hit_x = collect_wedges ? wedge_hit_x.data_ptr<float>() : nullptr;
+    params.out_wedge_hit_y = collect_wedges ? wedge_hit_y.data_ptr<float>() : nullptr;
+    params.out_wedge_hit_z = collect_wedges ? wedge_hit_z.data_ptr<float>() : nullptr;
+    params.out_wedge_normal_x = collect_wedges ? wedge_normal_x.data_ptr<float>() : nullptr;
+    params.out_wedge_normal_y = collect_wedges ? wedge_normal_y.data_ptr<float>() : nullptr;
+    params.out_wedge_normal_z = collect_wedges ? wedge_normal_z.data_ptr<float>() : nullptr;
+    params.out_wedge_prim_id = collect_wedges ? wedge_prim_id.data_ptr<int>() : nullptr;
+    params.out_wedge_dir_x = collect_wedges ? wedge_dir_x.data_ptr<float>() : nullptr;
+    params.out_wedge_dir_y = collect_wedges ? wedge_dir_y.data_ptr<float>() : nullptr;
+    params.out_wedge_dir_z = collect_wedges ? wedge_dir_z.data_ptr<float>() : nullptr;
+    params.out_wedge_source_x = collect_wedges ? wedge_source_x.data_ptr<float>() : nullptr;
+    params.out_wedge_source_y = collect_wedges ? wedge_source_y.data_ptr<float>() : nullptr;
+    params.out_wedge_source_z = collect_wedges ? wedge_source_z.data_ptr<float>() : nullptr;
+    params.out_wedge_source_power = collect_wedges ? wedge_source_power.data_ptr<float>() : nullptr;
+    params.out_wedge_initial_dir_x = collect_wedges ? wedge_initial_dir_x.data_ptr<float>() : nullptr;
+    params.out_wedge_initial_dir_y = collect_wedges ? wedge_initial_dir_y.data_ptr<float>() : nullptr;
+    params.out_wedge_initial_dir_z = collect_wedges ? wedge_initial_dir_z.data_ptr<float>() : nullptr;
+    params.out_wedge_bounce_depth = collect_wedges ? wedge_bounce_depth.data_ptr<int>() : nullptr;
 
     TorchCudaContext torch_ctx = current_torch_cuda_context();
     optix_pipeline_for_scene(scene, reflection_accumulation_pipeline_config())
@@ -1238,7 +1315,17 @@ py::tuple reflection_accumulation_forward_op(
         field_y_im.reshape({grid_resolution1, grid_resolution0}),
         field_z_re.reshape({grid_resolution1, grid_resolution0}),
         field_z_im.reshape({grid_resolution1, grid_resolution0}),
-        reflection_count);
+        reflection_count,
+        wedge_count,
+        wedge_ray_index,
+        stack_vec3(wedge_hit_x, wedge_hit_y, wedge_hit_z),
+        stack_vec3(wedge_normal_x, wedge_normal_y, wedge_normal_z),
+        wedge_prim_id,
+        stack_vec3(wedge_dir_x, wedge_dir_y, wedge_dir_z),
+        stack_vec3(wedge_source_x, wedge_source_y, wedge_source_z),
+        wedge_source_power,
+        stack_vec3(wedge_initial_dir_x, wedge_initial_dir_y, wedge_initial_dir_z),
+        wedge_bounce_depth);
 }
 
 } // namespace raydn

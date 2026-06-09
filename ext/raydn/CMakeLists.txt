@@ -397,6 +397,7 @@ if(RAYDN_BUILD_NATIVE)
         src/torch_ext/reflection/accum_reduce.cu
         src/torch_ext/diffraction/accum_reduce.cu
         src/torch_ext/diffraction/accum_ad.cu
+        src/torch_ext/diffraction/builder.cu
         src/torch_ext/diffraction/paths_init.cu
         src/torch_ext/common/stats.cu
         src/torch_ext/common/camera.cu

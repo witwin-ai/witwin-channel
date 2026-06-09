@@ -1,4 +1,3 @@
-import pytest
 import torch
 
 from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene, Structure, Transmitter
@@ -60,6 +59,11 @@ def test_materials_compile_scalar_parameters():
     assert conductor.parameters()["gain"] == 0.75
 
 
-def test_scene_requires_at_least_one_receiver():
-    with pytest.raises(ValueError, match="at least one receiver"):
-        Scene(structures=[], transmitters=[], receivers=[], frequency=1.0)
+def test_scene_allows_geometry_only_loader_workflow():
+    scene = Scene(structures=[], transmitters=[], receivers=[], frequency=1.0)
+
+    scene.add(Transmitter(position=torch.tensor([0.0, 0.0, 0.0])))
+    scene.add(ReceiverPoint(position=torch.tensor([1.0, 0.0, 0.0])))
+
+    assert len(scene.transmitters) == 1
+    assert len(scene.receivers) == 1

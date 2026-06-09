@@ -12,3 +12,4 @@ class Result:
     component_power: dict[str, torch.Tensor]
     metadata: dict[str, Any]
     diagnostics: dict[str, Any] | None = None
+    component_maps: dict[str, torch.Tensor] | None = None

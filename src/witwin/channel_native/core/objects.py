@@ -24,6 +24,7 @@ class Structure:
     material: Material
     name: str = ""
     surface_id: int = 0
+    metadata: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
         if self.vertices.ndim != 2 or self.vertices.shape[1] != 3:
