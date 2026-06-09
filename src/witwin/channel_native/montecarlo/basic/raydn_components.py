@@ -207,7 +207,12 @@ def reflection_component_maps_with_wedges(
     reflection_compact_min_samples: int = 262_144,
     reflection_staged_min_samples_per_cell: int = 64,
 ) -> ReflectionComponentResult:
-    del reflection_accumulation_strategy, reflection_compact_min_samples, reflection_staged_min_samples_per_cell
+    strategy_id = {
+        "auto": 0,
+        "atomic": 1,
+        "staged": 2,
+        "compact": 3,
+    }[reflection_accumulation_strategy]
     if not raydn.available or not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
@@ -261,6 +266,9 @@ def reflection_component_maps_with_wedges(
             False,
             int(samples) if collect_wedges else 0,
             1,
+            strategy_id,
+            int(reflection_compact_min_samples),
+            int(reflection_staged_min_samples_per_cell),
         )
         mc_store_scaled_component_map(
             maps,

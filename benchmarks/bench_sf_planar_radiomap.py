@@ -175,7 +175,7 @@ def _native_scene() -> Any:
     )
 
 
-def run_native_planar_benchmark(*, samples: int, repeats: int) -> dict[str, Any]:
+def run_native_planar_benchmark(*, samples: int, repeats: int, strategy: str = "auto") -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
@@ -191,6 +191,7 @@ def run_native_planar_benchmark(*, samples: int, repeats: int) -> dict[str, Any]
         seed=0,
         components=COMPONENTS,
         require_reflection=True,
+        reflection_accumulation_strategy=strategy,
     )
 
     times_ms: list[float] = []
@@ -221,6 +222,7 @@ def run_native_planar_benchmark(*, samples: int, repeats: int) -> dict[str, Any]
     return {
         "backend": "native",
         "samples": int(samples),
+        "strategy": strategy,
         "times_ms": times_ms,
         "median_ms": _median(times_ms),
         "shape": shape or [],
@@ -235,6 +237,7 @@ def main() -> None:
     parser.add_argument("--samples", type=int, default=100_000_000)
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--backend", choices=("sionna", "native", "both"), default="both")
+    parser.add_argument("--strategy", choices=("auto", "atomic", "staged", "compact"), default="auto")
     parser.add_argument("--json", type=pathlib.Path, default=pathlib.Path("artifacts/sf_planar_radiomap_benchmark.json"))
     parser.add_argument("--_sionna-child", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -246,7 +249,7 @@ def main() -> None:
         else:
             results.append(_run_sionna_in_child(samples=args.samples, repeats=args.repeats, json_path=args.json))
     if args.backend in {"native", "both"}:
-        results.append(run_native_planar_benchmark(samples=args.samples, repeats=args.repeats))
+        results.append(run_native_planar_benchmark(samples=args.samples, repeats=args.repeats, strategy=args.strategy))
     payload = {
         "benchmark": "sf_planar_radiomap",
         "config": {
@@ -259,6 +262,7 @@ def main() -> None:
             "frequency": FREQUENCY,
             "max_depth": MAX_DEPTH,
             "components": sorted(COMPONENTS),
+            "native_strategy": args.strategy,
         },
         "results": results,
     }

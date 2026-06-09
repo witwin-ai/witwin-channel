@@ -1069,7 +1069,10 @@ py::tuple reflection_accumulation_forward_op(
     bool collect_wedges,
     bool collect_wedge_prefixes,
     int64_t wedge_capacity,
-    int64_t wedge_sample_stride) {
+    int64_t wedge_sample_stride,
+    int64_t accumulation_strategy,
+    int64_t compact_min_samples,
+    int64_t staged_min_samples_per_cell) {
     require_vec3f(ray_o, "ray_o");
     require_vec3f(ray_d, "ray_d");
     require_ray_tmax(ray_tmax, ray_o.size(0), "reflection_accumulation");
@@ -1100,6 +1103,13 @@ py::tuple reflection_accumulation_forward_op(
         throw std::runtime_error("wedge_capacity must be non-negative.");
     if (wedge_sample_stride <= 0)
         throw std::runtime_error("wedge_sample_stride must be positive.");
+    if (accumulation_strategy < RAYDN_REFL_ACCUM_AUTO ||
+        accumulation_strategy > RAYDN_REFL_ACCUM_COMPACT)
+        throw std::runtime_error("accumulation_strategy is not supported.");
+    if (compact_min_samples < 0)
+        throw std::runtime_error("compact_min_samples must be non-negative.");
+    if (staged_min_samples_per_cell < 0)
+        throw std::runtime_error("staged_min_samples_per_cell must be non-negative.");
 
     SceneCache &scene = get_scene(scene_handle);
     const int64_t ray_count = ray_o.size(0);
@@ -1111,10 +1121,25 @@ py::tuple reflection_accumulation_forward_op(
                          std::max<int64_t>(stage_depth_count, 1);
     const int64_t stage_sample_count =
         stage_sample_count_fits ? ray_count * stage_depth_count : 0;
-    const bool staged_accum =
+    const int64_t staged_min_per_cell =
+        staged_min_samples_per_cell > 0
+            ? staged_min_samples_per_cell
+            : kStagedReflAccumMinSamplesPerCell;
+    const bool force_staged =
+        accumulation_strategy == RAYDN_REFL_ACCUM_STAGED;
+    const bool force_atomic =
+        accumulation_strategy == RAYDN_REFL_ACCUM_ATOMIC;
+    const bool auto_staged =
+        accumulation_strategy == RAYDN_REFL_ACCUM_AUTO &&
         stage_sample_count_fits &&
         stage_sample_count >= kStagedReflAccumMinSamples &&
-        stage_sample_count >= cell_count * kStagedReflAccumMinSamplesPerCell;
+        stage_sample_count >= cell_count * staged_min_per_cell &&
+        max_bounces_i <= 1 &&
+        ray_count <= 10000000;
+    const bool staged_accum =
+        !force_atomic &&
+        stage_sample_count_fits &&
+        (force_staged || auto_staged);
     auto fopts = ray_o.options();
     auto iopts = scene.global_faces.options();
     at::Tensor power = at::zeros({cell_count}, fopts);

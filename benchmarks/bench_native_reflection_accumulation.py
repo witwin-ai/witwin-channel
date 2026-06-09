@@ -89,7 +89,7 @@ def _time_event(torch: Any, func: Any) -> tuple[float, Any]:
     return float(start.elapsed_time(end)), value
 
 
-def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int) -> dict[str, Any]:
+def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int, strategy: str) -> dict[str, Any]:
     torch = imports["torch"]
     mc_component_map_buffer = imports["mc_component_map_buffer"]
     mc_finalize_component_maps = imports["mc_finalize_component_maps"]
@@ -118,6 +118,12 @@ def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int) -> dict[
     dim0 = GRID[1]
     dim1 = GRID[0]
     zero = torch.zeros((1, dim0, dim1), device=device, dtype=torch.float32)
+    strategy_id = {
+        "auto": 0,
+        "atomic": 1,
+        "staged": 2,
+        "compact": 3,
+    }[strategy]
 
     stage_times: dict[str, float] = {}
     stage_times["sample_directions"], ray_d = _time_event(
@@ -163,6 +169,9 @@ def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int) -> dict[
             False,
             0,
             1,
+            strategy_id,
+            262_144,
+            64,
         )
 
     stage_times["reflection_accumulation_forward"], out = _time_event(torch, reflection_forward)
@@ -214,7 +223,12 @@ def run_native_reflection_benchmark(
                 try:
                     torch.cuda.empty_cache()
                     torch.cuda.reset_peak_memory_stats()
-                    result = _run_once(imports, samples=int(sample_count), max_depth=int(max_depth))
+                    result = _run_once(
+                        imports,
+                        samples=int(sample_count),
+                        max_depth=int(max_depth),
+                        strategy=strategy,
+                    )
                     peak_allocated_bytes = max(peak_allocated_bytes, int(torch.cuda.max_memory_allocated()))
                     for stage, elapsed_ms in result["stage_times_ms"].items():
                         times_by_stage.setdefault(stage, []).append(float(elapsed_ms))
@@ -257,7 +271,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", type=int, nargs="+", default=[1_000_000, 10_000_000, 100_000_000])
     parser.add_argument("--max-depths", type=int, nargs="+", default=[1, 3, 5])
-    parser.add_argument("--strategy", default="auto")
+    parser.add_argument("--strategy", choices=("auto", "atomic", "staged", "compact"), default="auto")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
         "--json",

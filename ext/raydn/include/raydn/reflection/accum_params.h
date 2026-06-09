@@ -19,6 +19,13 @@ struct ReflAccumStagedValue {
     float4 b;
 };
 
+enum ReflAccumStrategy : int {
+    RAYDN_REFL_ACCUM_AUTO = 0,
+    RAYDN_REFL_ACCUM_ATOMIC = 1,
+    RAYDN_REFL_ACCUM_STAGED = 2,
+    RAYDN_REFL_ACCUM_COMPACT = 3,
+};
+
 /// Launch parameters for the native reflection-accumulation pipeline (flat SoA device pointers).
 struct AccumParams {
     OptixTraversableHandle primary_handle;   ///< Primary scene IAS handle.
