@@ -1,0 +1,21 @@
+{
+  "dfr_power": [
+    0.0
+  ],
+  "epc_field_imag": [
+    0.31961703300476074
+  ],
+  "epc_field_real": [
+    0.5850550532341003
+  ],
+  "reflection_t": [
+    [
+      1.0
+    ]
+  ],
+  "reflection_valid": [
+    [
+      true
+    ]
+  ]
+}

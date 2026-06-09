@@ -1,0 +1,33 @@
+# Third-party read-only reference clones (e.g. redner, RayDi snapshots)
+reference/
+
+# Build artifacts
+build/
+artifacts/
+dist/
+*.egg-info/
+_skbuild/
+CMakeCache.txt
+CMakeFiles/
+
+# Compiled native objects
+*.o
+*.obj
+*.so
+*.pyd
+*.dll
+*.lib
+*.exp
+*.ptx
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

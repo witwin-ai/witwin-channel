@@ -1,0 +1,17 @@
+[build-system]
+requires = ["scikit-build-core"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "witwin-channel-native"
+version = "0.0.0"
+description = "DrJit-free Torch/CUDA RF channel runtime."
+requires-python = ">=3.10"
+dependencies = ["torch"]
+
+[tool.scikit-build]
+wheel.packages = ["src/witwin"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["scikit-build-core"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "rayd-native"
+version = "0.0.0"
+description = "Torch-native RayD geometry and multipath primitives."
+requires-python = ">=3.10"
+dependencies = ["torch"]
+
+[tool.scikit-build]
+wheel.packages = ["raydn"]
