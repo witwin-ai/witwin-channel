@@ -6,6 +6,7 @@ from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
 
 
 _VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+_VALID_AD_MODES = frozenset({"none", "vjp", "jvp"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +19,9 @@ class Config:
     diagnostics: bool = False
     require_reflection: bool = False
     require_diffraction: bool = False
+    ad_mode: str = "none"
+    fixed_topology: bool = True
+    requires_fixed_seed: bool = True
 
     def __post_init__(self) -> None:
         if self.samples <= 0:
@@ -31,4 +35,6 @@ class Config:
             raise ValueError(f"components must be a subset of {sorted(_VALID_COMPONENTS)}")
         if self.accumulation_strategy not in ACCUMULATION_STRATEGIES - {"none"}:
             raise ValueError("accumulation_strategy is not supported for MC basic")
+        if self.ad_mode not in _VALID_AD_MODES:
+            raise ValueError(f"ad_mode must be one of {sorted(_VALID_AD_MODES)}")
         object.__setattr__(self, "components", components)

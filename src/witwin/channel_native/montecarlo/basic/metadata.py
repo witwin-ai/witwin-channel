@@ -33,18 +33,28 @@ def make_solver_metadata(
     reflection_available: bool,
     diffraction_available: bool,
 ) -> dict[str, Any]:
+    forward_launch_count = 1 if valid_contribution_count else 0
+    backward_launch_count = 1 if config.ad_mode == "vjp" and valid_contribution_count else 0
+    jvp_launch_count = 1 if config.ad_mode == "jvp" and valid_contribution_count else 0
+    tape_bytes = valid_contribution_count * 16 if config.ad_mode in {"vjp", "jvp"} else 0
     kernel_metadata = make_metadata(
         primitive="montecarlo_basic_primal",
-        forward_launch_count=1 if valid_contribution_count else 0,
+        forward_launch_count=forward_launch_count,
+        backward_launch_count=backward_launch_count,
+        jvp_launch_count=jvp_launch_count,
+        tape_bytes=tape_bytes,
         accumulation_strategy=config.accumulation_strategy,
         scheduling_strategy="torch_cuda",
         raydn_native=reflection_available or diffraction_available,
-        ad_status="unsupported",
+        ad_status=config.ad_mode if config.ad_mode != "none" else "unsupported",
     )
     return {
         "seed": config.seed,
         "samples": config.samples,
         "max_depth": config.max_depth,
+        "ad_mode": config.ad_mode,
+        "fixed_topology": config.fixed_topology,
+        "requires_fixed_seed": config.requires_fixed_seed,
         "path_count": path_count,
         "valid_contribution_count": valid_contribution_count,
         "components": component_status(

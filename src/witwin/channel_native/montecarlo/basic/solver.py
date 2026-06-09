@@ -14,9 +14,21 @@ from .result import Result
 from .sampling import make_cuda_generator
 
 
+def _validate_ad_config(config: Config) -> None:
+    if config.ad_mode == "none":
+        return
+    if not config.fixed_topology:
+        raise RuntimeError("fixed_topology=True is required for MC basic AD")
+    if not config.requires_fixed_seed:
+        raise RuntimeError("MC basic AD requires a fixed seed")
+    if config.components != {"los"}:
+        raise RuntimeError("MC basic fixed-topology AD is LoS-only")
+
+
 def solve(scene: Scene, config: Config) -> Result:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.montecarlo.basic requires CUDA")
+    _validate_ad_config(config)
 
     info = build_info()
     reflection_available = bool(info["uses_raydn_native"])
