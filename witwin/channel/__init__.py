@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import inspect
 from importlib import import_module
+
+if not hasattr(inspect, "getargspec"):
+    inspect.getargspec = inspect.getfullargspec  # type: ignore[attr-defined]
 
 from witwin.channel.types import (
     Bool,
