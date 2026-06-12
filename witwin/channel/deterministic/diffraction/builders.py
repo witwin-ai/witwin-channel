@@ -7,15 +7,17 @@ from witwin.channel.deterministic import types as wt
 from witwin.channel.core.runtime import Material, Tx, Wave
 from witwin.channel.core.runtime import point_grad_enabled, scene_geometry_grad_enabled, scene_material_grad_enabled
 from witwin.channel.core.physics.materials import FaceMaterial
+from witwin.channel.core.physics.wave_math import unit_phase_neg_kd
 from ..reflection.detail import (
     coerce_material_context,
     coerce_trace_detail,
 )
 from witwin.channel.core.numerics.arrays import complex_abs_sqr, complex_zero, gather
 from witwin.channel.core.physics.polarization import project_real_polarization_to_ray, reflect_field_vector, vector_from_scalar, vector_power, vector_scale, vector_select, vector_zero
-from witwin.channel.core.geometry.diffraction import wedge_exterior_mask
-from witwin.channel.core.geometry.raygen import generate_circle_directions, generate_sphere_directions
+from witwin.channel.core.geometry import reflect_point_across_plane
+from witwin.channel.core.geometry.diffraction import wedge_exterior_mask, wedge_geometry
 from .forward import ForwardEval
+from .math import UTDMath
 from .state import APPROX_MODE_DIRECT_FIRST_ORDER, APPROX_MODE_RECURSIVE_DIFFRACTION, APPROX_MODE_SAMPLED_INSERTED_REFLECTION, APPROX_MODE_SAMPLED_INSERTED_REFLECTION_CHAIN, APPROX_MODE_SAMPLED_REFLECTION_PREFIX, APPROX_MODE_SAMPLED_REFLECTION_PREFIX_CHAIN, PATH_EXPORT_REDUCED_STATE_LAYOUT, SOURCE_TYPE_DIRECT_TX, SOURCE_TYPE_REFLECTION_PREFIX, SPEED_OF_LIGHT, Geo
 from .state import State
 from witwin.channel.deterministic.kernels.cartesian_filter import compact_index_pairs
@@ -254,7 +256,7 @@ def _state_from_rayd_coherent_table(table, *, history_size: int, retain_lineage_
         retain_lineage_state=retain_lineage_state,
     )
 
-def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Material, reflection_n_rays, reflection_max_bounces, reflection_material: Material, reflection_mode, max_diffractions, total_state_budget_per_order=None, inserted_state_budget_per_order=None, max_inserted_reflections_per_path=None, retain_lineage_state=True, solver_mode='accuracy', memory_profile='default', state_layout='full', preserve_higher_order_candidate_topology: bool=False, return_report: bool=False):
+def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Material, reflection_n_rays, reflection_max_bounces, reflection_material: Material, max_diffractions, total_state_budget_per_order=None, inserted_state_budget_per_order=None, max_inserted_reflections_per_path=None, retain_lineage_state=True, solver_mode='accuracy', memory_profile='default', state_layout='full', preserve_higher_order_candidate_topology: bool=False, return_report: bool=False):
     max_order = max(1, int(max_diffractions))
     if max_inserted_reflections_per_path is None:
         max_inserted_reflections_per_path = max(0, max_order - 1)
@@ -343,7 +345,8 @@ def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Materi
                     pruning_reports.append(_tag_pruning_report(higher_budget, stage='pre_expansion', order=order, policy=str(pre_expansion_policy['policy'])))
             pre_expansion_seconds = time.perf_counter() - pre_expansion_start
             higher_start = time.perf_counter()
-            direct_states = higher(higher_source_states, edge_data, wave, scene=scene, material=material, global_to_local_idx=global_to_local_idx, candidate_backend=higher_order_candidate_backend, tx=tx, retain_lineage_state=retain_lineage_state, preserve_candidate_topology=bool(preserve_higher_order_candidate_topology), manage_edge_mask=rayd_mask_handle is None)
+            higher_report: dict = {}
+            direct_states = higher(higher_source_states, edge_data, wave, scene=scene, material=material, global_to_local_idx=global_to_local_idx, candidate_backend=higher_order_candidate_backend, tx=tx, retain_lineage_state=retain_lineage_state, preserve_candidate_topology=bool(preserve_higher_order_candidate_topology), manage_edge_mask=rayd_mask_handle is None, report=higher_report)
             higher_seconds = time.perf_counter() - higher_start
             inserted_states = State.empty(history_size=max_order)
             inserted_candidate_state_count = 0
@@ -355,7 +358,7 @@ def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Materi
                 inserted_reflection_material = Material(
                     reflection_coef=reflection_context.reflection_gain,
                 )
-                inserted_states = inserted(inserted_source_states, scene, edge_data, global_to_local_idx, wave, n_rays=reflection_n_rays, reflection_material=inserted_reflection_material, material=material, reflection_mode=reflection_mode, max_inserted_reflections_per_path=max_inserted_reflections_per_path, tx=tx, retain_lineage_state=retain_lineage_state)
+                inserted_states = inserted(inserted_source_states, scene, edge_data, global_to_local_idx, wave, reflection_material=inserted_reflection_material, material=material, max_inserted_reflections_per_path=max_inserted_reflections_per_path, tx=tx, retain_lineage_state=retain_lineage_state)
                 inserted_candidate_state_count = _state_count(inserted_states)
             inserted_seconds = time.perf_counter() - inserted_start
             post_budget_start = time.perf_counter()
@@ -377,6 +380,12 @@ def prepare(tx: Tx, rx_z, scene, wave: Wave, reflection_detail, material: Materi
                     _state_count(inserted_source_states) if inserted_reflection_enabled else 0
                 ),
                 'higher_order_candidate_state_count': _state_count(direct_states),
+                # Chains whose next edge lies inside the previous transition
+                # region; cascaded UTD remains approximate there (no uniform
+                # double-diffraction coefficient yet).
+                'transition_zone_incident_pairs': int(
+                    higher_report.get('transition_zone_incident_pairs', 0)
+                ),
                 'inserted_reflection_candidate_state_count': int(inserted_candidate_state_count),
                 'post_inserted_budget_state_count': _state_count(inserted_states),
                 'post_total_budget_state_count': _state_count(combined_states),
@@ -661,7 +670,29 @@ def bvh_pairs(prev_state_arrays, edge_data, prev_start, chunk_n_prev, scene, glo
     prev_idx, edge_idx = dedupe_pairs(prev_idx, edge_idx, edge_data['n_edges'])
     return (prev_idx, edge_idx, False)
 
-def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Material | None = None, global_to_local_idx=None, candidate_backend='auto', tx: Tx | None = None, retain_lineage_state=True, preserve_candidate_topology: bool=False, manage_edge_mask: bool=True):
+_TRANSITION_ZONE_KL_A_THRESHOLD = 10.0
+
+
+def _count_transition_zone_pairs(prev_states, prev_point, candidate_edge_pos, keep_mask, wave: Wave):
+    """Count chains whose next edge sits inside the previous transition region.
+
+    Cascaded UTD (even with slope diffraction) is not transition-consistent
+    there; the count is surfaced in the builder report so deep multi-screen
+    results can be flagged. ``kL*a < threshold`` marks |F| visibly below 1.
+    """
+    geometry = wedge_geometry(
+        prev_states['source_pos'], prev_point, prev_states['edge_dir'],
+        prev_states['n0'], candidate_edge_pos,
+    )
+    kl = wave.k * geometry.s * geometry.s_prime / (geometry.s + geometry.s_prime + wt.Float(1e-9))
+    inc_a0, inc_a1 = UTDMath.a_pm(geometry.phi - geometry.phi_prime, prev_states['wedge_n'])
+    ref_a0, ref_a1 = UTDMath.a_pm(geometry.phi + geometry.phi_prime, prev_states['wedge_n'])
+    a_min = dr.minimum(dr.minimum(inc_a0, inc_a1), dr.minimum(ref_a0, ref_a1))
+    in_transition = keep_mask & (kl * a_min < wt.Float(_TRANSITION_ZONE_KL_A_THRESHOLD))
+    return int(dr.width(dr.compress(in_transition)))
+
+
+def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Material | None = None, global_to_local_idx=None, candidate_backend='auto', tx: Tx | None = None, retain_lineage_state=True, preserve_candidate_topology: bool=False, manage_edge_mask: bool=True, report: dict | None = None):
     if material is None:
         material = Material()
     prev_state_arrays = ensure_source_lineage(prev_state_arrays)
@@ -729,10 +760,19 @@ def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Mater
             candidate_edge_pos = dr.gather(wt.Point3f, edge_data['pos'], edge_idx)
             candidate_adjacent_face0 = dr.gather(wt.Int32, edge_data['adjacent_face0'], edge_idx)
             candidate_adjacent_face1 = dr.gather(wt.Int32, edge_data['adjacent_face1'], edge_idx)
-            incident_field, incident_normal_derivative, incident_vector, incident_normal_derivative_vector = ForwardEval.to_targets(prev_states, candidate_edge_pos, wave, return_normal_derivative=True, return_vector=True, material=material, scene=scene, smooth_exterior_shadow=bool(preserve_candidate_topology), tx=tx, select_diffraction_point=False, enable_segment_visibility=False)
+            # Forward-marching Keller construction: evaluate the previous
+            # state through its stationary point for this candidate edge and
+            # keep that point as the new state's source.
+            incident_field, incident_normal_derivative, incident_vector, incident_normal_derivative_vector, prev_selected_point = ForwardEval.to_targets(prev_states, candidate_edge_pos, wave, return_normal_derivative=True, return_vector=True, material=material, scene=scene, smooth_exterior_shadow=bool(preserve_candidate_topology), tx=tx, select_diffraction_point=True, enable_segment_visibility=False, return_selected_point=True)
             field_power = vector_power(incident_vector)
             field_valid = field_power > wt.Float(1e-20)
             active_mask = field_valid if visibility_mask is None else visibility_mask & field_valid
+            if report is not None:
+                report['transition_zone_incident_pairs'] = int(
+                    report.get('transition_zone_incident_pairs', 0)
+                ) + _count_transition_zone_pairs(
+                    prev_states, prev_selected_point, candidate_edge_pos, active_mask, wave,
+                )
             keep_count = int(dr.width(dr.compress(active_mask)))
             if not preserve_candidate_topology and keep_count == 0:
                 continue
@@ -764,12 +804,28 @@ def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Mater
                 keep_edge_line_max = dr.gather(wt.Float, line_max_all, keep_edge_idx)
                 keep_adjacent_face0 = dr.gather(wt.Int32, candidate_adjacent_face0, keep_idx)
                 keep_adjacent_face1 = dr.gather(wt.Int32, candidate_adjacent_face1, keep_idx)
-            keep_source_pos = kept_prev_states['edge_pos']
+            if preserve_candidate_topology:
+                keep_source_pos = prev_selected_point
+                keep_prev_source = prev_states['source_pos']
+            else:
+                keep_source_pos = dr.gather(wt.Point3f, prev_selected_point, keep_idx)
+                keep_prev_source = dr.gather(wt.Point3f, prev_states['source_pos'], keep_idx)
             keep_path_length_prefix = None
             keep_first_interaction_pos = None
             if retain_lineage_state:
+                # The previous prefix is measured to the previous anchor;
+                # account for the stationary-point move along that edge.
                 keep_prev_path_length = kept_prev_states['path_length_prefix']
-                keep_path_length_prefix = keep_prev_path_length + dr.norm(keep_edge_pos - keep_source_pos)
+                keep_prev_anchor = kept_prev_states['edge_pos']
+                move_adjust = (
+                    dr.norm(keep_source_pos - keep_prev_source)
+                    - dr.norm(keep_prev_anchor - keep_prev_source)
+                )
+                keep_path_length_prefix = (
+                    keep_prev_path_length
+                    + move_adjust
+                    + dr.norm(keep_edge_pos - keep_source_pos)
+                )
                 keep_first_interaction_pos = kept_prev_states['first_interaction_pos']
             if preserve_candidate_topology:
                 zero_field = complex_zero(dr.width(keep_prev_idx))
@@ -801,14 +857,25 @@ def higher(prev_state_arrays, edge_data, wave: Wave, scene=None, material: Mater
     result = concat_state_arrays(chunk_states)
     return result
 
-def inserted(prev_state_arrays, scene, edge_data, global_to_local_idx, wave: Wave, n_rays, reflection_material: Material, material: Material | None = None, reflection_mode='2d', max_inserted_reflections_per_path=None, tx: Tx | None = None, retain_lineage_state=True):
+def inserted(prev_state_arrays, scene, edge_data, global_to_local_idx, wave: Wave, reflection_material: Material, material: Material | None = None, max_inserted_reflections_per_path=None, tx: Tx | None = None, retain_lineage_state=True):
+    """Insert one exact specular reflection between consecutive diffractions.
+
+    For every (source state, planar surface) pair the previous diffraction
+    point is mirrored across the surface plane; connecting the image to each
+    candidate edge anchored on that surface yields the exact specular
+    reflection point. The reflected field continues the astigmatic spreading
+    of the incoming edge wave (no per-leg re-normalization) and the new
+    state's source is the image point, so the downstream UTD distance
+    parameter sees the full unfolded path.
+    """
     if material is None:
         material = Material()
     if tx is None:
         raise ValueError("inserted diffraction reflection tracing requires an explicit transmitter runtime.")
     prev_state_arrays = ensure_source_lineage(prev_state_arrays)
     history_size = Geo.history_size(prev_state_arrays)
-    if scene is None or scene._triangle_runtime() is None or edge_data is None or (global_to_local_idx is None) or (prev_state_arrays['n_states'] == 0) or (n_rays <= 0):
+    tri_data = None if scene is None else scene._triangle_runtime()
+    if scene is None or tri_data is None or edge_data is None or (global_to_local_idx is None) or (prev_state_arrays['n_states'] == 0):
         return State.empty(history_size=history_size)
     line_min_all, line_max_all = Geo.data_line_bounds(edge_data, context='_build_inserted_reflection_state_arrays')
     if max_inserted_reflections_per_path is None:
@@ -819,41 +886,38 @@ def inserted(prev_state_arrays, scene, edge_data, global_to_local_idx, wave: Wav
     if prev_state_arrays['n_states'] == 0:
         return State.empty(history_size=history_size)
     n_states = prev_state_arrays['n_states']
-    rays_per_state = max(8, int(math.ceil(n_rays / max(1, n_states))))
-    if reflection_mode == '2d':
-        base_ray_dir = generate_circle_directions(rays_per_state)
-    else:
-        base_ray_dir = generate_sphere_directions(rays_per_state)
+    from ..reflection.paths import _surface_root_primitives
+    root_prims_all = _surface_root_primitives(tri_data)
+    n_surfaces = int(dr.width(root_prims_all))
+    if n_surfaces == 0:
+        return State.empty(history_size=history_size)
+    surface_edges_all = scene.get_triangle_surface_edge_candidates(root_prims_all)
+    candidate_slots_all = tuple(surface_edges_all['slots'])
+    if len(candidate_slots_all) == 0:
+        return State.empty(history_size=history_size)
+    omega = wt.Float(2.0 * math.pi * SPEED_OF_LIGHT / wave.wavelength)
     chunk_states = []
-    state_chunk_size = Geo.cart_chunk(n_states, rays_per_state)
+    state_chunk_size = Geo.cart_chunk(n_states, n_surfaces)
     for state_start in range(0, n_states, state_chunk_size):
         chunk_n_states = min(state_chunk_size, n_states - state_start)
-        n_total_rays = chunk_n_states * rays_per_state
-        ray_idx = dr.arange(wt.UInt32, n_total_rays)
-        state_idx = ray_idx // rays_per_state + wt.UInt32(state_start)
-        dir_idx = ray_idx % rays_per_state
-        ray_origin = dr.gather(wt.Point3f, prev_state_arrays['edge_pos'], state_idx)
-        ray_dir = wt.Vector3f(dr.gather(wt.Float, base_ray_dir.x, dir_idx), dr.gather(wt.Float, base_ray_dir.y, dir_idx), dr.gather(wt.Float, base_ray_dir.z, dir_idx))
-        active = dr.full(wt.Bool, True, n_total_rays)
-        hit, _, hit_p, hit_n, prim_idx = scene.intersect_rays_with_prim(ray_origin, ray_dir, active)
-        hit_idx = dr.compress(hit)
-        hit_count = int(dr.width(hit_idx))
-        if hit_count == 0:
-            continue
-        hit_state_idx = dr.gather(wt.UInt32, state_idx, hit_idx)
-        batch_states = gather_field_evaluation_state_fields(prev_state_arrays, hit_state_idx)
-        batch_state_edge_idx = dr.gather(wt.UInt32, prev_state_arrays['edge_idx'], hit_state_idx)
-        hit_p = dr.gather(wt.Point3f, hit_p, hit_idx)
-        hit_n = dr.gather(wt.Vector3f, hit_n, hit_idx)
-        prim_idx_i32 = dr.gather(wt.Int32, wt.Int32(prim_idx), hit_idx)
-        ray_dir = dr.gather(wt.Vector3f, ray_dir, hit_idx)
-        n_hit = dr.width(hit_idx)
-        field_at_hit, vector_at_hit = ForwardEval.to_targets(batch_states, hit_p, wave, return_vector=True, material=material, scene=scene, tx=tx, select_diffraction_point=False, enable_segment_visibility=False)
-        reflection_weight, material_inputs = Geo.surface_coeff(incident_dir=ray_dir, normal=hit_n, scene=scene, prim_idx=prim_idx_i32, material=reflection_material, wave=wave, tx=tx, valid_mask=dr.full(wt.Bool, True, n_hit))
-        reflected_field = field_at_hit * reflection_weight
-        reflected_vector = reflect_field_vector(vector_at_hit, ray_dir, hit_n, eta_r=material_inputs.eta_r, sigma=material_inputs.sigma, omega=wt.Float(2.0 * math.pi * SPEED_OF_LIGHT / wave.wavelength), gain=material_inputs.gain, mu_r=material_inputs.mu_r)
-        surface_edges = scene.get_triangle_surface_edge_candidates(prim_idx_i32)
-        candidate_globals = list(surface_edges['slots'])
+        n_pairs = chunk_n_states * n_surfaces
+        pair_idx = dr.arange(wt.UInt32, n_pairs)
+        state_idx = pair_idx // n_surfaces + wt.UInt32(state_start)
+        surface_idx = pair_idx % n_surfaces
+        prev_edge_pos = dr.gather(wt.Point3f, prev_state_arrays['edge_pos'], state_idx)
+        prev_edge_idx = dr.gather(wt.UInt32, prev_state_arrays['edge_idx'], state_idx)
+        root_prim = dr.gather(wt.Int32, root_prims_all, surface_idx)
+        safe_root = wt.UInt32(dr.maximum(root_prim, wt.Int32(0)))
+        plane_point = dr.gather(wt.Point3f, tri_data['v0'], safe_root)
+        v1 = dr.gather(wt.Point3f, tri_data['v1'], safe_root)
+        v2 = dr.gather(wt.Point3f, tri_data['v2'], safe_root)
+        plane_normal = dr.cross(v1 - plane_point, v2 - plane_point)
+        plane_normal = plane_normal / (dr.norm(plane_normal) + wt.Float(1e-12))
+        image_source = reflect_point_across_plane(prev_edge_pos, plane_point, plane_normal)
+        candidate_globals = [
+            dr.gather(wt.Int32, slot_values, surface_idx)
+            for slot_values in candidate_slots_all
+        ]
         candidate_valids = [edge_idx >= 0 for edge_idx in candidate_globals]
         per_candidate_states = []
         for slot, global_edge_idx in enumerate(candidate_globals):
@@ -863,48 +927,114 @@ def inserted(prev_state_arrays, scene, edge_data, global_to_local_idx, wave: Wav
             safe_global_idx = wt.UInt32(dr.select(slot_valid, global_edge_idx, wt.Int32(0)))
             local_edge_idx_i32 = dr.gather(wt.Int32, global_to_local_idx, safe_global_idx)
             slot_valid = slot_valid & (local_edge_idx_i32 >= 0)
-            slot_valid = slot_valid & (local_edge_idx_i32 != wt.Int32(batch_state_edge_idx))
+            slot_valid = slot_valid & (local_edge_idx_i32 != wt.Int32(prev_edge_idx))
             if not dr.any(slot_valid):
                 continue
             local_edge_idx = wt.UInt32(dr.select(slot_valid, local_edge_idx_i32, wt.Int32(0)))
             edge_pos = dr.gather(wt.Point3f, edge_data['pos'], local_edge_idx)
             n0 = dr.gather(wt.Vector3f, edge_data['n0'], local_edge_idx)
+            nn = dr.gather(wt.Vector3f, edge_data['n_face_n'], local_edge_idx)
+            edge_dir = dr.gather(wt.Vector3f, edge_data['edge_dir'], local_edge_idx)
             adjacent_face0 = dr.gather(wt.Int32, edge_data['adjacent_face0'], local_edge_idx)
             adjacent_face1 = dr.gather(wt.Int32, edge_data['adjacent_face1'], local_edge_idx)
-            visible = scene.segment_visible(hit_p, edge_pos, ignore_prim_idx=(prim_idx_i32, adjacent_face0, adjacent_face1))
-            slot_valid = slot_valid & visible
-            visible_count = int(dr.width(dr.compress(slot_valid)))
-            if visible_count == 0:
+            spec_valid, hit_p, geom_n, resolved_prim = scene.triangle_surface_intersection(
+                image_source, edge_pos, root_prim,
+            )
+            slot_valid = slot_valid & spec_valid
+            slot_valid = slot_valid & wedge_exterior_mask(image_source - edge_pos, edge_dir, n0, nn)
+            if not dr.any(slot_valid):
                 continue
-            incident_field = Geo.source_field(hit_p, reflected_field, edge_pos, wave)
-            incident_normal_derivative = Geo.source_field_normal_derivative(hit_p, reflected_field, edge_pos, n0, wave)
-            unit_incident_field = Geo.source_field(hit_p, wt.Complex2f(1.0, 0.0), edge_pos, wave)
-            unit_incident_normal_derivative = Geo.source_field_normal_derivative(hit_p, wt.Complex2f(1.0, 0.0), edge_pos, n0, wave)
-            incident_vector = vector_scale(reflected_vector, unit_incident_field)
-            incident_normal_derivative_vector = vector_scale(reflected_vector, unit_incident_normal_derivative)
+            surface_group = scene.triangle_group_id(root_prim)
+            visible_prev = scene.segment_visible(
+                prev_edge_pos, hit_p,
+                ignore_surface_group_idx=(surface_group,),
+            )
+            visible_next = scene.segment_visible(
+                hit_p, edge_pos,
+                ignore_prim_idx=(adjacent_face0, adjacent_face1),
+                ignore_surface_group_idx=(surface_group,),
+            )
+            slot_valid = slot_valid & visible_prev & visible_next
+            candidate_idx = dr.compress(slot_valid)
+            if dr.width(candidate_idx) == 0:
+                continue
+            cand_state_idx = dr.gather(wt.UInt32, state_idx, candidate_idx)
+            cand_prev_edge_pos = dr.gather(wt.Point3f, prev_edge_pos, candidate_idx)
+            cand_hit_p = dr.gather(wt.Point3f, hit_p, candidate_idx)
+            cand_geom_n = dr.gather(wt.Vector3f, geom_n, candidate_idx)
+            cand_resolved_prim = dr.gather(wt.Int32, resolved_prim, candidate_idx)
+            cand_edge_pos = dr.gather(wt.Point3f, edge_pos, candidate_idx)
+            cand_n0 = dr.gather(wt.Vector3f, n0, candidate_idx)
+            cand_image_source = dr.gather(wt.Point3f, image_source, candidate_idx)
+            batch_states = gather_field_evaluation_state_fields(prev_state_arrays, cand_state_idx)
+            field_at_hit, vector_at_hit = ForwardEval.to_targets(batch_states, cand_hit_p, wave, return_vector=True, material=material, scene=scene, tx=tx, select_diffraction_point=False, enable_segment_visibility=False)
+            incident_dir = cand_hit_p - cand_prev_edge_pos
+            d1 = dr.norm(incident_dir)
+            incident_dir = incident_dir / (d1 + wt.Float(1e-12))
+            reflection_weight, material_inputs = Geo.surface_coeff(incident_dir=incident_dir, normal=cand_geom_n, scene=scene, prim_idx=cand_resolved_prim, material=reflection_material, wave=wave, tx=tx, valid_mask=dr.full(wt.Bool, True, dr.width(candidate_idx)))
+            reflected_field = field_at_hit * reflection_weight
+            reflected_vector = reflect_field_vector(vector_at_hit, incident_dir, cand_geom_n, eta_r=material_inputs.eta_r, sigma=material_inputs.sigma, omega=omega, gain=material_inputs.gain, mu_r=material_inputs.mu_r)
+            # Continue the astigmatic edge wave through the planar reflection.
+            # At the specular point the wave has principal radii rho1 = d1
+            # (edge caustic) and rho2 = path-from-source + d1; the planar
+            # mirror preserves both, so the amplitude continuation over the
+            # reflected leg d2 is sqrt(rho1 rho2 / ((rho1+d2)(rho2+d2))).
+            # This reproduces evaluating the source wave at the mirrored
+            # target exactly (image principle).
+            d2 = dr.norm(cand_edge_pos - cand_hit_p)
+            total_distance = d1 + d2
+            prev_path_length = prev_state_arrays.get('path_length_prefix')
+            if prev_path_length is not None:
+                rho2 = dr.gather(wt.Float, prev_path_length, cand_state_idx) + d1
+            else:
+                rho2 = dr.norm(cand_prev_edge_pos - batch_states['source_pos']) + d1
+            rho1 = d1
+            continuation_amplitude = dr.sqrt(
+                (rho1 * rho2)
+                / ((rho1 + d2) * (rho2 + d2) + wt.Float(1e-12))
+            )
+            continuation = wt.Complex2f(continuation_amplitude, 0.0) * unit_phase_neg_kd(
+                wave.k, d2,
+            )
+            incident_field = reflected_field * continuation
+            incident_vector = vector_scale(reflected_vector, continuation)
+            # Normal-derivative of the continued wave (apparent source at the
+            # image point, distance d1+d2 along the arrival direction).
+            arrival_hat = (cand_edge_pos - cand_image_source) / (total_distance + wt.Float(1e-12))
+            projection = dr.dot(arrival_hat, cand_n0)
+            derivative_scale = wt.Complex2f(
+                -projection / (total_distance + wt.Float(1e-12)),
+                -projection * wave.k,
+            )
+            incident_normal_derivative = incident_field * derivative_scale
+            incident_normal_derivative_vector = vector_scale(incident_vector, derivative_scale)
             field_power = vector_power(incident_vector)
-            keep_idx = dr.compress(slot_valid & (field_power > wt.Float(1e-20)))
+            keep_idx = dr.compress(field_power > wt.Float(1e-20))
             if dr.width(keep_idx) == 0:
                 continue
-            keep_state_idx = dr.gather(wt.UInt32, hit_state_idx, keep_idx)
+            keep_state_idx = dr.gather(wt.UInt32, cand_state_idx, keep_idx)
             kept_batch_states = gather_inserted_reflection_state_fields(prev_state_arrays, keep_state_idx)
-            keep_edge_idx = dr.gather(wt.UInt32, local_edge_idx, keep_idx)
-            keep_edge_pos = dr.gather(wt.Point3f, edge_pos, keep_idx)
+            cand_local_edge_idx = dr.gather(wt.UInt32, local_edge_idx, candidate_idx)
+            keep_edge_idx = dr.gather(wt.UInt32, cand_local_edge_idx, keep_idx)
+            keep_edge_pos = dr.gather(wt.Point3f, cand_edge_pos, keep_idx)
             keep_edge_dir = dr.gather(wt.Vector3f, edge_data['edge_dir'], keep_edge_idx)
-            keep_n0 = dr.gather(wt.Vector3f, n0, keep_idx)
+            keep_n0 = dr.gather(wt.Vector3f, cand_n0, keep_idx)
             keep_nn = dr.gather(wt.Vector3f, edge_data['n_face_n'], keep_edge_idx)
             keep_wedge_n = dr.gather(wt.Float, edge_data['wedge_n'], keep_edge_idx)
             keep_edge_line_min = dr.gather(wt.Float, line_min_all, keep_edge_idx)
             keep_edge_line_max = dr.gather(wt.Float, line_max_all, keep_edge_idx)
-            keep_adjacent_face0 = dr.gather(wt.Int32, adjacent_face0, keep_idx)
-            keep_adjacent_face1 = dr.gather(wt.Int32, adjacent_face1, keep_idx)
-            keep_source_pos = wt.Point3f(dr.gather(wt.Float, hit_p.x, keep_idx), dr.gather(wt.Float, hit_p.y, keep_idx), dr.gather(wt.Float, hit_p.z, keep_idx))
-            keep_prev_edge_pos = kept_batch_states['edge_pos']
+            keep_adjacent_face0 = dr.gather(wt.Int32, adjacent_face0, dr.gather(wt.UInt32, candidate_idx, keep_idx))
+            keep_adjacent_face1 = dr.gather(wt.Int32, adjacent_face1, dr.gather(wt.UInt32, candidate_idx, keep_idx))
+            # The apparent source of the continued wave is the image of the
+            # previous diffraction point, so downstream s' is the unfolded
+            # d1 + d2 path length.
+            keep_source_pos = dr.gather(wt.Point3f, cand_image_source, keep_idx)
+            keep_total_distance = dr.gather(wt.Float, total_distance, keep_idx)
             keep_path_length_prefix = None
             keep_first_interaction_pos = None
             if retain_lineage_state:
                 keep_prev_path_length = kept_batch_states['path_length_prefix']
-                keep_path_length_prefix = keep_prev_path_length + dr.norm(keep_source_pos - keep_prev_edge_pos) + dr.norm(keep_edge_pos - keep_source_pos)
+                keep_path_length_prefix = keep_prev_path_length + keep_total_distance
                 keep_first_interaction_pos = kept_batch_states['first_interaction_pos']
             keep_incident_field = wt.Complex2f(dr.gather(wt.Float, incident_field.real, keep_idx), dr.gather(wt.Float, incident_field.imag, keep_idx))
             keep_incident_normal_derivative = wt.Complex2f(dr.gather(wt.Float, incident_normal_derivative.real, keep_idx), dr.gather(wt.Float, incident_normal_derivative.imag, keep_idx))

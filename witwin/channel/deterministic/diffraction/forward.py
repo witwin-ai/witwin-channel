@@ -21,7 +21,7 @@ from witwin.channel.core.numerics.arrays import repeat_complex, repeat_float, re
 from witwin.channel.core.physics.polarization import apply_jones_operator, diffraction_edge_basis, jones_add, jones_from_vector, jones_operator_mask_detach, jones_operator_mask_zero, jones_scale, project_real_polarization_to_ray, reflect_field_vector, vector_add, vector_from_jones, vector_from_scalar, vector_scale, vector_select, vector_zero
 from witwin.channel.core.geometry.diffraction import cotangent_pole_safe_mask, slope_derivative_safe_mask, wedge_exterior_mask, wedge_geometry
 from witwin.channel.core.geometry.raygen import generate_circle_directions, generate_sphere_directions
-from witwin.channel.core.physics.wave_math import cot, fresnel_integral, f_utd
+from witwin.channel.core.physics.wave_math import cot, fresnel_integral, f_utd, unit_phase_neg_kd
 from .state import Geo, SOURCE_TYPE_DIRECT_TX
 from .state import State
 from .math import ABranch, DiffAngle, UTDMath, OPERATOR_KEYS
@@ -86,7 +86,7 @@ class ForwardEval(UTDMath):
             vector_select(direct_mask, direct_derivative_vector, incident_normal_derivative_vector),
         )
 
-    def target_payload(field, *, normal_derivative=None, vector_field=None, normal_derivative_vector=None, field_valid=None, return_normal_derivative: bool=False, return_vector: bool=False, return_valid: bool=False):
+    def target_payload(field, *, normal_derivative=None, vector_field=None, normal_derivative_vector=None, field_valid=None, selected_point=None, return_normal_derivative: bool=False, return_vector: bool=False, return_valid: bool=False, return_selected_point: bool=False):
         items = (field,)
         if return_normal_derivative:
             items += (normal_derivative,)
@@ -94,15 +94,22 @@ class ForwardEval(UTDMath):
             items += (vector_field, normal_derivative_vector) if return_normal_derivative else (vector_field,)
         if return_valid:
             items += (field_valid,)
+        if return_selected_point:
+            items += (selected_point,)
         return items if len(items) > 1 else field
 
-    def truncation_factor_with_bounds(edge_state, edge_geometry, target_pos, wave: Wave, *, width, line_min, line_max, stationary_u=None):
+    def truncation_factor_with_bounds(edge_state, edge_geometry, target_pos, wave: Wave, *, width, line_min, line_max, stationary_u=None, source_rho_extra=None):
         edge_pos_b = broadcast(edge_state['edge_pos'], width)
         source_pos_b = broadcast(edge_state['source_pos'], width)
         edge_hat = edge_geometry.edge_hat
         source_axial = dr.dot(source_pos_b - edge_pos_b, edge_hat)
         target_axial = dr.dot(target_pos - edge_pos_b, edge_hat)
+        # The source-side phase curvature along the edge follows the
+        # edge-caustic radius (projected source distance + upstream path);
+        # source_rho_extra is zero/None for first-order and prefix states.
         s_prime_proj = edge_geometry.s_prime_proj
+        if source_rho_extra is not None:
+            s_prime_proj = s_prime_proj + source_rho_extra
         s_proj = edge_geometry.s_proj
         if stationary_u is None:
             stationary_u = (s_prime_proj * target_axial + s_proj * source_axial) / (s_proj + s_prime_proj + wt.Float(EPS))
@@ -117,7 +124,7 @@ class ForwardEval(UTDMath):
         delta_f = fresnel_integral(scale * (line_max - stationary_u)) - fresnel_integral(scale * (line_min - stationary_u))
         return wt.Complex2f(0.5, 0.5) * dr.conj(delta_f)
 
-    def truncation_factor(edge_state, edge_geometry, target_pos, wave: Wave, *, width):
+    def truncation_factor(edge_state, edge_geometry, target_pos, wave: Wave, *, width, source_rho_extra=None):
         edge_line_min, edge_line_max = Geo.state_line_bounds(edge_state, context='_finite_wedge_truncation_factor')
         return ForwardEval.truncation_factor_with_bounds(
             edge_state,
@@ -127,9 +134,10 @@ class ForwardEval(UTDMath):
             width=width,
             line_min=repeat_float(edge_line_min, width),
             line_max=repeat_float(edge_line_max, width),
+            source_rho_extra=source_rho_extra,
         )
 
-    def stationary_completion_factor(edge_state, edge_geometry, target_pos, wave: Wave, *, width, inside):
+    def stationary_completion_factor(edge_state, edge_geometry, target_pos, wave: Wave, *, width, inside, source_rho_extra=None):
         edge_line_min, edge_line_max = Geo.state_line_bounds(edge_state, context='_finite_wedge_stationary_completion_factor')
         line_min = repeat_float(edge_line_min, width)
         line_max = repeat_float(edge_line_max, width)
@@ -156,6 +164,7 @@ class ForwardEval(UTDMath):
             line_min=line_min,
             line_max=line_max,
             stationary_u=wt.Float(0.0),
+            source_rho_extra=source_rho_extra,
         )
         left_boundary = ForwardEval.truncation_factor_with_bounds(
             edge_state,
@@ -166,6 +175,7 @@ class ForwardEval(UTDMath):
             line_min=dr.zeros(wt.Float, width),
             line_max=edge_length,
             stationary_u=wt.Float(0.0),
+            source_rho_extra=source_rho_extra,
         )
         right_boundary = ForwardEval.truncation_factor_with_bounds(
             edge_state,
@@ -176,6 +186,7 @@ class ForwardEval(UTDMath):
             line_min=-edge_length,
             line_max=dr.zeros(wt.Float, width),
             stationary_u=wt.Float(0.0),
+            source_rho_extra=source_rho_extra,
         )
         boundary = dr.select(line_min >= wt.Float(0.0), left_boundary, right_boundary)
         boundary_power = complex_abs_sqr(boundary)
@@ -203,32 +214,47 @@ class ForwardEval(UTDMath):
     ):
         width = dr.width(target_pos.x)
         eval_edge_state = dict(edge_state)
+        anchor_point = broadcast(edge_state['edge_pos'], width)
         if select_diffraction_point:
+            # The Keller-cone stationary point applies to every state: direct
+            # first-order states recompute the incident field exactly, all
+            # others rescale the stored anchor field (see to_targets).
             selected_point = Geo.finite_edge_diffraction_point(edge_state, target_pos)
-            anchor_point = broadcast(edge_state['edge_pos'], width)
-            anchor_line_min = repeat_float(edge_state['edge_line_min'], width)
-            anchor_line_max = repeat_float(edge_state['edge_line_max'], width)
-            select_mask = ForwardEval.direct_first_order_mask(edge_state, width=width)
+            selected_valid = selected_point['valid']
             diffraction_point = {
-                'point': dr.select(select_mask, selected_point['point'], anchor_point),
-                'edge_line_min': dr.select(select_mask, selected_point['edge_line_min'], anchor_line_min),
-                'edge_line_max': dr.select(select_mask, selected_point['edge_line_max'], anchor_line_max),
-                'valid': dr.select(select_mask, selected_point['valid'], dr.full(wt.Bool, True, width)),
-                'inside': dr.select(select_mask, selected_point['inside'], dr.full(wt.Bool, True, width)),
-                'visibility_point': dr.select(select_mask, selected_point['visibility_point'], anchor_point),
+                'point': dr.select(selected_valid, selected_point['point'], anchor_point),
+                'edge_line_min': dr.select(
+                    selected_valid,
+                    selected_point['edge_line_min'],
+                    repeat_float(edge_state['edge_line_min'], width),
+                ),
+                'edge_line_max': dr.select(
+                    selected_valid,
+                    selected_point['edge_line_max'],
+                    repeat_float(edge_state['edge_line_max'], width),
+                ),
+                'valid': selected_valid,
+                'inside': dr.select(selected_valid, selected_point['inside'], dr.full(wt.Bool, True, width)),
+                'visibility_point': dr.select(
+                    selected_valid,
+                    selected_point['visibility_point'],
+                    anchor_point,
+                ),
             }
             eval_edge_state['edge_pos'] = diffraction_point['point']
             eval_edge_state['edge_line_min'] = diffraction_point['edge_line_min']
             eval_edge_state['edge_line_max'] = diffraction_point['edge_line_max']
+            selected_mask = selected_valid
         else:
             diffraction_point = {
-                'point': broadcast(edge_state['edge_pos'], width),
+                'point': anchor_point,
                 'edge_line_min': repeat_float(edge_state['edge_line_min'], width),
                 'edge_line_max': repeat_float(edge_state['edge_line_max'], width),
                 'valid': dr.full(wt.Bool, True, width),
                 'inside': dr.full(wt.Bool, True, width),
-                'visibility_point': broadcast(edge_state['edge_pos'], width),
+                'visibility_point': anchor_point,
             }
+            selected_mask = dr.zeros(wt.Bool, width)
 
         edge_geometry = wedge_geometry(eval_edge_state['source_pos'], eval_edge_state['edge_pos'], eval_edge_state['edge_dir'], eval_edge_state['n0'], target_pos)
         phi = edge_geometry.phi
@@ -313,7 +339,7 @@ class ForwardEval(UTDMath):
                 shadow_completion_mask = shadow_completion_mask & (shadow_boundary_distance < shadow_decay_span)
                 illuminated_boundary_weight = wt.Float(1.0) - ForwardEval.smooth01(illuminated_boundary_distance / shadow_anchor_outer_offset)
             field_valid = field_valid & (target_exterior | shadow_completion_mask)
-        return {'width': width, 'edge_state': eval_edge_state, 'diffraction_point': diffraction_point, 'edge_geometry': edge_geometry, 'phi': phi, 'phi_prime': phi_prime, 's': s, 's_prime': s_prime, 'wedge_n': wedge_n, 'edge_pos_b': edge_pos_b, 'edge_dir_b': edge_dir_b, 'n0_b': n0_b, 'nn_b': nn_b, 'source_pos_b': source_pos_b, 'source_exterior': source_exterior, 'base_valid': base_valid, 'target_exterior': target_exterior, 'interior_mask': interior_mask, 'geometry_valid': geometry_valid, 'field_valid': field_valid, 'shadow_completion_mask': shadow_completion_mask, 'shadow_completion_weight': shadow_completion_weight, 'shadow_boundary_distance': shadow_boundary_distance, 'illuminated_boundary_mask': illuminated_boundary_mask, 'illuminated_boundary_weight': illuminated_boundary_weight, 'shadow_opening_angle': shadow_opening_angle, 'shadow_anchor_offset': shadow_anchor_offset, 'shadow_anchor_outer_offset': shadow_anchor_outer_offset, 'shadow_decay_span': shadow_decay_span, 'shadow_decay_power': shadow_decay_power}
+        return {'width': width, 'edge_state': eval_edge_state, 'diffraction_point': diffraction_point, 'edge_geometry': edge_geometry, 'phi': phi, 'phi_prime': phi_prime, 's': s, 's_prime': s_prime, 'wedge_n': wedge_n, 'edge_pos_b': edge_pos_b, 'edge_dir_b': edge_dir_b, 'n0_b': n0_b, 'nn_b': nn_b, 'source_pos_b': source_pos_b, 'anchor_pos_b': anchor_point, 'selected_mask': selected_mask, 'source_exterior': source_exterior, 'base_valid': base_valid, 'target_exterior': target_exterior, 'interior_mask': interior_mask, 'geometry_valid': geometry_valid, 'field_valid': field_valid, 'shadow_completion_mask': shadow_completion_mask, 'shadow_completion_weight': shadow_completion_weight, 'shadow_boundary_distance': shadow_boundary_distance, 'illuminated_boundary_mask': illuminated_boundary_mask, 'illuminated_boundary_weight': illuminated_boundary_weight, 'shadow_opening_angle': shadow_opening_angle, 'shadow_anchor_offset': shadow_anchor_offset, 'shadow_anchor_outer_offset': shadow_anchor_outer_offset, 'shadow_decay_span': shadow_decay_span, 'shadow_decay_power': shadow_decay_power}
 
     def to_targets(
         edge_state,
@@ -328,6 +354,7 @@ class ForwardEval(UTDMath):
         tx: Tx | None = None,
         select_diffraction_point: bool = True,
         enable_segment_visibility: bool = True,
+        return_selected_point: bool = False,
     ):
         support_context = ForwardEval.target_support(
             edge_state,
@@ -359,13 +386,36 @@ class ForwardEval(UTDMath):
         safe_phi_prime = dr.select(pole_safe, phi_prime, 0.5 * wedge_n * dr.pi)
         step = wt.Float(UTD_SLOPE_DERIVATIVE_STEP)
         slope_safe = field_valid & slope_derivative_safe_mask(safe_phi, safe_phi_prime, wedge_n, step)
-        local_scale = dr.sqrt(s_prime / (s * (s + s_prime) + EPS))
-        phase = dr.exp(wt.Complex2f(0, -wave.k * s))
-        finite_wedge_factor = ForwardEval.truncation_factor(edge_state, edge_geometry, target_pos, wave, width=width)
-        direct_stationary_mask = (
+        # Astigmatic edge-caustic spreading: rho_par reduces to s_prime for
+        # spherical (first-order/prefix) incidence and to the full unfolded
+        # path for parallel-edge cascades. The UTD distance parameter L is
+        # unchanged because the rho2 = rho_e factors cancel.
+        anchor_pos_b = support_context['anchor_pos_b']
+        selected_mask = support_context['selected_mask']
+        anchor_source_distance = dr.norm(anchor_pos_b - source_pos_b) + wt.Float(EPS)
+        path_length_prefix = edge_state.get('path_length_prefix')
+        if path_length_prefix is None:
+            source_rho_extra = dr.zeros(wt.Float, width)
+        else:
+            source_rho_extra = dr.maximum(
+                repeat_float(path_length_prefix, width) - anchor_source_distance,
+                wt.Float(0.0),
+            )
+        rho_par = s_prime + source_rho_extra
+        local_scale = dr.sqrt(rho_par / (s * (s + rho_par) + EPS))
+        phase = unit_phase_neg_kd(wave.k, s)
+        # Stationary completion only applies to the exact direct recompute;
+        # rescaled states keep the truncation factor so the field stays
+        # continuous across face branch boundaries.
+        direct_mask = (
             ForwardEval.direct_first_order_mask(edge_state, width=width)
             if select_diffraction_point
             else dr.zeros(wt.Bool, width)
+        )
+        direct_stationary_mask = selected_mask & direct_mask
+        finite_wedge_factor = ForwardEval.truncation_factor(
+            edge_state, edge_geometry, target_pos, wave,
+            width=width, source_rho_extra=source_rho_extra,
         )
         stationary_completion_factor = ForwardEval.stationary_completion_factor(
             edge_state,
@@ -374,6 +424,7 @@ class ForwardEval(UTDMath):
             wave,
             width=width,
             inside=support_context['diffraction_point']['inside'],
+            source_rho_extra=source_rho_extra,
         )
         finite_wedge_factor = dr.select(
             direct_stationary_mask,
@@ -383,6 +434,22 @@ class ForwardEval(UTDMath):
         incoming_edge_basis = diffraction_edge_basis(edge_pos_b - source_pos_b, edge_dir_b, outgoing=False)
         outgoing_edge_basis = diffraction_edge_basis(target_pos - edge_pos_b, edge_dir_b, outgoing=True)
         incident_vector, incident_normal_derivative_vector = ForwardEval.incident_vectors(edge_state, width=width, edge_pos=edge_pos_b, wave=wave, tx=tx)
+        if select_diffraction_point:
+            # Non-direct states keep the stored anchor field; moving the
+            # diffraction point rescales the spherical-wave amplitude/phase by
+            # the source-distance change (polarization kept from the anchor).
+            rescale_mask = selected_mask & ~direct_mask
+            rescale = wt.Complex2f(anchor_source_distance / s_prime, 0.0) * dr.exp(
+                wt.Complex2f(0.0, -wave.k * (s_prime - anchor_source_distance))
+            )
+            rescale = wt.Complex2f(
+                dr.select(rescale_mask, rescale.real, wt.Float(1.0)),
+                dr.select(rescale_mask, rescale.imag, wt.Float(0.0)),
+            )
+            incident_vector = vector_scale(incident_vector, rescale)
+            incident_normal_derivative_vector = vector_scale(
+                incident_normal_derivative_vector, rescale,
+            )
         incident_jones_edge = jones_from_vector(incident_vector, incoming_edge_basis)
         incident_derivative_jones_edge = jones_from_vector(incident_normal_derivative_vector, incoming_edge_basis)
         incident_derivative_power = complex_abs_sqr(incident_derivative_jones_edge['u']) + complex_abs_sqr(incident_derivative_jones_edge['v'])
@@ -487,8 +554,10 @@ class ForwardEval(UTDMath):
                 field,
                 vector_field=vector_field,
                 field_valid=field_valid,
+                selected_point=support_context['diffraction_point']['point'],
                 return_vector=return_vector,
                 return_valid=return_valid,
+                return_selected_point=return_selected_point,
             )
         field_dphi_operator = jones_operator_mask_zero(safe_operators['field_dphi'], slope_safe)
         slope_dphi_operator = jones_operator_mask_zero(safe_operators['slope_dphi'], has_slope)
@@ -512,9 +581,11 @@ class ForwardEval(UTDMath):
             vector_field=vector_field,
             normal_derivative_vector=normal_derivative_vector,
             field_valid=field_valid,
+            selected_point=support_context['diffraction_point']['point'],
             return_normal_derivative=True,
             return_vector=return_vector,
             return_valid=return_valid,
+            return_selected_point=return_selected_point,
         )
 
     def roulette_random(state_idx, dir_idx, bounce):
@@ -542,6 +613,17 @@ class ForwardEval(UTDMath):
         return suffix_grid_native.accumulate_reflected_segment_fields_batched
 
     def trace_suffix(state_arrays, suffix, scene, wave: Wave, tx: Tx, execution=None):
+        """Trace reflected continuations of diffracted rays onto the grid.
+
+        The diffracted wave is astigmatic with principal radii (rho1, rho2) =
+        (distance from the edge, total unfolded path); planar reflections
+        preserve both. Each leg continues the field exactly with
+        sqrt(rho1 rho2 / ((rho1+d)(rho2+d))) e^{-jkd}. The grid splat kernel
+        applies lambda/(4 pi d) e^{-jkd} per cell, so the segment field is
+        pre-scaled by sqrt(rho1 rho2) * 4 pi / lambda, making the splat the
+        far-field-exact continuation sqrt(rho1 rho2)/d (near-field cells are
+        within sqrt((1+rho1/d)(1+rho2/d)) of exact).
+        """
         execution = coerce_diffraction_execution(execution)
         n_rx = suffix.grid.n_cells
         n_states = 0 if state_arrays is None else state_arrays['n_states']
@@ -563,18 +645,24 @@ class ForwardEval(UTDMath):
         dir_idx = ray_idx % rays_per_state
         batch_states = State.gather_path_export_eval(state_arrays, state_idx)
         ray_origin = batch_states['edge_pos']
+        path_length_prefix = batch_states.get('path_length_prefix')
+        if path_length_prefix is None:
+            path_length_prefix = dr.norm(batch_states['edge_pos'] - batch_states['source_pos'])
+        splat_prescale = wt.Float(4.0 * math.pi) / wave.wavelength
         ray_dir = wt.Vector3f(dr.gather(wt.Float, base_ray_dir.x, dir_idx), dr.gather(wt.Float, base_ray_dir.y, dir_idx), dr.gather(wt.Float, base_ray_dir.z, dir_idx))
         active = dr.full(wt.Bool, True, n_total_rays)
         total = complex_zero(n_rx)
         total_vector = vector_zero(n_rx)
-        tri_data = scene._triangle_runtime()
         current_field = None
         current_vector = None
+        rho1 = dr.zeros(wt.Float, n_total_rays)
+        rho2 = dr.zeros(wt.Float, n_total_rays)
         omega = wt.Float(2.0 * math.pi * SPEED_OF_LIGHT) / wave.wavelength
         for bounce in range(suffix.max_bounces):
             hit, _, hit_p, hit_n, hit_prim_idx = scene.intersect_rays_with_prim(ray_origin, ray_dir, active)
             if not dr.any(hit):
                 break
+            seg_len = dr.norm(hit_p - ray_origin) + EPS
             if bounce == 0:
                 field_at_hit, field_at_hit_vector = utd_pair_vectors(
                     batch_states,
@@ -583,12 +671,20 @@ class ForwardEval(UTDMath):
                     material=reflection_material,
                     select_diffraction_point=True,
                 )
+                rho1 = seg_len
+                rho2 = path_length_prefix + seg_len
             else:
-                seg_len = dr.norm(hit_p - ray_origin) + EPS
-                phase = dr.exp(wt.Complex2f(0, -wave.k * seg_len))
-                fspl = (wave.wavelength / wt.Float(4.0 * math.pi)) / seg_len
-                field_at_hit = current_field * fspl * phase
-                field_at_hit_vector = vector_scale(current_vector, fspl * phase)
+                continuation_amplitude = dr.sqrt(
+                    (rho1 * rho2)
+                    / ((rho1 + seg_len) * (rho2 + seg_len) + wt.Float(EPS))
+                )
+                continuation = wt.Complex2f(continuation_amplitude, 0.0) * unit_phase_neg_kd(
+                    wave.k, seg_len,
+                )
+                field_at_hit = current_field * continuation
+                field_at_hit_vector = vector_scale(current_vector, continuation)
+                rho1 = rho1 + seg_len
+                rho2 = rho2 + seg_len
             field_at_hit = dr.select(hit, field_at_hit, complex_zero(n_total_rays))
             field_at_hit_vector = vector_select(hit, field_at_hit_vector, vector_zero(n_total_rays))
             safe_ray_dir = dr.select(hit, ray_dir, wt.Vector3f(1.0, 0.0, 0.0))
@@ -602,7 +698,10 @@ class ForwardEval(UTDMath):
             reflected_dir = ray_dir - 2.0 * dot_dn * hit_n
             next_origin = hit_p + reflected_dir * RAY_ORIGIN_BIAS
             next_hit, next_blocker, _, _, _ = scene.intersect_rays_with_prim(next_origin, reflected_dir, hit)
-            accumulate_kwargs = dict(grid=suffix.grid, grid_data=suffix.grid_data, seg_origin=hit_p, seg_dir=reflected_dir, blocker_dist=next_blocker, seg_field=reflected_field, seg_vector=reflected_vector, state_idx=state_idx, n_states=n_states, wavelength=wave.wavelength_scalar, k=wave.k_scalar, active=hit, execution=execution)
+            splat_amplitude = dr.sqrt(dr.maximum(rho1 * rho2, wt.Float(0.0))) * splat_prescale
+            splat_field = reflected_field * wt.Complex2f(splat_amplitude, 0.0)
+            splat_vector = vector_scale(reflected_vector, wt.Complex2f(splat_amplitude, 0.0))
+            accumulate_kwargs = dict(grid=suffix.grid, grid_data=suffix.grid_data, seg_origin=hit_p, seg_dir=reflected_dir, blocker_dist=next_blocker, seg_field=splat_field, seg_vector=splat_vector, state_idx=state_idx, n_states=n_states, wavelength=wave.wavelength_scalar, k=wave.k_scalar, active=hit, execution=execution)
             segment_field, segment_vector = accumulate_segment_fields(**accumulate_kwargs)
             total = total + segment_field
             total_vector = vector_add(total_vector, segment_vector)

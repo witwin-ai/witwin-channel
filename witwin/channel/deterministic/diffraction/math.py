@@ -12,7 +12,7 @@ from witwin.channel.core.physics.materials import FaceMaterial, resolve_surface_
 from witwin.channel.core.numerics.constants import EPS, SMALL_EPS
 from witwin.channel.core.numerics.arrays import broadcast
 from witwin.channel.core.numerics.arrays import repeat_complex, repeat_float, repeat_int
-from witwin.channel.core.physics.wave_math import complex_relative_permittivity, fresnel_reflection, material_angular_frequency, scalar_fresnel_reflection
+from witwin.channel.core.physics.wave_math import complex_relative_permittivity, fresnel_reflection, material_angular_frequency, scalar_fresnel_reflection, unit_phase_neg_kd
 from witwin.channel.core.physics.polarization import basis_from_first_vector, jones_operator_add, jones_operator_diagonal, jones_operator_identity, jones_operator_in_basis, jones_operator_scale, stable_perpendicular_basis
 from witwin.channel.core.geometry.diffraction import normalize_in_wedge_plane, rotate_vector_around_axis
 from witwin.channel.core.physics.wave_math import cot, f_utd
@@ -427,7 +427,7 @@ class GeometrySupport:
         width = dr.width(target_pos.x)
         source_pos_b = broadcast(source_pos, width)
         distance = dr.norm(target_pos - source_pos_b) + EPS
-        phase = dr.exp(wt.Complex2f(0, -wave.k * distance))
+        phase = unit_phase_neg_kd(wave.k, distance)
         source_w = repeat_complex(source_weight, width)
         fspl = (wave.wavelength / wt.Float(4.0 * math.pi)) / distance
         return source_w * fspl * phase

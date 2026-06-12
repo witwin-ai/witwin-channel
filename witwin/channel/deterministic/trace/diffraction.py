@@ -146,12 +146,18 @@ def _accumulate_rayd_exact_coherent(
     return total, total_vector if return_vector else None
 
 
-def trace(
+def prepare(
     *,
     ctx,
     reflection_detail,
     state_layout: str,
 ):
+    """Build rx-independent diffraction state collections once per solve.
+
+    The returned collections can be replayed against every quadrature sample
+    set via :func:`trace`; only receiver-side accumulation depends on the
+    sample positions.
+    """
     effective = ctx.solver_controls["effective"]
     max_diffractions = int(effective["max_diffractions"])
     preserve_candidate_topology = bool(ctx.grad_preserving) and (
@@ -169,6 +175,32 @@ def trace(
         preserve_higher_order_candidate_topology=preserve_candidate_topology,
     )
     state_preparation_seconds = time.perf_counter() - state_start
+    state_counts = []
+    builder_reports = []
+    for raw in raw_collections:
+        state_arrays = raw.get("state_arrays")
+        state_counts.append(
+            0 if state_arrays is None else int(state_arrays["n_states"])
+        )
+        if "builder_report" in raw:
+            builder_reports.append(dict(raw["builder_report"]))
+    metadata = {
+        "state_preparation_seconds": float(state_preparation_seconds),
+        "raw_collection_count": int(len(raw_collections)),
+        "state_counts": tuple(state_counts),
+        "state_count_total": int(sum(state_counts)),
+        "state_count_max": int(max(state_counts, default=0)),
+        "builder_reports": tuple(builder_reports),
+    }
+    return raw_collections, metadata
+
+
+def trace(
+    *,
+    ctx,
+    raw_collections,
+):
+    """Accumulate prepared diffraction states onto this sample set's receivers."""
     accumulation_start = time.perf_counter()
     vector, accumulation_metadata = (
         diffraction_accumulation.baseline_matched_isotropic_diffraction_vector(
@@ -180,28 +212,14 @@ def trace(
             sample_grid=ctx.sample_grid,
             ray_mode=ctx.spec.ray_mode,
             return_metadata=True,
+            rx_positions=ctx.runtime.rx.positions,
         )
     )
     accumulation_seconds = time.perf_counter() - accumulation_start
-    state_counts = []
-    builder_reports = []
-    for raw in raw_collections:
-        state_arrays = raw.get("state_arrays")
-        state_counts.append(
-            0 if state_arrays is None else int(state_arrays["n_states"])
-        )
-        if "builder_report" in raw:
-            builder_reports.append(dict(raw["builder_report"]))
     return {
         "vector": vector,
         "metadata": {
-            "state_preparation_seconds": float(state_preparation_seconds),
             "accumulation_seconds": float(accumulation_seconds),
-            "raw_collection_count": int(len(raw_collections)),
-            "state_counts": tuple(state_counts),
-            "state_count_total": int(sum(state_counts)),
-            "state_count_max": int(max(state_counts, default=0)),
-            "builder_reports": tuple(builder_reports),
             **dict(accumulation_metadata),
         },
     }
@@ -340,7 +358,6 @@ def trace_components(*, ctx, reflection_detail, return_audit: bool = False):
         reflection_n_rays,
         reflection_max_bounces,
         ctx.runtime.reflection,
-        ctx.spec.ray_mode,
         max_diffractions,
         total_state_budget_per_order=effective["diffraction_state_budget"],
         inserted_state_budget_per_order=effective["inserted_reflection_state_budget"],
@@ -509,4 +526,10 @@ def accumulate_coherent(
     return total, total_vector
 
 
-__all__ = ["accumulate_coherent", "accumulate_components", "trace", "trace_components"]
+__all__ = [
+    "accumulate_coherent",
+    "accumulate_components",
+    "prepare",
+    "trace",
+    "trace_components",
+]

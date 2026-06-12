@@ -317,9 +317,9 @@ def _utd_accumulate_forward_drjit_ad(
     return direct_total, multi_total, direct_vector_total, multi_vector_total, []
 
 
-def _direct_first_order_selection(s: dict, *, enabled: bool):
+def _direct_first_order_selection(s: dict):
     n_s = int(s["n_states"])
-    if not enabled or "source_type_code" not in s or "order" not in s:
+    if "source_type_code" not in s or "order" not in s:
         return dr.zeros(wt.Float, n_s)
     direct_mask = s["source_type_code"] == wt.UInt32(SOURCE_TYPE_DIRECT_TX)
     first_order_mask = s["order"] == wt.UInt32(1)
@@ -332,10 +332,19 @@ def _pack_state_soa(s, *, select_diffraction_point: bool = False):
     Returns a flat tuple in the order expected by the C++ kernel.
     """
     n_s = int(s["n_states"])
-    select_stationary = _direct_first_order_selection(
-        s,
-        enabled=bool(select_diffraction_point),
+    # Stationary-point selection applies to every state; direct first-order
+    # states recompute the incident field exactly from the tx, the rest
+    # rescale the stored anchor field inside the kernel.
+    select_stationary = (
+        dr.full(wt.Float, 1.0, n_s)
+        if select_diffraction_point
+        else dr.zeros(wt.Float, n_s)
     )
+    direct_first = _direct_first_order_selection(s)
+    path_length_prefix = s.get("path_length_prefix")
+    if path_length_prefix is None:
+        path_length_prefix = dr.zeros(wt.Float, n_s)
+    path_length_prefix = wt.Float(path_length_prefix)
     dr.eval(
         s["edge_pos"], s["edge_dir"], s["n0"], s["n_face_n"],
         s["wedge_n"], s["edge_line_min"], s["edge_line_max"], s["source_pos"],
@@ -355,6 +364,8 @@ def _pack_state_soa(s, *, select_diffraction_point: bool = False):
         s["face0_eta_r"], s["face0_mu_r"], s["face0_sigma"], s["face0_gain"],
         s["face1_eta_r"], s["face1_mu_r"], s["face1_sigma"], s["face1_gain"],
         select_stationary,
+        direct_first,
+        path_length_prefix,
     )
     p = s["edge_pos"]
     d = s["edge_dir"]
@@ -413,6 +424,8 @@ def _pack_state_soa(s, *, select_diffraction_point: bool = False):
         s["face1_eta_r"], s["face1_mu_r"],
         s["face1_sigma"], s["face1_gain"], f1uf, f1pr,
         select_stationary,
+        direct_first,
+        path_length_prefix,
     )
 
 
@@ -563,14 +576,6 @@ def _shadow_support_mask(
     return base_valid & (target_exterior | shadow_completion)
 
 
-def _gather_direct_first_order_mask(state_arrays: dict, state_idx):
-    if "source_type_code" not in state_arrays or "order" not in state_arrays:
-        return dr.zeros(wt.Bool, dr.width(state_idx))
-    source_type = dr.gather(wt.UInt32, state_arrays["source_type_code"], state_idx)
-    order = dr.gather(wt.UInt32, state_arrays["order"], state_idx)
-    return (source_type == wt.UInt32(SOURCE_TYPE_DIRECT_TX)) & (order == wt.UInt32(1))
-
-
 def _encode_pair_validity_mask(visible):
     return dr.select(
         visible,
@@ -659,7 +664,6 @@ def _utd_accumulate_forward_native_primal(
                 dr.gather(wt.Float, native_rx_pos.z, rx_idx),
             )
             if select_diffraction_point:
-                select_mask = _gather_direct_first_order_mask(state_arrays, state_idx)
                 pair_state = {
                     "edge_pos": edge_pos,
                     "edge_dir": edge_dir,
@@ -668,17 +672,17 @@ def _utd_accumulate_forward_native_primal(
                     "edge_line_max": dr.gather(wt.Float, state_arrays["edge_line_max"], state_idx),
                 }
                 selected_point = Geo.finite_edge_diffraction_point(pair_state, batch_rx)
-                selected_valid = select_mask & selected_point["valid"]
+                selected_valid = selected_point["valid"]
                 visibility_edge_pos = dr.select(
                     selected_valid,
                     selected_point["visibility_point"],
                     edge_pos,
                 )
                 edge_pos = dr.select(selected_valid, selected_point["point"], edge_pos)
-                visible_stationary = ~select_mask | selected_point["valid"]
+                visible_stationary = selected_valid
             else:
                 visibility_edge_pos = edge_pos
-                visible_stationary = dr.full(wt.Bool, dr.width(state_idx), True)
+                visible_stationary = dr.full(wt.Bool, True, dr.width(state_idx))
                 selected_valid = None
             visible = scene.segment_visible(
                 visibility_edge_pos, batch_rx,

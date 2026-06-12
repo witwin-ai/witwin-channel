@@ -38,7 +38,7 @@ def _polarization_component(polarization, axis: str):
 
 
 def vector_zero(width: int):
-    # Distinct buffers â€?accumulation paths update in-place.
+    # Distinct buffers ï¿½?accumulation paths update in-place.
     return {axis: complex_zero(width) for axis in _XYZ}
 
 
@@ -402,10 +402,12 @@ def receiver_tangential(polarization, axis="z"):
 
 
 def scalarize_tangential_jones(jones, polarization, axis="z"):
+    # Matched-receiver projection <E, p*>: conjugate the receiver polarization
+    # so circular/elliptical states keep physical handedness.
     axis_name = normalize_axis(axis)
     a0, a1 = tangential_axes_for_axis(axis_name)
     rx_pol = receiver_tangential(polarization, axis=axis_name)
-    return jones[a0] * rx_pol[a0] + jones[a1] * rx_pol[a1]
+    return jones[a0] * dr.conj(rx_pol[a0]) + jones[a1] * dr.conj(rx_pol[a1])
 
 
 def scalarize_vector_to_tangential_polarization(field_vec, polarization, axis="z"):

@@ -10,11 +10,61 @@ from ..reflection import accumulation as accum, common, detail, paths
 from ..reflection.paths import empty_source_path_data
 
 
+def discover(*, ctx):
+    """Discover reflection path topology once per solve.
+
+    Discovery is detached and rx-independent (it depends on tx, scene, and the
+    sampling frame only), so the returned detail is shared across quadrature
+    sample sets and with mixed reflection-diffraction state preparation.
+    """
+    runtime = ctx.runtime
+    spec = ctx.spec
+    config = ctx.config
+    effective = ctx.solver_controls["effective"]
+    if (
+        ctx.scene is None
+        or effective["reflection_n_rays"] <= 0
+        or effective["reflection_max_bounces"] <= 0
+    ):
+        return None
+    ray_sampling = getattr(
+        spec,
+        "ray_sampling",
+        "full_sphere" if spec.ray_mode == "3d" else "circle",
+    )
+    if ctx.sample_grid is not None:
+        sampling_axis = ctx.sample_grid.axis
+        sampling_plane_position = ctx.sample_grid.position
+        sampling_bounds = ctx.sample_grid.bounds
+    else:
+        sampling_axis, sampling_plane_position, sampling_bounds = (
+            common.sampling_frame_from_rx(runtime.rx)
+        )
+    return discover_paths(
+        tx=runtime.tx,
+        scene=ctx.scene,
+        wave=runtime.wave,
+        n_rays=effective["reflection_n_rays"],
+        max_reflections=effective["reflection_max_bounces"],
+        mode=spec.ray_mode,
+        material=runtime.reflection,
+        ray_sampling=ray_sampling,
+        sampling_axis=sampling_axis,
+        sampling_plane_position=sampling_plane_position,
+        sampling_bounds=sampling_bounds,
+        reflection_transition_mode=config.reflection_transition_mode,
+        reflection_f_weight_boundary_radius_wavelengths=(
+            config.reflection_f_weight_boundary_radius_wavelengths
+        ),
+        reflection_f_weight_max_edges_per_slot=config.reflection_f_weight_max_edges_per_slot,
+        reflection_secondary_visibility_mode=config.reflection_secondary_visibility_mode,
+    )
+
+
 def trace(*, ctx, reflection_detail):
     scene = ctx.scene
     runtime = ctx.runtime
     sample_grid = ctx.sample_grid
-    config = ctx.config
     spec = ctx.spec
     n_rx = ctx.n_rx
     grad_preserving = ctx.grad_preserving
@@ -24,26 +74,9 @@ def trace(*, ctx, reflection_detail):
         "full_sphere" if spec.ray_mode == "3d" else "circle",
     )
     effective = ctx.solver_controls["effective"]
+    if reflection_detail is None:
+        reflection_detail = discover(ctx=ctx)
     if grad_preserving:
-        reflection_detail = discover_paths(
-            tx=runtime.tx,
-            scene=scene,
-            wave=runtime.wave,
-            n_rays=effective["reflection_n_rays"],
-            max_reflections=effective["reflection_max_bounces"],
-            mode=spec.ray_mode,
-            material=runtime.reflection,
-            ray_sampling=ray_sampling,
-            sampling_axis=sample_grid.axis,
-            sampling_plane_position=sample_grid.position,
-            sampling_bounds=sample_grid.bounds,
-            reflection_transition_mode=config.reflection_transition_mode,
-            reflection_f_weight_boundary_radius_wavelengths=(
-                config.reflection_f_weight_boundary_radius_wavelengths
-            ),
-            reflection_f_weight_max_edges_per_slot=config.reflection_f_weight_max_edges_per_slot,
-            reflection_secondary_visibility_mode=config.reflection_secondary_visibility_mode,
-        )
         _, _, reflection_detail, vector = compute_field(
             grid=sample_grid,
             rx_z=sample_grid.position,
@@ -64,27 +97,6 @@ def trace(*, ctx, reflection_detail):
             "detail": reflection_detail,
         }
 
-    if reflection_detail is None and effective["reflection_n_rays"] > 0 and effective["reflection_max_bounces"] > 0:
-        sampling_axis, sampling_plane_position, sampling_bounds = common.sampling_frame_from_rx(runtime.rx)
-        reflection_detail = discover_paths(
-            tx=runtime.tx,
-            scene=scene,
-            wave=runtime.wave,
-            n_rays=effective["reflection_n_rays"],
-            max_reflections=effective["reflection_max_bounces"],
-            mode=spec.ray_mode,
-            material=runtime.reflection,
-            ray_sampling=ray_sampling,
-            sampling_axis=sampling_axis,
-            sampling_plane_position=sampling_plane_position,
-            sampling_bounds=sampling_bounds,
-            reflection_transition_mode=config.reflection_transition_mode,
-            reflection_f_weight_boundary_radius_wavelengths=(
-                config.reflection_f_weight_boundary_radius_wavelengths
-            ),
-            reflection_f_weight_max_edges_per_slot=config.reflection_f_weight_max_edges_per_slot,
-            reflection_secondary_visibility_mode=config.reflection_secondary_visibility_mode,
-        )
     vector_coherent = accum.accumulate_vector_field(
         rx=runtime.rx,
         tx=runtime.tx,
@@ -281,4 +293,4 @@ def compute_field(
 
 
 
-__all__ = ["compute_field", "discover_paths", "trace"]
+__all__ = ["compute_field", "discover", "discover_paths", "trace"]

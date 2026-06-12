@@ -20,6 +20,23 @@ def material_angular_frequency(wavelength) -> wt.Float:
     return wt.Float(2.0 * math.pi * SPEED_OF_LIGHT / wavelength)
 
 
+_TWO_PI = 2.0 * math.pi
+
+
+def unit_phase_neg_kd(k, distance) -> wt.Complex2f:
+    """``exp(-j*k*d)`` with the ``k*d`` product reduced in float64.
+
+    The float32 product loses ~``k*d*2^-24`` of phase, which shifts coherent
+    multipath nulls at mmWave ranges; one f64 multiply per element is
+    negligible next to the surrounding math.
+    """
+    f64 = dr.float64_array_t(wt.Float)
+    kd = f64(distance) * f64(k)
+    kd = kd - dr.floor(kd * (1.0 / _TWO_PI)) * _TWO_PI
+    sin_p, cos_p = dr.sincos(wt.Float(kd))
+    return wt.Complex2f(cos_p, -sin_p)
+
+
 # ---------------------------------------------------------------------------
 # Complex sqrt + Fresnel reflection
 # ---------------------------------------------------------------------------
@@ -238,6 +255,7 @@ __all__ = [
     "fresnel_reflection",
     "material_angular_frequency",
     "scalar_fresnel_reflection",
+    "unit_phase_neg_kd",
     "shadow_completion_weight_from_distance",
     "shadow_decay_span_from_wedge_n",
     "shadow_support_amplitude_threshold",

@@ -300,7 +300,7 @@ __device__ __forceinline__ Complex point_source_field(
 {
     float3a delta = f3_sub(rx, image_source);
     float dist = safe_length(delta) + UTD_EPS;
-    Complex phase = cplx_exp_phase(-k * dist);
+    Complex phase = cplx_exp_neg_kd(k, dist);
     float wavelength = UTD_TWO_PI / k;
     float fspl = wavelength / (4.f * UTD_PI * dist);
     return cplx_mul_real(phase, fspl);
@@ -449,7 +449,7 @@ __global__ void reflection_accumulate_forward_kernel(
     // Distance from image source to receiver (through the chain)
     float3a delta = f3_sub(rx, img_src);
     float dist = safe_length(delta) + UTD_EPS;
-    Complex phase = cplx_exp_phase(-k * dist);
+    Complex phase = cplx_exp_neg_kd(k, dist);
     // Free-space path loss: wavelength / (4*pi*dist)
     float wavelength = UTD_TWO_PI / k;
     float fspl = wavelength / (4.f * UTD_PI * dist);
@@ -689,7 +689,9 @@ __global__ void reflection_accumulate_f_weight_forward_kernel(
         if (!branch.geom_valid) continue;
 
         Complex3 weighted_branch = c3_scale(branch.chain_vec, residual_weight);
-        Complex unit_field = point_source_field(primary.image_source, rx, k);
+        // The adjacent-face branch has its own image source; its unfolded
+        // path length sets both the spreading and the phase of the branch.
+        Complex unit_field = point_source_field(branch_image_source, rx, k);
         total = c3_add(total, c3_scale(weighted_branch, unit_field));
     }
 

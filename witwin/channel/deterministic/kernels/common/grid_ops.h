@@ -79,6 +79,12 @@ WITWIN_KERNEL_DINLINE int grid_cell_index(
     return iy * n_coord_0 + ix;
 }
 
+// Reduce k*d in double precision: the f32 product loses ~k*d*2^-24 of phase,
+// which matters for coherent sums at mmWave ranges.
+WITWIN_KERNEL_DINLINE float reduced_neg_kd(float k, float d) {
+    return -(float)fmod((double)k * (double)d, 6.283185307179586476925287);
+}
+
 WITWIN_KERNEL_DINLINE Complexf distance_factor(
     float pi,
     float min_dist,
@@ -88,7 +94,7 @@ WITWIN_KERNEL_DINLINE Complexf distance_factor(
 ) {
     float safe_d = fmaxf(d, min_dist);
     float fspl = (wavelength / (4.0f * pi)) / safe_d;
-    float phase = -k * d;
+    float phase = reduced_neg_kd(k, d);
     return make_complex(fspl * cosf(phase), fspl * sinf(phase));
 }
 
@@ -103,7 +109,7 @@ WITWIN_KERNEL_DINLINE Complexf distance_factor_tangent(
     float safe_d = fmaxf(d, min_dist);
     float fspl = (wavelength / (4.0f * pi)) / safe_d;
     float dfspl_dd = d > min_dist ? -(wavelength / (4.0f * pi)) / (safe_d * safe_d) : 0.0f;
-    float phase = -k * d;
+    float phase = reduced_neg_kd(k, d);
     float c = cosf(phase);
     float s = sinf(phase);
     float dphase_dd = -k;
@@ -136,7 +142,7 @@ WITWIN_KERNEL_DINLINE float factor_distance_adjoint(
     float safe_d = fmaxf(d, min_dist);
     float fspl = (wavelength / (4.0f * pi)) / safe_d;
     float dfspl_dd = d > min_dist ? -(wavelength / (4.0f * pi)) / (safe_d * safe_d) : 0.0f;
-    float phase = -k * d;
+    float phase = reduced_neg_kd(k, d);
     float c = cosf(phase);
     float s = sinf(phase);
     float dphase_dd = -k;

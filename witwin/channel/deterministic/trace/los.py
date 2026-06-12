@@ -5,6 +5,7 @@ import rayd
 from witwin.channel.deterministic import types as wt
 
 from witwin.channel.core.numerics.constants import RAY_EPS
+from witwin.channel.core.physics.wave_math import unit_phase_neg_kd
 from witwin.channel.core.physics.polarization import (
     project_real_polarization_to_ray,
     scalarize_vector_to_polarization,
@@ -26,7 +27,7 @@ def _los_blocked_field(*, scene, runtime):
     field = (
         wave.wavelength
         / (4 * dr.pi * distance)
-        * dr.exp(wt.Complex2f(0, -wave.k * distance))
+        * unit_phase_neg_kd(wave.k, distance)
     )
     return dr.select(blocked, wt.Complex2f(0, 0), field), ray_dir, ray_dir_normalized
 

@@ -21,6 +21,7 @@ from witwin.channel.core.numerics.arrays import (
 from witwin.channel.core.physics.polarization import project_real_polarization_to_ray, vector_eval, vector_power, vector_zero
 from witwin.channel.core.geometry.diffraction import wedge_exterior_mask
 from witwin.channel.core.physics.shadow_boundary_policy import ShadowBoundaryBackendPolicy
+from witwin.channel.core.physics.wave_math import unit_phase_neg_kd
 from .forward import ForwardEval, f_utd
 from .state import Geo
 
@@ -620,9 +621,9 @@ def accumulate_matched_isb_shadow_boundary_correction(
         return empty_payload
     ray_dir = rx_pos - tx.position
     distance = dr.norm(ray_dir) + EPS
-    continued_direct = (wave.wavelength / (wt.Float(4.0) * dr.pi * distance)) * dr.exp(
-        wt.Complex2f(0.0, -wave.k * distance)
-    )
+    continued_direct = (
+        wave.wavelength / (wt.Float(4.0) * dr.pi * distance)
+    ) * unit_phase_neg_kd(wave.k, distance)
     tx_pol_dir = project_real_polarization_to_ray(tx.polarization, ray_dir)
     active_rx_polarization = rx.effective_polarization(tx)
     hard_visibility = dr.select(

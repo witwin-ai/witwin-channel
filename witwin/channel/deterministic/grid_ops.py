@@ -24,26 +24,55 @@ from witwin.channel.core.geometry import (
 from witwin.channel.core.grid import Grid
 
 
+def _palindromic_row_counts(samples_per_cell: int) -> tuple[int, ...]:
+    """Split N samples into symmetric (palindromic) per-row counts.
+
+    Symmetry in both axes keeps the sample mean exactly at the cell center,
+    so the midpoint quadrature stays unbiased for any N (not just squares).
+    """
+    n = int(samples_per_cell)
+    target_rows = math.sqrt(n)
+    candidates = sorted(range(1, n + 1), key=lambda rows: abs(rows - target_rows))
+    for n_rows in candidates:
+        base, rem = divmod(n, n_rows)
+        if rem % 2 == 1 and n_rows % 2 == 0:
+            continue
+        counts = [base] * n_rows
+        if rem % 2 == 1:
+            counts[n_rows // 2] += 1
+            rem -= 1
+        for offset in range(rem // 2):
+            counts[offset] += 1
+            counts[n_rows - 1 - offset] += 1
+        return tuple(counts)
+    return (n,)
+
+
 def _quadrature_offsets(
     *,
     quadrature_mode: str,
     samples_per_cell: int,
     cell_size: tuple[float, float],
 ) -> tuple[tuple[tuple[float, float], float], ...]:
-    """Return local sample offsets and weights for one receiver cell."""
+    """Return local sample offsets and weights for one receiver cell.
+
+    Samples sit at the centers of a symmetric row partition of the cell and
+    carry per-stratum area weights (1 / (n_rows * row_count)), which is the
+    exact midpoint rule for the partition and sums to 1.
+    """
     cell_size_x, cell_size_y = float(cell_size[0]), float(cell_size[1])
     if quadrature_mode == "center":
         return (((0.0, 0.0), 1.0),)
 
-    subdivisions = int(math.ceil(math.sqrt(samples_per_cell)))
+    row_counts = _palindromic_row_counts(samples_per_cell)
+    n_rows = len(row_counts)
     offsets: list[tuple[tuple[float, float], float]] = []
-    weight = 1.0 / float(samples_per_cell)
-    for sample_index in range(samples_per_cell):
-        row = sample_index // subdivisions
-        col = sample_index % subdivisions
-        offset_x = ((col + 0.5) / subdivisions - 0.5) * cell_size_x
-        offset_y = ((row + 0.5) / subdivisions - 0.5) * cell_size_y
-        offsets.append(((offset_x, offset_y), weight))
+    for row, row_count in enumerate(row_counts):
+        offset_y = ((row + 0.5) / n_rows - 0.5) * cell_size_y
+        weight = 1.0 / float(n_rows * row_count)
+        for col in range(row_count):
+            offset_x = ((col + 0.5) / row_count - 0.5) * cell_size_x
+            offsets.append(((offset_x, offset_y), weight))
     return tuple(offsets)
 
 

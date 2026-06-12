@@ -104,19 +104,59 @@ def baseline_matched_isotropic_diffraction_vector(
     sample_grid=None,
     ray_mode: str = "3d",
     return_metadata: bool = False,
+    rx_positions=None,
 ):
+    """Accumulate prepared diffraction states onto receiver positions.
+
+    ``rx_positions`` (full-width, indexed by ``receiver_index_map``) lets one
+    state preparation be replayed against multiple quadrature sample sets.
+    When omitted, each collection's build-time positions are used.
+    """
     from witwin.channel.deterministic.trace import diffraction
     diffraction_vector_coherent = vector_zero(n_rx)
     tile_reports = []
     used_rayd_exact_grid_accumulation = False
     for raw in diffraction_raw_collections:
         receiver_index_map = raw.get("receiver_index_map")
-        local_positions = raw.get("rx_positions")
         state_arrays = raw.get("state_arrays")
+        if rx_positions is None:
+            local_positions = raw.get("rx_positions")
+        elif receiver_index_map is not None:
+            index = wt.UInt32(receiver_index_map)
+            local_positions = wt.Point3f(
+                dr.gather(wt.Float, rx_positions.x, index),
+                dr.gather(wt.Float, rx_positions.y, index),
+                dr.gather(wt.Float, rx_positions.z, index),
+            )
+        else:
+            local_positions = None
         if receiver_index_map is None or local_positions is None or state_arrays is None:
             continue
         local_rx_count = int(dr.width(local_positions.x))
         plan = receiver_tile_plan(config, n_rx=local_rx_count)
+        # Reflected diffraction suffix (D->R...) splats directly onto the full
+        # grid, so it requires an axis-aligned grid covering this collection
+        # in a single tile.
+        suffix = ReflectionSuffixConfig()
+        suffix_budget = raw.get("suffix_budget") or {}
+        if (
+            bool(getattr(config, "enable_rd_diffraction", False))
+            and sample_grid is not None
+            and int(plan["tile_count"]) <= 1
+            and local_rx_count == int(sample_grid.n_cells)
+            and int(suffix_budget.get("n_rays", 0)) > 0
+            and int(suffix_budget.get("max_bounces", 0)) > 0
+        ):
+            suffix = ReflectionSuffixConfig(
+                n_rays=int(suffix_budget["n_rays"]),
+                max_bounces=int(suffix_budget["max_bounces"]),
+                coef=1.0,
+                mode=str(ray_mode),
+                detail=raw.get("reflection_detail"),
+                grid=sample_grid,
+                grid_data=sample_grid.get_coordinates(),
+                rx_z=sample_grid.position,
+            )
         accumulate_mode = str(getattr(config.diffraction_execution, "accumulate_primal", "auto"))
         rayd_exact_auto_allowed = (
             accumulate_mode == "auto"
@@ -130,7 +170,7 @@ def baseline_matched_isotropic_diffraction_vector(
                 sample_grid=sample_grid,
                 scene=scene,
                 tx=raw["runtime"].tx,
-                suffix=ReflectionSuffixConfig(),
+                suffix=suffix,
                 shadow_support_cutoff_db=config.shadow_support_cutoff_db,
                 allow_rayd_exact_coherent_auto=True,
             )
@@ -161,7 +201,7 @@ def baseline_matched_isotropic_diffraction_vector(
                 scene=scene,
                 wave=raw["runtime"].wave,
                 material=raw["runtime"].diffraction,
-                suffix=ReflectionSuffixConfig(),
+                suffix=suffix,
                 execution=config.diffraction_execution,
                 return_vector=True,
                 return_scalar=False,
@@ -262,7 +302,6 @@ def trace_diffraction_raw_collections(
             reflection_n_rays,
             reflection_max_bounces,
             group_runtime.reflection,
-            spec.ray_mode,
             effective["max_diffractions"],
             total_state_budget_per_order=effective["diffraction_state_budget"],
             inserted_state_budget_per_order=effective["inserted_reflection_state_budget"],
@@ -283,6 +322,11 @@ def trace_diffraction_raw_collections(
             "state_arrays": state_arrays,
             "edge_data": edge_data if edge_data is not None else edge_cache.get("edge_data"),
             "builder_report": builder_report,
+            "reflection_detail": mixed_reflection_detail,
+            "suffix_budget": {
+                "n_rays": int(reflection_n_rays),
+                "max_bounces": int(reflection_max_bounces),
+            },
         })
     return raw_collections
 

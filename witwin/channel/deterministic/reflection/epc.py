@@ -21,7 +21,7 @@ from witwin.channel.core.runtime import (
     scene_geometry_grad_enabled,
 )
 from witwin.channel.core.physics.materials import resolve_surface_material
-from witwin.channel.core.physics.wave_math import material_angular_frequency
+from witwin.channel.core.physics.wave_math import material_angular_frequency, unit_phase_neg_kd
 from witwin.channel.core.numerics.constants import EPS, RAY_ORIGIN_BIAS
 from witwin.channel.core.numerics.arrays import (
     broadcast,
@@ -931,7 +931,7 @@ def _reference_outputs_with_slot_override(
         image_source = reflect_point_across_plane(image_source, plane_point, plane_normal)
 
     local_path_idx = dr.arange(wt.UInt32, width)
-    return chain_math_reference(
+    outputs = chain_math_reference(
         path_idx=local_path_idx,
         image_source=image_source,
         slot_plane_point=flatten_slot_points(slot_plane_points),
@@ -946,6 +946,8 @@ def _reference_outputs_with_slot_override(
         n_paths=width,
         wavelength=wavelength,
     )
+    outputs["image_source"] = image_source
+    return outputs
 
 
 def _one_complex(width: int) -> wt.Complex2f:
@@ -1226,11 +1228,22 @@ def finalize_reference_f_weight_outputs(
                 override_prim_idx=adjacent_prim_idx,
                 chain_depth=chain_depth,
             )
+            # The branch has its own image source; correct the spreading and
+            # phase relative to the primary unit field applied downstream.
+            primary_image = gather(paths.image_source, path_idx)
+            primary_distance = dr.norm(target_pos - wt.Point3f(
+                primary_image.x, primary_image.y, primary_image.z,
+            )) + wt.Float(EPS)
+            branch_distance = dr.norm(target_pos - branch_outputs["image_source"]) + wt.Float(EPS)
+            branch_unit_ratio = wt.Complex2f(primary_distance / branch_distance, 0.0) * dr.exp(
+                wt.Complex2f(0.0, -wave.k * (branch_distance - primary_distance))
+            )
             residual_weight = (
                 prefix_weights[slot]
                 * weights.adjacent_weight
                 * suffix_weights[slot]
                 * branch_visibility_weight
+                * branch_unit_ratio
             )
             residual_vector = vector_add(
                 residual_vector,
@@ -1322,7 +1335,7 @@ def _complex_inverse(value):
 
 def _rayd_path_unit_field(path_length, valid, wave: Wave):
     safe_length = dr.select(valid & (path_length > wt.Float(EPS)), path_length, wt.Float(1.0))
-    phase = dr.exp(wt.Complex2f(0.0, -wave.k * safe_length))
+    phase = unit_phase_neg_kd(wave.k, safe_length)
     amplitude = wt.Float(wave.wavelength_scalar / (4.0 * dr.pi)) / dr.maximum(
         safe_length,
         wt.Float(1.0e-6),

@@ -1,4 +1,4 @@
-#include <cuda_runtime.h>
+﻿#include <cuda_runtime.h>
 #include <stdexcept>
 
 #include <common/cuda_check.h>
@@ -92,6 +92,8 @@ __device__ __forceinline__ PairInputs load_pair_inputs(
     p.face0Material = {f0er[sIdx], f0mu[sIdx], f0sg[sIdx], f0g[sIdx], f0uf[sIdx], f0pr[sIdx]};
     p.face1Material = {f1er[sIdx], f1mu[sIdx], f1sg[sIdx], f1g[sIdx], f1uf[sIdx], f1pr[sIdx]};
     p.selectStationaryPoint = 0.f;
+    p.directFirstOrder = 0.f;
+    p.pathLengthPrefix = 0.f;
     return p;
 }
 
@@ -137,6 +139,8 @@ __device__ __forceinline__ PairInputs load_pair_inputs_from_slots(
         slots[77], slots[78], slots[79], slots[80], slots[81], slots[82]
     );
     p.selectStationaryPoint = slots[83][sIdx];
+    p.directFirstOrder = slots[84][sIdx];
+    p.pathLengthPrefix = slots[85][sIdx];
     return p;
 }
 
@@ -1791,7 +1795,7 @@ void utd_accumulate_tiled_forward_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     const float** device_slots = copy_state_slots_to_device(
@@ -1881,7 +1885,7 @@ void utd_accumulate_tiled_vector_power_forward_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     float3a rx_pol = {rx_pol_x, rx_pol_y, rx_pol_z};
@@ -1956,7 +1960,7 @@ void utd_accumulate_scalar_power_forward_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     float3a rxPol = {rx_pol_x, rx_pol_y, rx_pol_z};
@@ -2027,7 +2031,7 @@ void utd_accumulate_tiled_jvp_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     const float** device_state_slots = copy_state_slots_to_device(
@@ -2116,7 +2120,7 @@ void utd_pair_forward_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     const float** device_slots = copy_state_slots_to_device(
@@ -2199,7 +2203,7 @@ void utd_pair_jvp_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     const float** device_state_slots = copy_state_slots_to_device(
@@ -2293,7 +2297,7 @@ void utd_accumulate_tiled_vjp_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     const float** device_state_slots = copy_state_slots_to_device(
@@ -2386,7 +2390,7 @@ void utd_pair_vjp_slots(
         return;
     }
 
-    constexpr size_t SLOT_COUNT = 84;
+    constexpr size_t SLOT_COUNT = 86;
     constexpr int BLOCK = 256;
     int grid = (n_pairs + BLOCK - 1) / BLOCK;
     const float** device_state_slots = copy_state_slots_to_device(

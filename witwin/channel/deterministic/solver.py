@@ -65,17 +65,14 @@ def _scene_summary(scene: Scene, config: Config) -> dict[str, object]:
     }
 
 
-def _build_diffraction_metadata(sample_metadata: list[dict[str, object]]) -> dict[str, object]:
-    state_counts = []
-    builder_reports = []
+def _build_diffraction_metadata(
+    prep_metadata: Mapping[str, object],
+    sample_metadata: list[dict[str, object]],
+) -> dict[str, object]:
     receiver_tile_count = 0
     receiver_tile_size = 0
     receiver_tiling_enabled = False
     for metadata in sample_metadata:
-        state_counts.extend(int(value) for value in metadata.get("state_counts", ()))
-        builder_reports.extend(
-            dict(report) for report in metadata.get("builder_reports", ())
-        )
         receiver_tile_count += int(metadata.get("receiver_tile_count", 0))
         receiver_tile_size = max(
             receiver_tile_size,
@@ -87,13 +84,11 @@ def _build_diffraction_metadata(sample_metadata: list[dict[str, object]]) -> dic
     return {
         "samples": tuple(sample_metadata),
         "sample_count": int(len(sample_metadata)),
-        "raw_collection_count": int(
-            sum(int(metadata.get("raw_collection_count", 0)) for metadata in sample_metadata)
-        ),
-        "state_counts": tuple(state_counts),
-        "state_count_total": int(sum(state_counts)),
-        "state_count_max": int(max(state_counts, default=0)),
-        "builder_reports": tuple(builder_reports),
+        "raw_collection_count": int(prep_metadata.get("raw_collection_count", 0)),
+        "state_counts": tuple(prep_metadata.get("state_counts", ())),
+        "state_count_total": int(prep_metadata.get("state_count_total", 0)),
+        "state_count_max": int(prep_metadata.get("state_count_max", 0)),
+        "builder_reports": tuple(prep_metadata.get("builder_reports", ())),
         "receiver_tiling_enabled": bool(receiver_tiling_enabled),
         "receiver_tile_size": int(receiver_tile_size),
         "receiver_tile_count": int(receiver_tile_count),
@@ -198,6 +193,14 @@ def _empty_components(n_rx: int) -> dict[str, object]:
             "diffraction": vector_zero(n_rx),
             "total": vector_zero(n_rx),
         },
+        # Quadrature-averaged per-component power: sum_i w_i |E_comp,i|^2.
+        # Same incoherent-in-cell semantics as path_gain, unlike the
+        # vector_coherent payload which is the quadrature-mean field.
+        "power": {
+            "los": dr.zeros(wt.Float, int(n_rx)),
+            "reflection": dr.zeros(wt.Float, int(n_rx)),
+            "diffraction": dr.zeros(wt.Float, int(n_rx)),
+        },
         "path_gain": dr.zeros(wt.Float, int(n_rx)),
     }
 
@@ -212,6 +215,7 @@ def _add_sample(
 ) -> dict[str, object]:
     w = float(sample_weight)
     vc = components["vector_coherent"]
+    power = components["power"]
     vc["los"] = {
         axis: vc["los"][axis] + los_field_vector[axis] * w for axis in ("x", "y", "z")
     }
@@ -223,6 +227,9 @@ def _add_sample(
         axis: vc["diffraction"][axis] + diffraction_vector_coherent[axis] * w
         for axis in ("x", "y", "z")
     }
+    power["los"] = power["los"] + vector_power(los_field_vector) * w
+    power["reflection"] = power["reflection"] + vector_power(reflection_vector_coherent) * w
+    power["diffraction"] = power["diffraction"] + vector_power(diffraction_vector_coherent) * w
     total_v = {
         axis: los_field_vector[axis] + reflection_vector_coherent[axis] + diffraction_vector_coherent[axis]
         for axis in ("x", "y", "z")
@@ -243,7 +250,17 @@ def _finalize_totals(components: dict[str, object]) -> dict[str, object]:
 def _apply_shadow_boundary_correction(
     components: dict[str, object],
     shadow_boundary_payload: Mapping[str, object],
+    *,
+    samples_per_cell: int,
 ) -> None:
+    # The overwrite below replaces the quadrature-averaged path_gain with the
+    # power of the corrected mean field. That is only equivalent for a single
+    # center sample; resolve_trace_config enforces quadrature_mode='center'
+    # for shadow_boundary_correction, and this assert keeps the coupling local.
+    if int(samples_per_cell) != 1:
+        raise RuntimeError(
+            "shadow boundary correction requires a single center quadrature sample."
+        )
     correction_vector = shadow_boundary_payload["vector_coherent"]
     vc = components["vector_coherent"]
     vc["diffraction"] = {
@@ -253,15 +270,16 @@ def _apply_shadow_boundary_correction(
     vc["total"] = {
         axis: vc["total"][axis] + correction_vector[axis] for axis in ("x", "y", "z")
     }
+    components["power"]["diffraction"] = vector_power(vc["diffraction"])
     components["path_gain"] = vector_power(vc["total"])
 
 
 def _component_maps(components: dict[str, object]) -> Mapping[str, wt.Float]:
-    vc = components["vector_coherent"]
+    power = components["power"]
     return {
-        "los": vector_power(vc["los"]),
-        "reflection": vector_power(vc["reflection"]),
-        "diffraction": vector_power(vc["diffraction"]),
+        "los": power["los"],
+        "reflection": power["reflection"],
+        "diffraction": power["diffraction"],
         "path_gain": components["path_gain"],
     }
 
@@ -343,7 +361,6 @@ def _solve(
     )
     timing["grid_resolution_seconds"] += time.perf_counter() - grid_start
     components = _empty_components(n_rx)
-    reflection_detail = None
     diffraction_sample_metadata: list[dict[str, object]] = []
 
     rayd_exact_auto_candidate = (
@@ -356,7 +373,46 @@ def _solve(
         grad_sensitive
         or str(resolved.diffraction_execution.accumulate_primal) == "rayd_exact_coherent"
         or rayd_exact_auto_candidate
+        # Reflected diffraction suffix (D->R...) splats onto the grid directly.
+        or (
+            bool(resolved.enable_rd_diffraction)
+            and grid.surface_mode == "axis_aligned"
+            and int(resolved.reflection_n_rays) > 0
+            and int(resolved.reflection_max_bounces) > 0
+        )
     )
+
+    # Path discovery and diffraction state preparation are rx-independent:
+    # run them once against the cell centers and replay the prepared states
+    # against every quadrature sample set below.
+    center_runtime = runtime.with_rx(
+        grid.cell_centers,
+        polarization=resolved.rx_polarization,
+    )
+    center_ctx = TraceCtx(
+        scene=scene,
+        runtime=center_runtime,
+        sample_grid=(
+            NativeGrid.from_grid(grid, sample_index=0) if needs_native_grid else None
+        ),
+        config=resolved,
+        spec=spec,
+        solver_controls=solver_controls,
+        grad_preserving=bool(grad_sensitive),
+        n_rx=n_rx,
+    )
+    reflection_start = time.perf_counter()
+    reflection_detail = reflection.discover(ctx=center_ctx)
+    timing["reflection_trace_seconds"] += time.perf_counter() - reflection_start
+    diffraction_raw_collections, diffraction_prep_metadata = diffraction.prepare(
+        ctx=center_ctx,
+        reflection_detail=reflection_detail,
+        state_layout=PATH_EXPORT_REDUCED_STATE_LAYOUT,
+    )
+    timing["diffraction_state_preparation_seconds"] += float(
+        diffraction_prep_metadata.get("state_preparation_seconds", 0.0)
+    )
+
     for sample_set in grid.sample_sets:
         sample_grid = (
             NativeGrid.from_grid(grid, sample_index=sample_set.index)
@@ -388,14 +444,10 @@ def _solve(
         timing["reflection_trace_seconds"] += time.perf_counter() - reflection_start
         diffraction_field = diffraction.trace(
             ctx=ctx,
-            reflection_detail=reflection_detail,
-            state_layout=PATH_EXPORT_REDUCED_STATE_LAYOUT,
+            raw_collections=diffraction_raw_collections,
         )
         diffraction_metadata = dict(diffraction_field.get("metadata", {}))
         diffraction_sample_metadata.append(diffraction_metadata)
-        timing["diffraction_state_preparation_seconds"] += float(
-            diffraction_metadata.get("state_preparation_seconds", 0.0)
-        )
         timing["diffraction_accumulation_seconds"] += float(
             diffraction_metadata.get("accumulation_seconds", 0.0)
         )
@@ -419,7 +471,11 @@ def _solve(
         components=components,
     )
     if shadow_boundary_payload is not None:
-        _apply_shadow_boundary_correction(components, shadow_boundary_payload)
+        _apply_shadow_boundary_correction(
+            components,
+            shadow_boundary_payload,
+            samples_per_cell=int(spec.samples_per_cell),
+        )
     timing["shadow_boundary_correction_seconds"] += (
         time.perf_counter() - shadow_boundary_start
     )
@@ -461,7 +517,10 @@ def _solve(
         grid=grid,
         solver_controls=solver_controls,
         timing=timing,
-        diffraction_metadata=_build_diffraction_metadata(diffraction_sample_metadata),
+        diffraction_metadata=_build_diffraction_metadata(
+            diffraction_prep_metadata,
+            diffraction_sample_metadata,
+        ),
         shadow_boundary_payload=shadow_boundary_payload,
     )
     metadata["transmitter_count"] = 1

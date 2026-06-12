@@ -90,6 +90,13 @@ struct PairInputs {
     FaceMaterialParams face0Material;
     FaceMaterialParams face1Material;
     float   selectStationaryPoint;
+    // 1 when the incident field can be recomputed exactly from the tx
+    // (direct first-order); other selected states rescale the stored field.
+    float   directFirstOrder;
+    // Total unfolded path length from the original source to the edge anchor.
+    // Drives the edge-caustic (astigmatic) spreading radius for cascaded
+    // diffraction; equals |anchor - source| for first-order states.
+    float   pathLengthPrefix;
 };
 
 struct PairOutputs {
@@ -214,6 +221,14 @@ UTD_DINLINE Complex cplx_exp_phase(float p) {
     float s = sinf(p), c = cosf(p);
 #endif
     return {c, s};
+}
+// exp(-j k d) with the k*d product reduced in double precision: the f32
+// product loses ~k*d*2^-24 of phase, which matters for coherent sums at
+// mmWave ranges. One DP multiply per pair is negligible next to memory
+// traffic even at 1/32 DP throughput.
+UTD_DINLINE Complex cplx_exp_neg_kd(float k, float d) {
+    double kd = fmod((double)k * (double)d, 6.283185307179586476925287);
+    return cplx_exp_phase(-(float)kd);
 }
 UTD_DINLINE float   cplx_abs_sqr(Complex a) { return a.re*a.re + a.im*a.im; }
 UTD_DINLINE float   cplx_adj_dot(Complex g, Complex v) { return g.re*v.re + g.im*v.im; }

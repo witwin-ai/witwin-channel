@@ -1,4 +1,4 @@
-#include "drjit_common.h"
+﻿#include "drjit_common.h"
 #include <utd/bind.h>
 
 #include <utd/utd_types.h>
@@ -40,7 +40,7 @@
     face1_op_m11_re, face1_op_m11_im, \
     face0_eta_r, face0_mu_r, face0_sigma, face0_gain, face0_use_fresnel, face0_present, \
     face1_eta_r, face1_mu_r, face1_sigma, face1_gain, face1_use_fresnel, face1_present, \
-    select_stationary_point
+    select_stationary_point, direct_first_order, path_length_prefix
 
 #define UTD_FOR_EACH_STATE_FIELD(M) \
     M(edge_pos_x) M(edge_pos_y) M(edge_pos_z) \
@@ -75,7 +75,7 @@
     M(face1_op_m11_re) M(face1_op_m11_im) \
     M(face0_eta_r) M(face0_mu_r) M(face0_sigma) M(face0_gain) M(face0_use_fresnel) M(face0_present) \
     M(face1_eta_r) M(face1_mu_r) M(face1_sigma) M(face1_gain) M(face1_use_fresnel) M(face1_present) \
-    M(select_stationary_point)
+    M(select_stationary_point) M(direct_first_order) M(path_length_prefix)
 
 struct UTDTiledStateArrays {
     DiffFloat edge_pos_x, edge_pos_y, edge_pos_z;
@@ -111,6 +111,8 @@ struct UTDTiledStateArrays {
     DiffFloat face0_eta_r, face0_mu_r, face0_sigma, face0_gain, face0_use_fresnel, face0_present;
     DiffFloat face1_eta_r, face1_mu_r, face1_sigma, face1_gain, face1_use_fresnel, face1_present;
     DiffFloat select_stationary_point;
+    DiffFloat direct_first_order;
+    DiffFloat path_length_prefix;
 
     DRJIT_STRUCT(UTDTiledStateArrays, UTD_STATE_ARRAY_FIELDS);
 };
@@ -216,8 +218,8 @@ struct UTDPairOpOutput {
 };
 
 UTDTiledStateArrays make_utd_tiled_state_arrays(nb::tuple state_soa, const char *label) {
-    if (nb::len(state_soa) != 84) {
-        throw std::runtime_error(std::string(label) + " expected 84 state arrays");
+    if (nb::len(state_soa) != 86) {
+        throw std::runtime_error(std::string(label) + " expected 86 state arrays");
     }
     auto state = [&](size_t index) -> DiffFloat {
         return nb::cast<DiffFloat>(state_soa[index]);
@@ -255,7 +257,7 @@ UTDTiledStateArrays make_utd_tiled_state_arrays(nb::tuple state_soa, const char 
         state(69), state(70),
         state(71), state(72), state(73), state(74), state(75),
         state(76), state(77), state(78), state(79), state(80), state(81),
-        state(82), state(83),
+        state(82), state(83), state(84), state(85),
     };
 }
 
@@ -300,6 +302,8 @@ std::vector<const float*> utd_state_slot_ptrs(const UTDTiledStateArrays &state) 
         drjit_data_ptr(state.face1_sigma), drjit_data_ptr(state.face1_gain), drjit_data_ptr(state.face1_use_fresnel),
         drjit_data_ptr(state.face1_present),
         drjit_data_ptr(state.select_stationary_point),
+        drjit_data_ptr(state.direct_first_order),
+        drjit_data_ptr(state.path_length_prefix),
     };
 }
 
@@ -347,7 +351,9 @@ void eval_utd_tiled_state_arrays(const UTDTiledStateArrays &state) {
         state.face0_use_fresnel, state.face0_present,
         state.face1_eta_r, state.face1_mu_r, state.face1_sigma, state.face1_gain,
         state.face1_use_fresnel, state.face1_present,
-        state.select_stationary_point
+        state.select_stationary_point,
+        state.direct_first_order,
+        state.path_length_prefix
     );
 }
 
@@ -462,8 +468,8 @@ MaterializedTangentSlots materialize_utd_tangent_slots(
     const drjit::detached_t<UTDTiledStateArrays> &tangent)
 {
     MaterializedTangentSlots result;
-    result.arrays.reserve(84);
-    result.ptrs.reserve(84);
+    result.arrays.reserve(86);
+    result.ptrs.reserve(86);
     UTD_ADD_TANGENT_SLOT(edge_pos_x);
     UTD_ADD_TANGENT_SLOT(edge_pos_y);
     UTD_ADD_TANGENT_SLOT(edge_pos_z);
@@ -548,6 +554,8 @@ MaterializedTangentSlots materialize_utd_tangent_slots(
     UTD_ADD_TANGENT_SLOT(face1_use_fresnel);
     UTD_ADD_TANGENT_SLOT(face1_present);
     UTD_ADD_TANGENT_SLOT(select_stationary_point);
+    UTD_ADD_TANGENT_SLOT(direct_first_order);
+    UTD_ADD_TANGENT_SLOT(path_length_prefix);
     return result;
 }
 
@@ -570,8 +578,8 @@ MaterializedGradientSlots materialize_utd_gradient_slots(
     const UTDTiledStateArrays &primal)
 {
     MaterializedGradientSlots result;
-    result.arrays.reserve(84);
-    result.ptrs.reserve(84);
+    result.arrays.reserve(86);
+    result.ptrs.reserve(86);
     UTD_FOR_EACH_STATE_FIELD(UTD_ADD_GRADIENT_SLOT)
     return result;
 }

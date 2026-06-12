@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <utd/utd_types.h>
 
@@ -395,13 +395,18 @@ UTD_DINLINE FiniteEdgePointSelection finite_edge_diffraction_point(
 UTD_DINLINE PairInputs pair_state_at_stationary_point(
     PairInputs state,
     float3a targetPos,
+    float k,
     bool& selected,
     bool& inside,
-    bool& valid)
+    bool& valid,
+    bool& exactDirect,
+    Complex& incidentScale)
 {
     selected = false;
     inside = false;
     valid = true;
+    exactDirect = false;
+    incidentScale = cplx(1.f, 0.f);
     if (state.selectStationaryPoint <= 0.5f) {
         return state;
     }
@@ -409,6 +414,16 @@ UTD_DINLINE PairInputs pair_state_at_stationary_point(
     if (!point.valid) {
         valid = false;
         return state;
+    }
+    exactDirect = state.directFirstOrder > 0.5f;
+    if (!exactDirect) {
+        // The stored incident field was evaluated at the anchor; moving the
+        // diffraction point along the edge rescales the spherical-wave
+        // amplitude and phase by the source-distance change. Polarization is
+        // kept from the anchor (slowly varying along the edge).
+        float dAnchor = safe_length(f3_sub(state.edgePos, state.sourcePos)) + UTD_EPS;
+        float dNew = safe_length(f3_sub(point.point, state.sourcePos)) + UTD_EPS;
+        incidentScale = cplx_mul_real(cplx_exp_neg_kd(k, dNew - dAnchor), dAnchor / dNew);
     }
     state.edgePos = point.point;
     state.edgeLineMin = point.edgeLineMin;
@@ -418,10 +433,25 @@ UTD_DINLINE PairInputs pair_state_at_stationary_point(
     return state;
 }
 
+// Edge-caustic spreading radius of the incident wave at the (possibly moved)
+// diffraction point: the in-plane radius follows the moved source distance
+// sPrime, while the upstream path beyond the apparent source is invariant.
+// Equals sPrime for first-order/prefix states (spherical incidence).
+UTD_DINLINE float edge_caustic_rho(
+    float sPrime,
+    float pathLengthPrefix,
+    float3a anchorEdgePos,
+    float3a sourcePos)
+{
+    float dAnchor = safe_length(f3_sub(anchorEdgePos, sourcePos));
+    float prefixExtra = fmaxf(pathLengthPrefix - dAnchor, 0.f);
+    return sPrime + prefixExtra;
+}
+
 UTD_DINLINE Complex direct_source_field(float3a sourcePos, float3a targetPos, float k) {
     float distance = safe_length(f3_sub(targetPos, sourcePos)) + UTD_EPS;
     float fspl = 1.f / (2.f * fmaxf(k, UTD_SMALL_EPS) * distance);
-    return cplx_mul_real(cplx_exp_phase(-k * distance), fspl);
+    return cplx_mul_real(cplx_exp_neg_kd(k, distance), fspl);
 }
 
 UTD_DINLINE Complex3 direct_source_vector(
@@ -1660,7 +1690,8 @@ UTD_DINLINE Complex finite_wedge_truncation_factor_bounds(
     float k,
     float lineMin,
     float lineMax,
-    bool stationaryAtOrigin)
+    bool stationaryAtOrigin,
+    float sourceRhoExtra)
 {
     float3a edgeHat = safe_normalize(state.edgeDir, make_f3(0.f, 0.f, 1.f));
     float3a edgePos = state.edgePos;
@@ -1671,7 +1702,11 @@ UTD_DINLINE Complex finite_wedge_truncation_factor_bounds(
 
     float3a sourceToEdge = f3_sub(edgePos, sourcePos);
     float3a edgeToTarget = f3_sub(tgtPos, edgePos);
-    float sPrimeProj = safe_length(project_to_wedge_plane(sourceToEdge, edgeHat)) + UTD_EPS;
+    // The source-side phase curvature along the edge follows the edge-caustic
+    // radius (projected source distance + upstream path), not just the last
+    // leg; sourceRhoExtra is zero for first-order/prefix states.
+    float sPrimeProj = safe_length(project_to_wedge_plane(sourceToEdge, edgeHat))
+        + sourceRhoExtra + UTD_EPS;
     float sProj = safe_length(project_to_wedge_plane(edgeToTarget, edgeHat)) + UTD_EPS;
 
     float stationaryU = stationaryAtOrigin
@@ -1696,30 +1731,20 @@ UTD_DINLINE Complex finite_wedge_truncation_factor_bounds(
     return cplx_mul(cplx(0.5f, 0.5f), cplx_conj(delta));
 }
 
-UTD_DINLINE Complex finite_wedge_truncation_factor_bounds(
+UTD_DINLINE Complex finite_wedge_truncation_factor(
     PairInputs state,
     float3a tgtPos,
     float k,
-    float lineMin,
-    float lineMax)
+    float sourceRhoExtra)
 {
     return finite_wedge_truncation_factor_bounds(
         state,
         tgtPos,
         k,
-        lineMin,
-        lineMax,
-        false
-    );
-}
-
-UTD_DINLINE Complex finite_wedge_truncation_factor(PairInputs state, float3a tgtPos, float k) {
-    return finite_wedge_truncation_factor_bounds(
-        state,
-        tgtPos,
-        k,
         state.edgeLineMin,
-        state.edgeLineMax
+        state.edgeLineMax,
+        false,
+        sourceRhoExtra
     );
 }
 
@@ -1727,7 +1752,8 @@ UTD_DINLINE Complex finite_wedge_stationary_completion_factor(
     PairInputs state,
     float3a tgtPos,
     float k,
-    bool inside)
+    bool inside,
+    float sourceRhoExtra)
 {
     if (inside) {
         return cplx(1.f, 0.f);
@@ -1744,11 +1770,14 @@ UTD_DINLINE Complex finite_wedge_stationary_completion_factor(
         k,
         state.edgeLineMin,
         state.edgeLineMax,
-        true
+        true,
+        sourceRhoExtra
     );
     Complex boundary = state.edgeLineMin >= 0.f
-        ? finite_wedge_truncation_factor_bounds(state, tgtPos, k, 0.f, edgeLength, true)
-        : finite_wedge_truncation_factor_bounds(state, tgtPos, k, -edgeLength, 0.f, true);
+        ? finite_wedge_truncation_factor_bounds(
+            state, tgtPos, k, 0.f, edgeLength, true, sourceRhoExtra)
+        : finite_wedge_truncation_factor_bounds(
+            state, tgtPos, k, -edgeLength, 0.f, true, sourceRhoExtra);
     float boundaryPower = cplx_abs_sqr(boundary);
     if (boundaryPower <= UTD_EPS) {
         return cplx_mul_real(raw, endpointWeight);
@@ -1763,15 +1792,21 @@ UTD_DINLINE void compute_pair_field_terms(PairInputs state, float3a tgtPos, floa
     geomValid = false;
     field = cplx_zero(); directGain = cplx_zero(); derivativeGain = cplx_zero();
 
+    float3a anchorEdgePos = state.edgePos;
     bool selectedStationary = false;
     bool selectedInside = false;
     bool selectedValid = true;
+    bool exactDirect = false;
+    Complex incidentScale = cplx(1.f, 0.f);
     state = pair_state_at_stationary_point(
         state,
         tgtPos,
+        k,
         selectedStationary,
         selectedInside,
-        selectedValid
+        selectedValid,
+        exactDirect,
+        incidentScale
     );
     if (!selectedValid) return;
 
@@ -1790,7 +1825,10 @@ UTD_DINLINE void compute_pair_field_terms(PairInputs state, float3a tgtPos, floa
     float safePhiP = poleSafe ? phiP : 0.5f*w*UTD_PI;
     bool slopeSafe = slope_safe_mask(safePhi,safePhiP,w,UTD_SLOPE_STEP);
     bool useFace = (state.face0Material.present > 0.5f) || (state.face1Material.present > 0.5f);
-    bool endpointContinuation = selectedStationary && !tgtExt;
+    // Endpoint continuation / stationary completion only apply to the exact
+    // direct recompute; rescaled states keep the plain coefficients so the
+    // field stays continuous across the face-n branch boundary.
+    bool endpointContinuation = exactDirect && !tgtExt;
     Complex d = endpointContinuation
         ? (useFace ? diff_coeff_3d_endpoint_continued(phi,phiP,w,k,s,sP,sb,r0,rn)
                    : diff_coeff_2d_endpoint_continued(phi,phiP,w,k,s,sP,r0,rn))
@@ -1803,21 +1841,27 @@ UTD_DINLINE void compute_pair_field_terms(PairInputs state, float3a tgtPos, floa
         dSlope = useFace ? slope_diff_3d(safePhi,safePhiP,w,k,s,sP,sb,r0,rn)
                          : slope_diff_2d(safePhi,safePhiP,w,k,s,sP,r0,rn);
     }
-    float ls = sqrtf(sP/(s*(s+sP)+UTD_EPS));
-    Complex phase = cplx_exp_phase(-k*s);
+    // Astigmatic edge-caustic spreading: rhoPar reduces to sP for spherical
+    // (first-order/prefix) incidence and to the full unfolded path for
+    // parallel-edge cascades. The UTD distance parameter L is unchanged
+    // because the rho2 = rhoE factors cancel in the astigmatic L.
+    float rhoPar = edge_caustic_rho(sP, state.pathLengthPrefix, anchorEdgePos, state.sourcePos);
+    float rhoExtra = rhoPar - sP;
+    float ls = sqrtf(rhoPar/(s*(s+rhoPar)+UTD_EPS));
+    Complex phase = cplx_exp_neg_kd(k, s);
     directGain = cplx_mul_real(cplx_mul(d,phase), ls);
     derivativeGain = cplx_mul_real(cplx_mul(dSlope,phase), ls);
-    Complex finiteFactor = selectedStationary
-        ? finite_wedge_stationary_completion_factor(state, tgtPos, k, selectedInside)
-        : finite_wedge_truncation_factor(state, tgtPos, k);
+    Complex finiteFactor = (selectedStationary && exactDirect)
+        ? finite_wedge_stationary_completion_factor(state, tgtPos, k, selectedInside, rhoExtra)
+        : finite_wedge_truncation_factor(state, tgtPos, k, rhoExtra);
     directGain = cplx_mul(directGain, finiteFactor);
     derivativeGain = cplx_mul(derivativeGain, finiteFactor);
-    Complex incidentField = selectedStationary
+    Complex incidentField = exactDirect
         ? direct_source_field(state.sourcePos, state.edgePos, k)
-        : state.incidentField;
-    Complex incidentNormalDerivative = selectedStationary
+        : cplx_mul(state.incidentField, incidentScale);
+    Complex incidentNormalDerivative = exactDirect
         ? cplx_zero()
-        : state.incidentNormalDerivative;
+        : cplx_mul(state.incidentNormalDerivative, incidentScale);
     field = cplx_add(cplx_mul(incidentField, directGain),
                      cplx_mul(incidentNormalDerivative, derivativeGain));
 }
@@ -1843,15 +1887,19 @@ UTD_DINLINE Complex3 compute_pair_vector_at_angles(
     Basis3 inEB,
     Basis3 outEB,
     Complex finiteFactor,
-    bool endpointContinuation)
+    bool endpointContinuation,
+    bool exactDirect,
+    Complex incidentScale,
+    float rhoPar)
 {
-    bool selectedStationary = state.selectStationaryPoint > 0.5f;
-    Complex3 incidentVector = selectedStationary
+    Complex3 incidentVector = exactDirect
         ? direct_source_vector(state.sourcePos, state.edgePos, k, mat)
-        : vector_from_jones(state.incidentJones, state.incidentBasis);
-    Complex3 incidentDerivativeVector = selectedStationary
+        : c3_scale(vector_from_jones(state.incidentJones, state.incidentBasis), incidentScale);
+    Complex3 incidentDerivativeVector = exactDirect
         ? c3_zero()
-        : vector_from_jones(state.incidentDerivativeJones, state.incidentBasis);
+        : c3_scale(
+            vector_from_jones(state.incidentDerivativeJones, state.incidentBasis),
+            incidentScale);
     Jones2 incJE  = jones_from_vector(incidentVector, inEB);
     Jones2 incDJE = jones_from_vector(incidentDerivativeVector, inEB);
     bool poleSafe = cot_pole_safe_mask(phi, phiP, state.wedgeN, 1.0e-6f);
@@ -1910,23 +1958,29 @@ UTD_DINLINE Complex3 compute_pair_vector_at_angles(
     Jones2 slopeFieldJ = hasSlope ? apply_jop(incDJE, slopeOp) : jones_zero();
     Jones2 fieldJ = jones_add(apply_jop(incJE, directOp), slopeFieldJ);
     fieldJ = jones_scale(fieldJ, finiteFactor);
-    float ls = sqrtf(sP/(s*(s+sP)+UTD_EPS));
-    Complex scale = cplx_mul_real(cplx_exp_phase(-k*s), ls);
+    float ls = sqrtf(rhoPar/(s*(s+rhoPar)+UTD_EPS));
+    Complex scale = cplx_mul_real(cplx_exp_neg_kd(k, s), ls);
     return c3_scale(vector_from_jones(fieldJ, outEB), scale);
 }
 
 UTD_DINLINE Complex3 compute_pair_vector_contribution_no_completion(PairInputs state, float3a tgtPos,
     float k, MaterialParams mat)
 {
+    float3a anchorEdgePos = state.edgePos;
     bool selectedStationary = false;
     bool selectedInside = false;
     bool selectedValid = true;
+    bool exactDirect = false;
+    Complex incidentScale = cplx(1.f, 0.f);
     state = pair_state_at_stationary_point(
         state,
         tgtPos,
+        k,
         selectedStationary,
         selectedInside,
-        selectedValid
+        selectedValid,
+        exactDirect,
+        incidentScale
     );
     if (!selectedValid) return c3_zero();
 
@@ -1936,16 +1990,21 @@ UTD_DINLINE Complex3 compute_pair_vector_contribution_no_completion(PairInputs s
     bool geomValid = srcExt && (sP > UTD_MIN_DISTANCE) && (s > UTD_MIN_DISTANCE);
     if (!geomValid) return c3_zero();
 
+    float rhoPar = edge_caustic_rho(sP, state.pathLengthPrefix, anchorEdgePos, state.sourcePos);
+    float rhoExtra = rhoPar - sP;
     Basis3 inEB  = diffraction_edge_basis(f3_sub(state.edgePos, state.sourcePos), state.edgeDir, false);
     Basis3 outEB = diffraction_edge_basis(f3_sub(tgtPos, state.edgePos), state.edgeDir, true);
-    Complex finiteFactor = selectedStationary
-        ? finite_wedge_stationary_completion_factor(state, tgtPos, k, selectedInside)
-        : finite_wedge_truncation_factor(state, tgtPos, k);
+    // Endpoint continuation / stationary completion only apply to the exact
+    // direct recompute; rescaled states keep the plain coefficients and the
+    // truncation factor so the field stays continuous across face branches.
+    Complex finiteFactor = (selectedStationary && exactDirect)
+        ? finite_wedge_stationary_completion_factor(state, tgtPos, k, selectedInside, rhoExtra)
+        : finite_wedge_truncation_factor(state, tgtPos, k, rhoExtra);
     bool tgtExt = wedge_exterior_mask(f3_sub(tgtPos, state.edgePos), state.edgeDir, state.n0, state.nn);
-    bool endpointContinuation = selectedStationary && !tgtExt;
+    bool endpointContinuation = exactDirect && !tgtExt;
     return compute_pair_vector_at_angles(
         state, tgtPos, k, mat, phi, phiP, s, sP, sb, inEB, outEB, finiteFactor,
-        endpointContinuation);
+        endpointContinuation, exactDirect, incidentScale, rhoPar);
 }
 
 UTD_DINLINE Complex3 compute_pair_vector_contribution(PairInputs state, float3a tgtPos,
@@ -2047,10 +2106,12 @@ UTD_DINLINE void pair_vector_output_vjp(
     Jones2 directFieldJ = apply_jop(incJE, directOp);
     Jones2 slopeFieldJ = hasSlope ? apply_jop(incDJE, slopeOp) : jones_zero();
     Jones2 fieldJ = jones_add(directFieldJ, slopeFieldJ);
-    Complex finiteFactor = finite_wedge_truncation_factor(pi, tgt, k);
+    float rhoPar = edge_caustic_rho(sP, pi.pathLengthPrefix, pi.edgePos, pi.sourcePos);
+    float rhoExtra = rhoPar - sP;
+    Complex finiteFactor = finite_wedge_truncation_factor(pi, tgt, k, rhoExtra);
     Jones2 scaledFieldJ = jones_scale(fieldJ, finiteFactor);
-    float ls = sqrtf(sP / (s * (s + sP) + UTD_EPS));
-    Complex phase = cplx_exp_phase(-k * s);
+    float ls = sqrtf(rhoPar / (s * (s + rhoPar) + UTD_EPS));
+    Complex phase = cplx_exp_neg_kd(k, s);
     Complex scale = cplx_mul_real(phase, ls);
     Complex3 transport = vector_from_jones(scaledFieldJ, outEB);
 
@@ -2198,10 +2259,12 @@ UTD_DINLINE void pair_vector_output_vjp(
     Complex dPhaseDs = cplx_mul(phase, cplx(0.f, -k));
     gS += cplx_adj_dot(gPhase, dPhaseDs);
 
-    float den = s * (s + sP) + UTD_EPS;
+    // ls = sqrt(rho/(s(s+rho))) with rho = sP + const, so d rho/d sP = 1 and
+    // the spherical formulas apply with sP -> rho.
+    float den = s * (s + rhoPar) + UTD_EPS;
     float den2 = den * den;
     if (ls > UTD_SMALL_EPS) {
-        float dLsDs = -0.5f * sP * (2.f * s + sP) / (ls * den2);
+        float dLsDs = -0.5f * rhoPar * (2.f * s + rhoPar) / (ls * den2);
         float dLsDSP = 0.5f * (s * s + UTD_EPS) / (ls * den2);
         gS += gLs * dLsDs;
         gSP += gLs * dLsDSP;
