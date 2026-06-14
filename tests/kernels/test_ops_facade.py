@@ -89,6 +89,175 @@ def test_path_los_export_requires_native_cuda_kernel(monkeypatch):
         ops.path_los_export(tx_positions, tx_power, rx_positions, frequency_hz=3.0e9)
 
 
+def test_deterministic_los_field_matches_python_reference():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic LoS field")
+
+    from witwin.channel_native.deterministic.field import free_space_complex_field
+
+    path_gain = torch.tensor([1.0e-4, 2.5e-5, 0.0], device="cuda", dtype=torch.float32)
+    path_length = torch.tensor([1.0, 3.25, 9.5], device="cuda", dtype=torch.float32)
+
+    result = ops.deterministic_los_field(
+        path_gain=path_gain,
+        path_length_m=path_length,
+        frequency_hz=3.0e9,
+    )
+
+    field = torch.complex(result["field_real"], result["field_imag"])
+    expected = free_space_complex_field(path_gain, path_length, 3.0e9)
+    torch.testing.assert_close(field, expected, rtol=2.0e-5, atol=1.0e-7)
+    torch.testing.assert_close(result["path_gain"], path_gain, rtol=0.0, atol=0.0)
+
+
+def test_deterministic_diffraction_vector_field_matches_python_reference():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic diffraction field")
+
+    from witwin.channel_native.deterministic.field import equivalent_field_from_vector_components
+
+    x_re = torch.tensor([1.0, -0.5, 0.0], device="cuda", dtype=torch.float32)
+    x_im = torch.tensor([0.5, 0.25, 0.0], device="cuda", dtype=torch.float32)
+    y_re = torch.tensor([0.25, 0.75, 0.0], device="cuda", dtype=torch.float32)
+    y_im = torch.tensor([-0.125, 0.5, 0.0], device="cuda", dtype=torch.float32)
+    z_re = torch.tensor([0.125, -0.25, 0.0], device="cuda", dtype=torch.float32)
+    z_im = torch.tensor([0.0625, -0.5, 0.0], device="cuda", dtype=torch.float32)
+
+    result = ops.deterministic_diffraction_vector_field(
+        x_re=x_re,
+        x_im=x_im,
+        y_re=y_re,
+        y_im=y_im,
+        z_re=z_re,
+        z_im=z_im,
+    )
+
+    field = torch.complex(result["field_real"], result["field_imag"])
+    expected_gain, expected_field = equivalent_field_from_vector_components(x_re, x_im, y_re, y_im, z_re, z_im)
+    torch.testing.assert_close(result["path_gain"], expected_gain, rtol=2.0e-6, atol=1.0e-7)
+    torch.testing.assert_close(field, expected_field, rtol=2.0e-6, atol=1.0e-7)
+
+
+def test_deterministic_reflection_field_returns_native_complex_field():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection field")
+    native = ops.native_extension()
+    if native is None or not hasattr(native, "deterministic_reflection_field"):
+        pytest.skip("native deterministic reflection field kernel is not built")
+
+    tx_position = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
+    hit_position = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+    rx_position = torch.tensor([[1.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
+    normal = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
+    one = torch.ones((1,), device="cuda", dtype=torch.float32)
+    eps_r = torch.full((1,), 4.0, device="cuda", dtype=torch.float32)
+    sigma_e = torch.zeros((1,), device="cuda", dtype=torch.float32)
+
+    result = ops.deterministic_reflection_field(
+        tx_position=tx_position,
+        rx_position=rx_position,
+        hit_position=hit_position,
+        normal=normal,
+        tx_power=one,
+        eps_r=eps_r,
+        sigma_e=sigma_e,
+        mu_r=one,
+        gain=one,
+        frequency_hz=3.0e9,
+    )
+
+    assert result["path_gain"].is_cuda
+    assert result["field_real"].is_cuda
+    assert result["field_imag"].is_cuda
+    assert result["path_gain"].item() > 0.0
+    field = torch.complex(result["field_real"], result["field_imag"])
+    torch.testing.assert_close(result["path_gain"], field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
+
+
+def test_deterministic_reflection_field_requires_native_cuda_kernel(monkeypatch):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection field")
+
+    tensor = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
+    one = torch.ones((1,), device="cuda", dtype=torch.float32)
+    monkeypatch.setattr(ops, "native_extension", lambda: None)
+
+    with pytest.raises(RuntimeError, match="deterministic_reflection_field CUDA kernel is required"):
+        ops.deterministic_reflection_field(
+            tx_position=tensor,
+            rx_position=tensor,
+            hit_position=tensor,
+            normal=tensor,
+            tx_power=one,
+            eps_r=one,
+            sigma_e=one,
+            mu_r=one,
+            gain=one,
+            frequency_hz=3.0e9,
+        )
+
+
+def test_deterministic_reflection_sequence_field_matches_python_reference():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection sequence field")
+
+    from witwin.channel_native.deterministic.field import reflection_sequence_complex_field
+
+    tx_position = torch.tensor([[0.0, 0.0, 1.0], [0.2, 0.0, 1.0]], device="cuda", dtype=torch.float32)
+    hit_positions = torch.tensor(
+        [
+            [[2.0, 0.0, 1.0], [2.0, 2.0, 1.0]],
+            [[2.0, 0.1, 1.0], [2.0, 2.0, 1.0]],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    rx_position = torch.tensor([[0.0, 2.0, 1.0], [0.1, 2.0, 1.0]], device="cuda", dtype=torch.float32)
+    normals = torch.tensor(
+        [
+            [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
+            [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    tx_power = torch.tensor([1.0, 0.5], device="cuda", dtype=torch.float32)
+    eps_r = torch.tensor([[3.0, 4.0], [3.5, 4.5]], device="cuda", dtype=torch.float32)
+    sigma_e = torch.tensor([[0.005, 0.01], [0.004, 0.009]], device="cuda", dtype=torch.float32)
+    mu_r = torch.ones((2, 2), device="cuda", dtype=torch.float32)
+    gain = torch.ones((2, 2), device="cuda", dtype=torch.float32)
+
+    result = ops.deterministic_reflection_sequence_field(
+        tx_position=tx_position,
+        rx_position=rx_position,
+        hit_positions=hit_positions,
+        normals=normals,
+        tx_power=tx_power,
+        eps_r=eps_r,
+        sigma_e=sigma_e,
+        mu_r=mu_r,
+        gain=gain,
+        frequency_hz=3.0e9,
+    )
+    expected_gain, expected_field, expected_length = reflection_sequence_complex_field(
+        tx_position=tx_position,
+        rx_position=rx_position,
+        hit_positions=hit_positions,
+        normals=normals,
+        tx_power_w=tx_power,
+        eps_r=eps_r,
+        sigma_e=sigma_e,
+        mu_r=mu_r,
+        gain=gain,
+        frequency_hz=3.0e9,
+    )
+
+    field = torch.complex(result["field_real"], result["field_imag"])
+    torch.testing.assert_close(result["path_length_m"], expected_length, rtol=2.0e-5, atol=1.0e-6)
+    torch.testing.assert_close(result["path_gain"], expected_gain, rtol=5.0e-4, atol=1.0e-10)
+    torch.testing.assert_close(field, expected_field, rtol=5.0e-4, atol=1.0e-7)
+
+
 def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC LoS path-gain AD kernels")
@@ -729,3 +898,71 @@ def test_mc_face_material_tensors_requires_native_cuda_kernel(monkeypatch):
 
     with pytest.raises(RuntimeError, match="mc_face_material_tensors CUDA kernel is required"):
         ops.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)
+
+
+def test_deterministic_accumulate_flat_matches_torch_reference():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic accumulation")
+
+    tx_id = torch.tensor([0, 0, 0, 1], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, 0, 1, 1], device="cuda", dtype=torch.int32)
+    component_id = torch.tensor([0, 1, 1, 2], device="cuda", dtype=torch.int32)
+    path_gain = torch.tensor([1.0, 4.0, 9.0, 16.0], device="cuda", dtype=torch.float32)
+    field = torch.tensor([1.0 + 0.0j, 0.0 + 2.0j, 3.0 + 0.0j, 0.0 + 4.0j], device="cuda", dtype=torch.complex64)
+
+    result = ops.deterministic_accumulate_flat(
+        tx_id,
+        rx_id,
+        component_id,
+        path_gain,
+        field.real.contiguous(),
+        field.imag.contiguous(),
+        num_tx=2,
+        num_rx=2,
+        coherent=True,
+    )
+
+    expected_component_field = torch.zeros((3, 2, 2), device="cuda", dtype=torch.complex64)
+    expected_component_power = torch.zeros((3, 2, 2), device="cuda", dtype=torch.float32)
+    for index in range(int(tx_id.numel())):
+        cid = int(component_id[index])
+        tx = int(tx_id[index])
+        rx = int(rx_id[index])
+        expected_component_field[cid, tx, rx] += field[index]
+    expected_component_power = expected_component_field.abs().square()
+    expected_field_total = expected_component_field.sum(dim=0)
+    expected_power_total = expected_field_total.abs().square()
+
+    torch.testing.assert_close(result["component_power"], expected_component_power)
+    torch.testing.assert_close(torch.complex(result["component_field_real"], result["component_field_imag"]), expected_component_field)
+    torch.testing.assert_close(result["power_total"], expected_power_total)
+    torch.testing.assert_close(torch.complex(result["field_total_real"], result["field_total_imag"]), expected_field_total)
+
+
+def test_deterministic_accumulate_flat_incoherent_sums_power():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic accumulation")
+
+    tx_id = torch.tensor([0, 0], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, 0], device="cuda", dtype=torch.int32)
+    component_id = torch.tensor([1, 1], device="cuda", dtype=torch.int32)
+    path_gain = torch.tensor([4.0, 9.0], device="cuda", dtype=torch.float32)
+    field_real = torch.tensor([2.0, 3.0], device="cuda", dtype=torch.float32)
+    field_imag = torch.zeros((2,), device="cuda", dtype=torch.float32)
+
+    result = ops.deterministic_accumulate_flat(
+        tx_id,
+        rx_id,
+        component_id,
+        path_gain,
+        field_real,
+        field_imag,
+        num_tx=1,
+        num_rx=1,
+        coherent=False,
+    )
+
+    torch.testing.assert_close(result["component_power"][1], torch.tensor([[13.0]], device="cuda"))
+    torch.testing.assert_close(result["power_total"], torch.tensor([[13.0]], device="cuda"))
+    torch.testing.assert_close(result["field_total_real"], torch.sqrt(torch.tensor([[13.0]], device="cuda")))
+    torch.testing.assert_close(result["field_total_imag"], torch.zeros((1, 1), device="cuda"))

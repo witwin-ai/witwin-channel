@@ -1,4 +1,14 @@
 cmake_minimum_required(VERSION 3.26)
+
+set(CHANNEL_NATIVE_DEFAULT_CUDA_ARCHITECTURES "75-real;80-real;86-real;89-real;120-real;120-virtual")
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES OR CMAKE_CUDA_ARCHITECTURES STREQUAL "" OR CMAKE_CUDA_ARCHITECTURES STREQUAL "52")
+    set(CMAKE_CUDA_ARCHITECTURES "${CHANNEL_NATIVE_DEFAULT_CUDA_ARCHITECTURES}" CACHE STRING "CUDA architectures for Channel Native CUDA targets." FORCE)
+endif()
+set(CHANNEL_NATIVE_DEFAULT_TORCH_CUDA_ARCH_LIST "7.5 8.0 8.6 8.9 12.0+PTX")
+if("$ENV{TORCH_CUDA_ARCH_LIST}" STREQUAL "")
+    set(ENV{TORCH_CUDA_ARCH_LIST} "${CHANNEL_NATIVE_DEFAULT_TORCH_CUDA_ARCH_LIST}")
+endif()
+
 project(channel_native LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -38,6 +48,8 @@ Python_add_library(
     native/channel_native/build_info.cpp
     native/channel_native/kernels/accum.cu
     native/channel_native/kernels/diffraction.cu
+    native/channel_native/kernels/deterministic_accum.cu
+    native/channel_native/kernels/deterministic_field.cu
     native/channel_native/kernels/los.cu
     native/channel_native/kernels/material.cu
     native/channel_native/kernels/reflection.cu

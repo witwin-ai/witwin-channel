@@ -115,6 +115,49 @@ pybind11::dict cn_mc_face_material_tensors(
     torch::Tensor material_sigma_e,
     torch::Tensor material_mu_r,
     torch::Tensor face_material_id);
+pybind11::dict cn_deterministic_los_field(
+    torch::Tensor path_gain,
+    torch::Tensor path_length_m,
+    double frequency_hz);
+pybind11::dict cn_deterministic_diffraction_vector_field(
+    torch::Tensor x_re,
+    torch::Tensor x_im,
+    torch::Tensor y_re,
+    torch::Tensor y_im,
+    torch::Tensor z_re,
+    torch::Tensor z_im);
+pybind11::dict cn_deterministic_reflection_field(
+    torch::Tensor tx_position,
+    torch::Tensor rx_position,
+    torch::Tensor hit_position,
+    torch::Tensor normal,
+    torch::Tensor tx_power,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    double frequency_hz);
+pybind11::dict cn_deterministic_reflection_sequence_field(
+    torch::Tensor tx_position,
+    torch::Tensor rx_position,
+    torch::Tensor hit_positions,
+    torch::Tensor normals,
+    torch::Tensor tx_power,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    double frequency_hz);
+pybind11::dict cn_deterministic_accumulate_flat(
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor component_id,
+    torch::Tensor path_gain,
+    torch::Tensor field_real,
+    torch::Tensor field_imag,
+    int64_t num_tx,
+    int64_t num_rx,
+    bool coherent);
 
 PYBIND11_MODULE(_channel_native, module) {
     module.doc() = "Channel Native Torch/CUDA extension.";
@@ -203,4 +246,24 @@ PYBIND11_MODULE(_channel_native, module) {
         "mc_face_material_tensors",
         &cn_mc_face_material_tensors,
         "Expand material parameters to per-face tensors with a fused CUDA kernel.");
+    module.def(
+        "deterministic_los_field",
+        &cn_deterministic_los_field,
+        "Evaluate deterministic LoS/free-space scalar complex fields with a CUDA kernel.");
+    module.def(
+        "deterministic_diffraction_vector_field",
+        &cn_deterministic_diffraction_vector_field,
+        "Convert RayDN diffraction vector components into scalar deterministic fields with a CUDA kernel.");
+    module.def(
+        "deterministic_reflection_field",
+        &cn_deterministic_reflection_field,
+        "Evaluate deterministic scalar reflection complex fields with a CUDA kernel.");
+    module.def(
+        "deterministic_reflection_sequence_field",
+        &cn_deterministic_reflection_sequence_field,
+        "Evaluate deterministic multi-bounce scalar reflection complex fields with a CUDA kernel.");
+    module.def(
+        "deterministic_accumulate_flat",
+        &cn_deterministic_accumulate_flat,
+        "Accumulate deterministic flat path fields into per-component maps with a CUDA kernel.");
 }

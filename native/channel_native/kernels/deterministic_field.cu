@@ -1,0 +1,543 @@
+#include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAException.h>
+#include <torch/extension.h>
+
+#include <cmath>
+
+namespace {
+
+constexpr int kBlockSize = 256;
+constexpr float kLightSpeed = 299792458.0f;
+constexpr float kEpsilon0 = 8.854187817e-12f;
+constexpr float kPi = 3.14159265358979323846f;
+constexpr float kEps = 1.0e-6f;
+
+void check_tensor(const at::Tensor &tensor, const char *name, c10::ScalarType dtype, int64_t dimensions) {
+    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
+    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
+    TORCH_CHECK(tensor.dim() == dimensions, name, " has the wrong rank");
+    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
+}
+
+struct Float3 {
+    float x;
+    float y;
+    float z;
+};
+
+struct Complex {
+    float r;
+    float i;
+};
+
+__device__ Float3 make_f3(float x, float y, float z) {
+    return {x, y, z};
+}
+
+__device__ Float3 load_f3(const float *ptr, int64_t index) {
+    const int64_t base = index * 3;
+    return {ptr[base + 0], ptr[base + 1], ptr[base + 2]};
+}
+
+__device__ Float3 load_sequence_f3(const float *ptr, int64_t index, int64_t bounce, int64_t depth) {
+    const int64_t base = (index * depth + bounce) * 3;
+    return {ptr[base + 0], ptr[base + 1], ptr[base + 2]};
+}
+
+__device__ Float3 sub_f3(Float3 a, Float3 b) {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+__device__ Float3 scale_f3(Float3 a, float s) {
+    return {a.x * s, a.y * s, a.z * s};
+}
+
+__device__ float dot_f3(Float3 a, Float3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+__device__ Float3 cross_f3(Float3 a, Float3 b) {
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x,
+    };
+}
+
+__device__ float norm_f3(Float3 a) {
+    return sqrtf(fmaxf(dot_f3(a, a), 0.0f));
+}
+
+__device__ Float3 normalize_f3(Float3 a) {
+    const float inv = 1.0f / fmaxf(norm_f3(a), kEps);
+    return scale_f3(a, inv);
+}
+
+__device__ Complex c_make(float r, float i) {
+    return {r, i};
+}
+
+__device__ Complex c_add(Complex a, Complex b) {
+    return {a.r + b.r, a.i + b.i};
+}
+
+__device__ Complex c_sub(Complex a, Complex b) {
+    return {a.r - b.r, a.i - b.i};
+}
+
+__device__ Complex c_mul(Complex a, Complex b) {
+    return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r};
+}
+
+__device__ Complex c_scale(Complex a, float s) {
+    return {a.r * s, a.i * s};
+}
+
+__device__ Complex c_div(Complex a, Complex b) {
+    const float denom = fmaxf(b.r * b.r + b.i * b.i, kEps);
+    return {(a.r * b.r + a.i * b.i) / denom, (a.i * b.r - a.r * b.i) / denom};
+}
+
+__device__ Complex c_sqrt(Complex z) {
+    const float magnitude = hypotf(z.r, z.i);
+    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + z.r)));
+    const float imag_sign = z.i < 0.0f ? -1.0f : 1.0f;
+    const float imag = imag_sign * sqrtf(fmaxf(0.0f, 0.5f * (magnitude - z.r)));
+    return {real, imag};
+}
+
+__device__ Float3 fallback_transverse(Float3 direction) {
+    Float3 axis = fabsf(direction.z) < 0.9f ? make_f3(0.0f, 0.0f, 1.0f) : make_f3(0.0f, 1.0f, 0.0f);
+    return normalize_f3(sub_f3(axis, scale_f3(direction, dot_f3(axis, direction))));
+}
+
+__device__ Complex reflection_coefficient(
+    Float3 incident_direction,
+    Float3 normal,
+    float eps_r,
+    float sigma_e,
+    float mu_r,
+    float gain,
+    float frequency_hz) {
+    Float3 incident = normalize_f3(incident_direction);
+    Float3 n = normalize_f3(normal);
+    if (dot_f3(incident, n) > 0.0f) {
+        n = scale_f3(n, -1.0f);
+    }
+    const float cos_theta = fminf(fmaxf(fabsf(dot_f3(incident, n)), kEps), 1.0f);
+    const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
+    const float omega = fmaxf(2.0f * kPi * frequency_hz, kEps);
+    const float eta_r = fmaxf(eps_r, kEps);
+    const float sigma = fmaxf(sigma_e, 0.0f);
+    const float mu_value = fmaxf(mu_r, kEps);
+    const Complex eta = c_make(eta_r, -sigma / (omega * kEpsilon0));
+    const Complex mu = c_make(mu_value, 0.0f);
+    const Complex root = c_sqrt(c_sub(c_mul(mu, eta), c_make(sin2, 0.0f)));
+    const Complex mu_cos = c_make(mu_value * cos_theta, 0.0f);
+    const Complex eta_cos = c_scale(eta, cos_theta);
+    const Complex r_te = c_div(c_sub(mu_cos, root), c_add(mu_cos, root));
+    const Complex r_tm = c_div(c_sub(eta_cos, root), c_add(eta_cos, root));
+
+    Float3 s_hat = cross_f3(n, incident);
+    const float s_norm = norm_f3(s_hat);
+    const Float3 fallback = fallback_transverse(incident);
+    s_hat = s_norm > kEps ? scale_f3(s_hat, 1.0f / s_norm) : fallback;
+    const Float3 p_in = normalize_f3(cross_f3(s_hat, incident));
+    const Float3 tx_pol = make_f3(1.0f, 0.0f, 0.0f);
+    Float3 transverse = sub_f3(tx_pol, scale_f3(incident, dot_f3(tx_pol, incident)));
+    const float transverse_norm = norm_f3(transverse);
+    transverse = transverse_norm > kEps ? scale_f3(transverse, 1.0f / transverse_norm) : fallback;
+
+    const Complex e_s = c_make(dot_f3(transverse, s_hat), 0.0f);
+    const Complex e_p = c_make(dot_f3(transverse, p_in), 0.0f);
+    Complex coeff = c_add(c_mul(r_te, e_s), c_mul(r_tm, e_p));
+    return c_scale(coeff, gain);
+}
+
+__global__ void deterministic_reflection_field_kernel(
+    const float *__restrict__ tx_position,
+    const float *__restrict__ rx_position,
+    const float *__restrict__ hit_position,
+    const float *__restrict__ normal,
+    const float *__restrict__ tx_power,
+    const float *__restrict__ eps_r,
+    const float *__restrict__ sigma_e,
+    const float *__restrict__ mu_r,
+    const float *__restrict__ gain,
+    float frequency_hz,
+    int64_t count,
+    float *__restrict__ path_gain,
+    float *__restrict__ field_real,
+    float *__restrict__ field_imag) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        const Float3 tx = load_f3(tx_position, index);
+        const Float3 rx = load_f3(rx_position, index);
+        const Float3 hit = load_f3(hit_position, index);
+        Complex coeff = reflection_coefficient(
+            sub_f3(hit, tx),
+            load_f3(normal, index),
+            eps_r[index],
+            sigma_e[index],
+            mu_r[index],
+            gain[index],
+            frequency_hz);
+
+        const float segment0 = norm_f3(sub_f3(hit, tx));
+        const float segment1 = norm_f3(sub_f3(rx, hit));
+        const float path_length = fmaxf(segment0 + segment1, kEps);
+        const float wavelength = kLightSpeed / frequency_hz;
+        const float amplitude = sqrtf(fmaxf(tx_power[index], 0.0f)) * (wavelength / (4.0f * kPi)) / path_length;
+        const float phase = -(2.0f * kPi / wavelength) * path_length;
+        const Complex propagation = c_make(cosf(phase), sinf(phase));
+        const Complex field = c_scale(c_mul(coeff, propagation), amplitude);
+        field_real[index] = field.r;
+        field_imag[index] = field.i;
+        path_gain[index] = field.r * field.r + field.i * field.i;
+    }
+}
+
+__global__ void deterministic_los_field_kernel(
+    const float *__restrict__ input_path_gain,
+    const float *__restrict__ path_length_m,
+    float frequency_hz,
+    int64_t count,
+    float *__restrict__ path_gain,
+    float *__restrict__ field_real,
+    float *__restrict__ field_imag) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        const float gain = fmaxf(input_path_gain[index], 0.0f);
+        const float wavelength = kLightSpeed / frequency_hz;
+        const float phase = -(2.0f * kPi / wavelength) * path_length_m[index];
+        const float amplitude = sqrtf(gain);
+        path_gain[index] = input_path_gain[index];
+        field_real[index] = amplitude * cosf(phase);
+        field_imag[index] = amplitude * sinf(phase);
+    }
+}
+
+__global__ void deterministic_diffraction_vector_field_kernel(
+    const float *__restrict__ x_re,
+    const float *__restrict__ x_im,
+    const float *__restrict__ y_re,
+    const float *__restrict__ y_im,
+    const float *__restrict__ z_re,
+    const float *__restrict__ z_im,
+    int64_t count,
+    float *__restrict__ path_gain,
+    float *__restrict__ field_real,
+    float *__restrict__ field_imag) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        const float px = x_re[index] * x_re[index] + x_im[index] * x_im[index];
+        const float py = y_re[index] * y_re[index] + y_im[index] * y_im[index];
+        const float pz = z_re[index] * z_re[index] + z_im[index] * z_im[index];
+        const float total = px + py + pz;
+        path_gain[index] = total;
+
+        float real = x_re[index];
+        float imag = x_im[index];
+        float dominant = px;
+        if (py > dominant) {
+            dominant = py;
+            real = y_re[index];
+            imag = y_im[index];
+        }
+        if (pz > dominant) {
+            dominant = pz;
+            real = z_re[index];
+            imag = z_im[index];
+        }
+
+        const float dominant_amplitude = sqrtf(fmaxf(dominant, 0.0f));
+        const float total_amplitude = sqrtf(fmaxf(total, 0.0f));
+        if (dominant_amplitude > kEps) {
+            const float scale = total_amplitude / dominant_amplitude;
+            field_real[index] = real * scale;
+            field_imag[index] = imag * scale;
+        } else {
+            field_real[index] = 0.0f;
+            field_imag[index] = 0.0f;
+        }
+    }
+}
+
+__global__ void deterministic_reflection_sequence_field_kernel(
+    const float *__restrict__ tx_position,
+    const float *__restrict__ rx_position,
+    const float *__restrict__ hit_positions,
+    const float *__restrict__ normals,
+    const float *__restrict__ tx_power,
+    const float *__restrict__ eps_r,
+    const float *__restrict__ sigma_e,
+    const float *__restrict__ mu_r,
+    const float *__restrict__ gain,
+    float frequency_hz,
+    int64_t count,
+    int64_t depth,
+    float *__restrict__ path_gain,
+    float *__restrict__ field_real,
+    float *__restrict__ field_imag,
+    float *__restrict__ path_length_m) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        const Float3 tx = load_f3(tx_position, index);
+        const Float3 rx = load_f3(rx_position, index);
+        Float3 previous = tx;
+        Complex coeff = c_make(1.0f, 0.0f);
+        float path_length = 0.0f;
+        for (int64_t bounce = 0; bounce < depth; ++bounce) {
+            const Float3 hit = load_sequence_f3(hit_positions, index, bounce, depth);
+            const Float3 segment = sub_f3(hit, previous);
+            path_length += norm_f3(segment);
+            const int64_t scalar_index = index * depth + bounce;
+            const Complex bounce_coeff = reflection_coefficient(
+                segment,
+                load_sequence_f3(normals, index, bounce, depth),
+                eps_r[scalar_index],
+                sigma_e[scalar_index],
+                mu_r[scalar_index],
+                gain[scalar_index],
+                frequency_hz);
+            coeff = c_mul(coeff, bounce_coeff);
+            previous = hit;
+        }
+
+        path_length = fmaxf(path_length + norm_f3(sub_f3(rx, previous)), kEps);
+        const float wavelength = kLightSpeed / frequency_hz;
+        const float amplitude = sqrtf(fmaxf(tx_power[index], 0.0f)) * (wavelength / (4.0f * kPi)) / path_length;
+        const float phase = -(2.0f * kPi / wavelength) * path_length;
+        const Complex propagation = c_make(cosf(phase), sinf(phase));
+        const Complex field = c_scale(c_mul(coeff, propagation), amplitude);
+        field_real[index] = field.r;
+        field_imag[index] = field.i;
+        path_gain[index] = field.r * field.r + field.i * field.i;
+        path_length_m[index] = path_length;
+    }
+}
+
+}  // namespace
+
+pybind11::dict cn_deterministic_los_field(
+    torch::Tensor path_gain_input,
+    torch::Tensor path_length_m,
+    double frequency_hz) {
+    check_tensor(path_gain_input, "path_gain", torch::kFloat32, 1);
+    check_tensor(path_length_m, "path_length_m", torch::kFloat32, 1);
+    TORCH_CHECK(path_length_m.sizes() == path_gain_input.sizes(), "path_length_m must match path_gain");
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+
+    const int64_t count = path_gain_input.size(0);
+    auto path_gain = at::empty({count}, path_gain_input.options());
+    auto field_real = at::empty({count}, path_gain_input.options());
+    auto field_imag = at::empty({count}, path_gain_input.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_gain_input.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_los_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            path_gain_input.data_ptr<float>(),
+            path_length_m.data_ptr<float>(),
+            static_cast<float>(frequency_hz),
+            count,
+            path_gain.data_ptr<float>(),
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    pybind11::dict out;
+    out["path_gain"] = path_gain;
+    out["field_real"] = field_real;
+    out["field_imag"] = field_imag;
+    return out;
+}
+
+pybind11::dict cn_deterministic_diffraction_vector_field(
+    torch::Tensor x_re,
+    torch::Tensor x_im,
+    torch::Tensor y_re,
+    torch::Tensor y_im,
+    torch::Tensor z_re,
+    torch::Tensor z_im) {
+    check_tensor(x_re, "x_re", torch::kFloat32, 1);
+    check_tensor(x_im, "x_im", torch::kFloat32, 1);
+    check_tensor(y_re, "y_re", torch::kFloat32, 1);
+    check_tensor(y_im, "y_im", torch::kFloat32, 1);
+    check_tensor(z_re, "z_re", torch::kFloat32, 1);
+    check_tensor(z_im, "z_im", torch::kFloat32, 1);
+    TORCH_CHECK(x_im.sizes() == x_re.sizes(), "x_im must match x_re");
+    TORCH_CHECK(y_re.sizes() == x_re.sizes(), "y_re must match x_re");
+    TORCH_CHECK(y_im.sizes() == x_re.sizes(), "y_im must match x_re");
+    TORCH_CHECK(z_re.sizes() == x_re.sizes(), "z_re must match x_re");
+    TORCH_CHECK(z_im.sizes() == x_re.sizes(), "z_im must match x_re");
+
+    const int64_t count = x_re.size(0);
+    auto path_gain = at::empty({count}, x_re.options());
+    auto field_real = at::empty({count}, x_re.options());
+    auto field_imag = at::empty({count}, x_re.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(x_re.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_diffraction_vector_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            x_re.data_ptr<float>(),
+            x_im.data_ptr<float>(),
+            y_re.data_ptr<float>(),
+            y_im.data_ptr<float>(),
+            z_re.data_ptr<float>(),
+            z_im.data_ptr<float>(),
+            count,
+            path_gain.data_ptr<float>(),
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    pybind11::dict out;
+    out["path_gain"] = path_gain;
+    out["field_real"] = field_real;
+    out["field_imag"] = field_imag;
+    return out;
+}
+
+pybind11::dict cn_deterministic_reflection_field(
+    torch::Tensor tx_position,
+    torch::Tensor rx_position,
+    torch::Tensor hit_position,
+    torch::Tensor normal,
+    torch::Tensor tx_power,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    double frequency_hz) {
+    check_tensor(tx_position, "tx_position", torch::kFloat32, 2);
+    check_tensor(rx_position, "rx_position", torch::kFloat32, 2);
+    check_tensor(hit_position, "hit_position", torch::kFloat32, 2);
+    check_tensor(normal, "normal", torch::kFloat32, 2);
+    check_tensor(tx_power, "tx_power", torch::kFloat32, 1);
+    check_tensor(eps_r, "eps_r", torch::kFloat32, 1);
+    check_tensor(sigma_e, "sigma_e", torch::kFloat32, 1);
+    check_tensor(mu_r, "mu_r", torch::kFloat32, 1);
+    check_tensor(gain, "gain", torch::kFloat32, 1);
+    TORCH_CHECK(tx_position.size(1) == 3, "tx_position must have shape (N, 3)");
+    TORCH_CHECK(rx_position.sizes() == tx_position.sizes(), "rx_position must match tx_position");
+    TORCH_CHECK(hit_position.sizes() == tx_position.sizes(), "hit_position must match tx_position");
+    TORCH_CHECK(normal.sizes() == tx_position.sizes(), "normal must match tx_position");
+    const int64_t count = tx_position.size(0);
+    TORCH_CHECK(tx_power.size(0) == count, "tx_power must match path count");
+    TORCH_CHECK(eps_r.size(0) == count, "eps_r must match path count");
+    TORCH_CHECK(sigma_e.size(0) == count, "sigma_e must match path count");
+    TORCH_CHECK(mu_r.size(0) == count, "mu_r must match path count");
+    TORCH_CHECK(gain.size(0) == count, "gain must match path count");
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+
+    auto path_gain = at::empty({count}, tx_position.options());
+    auto field_real = at::empty({count}, tx_position.options());
+    auto field_imag = at::empty({count}, tx_position.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_position.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_reflection_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            tx_position.data_ptr<float>(),
+            rx_position.data_ptr<float>(),
+            hit_position.data_ptr<float>(),
+            normal.data_ptr<float>(),
+            tx_power.data_ptr<float>(),
+            eps_r.data_ptr<float>(),
+            sigma_e.data_ptr<float>(),
+            mu_r.data_ptr<float>(),
+            gain.data_ptr<float>(),
+            static_cast<float>(frequency_hz),
+            count,
+            path_gain.data_ptr<float>(),
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    pybind11::dict out;
+    out["path_gain"] = path_gain;
+    out["field_real"] = field_real;
+    out["field_imag"] = field_imag;
+    return out;
+}
+
+pybind11::dict cn_deterministic_reflection_sequence_field(
+    torch::Tensor tx_position,
+    torch::Tensor rx_position,
+    torch::Tensor hit_positions,
+    torch::Tensor normals,
+    torch::Tensor tx_power,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    double frequency_hz) {
+    check_tensor(tx_position, "tx_position", torch::kFloat32, 2);
+    check_tensor(rx_position, "rx_position", torch::kFloat32, 2);
+    check_tensor(hit_positions, "hit_positions", torch::kFloat32, 3);
+    check_tensor(normals, "normals", torch::kFloat32, 3);
+    check_tensor(tx_power, "tx_power", torch::kFloat32, 1);
+    check_tensor(eps_r, "eps_r", torch::kFloat32, 2);
+    check_tensor(sigma_e, "sigma_e", torch::kFloat32, 2);
+    check_tensor(mu_r, "mu_r", torch::kFloat32, 2);
+    check_tensor(gain, "gain", torch::kFloat32, 2);
+    TORCH_CHECK(tx_position.size(1) == 3, "tx_position must have shape (N, 3)");
+    TORCH_CHECK(rx_position.sizes() == tx_position.sizes(), "rx_position must match tx_position");
+    TORCH_CHECK(hit_positions.size(0) == tx_position.size(0), "hit_positions must match path count");
+    TORCH_CHECK(hit_positions.size(2) == 3, "hit_positions must have shape (N, D, 3)");
+    TORCH_CHECK(normals.sizes() == hit_positions.sizes(), "normals must match hit_positions");
+    const int64_t count = tx_position.size(0);
+    const int64_t depth = hit_positions.size(1);
+    TORCH_CHECK(depth > 0, "hit_positions depth must be positive");
+    TORCH_CHECK(tx_power.size(0) == count, "tx_power must match path count");
+    TORCH_CHECK(eps_r.size(0) == count && eps_r.size(1) == depth, "eps_r must have shape (N, D)");
+    TORCH_CHECK(sigma_e.sizes() == eps_r.sizes(), "sigma_e must match eps_r");
+    TORCH_CHECK(mu_r.sizes() == eps_r.sizes(), "mu_r must match eps_r");
+    TORCH_CHECK(gain.sizes() == eps_r.sizes(), "gain must match eps_r");
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+
+    auto path_gain = at::empty({count}, tx_position.options());
+    auto field_real = at::empty({count}, tx_position.options());
+    auto field_imag = at::empty({count}, tx_position.options());
+    auto path_length = at::empty({count}, tx_position.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_position.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_reflection_sequence_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            tx_position.data_ptr<float>(),
+            rx_position.data_ptr<float>(),
+            hit_positions.data_ptr<float>(),
+            normals.data_ptr<float>(),
+            tx_power.data_ptr<float>(),
+            eps_r.data_ptr<float>(),
+            sigma_e.data_ptr<float>(),
+            mu_r.data_ptr<float>(),
+            gain.data_ptr<float>(),
+            static_cast<float>(frequency_hz),
+            count,
+            depth,
+            path_gain.data_ptr<float>(),
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>(),
+            path_length.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    pybind11::dict out;
+    out["path_gain"] = path_gain;
+    out["field_real"] = field_real;
+    out["field_imag"] = field_imag;
+    out["path_length_m"] = path_length;
+    return out;
+}

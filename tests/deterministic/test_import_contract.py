@@ -1,0 +1,34 @@
+import importlib
+import sys
+
+
+FORBIDDEN_MODULES = (
+    "drjit",
+    "mitsuba",
+    "sionna",
+    "raydn",
+    "witwin.channel",
+)
+
+FORBIDDEN_INTERNAL_MODULES = (
+    "witwin.channel_native.path.raydn_export",
+)
+
+
+def test_deterministic_import_does_not_import_forbidden_solver_stacks():
+    for module_name in list(sys.modules):
+        if module_name == "witwin.channel_native.deterministic" or module_name.startswith(
+            "witwin.channel_native.deterministic."
+        ):
+            sys.modules.pop(module_name, None)
+    for module_name in FORBIDDEN_MODULES:
+        sys.modules.pop(module_name, None)
+    for module_name in FORBIDDEN_INTERNAL_MODULES:
+        sys.modules.pop(module_name, None)
+
+    importlib.import_module("witwin.channel_native.deterministic")
+
+    for module_name in FORBIDDEN_MODULES:
+        assert module_name not in sys.modules
+    for module_name in FORBIDDEN_INTERNAL_MODULES:
+        assert module_name not in sys.modules

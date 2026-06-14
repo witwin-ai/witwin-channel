@@ -644,3 +644,251 @@ def mc_face_material_tensors(
     if not isinstance(exported, dict):
         raise TypeError("_channel_native.mc_face_material_tensors must return a dict")
     return exported
+
+
+def deterministic_los_field(
+    path_gain: torch.Tensor,
+    path_length_m: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
+    if path_length_m.shape != path_gain.shape:
+        raise ValueError("path_length_m must match path_gain")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+
+    native = native_extension()
+    if native is None or not hasattr(native, "deterministic_los_field"):
+        raise RuntimeError("_channel_native.deterministic_los_field CUDA kernel is required")
+    exported = native.deterministic_los_field(path_gain, path_length_m, float(frequency_hz))
+    if not isinstance(exported, dict):
+        raise TypeError("_channel_native.deterministic_los_field must return a dict")
+    validate_cuda_tensor("path_gain", exported["path_gain"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_real", exported["field_real"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_imag", exported["field_imag"], dtype=torch.float32, ndim=1)
+    if exported["path_gain"].shape != path_gain.shape:
+        raise ValueError("_channel_native.deterministic_los_field returned bad shape")
+    return exported
+
+
+def deterministic_diffraction_vector_field(
+    x_re: torch.Tensor,
+    x_im: torch.Tensor,
+    y_re: torch.Tensor,
+    y_im: torch.Tensor,
+    z_re: torch.Tensor,
+    z_im: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("x_re", x_re, dtype=torch.float32, ndim=1)
+    for name, tensor in {
+        "x_im": x_im,
+        "y_re": y_re,
+        "y_im": y_im,
+        "z_re": z_re,
+        "z_im": z_im,
+    }.items():
+        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
+        if tensor.shape != x_re.shape:
+            raise ValueError(f"{name} must match x_re")
+
+    native = native_extension()
+    if native is None or not hasattr(native, "deterministic_diffraction_vector_field"):
+        raise RuntimeError("_channel_native.deterministic_diffraction_vector_field CUDA kernel is required")
+    exported = native.deterministic_diffraction_vector_field(x_re, x_im, y_re, y_im, z_re, z_im)
+    if not isinstance(exported, dict):
+        raise TypeError("_channel_native.deterministic_diffraction_vector_field must return a dict")
+    validate_cuda_tensor("path_gain", exported["path_gain"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_real", exported["field_real"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_imag", exported["field_imag"], dtype=torch.float32, ndim=1)
+    if exported["path_gain"].shape != x_re.shape:
+        raise ValueError("_channel_native.deterministic_diffraction_vector_field returned bad shape")
+    return exported
+
+
+def deterministic_reflection_field(
+    tx_position: torch.Tensor,
+    rx_position: torch.Tensor,
+    hit_position: torch.Tensor,
+    normal: torch.Tensor,
+    tx_power: torch.Tensor,
+    eps_r: torch.Tensor,
+    sigma_e: torch.Tensor,
+    mu_r: torch.Tensor,
+    gain: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("tx_position", tx_position, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("rx_position", rx_position, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("hit_position", hit_position, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("normal", normal, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("eps_r", eps_r, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("sigma_e", sigma_e, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("mu_r", mu_r, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("gain", gain, dtype=torch.float32, ndim=1)
+    count = tx_position.shape[0]
+    if rx_position.shape != tx_position.shape or hit_position.shape != tx_position.shape or normal.shape != tx_position.shape:
+        raise ValueError("reflection field vec3 tensors must have matching shape")
+    for name, tensor in {
+        "tx_power": tx_power,
+        "eps_r": eps_r,
+        "sigma_e": sigma_e,
+        "mu_r": mu_r,
+        "gain": gain,
+    }.items():
+        if tensor.shape[0] != count:
+            raise ValueError(f"{name} must match path count")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+
+    native = native_extension()
+    if native is None or not hasattr(native, "deterministic_reflection_field"):
+        raise RuntimeError("_channel_native.deterministic_reflection_field CUDA kernel is required")
+    exported = native.deterministic_reflection_field(
+        tx_position,
+        rx_position,
+        hit_position,
+        normal,
+        tx_power,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        float(frequency_hz),
+    )
+    if not isinstance(exported, dict):
+        raise TypeError("_channel_native.deterministic_reflection_field must return a dict")
+    validate_cuda_tensor("path_gain", exported["path_gain"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_real", exported["field_real"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_imag", exported["field_imag"], dtype=torch.float32, ndim=1)
+    return exported
+
+
+def deterministic_reflection_sequence_field(
+    tx_position: torch.Tensor,
+    rx_position: torch.Tensor,
+    hit_positions: torch.Tensor,
+    normals: torch.Tensor,
+    tx_power: torch.Tensor,
+    eps_r: torch.Tensor,
+    sigma_e: torch.Tensor,
+    mu_r: torch.Tensor,
+    gain: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("tx_position", tx_position, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("rx_position", rx_position, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("hit_positions", hit_positions, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("normals", normals, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("eps_r", eps_r, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("sigma_e", sigma_e, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("mu_r", mu_r, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("gain", gain, dtype=torch.float32, ndim=2)
+    count = tx_position.shape[0]
+    if rx_position.shape != tx_position.shape:
+        raise ValueError("rx_position must match tx_position")
+    if hit_positions.shape[0] != count or hit_positions.shape[2] != 3:
+        raise ValueError("hit_positions must have shape (path_count, depth, 3)")
+    if normals.shape != hit_positions.shape:
+        raise ValueError("normals must match hit_positions")
+    depth_shape = hit_positions.shape[:2]
+    for name, tensor in {
+        "eps_r": eps_r,
+        "sigma_e": sigma_e,
+        "mu_r": mu_r,
+        "gain": gain,
+    }.items():
+        if tensor.shape != depth_shape:
+            raise ValueError(f"{name} must have shape (path_count, depth)")
+    if tx_power.shape[0] != count:
+        raise ValueError("tx_power must match path count")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+
+    native = native_extension()
+    if native is None or not hasattr(native, "deterministic_reflection_sequence_field"):
+        raise RuntimeError("_channel_native.deterministic_reflection_sequence_field CUDA kernel is required")
+    exported = native.deterministic_reflection_sequence_field(
+        tx_position,
+        rx_position,
+        hit_positions,
+        normals,
+        tx_power,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        float(frequency_hz),
+    )
+    if not isinstance(exported, dict):
+        raise TypeError("_channel_native.deterministic_reflection_sequence_field must return a dict")
+    validate_cuda_tensor("path_gain", exported["path_gain"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_real", exported["field_real"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_imag", exported["field_imag"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("path_length_m", exported["path_length_m"], dtype=torch.float32, ndim=1)
+    return exported
+
+
+def deterministic_accumulate_flat(
+    tx_id: torch.Tensor,
+    rx_id: torch.Tensor,
+    component_id: torch.Tensor,
+    path_gain: torch.Tensor,
+    field_real: torch.Tensor,
+    field_imag: torch.Tensor,
+    *,
+    num_tx: int,
+    num_rx: int,
+    coherent: bool,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("tx_id", tx_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("component_id", component_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_real", field_real, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
+    for name, tensor in {
+        "rx_id": rx_id,
+        "component_id": component_id,
+        "path_gain": path_gain,
+        "field_real": field_real,
+        "field_imag": field_imag,
+    }.items():
+        if tensor.shape != tx_id.shape:
+            raise ValueError(f"{name} must match tx_id shape")
+    if num_tx < 0 or num_rx < 0:
+        raise ValueError("num_tx and num_rx must be non-negative")
+
+    native = native_extension()
+    if native is None or not hasattr(native, "deterministic_accumulate_flat"):
+        raise RuntimeError("_channel_native.deterministic_accumulate_flat CUDA kernel is required")
+    exported = native.deterministic_accumulate_flat(
+        tx_id,
+        rx_id,
+        component_id,
+        path_gain,
+        field_real,
+        field_imag,
+        int(num_tx),
+        int(num_rx),
+        bool(coherent),
+    )
+    if not isinstance(exported, dict):
+        raise TypeError("_channel_native.deterministic_accumulate_flat must return a dict")
+    validate_cuda_tensor("power_total", exported["power_total"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("field_total_real", exported["field_total_real"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("field_total_imag", exported["field_total_imag"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("component_power", exported["component_power"], dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("component_field_real", exported["component_field_real"], dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("component_field_imag", exported["component_field_imag"], dtype=torch.float32, ndim=3)
+    expected_component_shape = (3, int(num_tx), int(num_rx))
+    if tuple(exported["power_total"].shape) != (int(num_tx), int(num_rx)):
+        raise ValueError("_channel_native.deterministic_accumulate_flat returned bad power_total shape")
+    if tuple(exported["component_power"].shape) != expected_component_shape:
+        raise ValueError("_channel_native.deterministic_accumulate_flat returned bad component shape")
+    return exported

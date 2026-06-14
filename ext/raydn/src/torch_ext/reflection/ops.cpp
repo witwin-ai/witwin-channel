@@ -805,6 +805,208 @@ py::tuple trace_refl_epc_field_forward_op(
         active_ctx);
 }
 
+py::tuple reflection_epc_paths_forward_op(
+    int64_t scene_handle,
+    at::Tensor source,
+    at::Tensor receiver,
+    py::object active_obj,
+    at::Tensor expected_prim_ids,
+    at::Tensor direct_plane_points,
+    at::Tensor direct_plane_normals,
+    at::Tensor surface_group_id,
+    at::Tensor surface_group_size,
+    at::Tensor surface_group_members,
+    int64_t max_bounces,
+    int64_t visibility_ignore_mode) {
+    require_vec3f(source, "source");
+    require_vec3f(receiver, "receiver");
+    require_same_batch(source, receiver, "reflection_epc_paths");
+    require_cuda(expected_prim_ids, "expected_prim_ids");
+    require_contiguous(expected_prim_ids, "expected_prim_ids");
+    require_dtype(expected_prim_ids, at::kInt, "expected_prim_ids");
+    require_rank(expected_prim_ids, 2, "expected_prim_ids");
+    require_cuda(direct_plane_points, "direct_plane_points");
+    require_contiguous(direct_plane_points, "direct_plane_points");
+    require_dtype(direct_plane_points, at::kFloat, "direct_plane_points");
+    require_rank(direct_plane_points, 3, "direct_plane_points");
+    require_last_dim(direct_plane_points, 3, "direct_plane_points");
+    require_cuda(direct_plane_normals, "direct_plane_normals");
+    require_contiguous(direct_plane_normals, "direct_plane_normals");
+    require_dtype(direct_plane_normals, at::kFloat, "direct_plane_normals");
+    require_rank(direct_plane_normals, 3, "direct_plane_normals");
+    require_last_dim(direct_plane_normals, 3, "direct_plane_normals");
+    require_flat_i32(surface_group_id, "surface_group_id");
+    require_flat_i32(surface_group_size, "surface_group_size");
+    require_flat_i32(surface_group_members, "surface_group_members");
+    if (max_bounces < 1)
+        throw std::runtime_error("max_bounces must be at least 1.");
+    if (expected_prim_ids.size(0) != source.size(0) || expected_prim_ids.size(1) != max_bounces)
+        throw std::runtime_error("expected_prim_ids must have shape (N, max_bounces).");
+    if (direct_plane_points.size(0) != source.size(0) || direct_plane_points.size(1) != max_bounces)
+        throw std::runtime_error("direct_plane_points must have shape (N, max_bounces, 3).");
+    if (!direct_plane_normals.sizes().equals(direct_plane_points.sizes()))
+        throw std::runtime_error("direct_plane_normals must match direct_plane_points.");
+    if (surface_group_size.size(0) <= 0)
+        throw std::runtime_error("surface_group_size must contain at least one group.");
+    if (surface_group_members.numel() % surface_group_size.size(0) != 0)
+        throw std::runtime_error("surface_group_members must be padded to group_count * max_group_size.");
+
+    at::Tensor active = optional_active_from_py(active_obj, source.size(0), "active");
+    at::Tensor active_ctx = active.defined() ? active : at::empty({0}, source.options().dtype(at::kBool));
+    SceneCache &scene = get_scene(scene_handle);
+    const int64_t ray_count = source.size(0);
+    const int64_t slot_count = ray_count * max_bounces;
+    auto fopts = source.options();
+    auto iopts = scene.global_faces.options();
+
+    at::Tensor valid = at::empty({ray_count}, source.options().dtype(at::kBool));
+    at::Tensor path_length = at::empty({ray_count}, fopts);
+    at::Tensor resolved_prim_ids = at::empty({ray_count, max_bounces}, iopts);
+    at::Tensor surface_group_ids = at::empty({ray_count, max_bounces}, iopts);
+    at::Tensor point_x = at::empty({slot_count}, fopts);
+    at::Tensor point_y = at::empty({slot_count}, fopts);
+    at::Tensor point_z = at::empty({slot_count}, fopts);
+    at::Tensor plane_normal_x = at::empty({slot_count}, fopts);
+    at::Tensor plane_normal_y = at::empty({slot_count}, fopts);
+    at::Tensor plane_normal_z = at::empty({slot_count}, fopts);
+    at::Tensor trace_prim_ids = at::empty({slot_count}, iopts);
+    at::Tensor bounce_count = at::empty({ray_count}, iopts);
+    at::Tensor first_blocked_segment = at::empty({ray_count}, iopts);
+    at::Tensor first_blocked_prim = at::empty({ray_count}, iopts);
+    at::Tensor first_blocked_group = at::empty({ray_count}, iopts);
+    at::Tensor tape_barycentric = at::empty({ray_count, 3}, fopts);
+    at::Tensor source_x = at::empty({ray_count}, fopts);
+    at::Tensor source_y = at::empty({ray_count}, fopts);
+    at::Tensor source_z = at::empty({ray_count}, fopts);
+    at::Tensor receiver_x = at::empty({ray_count}, fopts);
+    at::Tensor receiver_y = at::empty({ray_count}, fopts);
+    at::Tensor receiver_z = at::empty({ray_count}, fopts);
+    at::Tensor ray_dx = at::empty({ray_count}, fopts);
+    at::Tensor ray_dy = at::empty({ray_count}, fopts);
+    at::Tensor ray_dz = at::empty({ray_count}, fopts);
+    at::Tensor ray_tmax = at::empty({ray_count}, fopts);
+
+    if (ray_count == 0) {
+        at::Tensor hit_positions = stack_vec3(point_x, point_y, point_z).reshape({ray_count, max_bounces, 3}).contiguous();
+        at::Tensor normals = stack_vec3(plane_normal_x, plane_normal_y, plane_normal_z).reshape({ray_count, max_bounces, 3}).contiguous();
+        return py::make_tuple(valid, path_length, resolved_prim_ids, surface_group_ids, hit_positions, normals);
+    }
+
+    at::Tensor active_contig = active;
+    at::Tensor direct_plane_points_flat = direct_plane_points.reshape({slot_count, 3}).contiguous();
+    at::Tensor direct_plane_normals_flat = direct_plane_normals.reshape({slot_count, 3}).contiguous();
+    Vec3SoA plane_points = split_vec3(direct_plane_points_flat);
+    Vec3SoA plane_normals = split_vec3(direct_plane_normals_flat);
+    TriangleSoA tri = make_scene_triangle_soa(scene);
+    at::Tensor resolved_flat = resolved_prim_ids.reshape({slot_count}).contiguous();
+    at::Tensor group_flat = surface_group_ids.reshape({slot_count}).contiguous();
+
+    ReflEpcForwardSetupParams setup_params = {};
+    setup_params.n_rays = static_cast<int32_t>(ray_count);
+    setup_params.max_bounces = static_cast<int32_t>(max_bounces);
+    setup_params.source_aos = source.data_ptr<float>();
+    setup_params.receiver_aos = receiver.data_ptr<float>();
+    setup_params.source_x = source_x.data_ptr<float>();
+    setup_params.source_y = source_y.data_ptr<float>();
+    setup_params.source_z = source_z.data_ptr<float>();
+    setup_params.receiver_x = receiver_x.data_ptr<float>();
+    setup_params.receiver_y = receiver_y.data_ptr<float>();
+    setup_params.receiver_z = receiver_z.data_ptr<float>();
+    setup_params.ray_dx = ray_dx.data_ptr<float>();
+    setup_params.ray_dy = ray_dy.data_ptr<float>();
+    setup_params.ray_dz = ray_dz.data_ptr<float>();
+    setup_params.ray_tmax = ray_tmax.data_ptr<float>();
+    setup_params.epc_valid = mutable_mask_ptr(valid);
+    setup_params.epc_bounce_count = bounce_count.data_ptr<int>();
+    setup_params.epc_path_length = path_length.data_ptr<float>();
+    setup_params.point_x = point_x.data_ptr<float>();
+    setup_params.point_y = point_y.data_ptr<float>();
+    setup_params.point_z = point_z.data_ptr<float>();
+    setup_params.trace_prim_ids = trace_prim_ids.data_ptr<int>();
+    setup_params.resolved_prim_ids = resolved_flat.data_ptr<int>();
+    setup_params.surface_group_ids = group_flat.data_ptr<int>();
+    setup_params.plane_normal_x = plane_normal_x.data_ptr<float>();
+    setup_params.plane_normal_y = plane_normal_y.data_ptr<float>();
+    setup_params.plane_normal_z = plane_normal_z.data_ptr<float>();
+    setup_params.first_blocked_segment = first_blocked_segment.data_ptr<int>();
+    setup_params.first_blocked_prim = first_blocked_prim.data_ptr<int>();
+    setup_params.first_blocked_group = first_blocked_group.data_ptr<int>();
+    setup_params.tape_barycentric = tape_barycentric.data_ptr<float>();
+    reflection_epc_forward_setup_gpu(setup_params);
+
+    ReflEpcParams epc_params = {};
+    epc_params.primary_handle = scene.triangle_ias.traversable;
+    epc_params.secondary_handle = 0;
+    epc_params.split_mode = 0;
+    epc_params.tri_p0_x = tri.p0_x.data_ptr<float>();
+    epc_params.tri_p0_y = tri.p0_y.data_ptr<float>();
+    epc_params.tri_p0_z = tri.p0_z.data_ptr<float>();
+    epc_params.tri_e1_x = tri.e1_x.data_ptr<float>();
+    epc_params.tri_e1_y = tri.e1_y.data_ptr<float>();
+    epc_params.tri_e1_z = tri.e1_z.data_ptr<float>();
+    epc_params.tri_e2_x = tri.e2_x.data_ptr<float>();
+    epc_params.tri_e2_y = tri.e2_y.data_ptr<float>();
+    epc_params.tri_e2_z = tri.e2_z.data_ptr<float>();
+    epc_params.tri_fn_x = tri.fn_x.data_ptr<float>();
+    epc_params.tri_fn_y = tri.fn_y.data_ptr<float>();
+    epc_params.tri_fn_z = tri.fn_z.data_ptr<float>();
+    epc_params.face_offsets = tri.face_offsets.data_ptr<int>();
+    epc_params.n_meshes = checked_i32(scene.meshes.size(), "n_meshes");
+    epc_params.n_triangles = tri.n_triangles;
+    epc_params.expected_prim_ids = expected_prim_ids.data_ptr<int>();
+    epc_params.expected_prim_count = static_cast<int32_t>(slot_count);
+    epc_params.surface_group_id = surface_group_id.data_ptr<int>();
+    epc_params.surface_group_id_count = static_cast<int32_t>(surface_group_id.size(0));
+    epc_params.surface_group_size = surface_group_size.data_ptr<int>();
+    epc_params.surface_group_count = static_cast<int32_t>(surface_group_size.size(0));
+    epc_params.surface_group_members = surface_group_members.data_ptr<int>();
+    epc_params.surface_max_group_size = static_cast<int32_t>(surface_group_members.numel() / surface_group_size.size(0));
+    epc_params.visibility_ignore_mode = static_cast<int32_t>(visibility_ignore_mode);
+    epc_params.ray_ox = source_x.data_ptr<float>();
+    epc_params.ray_oy = source_y.data_ptr<float>();
+    epc_params.ray_oz = source_z.data_ptr<float>();
+    epc_params.ray_dx = ray_dx.data_ptr<float>();
+    epc_params.ray_dy = ray_dy.data_ptr<float>();
+    epc_params.ray_dz = ray_dz.data_ptr<float>();
+    epc_params.ray_tmax = ray_tmax.data_ptr<float>();
+    epc_params.direct_plane_point_x = plane_points.x.data_ptr<float>();
+    epc_params.direct_plane_point_y = plane_points.y.data_ptr<float>();
+    epc_params.direct_plane_point_z = plane_points.z.data_ptr<float>();
+    epc_params.direct_plane_normal_x = plane_normals.x.data_ptr<float>();
+    epc_params.direct_plane_normal_y = plane_normals.y.data_ptr<float>();
+    epc_params.direct_plane_normal_z = plane_normals.z.data_ptr<float>();
+    epc_params.rx_x = receiver_x.data_ptr<float>();
+    epc_params.rx_y = receiver_y.data_ptr<float>();
+    epc_params.rx_z = receiver_z.data_ptr<float>();
+    epc_params.rx_count = static_cast<int32_t>(ray_count);
+    epc_params.active_mask = optional_mask_ptr(active_contig);
+    epc_params.n_rays = static_cast<int32_t>(ray_count);
+    epc_params.max_bounces = static_cast<int32_t>(max_bounces);
+    epc_params.out_valid = mutable_mask_ptr(valid);
+    epc_params.out_bounce_count = bounce_count.data_ptr<int>();
+    epc_params.out_path_length = path_length.data_ptr<float>();
+    epc_params.out_point_x = point_x.data_ptr<float>();
+    epc_params.out_point_y = point_y.data_ptr<float>();
+    epc_params.out_point_z = point_z.data_ptr<float>();
+    epc_params.out_trace_prim_ids = trace_prim_ids.data_ptr<int>();
+    epc_params.out_resolved_prim_ids = resolved_flat.data_ptr<int>();
+    epc_params.out_surface_group_ids = group_flat.data_ptr<int>();
+    epc_params.out_plane_normal_x = plane_normal_x.data_ptr<float>();
+    epc_params.out_plane_normal_y = plane_normal_y.data_ptr<float>();
+    epc_params.out_plane_normal_z = plane_normal_z.data_ptr<float>();
+    epc_params.out_first_blocked_segment = first_blocked_segment.data_ptr<int>();
+    epc_params.out_first_blocked_prim = first_blocked_prim.data_ptr<int>();
+    epc_params.out_first_blocked_group = first_blocked_group.data_ptr<int>();
+
+    TorchCudaContext torch_ctx = current_torch_cuda_context();
+    optix_pipeline_for_scene(scene, reflection_epc_pipeline_config())
+        ->launch(0, epc_params, static_cast<unsigned int>(ray_count), torch_ctx.stream);
+
+    at::Tensor hit_positions = stack_vec3(point_x, point_y, point_z).reshape({ray_count, max_bounces, 3}).contiguous();
+    at::Tensor normals = stack_vec3(plane_normal_x, plane_normal_y, plane_normal_z).reshape({ray_count, max_bounces, 3}).contiguous();
+    return py::make_tuple(valid, path_length, resolved_flat.reshape({ray_count, max_bounces}).contiguous(), group_flat.reshape({ray_count, max_bounces}).contiguous(), hit_positions, normals);
+}
+
 py::tuple trace_refl_epc_field_backward_op(
     int64_t scene_handle,
     at::Tensor source,

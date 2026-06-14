@@ -16,7 +16,6 @@ def _empty_scene() -> Scene:
 @pytest.mark.parametrize(
     ("module_name", "message"),
     [
-        ("witwin.channel_native.deterministic", "deterministic solver is reserved"),
         ("witwin.channel_native.psdr", "PSDR solver is reserved"),
     ],
 )

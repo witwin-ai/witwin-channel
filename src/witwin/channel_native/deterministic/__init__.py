@@ -1,7 +1,7 @@
-"""Reserved deterministic solver API for future dense radiomap work."""
+"""Native deterministic RF solver public API."""
 
 from .config import Config
-from .result import Result
+from .result import PathTable, Result
 from .solver import solve
 
-__all__ = ["Config", "Result", "solve"]
+__all__ = ["Config", "PathTable", "Result", "solve"]

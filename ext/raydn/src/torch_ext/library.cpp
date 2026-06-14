@@ -71,6 +71,7 @@ py::tuple trace_reflections_forward_reduced_op(int64_t, at::Tensor, at::Tensor, 
 py::tuple trace_reflections_backward_optional_op(int64_t, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, py::object, py::object);
 py::tuple trace_reflections_jvp_optional_op(int64_t, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, py::object, py::object, py::object, at::Tensor);
 py::tuple trace_refl_epc_field_forward_op(int64_t, at::Tensor, at::Tensor, py::object, int64_t);
+py::tuple reflection_epc_paths_forward_op(int64_t, at::Tensor, at::Tensor, py::object, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, int64_t, int64_t);
 py::tuple trace_refl_epc_field_backward_op(int64_t, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, py::object, py::object, py::object, bool, bool, bool);
 py::tuple trace_refl_epc_field_jvp_op(int64_t, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, py::object, py::object, py::object);
 py::tuple reflection_dedup_forward_op(at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, int64_t, double);
@@ -205,6 +206,11 @@ OptionalTensorList trace_reflections_jvp_optional_dispatch(ScenePtr scene, at::T
 OptionalTensorList trace_refl_epc_field_forward_dispatch(ScenePtr scene, at::Tensor source, at::Tensor receiver, OptionalTensor active, int64_t max_bounces) {
     py::gil_scoped_acquire gil;
     return tuple_to_optional_tensor_list(trace_refl_epc_field_forward_op(handle(scene), source, receiver, to_py_optional(active), max_bounces));
+}
+
+OptionalTensorList reflection_epc_paths_forward_dispatch(ScenePtr scene, at::Tensor source, at::Tensor receiver, OptionalTensor active, at::Tensor expected_prim_ids, at::Tensor direct_plane_points, at::Tensor direct_plane_normals, at::Tensor surface_group_id, at::Tensor surface_group_size, at::Tensor surface_group_members, int64_t max_bounces, int64_t visibility_ignore_mode) {
+    py::gil_scoped_acquire gil;
+    return tuple_to_optional_tensor_list(reflection_epc_paths_forward_op(handle(scene), source, receiver, to_py_optional(active), expected_prim_ids, direct_plane_points, direct_plane_normals, surface_group_id, surface_group_size, surface_group_members, max_bounces, visibility_ignore_mode));
 }
 
 OptionalTensorList trace_refl_epc_field_backward_dispatch(ScenePtr scene, at::Tensor source, at::Tensor receiver, at::Tensor active, at::Tensor tape_prim_id, at::Tensor tape_barycentric, at::Tensor tape_t, OptionalTensor grad_field_real, OptionalTensor grad_field_imag, OptionalTensor grad_path_length, bool need_grad_vertices, bool need_grad_source, bool need_grad_receiver) {
@@ -366,6 +372,7 @@ TORCH_LIBRARY_FRAGMENT(raydn, m) {
     m.def("trace_reflections_backward_optional(" RAYDN_SCHEMA_SCENE " scene, Tensor ray_o, Tensor ray_d, Tensor ray_tmax, Tensor active, Tensor tape_prim_id, Tensor tape_barycentric, Tensor tape_hit_points, Tensor tape_normals, Tensor image_sources, Tensor? grad_t, Tensor? grad_image_sources) -> Tensor?[]");
     m.def("trace_reflections_jvp_optional(" RAYDN_SCHEMA_SCENE " scene, Tensor ray_o, Tensor ray_d, Tensor active, Tensor tape_prim_id, Tensor tape_barycentric, Tensor tape_hit_points, Tensor tape_normals, Tensor? tangent_vertices, Tensor? tangent_ray_o, Tensor? tangent_ray_d, Tensor image_sources) -> Tensor?[]");
     m.def("trace_refl_epc_field_forward(" RAYDN_SCHEMA_SCENE " scene, Tensor source, Tensor receiver, Tensor? active, int max_bounces) -> Tensor?[]");
+    m.def("reflection_epc_paths_forward(" RAYDN_SCHEMA_SCENE " scene, Tensor source, Tensor receiver, Tensor? active, Tensor expected_prim_ids, Tensor direct_plane_points, Tensor direct_plane_normals, Tensor surface_group_id, Tensor surface_group_size, Tensor surface_group_members, int max_bounces, int visibility_ignore_mode) -> Tensor?[]");
     m.def("trace_refl_epc_field_backward(" RAYDN_SCHEMA_SCENE " scene, Tensor source, Tensor receiver, Tensor active, Tensor tape_prim_id, Tensor tape_barycentric, Tensor tape_t, Tensor? grad_field_real, Tensor? grad_field_imag, Tensor? grad_path_length, bool need_grad_vertices, bool need_grad_source, bool need_grad_receiver) -> Tensor?[]");
     m.def("trace_refl_epc_field_jvp(" RAYDN_SCHEMA_SCENE " scene, Tensor source, Tensor receiver, Tensor active, Tensor tape_prim_id, Tensor tape_barycentric, Tensor tape_t, Tensor? tangent_vertices, Tensor? tangent_source, Tensor? tangent_receiver) -> Tensor?[]");
     m.def("reflection_dedup_forward(Tensor bounce_count, Tensor shape_ids, Tensor prim_ids, Tensor t, Tensor bary_u, Tensor bary_v, Tensor hit_x, Tensor hit_y, Tensor hit_z, Tensor norm_x, Tensor norm_y, Tensor norm_z, Tensor img_x, Tensor img_y, Tensor img_z, int max_bounces, float image_source_tolerance) -> Tensor?[]");
@@ -418,6 +425,7 @@ TORCH_LIBRARY_IMPL(raydn, CUDA, m) {
     m.impl("trace_reflections_backward_optional", TORCH_FN(trace_reflections_backward_optional_dispatch));
     m.impl("trace_reflections_jvp_optional", TORCH_FN(trace_reflections_jvp_optional_dispatch));
     m.impl("trace_refl_epc_field_forward", TORCH_FN(trace_refl_epc_field_forward_dispatch));
+    m.impl("reflection_epc_paths_forward", TORCH_FN(reflection_epc_paths_forward_dispatch));
     m.impl("trace_refl_epc_field_backward", TORCH_FN(trace_refl_epc_field_backward_dispatch));
     m.impl("trace_refl_epc_field_jvp", TORCH_FN(trace_refl_epc_field_jvp_dispatch));
     m.impl("reflection_dedup_forward", TORCH_FN(reflection_dedup_forward_dispatch));
