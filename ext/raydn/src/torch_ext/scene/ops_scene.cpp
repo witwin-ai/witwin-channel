@@ -1,6 +1,7 @@
 #include <raydn/scene/cache.h>
 #include <raydn/scene/cache_kernels.h>
 #include <raydn/common/tensor_check.h>
+#include <raydn/native_api.h>
 
 #include <torch/extension.h>
 
@@ -58,6 +59,62 @@ c10::intrusive_ptr<SceneHandle> create_scene_cache_from_flat(
     }
     const int64_t handle = create_scene(std::move(meshes));
     return c10::make_intrusive<SceneHandle>(handle);
+}
+
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_scene_create(
+    const at::Tensor *vertices,
+    const at::Tensor *faces,
+    const at::Tensor *uv,
+    const at::Tensor *face_uv,
+    const at::Tensor *to_world_left,
+    const at::Tensor *to_world_right,
+    const int64_t *mesh_flags,
+    int64_t mesh_count) {
+    if (mesh_count <= 0)
+        throw std::runtime_error("raydn_native_scene_create requires at least one mesh");
+    if (vertices == nullptr || faces == nullptr || uv == nullptr || face_uv == nullptr ||
+        to_world_left == nullptr || to_world_right == nullptr || mesh_flags == nullptr)
+        throw std::runtime_error("raydn_native_scene_create received a null input array");
+    std::vector<MeshRecord> meshes;
+    meshes.reserve(static_cast<size_t>(mesh_count));
+    for (int64_t i = 0; i < mesh_count; ++i) {
+        MeshRecord record;
+        record.vertices = vertices[i];
+        record.faces = faces[i];
+        record.uv = uv[i];
+        record.face_uv = face_uv[i];
+        record.to_world_left = to_world_left[i];
+        record.to_world_right = to_world_right[i];
+        const int64_t flags = mesh_flags[i];
+        record.use_face_normals = (flags & kMeshUseFaceNormals) != 0;
+        record.edges_enabled = (flags & kMeshEdgesEnabled) != 0;
+        record.dynamic = (flags & kMeshDynamic) != 0;
+        meshes.push_back(record);
+    }
+    return create_scene(std::move(meshes));
+}
+
+extern "C" RAYDN_NATIVE_API void raydn_native_scene_destroy(int64_t scene_handle) {
+    destroy_scene(scene_handle);
+}
+
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_scene_edge_records(
+    int64_t scene_handle,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    if (outputs == nullptr)
+        throw std::runtime_error("raydn_native_scene_edge_records received null outputs");
+    constexpr int64_t kOutputCount = 12;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_scene_edge_records output capacity is too small");
+    std::vector<at::Tensor> records =
+        scene_edge_records(c10::make_intrusive<SceneHandle>(scene_handle, false));
+    const int64_t output_count = static_cast<int64_t>(records.size());
+    if (output_count != kOutputCount)
+        throw std::runtime_error("raydn_native_scene_edge_records returned an unexpected output count");
+    for (int64_t i = 0; i < output_count; ++i)
+        outputs[i] = records[static_cast<size_t>(i)];
+    return output_count;
 }
 
 int64_t create_scene_op(py::list mesh_specs) {

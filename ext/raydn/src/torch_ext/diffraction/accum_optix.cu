@@ -962,8 +962,12 @@ static __forceinline__ __device__ float diffraction_weight(int state_idx,
         fmaxf(state_exterior_angle_at(state_idx), 0.25f * kPi);
     const float wedge_scale = fminf(exterior_angle / (2.f * kPi), 2.f);
     const float material_gain = material_gain_for_state(state_idx);
+    const float wave_gain =
+        (params.wavelength * (1.f / (4.f * kPi))) *
+        (params.wavelength * (1.f / (4.f * kPi)));
     return state_src_power_at(state_idx) *
            material_gain *
+           wave_gain *
            fmaxf(edge_measure_weight, 0.f) *
            params.grid_cell_area *
            wedge_scale /

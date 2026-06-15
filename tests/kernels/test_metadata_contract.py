@@ -13,14 +13,14 @@ def test_make_metadata_includes_required_fields():
         forward_launch_count=1,
         raydn_native=False,
         accumulation_strategy="atomic_add",
-        ad_status="unsupported",
+        ad_status="none",
     )
 
     assert set(REQUIRED_METADATA_FIELDS).issubset(metadata)
     assert metadata["primitive"] == "trace_los_field"
     assert metadata["forward_launch_count"] == 1
     assert metadata["raydn_native"] is False
-    assert metadata["fusion_debt"] is False
+    assert "fusion_debt" not in metadata
     validate_metadata(metadata)
 
 
@@ -46,3 +46,8 @@ def test_validate_metadata_rejects_negative_counts():
 
     with pytest.raises(ValueError, match="forward_launch_count"):
         validate_metadata(metadata)
+
+
+def test_validate_metadata_rejects_legacy_unsupported_ad_status():
+    with pytest.raises(ValueError, match="ad_status"):
+        make_metadata(primitive="trace_los_field", ad_status="unsupported")

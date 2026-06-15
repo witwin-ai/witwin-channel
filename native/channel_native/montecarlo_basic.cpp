@@ -22,6 +22,7 @@ at::Tensor cn_mc_store_scaled_component_map_cuda(
     int64_t scale_index);
 at::Tensor cn_mc_sample_directions_cuda(int64_t count, at::Tensor reference);
 at::Tensor cn_mc_los_component_maps_cuda(at::Tensor los);
+at::Tensor cn_mc_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols);
 std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
@@ -167,6 +168,10 @@ torch::Tensor cn_mc_store_scaled_component_map(
 
 torch::Tensor cn_mc_los_component_maps(torch::Tensor los) {
     return cn_mc_los_component_maps_cuda(los);
+}
+
+torch::Tensor cn_mc_los_component_maps_from_matrix(torch::Tensor los, int64_t rows, int64_t cols) {
+    return cn_mc_los_component_maps_from_matrix_cuda(los, rows, cols);
 }
 
 pybind11::tuple cn_mc_los_path_gain_backward(

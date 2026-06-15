@@ -193,6 +193,18 @@ __global__ void los_component_maps_kernel(
     }
 }
 
+__global__ void los_component_maps_public_layout_kernel(
+    const float *__restrict__ los,
+    float *__restrict__ maps,
+    int64_t element_count) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         idx < element_count;
+         idx += stride) {
+        maps[idx] = los[idx];
+    }
+}
+
 __global__ void apply_los_visibility_kernel(
     const float *__restrict__ los,
     const bool *__restrict__ visible,
@@ -209,6 +221,25 @@ __global__ void apply_los_visibility_kernel(
         const int64_t col = cell - row * cols;
         const float gain = visible[cell] ? los[(tx_index * rows + row) * cols + col] : 0.0f;
         maps[(tx_index * cols + col) * rows + row] = gain;
+    }
+}
+
+__global__ void apply_los_visibility_public_layout_kernel(
+    const float *__restrict__ los,
+    const bool *__restrict__ visible,
+    float *__restrict__ maps,
+    int64_t tx_index,
+    int64_t rows,
+    int64_t cols) {
+    const int64_t cell_count = rows * cols;
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t cell = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         cell < cell_count;
+         cell += stride) {
+        const int64_t row = cell / cols;
+        const int64_t col = cell - row * cols;
+        const float gain = visible[cell] ? los[(tx_index * rows + row) * cols + col] : 0.0f;
+        maps[(tx_index * rows + row) * cols + col] = gain;
     }
 }
 
@@ -469,20 +500,42 @@ at::Tensor cn_mc_los_component_maps_cuda(at::Tensor los) {
     return maps;
 }
 
+at::Tensor cn_mc_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols) {
+    check_cuda_tensor(los, "los", at::kFloat, 2);
+    TORCH_CHECK(rows >= 0 && cols >= 0, "rows and cols must be non-negative");
+    TORCH_CHECK(los.size(1) == rows * cols, "los columns must match rows * cols");
+    const int64_t tx_count = los.size(0);
+    auto maps = at::empty({tx_count, cols, rows}, los.options());
+    const int64_t element_count = los.numel();
+    if (element_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
+        const int block_count = static_cast<int>((element_count + kLosBlockSize - 1) / kLosBlockSize);
+        los_component_maps_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            los.data_ptr<float>(),
+            maps.data_ptr<float>(),
+            tx_count,
+            rows,
+            cols);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return maps;
+}
+
 at::Tensor cn_mc_apply_los_visibility_cuda(
     at::Tensor maps,
     at::Tensor los,
     at::Tensor visible,
     int64_t tx_index) {
     check_cuda_tensor(maps, "maps", at::kFloat, 3);
-    check_cuda_tensor(los, "los", at::kFloat, 3);
+    check_cuda_tensor(los, "los", at::kFloat, 2);
     check_cuda_tensor(visible, "visible", at::kBool, 1);
     TORCH_CHECK(maps.size(0) == los.size(0), "maps and los must have the same tx dimension");
-    TORCH_CHECK(maps.size(1) == los.size(2), "maps y dimension must match los cols");
-    TORCH_CHECK(maps.size(2) == los.size(1), "maps x dimension must match los rows");
+    TORCH_CHECK(los.size(1) == maps.size(1) * maps.size(2), "los columns must match map cells");
     TORCH_CHECK(tx_index >= 0 && tx_index < los.size(0), "tx_index is out of range");
-    const int64_t rows = los.size(1);
-    const int64_t cols = los.size(2);
+    TORCH_CHECK(los.get_device() == maps.get_device(), "los must share maps device");
+    TORCH_CHECK(visible.get_device() == maps.get_device(), "visible must share maps device");
+    const int64_t rows = maps.size(2);
+    const int64_t cols = maps.size(1);
     const int64_t cell_count = rows * cols;
     TORCH_CHECK(visible.size(0) == cell_count, "visible length must match one receiver grid");
 
@@ -597,6 +650,246 @@ std::tuple<at::Tensor, at::Tensor> cn_mc_transmitter_tensors_cuda(
 }
 
 at::Tensor cn_mc_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z) {
+    check_cuda_tensor(x, "x", at::kFloat, 1);
+    check_cuda_tensor(y, "y", at::kFloat, 1);
+    check_cuda_tensor(z, "z", at::kFloat, 1);
+    TORCH_CHECK(y.size(0) == x.size(0), "y must match x length");
+    TORCH_CHECK(z.size(0) == x.size(0), "z must match x length");
+    const int64_t count = x.size(0);
+    auto out = at::empty({count, 3}, x.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(x.get_device()).stream();
+        const int block_count = static_cast<int>((count + kLosBlockSize - 1) / kLosBlockSize);
+        pack_vec3_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            x.data_ptr<float>(),
+            y.data_ptr<float>(),
+            z.data_ptr<float>(),
+            out.data_ptr<float>(),
+            count);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return out;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_los_export_cuda(
+    at::Tensor tx_positions,
+    at::Tensor tx_power,
+    at::Tensor rx_positions,
+    double frequency_hz) {
+    check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
+    TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
+    TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+
+    const int64_t tx_count = tx_positions.size(0);
+    const int64_t rx_count = rx_positions.size(0);
+    const int64_t path_count = tx_count * rx_count;
+    auto float_options = tx_positions.options();
+    auto int_options = tx_positions.options().dtype(at::kInt);
+    auto tx_id = at::empty({path_count}, int_options);
+    auto rx_id = at::empty({path_count}, int_options);
+    auto path_length = at::empty({path_count}, float_options);
+    auto delay = at::empty({path_count}, float_options);
+    auto path_gain = at::empty({path_count}, float_options);
+    auto path_gain_matrix = at::empty({tx_count, rx_count}, float_options);
+
+    if (path_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
+        const int block_count = static_cast<int>((path_count + kLosBlockSize - 1) / kLosBlockSize);
+        const float wavelength = static_cast<float>(kLightSpeedMetersPerSecond / frequency_hz);
+        path_los_export_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            tx_positions.data_ptr<float>(),
+            tx_power.data_ptr<float>(),
+            rx_positions.data_ptr<float>(),
+            tx_id.data_ptr<int>(),
+            rx_id.data_ptr<int>(),
+            path_length.data_ptr<float>(),
+            delay.data_ptr<float>(),
+            path_gain.data_ptr<float>(),
+            path_gain_matrix.data_ptr<float>(),
+            tx_count,
+            rx_count,
+            wavelength);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    return {tx_id, rx_id, path_length, delay, path_gain, path_gain_matrix};
+}
+
+at::Tensor cn_bdpt_los_component_maps_cuda(at::Tensor los) {
+    check_cuda_tensor(los, "los", at::kFloat, 3);
+    const int64_t tx_count = los.size(0);
+    const int64_t rows = los.size(1);
+    const int64_t cols = los.size(2);
+    auto maps = at::empty({tx_count, cols, rows}, los.options());
+    const int64_t element_count = los.numel();
+    if (element_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
+        const int block_count = static_cast<int>((element_count + kLosBlockSize - 1) / kLosBlockSize);
+        los_component_maps_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            los.data_ptr<float>(),
+            maps.data_ptr<float>(),
+            tx_count,
+            rows,
+            cols);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return maps;
+}
+
+at::Tensor cn_bdpt_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols) {
+    check_cuda_tensor(los, "los", at::kFloat, 2);
+    TORCH_CHECK(rows >= 0 && cols >= 0, "rows and cols must be non-negative");
+    TORCH_CHECK(los.size(1) == rows * cols, "los columns must match rows * cols");
+    const int64_t tx_count = los.size(0);
+    auto maps = at::empty({tx_count, cols, rows}, los.options());
+    const int64_t element_count = los.numel();
+    if (element_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
+        const int block_count = static_cast<int>((element_count + kLosBlockSize - 1) / kLosBlockSize);
+        los_component_maps_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            los.data_ptr<float>(),
+            maps.data_ptr<float>(),
+            tx_count,
+            rows,
+            cols);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return maps;
+}
+
+at::Tensor cn_bdpt_apply_los_visibility_cuda(
+    at::Tensor maps,
+    at::Tensor los,
+    at::Tensor visible,
+    int64_t tx_index) {
+    check_cuda_tensor(maps, "maps", at::kFloat, 3);
+    check_cuda_tensor(los, "los", at::kFloat, 2);
+    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    TORCH_CHECK(maps.size(0) == los.size(0), "maps and los must have the same tx dimension");
+    TORCH_CHECK(los.size(1) == maps.size(1) * maps.size(2), "los columns must match map cells");
+    TORCH_CHECK(tx_index >= 0 && tx_index < los.size(0), "tx_index is out of range");
+    TORCH_CHECK(los.get_device() == maps.get_device(), "los must share maps device");
+    TORCH_CHECK(visible.get_device() == maps.get_device(), "visible must share maps device");
+    const int64_t rows = maps.size(1);
+    const int64_t cols = maps.size(2);
+    const int64_t cell_count = rows * cols;
+    TORCH_CHECK(visible.size(0) == cell_count, "visible length must match one receiver grid");
+
+    if (cell_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
+        const int block_count = static_cast<int>((cell_count + kLosBlockSize - 1) / kLosBlockSize);
+        apply_los_visibility_public_layout_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            los.data_ptr<float>(),
+            visible.data_ptr<bool>(),
+            maps.data_ptr<float>(),
+            tx_index,
+            rows,
+            cols);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return maps;
+}
+
+std::tuple<at::Tensor, at::Tensor> cn_bdpt_los_visibility_inputs_cuda(
+    at::Tensor tx_positions,
+    int64_t tx_index,
+    int64_t rx_count) {
+    check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
+    TORCH_CHECK(tx_index >= 0 && tx_index < tx_positions.size(0), "tx_index is out of range");
+    TORCH_CHECK(rx_count >= 0, "rx_count must be non-negative");
+
+    auto start = at::empty({rx_count, 3}, tx_positions.options());
+    auto active = at::empty({rx_count}, tx_positions.options().dtype(at::kBool));
+    if (rx_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
+        const int block_count = static_cast<int>((rx_count + kLosBlockSize - 1) / kLosBlockSize);
+        los_visibility_inputs_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            tx_positions.data_ptr<float>(),
+            start.data_ptr<float>(),
+            active.data_ptr<bool>(),
+            tx_index,
+            rx_count);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {start, active};
+}
+
+at::Tensor cn_bdpt_receiver_grid_points_cuda(
+    at::Tensor reference,
+    int64_t rows,
+    int64_t cols,
+    double origin_x,
+    double origin_y,
+    double origin_z,
+    double x_axis_x,
+    double x_axis_y,
+    double x_axis_z,
+    double y_axis_x,
+    double y_axis_y,
+    double y_axis_z,
+    double spacing0,
+    double spacing1) {
+    check_cuda_tensor(reference, "reference", at::kFloat, 2);
+    TORCH_CHECK(rows >= 0 && cols >= 0, "rows and cols must be non-negative");
+    const int64_t count = rows * cols;
+    auto points = at::empty({count, 3}, reference.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
+        const int block_count = static_cast<int>((count + kLosBlockSize - 1) / kLosBlockSize);
+        receiver_grid_points_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            points.data_ptr<float>(),
+            rows,
+            cols,
+            static_cast<float>(origin_x),
+            static_cast<float>(origin_y),
+            static_cast<float>(origin_z),
+            static_cast<float>(x_axis_x),
+            static_cast<float>(x_axis_y),
+            static_cast<float>(x_axis_z),
+            static_cast<float>(y_axis_x),
+            static_cast<float>(y_axis_y),
+            static_cast<float>(y_axis_z),
+            static_cast<float>(spacing0),
+            static_cast<float>(spacing1));
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return points;
+}
+
+std::tuple<at::Tensor, at::Tensor> cn_bdpt_transmitter_tensors_cuda(
+    const std::vector<float> &positions_host,
+    const std::vector<float> &power_host) {
+    TORCH_CHECK(positions_host.size() % 3 == 0, "transmitter positions must be flat xyz triples");
+    const int64_t tx_count = static_cast<int64_t>(power_host.size());
+    TORCH_CHECK(
+        static_cast<int64_t>(positions_host.size()) == tx_count * 3,
+        "transmitter positions and powers must have the same length");
+
+    const int device = c10::cuda::current_device();
+    auto options = at::TensorOptions().dtype(at::kFloat).device(at::kCUDA, device);
+    auto positions = at::empty({tx_count, 3}, options);
+    auto power = at::empty({tx_count}, options);
+    if (tx_count > 0) {
+        C10_CUDA_CHECK(cudaMemcpy(
+            positions.data_ptr<float>(),
+            positions_host.data(),
+            positions_host.size() * sizeof(float),
+            cudaMemcpyHostToDevice));
+        C10_CUDA_CHECK(cudaMemcpy(
+            power.data_ptr<float>(),
+            power_host.data(),
+            power_host.size() * sizeof(float),
+            cudaMemcpyHostToDevice));
+    }
+    return {positions, power};
+}
+
+at::Tensor cn_bdpt_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z) {
     check_cuda_tensor(x, "x", at::kFloat, 1);
     check_cuda_tensor(y, "y", at::kFloat, 1);
     check_cuda_tensor(z, "z", at::kFloat, 1);

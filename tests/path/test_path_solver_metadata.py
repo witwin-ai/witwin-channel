@@ -25,10 +25,11 @@ def test_path_solver_metadata_reports_counts_and_capabilities():
     assert result.metadata["capability"]["path_native"] is path_native
     assert result.metadata["capability"]["raydn_native"] is raydn_native
     assert result.metadata["components"]["los"] == "enabled"
-    assert result.metadata["components"]["reflection"] == "disabled"
-    assert result.metadata["components"]["diffraction"] == "disabled"
+    assert result.metadata["components"]["reflection"] == "not_requested"
+    assert result.metadata["components"]["diffraction"] == "not_requested"
     assert result.metadata["kernel"]["primitive"] == "path_solver"
-    assert result.metadata["kernel"]["launch_count"] == (1 if path_native else 0)
-    assert result.metadata["kernel"]["fusion_debt"] is (not path_native)
-    assert result.metadata["kernel"]["ad_status"] == "unsupported"
+    assert result.metadata["kernel"]["launch_count"] == 1
+    assert result.metadata["kernel"]["scheduling_strategy"] == "native_cuda"
+    assert "fusion_debt" not in result.metadata["kernel"]
+    assert result.metadata["kernel"]["ad_status"] == "none"
     assert result.diagnostics is not None

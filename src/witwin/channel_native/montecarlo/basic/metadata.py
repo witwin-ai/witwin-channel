@@ -14,14 +14,18 @@ def component_status(
     diffraction_available: bool,
 ) -> dict[str, str]:
     status = {
-        "los": "enabled" if "los" in config.components else "disabled",
-        "reflection": "disabled",
-        "diffraction": "disabled",
+        "los": "enabled" if "los" in config.components else "not_requested",
+        "reflection": "not_requested",
+        "diffraction": "not_requested",
     }
     if "reflection" in config.components:
-        status["reflection"] = "enabled" if reflection_available else "capability-disabled"
+        if not reflection_available:
+            raise RuntimeError("reflection requires RayDN native capability")
+        status["reflection"] = "enabled"
     if "diffraction" in config.components:
-        status["diffraction"] = "enabled" if diffraction_available else "capability-disabled"
+        if not diffraction_available:
+            raise RuntimeError("diffraction requires RayDN native capability")
+        status["diffraction"] = "enabled"
     return status
 
 
@@ -49,9 +53,9 @@ def make_solver_metadata(
         tape_bytes=tape_bytes,
         fused_stages=1 if raydn_component_enabled else 0,
         accumulation_strategy=config.accumulation_strategy,
-        scheduling_strategy="native_fused" if raydn_component_enabled else "torch_cuda",
+        scheduling_strategy="native_fused" if raydn_component_enabled else "native_cuda",
         raydn_native=reflection_available or diffraction_available,
-        ad_status=config.ad_mode if config.ad_mode != "none" else "unsupported",
+        ad_status=config.ad_mode if config.ad_mode != "none" else "none",
     )
     return {
         "seed": config.seed,

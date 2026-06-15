@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import importlib
 import re
-import sys
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -18,12 +14,6 @@ from .objects import Structure
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
-_LOCAL_SIONNA_CANDIDATES = (
-    _REPO_ROOT / "reference" / "sionna-rt-reference-2.0.1" / "src",
-    _REPO_ROOT.parent / "channel" / "reference" / "sionna-rt-reference-2.0.1" / "src",
-    _REPO_ROOT.parent / "channel" / "sionna-rt-reference-2.0.1" / "src",
-)
-
 _PLY_SCALAR_DTYPES = {
     "char": "i1",
     "int8": "i1",
@@ -78,37 +68,9 @@ class _NativeMesh:
     source_count: int = 1
 
 
-def _source_roots(source_root: str | Path | None) -> list[Path]:
-    roots: list[Path] = []
-    if source_root is not None:
-        explicit = Path(source_root).expanduser().resolve()
-        if (explicit / "sionna" / "rt").exists():
-            roots.append(explicit)
-        if (explicit / "src" / "sionna" / "rt").exists():
-            roots.append(explicit / "src")
-    for candidate in _LOCAL_SIONNA_CANDIDATES:
-        resolved = candidate.resolve()
-        if (resolved / "sionna" / "rt").exists():
-            roots.append(resolved)
-    seen: set[Path] = set()
-    return [root for root in roots if not (root in seen or seen.add(root))]
-
-
-@contextmanager
-def _local_sionna_on_path(selected: Path | None, *, prefer_local: bool) -> Iterator[None]:
-    entry = None if selected is None else str(selected)
-    added = prefer_local and entry is not None and entry not in sys.path
-    if added:
-        sys.path.insert(0, entry)
-    try:
-        yield
-    finally:
-        pass
-
-
-def _sanitize(name: str | None, fallback: str) -> str:
-    text = re.sub(r"[^0-9A-Za-z_-]+", "-", "" if name is None else str(name)).strip("-_") or fallback
-    return f"{fallback}-{text}" if text[0].isdigit() else text
+def _sanitize(name: str | None, default: str) -> str:
+    text = re.sub(r"[^0-9A-Za-z_-]+", "-", "" if name is None else str(name)).strip("-_") or default
+    return f"{default}-{text}" if text[0].isdigit() else text
 
 
 def _unique(base: str, used: set[str]) -> str:
@@ -149,7 +111,7 @@ def _native_material(material_name: str | None, frequency_hz: float) -> Dielectr
     if material_name is None:
         return Dielectric(eps_r=1.0)
     if material_name not in _ITU_MATERIALS_PROPERTIES:
-        raise ValueError(f"unsupported ITU radio material: {material_name!r}")
+        raise ValueError(f"ITU radio material is not recognized: {material_name!r}")
     eps_r, sigma = _itu_parameters(material_name, frequency_hz)
     return Dielectric(eps_r=eps_r, mu_r=1.0, sigma_e=sigma)
 
@@ -184,11 +146,11 @@ def _read_ply_header(handle) -> tuple[list[str], int, list[tuple[str, str]], int
                 face_count = int(parts[2])
         elif parts[0] == "property" and current_element == "vertex":
             if len(parts) != 3 or parts[1] not in _PLY_SCALAR_DTYPES:
-                raise ValueError(f"unsupported vertex PLY property: {line}")
+                raise ValueError(f"vertex PLY property is not accepted: {line}")
             vertex_properties.append((parts[2], parts[1]))
         elif parts[0] == "property" and current_element == "face":
             if parts != ["property", "list", "uchar", "int", "vertex_indices"]:
-                raise ValueError(f"unsupported face PLY property: {line}")
+                raise ValueError(f"face PLY property is not accepted: {line}")
 
     if vertex_count <= 0 or face_count < 0:
         raise ValueError("invalid PLY element counts")
@@ -393,45 +355,6 @@ def _load_mitsuba_native_ply(
     )
 
 
-def _to_np(value, *, dtype) -> np.ndarray:
-    if isinstance(value, np.ndarray):
-        return value.astype(dtype, copy=False)
-    if isinstance(value, torch.Tensor):
-        return value.detach().cpu().numpy().astype(dtype, copy=False)
-    if hasattr(value, "torch"):
-        tensor = value.torch()
-        if isinstance(tensor, torch.Tensor):
-            return tensor.detach().cpu().numpy().astype(dtype, copy=False)
-    return np.asarray(value, dtype=dtype)
-
-
-def _scalar(value) -> float:
-    array = _to_np(value, dtype=np.float32).reshape(-1)
-    if array.size == 0:
-        raise ValueError("expected a non-empty scalar-like material parameter")
-    return float(array[0])
-
-
-def _extract_mi_mesh(mi_mesh) -> tuple[np.ndarray, np.ndarray]:
-    params = importlib.import_module("mitsuba").traverse(mi_mesh)
-    vertices = _to_np(params["vertex_positions"], dtype=np.float32).reshape(-1, 3)
-    faces = _to_np(params["faces"], dtype=np.int32).reshape(-1, 3)
-    return np.ascontiguousarray(vertices), np.ascontiguousarray(faces)
-
-
-def load_rt(*, source_root: str | Path | None = None, prefer_local: bool = True) -> Any:
-    roots = _source_roots(source_root)
-    selected = roots[0] if roots else None
-    with _local_sionna_on_path(selected, prefer_local=prefer_local):
-        try:
-            return importlib.import_module("sionna.rt")
-        except Exception as exc:
-            searched = ", ".join(str(root) for root in roots) if roots else "<none>"
-            raise ImportError(
-                f"Unable to import sionna.rt. Checked local roots: {searched}."
-            ) from exc
-
-
 def load_mitsuba(
     filename: str | Path,
     *,
@@ -444,7 +367,6 @@ def load_mitsuba(
     frequency: float | None = None,
     metadata: dict[str, object] | None = None,
     native_loader: bool = True,
-    allow_python_fallback: bool = False,
     vertical_ratio: float = 0.7,
     edge_selection_mode: str = "vertical_only",
     edge_diffraction: bool | None = None,
@@ -456,119 +378,18 @@ def load_mitsuba(
         raise FileNotFoundError(f"Mitsuba scene file not found: {scene_path}")
 
     resolved_frequency = 3.5e9 if frequency is None else float(frequency)
-    if native_loader:
-        try:
-            return _load_mitsuba_native_ply(
-                scene_path,
-                scene_cls=scene_cls,
-                merge_shapes=bool(merge_shapes),
-                merge_shapes_exclude_regex=merge_shapes_exclude_regex,
-                frequency=resolved_frequency,
-                metadata=metadata,
-                vertical_ratio=vertical_ratio,
-                edge_selection_mode=edge_selection_mode,
-                edge_diffraction=edge_diffraction,
-                boundary_edge_policy=boundary_edge_policy,
-                source_root=source_root,
-            )
-        except Exception:
-            if not allow_python_fallback:
-                raise
-
-    roots = _source_roots(source_root)
-    rt = load_rt(source_root=source_root, prefer_local=prefer_local)
-    try:
-        sionna_scene = rt.load_scene(
-            str(scene_path),
-            merge_shapes=bool(merge_shapes),
-            merge_shapes_exclude_regex=merge_shapes_exclude_regex,
-            remove_duplicate_vertices=bool(remove_duplicate_vertices),
-        )
-    except TypeError:
-        sionna_scene = rt.load_scene(str(scene_path))
-    if frequency is not None:
-        sionna_scene.frequency = float(frequency)
-
-    structures: list[Structure] = []
-    used: set[str] = set()
-    mat_cache: dict[tuple[object, ...], Dielectric] = {}
-    objects = getattr(sionna_scene, "objects", None)
-    if not isinstance(objects, dict):
-        raise TypeError("expected a sionna.rt.Scene with an object dictionary")
-
-    for index, (key, obj) in enumerate(objects.items()):
-        name = _unique(str(getattr(obj, "name", None) or key or f"structure-{index}"), used)
-        vertices_np, faces_np = _extract_mi_mesh(obj.mi_mesh)
-        radio_mat = getattr(obj, "radio_material", None)
-        if radio_mat is None:
-            material = Dielectric(eps_r=1.0)
-            radio_meta = {
-                "object_key": str(key),
-                "radio_material_name": None,
-                "thickness": None,
-                "scattering_coefficient": None,
-                "xpd_coefficient": None,
-            }
-        else:
-            mat_key = (
-                getattr(radio_mat, "name", None),
-                _scalar(radio_mat.relative_permittivity),
-                _scalar(radio_mat.conductivity),
-                _scalar(radio_mat.thickness),
-                _scalar(radio_mat.scattering_coefficient),
-                _scalar(radio_mat.xpd_coefficient),
-            )
-            material = mat_cache.get(mat_key)
-            if material is None:
-                material = Dielectric(eps_r=float(mat_key[1]), mu_r=1.0, sigma_e=float(mat_key[2]))
-                mat_cache[mat_key] = material
-            radio_meta = {
-                "object_key": str(key),
-                "radio_material_name": mat_key[0],
-                "thickness": mat_key[3],
-                "scattering_coefficient": mat_key[4],
-                "xpd_coefficient": mat_key[5],
-            }
-
-        structures.append(
-            Structure(
-                vertices=torch.from_numpy(vertices_np).to(dtype=torch.float32),
-                faces=torch.from_numpy(faces_np).to(dtype=torch.int32),
-                material=material,
-                name=name,
-                surface_id=index,
-                metadata={"sionna": radio_meta},
-            )
-        )
-
-    scene_frequency = getattr(sionna_scene, "frequency", None)
-    resolved_frequency = frequency
-    if resolved_frequency is None and scene_frequency is not None:
-        resolved_frequency = _scalar(scene_frequency)
-    if resolved_frequency is None:
-        resolved_frequency = 3.5e9
-
-    resolved_metadata = dict(metadata or {})
-    resolved_metadata["mitsuba"] = {
-        "source_path": str(scene_path),
-        "loader": "sionna.rt.load_scene",
-        "merge_shapes": bool(merge_shapes),
-        "merge_shapes_exclude_regex": merge_shapes_exclude_regex,
-        "remove_duplicate_vertices": bool(remove_duplicate_vertices),
-        "frequency": float(resolved_frequency),
-        "sionna_source_root": str(roots[0]) if roots else None,
-    }
-    resolved_metadata["sionna_import_edge_policy"] = EdgePolicy(
+    if not native_loader:
+        raise ValueError("Scene.load_mitsuba requires the native loader")
+    return _load_mitsuba_native_ply(
+        scene_path,
+        scene_cls=scene_cls,
+        merge_shapes=bool(merge_shapes),
+        merge_shapes_exclude_regex=merge_shapes_exclude_regex,
+        frequency=resolved_frequency,
+        metadata=metadata,
         vertical_ratio=vertical_ratio,
         edge_selection_mode=edge_selection_mode,
         edge_diffraction=edge_diffraction,
         boundary_edge_policy=boundary_edge_policy,
-    )
-
-    return scene_cls(
-        structures=structures,
-        transmitters=[],
-        receivers=[],
-        frequency=float(resolved_frequency),
-        metadata=resolved_metadata,
+        source_root=source_root,
     )

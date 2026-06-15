@@ -106,6 +106,67 @@ __global__ void diffraction_state_pack_kernel(
     }
 }
 
+__global__ void diffraction_state_pack_selected_kernel(
+    const bool *__restrict__ selected,
+    const float *__restrict__ edge_pos,
+    const float *__restrict__ edge_dir,
+    const float *__restrict__ line_min,
+    const float *__restrict__ line_max,
+    const float *__restrict__ n0,
+    const float *__restrict__ n1,
+    const int *__restrict__ face0,
+    const int *__restrict__ face1,
+    const float *__restrict__ exterior_angle,
+    const float *__restrict__ tx,
+    const float *__restrict__ tx_power,
+    int *__restrict__ state_edge_index,
+    float *__restrict__ state_edge_pos,
+    float *__restrict__ state_edge_dir,
+    float *__restrict__ state_line_min,
+    float *__restrict__ state_line_max,
+    float *__restrict__ state_n0,
+    float *__restrict__ state_n1,
+    int *__restrict__ state_face0,
+    int *__restrict__ state_face1,
+    float *__restrict__ state_exterior_angle,
+    float *__restrict__ state_src,
+    float *__restrict__ state_src_power,
+    int64_t edge_count) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    const float tx_x = tx[0];
+    const float tx_y = tx[1];
+    const float tx_z = tx[2];
+    const float power = tx_power[0];
+    for (int64_t edge = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         edge < edge_count;
+         edge += stride) {
+        state_edge_index[edge] = static_cast<int>(edge);
+        state_line_min[edge] = line_min[edge];
+        state_line_max[edge] = line_max[edge];
+        state_face0[edge] = face0[edge];
+        state_face1[edge] = face1[edge];
+        state_exterior_angle[edge] = exterior_angle[edge];
+        state_src_power[edge] = selected[edge] ? power : 0.0f;
+
+        const int64_t base = edge * 3;
+        state_edge_pos[base + 0] = edge_pos[base + 0];
+        state_edge_pos[base + 1] = edge_pos[base + 1];
+        state_edge_pos[base + 2] = edge_pos[base + 2];
+        state_edge_dir[base + 0] = edge_dir[base + 0];
+        state_edge_dir[base + 1] = edge_dir[base + 1];
+        state_edge_dir[base + 2] = edge_dir[base + 2];
+        state_n0[base + 0] = n0[base + 0];
+        state_n0[base + 1] = n0[base + 1];
+        state_n0[base + 2] = n0[base + 2];
+        state_n1[base + 0] = n1[base + 0];
+        state_n1[base + 1] = n1[base + 1];
+        state_n1[base + 2] = n1[base + 2];
+        state_src[base + 0] = tx_x;
+        state_src[base + 1] = tx_y;
+        state_src[base + 2] = tx_z;
+    }
+}
+
 __device__ __forceinline__ float3 load_vec3(const float *data, int64_t index) {
     const float *ptr = data + index * 3;
     return make_float3(ptr[0], ptr[1], ptr[2]);
@@ -516,7 +577,7 @@ __global__ void fill_selected_edge_indices_kernel(
 
 }  // namespace
 
-at::Tensor cn_mc_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor state_src) {
+at::Tensor diffraction_state_wi_cuda_impl(at::Tensor state_edge_pos, at::Tensor state_src) {
     check_tensor(state_edge_pos, "state_edge_pos", at::kFloat, 2);
     check_tensor(state_src, "state_src", at::kFloat, 2);
     TORCH_CHECK(state_edge_pos.size(1) == 3, "state_edge_pos must have shape (N, 3)");
@@ -538,7 +599,7 @@ at::Tensor cn_mc_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor
     return state_wi;
 }
 
-at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected) {
+at::Tensor selected_edge_indices_cuda_impl(at::Tensor selected) {
     check_tensor(selected, "selected", at::kBool, 1);
     const int64_t edge_count = selected.size(0);
     auto int_options = selected.options().dtype(at::kInt);
@@ -571,7 +632,7 @@ at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected) {
     return indices;
 }
 
-std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
+std::vector<at::Tensor> diffraction_state_pack_cuda_impl(
     at::Tensor edge_indices,
     at::Tensor edge_pos,
     at::Tensor edge_dir,
@@ -583,7 +644,8 @@ std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
     at::Tensor face1,
     at::Tensor exterior_angle,
     at::Tensor tx,
-    at::Tensor tx_power) {
+    at::Tensor tx_power,
+    int64_t tx_power_index) {
     check_tensor(edge_indices, "edge_indices", at::kInt, 1);
     check_tensor(edge_pos, "edge_pos", at::kFloat, 2);
     check_tensor(edge_dir, "edge_dir", at::kFloat, 2);
@@ -595,7 +657,15 @@ std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
     check_tensor(face1, "face1", at::kInt, 1);
     check_tensor(exterior_angle, "exterior_angle", at::kFloat, 1);
     check_tensor(tx, "tx", at::kFloat, 1);
-    check_tensor(tx_power, "tx_power", at::kFloat, 0);
+    TORCH_CHECK(tx_power.is_cuda(), "tx_power must be a CUDA tensor");
+    TORCH_CHECK(tx_power.scalar_type() == at::kFloat, "tx_power has the wrong dtype");
+    TORCH_CHECK(tx_power.is_contiguous(), "tx_power must be contiguous");
+    TORCH_CHECK(tx_power.dim() == 0 || tx_power.dim() == 1, "tx_power must be scalar or 1-D");
+    if (tx_power.dim() == 0) {
+        TORCH_CHECK(tx_power_index == 0, "tx_power_index must be zero for scalar tx_power");
+    } else {
+        TORCH_CHECK(tx_power_index >= 0 && tx_power_index < tx_power.size(0), "tx_power_index is out of range");
+    }
     TORCH_CHECK(edge_pos.size(1) == 3, "edge_pos must have shape (N, 3)");
     TORCH_CHECK(edge_dir.sizes() == edge_pos.sizes(), "edge_dir must match edge_pos");
     TORCH_CHECK(n0.sizes() == edge_pos.sizes(), "n0 must match edge_pos");
@@ -639,7 +709,7 @@ std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
             face1.data_ptr<int>(),
             exterior_angle.data_ptr<float>(),
             tx.data_ptr<float>(),
-            tx_power.data_ptr<float>(),
+            tx_power.data_ptr<float>() + tx_power_index,
             state_edge_index.data_ptr<int>(),
             state_edge_pos.data_ptr<float>(),
             state_edge_dir.data_ptr<float>(),
@@ -672,7 +742,118 @@ std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
     };
 }
 
-std::vector<at::Tensor> cn_mc_diffraction_edge_geometry_cuda(
+std::vector<at::Tensor> diffraction_state_pack_selected_cuda_impl(
+    at::Tensor selected,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor line_min,
+    at::Tensor line_max,
+    at::Tensor n0,
+    at::Tensor n1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor exterior_angle,
+    at::Tensor tx,
+    at::Tensor tx_power,
+    int64_t tx_power_index) {
+    check_tensor(selected, "selected", at::kBool, 1);
+    check_tensor(edge_pos, "edge_pos", at::kFloat, 2);
+    check_tensor(edge_dir, "edge_dir", at::kFloat, 2);
+    check_tensor(line_min, "line_min", at::kFloat, 1);
+    check_tensor(line_max, "line_max", at::kFloat, 1);
+    check_tensor(n0, "n0", at::kFloat, 2);
+    check_tensor(n1, "n1", at::kFloat, 2);
+    check_tensor(face0, "face0", at::kInt, 1);
+    check_tensor(face1, "face1", at::kInt, 1);
+    check_tensor(exterior_angle, "exterior_angle", at::kFloat, 1);
+    check_tensor(tx, "tx", at::kFloat, 1);
+    TORCH_CHECK(tx_power.is_cuda(), "tx_power must be a CUDA tensor");
+    TORCH_CHECK(tx_power.scalar_type() == at::kFloat, "tx_power has the wrong dtype");
+    TORCH_CHECK(tx_power.is_contiguous(), "tx_power must be contiguous");
+    TORCH_CHECK(tx_power.dim() == 0 || tx_power.dim() == 1, "tx_power must be scalar or 1-D");
+    if (tx_power.dim() == 0) {
+        TORCH_CHECK(tx_power_index == 0, "tx_power_index must be zero for scalar tx_power");
+    } else {
+        TORCH_CHECK(tx_power_index >= 0 && tx_power_index < tx_power.size(0), "tx_power_index is out of range");
+    }
+    TORCH_CHECK(edge_pos.size(1) == 3, "edge_pos must have shape (N, 3)");
+    TORCH_CHECK(edge_dir.sizes() == edge_pos.sizes(), "edge_dir must match edge_pos");
+    TORCH_CHECK(n0.sizes() == edge_pos.sizes(), "n0 must match edge_pos");
+    TORCH_CHECK(n1.sizes() == edge_pos.sizes(), "n1 must match edge_pos");
+    TORCH_CHECK(line_min.size(0) == edge_pos.size(0), "line_min must match edge count");
+    TORCH_CHECK(line_max.size(0) == edge_pos.size(0), "line_max must match edge count");
+    TORCH_CHECK(face0.size(0) == edge_pos.size(0), "face0 must match edge count");
+    TORCH_CHECK(face1.size(0) == edge_pos.size(0), "face1 must match edge count");
+    TORCH_CHECK(exterior_angle.size(0) == edge_pos.size(0), "exterior_angle must match edge count");
+    TORCH_CHECK(selected.size(0) == edge_pos.size(0), "selected must match edge count");
+    TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
+    TORCH_CHECK(edge_pos.get_device() == selected.get_device(), "edge tensors must be on the same device");
+
+    const int64_t state_count = edge_pos.size(0);
+    auto int_options = face0.options();
+    auto float_options = edge_pos.options();
+    auto state_edge_index = at::empty({state_count}, int_options);
+    auto state_edge_pos = at::empty({state_count, 3}, float_options);
+    auto state_edge_dir = at::empty({state_count, 3}, float_options);
+    auto state_line_min = at::empty({state_count}, float_options);
+    auto state_line_max = at::empty({state_count}, float_options);
+    auto state_n0 = at::empty({state_count, 3}, float_options);
+    auto state_n1 = at::empty({state_count, 3}, float_options);
+    auto state_face0 = at::empty({state_count}, int_options);
+    auto state_face1 = at::empty({state_count}, int_options);
+    auto state_exterior_angle = at::empty({state_count}, float_options);
+    auto state_src = at::empty({state_count, 3}, float_options);
+    auto state_src_power = at::empty({state_count}, float_options);
+
+    if (state_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(edge_pos.get_device()).stream();
+        const int block_count = static_cast<int>((state_count + kDiffractionBlockSize - 1) / kDiffractionBlockSize);
+        diffraction_state_pack_selected_kernel<<<block_count, kDiffractionBlockSize, 0, stream>>>(
+            selected.data_ptr<bool>(),
+            edge_pos.data_ptr<float>(),
+            edge_dir.data_ptr<float>(),
+            line_min.data_ptr<float>(),
+            line_max.data_ptr<float>(),
+            n0.data_ptr<float>(),
+            n1.data_ptr<float>(),
+            face0.data_ptr<int>(),
+            face1.data_ptr<int>(),
+            exterior_angle.data_ptr<float>(),
+            tx.data_ptr<float>(),
+            tx_power.data_ptr<float>() + tx_power_index,
+            state_edge_index.data_ptr<int>(),
+            state_edge_pos.data_ptr<float>(),
+            state_edge_dir.data_ptr<float>(),
+            state_line_min.data_ptr<float>(),
+            state_line_max.data_ptr<float>(),
+            state_n0.data_ptr<float>(),
+            state_n1.data_ptr<float>(),
+            state_face0.data_ptr<int>(),
+            state_face1.data_ptr<int>(),
+            state_exterior_angle.data_ptr<float>(),
+            state_src.data_ptr<float>(),
+            state_src_power.data_ptr<float>(),
+            state_count);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    return {
+        state_edge_index,
+        state_edge_pos,
+        state_edge_dir,
+        state_line_min,
+        state_line_max,
+        state_n0,
+        state_n1,
+        state_face0,
+        state_face1,
+        state_exterior_angle,
+        state_src,
+        state_src_power,
+    };
+}
+
+std::vector<at::Tensor> diffraction_edge_geometry_cuda_impl(
     at::Tensor vertices,
     at::Tensor faces,
     at::Tensor face_normals,
@@ -748,7 +929,7 @@ std::vector<at::Tensor> cn_mc_diffraction_edge_geometry_cuda(
     };
 }
 
-std::vector<at::Tensor> cn_mc_surface_group_edge_candidates_cuda(
+std::vector<at::Tensor> surface_group_edge_candidates_cuda_impl(
     at::Tensor vertices,
     at::Tensor faces,
     at::Tensor face_normals,
@@ -892,4 +1073,222 @@ std::vector<at::Tensor> cn_mc_surface_group_edge_candidates_cuda(
     }
 
     return {counts, indices};
+}
+
+at::Tensor cn_mc_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor state_src) {
+    return diffraction_state_wi_cuda_impl(state_edge_pos, state_src);
+}
+
+at::Tensor cn_bdpt_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor state_src) {
+    return diffraction_state_wi_cuda_impl(state_edge_pos, state_src);
+}
+
+at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected) {
+    return selected_edge_indices_cuda_impl(selected);
+}
+
+at::Tensor cn_bdpt_selected_edge_indices_cuda(at::Tensor selected) {
+    return selected_edge_indices_cuda_impl(selected);
+}
+
+std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
+    at::Tensor edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor line_min,
+    at::Tensor line_max,
+    at::Tensor n0,
+    at::Tensor n1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor exterior_angle,
+    at::Tensor tx,
+    at::Tensor tx_power) {
+    return diffraction_state_pack_cuda_impl(
+        edge_indices,
+        edge_pos,
+        edge_dir,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+        tx,
+        tx_power,
+        0);
+}
+
+std::vector<at::Tensor> cn_bdpt_diffraction_state_pack_cuda(
+    at::Tensor edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor line_min,
+    at::Tensor line_max,
+    at::Tensor n0,
+    at::Tensor n1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor exterior_angle,
+    at::Tensor tx,
+    at::Tensor tx_power) {
+    return diffraction_state_pack_cuda_impl(
+        edge_indices,
+        edge_pos,
+        edge_dir,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+        tx,
+        tx_power,
+        0);
+}
+
+std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_cuda(
+    at::Tensor edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor line_min,
+    at::Tensor line_max,
+    at::Tensor n0,
+    at::Tensor n1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor exterior_angle,
+    at::Tensor tx,
+    at::Tensor tx_power,
+    int64_t tx_power_index) {
+    return diffraction_state_pack_cuda_impl(
+        edge_indices,
+        edge_pos,
+        edge_dir,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+        tx,
+        tx_power,
+        tx_power_index);
+}
+
+std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
+    at::Tensor selected,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor line_min,
+    at::Tensor line_max,
+    at::Tensor n0,
+    at::Tensor n1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor exterior_angle,
+    at::Tensor tx,
+    at::Tensor tx_power,
+    int64_t tx_power_index) {
+    return diffraction_state_pack_selected_cuda_impl(
+        selected,
+        edge_pos,
+        edge_dir,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+        tx,
+        tx_power,
+        tx_power_index);
+}
+
+std::vector<at::Tensor> cn_mc_diffraction_edge_geometry_cuda(
+    at::Tensor vertices,
+    at::Tensor faces,
+    at::Tensor face_normals,
+    at::Tensor edge_v0,
+    at::Tensor edge_v1,
+    at::Tensor face0,
+    at::Tensor face1,
+    double plane_tol) {
+    return diffraction_edge_geometry_cuda_impl(
+        vertices,
+        faces,
+        face_normals,
+        edge_v0,
+        edge_v1,
+        face0,
+        face1,
+        plane_tol);
+}
+
+std::vector<at::Tensor> cn_bdpt_diffraction_edge_geometry_cuda(
+    at::Tensor vertices,
+    at::Tensor faces,
+    at::Tensor face_normals,
+    at::Tensor edge_v0,
+    at::Tensor edge_v1,
+    at::Tensor face0,
+    at::Tensor face1,
+    double plane_tol) {
+    return diffraction_edge_geometry_cuda_impl(
+        vertices,
+        faces,
+        face_normals,
+        edge_v0,
+        edge_v1,
+        face0,
+        face1,
+        plane_tol);
+}
+
+std::vector<at::Tensor> cn_mc_surface_group_edge_candidates_cuda(
+    at::Tensor vertices,
+    at::Tensor faces,
+    at::Tensor face_normals,
+    at::Tensor edge_v0,
+    at::Tensor edge_v1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor selected,
+    double plane_tol) {
+    return surface_group_edge_candidates_cuda_impl(
+        vertices,
+        faces,
+        face_normals,
+        edge_v0,
+        edge_v1,
+        face0,
+        face1,
+        selected,
+        plane_tol);
+}
+
+std::vector<at::Tensor> cn_bdpt_surface_group_edge_candidates_cuda(
+    at::Tensor vertices,
+    at::Tensor faces,
+    at::Tensor face_normals,
+    at::Tensor edge_v0,
+    at::Tensor edge_v1,
+    at::Tensor face0,
+    at::Tensor face1,
+    at::Tensor selected,
+    double plane_tol) {
+    return surface_group_edge_candidates_cuda_impl(
+        vertices,
+        faces,
+        face_normals,
+        edge_v0,
+        edge_v1,
+        face0,
+        face1,
+        selected,
+        plane_tol);
 }

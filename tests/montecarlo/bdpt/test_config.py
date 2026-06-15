@@ -1,0 +1,69 @@
+import pytest
+
+from witwin.channel_native.montecarlo.bdpt import Config
+
+
+def test_bdpt_config_defaults_match_public_contract():
+    config = Config()
+
+    assert config.samples == 4096
+    assert config.seed == 0
+    assert config.max_depth == 3
+    assert config.max_light_depth == 3
+    assert config.max_sensor_depth == 3
+    assert config.max_diffraction_order == 1
+    assert config.components == frozenset({"los", "reflection", "diffraction"})
+    assert config.mis == "power_heuristic"
+    assert config.power_heuristic_beta == 2.0
+    assert config.receiver_strategy == "grid_area"
+    assert config.accumulation_strategy == "auto"
+    assert config.sample_streams == 1
+    assert config.diagnostics is False
+    assert config.export_paths is False
+    assert config.max_exported_paths is None
+    assert config.ad_mode == "none"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"samples": 0}, "samples"),
+        ({"seed": -1}, "seed"),
+        ({"max_depth": -1}, "max_depth"),
+        ({"max_light_depth": -1}, "max_light_depth"),
+        ({"max_sensor_depth": -1}, "max_sensor_depth"),
+        ({"max_diffraction_order": 2}, "max_diffraction_order"),
+        ({"components": {"scatter"}}, "components"),
+        ({"components": set()}, "components"),
+        ({"mis": "veach"}, "mis"),
+        ({"power_heuristic_beta": 0.0}, "power_heuristic_beta"),
+        ({"receiver_strategy": "python_loop"}, "receiver_strategy"),
+        ({"accumulation_strategy": "python_loop"}, "accumulation_strategy"),
+        ({"sample_streams": 0}, "sample_streams"),
+        ({"max_exported_paths": -1}, "max_exported_paths"),
+        ({"ad_mode": "vjp"}, "ad_mode"),
+    ],
+)
+def test_bdpt_config_rejects_invalid_values(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        Config(**kwargs)
+
+
+def test_bdpt_config_accepts_supported_variants_and_normalizes_components():
+    config = Config(
+        samples=16,
+        max_light_depth=None,
+        max_sensor_depth=None,
+        max_diffraction_order=0,
+        components=["los"],
+        mis="balance",
+        receiver_strategy="point_sphere",
+        accumulation_strategy="compact",
+        sample_streams=3,
+        export_paths=True,
+        max_exported_paths=8,
+    )
+
+    assert config.max_light_depth == config.max_depth
+    assert config.max_sensor_depth == config.max_depth
+    assert config.components == frozenset({"los"})

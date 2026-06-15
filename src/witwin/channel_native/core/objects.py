@@ -77,12 +77,19 @@ class ReceiverGrid:
 
     def points(self) -> torch.Tensor:
         rows, cols = self.shape
-        points = []
+        origin = (float(self.origin[0]), float(self.origin[1]), float(self.origin[2]))
+        x_axis = (float(self.x_axis[0]), float(self.x_axis[1]), float(self.x_axis[2]))
+        y_axis = (float(self.y_axis[0]), float(self.y_axis[1]), float(self.y_axis[2]))
+        points: list[tuple[float, float, float]] = []
         for i in range(rows):
             for j in range(cols):
+                x_weight = i * self.spacing[0]
+                y_weight = j * self.spacing[1]
                 points.append(
-                    self.origin
-                    + self.x_axis * (i * self.spacing[0])
-                    + self.y_axis * (j * self.spacing[1])
+                    (
+                        origin[0] + x_axis[0] * x_weight + y_axis[0] * y_weight,
+                        origin[1] + x_axis[1] * x_weight + y_axis[1] * y_weight,
+                        origin[2] + x_axis[2] * x_weight + y_axis[2] * y_weight,
+                    )
                 )
-        return torch.stack(points, dim=0)
+        return torch.tensor(points, dtype=torch.float32)

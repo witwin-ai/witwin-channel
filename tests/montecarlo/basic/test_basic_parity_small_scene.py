@@ -23,12 +23,13 @@ def test_single_wall_reflection_scene_is_capability_gated():
         pytest.skip("CUDA is required for MC basic parity")
 
     scene = single_wall_reflection_scene()
+    if not build_info()["uses_raydn_native"]:
+        with pytest.raises(RuntimeError, match="reflection requires RayDN native capability"):
+            solve(scene, Config(samples=256, seed=11, components={"reflection"}))
+        return
+
     result = solve(scene, Config(samples=256, seed=11, components={"reflection"}))
     status = result.metadata["components"]["reflection"]
 
-    if build_info()["uses_raydn_native"]:
-        assert status == "enabled"
-        assert result.component_power["reflection"].is_cuda
-    else:
-        assert status == "capability-disabled"
-        assert result.component_power["reflection"].item() == 0.0
+    assert status == "enabled"
+    assert result.component_power["reflection"].is_cuda

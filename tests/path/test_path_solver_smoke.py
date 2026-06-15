@@ -35,12 +35,12 @@ def test_path_solver_reflection_is_capability_gated():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
 
-    result = solve(single_wall_reflection_scene(), Config(components={"reflection"}))
-
-    if build_info()["uses_raydn_native"]:
-        assert result.metadata["components"]["reflection"] == "enabled"
+    if not build_info()["uses_raydn_native"]:
+        with pytest.raises(RuntimeError, match="reflection paths require RayDN native capability"):
+            solve(single_wall_reflection_scene(), Config(components={"reflection"}))
     else:
-        assert result.metadata["components"]["reflection"] == "capability-disabled"
+        result = solve(single_wall_reflection_scene(), Config(components={"reflection"}))
+        assert result.metadata["components"]["reflection"] == "enabled"
         assert result.valid.numel() == 0
 
 

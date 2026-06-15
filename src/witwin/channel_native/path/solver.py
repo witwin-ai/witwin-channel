@@ -8,12 +8,12 @@ from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.core.material_runtime import face_material_tensors
 
 from .config import Config
 from .raydn_export import (
-    concatenate_path_blocks,
     diffraction_paths_order1,
-    los_visibility_mask,
+    _empty_path_block,
     reflection_paths_order1,
 )
 from .result import Result
@@ -22,16 +22,59 @@ from .result import Result
 _COMPONENT_ID = {"los": 0, "reflection": 1, "diffraction": 2}
 
 
-def _receiver_positions(scene: Scene, *, device: torch.device) -> torch.Tensor:
-    blocks = []
+def _vector3_tuple(value: torch.Tensor) -> tuple[float, float, float]:
+    return (float(value[0]), float(value[1]), float(value[2]))
+
+
+def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
+    flat_positions = tuple(
+        component
+        for transmitter in scene.transmitters
+        for component in _vector3_tuple(transmitter.position)
+    )
+    powers = tuple(float(transmitter.power_w) for transmitter in scene.transmitters)
+    exported = ops.mc_transmitter_tensors(flat_positions, powers)
+    return exported["positions"], exported["power"]
+
+
+def _host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
+    powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
+    return ops.mc_transmitter_tensors(flat_positions, powers)["positions"]
+
+
+def _receiver_positions(scene: Scene, *, reference: torch.Tensor) -> torch.Tensor:
+    blocks: list[torch.Tensor] = []
+    point_positions: list[float] = []
+
+    def flush_points() -> None:
+        nonlocal point_positions
+        if point_positions:
+            blocks.append(_host_vec3_tensor(tuple(point_positions)))
+            point_positions = []
+
     for receiver in scene.receivers:
         if isinstance(receiver, ReceiverPoint):
-            blocks.append(receiver.position.reshape(1, 3))
+            point_positions.extend(_vector3_tuple(receiver.position))
         elif isinstance(receiver, ReceiverGrid):
-            blocks.append(receiver.points())
+            flush_points()
+            blocks.append(
+                ops.mc_receiver_grid_points(
+                    reference,
+                    origin=_vector3_tuple(receiver.origin),
+                    x_axis=_vector3_tuple(receiver.x_axis),
+                    y_axis=_vector3_tuple(receiver.y_axis),
+                    shape=receiver.shape,
+                    spacing=receiver.spacing,
+                )
+            )
         else:
-            raise TypeError(f"unsupported receiver type: {type(receiver).__name__}")
-    return torch.cat(blocks, dim=0).to(device=device, dtype=torch.float32).contiguous()
+            raise TypeError(f"receiver type is not accepted: {type(receiver).__name__}")
+    flush_points()
+    if not blocks:
+        return _host_vec3_tensor(())
+    if len(blocks) == 1:
+        return blocks[0]
+    return ops.path_concat_vec3(blocks)
 
 
 def _component_status(
@@ -41,14 +84,22 @@ def _component_status(
     diffraction_available: bool,
 ) -> dict[str, str]:
     status = {
-        "los": "enabled" if "los" in config.components else "disabled",
-        "reflection": "disabled",
-        "diffraction": "disabled",
+        "los": "enabled" if "los" in config.components else "not_requested",
+        "reflection": "not_requested",
+        "diffraction": "not_requested",
     }
     if "reflection" in config.components:
-        status["reflection"] = "enabled" if reflection_available else "capability-disabled"
+        if not reflection_available:
+            raise RuntimeError("reflection paths require RayDN native capability")
+        if config.max_depth < 1:
+            raise RuntimeError("reflection paths require max_depth >= 1")
+        status["reflection"] = "enabled"
     if "diffraction" in config.components:
-        status["diffraction"] = "enabled" if diffraction_available else "capability-disabled"
+        if not diffraction_available:
+            raise RuntimeError("diffraction paths require RayDN native capability")
+        if config.max_depth < 1:
+            raise RuntimeError("diffraction paths require max_depth >= 1")
+        status["diffraction"] = "enabled"
     return status
 
 
@@ -96,12 +147,11 @@ def _metadata(
 ) -> dict[str, Any]:
     kernel = make_metadata(
         primitive="path_solver",
-        forward_launch_count=1 if path_count and path_native_available else 0,
+        forward_launch_count=1 if path_count else 0,
         accumulation_strategy="none",
-        scheduling_strategy="torch_cuda",
+        scheduling_strategy="native_cuda",
         raydn_native=reflection_available or diffraction_available,
-        fusion_debt=not path_native_available,
-        ad_status="unsupported",
+        ad_status="none",
     )
     capability = {
         "path_native": path_native_available,
@@ -137,19 +187,23 @@ def solve(scene: Scene, config: Config) -> Result:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.path solver requires CUDA")
     if config.ad_mode != "none":
-        raise RuntimeError("path topology AD is unsupported")
+        raise RuntimeError("path topology AD is not enabled")
 
     info = build_info()
     reflection_available = bool(info["uses_raydn_native"])
     diffraction_available = bool(info["uses_raydn_native"])
     path_native_available = bool(info.get("uses_path_native", False))
-    if config.require_reflection and "reflection" in config.components and not reflection_available:
+    if not path_native_available:
+        raise RuntimeError("path solver requires _channel_native path native CUDA kernels")
+    if "reflection" in config.components and not reflection_available:
         raise RuntimeError("reflection paths require RayDN native capability")
-    if config.require_diffraction and "diffraction" in config.components and not diffraction_available:
+    if "diffraction" in config.components and not diffraction_available:
         raise RuntimeError("diffraction paths require RayDN native capability")
+    if config.max_depth < 1 and ("reflection" in config.components or "diffraction" in config.components):
+        raise RuntimeError("requested scattering paths require max_depth >= 1")
 
-    device = torch.device("cuda")
     if not scene.transmitters:
+        device = torch.device("cuda")
         return _empty_result(
             device=device,
             config=config,
@@ -159,12 +213,15 @@ def solve(scene: Scene, config: Config) -> Result:
         )
 
     compiled = scene.compile()
-    tx_positions = torch.stack([tx.position for tx in scene.transmitters], dim=0).to(
-        device=device, dtype=torch.float32
+    tx_positions, tx_power = _transmitter_tensors(scene)
+    device = tx_positions.device
+    rx_positions = _receiver_positions(scene, reference=tx_positions)
+    material_tensors = (
+        face_material_tensors(scene, device=device)
+        if scene.structures and (("reflection" in config.components) or ("diffraction" in config.components))
+        else None
     )
-    tx_power = torch.tensor([tx.power_w for tx in scene.transmitters], device=device, dtype=torch.float32)
-    rx_positions = _receiver_positions(scene, device=device)
-    blocks: list[dict[str, torch.Tensor]] = []
+    los_block = _empty_path_block(device)
     if "los" in config.components:
         exported = ops.path_los_export(
             tx_positions,
@@ -172,58 +229,63 @@ def solve(scene: Scene, config: Config) -> Result:
             rx_positions,
             frequency_hz=scene.frequency,
         )
-        tx_id = exported["tx_id"]
-        rx_id = exported["rx_id"]
-        tx_for_path = tx_positions.index_select(0, tx_id.to(dtype=torch.long))
-        rx_for_path = rx_positions.index_select(0, rx_id.to(dtype=torch.long))
-        visible = los_visibility_mask(
-            compiled.raydn,
-            tx_for_path,
-            rx_for_path,
-            has_structures=bool(scene.structures),
+        visibility_inputs = ops.path_los_visibility_inputs(
+            tx_positions,
+            rx_positions,
+            exported["tx_id"],
+            exported["rx_id"],
         )
-        keep = visible.nonzero(as_tuple=False).flatten()
-        blocks.append(
-            {
-                "valid": torch.ones((int(keep.numel()),), device=device, dtype=torch.bool),
-                "tx_id": tx_id[keep].to(dtype=torch.int32).contiguous(),
-                "rx_id": rx_id[keep].to(dtype=torch.int32).contiguous(),
-                "depth": torch.zeros((int(keep.numel()),), device=device, dtype=torch.int32),
-                "component_id": torch.full(
-                    (int(keep.numel()),), _COMPONENT_ID["los"], device=device, dtype=torch.int32
-                ),
-                "primitive_id": torch.full((int(keep.numel()),), -1, device=device, dtype=torch.int32),
-                "edge_id": torch.full((int(keep.numel()),), -1, device=device, dtype=torch.int32),
-                "path_length_m": exported["path_length_m"][keep].to(dtype=torch.float32).contiguous(),
-                "delay_s": exported["delay_s"][keep].to(dtype=torch.float32).contiguous(),
-                "path_gain": exported["path_gain"][keep].to(dtype=torch.float32).contiguous(),
-            }
+        if scene.structures:
+            if not compiled.raydn.available:
+                raise RuntimeError("LoS visibility requires RayDN native capability")
+            visible = ops.raydn_visibility_forward(
+                compiled.raydn.require_handle(),
+                visibility_inputs["start"],
+                visibility_inputs["end"],
+                visibility_inputs["active"],
+            )[0]
+        else:
+            visible = visibility_inputs["active"]
+        los_block = ops.path_filter_los(
+            exported["tx_id"],
+            exported["rx_id"],
+            exported["path_length_m"],
+            exported["delay_s"],
+            exported["path_gain"],
+            visible,
         )
+    reflection_block = _empty_path_block(device)
     if "reflection" in config.components and reflection_available and config.max_depth >= 1:
-        blocks.append(
-            reflection_paths_order1(
-                scene,
-                compiled.raydn,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=scene.frequency,
-            )
+        reflection_block = reflection_paths_order1(
+            scene,
+            compiled.raydn,
+            tx_positions,
+            tx_power,
+            rx_positions,
+            frequency_hz=scene.frequency,
+            material_tensors=material_tensors,
         )
+    diffraction_block = _empty_path_block(device)
     if "diffraction" in config.components and diffraction_available and config.max_depth >= 1:
-        blocks.append(
-            diffraction_paths_order1(
-                scene,
-                compiled.raydn,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=scene.frequency,
-            )
+        diffraction_block = diffraction_paths_order1(
+            scene,
+            compiled.raydn,
+            tx_positions,
+            tx_power,
+            rx_positions,
+            frequency_hz=scene.frequency,
+            material_tensors=material_tensors,
         )
 
-    exported_paths = concatenate_path_blocks(blocks, device=device)
-    path_count = int(exported_paths["path_gain"].numel())
+    exported_paths = ops.path_finalize_blocks(
+        los_block,
+        reflection_block,
+        diffraction_block,
+        max_paths=config.max_paths,
+        tx_count=len(scene.transmitters),
+        max_depth=config.max_depth,
+    )
+    path_count = int(exported_paths["path_gain"].shape[0])
     if path_count == 0:
         return _empty_result(
             device=device,
@@ -232,19 +294,6 @@ def solve(scene: Scene, config: Config) -> Result:
             diffraction_available=diffraction_available,
             path_native_available=path_native_available,
         )
-    sort_key = (
-        (((exported_paths["rx_id"].to(dtype=torch.long) * max(len(scene.transmitters), 1))
-          + exported_paths["tx_id"].to(dtype=torch.long))
-         * (max(int(config.max_depth), 1) + 1)
-         + exported_paths["depth"].to(dtype=torch.long))
-        * len(_COMPONENT_ID)
-        + exported_paths["component_id"].to(dtype=torch.long)
-    )
-    order = torch.argsort(sort_key, stable=True)
-    if config.max_paths is not None:
-        path_count = min(path_count, config.max_paths)
-        order = order[:path_count]
-
     metadata = _metadata(
         config=config,
         path_count=path_count,
@@ -261,16 +310,16 @@ def solve(scene: Scene, config: Config) -> Result:
             "component_order": dict(_COMPONENT_ID),
         }
     return Result(
-        valid=torch.ones((path_count,), device=device, dtype=torch.bool),
-        tx_id=exported_paths["tx_id"][order].contiguous(),
-        rx_id=exported_paths["rx_id"][order].contiguous(),
-        depth=exported_paths["depth"][order].contiguous(),
-        component_id=exported_paths["component_id"][order].contiguous(),
-        primitive_id=exported_paths["primitive_id"][order].contiguous(),
-        edge_id=exported_paths["edge_id"][order].contiguous(),
-        path_length_m=exported_paths["path_length_m"][order].to(dtype=torch.float32).contiguous(),
-        delay_s=exported_paths["delay_s"][order].to(dtype=torch.float32).contiguous(),
-        path_gain=exported_paths["path_gain"][order].to(dtype=torch.float32).contiguous(),
+        valid=exported_paths["valid"],
+        tx_id=exported_paths["tx_id"],
+        rx_id=exported_paths["rx_id"],
+        depth=exported_paths["depth"],
+        component_id=exported_paths["component_id"],
+        primitive_id=exported_paths["primitive_id"],
+        edge_id=exported_paths["edge_id"],
+        path_length_m=exported_paths["path_length_m"],
+        delay_s=exported_paths["delay_s"],
+        path_gain=exported_paths["path_gain"],
         metadata=metadata,
         diagnostics=diagnostics,
     )

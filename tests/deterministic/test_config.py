@@ -15,8 +15,6 @@ def test_config_defaults_match_public_contract():
     assert config.max_paths is None
     assert config.sort_key == "receiver_transmitter_depth_component"
     assert config.diagnostics is False
-    assert config.require_reflection is False
-    assert config.require_diffraction is False
     assert config.ad_mode == "none"
 
 

@@ -10,4 +10,7 @@ def test_reserved_solver_packages_import():
     assert path.Result.__name__ == "Result"
     assert psdr.Config.__name__ == "Config"
     assert psdr.Result.__name__ == "Result"
-    assert bdpt.__doc__
+    assert bdpt.Config.__name__ == "Config"
+    assert bdpt.Result.__name__ == "Result"
+    assert bdpt.BDPTPathSamples.__name__ == "BDPTPathSamples"
+    assert callable(bdpt.solve)

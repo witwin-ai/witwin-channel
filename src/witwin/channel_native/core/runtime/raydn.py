@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel_native.core.kernels import raydn_backend
-from witwin.channel_native.core.kernels.ops import mc_pack_vec3
+from witwin.channel_native.core.kernels.ops import mc_pack_vec3, raydn_scene_create, raydn_scene_edge_records
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +25,8 @@ class RayDNEdgeRecords:
 class RayDNScene:
     """Opaque wrapper for a native RayDN scene/cache handle."""
 
-    handle: object | None = None
+    handle: int | None = None
+    owner: object | None = None
     mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
     reason: str | None = None
     runtime_cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
@@ -35,7 +35,7 @@ class RayDNScene:
     def available(self) -> bool:
         return self.handle is not None
 
-    def require_handle(self) -> object:
+    def require_handle(self) -> int:
         if self.handle is None:
             reason = "unknown" if self.reason is None else self.reason
             raise RuntimeError(f"RayDN native scene is unavailable: {reason}")
@@ -45,7 +45,7 @@ class RayDNScene:
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
             return cached  # type: ignore[return-value]
-        values = self.require_handle().edge_records()
+        values = raydn_scene_edge_records(self.require_handle())
         if len(values) != 12:
             raise RuntimeError(f"RayDN edge_records returned {len(values)} tensors, expected 12")
         face_normals = mc_pack_vec3(values[2], values[3], values[4])
@@ -92,7 +92,6 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
     if not torch.cuda.is_available():
         return RayDNScene(reason="CUDA is unavailable")
 
-    raydn_backend.require_native_extension()
     device = torch.device("cuda")
     vertices: list[torch.Tensor] = []
     faces: list[torch.Tensor] = []
@@ -128,14 +127,13 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
             )
         )
 
-    with torch._C._DisableFuncTorch():
-        handle = torch.classes.raydn.Scene(
-            vertices,
-            faces,
-            uv,
-            face_uv,
-            to_world_left,
-            to_world_right,
-            mesh_flags,
-        )
-    return RayDNScene(handle=handle, mesh_tensors=tuple(keepalive))
+    handle, owner = raydn_scene_create(
+        vertices,
+        faces,
+        uv,
+        face_uv,
+        to_world_left,
+        to_world_right,
+        mesh_flags,
+    )
+    return RayDNScene(handle=handle, owner=owner, mesh_tensors=tuple(keepalive))

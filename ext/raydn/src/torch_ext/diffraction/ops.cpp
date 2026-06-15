@@ -20,6 +20,7 @@
 #include <raydn/reflection/epc_params.h>
 #include <raydn/reflection/trace_params.h>
 #include <raydn/reflection/visibility_params.h>
+#include <raydn/native_api.h>
 #include <raydn/scene/cache.h>
 #include <raydn/common/tensor_check.h>
 
@@ -677,6 +678,76 @@ py::tuple diffraction_paths_order1_forward_op(
         out_p2);
 }
 
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_diffraction_paths_order1_forward(
+    int64_t scene_handle,
+    const at::Tensor *tx_pos,
+    const at::Tensor *rx_pos,
+    const at::Tensor *active,
+    const at::Tensor *state_edge_index,
+    const at::Tensor *state_edge_pos,
+    const at::Tensor *state_edge_dir,
+    const at::Tensor *state_edge_t_min,
+    const at::Tensor *state_edge_t_max,
+    const at::Tensor *state_n0,
+    const at::Tensor *state_n1,
+    const at::Tensor *state_prim0,
+    const at::Tensor *state_prim1,
+    const at::Tensor *state_exterior_angle,
+    const at::Tensor *state_src,
+    const at::Tensor *state_src_power,
+    const at::Tensor *material_gain,
+    const at::Tensor *material_valid,
+    int64_t state_limit,
+    int64_t capacity,
+    double wavelength,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    auto required = [](const at::Tensor *tensor, const char *name) -> const at::Tensor & {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_diffraction_paths_order1_forward received null ") + name);
+        return *tensor;
+    };
+    auto optional = [](const at::Tensor *tensor) -> c10::optional<at::Tensor> {
+        if (tensor == nullptr || !tensor->defined())
+            return c10::nullopt;
+        return *tensor;
+    };
+    if (outputs == nullptr)
+        throw std::runtime_error("raydn_native_diffraction_paths_order1_forward received null outputs");
+    constexpr int64_t kOutputCount = 18;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_diffraction_paths_order1_forward output capacity is too small");
+
+    py::tuple result = diffraction_paths_order1_forward_op(
+        scene_handle,
+        required(tx_pos, "tx_pos"),
+        required(rx_pos, "rx_pos"),
+        optional(active),
+        required(state_edge_index, "state_edge_index"),
+        required(state_edge_pos, "state_edge_pos"),
+        required(state_edge_dir, "state_edge_dir"),
+        required(state_edge_t_min, "state_edge_t_min"),
+        required(state_edge_t_max, "state_edge_t_max"),
+        required(state_n0, "state_n0"),
+        required(state_n1, "state_n1"),
+        required(state_prim0, "state_prim0"),
+        required(state_prim1, "state_prim1"),
+        required(state_exterior_angle, "state_exterior_angle"),
+        required(state_src, "state_src"),
+        required(state_src_power, "state_src_power"),
+        required(material_gain, "material_gain"),
+        required(material_valid, "material_valid"),
+        state_limit,
+        capacity,
+        wavelength);
+    const int64_t output_count = static_cast<int64_t>(py::len(result));
+    if (output_count != kOutputCount)
+        throw std::runtime_error("raydn_native_diffraction_paths_order1_forward returned an unexpected output count");
+    for (int64_t i = 0; i < output_count; ++i)
+        outputs[i] = result[static_cast<size_t>(i)].cast<at::Tensor>();
+    return output_count;
+}
+
 py::tuple diffraction_accumulation_forward_op(
     int64_t scene_handle,
     c10::optional<at::Tensor> active,
@@ -1204,6 +1275,138 @@ py::tuple diffraction_accumulation_forward_op(
         tape_cell,
         tape_material_idx,
         tape_edge_u);
+}
+
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_diffraction_accumulation_forward(
+    int64_t scene_handle,
+    const at::Tensor *active,
+    const at::Tensor *state_edge_index,
+    const at::Tensor *state_edge_pos,
+    const at::Tensor *state_edge_dir,
+    const at::Tensor *state_edge_t_min,
+    const at::Tensor *state_edge_t_max,
+    const at::Tensor *state_n0,
+    const at::Tensor *state_n1,
+    const at::Tensor *state_prim0,
+    const at::Tensor *state_prim1,
+    const at::Tensor *state_exterior_angle,
+    const at::Tensor *state_src,
+    const at::Tensor *state_src_power,
+    const at::Tensor *state_wi,
+    const at::Tensor *state_d0,
+    const at::Tensor *material_eta_r,
+    const at::Tensor *material_sigma,
+    const at::Tensor *material_mu_r,
+    const at::Tensor *material_gain,
+    const at::Tensor *material_valid,
+    int64_t state_limit,
+    int64_t grid_axis,
+    double grid_position,
+    double grid_coord0_min,
+    double grid_coord0_max,
+    double grid_coord1_min,
+    double grid_coord1_max,
+    int64_t grid_resolution0,
+    int64_t grid_resolution1,
+    double grid_cell_area,
+    double wavelength,
+    int64_t direct_samples,
+    int64_t keller_samples,
+    int64_t suffix_samples,
+    int64_t seed,
+    int64_t max_order,
+    int64_t recursive_state_limit,
+    const at::Tensor *recursive_active,
+    const at::Tensor *recursive_state_edge_index,
+    const at::Tensor *recursive_state_edge_pos,
+    const at::Tensor *recursive_state_edge_dir,
+    const at::Tensor *recursive_state_edge_t_min,
+    const at::Tensor *recursive_state_edge_t_max,
+    const at::Tensor *recursive_state_n0,
+    const at::Tensor *recursive_state_n1,
+    const at::Tensor *recursive_state_prim0,
+    const at::Tensor *recursive_state_prim1,
+    const at::Tensor *recursive_state_exterior_angle,
+    int64_t export_tape,
+    const at::Tensor *sample_state_index,
+    const at::Tensor *sample_edge_weight,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    auto required = [](const at::Tensor *tensor, const char *name) {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_diffraction_accumulation_forward received null ") + name);
+        return *tensor;
+    };
+    auto optional = [](const at::Tensor *tensor) -> c10::optional<at::Tensor> {
+        if (tensor == nullptr || !tensor->defined())
+            return c10::nullopt;
+        return *tensor;
+    };
+    if (outputs == nullptr)
+        throw std::runtime_error("raydn_native_diffraction_accumulation_forward received null outputs");
+    constexpr int64_t kOutputCount = 19;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_diffraction_accumulation_forward output capacity is too small");
+
+    py::tuple result = diffraction_accumulation_forward_op(
+        scene_handle,
+        optional(active),
+        required(state_edge_index, "state_edge_index"),
+        required(state_edge_pos, "state_edge_pos"),
+        required(state_edge_dir, "state_edge_dir"),
+        required(state_edge_t_min, "state_edge_t_min"),
+        required(state_edge_t_max, "state_edge_t_max"),
+        required(state_n0, "state_n0"),
+        required(state_n1, "state_n1"),
+        required(state_prim0, "state_prim0"),
+        required(state_prim1, "state_prim1"),
+        required(state_exterior_angle, "state_exterior_angle"),
+        required(state_src, "state_src"),
+        required(state_src_power, "state_src_power"),
+        optional(state_wi),
+        optional(state_d0),
+        required(material_eta_r, "material_eta_r"),
+        required(material_sigma, "material_sigma"),
+        required(material_mu_r, "material_mu_r"),
+        required(material_gain, "material_gain"),
+        required(material_valid, "material_valid"),
+        state_limit,
+        grid_axis,
+        grid_position,
+        grid_coord0_min,
+        grid_coord0_max,
+        grid_coord1_min,
+        grid_coord1_max,
+        grid_resolution0,
+        grid_resolution1,
+        grid_cell_area,
+        wavelength,
+        direct_samples,
+        keller_samples,
+        suffix_samples,
+        seed,
+        max_order,
+        recursive_state_limit,
+        optional(recursive_active),
+        optional(recursive_state_edge_index),
+        optional(recursive_state_edge_pos),
+        optional(recursive_state_edge_dir),
+        optional(recursive_state_edge_t_min),
+        optional(recursive_state_edge_t_max),
+        optional(recursive_state_n0),
+        optional(recursive_state_n1),
+        optional(recursive_state_prim0),
+        optional(recursive_state_prim1),
+        optional(recursive_state_exterior_angle),
+        export_tape,
+        optional(sample_state_index),
+        optional(sample_edge_weight));
+    const int64_t output_count = static_cast<int64_t>(py::len(result));
+    if (output_count != kOutputCount)
+        throw std::runtime_error("raydn_native_diffraction_accumulation_forward returned an unexpected output count");
+    for (int64_t i = 0; i < output_count; ++i)
+        outputs[i] = result[static_cast<size_t>(i)].cast<at::Tensor>();
+    return output_count;
 }
 
 py::tuple diffraction_accumulation_direct_backward_op(
@@ -2726,6 +2929,92 @@ at::Tensor diffraction_discover_edges_counted_op(
         edge_adjacent_face1,
         seen);
     return at::nonzero(seen).reshape({-1}).to(at::kInt).contiguous();
+}
+
+extern "C" RAYDN_NATIVE_API void raydn_native_diffraction_discover_edges(
+    const at::Tensor *tx_pos,
+    const at::Tensor *ray_dir,
+    const at::Tensor *prim_index,
+    const at::Tensor *hit_p,
+    const at::Tensor *hit_n,
+    const at::Tensor *hit_geo_n,
+    const at::Tensor *triangle_edge_count,
+    const at::Tensor *triangle_edge_indices,
+    const at::Tensor *edge_pos,
+    const at::Tensor *edge_dir,
+    const at::Tensor *edge_n0,
+    const at::Tensor *edge_nn,
+    const at::Tensor *edge_line_min,
+    const at::Tensor *edge_line_max,
+    const at::Tensor *edge_adjacent_face1,
+    at::Tensor *out) {
+    auto required = [](const at::Tensor *tensor, const char *name) -> const at::Tensor & {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_diffraction_discover_edges received null ") + name);
+        return *tensor;
+    };
+    if (out == nullptr)
+        throw std::runtime_error("raydn_native_diffraction_discover_edges received null out");
+    *out = diffraction_discover_edges_op(
+        required(tx_pos, "tx_pos"),
+        required(ray_dir, "ray_dir"),
+        required(prim_index, "prim_index"),
+        required(hit_p, "hit_p"),
+        required(hit_n, "hit_n"),
+        required(hit_geo_n, "hit_geo_n"),
+        required(triangle_edge_count, "triangle_edge_count"),
+        required(triangle_edge_indices, "triangle_edge_indices"),
+        required(edge_pos, "edge_pos"),
+        required(edge_dir, "edge_dir"),
+        required(edge_n0, "edge_n0"),
+        required(edge_nn, "edge_nn"),
+        required(edge_line_min, "edge_line_min"),
+        required(edge_line_max, "edge_line_max"),
+        required(edge_adjacent_face1, "edge_adjacent_face1"));
+}
+
+extern "C" RAYDN_NATIVE_API void raydn_native_diffraction_discover_edges_counted(
+    const at::Tensor *tx_pos,
+    const at::Tensor *ray_dir,
+    const at::Tensor *prim_index,
+    const at::Tensor *hit_p,
+    const at::Tensor *hit_n,
+    const at::Tensor *hit_geo_n,
+    const at::Tensor *hit_count,
+    const at::Tensor *triangle_edge_count,
+    const at::Tensor *triangle_edge_indices,
+    const at::Tensor *edge_pos,
+    const at::Tensor *edge_dir,
+    const at::Tensor *edge_n0,
+    const at::Tensor *edge_nn,
+    const at::Tensor *edge_line_min,
+    const at::Tensor *edge_line_max,
+    const at::Tensor *edge_adjacent_face1,
+    at::Tensor *out) {
+    auto required = [](const at::Tensor *tensor, const char *name) -> const at::Tensor & {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_diffraction_discover_edges_counted received null ") + name);
+        return *tensor;
+    };
+    if (out == nullptr)
+        throw std::runtime_error("raydn_native_diffraction_discover_edges_counted received null out");
+    *out = diffraction_discover_edges_counted_op(
+        required(tx_pos, "tx_pos"),
+        required(ray_dir, "ray_dir"),
+        required(prim_index, "prim_index"),
+        required(hit_p, "hit_p"),
+        required(hit_n, "hit_n"),
+        required(hit_geo_n, "hit_geo_n"),
+        required(hit_count, "hit_count"),
+        required(triangle_edge_count, "triangle_edge_count"),
+        required(triangle_edge_indices, "triangle_edge_indices"),
+        required(edge_pos, "edge_pos"),
+        required(edge_dir, "edge_dir"),
+        required(edge_n0, "edge_n0"),
+        required(edge_nn, "edge_nn"),
+        required(edge_line_min, "edge_line_min"),
+        required(edge_line_max, "edge_line_max"),
+        required(edge_adjacent_face1, "edge_adjacent_face1"));
 }
 
 

@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel_native.core.kernels import ops as kernel_ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config, solve
@@ -10,7 +11,10 @@ from witwin.channel_native.deterministic.field import reflection_sequence_comple
 
 
 def test_multibounce_sort_order_uses_full_primitive_sequence():
-    device = torch.device("cpu")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for native deterministic topology sorting")
+
+    device = torch.device("cuda")
     primitive_sequence = torch.tensor([[4, 2], [4, 1], [3, 9]], device=device, dtype=torch.int32)
     count = int(primitive_sequence.shape[0])
     block = {
@@ -47,7 +51,10 @@ def test_multibounce_sort_order_uses_full_primitive_sequence():
 
 
 def test_multibounce_grouping_splits_non_coplanar_faces_with_same_surface_id():
-    device = torch.device("cpu")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for native deterministic face grouping")
+
+    device = torch.device("cuda")
     points = torch.tensor(
         [
             [0.0, 0.0, 0.0],
@@ -72,8 +79,8 @@ def test_multibounce_grouping_splits_non_coplanar_faces_with_same_surface_id():
     groups = topology._coplanar_face_groups(tri_a, normals, same_surface)
 
     assert int(groups["group_count"]) == 2
-    torch.testing.assert_close(groups["face_group_id"], torch.tensor([0, 0, 1], dtype=torch.int32))
-    torch.testing.assert_close(groups["representative_faces"], torch.tensor([0, 2], dtype=torch.long))
+    torch.testing.assert_close(groups["face_group_id"], torch.tensor([0, 0, 1], device=device, dtype=torch.int32))
+    torch.testing.assert_close(groups["representative_faces"], torch.tensor([0, 2], device=device, dtype=torch.long))
 
 
 def two_wall_multibounce_scene() -> Scene:
@@ -273,17 +280,15 @@ def test_two_bounce_reflection_uses_raydn_epc_path_export(monkeypatch):
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native reflection is not built")
-    if not hasattr(torch.ops.raydn, "reflection_epc_paths_forward"):
-        pytest.skip("RayDN EPC path export op is not built")
 
-    original = torch.ops.raydn.reflection_epc_paths_forward
+    original = kernel_ops.raydn_reflection_epc_paths_forward
     calls = {"count": 0}
 
     def counted(*args, **kwargs):
         calls["count"] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(torch.ops.raydn, "reflection_epc_paths_forward", counted)
+    monkeypatch.setattr(kernel_ops, "raydn_reflection_epc_paths_forward", counted)
     result = solve(
         two_wall_multibounce_scene(),
         Config(components={"reflection"}, max_depth=2, coherent=True, export_paths=True),
@@ -349,8 +354,6 @@ def test_two_bounce_reflection_plans_by_surface_groups_before_face_guardrail():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native reflection is not built")
-    if not hasattr(torch.ops.raydn, "reflection_epc_paths_forward"):
-        pytest.skip("RayDN EPC path export op is not built")
 
     face_count = 400
     base = torch.arange(face_count, dtype=torch.float32)

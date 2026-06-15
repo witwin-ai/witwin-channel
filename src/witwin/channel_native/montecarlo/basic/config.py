@@ -6,7 +6,7 @@ from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
 
 
 _VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
-_VALID_AD_MODES = frozenset({"none", "vjp", "jvp"})
+_VALID_AD_MODES = frozenset({"none"})
 _VALID_REFLECTION_ACCUMULATION_STRATEGIES = frozenset(
     {"auto", "atomic", "staged", "compact", "streaming_planar"}
 )
@@ -20,8 +20,6 @@ class Config:
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _VALID_COMPONENTS
     accumulation_strategy: str = "atomic_add"
     diagnostics: bool = False
-    require_reflection: bool = False
-    require_diffraction: bool = False
     reflection_accumulation_strategy: str = "auto"
     reflection_compact_min_samples: int = 262_144
     reflection_staged_min_samples_per_cell: int = 64
@@ -48,5 +46,5 @@ class Config:
         if self.reflection_staged_min_samples_per_cell < 0:
             raise ValueError("reflection_staged_min_samples_per_cell must be non-negative")
         if self.ad_mode not in _VALID_AD_MODES:
-            raise ValueError(f"ad_mode must be one of {sorted(_VALID_AD_MODES)}")
+            raise ValueError("ad_mode must be 'none' for MC basic native CUDA")
         object.__setattr__(self, "components", components)

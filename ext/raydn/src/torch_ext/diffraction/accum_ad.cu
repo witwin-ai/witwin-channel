@@ -910,7 +910,11 @@ static __forceinline__ __device__ bool load_primal(
                   p.suffix_fspl *
                   fmaxf(p.suffix_candidate_count, 1.f)
             : 1.f;
+    const float wave_gain =
+        (params.wavelength * (1.f / (4.f * kPi))) *
+        (params.wavelength * (1.f / (4.f * kPi)));
     p.common_no_src = p.material_gain *
+                      wave_gain *
                       p.edge_length *
                       params.grid_cell_area *
                       p.wedge_scale *

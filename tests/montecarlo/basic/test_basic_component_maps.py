@@ -3,12 +3,12 @@ import torch
 
 from tests.support.scenes import single_wall_reflection_scene, wedge_diffraction_scene
 from witwin.channel_native import ReceiverGrid, Transmitter
-from witwin.channel_native.core.edge_policy import EdgePolicy
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL, _selected_diffraction_edges
 from witwin.channel_native.montecarlo.basic import Config, solve
 import witwin.channel_native.montecarlo.basic.backend as basic_backend
 import witwin.channel_native.montecarlo.basic.raydn_components as raydn_components
+
+_REFERENCE_EDGE_INFO_PLANE_TOL = 1.34e-5
 
 
 def _grid_at_x(x: float) -> ReceiverGrid:
@@ -42,18 +42,52 @@ def _unsigned_angle(a: torch.Tensor, b: torch.Tensor, axis: torch.Tensor) -> tor
     return torch.where(angle < 0.0, angle + 2.0 * torch.pi, angle)
 
 
-def _torch_diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
-    selected = _selected_diffraction_edges(
-        vertices=records.vertices,
-        faces=records.faces,
-        face_normals=records.face_normals,
-        edge_v0=records.edge_v0,
-        edge_v1=records.edge_v1,
-        face0=records.face0,
-        face1=records.face1,
-        edge_policy=EdgePolicy(edge_selection_mode="all_edges", boundary_edge_policy="half_plane"),
-        plane_tol=_RAYD_EDGE_INFO_PLANE_TOL,
+def _opposite_vertex(face: torch.Tensor, shared0: torch.Tensor, shared1: torch.Tensor) -> torch.Tensor:
+    face = face.to(dtype=torch.long)
+    x_other = (face[:, 0] != shared0) & (face[:, 0] != shared1)
+    y_other = (face[:, 1] != shared0) & (face[:, 1] != shared1)
+    return torch.where(x_other, face[:, 0], torch.where(y_other, face[:, 1], face[:, 2]))
+
+
+def _selected_diffraction_edges_reference(records) -> torch.Tensor:
+    edge_v0 = records.edge_v0.to(dtype=torch.long)
+    edge_v1 = records.edge_v1.to(dtype=torch.long)
+    face0 = records.face0.to(dtype=torch.long)
+    face1 = records.face1.to(dtype=torch.long)
+    vectors = records.vertices[edge_v1] - records.vertices[edge_v0]
+    lengths = torch.linalg.vector_norm(vectors, dim=1).clamp_min(1.0e-12)
+    valid0 = face0 >= 0
+    valid1 = face1 >= 0
+    boundary = valid0 & ~valid1
+    interior = valid0 & valid1
+    safe0 = face0.clamp_min(0)
+    safe1 = face1.clamp_min(0)
+    n0 = _safe_normalize_vectors(records.face_normals[safe0])
+    n1 = _safe_normalize_vectors(records.face_normals[safe1])
+    face_a = records.faces[safe0]
+    face_b = records.faces[safe1]
+    plane_point = records.vertices[edge_v0]
+    point_a = records.vertices[_opposite_vertex(face_a, edge_v0, edge_v1)]
+    point_b = records.vertices[_opposite_vertex(face_b, edge_v0, edge_v1)]
+    normal_dot = (n0 * n1).sum(dim=1)
+    aligned = normal_dot.abs() >= 1.0 - 1.0e-5
+    plane_dist_a = ((point_a - plane_point) * n0).sum(dim=1).abs()
+    plane_dist_b = ((point_b - plane_point) * n0).sum(dim=1).abs()
+    coplanar = (
+        interior
+        & aligned
+        & (plane_dist_a <= _REFERENCE_EDGE_INFO_PLANE_TOL)
+        & (plane_dist_b <= _REFERENCE_EDGE_INFO_PLANE_TOL)
     )
+    interior_angle = torch.acos(torch.clamp(-normal_dot, -1.0, 1.0))
+    exterior_angle = torch.where(interior, 2.0 * torch.pi - interior_angle, torch.zeros_like(interior_angle))
+    exterior_angle = torch.where(boundary, torch.full_like(exterior_angle, 2.0 * torch.pi), exterior_angle)
+    wedge_n = exterior_angle / torch.pi
+    return (interior | boundary) & ~coplanar & (lengths > 1.0e-6) & (wedge_n > 1.0 + 1.0e-6)
+
+
+def _torch_diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
+    selected = _selected_diffraction_edges_reference(records)
     edge_v0 = records.edge_v0.to(dtype=torch.long)
     edge_v1 = records.edge_v1.to(dtype=torch.long)
     vertices = records.vertices
@@ -280,7 +314,7 @@ def test_diffraction_edge_geometry_native_matches_torch_reference():
         torch.testing.assert_close(native[idx], reference[idx], rtol=1e-6, atol=1e-6)
 
 
-def test_diffraction_edge_candidates_are_cached_across_transmitters(monkeypatch):
+def test_solver_diffraction_path_does_not_size_surface_candidates_per_transmitter(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
     if not build_info()["uses_raydn_native"]:
@@ -308,10 +342,10 @@ def test_diffraction_edge_candidates_are_cached_across_transmitters(monkeypatch)
 
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
 
-    assert call_count == 1
+    assert call_count == 0
 
 
-def test_diffraction_edge_candidates_are_cached_across_solves(monkeypatch):
+def test_solver_diffraction_path_does_not_size_surface_candidates_across_solves(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
     if not build_info()["uses_raydn_native"]:
@@ -331,4 +365,4 @@ def test_diffraction_edge_candidates_are_cached_across_solves(monkeypatch):
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
 
-    assert call_count == 1
+    assert call_count == 0

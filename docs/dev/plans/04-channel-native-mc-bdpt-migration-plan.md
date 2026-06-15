@@ -1,6 +1,6 @@
 # Channel Native Monte Carlo BDPT Migration Plan
 
-**Goal:** Implement `witwin.channel_native.montecarlo.bdpt` as a complete native Torch/CUDA/OptiX bidirectional Monte Carlo solver for receiver-grid radiomaps and point receiver estimates, with LoS, reflection, diffraction, multiple importance sampling, fixed-seed reproducibility, diagnostics, and parity against the original `witwin.channel` BDPT behavior.
+**Goal:** Implement `witwin.channel_native.montecarlo.bdpt` as a complete native CUDA/OptiX bidirectional Monte Carlo solver for receiver-grid radiomaps and point receiver estimates, with Torch used only as the tensor storage/API carrier. The solver covers LoS, reflection, diffraction, multiple importance sampling, fixed-seed reproducibility, diagnostics, and parity against the original `witwin.channel` BDPT behavior.
 
 **Non-negotiable boundary:** `witwin.channel_native.montecarlo.bdpt` must not call Python `raydn.Scene`, Python `raydn.autograd`, DrJit, Mitsuba, Sionna solver code, or the original `witwin.channel` solver during package import or solver hot paths. Original code is allowed only in parity tests and benchmark scripts.
 
@@ -55,13 +55,11 @@ result = solve(
 - `sample_streams: int = 1`
   - Number of independent RNG streams per transmitter.
 - `diagnostics: bool = False`
-- `require_reflection: bool = False`
-- `require_diffraction: bool = False`
 - `export_paths: bool = False`
 - `max_exported_paths: int | None = None`
 - `ad_mode: str = "none"`
   - BDPT is primal-only for the first complete migration.
-  - Unsupported modes raise tested config errors.
+  - Non-`none` modes raise tested config errors.
 
 ### Result Contract
 
@@ -69,7 +67,8 @@ result = solve(
 
 - `path_gain: torch.Tensor`
   - Shape `(tx, rx)` for point receivers.
-  - Shape `(tx, dim0, dim1)` for the first `ReceiverGrid`.
+  - Shape `(tx, cols, rows)` for the first `ReceiverGrid` whose declared
+    shape is `(rows, cols)`, matching the maintained MC/RayDN grid-map layout.
 - `component_power: dict[str, torch.Tensor]`
   - Keys: `los`, `reflection`, `diffraction`.
 - `component_maps: dict[str, torch.Tensor] | None`
@@ -112,6 +111,8 @@ result = solve(
    - total path gain relative tolerance `0.35`
    - component map correlation above `0.85` for non-empty components
    - no systematic all-zero or all-NaN component map
+   - current reduced synthetic gate is green in pytest; see "Current
+     Implementation Status" for the latest measured values.
 9. No production BDPT hot path calls Python RayDN wrappers, DrJit, Mitsuba, Sionna solver code, or original `witwin.channel`.
 10. Metadata reports:
     - sample count
@@ -125,7 +126,7 @@ result = solve(
     - launch count
     - accumulation strategy
     - variance status
-    - AD unsupported status
+    - AD status (`none` for primal BDPT)
 
 ---
 
@@ -135,12 +136,12 @@ result = solve(
 
 ```text
 Scene
-  -> Scene.compile()
-  -> CompiledScene(GeometryStore, MaterialStore, AssignmentStore, RayDNScene)
+  -> build_scene_from_structures()
+  -> RayDN native scene handle
   -> BDPT launch state
   -> transmitter/light subpath generation
   -> receiver/sensor subpath generation
-  -> native connection and visibility
+  -> _channel_native direct RayDN bridge for visibility/reflection/diffraction
   -> MIS contribution evaluation
   -> component-map accumulation
   -> Result(path_gain, component maps, variance, optional path samples, metadata)
@@ -148,15 +149,15 @@ Scene
 
 ### Reused Components
 
-- `Scene.compile()` for geometry/material/assignment stores and RayDN native scene handle.
-- `montecarlo.basic.raydn_components.grid_spec()` for grid bounds and public layout.
-- `montecarlo.basic.sampling.make_cuda_generator()` for seed policy, with BDPT-specific stream splitting.
-- `core.material_runtime.face_material_tensors()` for material tensors.
+- `core.runtime.raydn.build_scene_from_structures()` for the RayDN native scene handle.
+- BDPT-local grid-bound helpers for RayDN-native component-map layout.
+- BDPT native launch-state and seeded direction kernels for seed policy and stream splitting.
+- BDPT native material helpers for per-face material tensors from host scene structures.
 - `core.kernels.ops` for Channel Native native helper calls.
 - RayDN native:
-  - `visibility_forward`
-  - reflection/intersection kernels
-  - diffraction accumulation and edge discovery primitives where compatible.
+  - exported `raydn_native_visibility_forward`
+  - exported `raydn_native_reflection_accumulation_forward`
+  - exported diffraction edge discovery and accumulation bridge entry points.
 
 ### New BDPT Components
 
@@ -297,7 +298,7 @@ Steps:
 - Generate direct transmitter-to-receiver or transmitter-to-grid connections.
 - Use RayDN visibility for LoS masking when structures exist.
 - Accumulate LoS contribution into the public layout.
-- Return zero maps for disabled or unavailable components.
+- Return native zero-filled storage for components that were not requested.
 - Report launch, sample, valid contribution, and component metadata.
 
 Acceptance command:
@@ -327,7 +328,7 @@ Steps:
 - Apply material scattering and update throughput/pdf fields.
 - Connect compatible light and sensor vertices with visibility checks.
 - Accumulate reflection contributions with selected MIS mode.
-- Raise explicit errors when `require_reflection=True` and native capability is unavailable.
+- Raise explicit errors whenever reflection is requested and native capability is unavailable.
 
 Acceptance command:
 
@@ -353,7 +354,7 @@ Steps:
 - Implement `mis="none"` as unit weight for diagnostic comparisons.
 - Clamp invalid or zero pdf paths to zero contribution.
 - Verify weight normalization on synthetic pdf tensors.
-- Verify native and Torch reference MIS match within `1.0e-6`.
+- Verify native MIS output against hand-computed constants within `1.0e-6`; production and tests must not keep a Torch-computed MIS alternate/reference path.
 
 Acceptance command:
 
@@ -381,7 +382,7 @@ Steps:
 - Sample or connect paths through edge events with UTD contribution terms.
 - Track `edge_id` and component id in subpath and connection tensors.
 - Include diffraction pdf terms in MIS weight calculation.
-- Raise explicit errors when `require_diffraction=True` and native capability is unavailable.
+- Raise explicit errors whenever diffraction is requested and native capability is unavailable.
 
 Acceptance command:
 
@@ -492,13 +493,14 @@ Required files:
 
 - `benchmarks/bench_bdpt_basic.py`
 - `benchmarks/bench_bdpt_munich.py`
+- `tests/support/bin/benchmark_single_plane_bdpt_native_vs_original.py`
 - `tests/montecarlo/bdpt/test_performance_gate.py`
 - `docs/dev/perf/bdpt_native_baselines.md`
 
 Gates:
 
 - Empty-space LoS BDPT has no more than `1.25x` overhead versus MC basic LoS for the same grid and sample count.
-- Single-plane reflection BDPT is no slower than `1.50x` original BDPT on the maintained reduced scene.
+- Single-plane open-mesh reflection BDPT is faster than original `witwin.channel` BDPT on the maintained hand-authored scene, with strict subprocess original/native gates and a maintained minimum speedup threshold.
 - Munich reduced BDPT reports no all-zero component maps and completes within the documented local baseline budget.
 - Native profiler metadata records launch counts and selected accumulation strategy.
 
@@ -528,24 +530,65 @@ The BDPT migration is complete when:
 
 ---
 
+## Current Implementation Status
+
+As of the latest native iteration:
+
+- BDPT import/config/solver surfaces are active, not reserved stubs.
+- Runtime artifact-loader alternate search paths have been removed from Channel Native and RayDN extension loaders.
+- `Scene.load_mitsuba()` now requires the native loader path; the Python Sionna/Mitsuba scene-construction branch has been removed.
+- BDPT solver hot paths no longer call `Scene.compile()`, original `witwin.channel`, MC basic solver code, `torch.ops.raydn`, or `torch.classes.raydn`.
+- RayDN visibility, ray/scene intersection, reflection accumulation, diffraction edge discovery, diffraction accumulation, reflection EPC path export, and scene create/destroy/edge-record extraction are reached through `_channel_native` direct native bridge entry points backed by exported `_raydn` C symbols.
+- Channel Native runtime scene ownership now stores a native integer scene handle plus a `_channel_native` owner capsule; Python does not instantiate RayDN Torch custom classes for Channel Native scenes.
+- The bridge resolves symbols from `_raydn.native_module_handle()` and does not call `LoadLibrary`/`dlopen`, so it does not implicitly load a second RayDN DSO or duplicate the RayDN scene registry.
+- Deterministic scalar field, vector-field reduction, reflection field, multi-bounce reflection field, delay-to-length, phase-from-field, phase-from-length, real/imag-to-complex packing, topology padding, topology concat, face grouping, face sequence generation, reflection EPC input expansion, reflection compaction, and first-order diffraction RayDN export compaction are now `_channel_native` CUDA entry points for the migrated deterministic topology/field path.
+- Torch remains the tensor storage and extension ABI carrier for these paths; migrated production code must call required native ops and raise when the native op is unavailable rather than using Python/Torch fallback computation.
+- BDPT solver accumulation now uses native connection samples for LoS and reflected-light endpoint connections. Receiver-grid first-order diffraction is accumulated directly through RayDN native direct/Keller component maps instead of path-block samples.
+- BDPT path export now comes from native connection samples and native connection-sample compaction. The old matrix/component-map path export facades (`bdpt_export_paths`, `bdpt_export_component_paths`, `bdpt_component_connection_samples`), legacy path-block sample/export entry points (`bdpt_sample_path_block`, `bdpt_connection_samples_from_path_block`), and derived `bdpt_variance_estimate` facade have been removed from public Python/native bindings and their native BDPT CUDA/C++ wrappers.
+- Receiver-grid first-order diffraction path export is now native direct/Keller tape-backed through `_channel_native.bdpt_diffraction_connection_samples_from_tape`. Diffraction point receivers now use `_channel_native.bdpt_diffraction_point_connection_samples` to emit native point-target connection samples and two native RayDN visibility passes for source-edge and edge-receiver segments.
+- Variance diagnostics use native first/second moment accumulation from connection samples (`bdpt_connection_variance`) rather than derived map buffers.
+- Receiver-grid `path_gain`, component maps, and diagnostics `variance` now return the public grid layout `(tx, cols, rows)` for `ReceiverGrid.shape=(rows, cols)` through native CUDA map/finalize kernels; point receivers remain `(tx, rx)`.
+- BDPT accumulation strategy selection is now passed into `_channel_native.bdpt_accumulate_connection_samples`. Explicit `atomic`, `staged`, and `compact` configurations dispatch to native CUDA accumulation variants and are tested for numerical agreement; metadata reports the concrete native kernel variant (`atomic_add`, `cell_reduce`, or `compact_atomic_add`).
+- BDPT endpoint light subpath state now consumes the native launch-state `light_seed` tensor and generates per-sample unit directions in native CUDA instead of using a fixed placeholder direction. Torch remains only the tensor carrier for the seed and subpath-state buffers.
+- `_raydn` now exports `raydn_native_intersect_forward`, `_channel_native.bdpt_intersect_forward` dispatches to it through the loaded RayDN module handle, and `_channel_native.bdpt_reflected_light_subpath_state` converts light subpaths plus RayDN hit geometry into depth-1 reflected light subpath state in native CUDA. Reflected-light subpaths apply native material validity/gain, preserve component masks with a reflection bit, and are connected to sensor endpoints through native endpoint-connection and RayDN visibility kernels.
+- LoS estimates with structures now use BDPT endpoint connection samples plus RayDN-native visibility filtering rather than path-export helpers.
+- Mixed-component LoS/reflection/diffraction connection samples now compute MIS weights per row in native CUDA from path pdf, MIS mode, beta, and topology-scoped competing strategy pdf sums. LoS, reflection, and diffraction topologies are not treated as mutual competitors; explicit competing-strategy behavior is covered at the native direct/Keller operator level. There is no Torch/reference fallback computation. BDPT LoS matrix-to-map conversion now uses the MC/RayDN `(tx, cols, rows)` native grid layout instead of the point-layout no-op path.
+- Reflection order-1 receiver-grid estimates now use RayDN native reflection accumulation directly for radiomap solves. Reflection point receivers and reflection path export now use native reflected-light subpaths, native endpoint connection samples, and RayDN-native visibility filtering instead of the old path-block adapter.
+- RayDN order-1 diffraction accumulation now applies the wavelength gain `(lambda / 4pi)^2` in both primal OptiX accumulation and AD accumulation kernels.
+- Receiver-grid first-order diffraction now uses the original order-1 BDPTDiffractionMIS default direct/Keller sample split for `max_depth=1`: `direct=(samples+2)//3`, `keller=(samples+1)//3`, `suffix=0`. The solver calls `_channel_native.bdpt_diffraction_accumulation_forward` for component maps and `_channel_native.bdpt_diffraction_connection_samples_from_tape` for path export, and no longer imports or calls `diffraction_paths_order1` or `bdpt_sample_path_block`.
+- BDPT `valid_contribution_count` now comes from `_channel_native.bdpt_count_valid_connection_samples` when connection samples exist, avoiding Torch-side tensor reductions for metadata.
+- BDPT package helpers that performed Python LoS visibility loops have been removed from the package surface.
+- Current smoke/regression verification covers LoS, reflection, diffraction, native scene construction, component maps, Munich reduced nonzero smoke, strict Munich native-vs-original parity, strict-loader/static dispatcher checks, reserved import checks, MIS-weighted accumulation, variance diagnostics, path export, single-reflector convergence, single-wedge point-receiver diffraction convergence, diffraction fixed-seed/direct-Keller split checks, and performance smoke.
+- `tests/support/bin/benchmark_munich_bdpt_native_vs_original.py` now runs the original `witwin.channel` BDPT solver in a subprocess and records native/original timing, delta maps, component correlations, and artifacts instead of wrapping the native-only smoke benchmark. Its default synthetic-reduced mode avoids full Munich XML OptiX compile instability. The latest local strict steady-state run (`samples=16`, `grid_size=4`, `max_depth=1`, `warmup_runs=1`) measured native solve `1.901800002087839 ms`, original solve `68.98979999823496 ms`, native speedup `36.27605422362835x`, LoS correlation `1.0000000744796738`, reflection correlation `0.9999999400453701`, diffraction correlation `1.0`, diffraction relative sum error `9.127283806135762e-08`, and total relative sum error `9.127168010444401e-08`. Strict parity gates passed.
+- `tests/support/bin/benchmark_single_plane_bdpt_native_vs_original.py` now runs original `witwin.channel` BDPT in a subprocess on a hand-authored open two-triangle plane scene and compares it with native Channel Native BDPT. The latest strict local smoke passed shape/nonzero/speed and relative-sum-error gates with native median `1.8860999989556149 ms`, original median `2.713899993977975 ms`, native speedup `1.4388950720962492x`, and relative sum error `2.69366456949439e-07`.
+
+Known residual notes:
+
+- Reflection point receivers and reflection path export no longer route through the RayDN reflection path-export adapter or BDPT path-block conversion. The current native subpath route is seeded and fully native, but it is stochastic rather than the previous deterministic image-source candidate export, so maintained export tests assert fixed-seed stability rather than seed-independent candidate identity.
+- Stage 8 now has native strategy dispatch. `staged` and `compact` are maintained native variants; further dense-grid profiling and threshold tuning remain optimization follow-up work rather than a fallback or correctness dependency.
+- Cold first-use native OptiX/RayDN pipeline setup can dominate the first solve. The maintained performance advantage gate is steady-state with warmup; cold-start behavior is reported separately.
+- Original `witwin.channel` code remains allowed only in parity/benchmark support scripts.
+
+---
+
 ## Explicitly Out Of Scope
 
-- CPU fallback solvers.
-- Python RayDN wrapper fallback.
+- CPU solvers.
+- Python RayDN wrapper dispatch.
 - Runtime Mitsuba/Sionna solver calls.
 - DrJit dependency.
 - Topology-changing gradients.
 - BDPT fixed-topology AD in the first complete primal migration.
 - Multi-edge diffraction before first-order diffraction parity passes.
 - Arbitrary non-axis-aligned receiver grids beyond the current MC basic grid rules.
-- Public tensor-only scene construction.
+- Public arbitrary tensor-only scene construction API beyond the internal native scene owner.
 
 ---
 
 ## Risk Register
 
 1. **MIS mistakes can look like noisy MC error.**
-   - Mitigation: isolate MIS kernel tests on synthetic pdfs and compare native output to Torch references.
+   - Mitigation: isolate MIS kernel tests on synthetic pdfs and compare native output to hand-computed constants.
 
 2. **RNG stream reuse can bias estimates.**
    - Mitigation: split light, sensor, connection, and diffraction random dimensions and test fixed-seed stability plus seed divergence.

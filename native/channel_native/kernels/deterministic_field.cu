@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
+#include <c10/util/complex.h>
 #include <torch/extension.h>
 
 #include <cmath>
@@ -107,7 +108,7 @@ __device__ Complex c_sqrt(Complex z) {
     return {real, imag};
 }
 
-__device__ Float3 fallback_transverse(Float3 direction) {
+__device__ Float3 orthogonal_transverse(Float3 direction) {
     Float3 axis = fabsf(direction.z) < 0.9f ? make_f3(0.0f, 0.0f, 1.0f) : make_f3(0.0f, 1.0f, 0.0f);
     return normalize_f3(sub_f3(axis, scale_f3(direction, dot_f3(axis, direction))));
 }
@@ -141,13 +142,13 @@ __device__ Complex reflection_coefficient(
 
     Float3 s_hat = cross_f3(n, incident);
     const float s_norm = norm_f3(s_hat);
-    const Float3 fallback = fallback_transverse(incident);
-    s_hat = s_norm > kEps ? scale_f3(s_hat, 1.0f / s_norm) : fallback;
+    const Float3 transverse_basis = orthogonal_transverse(incident);
+    s_hat = s_norm > kEps ? scale_f3(s_hat, 1.0f / s_norm) : transverse_basis;
     const Float3 p_in = normalize_f3(cross_f3(s_hat, incident));
     const Float3 tx_pol = make_f3(1.0f, 0.0f, 0.0f);
     Float3 transverse = sub_f3(tx_pol, scale_f3(incident, dot_f3(tx_pol, incident)));
     const float transverse_norm = norm_f3(transverse);
-    transverse = transverse_norm > kEps ? scale_f3(transverse, 1.0f / transverse_norm) : fallback;
+    transverse = transverse_norm > kEps ? scale_f3(transverse, 1.0f / transverse_norm) : transverse_basis;
 
     const Complex e_s = c_make(dot_f3(transverse, s_hat), 0.0f);
     const Complex e_p = c_make(dot_f3(transverse, p_in), 0.0f);
@@ -169,7 +170,9 @@ __global__ void deterministic_reflection_field_kernel(
     int64_t count,
     float *__restrict__ path_gain,
     float *__restrict__ field_real,
-    float *__restrict__ field_imag) {
+    float *__restrict__ field_imag,
+    float *__restrict__ path_length_m,
+    float *__restrict__ delay_s) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
@@ -197,6 +200,8 @@ __global__ void deterministic_reflection_field_kernel(
         field_real[index] = field.r;
         field_imag[index] = field.i;
         path_gain[index] = field.r * field.r + field.i * field.i;
+        path_length_m[index] = path_length;
+        delay_s[index] = path_length / kLightSpeed;
     }
 }
 
@@ -286,7 +291,8 @@ __global__ void deterministic_reflection_sequence_field_kernel(
     float *__restrict__ path_gain,
     float *__restrict__ field_real,
     float *__restrict__ field_imag,
-    float *__restrict__ path_length_m) {
+    float *__restrict__ path_length_m,
+    float *__restrict__ delay_s) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
@@ -323,6 +329,85 @@ __global__ void deterministic_reflection_sequence_field_kernel(
         field_imag[index] = field.i;
         path_gain[index] = field.r * field.r + field.i * field.i;
         path_length_m[index] = path_length;
+        delay_s[index] = path_length / kLightSpeed;
+    }
+}
+
+__global__ void deterministic_delay_to_path_length_kernel(
+    const float *__restrict__ delay_s,
+    int64_t count,
+    float *__restrict__ path_length_m) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        path_length_m[index] = delay_s[index] * kLightSpeed;
+    }
+}
+
+__global__ void deterministic_pack_complex_kernel(
+    const float *__restrict__ field_real,
+    const float *__restrict__ field_imag,
+    int64_t count,
+    c10::complex<float> *__restrict__ field) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        field[index] = c10::complex<float>(field_real[index], field_imag[index]);
+    }
+}
+
+__global__ void deterministic_phase_from_field_kernel(
+    const float *__restrict__ field_real,
+    const float *__restrict__ field_imag,
+    int64_t count,
+    float *__restrict__ phase_rad) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        float phase = -atan2f(field_imag[index], field_real[index]);
+        phase = fmodf(phase, 2.0f * kPi);
+        if (phase < 0.0f) {
+            phase += 2.0f * kPi;
+        }
+        phase_rad[index] = phase;
+    }
+}
+
+__global__ void deterministic_phase_from_length_kernel(
+    const float *__restrict__ path_length_m,
+    float frequency_hz,
+    int64_t count,
+    float *__restrict__ phase_rad) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    const float scale = 2.0f * kPi * frequency_hz / kLightSpeed;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        float phase = fmodf(scale * path_length_m[index], 2.0f * kPi);
+        if (phase < 0.0f) {
+            phase += 2.0f * kPi;
+        }
+        phase_rad[index] = phase;
+    }
+}
+
+__global__ void deterministic_field_from_power_phase_kernel(
+    const float *__restrict__ path_gain,
+    const float *__restrict__ phase_rad,
+    int64_t count,
+    float *__restrict__ field_real,
+    float *__restrict__ field_imag) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        const float amplitude = sqrtf(fmaxf(path_gain[index], 0.0f));
+        const float phase = -phase_rad[index];
+        field_real[index] = amplitude * cosf(phase);
+        field_imag[index] = amplitude * sinf(phase);
     }
 }
 
@@ -444,6 +529,8 @@ pybind11::dict cn_deterministic_reflection_field(
     auto path_gain = at::empty({count}, tx_position.options());
     auto field_real = at::empty({count}, tx_position.options());
     auto field_imag = at::empty({count}, tx_position.options());
+    auto path_length = at::empty({count}, tx_position.options());
+    auto delay = at::empty({count}, tx_position.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_position.get_device()).stream();
         const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
@@ -461,7 +548,9 @@ pybind11::dict cn_deterministic_reflection_field(
             count,
             path_gain.data_ptr<float>(),
             field_real.data_ptr<float>(),
-            field_imag.data_ptr<float>());
+            field_imag.data_ptr<float>(),
+            path_length.data_ptr<float>(),
+            delay.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
@@ -469,6 +558,8 @@ pybind11::dict cn_deterministic_reflection_field(
     out["path_gain"] = path_gain;
     out["field_real"] = field_real;
     out["field_imag"] = field_imag;
+    out["path_length_m"] = path_length;
+    out["delay_s"] = delay;
     return out;
 }
 
@@ -511,6 +602,7 @@ pybind11::dict cn_deterministic_reflection_sequence_field(
     auto field_real = at::empty({count}, tx_position.options());
     auto field_imag = at::empty({count}, tx_position.options());
     auto path_length = at::empty({count}, tx_position.options());
+    auto delay = at::empty({count}, tx_position.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_position.get_device()).stream();
         const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
@@ -530,7 +622,8 @@ pybind11::dict cn_deterministic_reflection_sequence_field(
             path_gain.data_ptr<float>(),
             field_real.data_ptr<float>(),
             field_imag.data_ptr<float>(),
-            path_length.data_ptr<float>());
+            path_length.data_ptr<float>(),
+            delay.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
@@ -539,5 +632,128 @@ pybind11::dict cn_deterministic_reflection_sequence_field(
     out["field_real"] = field_real;
     out["field_imag"] = field_imag;
     out["path_length_m"] = path_length;
+    out["delay_s"] = delay;
+    return out;
+}
+
+torch::Tensor cn_deterministic_delay_to_path_length(torch::Tensor delay_s) {
+    check_tensor(delay_s, "delay_s", torch::kFloat32, 1);
+    auto path_length = at::empty_like(delay_s);
+    const int64_t count = delay_s.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(delay_s.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_delay_to_path_length_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            delay_s.data_ptr<float>(),
+            count,
+            path_length.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return path_length;
+}
+
+torch::Tensor cn_deterministic_pack_complex(torch::Tensor field_real, torch::Tensor field_imag) {
+    check_tensor(field_real, "field_real", torch::kFloat32, 1);
+    check_tensor(field_imag, "field_imag", torch::kFloat32, 1);
+    TORCH_CHECK(field_imag.sizes() == field_real.sizes(), "field_imag must match field_real");
+    auto complex_options = field_real.options().dtype(torch::kComplexFloat);
+    auto field = at::empty({field_real.size(0)}, complex_options);
+    const int64_t count = field_real.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(field_real.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_pack_complex_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>(),
+            count,
+            field.data_ptr<c10::complex<float>>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return field;
+}
+
+torch::Tensor cn_deterministic_phase_from_field(torch::Tensor field_real, torch::Tensor field_imag) {
+    check_tensor(field_real, "field_real", torch::kFloat32, 1);
+    check_tensor(field_imag, "field_imag", torch::kFloat32, 1);
+    TORCH_CHECK(field_imag.sizes() == field_real.sizes(), "field_imag must match field_real");
+    auto phase = at::empty_like(field_real);
+    const int64_t count = field_real.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(field_real.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_phase_from_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>(),
+            count,
+            phase.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return phase;
+}
+
+pybind11::dict cn_deterministic_zero_field_phase(torch::Tensor reference) {
+    check_tensor(reference, "reference", torch::kFloat32, 1);
+    auto complex_options = reference.options().dtype(torch::kComplexFloat);
+    auto path_field = at::empty({reference.size(0)}, complex_options);
+    auto phase = at::empty_like(reference);
+    const int64_t count = reference.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
+        C10_CUDA_CHECK(cudaMemsetAsync(
+            path_field.data_ptr<c10::complex<float>>(),
+            0,
+            static_cast<size_t>(count) * sizeof(c10::complex<float>),
+            stream));
+        C10_CUDA_CHECK(cudaMemsetAsync(
+            phase.data_ptr<float>(),
+            0,
+            static_cast<size_t>(count) * sizeof(float),
+            stream));
+    }
+    pybind11::dict out;
+    out["path_field"] = path_field;
+    out["phase_rad"] = phase;
+    return out;
+}
+
+torch::Tensor cn_deterministic_phase_from_length(torch::Tensor path_length_m, double frequency_hz) {
+    check_tensor(path_length_m, "path_length_m", torch::kFloat32, 1);
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+    auto phase = at::empty_like(path_length_m);
+    const int64_t count = path_length_m.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_length_m.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_phase_from_length_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            path_length_m.data_ptr<float>(),
+            static_cast<float>(frequency_hz),
+            count,
+            phase.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return phase;
+}
+
+pybind11::dict cn_deterministic_field_from_power_phase(torch::Tensor path_gain, torch::Tensor phase_rad) {
+    check_tensor(path_gain, "path_gain", torch::kFloat32, 1);
+    check_tensor(phase_rad, "phase_rad", torch::kFloat32, 1);
+    TORCH_CHECK(phase_rad.sizes() == path_gain.sizes(), "phase_rad must match path_gain");
+    auto field_real = at::empty_like(path_gain);
+    auto field_imag = at::empty_like(path_gain);
+    const int64_t count = path_gain.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_gain.get_device()).stream();
+        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        deterministic_field_from_power_phase_kernel<<<block_count, kBlockSize, 0, stream>>>(
+            path_gain.data_ptr<float>(),
+            phase_rad.data_ptr<float>(),
+            count,
+            field_real.data_ptr<float>(),
+            field_imag.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict out;
+    out["field_real"] = field_real;
+    out["field_imag"] = field_imag;
     return out;
 }

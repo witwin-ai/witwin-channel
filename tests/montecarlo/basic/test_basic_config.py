@@ -12,8 +12,6 @@ def test_basic_config_defaults_are_explicit():
     assert config.components == frozenset({"los", "reflection", "diffraction"})
     assert config.accumulation_strategy == "atomic_add"
     assert config.diagnostics is False
-    assert config.require_reflection is False
-    assert config.require_diffraction is False
 
 
 def test_basic_config_validates_samples_and_components():

@@ -18,6 +18,7 @@
 #include <raydn/reflection/epc_params.h>
 #include <raydn/reflection/trace_params.h>
 #include <raydn/reflection/visibility_params.h>
+#include <raydn/native_api.h>
 #include <raydn/scene/cache.h>
 #include <raydn/common/tensor_check.h>
 
@@ -224,6 +225,18 @@ at::Tensor optional_active_from_py(py::object active_obj, int64_t count, const c
     return active.contiguous();
 }
 
+at::Tensor optional_active_from_tensor(const at::Tensor *active_ptr, int64_t count, const char *name) {
+    if (active_ptr == nullptr || !active_ptr->defined())
+        return at::Tensor();
+    const at::Tensor &active = *active_ptr;
+    require_mask(active, name);
+    if (active.numel() == 0)
+        return active.contiguous();
+    if (active.size(0) != count)
+        throw std::runtime_error(std::string(name) + " must match the batch size.");
+    return active.contiguous();
+}
+
 at::Tensor stack_vec3(const at::Tensor &x, const at::Tensor &y, const at::Tensor &z) {
     return at::stack({x, y, z}, 1).contiguous();
 }
@@ -239,17 +252,21 @@ std::shared_ptr<OptixLaunchPipeline> optix_pipeline_for_scene(
         config);
 }
 
-} // namespace
+struct SegmentVisibilityNativeOutputs {
+    at::Tensor visible;
+    at::Tensor blocker_prim;
+    at::Tensor tape_t;
+};
 
-py::tuple visibility_forward_op(
+SegmentVisibilityNativeOutputs visibility_forward_native_impl(
     int64_t scene_handle,
     at::Tensor start,
     at::Tensor end,
-    py::object active_obj) {
+    const at::Tensor *active_ptr) {
     require_vec3f(start, "start");
     require_vec3f(end, "end");
     require_same_batch(start, end, "visibility");
-    at::Tensor active = optional_active_from_py(active_obj, start.size(0), "active");
+    at::Tensor active = optional_active_from_tensor(active_ptr, start.size(0), "active");
 
     SceneCache &scene = get_scene(scene_handle);
     const int64_t ray_count = start.size(0);
@@ -257,7 +274,7 @@ py::tuple visibility_forward_op(
     at::Tensor blocker_prim = at::empty({ray_count}, scene.global_faces.options());
     at::Tensor tape_t = at::empty({ray_count}, start.options());
     if (ray_count == 0)
-        return py::make_tuple(visible, blocker_prim, tape_t);
+        return {visible, blocker_prim, tape_t};
 
     at::Tensor active_contig = active;
 
@@ -276,7 +293,40 @@ py::tuple visibility_forward_op(
     TorchCudaContext torch_ctx = current_torch_cuda_context();
     optix_pipeline_for_scene(scene, segment_visibility_pipeline_config())
         ->launch(0, params, static_cast<unsigned int>(ray_count), torch_ctx.stream);
-    return py::make_tuple(visible, blocker_prim, tape_t);
+    return {visible, blocker_prim, tape_t};
+}
+
+} // namespace
+
+py::tuple visibility_forward_op(
+    int64_t scene_handle,
+    at::Tensor start,
+    at::Tensor end,
+    py::object active_obj) {
+    at::Tensor active_storage;
+    const at::Tensor *active = nullptr;
+    if (!active_obj.is_none()) {
+        active_storage = active_obj.cast<at::Tensor>();
+        active = &active_storage;
+    }
+    SegmentVisibilityNativeOutputs out = visibility_forward_native_impl(scene_handle, start, end, active);
+    return py::make_tuple(out.visible, out.blocker_prim, out.tape_t);
+}
+
+extern "C" RAYDN_NATIVE_API void raydn_native_visibility_forward(
+    int64_t scene_handle,
+    const at::Tensor *start,
+    const at::Tensor *end,
+    const at::Tensor *active,
+    at::Tensor *visible,
+    at::Tensor *blocker_prim,
+    at::Tensor *tape_t) {
+    if (start == nullptr || end == nullptr || visible == nullptr || blocker_prim == nullptr || tape_t == nullptr)
+        throw std::runtime_error("raydn_native_visibility_forward received a null tensor pointer.");
+    SegmentVisibilityNativeOutputs out = visibility_forward_native_impl(scene_handle, *start, *end, active);
+    *visible = out.visible;
+    *blocker_prim = out.blocker_prim;
+    *tape_t = out.tape_t;
 }
 
 py::tuple trace_reflections_forward_impl(
@@ -1007,6 +1057,56 @@ py::tuple reflection_epc_paths_forward_op(
     return py::make_tuple(valid, path_length, resolved_flat.reshape({ray_count, max_bounces}).contiguous(), group_flat.reshape({ray_count, max_bounces}).contiguous(), hit_positions, normals);
 }
 
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_reflection_epc_paths_forward(
+    int64_t scene_handle,
+    const at::Tensor *source,
+    const at::Tensor *receiver,
+    const at::Tensor *active,
+    const at::Tensor *expected_prim_ids,
+    const at::Tensor *direct_plane_points,
+    const at::Tensor *direct_plane_normals,
+    const at::Tensor *surface_group_id,
+    const at::Tensor *surface_group_size,
+    const at::Tensor *surface_group_members,
+    int64_t max_bounces,
+    int64_t visibility_ignore_mode,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    auto required = [](const at::Tensor *tensor, const char *name) -> const at::Tensor & {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_reflection_epc_paths_forward received null ") + name);
+        return *tensor;
+    };
+    if (outputs == nullptr)
+        throw std::runtime_error("raydn_native_reflection_epc_paths_forward received null outputs");
+    constexpr int64_t kOutputCount = 6;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_reflection_epc_paths_forward output capacity is too small");
+
+    py::object active_obj = active == nullptr || !active->defined()
+        ? py::none()
+        : py::cast(*active);
+    py::tuple result = reflection_epc_paths_forward_op(
+        scene_handle,
+        required(source, "source"),
+        required(receiver, "receiver"),
+        active_obj,
+        required(expected_prim_ids, "expected_prim_ids"),
+        required(direct_plane_points, "direct_plane_points"),
+        required(direct_plane_normals, "direct_plane_normals"),
+        required(surface_group_id, "surface_group_id"),
+        required(surface_group_size, "surface_group_size"),
+        required(surface_group_members, "surface_group_members"),
+        max_bounces,
+        visibility_ignore_mode);
+    const int64_t output_count = static_cast<int64_t>(py::len(result));
+    if (output_count != kOutputCount)
+        throw std::runtime_error("raydn_native_reflection_epc_paths_forward returned an unexpected output count");
+    for (int64_t i = 0; i < output_count; ++i)
+        outputs[i] = result[static_cast<size_t>(i)].cast<at::Tensor>();
+    return output_count;
+}
+
 py::tuple trace_refl_epc_field_backward_op(
     int64_t scene_handle,
     at::Tensor source,
@@ -1572,6 +1672,103 @@ py::tuple reflection_accumulation_forward_op(
         wedge_source_power,
         stack_vec3(wedge_initial_dir_x, wedge_initial_dir_y, wedge_initial_dir_z),
         wedge_bounce_depth);
+}
+
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_reflection_accumulation_forward(
+    int64_t scene_handle,
+    const at::Tensor *ray_o,
+    const at::Tensor *ray_d,
+    const at::Tensor *ray_tmax,
+    const at::Tensor *active,
+    const at::Tensor *tx,
+    const at::Tensor *tx_pol,
+    const at::Tensor *material_eta_r,
+    const at::Tensor *material_sigma,
+    const at::Tensor *material_mu_r,
+    const at::Tensor *material_gain,
+    const at::Tensor *material_valid,
+    int64_t max_bounces,
+    int64_t grid_axis,
+    double grid_position,
+    double grid_coord0_min,
+    double grid_coord0_max,
+    double grid_coord1_min,
+    double grid_coord1_max,
+    int64_t grid_resolution0,
+    int64_t grid_resolution1,
+    double wavelength,
+    double solid_angle_per_ray,
+    bool collect_wedges,
+    bool collect_wedge_prefixes,
+    int64_t wedge_capacity,
+    int64_t wedge_sample_stride,
+    int64_t accumulation_strategy,
+    int64_t compact_min_samples,
+    int64_t staged_min_samples_per_cell,
+    int64_t procedural_sample_count,
+    bool streaming_los_enabled,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    auto require_ptr = [](const at::Tensor *tensor, const char *name) {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_reflection_accumulation_forward received null ") + name);
+    };
+    require_ptr(ray_o, "ray_o");
+    require_ptr(ray_d, "ray_d");
+    require_ptr(ray_tmax, "ray_tmax");
+    require_ptr(active, "active");
+    require_ptr(tx, "tx");
+    require_ptr(tx_pol, "tx_pol");
+    require_ptr(material_eta_r, "material_eta_r");
+    require_ptr(material_sigma, "material_sigma");
+    require_ptr(material_mu_r, "material_mu_r");
+    require_ptr(material_gain, "material_gain");
+    require_ptr(material_valid, "material_valid");
+    if (outputs == nullptr)
+        throw std::runtime_error("raydn_native_reflection_accumulation_forward received null outputs");
+    constexpr int64_t kOutputCount = 18;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_reflection_accumulation_forward output capacity is too small");
+
+    py::tuple result = reflection_accumulation_forward_op(
+        scene_handle,
+        *ray_o,
+        *ray_d,
+        *ray_tmax,
+        *active,
+        *tx,
+        *tx_pol,
+        *material_eta_r,
+        *material_sigma,
+        *material_mu_r,
+        *material_gain,
+        *material_valid,
+        max_bounces,
+        grid_axis,
+        grid_position,
+        grid_coord0_min,
+        grid_coord0_max,
+        grid_coord1_min,
+        grid_coord1_max,
+        grid_resolution0,
+        grid_resolution1,
+        wavelength,
+        solid_angle_per_ray,
+        collect_wedges,
+        collect_wedge_prefixes,
+        wedge_capacity,
+        wedge_sample_stride,
+        accumulation_strategy,
+        compact_min_samples,
+        staged_min_samples_per_cell,
+        procedural_sample_count,
+        streaming_los_enabled);
+    const int64_t output_count = static_cast<int64_t>(py::len(result));
+    if (output_count != kOutputCount)
+        throw std::runtime_error("raydn_native_reflection_accumulation_forward returned an unexpected output count");
+    for (int64_t i = 0; i < output_count; ++i)
+        outputs[i] = result[static_cast<size_t>(i)].cast<at::Tensor>();
+    return output_count;
 }
 
 } // namespace raydn

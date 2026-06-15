@@ -1,3 +1,5 @@
+import math
+
 import pytest
 import torch
 
@@ -89,6 +91,86 @@ def test_path_los_export_requires_native_cuda_kernel(monkeypatch):
         ops.path_los_export(tx_positions, tx_power, rx_positions, frequency_hz=3.0e9)
 
 
+def test_path_reflection_candidates_generate_native_segments():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for path reflection candidates")
+
+    vertices = torch.tensor(
+        [[1.0, -1.0, -1.0], [1.0, 1.0, -1.0], [1.0, 0.0, 1.0]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    faces = torch.tensor([[0, 1, 2]], device="cuda", dtype=torch.int32)
+    face_normals = torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+    face_gain = torch.tensor([1.0], device="cuda", dtype=torch.float32)
+    tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+    tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
+    rx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+
+    candidates = ops.path_reflection_candidates(
+        vertices,
+        faces,
+        face_normals,
+        face_gain,
+        tx_positions,
+        tx_power,
+        rx_positions,
+        frequency_hz=3.0e9,
+    )
+
+    assert candidates["valid"].is_cuda
+    assert bool(candidates["valid"].item())
+    assert int(candidates["component_id"].item()) == 1
+    assert int(candidates["primitive_id"].item()) == 0
+    assert candidates["seg0_start"].shape == (1, 3)
+    torch.testing.assert_close(
+        candidates["path_length_m"],
+        torch.tensor([2.0], device="cuda", dtype=torch.float32),
+        rtol=2.0e-6,
+        atol=1.0e-6,
+    )
+
+
+def test_path_diffraction_block_and_merge_use_native_compaction():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for path diffraction block compaction")
+
+    capacity = 3
+    out = (
+        torch.tensor([capacity], device="cuda", dtype=torch.int32),
+        torch.tensor([True, False, True], device="cuda", dtype=torch.bool),
+        torch.zeros((capacity,), device="cuda", dtype=torch.int32),
+        torch.tensor([7, 8, 9], device="cuda", dtype=torch.int32),
+        torch.tensor([1, 1, 1], device="cuda", dtype=torch.int32),
+        torch.tensor([11, 12, 13], device="cuda", dtype=torch.int32),
+        torch.zeros((capacity,), device="cuda", dtype=torch.int32),
+        torch.zeros((capacity,), device="cuda", dtype=torch.int32),
+        torch.tensor([1.0e-9, 2.0e-9, 3.0e-9], device="cuda", dtype=torch.float32),
+        torch.tensor([1.0, 9.0, 2.0], device="cuda", dtype=torch.float32),
+        torch.tensor([2.0, 9.0, 3.0], device="cuda", dtype=torch.float32),
+        torch.tensor([0.5, 9.0, 1.0], device="cuda", dtype=torch.float32),
+        torch.tensor([0.25, 9.0, 4.0], device="cuda", dtype=torch.float32),
+        torch.tensor([0.0, 9.0, 5.0], device="cuda", dtype=torch.float32),
+        torch.tensor([0.75, 9.0, 6.0], device="cuda", dtype=torch.float32),
+        torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
+        torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
+        torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
+    )
+
+    block = ops.path_diffraction_block(out, tx_index=2)
+    merged = ops.path_merge_blocks([block], tx_count=3, max_depth=1)
+
+    assert block["valid"].shape == (2,)
+    torch.testing.assert_close(block["tx_id"], torch.tensor([2, 2], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["rx_id"], torch.tensor([7, 9], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["edge_id"], torch.tensor([11, 13], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(
+        block["path_gain"],
+        torch.tensor([5.875, 91.0], device="cuda", dtype=torch.float32),
+    )
+    torch.testing.assert_close(merged["path_gain"], block["path_gain"])
+
+
 def test_deterministic_los_field_matches_python_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic LoS field")
@@ -108,6 +190,883 @@ def test_deterministic_los_field_matches_python_reference():
     expected = free_space_complex_field(path_gain, path_length, 3.0e9)
     torch.testing.assert_close(field, expected, rtol=2.0e-5, atol=1.0e-7)
     torch.testing.assert_close(result["path_gain"], path_gain, rtol=0.0, atol=0.0)
+
+
+def test_deterministic_los_topology_block_compacts_and_fills_extended_fields():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic LoS topology block")
+
+    tx_id = torch.tensor([0, 0, 1], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, 1, 0], device="cuda", dtype=torch.int32)
+    path_length = torch.tensor([1.0, 2.0, 3.0], device="cuda", dtype=torch.float32)
+    delay = path_length / 299_792_458.0
+    path_gain = torch.tensor([1.0e-4, 2.0e-4, 3.0e-4], device="cuda", dtype=torch.float32)
+    visible = torch.tensor([True, False, True], device="cuda", dtype=torch.bool)
+
+    block = ops.deterministic_los_topology_block(
+        tx_id,
+        rx_id,
+        path_length,
+        delay,
+        path_gain,
+        visible,
+        frequency_hz=3.0e9,
+        sequence_width=2,
+    )
+
+    assert block["valid"].shape == (2,)
+    torch.testing.assert_close(block["tx_id"], torch.tensor([0, 1], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["rx_id"], torch.tensor([0, 0], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["depth"], torch.zeros((2,), device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["component_id"], torch.zeros((2,), device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["primitive_id"], torch.full((2,), -1, device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["edge_id"], torch.full((2,), -1, device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["path_length_m"], torch.tensor([1.0, 3.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(block["path_gain"], torch.tensor([1.0e-4, 3.0e-4], device="cuda", dtype=torch.float32))
+    assert block["path_field"].is_cuda
+    assert block["path_field"].dtype == torch.complex64
+    assert block["interaction_position"].shape == (2, 3)
+    assert block["primitive_sequence"].shape == (2, 2)
+    assert block["interaction_positions"].shape == (2, 2, 3)
+    torch.testing.assert_close(
+        block["primitive_sequence"],
+        torch.full((2, 2), -1, device="cuda", dtype=torch.int32),
+    )
+
+
+def test_deterministic_los_topology_block_all_visible_does_not_require_python_mask():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic LoS topology block")
+
+    tx_id = torch.tensor([0, 1], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([1, 0], device="cuda", dtype=torch.int32)
+    path_length = torch.tensor([4.0, 5.0], device="cuda", dtype=torch.float32)
+    delay = path_length / 299_792_458.0
+    path_gain = torch.tensor([4.0e-4, 5.0e-4], device="cuda", dtype=torch.float32)
+
+    block = ops.deterministic_los_topology_block(
+        tx_id,
+        rx_id,
+        path_length,
+        delay,
+        path_gain,
+        None,
+        frequency_hz=3.0e9,
+        sequence_width=0,
+    )
+
+    assert block["valid"].shape == (2,)
+    torch.testing.assert_close(block["tx_id"], tx_id)
+    torch.testing.assert_close(block["rx_id"], rx_id)
+    torch.testing.assert_close(block["path_length_m"], path_length)
+    assert block["primitive_sequence"].shape == (2, 0)
+    assert block["interaction_positions"].shape == (2, 0, 3)
+
+
+def test_deterministic_selected_edge_count_uses_native_unique_count():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic selected-edge counting")
+
+    edge_id = torch.tensor([-1, 7, 11, 7, -1, 11], device="cuda", dtype=torch.int32)
+
+    assert ops.deterministic_selected_edge_count(edge_id) == 2
+
+
+def test_deterministic_zero_field_phase_uses_native_storage_fill():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic zero field/phase storage")
+
+    reference = torch.tensor([1.0, 2.0, 3.0], device="cuda", dtype=torch.float32)
+
+    exported = ops.deterministic_zero_field_phase(reference)
+
+    assert exported["path_field"].is_cuda
+    assert exported["path_field"].dtype == torch.complex64
+    assert exported["phase_rad"].is_cuda
+    assert exported["phase_rad"].dtype == torch.float32
+    assert exported["path_field"].shape == reference.shape
+    assert exported["phase_rad"].shape == reference.shape
+    torch.testing.assert_close(exported["path_field"].abs(), reference * 0.0, rtol=0.0, atol=0.0)
+    torch.testing.assert_close(exported["phase_rad"], reference * 0.0, rtol=0.0, atol=0.0)
+
+
+def test_deterministic_topology_default_fields_uses_native_fill():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology default fields")
+
+    reference = torch.tensor([1.0, 2.0], device="cuda", dtype=torch.float32)
+
+    exported = ops.deterministic_topology_default_fields(reference)
+
+    assert exported["interaction_position"].shape == (2, 3)
+    assert exported["interaction_normal"].shape == (2, 3)
+    assert exported["material_id"].shape == (2,)
+    assert exported["path_field"].shape == (2,)
+    torch.testing.assert_close(
+        exported["interaction_position"],
+        torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
+        rtol=0.0,
+        atol=0.0,
+    )
+    torch.testing.assert_close(
+        exported["interaction_normal"],
+        torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
+        rtol=0.0,
+        atol=0.0,
+    )
+    torch.testing.assert_close(
+        exported["material_id"],
+        torch.tensor([-1, -1], device="cuda", dtype=torch.int32),
+        rtol=0.0,
+        atol=0,
+    )
+    torch.testing.assert_close(
+        exported["path_field"],
+        torch.tensor([0.0 + 0.0j, 0.0 + 0.0j], device="cuda", dtype=torch.complex64),
+        rtol=0.0,
+        atol=0.0,
+    )
+
+
+def test_deterministic_pad_topology_sequences_uses_native_defaults_and_copy():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology sequence padding")
+
+    depth = torch.tensor([0, 1, 2], device="cuda", dtype=torch.int32)
+    primitive_id = torch.tensor([-1, 5, 9], device="cuda", dtype=torch.int32)
+    material_id = torch.tensor([-1, 2, 3], device="cuda", dtype=torch.int32)
+    interaction_position = torch.tensor(
+        [[0.0, 0.0, 0.0], [1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    interaction_normal = torch.tensor(
+        [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    empty_i32 = torch.empty((3, 0), device="cuda", dtype=torch.int32)
+    empty_vec = torch.empty((3, 0, 3), device="cuda", dtype=torch.float32)
+
+    defaults = ops.deterministic_pad_topology_sequences(
+        depth=depth,
+        primitive_id=primitive_id,
+        material_id=material_id,
+        interaction_position=interaction_position,
+        interaction_normal=interaction_normal,
+        primitive_sequence=empty_i32,
+        material_sequence=empty_i32,
+        interaction_positions=empty_vec,
+        interaction_normals=empty_vec,
+        width=2,
+    )
+
+    torch.testing.assert_close(
+        defaults["primitive_sequence"],
+        torch.tensor([[-1, -1], [5, -1], [9, -1]], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(
+        defaults["material_sequence"],
+        torch.tensor([[-1, -1], [2, -1], [3, -1]], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(defaults["interaction_positions"][1, 0], interaction_position[1])
+    torch.testing.assert_close(defaults["interaction_normals"][2, 0], interaction_normal[2])
+
+    source_i32 = torch.tensor([[11], [12], [13]], device="cuda", dtype=torch.int32)
+    source_vec = torch.tensor(
+        [[[1.0, 0.0, 0.0]], [[2.0, 0.0, 0.0]], [[3.0, 0.0, 0.0]]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    copied = ops.deterministic_pad_topology_sequences(
+        depth=depth,
+        primitive_id=primitive_id,
+        material_id=material_id,
+        interaction_position=interaction_position,
+        interaction_normal=interaction_normal,
+        primitive_sequence=source_i32,
+        material_sequence=source_i32,
+        interaction_positions=source_vec,
+        interaction_normals=source_vec,
+        width=2,
+    )
+
+    torch.testing.assert_close(
+        copied["primitive_sequence"],
+        torch.tensor([[11, -1], [12, -1], [13, -1]], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(copied["interaction_positions"][:, 0, :], source_vec[:, 0, :])
+
+
+def test_deterministic_topology_base_fields_fill_constants_and_sources():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology base fields")
+
+    rx_id = torch.tensor([3, 4], device="cuda", dtype=torch.int32)
+    path_length = torch.tensor([1.5, 2.5], device="cuda", dtype=torch.float32)
+    delay = torch.tensor([1.0e-9, 2.0e-9], device="cuda", dtype=torch.float32)
+    path_gain = torch.tensor([0.25, 0.5], device="cuda", dtype=torch.float32)
+    depth_source = torch.tensor([1, 2], device="cuda", dtype=torch.int32)
+    primitive_source = torch.tensor([7, 8], device="cuda", dtype=torch.int32)
+    empty_i32 = torch.empty((0,), device="cuda", dtype=torch.int32)
+
+    block = ops.deterministic_topology_base_fields(
+        rx_id=rx_id,
+        path_length_m=path_length,
+        delay_s=delay,
+        path_gain=path_gain,
+        tx_index=2,
+        component_id=1,
+        depth_source=depth_source,
+        depth_value=0,
+        primitive_source=primitive_source,
+        primitive_value=-1,
+        edge_source=empty_i32,
+        edge_value=-1,
+    )
+
+    torch.testing.assert_close(block["valid"], torch.tensor([True, True], device="cuda", dtype=torch.bool))
+    torch.testing.assert_close(block["tx_id"], torch.tensor([2, 2], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["rx_id"], rx_id)
+    torch.testing.assert_close(block["depth"], depth_source)
+    torch.testing.assert_close(block["component_id"], torch.tensor([1, 1], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["primitive_id"], primitive_source)
+    torch.testing.assert_close(block["edge_id"], torch.tensor([-1, -1], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(block["path_length_m"], path_length)
+    torch.testing.assert_close(block["delay_s"], delay)
+    torch.testing.assert_close(block["path_gain"], path_gain)
+
+
+def test_deterministic_repeat_range_generates_native_repeated_indices():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic repeated range generation")
+
+    reference = torch.empty((1,), device="cuda", dtype=torch.float32)
+
+    repeated = ops.deterministic_repeat_range(reference, start=4, end=7, repeats=2)
+
+    torch.testing.assert_close(
+        repeated,
+        torch.tensor([4, 4, 5, 5, 6, 6], device="cuda", dtype=torch.int32),
+    )
+
+
+def test_deterministic_reflection_epc_input_batch_generates_native_pairs():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection EPC batch generation")
+
+    tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
+    rx_positions = torch.tensor(
+        [
+            [-1.0, -1.0, -1.0],
+            [-1.0, -1.0, -1.0],
+            [-1.0, -1.0, -1.0],
+            [-1.0, -1.0, -1.0],
+            [0.0, 1.0, 2.0],
+            [3.0, 4.0, 5.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    sequences = torch.tensor([[2, 0], [1, 2]], device="cuda", dtype=torch.long)
+    tri_a = torch.tensor(
+        [[10.0, 10.5, 11.0], [20.0, 20.5, 21.0], [30.0, 30.5, 31.0]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    normals = torch.tensor(
+        [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+
+    batch = ops.deterministic_reflection_epc_input_batch(
+        tx=tx,
+        rx_positions=rx_positions,
+        sequences=sequences,
+        tri_a=tri_a,
+        normals=normals,
+        rx_start=4,
+        rx_end=6,
+    )
+
+    expected_sequence_batch = sequences.repeat(2, 1).to(dtype=torch.int32)
+    torch.testing.assert_close(batch["tx_batch"], tx.expand(4, 3).contiguous())
+    torch.testing.assert_close(batch["rx_batch"], rx_positions[4:6].repeat_interleave(2, dim=0).contiguous())
+    torch.testing.assert_close(batch["rx_indices"], torch.tensor([4, 4, 5, 5], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(batch["sequence_batch"], expected_sequence_batch)
+    torch.testing.assert_close(batch["direct_plane_points"], tri_a[expected_sequence_batch.to(dtype=torch.long)])
+    torch.testing.assert_close(batch["direct_plane_normals"], normals[expected_sequence_batch.to(dtype=torch.long)])
+
+
+def test_deterministic_face_anchor_points_gathers_first_vertices_native():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic face anchor gather")
+
+    vertices = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+            [7.0, 8.0, 9.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    faces = torch.tensor(
+        [
+            [2, 1, 0],
+            [3, 2, 1],
+            [1, 0, 3],
+        ],
+        device="cuda",
+        dtype=torch.int32,
+    )
+
+    anchors = ops.deterministic_face_anchor_points(vertices, faces)
+
+    expected = torch.tensor(
+        [
+            [4.0, 5.0, 6.0],
+            [7.0, 8.0, 9.0],
+            [1.0, 2.0, 3.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    torch.testing.assert_close(anchors, expected)
+
+
+def test_deterministic_face_sequence_chunk_generates_base_digits():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic face sequence generation")
+
+    reference = torch.empty((1,), device="cuda", dtype=torch.float32)
+
+    sequences = ops.deterministic_face_sequence_chunk(
+        reference,
+        face_count=3,
+        depth=2,
+        start=1,
+        end=6,
+    )
+
+    expected = torch.tensor(
+        [[0, 1], [0, 2], [1, 0], [1, 1], [1, 2]],
+        device="cuda",
+        dtype=torch.int32,
+    )
+    torch.testing.assert_close(sequences, expected)
+
+
+def test_deterministic_mapped_face_sequence_chunk_maps_digits_to_face_ids():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic mapped face sequence generation")
+
+    face_ids = torch.tensor([4, 7, 9], device="cuda", dtype=torch.int64)
+
+    sequences = ops.deterministic_mapped_face_sequence_chunk(
+        face_ids,
+        depth=2,
+        start=1,
+        end=6,
+    )
+
+    expected = torch.tensor(
+        [[4, 7], [4, 9], [7, 4], [7, 7], [7, 9]],
+        device="cuda",
+        dtype=torch.int32,
+    )
+    torch.testing.assert_close(sequences, expected)
+
+
+def test_deterministic_mapped_face_sequence_chunk_can_skip_adjacent_repeats():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic mapped face sequence generation")
+
+    face_ids = torch.tensor([4, 7, 9], device="cuda", dtype=torch.int64)
+
+    sequences = ops.deterministic_mapped_face_sequence_chunk(
+        face_ids,
+        depth=2,
+        start=0,
+        end=6,
+        adjacent_distinct=True,
+    )
+
+    expected = torch.tensor(
+        [[4, 7], [4, 9], [7, 4], [7, 9], [9, 4], [9, 7]],
+        device="cuda",
+        dtype=torch.int32,
+    )
+    torch.testing.assert_close(sequences, expected)
+
+
+def test_deterministic_reflection_order1_compact_selects_visible_material_inputs():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection order1 compaction")
+
+    visible = torch.tensor([False, True, True], device="cuda", dtype=torch.bool)
+    epc_faces = torch.tensor([[9], [2], [1]], device="cuda", dtype=torch.int32)
+    sequence_batch = torch.tensor([[0], [1], [2]], device="cuda", dtype=torch.int32)
+    epc_hits = torch.tensor(
+        [
+            [[0.0, 0.0, 0.0]],
+            [[1.0, 2.0, 3.0]],
+            [[4.0, 5.0, 6.0]],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    epc_normals = epc_hits + 10.0
+    rx_indices = torch.tensor([4, 4, 5], device="cuda", dtype=torch.int32)
+    tx = torch.tensor([7.0, 8.0, 9.0], device="cuda", dtype=torch.float32)
+    rx_positions = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [40.0, 41.0, 42.0],
+            [50.0, 51.0, 52.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    tx_power = torch.tensor([0.5, 1.5], device="cuda", dtype=torch.float32)
+    face_eps_r = torch.tensor([10.0, 11.0, 12.0], device="cuda", dtype=torch.float32)
+    face_sigma_e = face_eps_r + 100.0
+    face_mu_r = face_eps_r + 200.0
+    face_gain = face_eps_r + 300.0
+    face_material_id = torch.tensor([3, 4, 5], device="cuda", dtype=torch.int32)
+
+    compacted = ops.deterministic_reflection_order1_compact(
+        visible=visible,
+        epc_faces=epc_faces,
+        epc_hits=epc_hits,
+        epc_normals=epc_normals,
+        sequence_batch=sequence_batch,
+        rx_indices=rx_indices,
+        tx=tx,
+        rx_positions=rx_positions,
+        tx_power=tx_power,
+        tx_index=1,
+        face_eps_r=face_eps_r,
+        face_sigma_e=face_sigma_e,
+        face_mu_r=face_mu_r,
+        face_gain=face_gain,
+        face_material_id=face_material_id,
+        grouped_export=False,
+    )
+
+    torch.testing.assert_close(compacted["selected_faces"], torch.tensor([1, 2], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["selected_points"], epc_hits[1:, 0, :])
+    torch.testing.assert_close(compacted["selected_normals"], epc_normals[1:, 0, :])
+    torch.testing.assert_close(compacted["selected_rx_id"], torch.tensor([4, 5], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["tx_keep"], tx.expand(2, 3).contiguous())
+    torch.testing.assert_close(compacted["rx_keep"], rx_positions[4:6])
+    torch.testing.assert_close(compacted["tx_power"], torch.tensor([1.5, 1.5], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["eps_r"], torch.tensor([11.0, 12.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["sigma_e"], torch.tensor([111.0, 112.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["mu_r"], torch.tensor([211.0, 212.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["gain"], torch.tensor([311.0, 312.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["material_id"], torch.tensor([4, 5], device="cuda", dtype=torch.int32))
+
+
+def test_deterministic_reflection_sequence_compact_selects_visible_sequences_with_limit():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection sequence compaction")
+
+    visible = torch.tensor([True, False, True], device="cuda", dtype=torch.bool)
+    epc_sequences = torch.tensor([[0, 1], [1, 2], [2, 0]], device="cuda", dtype=torch.int32)
+    epc_hits = torch.tensor(
+        [
+            [[1.0, 1.5, 2.0], [2.0, 2.5, 3.0]],
+            [[3.0, 3.5, 4.0], [4.0, 4.5, 5.0]],
+            [[5.0, 5.5, 6.0], [6.0, 6.5, 7.0]],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    epc_normals = epc_hits + 20.0
+    rx_indices = torch.tensor([4, 4, 5], device="cuda", dtype=torch.int32)
+    tx = torch.tensor([7.0, 8.0, 9.0], device="cuda", dtype=torch.float32)
+    rx_positions = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [40.0, 41.0, 42.0],
+            [50.0, 51.0, 52.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    tx_power = torch.tensor([0.5, 1.5], device="cuda", dtype=torch.float32)
+    face_eps_r = torch.tensor([10.0, 11.0, 12.0], device="cuda", dtype=torch.float32)
+    face_sigma_e = face_eps_r + 100.0
+    face_mu_r = face_eps_r + 200.0
+    face_gain = face_eps_r + 300.0
+    face_material_id = torch.tensor([3, 4, 5], device="cuda", dtype=torch.int32)
+
+    compacted = ops.deterministic_reflection_sequence_compact(
+        visible=visible,
+        epc_sequences=epc_sequences,
+        epc_hits=epc_hits,
+        epc_normals=epc_normals,
+        rx_indices=rx_indices,
+        tx=tx,
+        rx_positions=rx_positions,
+        tx_power=tx_power,
+        tx_index=1,
+        face_eps_r=face_eps_r,
+        face_sigma_e=face_sigma_e,
+        face_mu_r=face_mu_r,
+        face_gain=face_gain,
+        face_material_id=face_material_id,
+        max_count=1,
+    )
+
+    torch.testing.assert_close(compacted["selected_sequences"], torch.tensor([[0, 1]], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["selected_hits"], epc_hits[:1])
+    torch.testing.assert_close(compacted["selected_normals"], epc_normals[:1])
+    torch.testing.assert_close(compacted["first_hit"], epc_hits[:1, 0, :])
+    torch.testing.assert_close(compacted["first_normal"], epc_normals[:1, 0, :])
+    torch.testing.assert_close(compacted["selected_rx_id"], torch.tensor([4], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["selected_tx"], tx.reshape(1, 3))
+    torch.testing.assert_close(compacted["selected_rx"], rx_positions[4:5])
+    torch.testing.assert_close(compacted["tx_power"], torch.tensor([1.5], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["eps_r"], torch.tensor([[10.0, 11.0]], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["sigma_e"], torch.tensor([[110.0, 111.0]], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["mu_r"], torch.tensor([[210.0, 211.0]], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["gain"], torch.tensor([[310.0, 311.0]], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["first_face"], torch.tensor([0], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["material_id"], torch.tensor([3], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["material_sequence"], torch.tensor([[3, 4]], device="cuda", dtype=torch.int32))
+
+
+def test_deterministic_normalize_vec3_normalizes_rows_with_native_kernel():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic vec3 normalization")
+
+    values = torch.tensor([[3.0, 4.0, 0.0], [0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+
+    normalized = ops.deterministic_normalize_vec3(values, eps=1.0e-6)
+
+    expected = torch.tensor([[0.6, 0.8, 0.0], [0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+    torch.testing.assert_close(normalized, expected)
+
+
+def test_deterministic_reflect_points_reflects_about_planes_with_native_kernel():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic point reflection")
+
+    points = torch.tensor([[1.0, 2.0, 3.0], [2.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
+    plane_points = torch.tensor([[0.0, 0.0, 0.0], [1.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
+    normals = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32)
+
+    reflected = ops.deterministic_reflect_points(points, plane_points, normals)
+
+    expected = torch.tensor([[-1.0, 2.0, 3.0], [2.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
+    torch.testing.assert_close(reflected, expected)
+
+
+def test_deterministic_face_groups_matches_canonical_plane_keys():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic face grouping")
+
+    tri_a = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 2.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    normals = torch.tensor(
+        [
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, -1.0],
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    surface_ids = torch.tensor([1, 1, 1, 2, 1], device="cuda", dtype=torch.int64)
+
+    groups = ops.deterministic_face_groups(tri_a, normals, surface_ids, quantization=1.0e-4)
+
+    assert groups["group_count"] == 4
+    torch.testing.assert_close(
+        groups["face_group_id"],
+        torch.tensor([0, 0, 1, 3, 2], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(
+        groups["representative_faces"],
+        torch.tensor([0, 2, 4, 3], device="cuda", dtype=torch.int64),
+    )
+    torch.testing.assert_close(
+        groups["surface_group_size"],
+        torch.tensor([2, 1, 1, 1], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(
+        groups["surface_group_members"],
+        torch.tensor([0, 1, 2, -1, 4, -1, 3, -1], device="cuda", dtype=torch.int32),
+    )
+
+
+def test_deterministic_surface_face_groups_groups_by_surface_id_only():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic surface grouping")
+
+    surface_ids = torch.tensor([3, 3, 2, 3, 2], device="cuda", dtype=torch.int64)
+
+    groups = ops.deterministic_surface_face_groups(surface_ids)
+
+    assert groups["group_count"] == 2
+    torch.testing.assert_close(
+        groups["face_group_id"],
+        torch.tensor([1, 1, 0, 1, 0], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(
+        groups["representative_faces"],
+        torch.tensor([2, 0], device="cuda", dtype=torch.int64),
+    )
+    torch.testing.assert_close(
+        groups["surface_group_size"],
+        torch.tensor([2, 3], device="cuda", dtype=torch.int32),
+    )
+    torch.testing.assert_close(
+        groups["surface_group_members"],
+        torch.tensor([2, 4, -1, 0, 1, 3], device="cuda", dtype=torch.int32),
+    )
+
+
+def test_deterministic_concat_topology_blocks_concatenates_full_schema():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology concat")
+
+    def make_block(offset: int, count: int) -> dict[str, torch.Tensor]:
+        i32 = torch.arange(offset, offset + count, device="cuda", dtype=torch.int32)
+        f32 = i32.to(dtype=torch.float32)
+        return {
+            "valid": torch.ones((count,), device="cuda", dtype=torch.bool),
+            "tx_id": i32,
+            "rx_id": i32 + 10,
+            "depth": torch.full((count,), 1, device="cuda", dtype=torch.int32),
+            "component_id": torch.full((count,), 2, device="cuda", dtype=torch.int32),
+            "primitive_id": i32 + 20,
+            "edge_id": i32 + 30,
+            "path_length_m": f32 + 0.25,
+            "delay_s": f32 + 0.5,
+            "path_gain": f32 + 0.75,
+            "path_field": torch.complex(f32 + 1.0, f32 + 2.0),
+            "interaction_position": torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
+            "interaction_normal": torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
+            "material_id": i32 + 40,
+            "primitive_sequence": torch.stack((i32 + 50, i32 + 60), dim=1),
+            "material_sequence": torch.stack((i32 + 70, i32 + 80), dim=1),
+            "interaction_positions": torch.stack(
+                (
+                    torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
+                    torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
+                ),
+                dim=1,
+            ),
+            "interaction_normals": torch.stack(
+                (
+                    torch.stack((f32 + 6.0, f32 + 7.0, f32 + 8.0), dim=1),
+                    torch.stack((f32 + 9.0, f32 + 10.0, f32 + 11.0), dim=1),
+                ),
+                dim=1,
+            ),
+        }
+
+    block0 = make_block(0, 2)
+    block1 = make_block(10, 1)
+
+    out = ops.deterministic_concat_topology_blocks([block0, block1], sequence_width=2)
+
+    for key, tensor in block0.items():
+        expected = torch.cat((tensor, block1[key]), dim=0).contiguous()
+        torch.testing.assert_close(out[key], expected)
+
+
+def test_deterministic_concat_topology_blocks_concatenates_unpadded_schema():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology concat")
+
+    def make_block(offset: int, count: int) -> dict[str, torch.Tensor]:
+        i32 = torch.arange(offset, offset + count, device="cuda", dtype=torch.int32)
+        f32 = i32.to(dtype=torch.float32)
+        return {
+            "valid": torch.ones((count,), device="cuda", dtype=torch.bool),
+            "tx_id": i32,
+            "rx_id": i32 + 10,
+            "depth": torch.full((count,), 1, device="cuda", dtype=torch.int32),
+            "component_id": torch.full((count,), 2, device="cuda", dtype=torch.int32),
+            "primitive_id": i32 + 20,
+            "edge_id": i32 + 30,
+            "path_length_m": f32 + 0.25,
+            "delay_s": f32 + 0.5,
+            "path_gain": f32 + 0.75,
+            "path_field": torch.complex(f32 + 1.0, f32 + 2.0),
+            "interaction_position": torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
+            "interaction_normal": torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
+            "material_id": i32 + 40,
+        }
+
+    block0 = make_block(0, 2)
+    block1 = make_block(10, 1)
+
+    out = ops.deterministic_concat_topology_blocks([block0, block1], sequence_width=0)
+
+    assert "primitive_sequence" not in out
+    assert "material_sequence" not in out
+    assert "interaction_positions" not in out
+    assert "interaction_normals" not in out
+    for key, tensor in block0.items():
+        expected = torch.cat((tensor, block1[key]), dim=0).contiguous()
+        torch.testing.assert_close(out[key], expected)
+
+
+def test_deterministic_gather_topology_block_orders_and_truncates_full_schema():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology gather")
+
+    count = 4
+    i32 = torch.arange(count, device="cuda", dtype=torch.int32)
+    f32 = i32.to(dtype=torch.float32)
+    block = {
+        "valid": torch.ones((count,), device="cuda", dtype=torch.bool),
+        "tx_id": i32,
+        "rx_id": i32 + 10,
+        "depth": i32 + 20,
+        "component_id": i32 + 30,
+        "primitive_id": i32 + 40,
+        "edge_id": i32 + 50,
+        "path_length_m": f32 + 0.25,
+        "delay_s": f32 + 0.5,
+        "path_gain": f32 + 0.75,
+        "path_field": torch.complex(f32 + 1.0, f32 + 2.0),
+        "interaction_position": torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
+        "interaction_normal": torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
+        "material_id": i32 + 60,
+        "primitive_sequence": torch.stack((i32 + 70, i32 + 80), dim=1),
+        "material_sequence": torch.stack((i32 + 90, i32 + 100), dim=1),
+        "interaction_positions": torch.stack(
+            (
+                torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
+                torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
+            ),
+            dim=1,
+        ),
+        "interaction_normals": torch.stack(
+            (
+                torch.stack((f32 + 6.0, f32 + 7.0, f32 + 8.0), dim=1),
+                torch.stack((f32 + 9.0, f32 + 10.0, f32 + 11.0), dim=1),
+            ),
+            dim=1,
+        ),
+    }
+    order = torch.tensor([2, 0, 3], device="cuda", dtype=torch.long)
+
+    out = ops.deterministic_gather_topology_block(block, order, max_count=2, sequence_width=2)
+
+    expected_order = order[:2]
+    for key, tensor in block.items():
+        torch.testing.assert_close(out[key], tensor[expected_order].contiguous())
+
+
+def test_deterministic_sort_order_matches_topology_key_priority():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology sorting")
+
+    valid = torch.ones(4, device="cuda", dtype=torch.bool)
+    tx_id = torch.tensor([0, 0, 0, 0], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([1, 0, 0, 0], device="cuda", dtype=torch.int32)
+    depth = torch.tensor([1, 1, 1, 0], device="cuda", dtype=torch.int32)
+    component_id = torch.tensor([1, 1, 0, 1], device="cuda", dtype=torch.int32)
+    primitive_id = torch.tensor([2, 1, 3, 4], device="cuda", dtype=torch.int32)
+    edge_id = torch.tensor([-1, -1, -1, -1], device="cuda", dtype=torch.int32)
+    primitive_sequence = torch.tensor(
+        [[5, 2], [5, 1], [4, 9], [8, 8]],
+        device="cuda",
+        dtype=torch.int32,
+    )
+
+    order = ops.deterministic_sort_order(
+        valid,
+        tx_id,
+        rx_id,
+        depth,
+        component_id,
+        primitive_id,
+        edge_id,
+        primitive_sequence,
+    )
+
+    torch.testing.assert_close(order, torch.tensor([3, 2, 1, 0], device="cuda", dtype=torch.long))
+
+
+def test_deterministic_diffraction_order1_compact_selects_valid_raydn_rows():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic diffraction compaction")
+
+    valid = torch.tensor([False, True, True, False], device="cuda", dtype=torch.bool)
+    rx_id = torch.tensor([10, 11, 12, 13], device="cuda", dtype=torch.int32)
+    depth = torch.tensor([0, 2, 3, 4], device="cuda", dtype=torch.int32)
+    edge_id = torch.tensor([20, 21, 22, 23], device="cuda", dtype=torch.int32)
+    delay = torch.tensor([0.1, 0.2, 0.3, 0.4], device="cuda", dtype=torch.float32)
+    x_re = torch.tensor([1.0, 2.0, 3.0, 4.0], device="cuda", dtype=torch.float32)
+    x_im = x_re + 10.0
+    y_re = x_re + 20.0
+    y_im = x_re + 30.0
+    z_re = x_re + 40.0
+    z_im = x_re + 50.0
+    interaction_position = torch.tensor(
+        [
+            [0.0, 1.0, 2.0],
+            [10.0, 11.0, 12.0],
+            [20.0, 21.0, 22.0],
+            [30.0, 31.0, 32.0],
+        ],
+        device="cuda",
+        dtype=torch.float32,
+    )
+
+    compacted = ops.deterministic_diffraction_order1_compact(
+        valid=valid,
+        rx_id=rx_id,
+        depth=depth,
+        edge_id=edge_id,
+        delay_s=delay,
+        x_re=x_re,
+        x_im=x_im,
+        y_re=y_re,
+        y_im=y_im,
+        z_re=z_re,
+        z_im=z_im,
+        interaction_position=interaction_position,
+    )
+
+    torch.testing.assert_close(compacted["rx_id"], torch.tensor([11, 12], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["depth"], torch.tensor([2, 3], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["edge_id"], torch.tensor([21, 22], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(compacted["delay_s"], torch.tensor([0.2, 0.3], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["x_re"], torch.tensor([2.0, 3.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["x_im"], torch.tensor([12.0, 13.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["y_re"], torch.tensor([22.0, 23.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["y_im"], torch.tensor([32.0, 33.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["z_re"], torch.tensor([42.0, 43.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["z_im"], torch.tensor([52.0, 53.0], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(compacted["interaction_position"], interaction_position[1:3])
 
 
 def test_deterministic_diffraction_vector_field_matches_python_reference():
@@ -169,7 +1128,12 @@ def test_deterministic_reflection_field_returns_native_complex_field():
     assert result["path_gain"].is_cuda
     assert result["field_real"].is_cuda
     assert result["field_imag"].is_cuda
+    assert result["path_length_m"].is_cuda
+    assert result["delay_s"].is_cuda
     assert result["path_gain"].item() > 0.0
+    expected_length = torch.tensor([1.0 + math.sqrt(2.0)], device="cuda", dtype=torch.float32)
+    torch.testing.assert_close(result["path_length_m"], expected_length, rtol=2.0e-6, atol=1.0e-6)
+    torch.testing.assert_close(result["delay_s"], expected_length / 299_792_458.0, rtol=2.0e-6, atol=1.0e-12)
     field = torch.complex(result["field_real"], result["field_imag"])
     torch.testing.assert_close(result["path_gain"], field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
 
@@ -254,8 +1218,27 @@ def test_deterministic_reflection_sequence_field_matches_python_reference():
 
     field = torch.complex(result["field_real"], result["field_imag"])
     torch.testing.assert_close(result["path_length_m"], expected_length, rtol=2.0e-5, atol=1.0e-6)
+    torch.testing.assert_close(
+        result["delay_s"],
+        expected_length / 299_792_458.0,
+        rtol=2.0e-5,
+        atol=1.0e-12,
+    )
     torch.testing.assert_close(result["path_gain"], expected_gain, rtol=5.0e-4, atol=1.0e-10)
     torch.testing.assert_close(field, expected_field, rtol=5.0e-4, atol=1.0e-7)
+
+
+def test_deterministic_delay_to_path_length_uses_native_kernel():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic delay conversion")
+    native = ops.native_extension()
+    if native is None or not hasattr(native, "deterministic_delay_to_path_length"):
+        pytest.skip("native deterministic delay conversion kernel is not built")
+
+    delay = torch.tensor([0.0, 1.0e-9, 2.5e-9], device="cuda", dtype=torch.float32)
+    result = ops.deterministic_delay_to_path_length(delay)
+    expected = torch.tensor([0.0, 0.2997924685, 0.7494811416], device="cuda", dtype=torch.float32)
+    torch.testing.assert_close(result, expected, rtol=2.0e-6, atol=1.0e-7)
 
 
 def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
@@ -516,12 +1499,25 @@ def test_mc_los_component_maps_converts_to_public_grid_layout():
     torch.testing.assert_close(maps, los.transpose(1, 2).contiguous())
 
 
+def test_mc_los_component_maps_from_matrix_uses_native_grid_layout():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC LoS component maps")
+
+    los = torch.arange(6, device="cuda", dtype=torch.float32).reshape(1, 6).contiguous()
+
+    maps = ops.mc_los_component_maps_from_matrix(los, rows=2, cols=3)
+
+    assert maps.shape == (1, 3, 2)
+    expected = torch.tensor([[[0.0, 3.0], [1.0, 4.0], [2.0, 5.0]]], device="cuda")
+    torch.testing.assert_close(maps, expected)
+
+
 def test_mc_apply_los_visibility_masks_one_transmitter_in_public_layout():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC LoS visibility")
 
-    los = torch.tensor([[[1.0, 2.0], [3.0, 4.0]]], device="cuda", dtype=torch.float32)
-    maps = ops.mc_los_component_maps(los)
+    los = torch.tensor([[1.0, 2.0, 3.0, 4.0]], device="cuda", dtype=torch.float32)
+    maps = ops.mc_los_component_maps_from_matrix(los, rows=2, cols=2)
     visible = torch.tensor([True, False, False, True], device="cuda", dtype=torch.bool)
 
     out = ops.mc_apply_los_visibility(maps, los, visible, tx_index=0)
@@ -534,7 +1530,7 @@ def test_mc_apply_los_visibility_requires_native_cuda_kernel(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC LoS visibility")
 
-    los = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
+    los = torch.zeros((1, 4), device="cuda", dtype=torch.float32)
     maps = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
     visible = torch.ones((4,), device="cuda", dtype=torch.bool)
     monkeypatch.setattr(ops, "native_extension", lambda: None)
@@ -757,6 +1753,88 @@ def test_mc_diffraction_state_pack_gathers_edge_state_tensors():
     torch.testing.assert_close(states[9], exterior_angle[idx])
     torch.testing.assert_close(states[10], tx.expand(2, 3).contiguous())
     torch.testing.assert_close(states[11], tx_power.expand(2).contiguous())
+
+
+def test_deterministic_diffraction_state_pack_reads_power_by_native_index():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic diffraction state packing")
+
+    edge_indices = torch.tensor([1], device="cuda", dtype=torch.int32)
+    edge_pos = torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]], device="cuda", dtype=torch.float32)
+    edge_dir = edge_pos + 10.0
+    line_min = torch.tensor([-1.0, -2.0], device="cuda", dtype=torch.float32)
+    line_max = torch.tensor([1.0, 2.0], device="cuda", dtype=torch.float32)
+    n0 = edge_pos + 20.0
+    n1 = edge_pos + 30.0
+    face0 = torch.tensor([10, 11], device="cuda", dtype=torch.int32)
+    face1 = torch.tensor([20, 21], device="cuda", dtype=torch.int32)
+    exterior_angle = torch.tensor([0.5, 1.5], device="cuda", dtype=torch.float32)
+    tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
+    tx_power = torch.tensor([2.0, 4.0, 8.0], device="cuda", dtype=torch.float32)
+
+    states = ops.deterministic_diffraction_state_pack(
+        edge_indices,
+        edge_pos,
+        edge_dir,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+        tx,
+        tx_power,
+        2,
+    )
+
+    torch.testing.assert_close(states[0], edge_indices)
+    torch.testing.assert_close(states[1], torch.tensor([[3.0, 4.0, 5.0]], device="cuda", dtype=torch.float32))
+    torch.testing.assert_close(states[10], tx.reshape(1, 3))
+    torch.testing.assert_close(states[11], torch.tensor([8.0], device="cuda", dtype=torch.float32))
+
+
+def test_deterministic_diffraction_state_pack_selected_keeps_device_sized_capacity():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic diffraction state packing")
+
+    selected = torch.tensor([False, True, False], device="cuda", dtype=torch.bool)
+    edge_pos = torch.tensor(
+        [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]],
+        device="cuda",
+        dtype=torch.float32,
+    )
+    edge_dir = edge_pos + 10.0
+    line_min = torch.tensor([-1.0, -2.0, -3.0], device="cuda", dtype=torch.float32)
+    line_max = torch.tensor([1.0, 2.0, 3.0], device="cuda", dtype=torch.float32)
+    n0 = edge_pos + 20.0
+    n1 = edge_pos + 30.0
+    face0 = torch.tensor([10, 11, 12], device="cuda", dtype=torch.int32)
+    face1 = torch.tensor([20, 21, 22], device="cuda", dtype=torch.int32)
+    exterior_angle = torch.tensor([0.5, 1.5, 2.5], device="cuda", dtype=torch.float32)
+    tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
+    tx_power = torch.tensor([4.0, 6.0], device="cuda", dtype=torch.float32)
+
+    states = ops.deterministic_diffraction_state_pack_selected(
+        selected,
+        edge_pos,
+        edge_dir,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+        tx,
+        tx_power,
+        tx_power_index=1,
+    )
+
+    torch.testing.assert_close(states[0], torch.tensor([0, 1, 2], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(states[1], edge_pos)
+    torch.testing.assert_close(states[10], tx.expand(3, 3).contiguous())
+    torch.testing.assert_close(states[11], torch.tensor([0.0, 6.0, 0.0], device="cuda", dtype=torch.float32))
 
 
 def test_mc_diffraction_state_pack_requires_native_cuda_kernel(monkeypatch):

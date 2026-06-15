@@ -7,13 +7,15 @@ ACCUMULATION_STRATEGIES = frozenset(
     {
         "none",
         "atomic_add",
+        "cell_reduce",
+        "compact_atomic_add",
         "sorted_segment_reduce",
         "shared_memory_private_reduce",
         "hybrid_tile_reduce",
     }
 )
 
-AD_STATUSES = frozenset({"none", "unsupported", "primal", "vjp", "jvp"})
+AD_STATUSES = frozenset({"none", "primal", "vjp", "jvp"})
 
 REQUIRED_METADATA_FIELDS = (
     "primitive",
@@ -30,7 +32,6 @@ REQUIRED_METADATA_FIELDS = (
     "shared_memory_bytes",
     "occupancy_estimate",
     "spill_bytes",
-    "fusion_debt",
     "raydn_native",
     "ad_status",
 )
@@ -51,7 +52,6 @@ def make_metadata(
     shared_memory_bytes: int = 0,
     occupancy_estimate: float = 0.0,
     spill_bytes: int = 0,
-    fusion_debt: bool = False,
     raydn_native: bool = False,
     ad_status: str = "none",
 ) -> dict[str, bool | float | int | str]:
@@ -70,7 +70,6 @@ def make_metadata(
         "shared_memory_bytes": shared_memory_bytes,
         "occupancy_estimate": occupancy_estimate,
         "spill_bytes": spill_bytes,
-        "fusion_debt": fusion_debt,
         "raydn_native": raydn_native,
         "ad_status": ad_status,
     }
@@ -123,6 +122,5 @@ def validate_metadata(metadata: Mapping[str, object]) -> None:
     if not isinstance(occupancy, int | float) or occupancy < 0.0:
         raise ValueError("metadata occupancy_estimate must be non-negative")
 
-    for field in ("fusion_debt", "raydn_native"):
-        if not isinstance(metadata[field], bool):
-            raise ValueError(f"metadata {field} must be a boolean")
+    if not isinstance(metadata["raydn_native"], bool):
+        raise ValueError("metadata raydn_native must be a boolean")

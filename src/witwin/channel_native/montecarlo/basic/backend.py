@@ -4,10 +4,10 @@ import torch
 
 from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core.kernels.ops import (
-    mc_los_path_gain_backward,
-    mc_los_path_gain_jvp,
     mc_receiver_grid_points,
     mc_transmitter_tensors,
+    mc_zero_matrix,
+    path_concat_vec3,
     path_los_export,
 )
 
@@ -30,6 +30,11 @@ def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torc
     )
 
 
+def _host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
+    powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
+    return mc_transmitter_tensors(flat_positions, powers)["positions"]
+
+
 def receiver_positions(
     scene: Scene,
     *,
@@ -42,24 +47,43 @@ def receiver_positions(
         and reference is not None
     ):
         return receiver_grid_points(scene.receivers[0], reference=reference)
-    positions = []
+    blocks: list[torch.Tensor] = []
+    point_positions: list[float] = []
+    grid_reference = reference
+
+    def flush_points() -> None:
+        nonlocal point_positions, grid_reference
+        if not point_positions:
+            return
+        block = _host_vec3_tensor(tuple(point_positions))
+        blocks.append(block)
+        if grid_reference is None:
+            grid_reference = block
+        point_positions = []
+
     for receiver in scene.receivers:
         if isinstance(receiver, ReceiverPoint):
-            positions.append(receiver.position)
+            point_positions.extend(_vector3_tuple(receiver.position))
         elif isinstance(receiver, ReceiverGrid):
-            positions.extend(receiver.points())
+            flush_points()
+            if grid_reference is None:
+                grid_reference = _host_vec3_tensor(())
+            blocks.append(receiver_grid_points(receiver, reference=grid_reference))
         else:
-            raise TypeError(f"unsupported receiver type: {type(receiver)!r}")
-    return torch.stack(positions, dim=0).to(device=device, dtype=torch.float32).contiguous()
+            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
+    flush_points()
+    if not blocks:
+        return _host_vec3_tensor(())
+    if len(blocks) == 1:
+        return blocks[0]
+    return path_concat_vec3(blocks)
 
 
 def transmitter_positions(scene: Scene, *, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
     del device
     if not scene.transmitters:
-        return (
-            torch.empty((0, 3), device="cuda", dtype=torch.float32),
-            torch.empty((0,), device="cuda", dtype=torch.float32),
-        )
+        exported = mc_transmitter_tensors((), ())
+        return exported["positions"], exported["power"]
     flat_positions = tuple(
         component
         for tx in scene.transmitters
@@ -74,7 +98,7 @@ def los_path_gain(scene: Scene, *, device: torch.device) -> torch.Tensor:
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
     if tx_pos.shape[0] == 0 or rx_pos.shape[0] == 0:
-        return torch.zeros((tx_pos.shape[0], rx_pos.shape[0]), device=device, dtype=torch.float32)
+        return mc_zero_matrix(tx_pos, rows=tx_pos.shape[0], cols=rx_pos.shape[0])
 
     exported = path_los_export(
         tx_pos,
@@ -83,71 +107,3 @@ def los_path_gain(scene: Scene, *, device: torch.device) -> torch.Tensor:
         frequency_hz=float(scene.frequency),
     )
     return exported["path_gain_matrix"]
-
-
-class _LosPathGainAutograd(torch.autograd.Function):
-    @staticmethod
-    def forward(
-        ctx: torch.autograd.function.FunctionCtx,
-        tx_pos: torch.Tensor,
-        tx_power: torch.Tensor,
-        rx_pos: torch.Tensor,
-        frequency_hz: float,
-    ) -> torch.Tensor:
-        ctx.frequency_hz = float(frequency_hz)
-        ctx.save_for_backward(tx_pos, tx_power, rx_pos)
-        ctx.save_for_forward(tx_pos, tx_power, rx_pos)
-        exported = path_los_export(
-            tx_pos,
-            tx_power,
-            rx_pos,
-            frequency_hz=float(frequency_hz),
-        )
-        return exported["path_gain_matrix"]
-
-    @staticmethod
-    def backward(
-        ctx: torch.autograd.function.FunctionCtx,
-        grad_output: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, None]:
-        tx_pos, tx_power, rx_pos = ctx.saved_tensors
-        grad_tx, grad_power, grad_rx = mc_los_path_gain_backward(
-            tx_pos,
-            tx_power,
-            rx_pos,
-            grad_output,
-            frequency_hz=ctx.frequency_hz,
-        )
-        return grad_tx, grad_power, grad_rx, None
-
-    @staticmethod
-    def jvp(
-        ctx: torch.autograd.function.FunctionCtx,
-        tx_tangent: torch.Tensor | None,
-        power_tangent: torch.Tensor | None,
-        rx_tangent: torch.Tensor | None,
-        frequency_tangent: object,
-    ) -> torch.Tensor:
-        del frequency_tangent
-        tx_pos, tx_power, rx_pos = ctx.saved_tensors
-        return mc_los_path_gain_jvp(
-            tx_pos,
-            tx_power,
-            rx_pos,
-            tx_pos if tx_tangent is None else tx_tangent,
-            tx_power if power_tangent is None else power_tangent,
-            rx_pos if rx_tangent is None else rx_tangent,
-            tx_tangent is not None,
-            power_tangent is not None,
-            rx_tangent is not None,
-            frequency_hz=ctx.frequency_hz,
-        )
-
-
-def los_path_gain_autograd(scene: Scene, *, device: torch.device) -> torch.Tensor:
-    tx_pos, tx_power = transmitter_positions(scene, device=device)
-    rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
-    if tx_pos.shape[0] == 0 or rx_pos.shape[0] == 0:
-        return torch.zeros((tx_pos.shape[0], rx_pos.shape[0]), device=device, dtype=torch.float32)
-
-    return _LosPathGainAutograd.apply(tx_pos, tx_power, rx_pos, float(scene.frequency))

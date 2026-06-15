@@ -25,6 +25,8 @@ __global__ void reflection_launch_inputs_kernel(
     float *__restrict__ ray_o,
     bool *__restrict__ active,
     float *__restrict__ tx_pol,
+    int *__restrict__ tx_id,
+    int64_t *__restrict__ light_seed,
     int64_t tx_index,
     int64_t sample_count) {
     const float tx_x = tx_positions[tx_index * 3 + 0];
@@ -45,6 +47,14 @@ __global__ void reflection_launch_inputs_kernel(
         pol[2] = 0.0f;
 
         active[sample] = true;
+        if (tx_id != nullptr) {
+            tx_id[sample] = static_cast<int>(tx_index);
+        }
+        if (light_seed != nullptr) {
+            light_seed[sample] = static_cast<int64_t>(
+                (static_cast<unsigned long long>(tx_index) << 32) ^
+                static_cast<unsigned long long>(sample));
+        }
     }
 }
 
@@ -71,9 +81,43 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_reflection_laun
             ray_o.data_ptr<float>(),
             active.data_ptr<bool>(),
             tx_pol.data_ptr<float>(),
+            nullptr,
+            nullptr,
             tx_index,
             sample_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return {ray_o, ray_tmax, active, tx_pol};
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_reflection_launch_inputs_cuda(
+    at::Tensor tx_positions,
+    int64_t tx_index,
+    int64_t sample_count) {
+    check_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
+    TORCH_CHECK(tx_index >= 0 && tx_index < tx_positions.size(0), "tx_index is out of range");
+    TORCH_CHECK(sample_count >= 0, "sample_count must be non-negative");
+
+    auto ray_o = at::empty({sample_count, 3}, tx_positions.options());
+    auto ray_tmax = at::empty({0}, tx_positions.options());
+    auto active = at::empty({sample_count}, tx_positions.options().dtype(at::kBool));
+    auto tx_pol = at::empty({sample_count, 3}, tx_positions.options());
+    auto tx_id = at::empty({sample_count}, tx_positions.options().dtype(at::kInt));
+    auto light_seed = at::empty({sample_count}, tx_positions.options().dtype(at::kLong));
+    if (sample_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
+        const int block_count = static_cast<int>((sample_count + kReflectionBlockSize - 1) / kReflectionBlockSize);
+        reflection_launch_inputs_kernel<<<block_count, kReflectionBlockSize, 0, stream>>>(
+            tx_positions.data_ptr<float>(),
+            ray_o.data_ptr<float>(),
+            active.data_ptr<bool>(),
+            tx_pol.data_ptr<float>(),
+            tx_id.data_ptr<int>(),
+            light_seed.data_ptr<int64_t>(),
+            tx_index,
+            sample_count);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {ray_o, ray_tmax, active, tx_pol, tx_id, light_seed};
 }

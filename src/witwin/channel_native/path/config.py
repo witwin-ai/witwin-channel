@@ -15,8 +15,6 @@ class Config:
     max_paths: int | None = None
     sort_key: str = "receiver_transmitter_depth_component"
     diagnostics: bool = False
-    require_reflection: bool = False
-    require_diffraction: bool = False
     ad_mode: str = "none"
 
     def __post_init__(self) -> None:

@@ -6,7 +6,6 @@ import torch
 
 from witwin.channel_native.core.kernels import ops
 
-from .field import phase_rad_from_complex_field
 from .result import PathTable
 from .topology import ReceiverLayout, TopologyBatch, apply_receiver_layout
 
@@ -46,12 +45,15 @@ def accumulate_flat_components(
         coherent=bool(coherent),
     )
     power_total = exported["power_total"]
-    field_total = torch.complex(exported["field_total_real"], exported["field_total_imag"]).to(torch.complex64)
+    field_total = ops.deterministic_pack_complex(
+        exported["field_total_real"].reshape(-1).contiguous(),
+        exported["field_total_imag"].reshape(-1).contiguous(),
+    ).reshape(exported["field_total_real"].shape)
     component_power_tensor = exported["component_power"]
-    component_field_tensor = torch.complex(
-        exported["component_field_real"],
-        exported["component_field_imag"],
-    ).to(torch.complex64)
+    component_field_tensor = ops.deterministic_pack_complex(
+        exported["component_field_real"].reshape(-1).contiguous(),
+        exported["component_field_imag"].reshape(-1).contiguous(),
+    ).reshape(exported["component_field_real"].shape)
     component_power = {
         name: component_power_tensor[cid].contiguous()
         for name, cid in _COMPONENT_ID.items()
@@ -124,10 +126,14 @@ def accumulate_path_result(
 def build_path_table(paths: TopologyBatch, *, frequency_hz: float, include_fields: bool = True) -> PathTable:
     if include_fields:
         path_field = paths.path_field.to(dtype=torch.complex64).contiguous()
-        phase = phase_rad_from_complex_field(path_field)
+        phase = ops.deterministic_phase_from_field(
+            path_field.real.to(dtype=torch.float32).contiguous(),
+            path_field.imag.to(dtype=torch.float32).contiguous(),
+        )
     else:
-        path_field = torch.zeros(paths.path_gain.shape, device=paths.path_gain.device, dtype=torch.complex64)
-        phase = torch.zeros(paths.path_gain.shape, device=paths.path_gain.device, dtype=torch.float32)
+        zero_field_phase = ops.deterministic_zero_field_phase(paths.path_gain.to(dtype=torch.float32).contiguous())
+        path_field = zero_field_phase["path_field"]
+        phase = zero_field_phase["phase_rad"]
     return PathTable(
         valid=paths.valid.contiguous(),
         tx_id=paths.tx_id.to(dtype=torch.int32).contiguous(),

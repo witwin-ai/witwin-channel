@@ -1,6 +1,7 @@
 #include <raydn/scene/geometry_kernels.h>
 #include <raydn/scene/cache.h>
 #include <raydn/common/tensor_check.h>
+#include <raydn/native_api.h>
 
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/extension.h>
@@ -653,6 +654,46 @@ py::tuple intersect_forward_flags_op(
     IntersectForwardOutputs out =
         intersect_forward_flags_cuda(scene, ray_o, ray_d, ray_tmax, active, flags);
     return intersection_public_tuple(out);
+}
+
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_intersect_forward(
+    int64_t scene_handle,
+    const at::Tensor *ray_o,
+    const at::Tensor *ray_d,
+    const at::Tensor *ray_tmax,
+    const at::Tensor *active,
+    int64_t flags,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    if (ray_o == nullptr || ray_d == nullptr || ray_tmax == nullptr || outputs == nullptr)
+        throw std::runtime_error("raydn_native_intersect_forward received a null required pointer");
+    constexpr int64_t kOutputCount = 10;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_intersect_forward output capacity is too small");
+    require_vec3f(*ray_o, "ray_o");
+    require_vec3f(*ray_d, "ray_d");
+    require_ray_tmax(*ray_tmax, ray_o->size(0));
+    at::Tensor active_storage;
+    if (active != nullptr) {
+        require_mask(*active, "active");
+        if (active->numel() != 0 && active->size(0) != ray_o->size(0))
+            throw std::runtime_error("active must be empty or match the ray batch size.");
+        active_storage = *active;
+    }
+    SceneCache &scene = get_scene(scene_handle);
+    IntersectForwardOutputs out =
+        intersect_forward_flags_cuda(scene, *ray_o, *ray_d, *ray_tmax, active_storage, flags);
+    outputs[0] = out.t;
+    outputs[1] = out.p;
+    outputs[2] = out.n;
+    outputs[3] = out.geo_n;
+    outputs[4] = out.uv;
+    outputs[5] = out.barycentric;
+    outputs[6] = out.shape_id;
+    outputs[7] = out.prim_id;
+    outputs[8] = out.local_prim_id;
+    outputs[9] = out.global_prim_id;
+    return kOutputCount;
 }
 
 at::Tensor intersect_forward_t_op(

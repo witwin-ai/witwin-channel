@@ -20,21 +20,24 @@ def test_basic_solver_metadata_reports_counts_and_capabilities():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
 
-    result = solve(_scene(), Config(samples=32, seed=123, diagnostics=True))
+    raydn_native = build_info()["uses_raydn_native"]
+    config = (
+        Config(samples=32, seed=123, diagnostics=True)
+        if raydn_native
+        else Config(samples=32, seed=123, diagnostics=True, components={"los"})
+    )
+    result = solve(_scene(), config)
 
     validate_metadata(result.metadata["kernel"])
     assert result.metadata["seed"] == 123
     assert result.metadata["samples"] == 32
     assert result.metadata["path_count"] == 32
     assert result.metadata["valid_contribution_count"] == 32
-    raydn_native = build_info()["uses_raydn_native"]
     assert result.metadata["raydn"]["reflection"] is raydn_native
     assert result.metadata["raydn"]["diffraction"] is raydn_native
     assert result.metadata["components"]["los"] == "enabled"
-    assert result.metadata["components"]["reflection"] == (
-        "enabled" if raydn_native else "capability-disabled"
-    )
-    assert result.metadata["components"]["diffraction"] == (
-        "enabled" if raydn_native else "capability-disabled"
-    )
+    assert result.metadata["components"]["reflection"] == ("enabled" if raydn_native else "not_requested")
+    assert result.metadata["components"]["diffraction"] == ("enabled" if raydn_native else "not_requested")
+    assert result.metadata["kernel"]["scheduling_strategy"] in {"native_cuda", "native_fused"}
+    assert result.metadata["kernel"]["ad_status"] == "none"
     assert result.diagnostics is not None

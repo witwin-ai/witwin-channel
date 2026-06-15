@@ -27,18 +27,18 @@ def test_los_hot_path_uses_channel_native_kernel_facade(monkeypatch):
     assert len(calls) == 1
 
 
-def test_los_hot_path_uses_native_field_facade(monkeypatch):
+def test_los_hot_path_uses_native_topology_facade(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic hot-path contract")
 
     calls = []
-    original = ops.deterministic_los_field
+    original = ops.deterministic_los_topology_block
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(ops, "deterministic_los_field", wrapped)
+    monkeypatch.setattr(ops, "deterministic_los_topology_block", wrapped)
 
     solve(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
 

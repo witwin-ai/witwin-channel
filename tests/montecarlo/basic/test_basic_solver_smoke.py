@@ -43,13 +43,13 @@ def test_basic_solver_does_not_import_python_raydn():
     assert "raydn" not in sys.modules
 
 
-def test_basic_solver_required_reflection_errors_when_capability_missing():
+def test_basic_solver_reflection_component_requires_native_capability():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
 
     if build_info()["uses_raydn_native"]:
-        result = solve(_empty_space_scene(), Config(components={"reflection"}, require_reflection=True))
+        result = solve(_empty_space_scene(), Config(components={"reflection"}))
         assert result.metadata["components"]["reflection"] == "enabled"
     else:
         with pytest.raises(RuntimeError, match="reflection.*RayDN"):
-            solve(_empty_space_scene(), Config(components={"reflection"}, require_reflection=True))
+            solve(_empty_space_scene(), Config(components={"reflection"}))

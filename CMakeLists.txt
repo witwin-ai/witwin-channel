@@ -20,11 +20,10 @@ endif()
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
-option(CHANNEL_NATIVE_BUILD_RAYDN "Build vendored RayDN native backend." ON)
-
-if(CHANNEL_NATIVE_BUILD_RAYDN)
-    set(RAYDN_BUILD_NATIVE ON CACHE BOOL "Build RayDN native extension for Channel Native." FORCE)
-    add_subdirectory(ext/raydn)
+set(RAYDN_BUILD_NATIVE ON CACHE BOOL "Build RayDN native extension for Channel Native." FORCE)
+add_subdirectory(ext/raydn)
+if(NOT TARGET _raydn)
+    message(FATAL_ERROR "Channel Native requires the vendored RayDN native backend target _raydn.")
 endif()
 
 execute_process(
@@ -38,7 +37,14 @@ if(NOT TORCH_CMAKE_PREFIX_RESULT EQUAL 0)
 endif()
 list(PREPEND CMAKE_PREFIX_PATH "${TORCH_CMAKE_PREFIX}")
 find_package(Torch REQUIRED)
-find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib" REQUIRED)
+get_filename_component(TORCH_PACKAGE_DIR "${TORCH_CMAKE_PREFIX}/../.." ABSOLUTE)
+find_library(
+    TORCH_PYTHON_LIBRARY
+    torch_python
+    PATHS
+        "${TORCH_INSTALL_PREFIX}/lib"
+        "${TORCH_PACKAGE_DIR}/lib"
+    REQUIRED)
 
 Python_add_library(
     _channel_native
@@ -46,12 +52,19 @@ Python_add_library(
     WITH_SOABI
     native/channel_native/bindings.cpp
     native/channel_native/build_info.cpp
+    native/channel_native/bdpt.cpp
+    native/channel_native/raydn_bridge.cpp
     native/channel_native/kernels/accum.cu
+    native/channel_native/kernels/bdpt_accum.cu
+    native/channel_native/kernels/bdpt_connect.cu
+    native/channel_native/kernels/bdpt_sampling.cu
+    native/channel_native/kernels/bdpt_subpaths.cu
     native/channel_native/kernels/diffraction.cu
     native/channel_native/kernels/deterministic_accum.cu
     native/channel_native/kernels/deterministic_field.cu
     native/channel_native/kernels/los.cu
     native/channel_native/kernels/material.cu
+    native/channel_native/kernels/path_trace.cu
     native/channel_native/kernels/reflection.cu
     native/channel_native/kernels/sampling.cu
     native/channel_native/montecarlo_basic.cpp
@@ -60,14 +73,8 @@ Python_add_library(
 
 target_compile_features(_channel_native PRIVATE cxx_std_17)
 target_link_libraries(_channel_native PRIVATE "${TORCH_LIBRARIES}" "${TORCH_PYTHON_LIBRARY}")
-if(TARGET _raydn)
-    add_dependencies(_channel_native _raydn)
-    target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYDN=1 CHANNEL_NATIVE_WITH_OPTIX=1)
-else()
-    target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYDN=0 CHANNEL_NATIVE_WITH_OPTIX=0)
-endif()
+add_dependencies(_channel_native _raydn)
+target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYDN=1 CHANNEL_NATIVE_WITH_OPTIX=1)
 
 install(TARGETS _channel_native LIBRARY DESTINATION witwin/channel_native)
-if(TARGET _raydn)
-    install(TARGETS _raydn LIBRARY DESTINATION witwin/channel_native/_native RUNTIME DESTINATION witwin/channel_native/_native)
-endif()
+install(TARGETS _raydn LIBRARY DESTINATION witwin/channel_native/_native RUNTIME DESTINATION witwin/channel_native/_native)
