@@ -236,21 +236,32 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Drop non-manylinux Linux wheels
+      - name: Select publishable distributions
         shell: bash
-        # PyPI rejects bare linux_x86_64 platform tags (only manylinux* is
-        # accepted), and these CUDA wheels link the runner's CUDA/glibc so they
-        # are not portable anyway. Publish the Windows wheels plus the sdist;
-        # Linux users build from the sdist.
+        # The CUDA toolkit action also uploads helper artifacts (e.g.
+        # cuda-installer.log), so prune dist/ to real distributions. PyPI also
+        # rejects bare linux_x86_64 platform tags (only manylinux* is accepted),
+        # and these CUDA wheels link the runner's CUDA/glibc so they are not
+        # portable anyway. Publish the Windows wheels plus the sdist; Linux
+        # users build from the sdist.
         run: |
-          shopt -s nullglob
-          dropped=(dist/*linux_x86_64*.whl)
-          if [ ${#dropped[@]} -gt 0 ]; then
-            echo "Dropping non-publishable Linux wheels:"
-            for w in "${dropped[@]}"; do echo "  - $(basename "$w")"; rm -f "$w"; done
-          fi
+          shopt -s nullglob dotglob
+          for f in dist/*; do
+            case "$f" in
+              *linux_x86_64*.whl)
+                echo "Dropping non-publishable Linux wheel: $(basename "$f")"; rm -f "$f" ;;
+              *.whl|*.tar.gz)
+                : ;;
+              *)
+                echo "Dropping non-distribution file: $(basename "$f")"; rm -f "$f" ;;
+            esac
+          done
           echo "Publishing:"
           ls -1 dist
+          if ! ls dist/*.whl dist/*.tar.gz >/dev/null 2>&1; then
+            echo "No distributions left to publish." >&2
+            exit 1
+          fi
 
       - name: Publish distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
