@@ -683,7 +683,8 @@ static __forceinline__ __device__ bool keller_grid_hit_from_incident(float3 inci
                                                                      float3 edge_point,
                                                                      float3 edge_dir,
                                                                      float3 &target,
-                                                                     int &cell) {
+                                                                     int &cell,
+                                                                     float &measure_scale) {
     const float3 incident = normalize3(incident_vec);
     const float axial = fminf(fmaxf(dot3(incident, edge_dir), -1.f), 1.f);
     const float radial = sqrtf(fmaxf(1.f - axial * axial, 0.f));
@@ -702,6 +703,22 @@ static __forceinline__ __device__ bool keller_grid_hit_from_incident(float3 inci
         return false;
     }
     target = edge_point + t * ko;
+
+    // pdf compensation (audit DF-6): the (edge_t, phi) sample maps onto the
+    // grid plane with area element J = |d x/d edge_t x d x/d phi|; the
+    // deposit must carry 2*pi*J instead of the fixed cell area, otherwise
+    // energy lands with a systematic offset and unbounded weight near the
+    // plane. The cone-axis variation along the edge is neglected (slowly
+    // varying for sources away from the edge).
+    const float3 dko_dphi = radial * (-s * basis0 + c * basis1);
+    const float inv_denom = 1.f / denom;
+    const float3 u_t = edge_dir - (component(edge_dir, params.grid_axis) * inv_denom) * ko;
+    const float3 u_phi = t * (dko_dphi - (component(dko_dphi, params.grid_axis) * inv_denom) * ko);
+    const float jacobian = length3(cross3(u_t, u_phi));
+    measure_scale = 2.f * kPi * jacobian / fmaxf(params.grid_cell_area, kDfrEps);
+    if (!isfinite(measure_scale)) {
+        return false;
+    }
     return grid_cell_from_point(target, cell);
 }
 
@@ -710,15 +727,13 @@ static __forceinline__ __device__ bool keller_grid_hit(int state_idx,
                                                        float3 edge_point,
                                                        float3 edge_dir,
                                                        float3 &target,
-                                                       int &cell) {
-    const bool has_state_wi =
-        params.state_wi_x != nullptr &&
-        params.state_wi_y != nullptr &&
-        params.state_wi_z != nullptr;
-    const float3 incident = has_state_wi
-        ? state_wi_at(state_idx)
-        : edge_point - state_src_at(state_idx);
-    return keller_grid_hit_from_incident(incident, lane, 1u, edge_point, edge_dir, target, cell);
+                                                       int &cell,
+                                                       float &measure_scale) {
+    // The Keller cone half-angle must follow the sampled edge point, not the
+    // per-state anchor incident (audit DF-6): long edges otherwise emit
+    // off-cone directions at their far ends.
+    const float3 incident = edge_point - state_src_at(state_idx);
+    return keller_grid_hit_from_incident(incident, lane, 1u, edge_point, edge_dir, target, cell, measure_scale);
 }
 
 static __forceinline__ __device__ int material_index_for_faces(int face0_prim,
@@ -969,7 +984,11 @@ static __forceinline__ __device__ float diffraction_weight(int state_idx,
                                                            float edge_measure_weight) {
     const float3 source = state_src_at(state_idx);
     const float source_distance = fmaxf(norm3(edge_point - source), kDfrEps);
-    const float target_distance = fmaxf(norm3(target - edge_point), kDfrEps);
+    // Edges that cross the receiver plane make 1/d_r^2 non-integrable in
+    // variance; clamping the target leg to half a cell only smears energy
+    // that would land inside the depositing cell anyway.
+    const float half_cell = 0.5f * sqrtf(fmaxf(params.grid_cell_area, 0.f));
+    const float target_distance = fmaxf(norm3(target - edge_point), fmaxf(kDfrEps, half_cell));
     const float exterior_angle =
         fmaxf(state_exterior_angle_at(state_idx), 0.25f * kPi);
     const float wedge_scale = fminf(exterior_angle / (2.f * kPi), 2.f);
@@ -1088,8 +1107,9 @@ static __forceinline__ __device__ void run_diffraction_order1_accumulation_rayge
     const float3 edge_point = edge_pos + edge_t * edge_dir;
     const float3 source = state_src_at(state_idx);
     float3 target = grid_cell_center(cell);
+    float keller_measure_scale = 1.f;
     if constexpr (IncludeKeller) {
-        if (is_keller && !keller_grid_hit(state_idx, lane, edge_point, edge_dir, target, cell)) {
+        if (is_keller && !keller_grid_hit(state_idx, lane, edge_point, edge_dir, target, cell, keller_measure_scale)) {
             if (params.collect_debug_counts != 0) {
                 atomicAdd(params.out_utd_rejects, 1);
             }
@@ -1150,6 +1170,11 @@ static __forceinline__ __device__ void run_diffraction_order1_accumulation_rayge
         sample_edge_weight_for_lane(state_idx, lane, strategy_sample_count);
     float contribution =
         diffraction_weight(state_idx, edge_point, connection_target, edge_measure_weight);
+    if constexpr (IncludeKeller) {
+        if (is_keller) {
+            contribution *= keller_measure_scale;
+        }
+    }
     if constexpr (IncludeSuffix) {
         if (is_suffix) {
             contribution *= suffix_reflection_gain *
@@ -1327,7 +1352,8 @@ static __forceinline__ __device__ void run_diffraction_order1_no_suffix_target_a
     const float3 edge_dir = normalize3(state_edge_dir_at(state_idx));
     const float3 edge_point = edge_pos + edge_t * edge_dir;
     float3 target = grid_cell_center(cell);
-    if (is_keller && !keller_grid_hit(state_idx, lane, edge_point, edge_dir, target, cell)) {
+    float keller_measure_scale = 1.f;
+    if (is_keller && !keller_grid_hit(state_idx, lane, edge_point, edge_dir, target, cell, keller_measure_scale)) {
         if (params.collect_debug_counts != 0) {
             atomicAdd(params.out_utd_rejects, 1);
         }
@@ -1345,7 +1371,8 @@ static __forceinline__ __device__ void run_diffraction_order1_no_suffix_target_a
     const float edge_measure_weight =
         sample_edge_weight_for_lane(state_idx, lane, strategy_sample_count);
     const float contribution =
-        diffraction_weight(state_idx, edge_point, target, edge_measure_weight);
+        diffraction_weight(state_idx, edge_point, target, edge_measure_weight) *
+        (is_keller ? keller_measure_scale : 1.f);
     if (!(contribution > 0.f) || !isfinite(contribution)) {
         if (params.collect_debug_counts != 0) {
             atomicAdd(params.out_utd_rejects, 1);
@@ -1843,6 +1870,7 @@ static __forceinline__ __device__ void run_diffraction_chain_accumulation_raygen
     const float3 terminal_point = params.max_order == 3 ? third_point : second_point;
     const float3 terminal_edge_dir = params.max_order == 3 ? third_edge_dir : second_edge_dir;
     float3 final_target = target;
+    float keller_measure_scale = 1.f;
     if (is_keller) {
         const float3 terminal_incident =
             params.max_order == 3 ? (third_point - second_point) : (second_point - first_point);
@@ -1852,7 +1880,8 @@ static __forceinline__ __device__ void run_diffraction_chain_accumulation_raygen
                                            terminal_point,
                                            terminal_edge_dir,
                                            final_target,
-                                           cell)) {
+                                           cell,
+                                           keller_measure_scale)) {
             if (params.collect_debug_counts != 0) {
                 atomicAdd(params.out_utd_rejects, 1);
             }
@@ -1956,6 +1985,9 @@ static __forceinline__ __device__ void run_diffraction_chain_accumulation_raygen
     const float sample_norm = 1.f / fmaxf(static_cast<float>(strategy_sample_count), 1.f);
     float contribution =
         chain_weight * wave_gain * params.grid_cell_area * sample_norm;
+    if (is_keller) {
+        contribution *= keller_measure_scale;
+    }
     if (is_suffix) {
         contribution *= suffix_reflection_gain *
                         suffix_fspl *

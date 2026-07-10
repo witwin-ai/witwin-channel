@@ -3,8 +3,11 @@
 
 #include <raydn/common/math.cuh>
 #include <raydn/diffraction/paths_params.h>
+#include <utd/utd_math.h>
 
 namespace raydn {
+
+namespace utd = witwin::channel::native_ext;
 
 extern "C" {
 extern __constant__ DfrPathParams params;
@@ -246,6 +249,97 @@ extern "C" __global__ void __miss__diffraction_paths() {
     optixSetPayload_0(0u);
 }
 
+static __forceinline__ __device__ utd::float3a to_utd(float3 value) {
+    return utd::make_f3(value.x, value.y, value.z);
+}
+
+static __forceinline__ __device__ utd::FaceMaterialParams face_material_params(int prim) {
+    utd::FaceMaterialParams m;
+    m.etaR = 1.f;
+    m.muR = 1.f;
+    m.sigma = 0.f;
+    m.gain = 1.f;
+    m.useFresnel = 1.f;
+    m.present = 0.f;
+    if (prim < 0 || prim >= params.material_count) {
+        return m;
+    }
+    if (params.material_valid != nullptr &&
+        read_u8(params.material_valid, params.material_valid_stride, prim) == 0u) {
+        return m;
+    }
+    m.present = 1.f;
+    if (params.material_eta_r != nullptr) {
+        m.etaR = read_f32(params.material_eta_r, params.material_eta_r_stride, prim);
+    }
+    if (params.material_sigma != nullptr) {
+        m.sigma = read_f32(params.material_sigma, params.material_sigma_stride, prim);
+    }
+    if (params.material_mu_r != nullptr) {
+        m.muR = read_f32(params.material_mu_r, params.material_mu_r_stride, prim);
+    }
+    if (params.material_gain != nullptr) {
+        m.gain = fmaxf(read_f32(params.material_gain, params.material_gain_stride, prim), 0.f);
+    }
+    return m;
+}
+
+/// Direct first-order UTD pair state built on the fly from the packed edge
+/// state (audit DF-1): the incident field is recomputed exactly from the tx
+/// inside utd::compute_pair_contribution (directFirstOrder), and the face
+/// reflection operators come from the raw material parameters.
+static __forceinline__ __device__ utd::PairInputs direct_pair_inputs(int state_idx,
+                                                                     float3 source,
+                                                                     float3 edge_pos,
+                                                                     float3 edge_dir,
+                                                                     float t_min,
+                                                                     float t_max) {
+    utd::PairInputs p = {};
+    p.edgePos = to_utd(edge_pos);
+    p.edgeDir = to_utd(edge_dir);
+    p.n0 = to_utd(vec_from_storage(params.state_n0_aos,
+                                   params.state_n0_stride0,
+                                   params.state_n0_stride1,
+                                   params.state_n0_x,
+                                   params.state_n0_y,
+                                   params.state_n0_z,
+                                   state_idx));
+    p.nn = to_utd(vec_from_storage(params.state_n1_aos,
+                                   params.state_n1_stride0,
+                                   params.state_n1_stride1,
+                                   params.state_n1_x,
+                                   params.state_n1_y,
+                                   params.state_n1_z,
+                                   state_idx));
+    p.wedgeN = read_f32(params.state_exterior_angle, params.state_exterior_angle_stride, state_idx) /
+               utd::UTD_PI;
+    p.edgeLineMin = t_min;
+    p.edgeLineMax = t_max;
+    p.sourcePos = to_utd(source);
+    p.selectStationaryPoint = 1.f;
+    p.directFirstOrder = 1.f;
+    p.pathLengthPrefix = norm3(edge_pos - source);
+    p.face0Material = face_material_params(read_i32(params.state_prim0, params.state_prim0_stride, state_idx));
+    p.face1Material = face_material_params(read_i32(params.state_prim1, params.state_prim1_stride, state_idx));
+    return p;
+}
+
+static __forceinline__ __device__ utd::MaterialParams paths_material_params() {
+    utd::MaterialParams mat;
+    mat.useFresnel = 1;
+    mat.etaR = 1.f;
+    mat.muR = 1.f;
+    mat.sigma = 0.f;
+    mat.gain = 1.f;
+    // omega > 0 activates the per-face Fresnel reflection operators.
+    mat.omega = params.k * kSpeedOfLight;
+    // Global x-hat transmit polarization (deterministic solver convention).
+    mat.txPolX = 1.f;
+    mat.txPolY = 0.f;
+    mat.txPolZ = 0.f;
+    return mat;
+}
+
 template <bool SplitScene>
 static __forceinline__ __device__ void trace_paths_order1_impl() {
     const unsigned int lane = optixGetLaunchIndex().x;
@@ -295,10 +389,9 @@ static __forceinline__ __device__ void trace_paths_order1_impl() {
                                     params.state_edge_dir_y,
                                     params.state_edge_dir_z,
                                     state_idx));
-    const float mid_t =
-        0.5f * (read_f32(params.state_edge_t_min, params.state_edge_t_min_stride, state_idx) +
-                read_f32(params.state_edge_t_max, params.state_edge_t_max_stride, state_idx));
-    const float3 edge_point = edge_pos + mid_t * edge_dir;
+    const float t_min = read_f32(params.state_edge_t_min, params.state_edge_t_min_stride, state_idx);
+    const float t_max = read_f32(params.state_edge_t_max, params.state_edge_t_max_stride, state_idx);
+    const float edge_length = t_max - t_min;
     const float3 receiver =
         vec_from_storage(params.rx_pos_aos,
                          params.rx_pos_stride0,
@@ -309,19 +402,44 @@ static __forceinline__ __device__ void trace_paths_order1_impl() {
                          rx_idx);
 
     if (!isfinite(source.x) || !isfinite(source.y) || !isfinite(source.z) ||
-        !isfinite(edge_point.x) || !isfinite(edge_point.y) || !isfinite(edge_point.z) ||
-        !isfinite(receiver.x) || !isfinite(receiver.y) || !isfinite(receiver.z)) {
+        !isfinite(edge_pos.x) || !isfinite(edge_pos.y) || !isfinite(edge_pos.z) ||
+        !isfinite(receiver.x) || !isfinite(receiver.y) || !isfinite(receiver.z) ||
+        !(edge_length > 1.0e-6f)) {
         return;
     }
+
+    // Keller stationary point (audit DF-1/D-5): delay, visibility, and the
+    // exported interaction point follow the physical diffraction point
+    // instead of the edge midpoint.
+    const float3 edge_origin = edge_pos + t_min * edge_dir;
+    const float parameter = utd::first_order_diffraction_parameter(
+        to_utd(source), to_utd(receiver), to_utd(edge_origin), to_utd(edge_dir));
+    if (!isfinite(parameter)) {
+        return;
+    }
+    const float clamped_parameter = fminf(fmaxf(parameter, 0.f), edge_length);
+    const float3 edge_point = edge_origin + clamped_parameter * edge_dir;
+
     if (!visible_segment<SplitScene>(source, edge_point) ||
         !visible_segment<SplitScene>(edge_point, receiver)) {
         return;
     }
 
-    const float contribution = path_weight(state_idx, edge_point, receiver);
-    if (!(contribution > 0.f) || !isfinite(contribution)) {
+    const utd::PairInputs pair = direct_pair_inputs(state_idx, source, edge_pos, edge_dir, t_min, t_max);
+    const utd::PairOutputs utd_out =
+        utd::compute_pair_contribution(pair, to_utd(receiver), params.k, paths_material_params());
+    const float norm = utd::cplx_abs_sqr(utd_out.vectorField.x) +
+                       utd::cplx_abs_sqr(utd_out.vectorField.y) +
+                       utd::cplx_abs_sqr(utd_out.vectorField.z);
+    // Reject numerically negligible fields (< -300 dB): they only differ
+    // between consumers by float32 flush-to-zero behavior.
+    if (!(norm > 1.0e-30f) || !isfinite(norm)) {
         return;
     }
+    // The UTD field is evaluated for unit source amplitude with the
+    // lambda/(4 pi d) spherical spreading convention; scale by sqrt(P_tx).
+    const float amplitude_scale =
+        sqrtf(fmaxf(read_f32(params.state_src_power, params.state_src_power_stride, state_idx), 0.f));
 
     const int out_idx = reserve_path_slot();
     if (out_idx < 0 || out_idx >= params.capacity) {
@@ -329,10 +447,6 @@ static __forceinline__ __device__ void trace_paths_order1_impl() {
     }
 
     const float path_length = norm3(edge_point - source) + norm3(receiver - edge_point);
-    float phase_s;
-    float phase_c;
-    { const double kd = fmod(static_cast<double>(params.k) * static_cast<double>(path_length), 6.283185307179586476925287); sincosf(-static_cast<float>(kd), &phase_s, &phase_c); }
-    const float amplitude = sqrtf(fmaxf(contribution, 0.f));
 
     params.out_valid[out_idx] = 1u;
     params.out_tx_id[out_idx] = tx_idx;
@@ -341,8 +455,16 @@ static __forceinline__ __device__ void trace_paths_order1_impl() {
     params.out_edge0[out_idx] =
         read_i32(params.state_edge_index, params.state_edge_index_stride, state_idx);
     params.out_delay[out_idx] = path_length / kSpeedOfLight;
-    params.out_field_x_re[out_idx] = amplitude * phase_c;
-    params.out_field_x_im[out_idx] = amplitude * phase_s;
+    params.out_field_x_re[out_idx] = utd_out.vectorField.x.re * amplitude_scale;
+    params.out_field_x_im[out_idx] = utd_out.vectorField.x.im * amplitude_scale;
+    if (params.out_field_y_re != nullptr && params.out_field_y_im != nullptr) {
+        params.out_field_y_re[out_idx] = utd_out.vectorField.y.re * amplitude_scale;
+        params.out_field_y_im[out_idx] = utd_out.vectorField.y.im * amplitude_scale;
+    }
+    if (params.out_field_z_re != nullptr && params.out_field_z_im != nullptr) {
+        params.out_field_z_re[out_idx] = utd_out.vectorField.z.re * amplitude_scale;
+        params.out_field_z_im[out_idx] = utd_out.vectorField.z.im * amplitude_scale;
+    }
     write_point(params.out_p0_aos, params.out_p0_x, params.out_p0_y, params.out_p0_z,
                 out_idx, edge_point);
 }

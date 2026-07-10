@@ -174,6 +174,9 @@ using DiffractionPathsOrder1ForwardFn = int64_t (*)(
     const at::Tensor *,
     const at::Tensor *,
     const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
     int64_t,
     int64_t,
     double,
@@ -922,6 +925,9 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     torch::Tensor state_exterior_angle,
     torch::Tensor state_src,
     torch::Tensor state_src_power,
+    torch::Tensor material_eta_r,
+    torch::Tensor material_sigma,
+    torch::Tensor material_mu_r,
     torch::Tensor material_gain,
     torch::Tensor material_valid,
     int64_t state_limit,
@@ -949,6 +955,9 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
         &state_exterior_angle,
         &state_src,
         &state_src_power,
+        &material_eta_r,
+        &material_sigma,
+        &material_mu_r,
         &material_gain,
         &material_valid,
         state_limit,
@@ -979,6 +988,9 @@ pybind11::dict cn_path_diffraction_paths_order1(
     torch::Tensor face0,
     torch::Tensor face1,
     torch::Tensor exterior_angle,
+    torch::Tensor material_eta_r,
+    torch::Tensor material_sigma,
+    torch::Tensor material_mu_r,
     torch::Tensor material_gain,
     torch::Tensor material_valid,
     double wavelength,
@@ -996,6 +1008,9 @@ pybind11::dict cn_path_diffraction_paths_order1(
     check_flat_tensor(face0, "face0", at::kInt);
     check_flat_tensor(face1, "face1", at::kInt);
     check_flat_tensor(exterior_angle, "exterior_angle", at::kFloat);
+    check_flat_tensor(material_eta_r, "material_eta_r", at::kFloat);
+    check_flat_tensor(material_sigma, "material_sigma", at::kFloat);
+    check_flat_tensor(material_mu_r, "material_mu_r", at::kFloat);
     check_flat_tensor(material_gain, "material_gain", at::kFloat);
     check_flat_tensor(material_valid, "material_valid", at::kBool);
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
@@ -1079,7 +1094,10 @@ pybind11::dict cn_path_diffraction_paths_order1(
             scene_handle,
             &tx_view,
             &rx_positions,
-            nullptr,
+            // The packed state table keeps one row per edge; the selection
+            // mask must gate the launch so deselected (e.g. merged duplicate)
+            // records never emit paths.
+            &selected,
             &states[0],
             &states[1],
             &states[2],
@@ -1092,6 +1110,9 @@ pybind11::dict cn_path_diffraction_paths_order1(
             &states[9],
             &states[10],
             &states[11],
+            &material_eta_r,
+            &material_sigma,
+            &material_mu_r,
             &material_gain,
             &material_valid,
             state_limit,

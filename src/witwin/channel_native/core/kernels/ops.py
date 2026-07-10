@@ -2904,6 +2904,9 @@ def path_diffraction_paths_order1(
     tx_power: torch.Tensor,
     rx_positions: torch.Tensor,
     edge_geometry: tuple[torch.Tensor, ...],
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_mu_r: torch.Tensor,
     material_gain: torch.Tensor,
     material_valid: torch.Tensor,
     *,
@@ -2925,6 +2928,9 @@ def path_diffraction_paths_order1(
     validate_cuda_tensor("face0", face0, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("face1", face1, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("exterior_angle", exterior_angle, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("material_eta_r", material_eta_r, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("material_sigma", material_sigma, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_gain", material_gain, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_valid", material_valid, dtype=torch.bool, ndim=1)
     if tx_power.shape[0] != tx_positions.shape[0]:
@@ -2946,6 +2952,9 @@ def path_diffraction_paths_order1(
         face0,
         face1,
         exterior_angle,
+        material_eta_r,
+        material_sigma,
+        material_mu_r,
         material_gain,
         material_valid,
         float(wavelength),

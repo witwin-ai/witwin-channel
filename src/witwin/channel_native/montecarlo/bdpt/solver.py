@@ -9,6 +9,7 @@ import torch
 from witwin.channel_native import Scene
 from witwin.channel_native import ReceiverGrid
 from witwin.channel_native.core.kernels.extension import build_info
+from witwin.channel_native.core.materials import effective_sigma_e
 from witwin.channel_native.core.kernels.ops import (
     bdpt_accumulate_connection_samples,
     bdpt_compact_connection_samples,
@@ -194,7 +195,7 @@ def _face_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
     for material_id, structure in enumerate(scene.structures):
         params = structure.material.parameters()
         material_eps_r.append(float(params["eps_r"]))
-        material_sigma_e.append(float(params["sigma_e"]))
+        material_sigma_e.append(effective_sigma_e(params))
         material_mu_r.append(float(params["mu_r"]))
         face_material_id.extend([material_id] * int(structure.faces.shape[0]))
     if not material_eps_r:
@@ -483,7 +484,11 @@ def _native_diffraction_component_maps(
     selected, edge_pos, edge_dir, _lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle = edge_geometry
     edge_indices = bdpt_selected_edge_indices(selected)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    direct_samples, keller_samples, suffix_samples = _diffraction_sample_split(int(samples))
+    # Grid maps use the Keller-cone strategy exclusively (audit MC-5/2.5,
+    # aligned with the basic solver): the deterministic direct cell scan
+    # cannot cover state_count x cell_count pairs within the sample budget,
+    # and the unweighted direct+keller sum double counts covered cells.
+    direct_samples, keller_samples, suffix_samples = 0, int(samples), 0
     sample_blocks: list[dict[str, torch.Tensor]] = []
 
     for tx_index in range(int(tx_positions.shape[0])):

@@ -57,7 +57,9 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     assert saved["delta"]["median_abs_delta_db"] < 20.0
     assert saved["component_delta"]["los"]["max_abs_delta_db"] < 1.0e-3
     assert saved["component_delta"]["reflection"]["median_abs_delta_db"] < 1.0
-    assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 25.0
+    # Real UTD evaluation (audit DF-1): the native diffraction component now
+    # tracks the original Kouyoumjian-Pathak implementation closely.
+    assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 3.0
     assert saved["native"]["metadata"]["kernel"]["launch_count"] <= 10
     assert saved["performance"]["native_solve_time_ms"] < saved["performance"]["original_solve_time_ms"]
     assert saved["performance"]["original_solve_time_ms"] > 0.0

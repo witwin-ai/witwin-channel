@@ -130,19 +130,32 @@ def test_bdpt_diffraction_path_export_is_seeded_by_native_direct_keller_tape():
         pytest.skip("CUDA is required for BDPT diffraction path export")
 
     scene = wedge_diffraction_scene().add(_reflection_grid())
-    first = solve(scene, Config(samples=16, seed=17, components={"diffraction"}, export_paths=True))
-    second = solve(scene, Config(samples=16, seed=17, components={"diffraction"}, export_paths=True))
-    changed = solve(scene, Config(samples=16, seed=18, components={"diffraction"}, export_paths=True))
+    # Grid diffraction is Keller-only (audit MC-5): 512 samples ensure cone
+    # rays land on the export grid.
+    first = solve(scene, Config(samples=512, seed=17, components={"diffraction"}, export_paths=True))
+    second = solve(scene, Config(samples=512, seed=17, components={"diffraction"}, export_paths=True))
+    changed = solve(scene, Config(samples=512, seed=18, components={"diffraction"}, export_paths=True))
 
     assert isinstance(first.path_samples, BDPTPathSamples)
     assert isinstance(second.path_samples, BDPTPathSamples)
     assert isinstance(changed.path_samples, BDPTPathSamples)
     assert first.path_samples.contribution.shape[0] > 0
-    torch.testing.assert_close(first.path_samples.contribution, second.path_samples.contribution)
-    torch.testing.assert_close(first.path_samples.rx_id, second.path_samples.rx_id)
+    # The export compaction assigns row slots atomically, so compare the
+    # exported samples as an unordered set.
+    torch.testing.assert_close(
+        first.path_samples.contribution.sort().values,
+        second.path_samples.contribution.sort().values,
+    )
+    torch.testing.assert_close(
+        first.path_samples.rx_id.sort().values,
+        second.path_samples.rx_id.sort().values,
+    )
     assert changed.path_samples.contribution.shape[0] > 0
     if changed.path_samples.contribution.shape == first.path_samples.contribution.shape:
-        assert not torch.equal(first.path_samples.contribution, changed.path_samples.contribution)
+        assert not torch.equal(
+            first.path_samples.contribution.sort().values,
+            changed.path_samples.contribution.sort().values,
+        )
     torch.testing.assert_close(
         first.path_samples.component_id,
         torch.full_like(first.path_samples.component_id, 2),

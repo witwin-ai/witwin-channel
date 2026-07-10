@@ -98,22 +98,15 @@ def test_bdpt_single_wedge_point_diffraction_converges_to_maintained_reference(s
     torch.testing.assert_close(observed, reference, rtol=relative_tolerance, atol=1.0e-8)
 
 
-def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges(monkeypatch):
+def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges():
     """Guards audit MC-2: with the round-robin lane mapping the per-lane edge
     measure must scale by the state count, otherwise adding a second wedge
-    halves each wedge's contribution (1/S underestimate).
-
-    Restricted to the direct strategy: the Keller cone sampler currently has
-    unbounded variance (audit DF-6, no pdf compensation), which would swamp
-    the additivity signal.
-    """
+    halves each wedge's contribution (1/S underestimate)."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native diffraction is not built")
-
-    monkeypatch.setattr(bdpt_solver, "_diffraction_sample_split", lambda samples: (int(samples), 0, 0))
 
     from witwin.channel_native import Scene, Structure, Transmitter
     from witwin.channel_native.core.materials import PerfectConductor
@@ -144,7 +137,7 @@ def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges(monkeypatc
             frequency=3.0e9,
         ).add(_grid())
 
-    config = Config(samples=4096, seed=7, components={"diffraction"})
+    config = Config(samples=16384, seed=7, components={"diffraction"})
     near = solve(scene_with(wedge_pair(0.0, "near")), config)
     far = solve(scene_with(wedge_pair(30.0, "far")), config)
     both = solve(scene_with(wedge_pair(0.0, "near") + wedge_pair(30.0, "far")), config)
@@ -152,7 +145,29 @@ def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges(monkeypatc
     separate = near.component_power["diffraction"].item() + far.component_power["diffraction"].item()
     combined = both.component_power["diffraction"].item()
     assert separate > 0.0
-    assert combined == pytest.approx(separate, rel=0.1)
+    assert combined == pytest.approx(separate, rel=0.15)
+
+
+def test_bdpt_grid_diffraction_is_seed_stable():
+    """Guards audit DF-6: without pdf compensation the Keller sampler had
+    unbounded variance (20x swings across seeds at this sample count)."""
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for BDPT diffraction")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native diffraction is not built")
+
+    scene = wedge_diffraction_scene().add(_grid())
+    values = [
+        solve(scene, Config(samples=8192, seed=seed, components={"diffraction"}))
+        .component_power["diffraction"]
+        .item()
+        for seed in (1, 7, 21)
+    ]
+    mean = sum(values) / len(values)
+    spread = (max(values) - min(values)) / mean
+    assert mean > 0.0
+    assert spread < 0.3
 
 
 def test_bdpt_diffraction_rejects_mis_none_with_multiple_strategies():

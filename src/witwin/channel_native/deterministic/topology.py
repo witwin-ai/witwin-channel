@@ -167,6 +167,26 @@ def _coplanar_face_groups(
     )
 
 
+def _cached_coplanar_face_groups(
+    raydn: object,
+    tri_a: torch.Tensor,
+    normals: torch.Tensor,
+    surface_ids: torch.Tensor,
+) -> dict[str, torch.Tensor | int]:
+    """Coplanar face groups are geometry-only; cache them per RayDN scene so
+    the union-find does not rerun for every component of every solve."""
+
+    cache = getattr(raydn, "runtime_cache", None)
+    if cache is None:
+        return _coplanar_face_groups(tri_a, normals, surface_ids)
+    cached = cache.get("deterministic_coplanar_face_groups")
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    groups = _coplanar_face_groups(tri_a, normals, surface_ids)
+    cache["deterministic_coplanar_face_groups"] = groups
+    return groups
+
+
 def apply_receiver_layout(values: torch.Tensor, layout: ReceiverLayout) -> torch.Tensor:
     return layout.apply(values)
 
@@ -432,7 +452,9 @@ def _reflection_topology_order1(
     # from several coplanar triangles yields exactly one specular path, and
     # every planar facade (not one representative per structure) is covered.
     # The EPC kernel resolves the actual containing triangle per path.
-    groups = _coplanar_face_groups(tri_a, normals, compiled.geometry.face_surface_id.to(device=device, dtype=torch.long).contiguous())
+    groups = _cached_coplanar_face_groups(
+        raydn, tri_a, normals, compiled.geometry.face_surface_id.to(device=device, dtype=torch.long).contiguous()
+    )
     grouped_export = True
     group_count = int(groups["group_count"])
     representative_faces = groups["representative_faces"].contiguous()
@@ -711,7 +733,7 @@ def _reflection_topology_multibounce(
     # the planning guard, enumerate it exactly; otherwise discover reachable
     # plane chains by tracing rays from the transmitter and validate only
     # those, matching the original discovery-based implementation.
-    groups = _coplanar_face_groups(tri_a, normals, face_group_source)
+    groups = _cached_coplanar_face_groups(raydn, tri_a, normals, face_group_source)
     group_count = int(groups["group_count"])
     representative_faces = groups["representative_faces"].contiguous()
     surface_group_id = groups["surface_group_id"]
@@ -921,6 +943,44 @@ def _deterministic_diffraction_states(
     )
 
 
+_DIFFRACTION_PREFILTER_EDGE_FRACTIONS = (0.02, 1.0 / 3.0, 2.0 / 3.0, 0.98)
+
+
+def _tx_visible_diffraction_states(
+    raydn: object,
+    states: tuple[torch.Tensor, ...],
+    tx: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    """Drop edge states that are occluded from the transmitter.
+
+    The UTD kernel checks visibility at the per-receiver stationary point, so
+    a state is only culled when the transmitter cannot see the edge at any of
+    several sample points along it. This shrinks the rx x state workspace and
+    pair launches on city-scale scenes (mirrors the original tx_first
+    pruning) while keeping states whose midpoint happens to be occluded.
+    """
+
+    state_count = int(states[0].shape[0])
+    if state_count <= 0:
+        return states
+    edge_anchor = states[1]
+    edge_dir = states[2]
+    line_min = states[3]
+    line_max = states[4]
+    starts = tx.reshape(1, 3).expand(state_count, 3).contiguous()
+    visible = torch.zeros((state_count,), device=edge_anchor.device, dtype=torch.bool)
+    for fraction in _DIFFRACTION_PREFILTER_EDGE_FRACTIONS:
+        t = line_min + fraction * (line_max - line_min)
+        point = (edge_anchor + t.unsqueeze(1) * edge_dir).contiguous()
+        visible |= ops.raydn_visibility_forward(raydn.require_handle(), starts, point, None)[0]
+    if bool(visible.all()):
+        return states
+    return tuple(
+        tensor[visible] if tensor.shape[:1] == (state_count,) else tensor
+        for tensor in states
+    )
+
+
 def _diffraction_topology_order1(
     scene: Scene,
     compiled: object,
@@ -950,7 +1010,7 @@ def _diffraction_topology_order1(
     if not raydn.available:
         raise RuntimeError("deterministic diffraction requires RayDN native scene capability")
 
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid = face_material_tensors(compiled, device=device)
+    face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = face_material_tensors(compiled, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
     handle = raydn.require_handle()
     blocks: list[dict[str, torch.Tensor]] = []
@@ -958,6 +1018,7 @@ def _diffraction_topology_order1(
     rx_count = int(rx_positions.shape[0])
     for tx_index, tx in enumerate(tx_positions):
         states = _deterministic_diffraction_states(raydn, tx, tx_power, tx_index)
+        states = _tx_visible_diffraction_states(raydn, states, tx)
         state_count = int(states[0].shape[0])
         if state_count <= 0:
             continue
@@ -974,6 +1035,9 @@ def _diffraction_topology_order1(
                 rx_chunk,
                 None,
                 *states,
+                face_eps_r,
+                face_sigma_e,
+                face_mu_r,
                 material_gain,
                 material_valid,
                 state_count,

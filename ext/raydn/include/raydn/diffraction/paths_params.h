@@ -87,6 +87,12 @@ struct DfrPathParams {
     const float *state_src_power;
     int state_src_power_stride;
 
+    const float *material_eta_r;
+    int material_eta_r_stride;
+    const float *material_sigma;
+    int material_sigma_stride;
+    const float *material_mu_r;
+    int material_mu_r_stride;
     const float *material_gain;
     int material_gain_stride;
     const uint8_t *material_valid;

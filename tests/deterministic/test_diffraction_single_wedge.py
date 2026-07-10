@@ -21,30 +21,28 @@ def test_single_wedge_diffraction_matches_path_reference():
     assert result.paths is not None
     assert result.paths.valid.numel() == reference.valid.numel()
     torch.testing.assert_close(result.paths.edge_id, reference.edge_id)
-    # The shared wedge edge is one merged record (audit D-6): the historical
-    # expectation carried a duplicate half-plane entry (old ids 0 and 3).
+    # Real UTD paths (audit DF-1): one merged record for the shared wedge
+    # edge (audit D-6), Keller stationary-point delays, and K-P amplitudes.
     torch.testing.assert_close(
         result.paths.edge_id,
-        torch.tensor([0, 1, 2, 4, 5], device=result.paths.edge_id.device, dtype=torch.int32),
+        torch.tensor([0, 1, 2, 5], device=result.paths.edge_id.device, dtype=torch.int32),
     )
     expected_length = torch.tensor(
         [
-            3.6502816677093506,
-            5.004337787628174,
-            3.8284270763397217,
-            5.3027753829956055,
-            4.162277698516846,
+            3.650281668,
+            4.744879723,
+            3.768759727,
+            4.046976566,
         ],
         device=result.paths.path_length_m.device,
         dtype=torch.float32,
     )
     expected_gain = torch.tensor(
         [
-            1.42285853144e-05,
-            3.796661076194141e-06,
-            2.850105011020787e-05,
-            3.1767988275532844e-06,
-            2.2800833903602324e-05,
+            1.71160394302e-07,
+            2.04434025264e-09,
+            4.26232276141e-08,
+            9.16079212487e-09,
         ],
         device=result.paths.path_gain.device,
         dtype=torch.float32,
@@ -70,15 +68,15 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
     result = solve(scene, Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False))
 
     assert result.paths is not None
-    # The two horizontal outline edges (|dz|/length = 0) must not produce
-    # paths; the vertical shared wedge edge and the two slanted outline edges
+    # The horizontal outline edges (|dz|/length = 0) must not produce paths;
+    # the vertical shared wedge edge and the slanted outline edges
     # (|dz|/length ~ 0.83 > 0.7) survive.
     assert int(result.paths.valid.numel()) == 3
     baseline = solve(
         wedge_diffraction_scene(),
         Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False),
     )
-    assert int(baseline.paths.valid.numel()) == 5
+    assert int(baseline.paths.valid.numel()) == 4
 
 
 def test_diffraction_path_field_export_uses_native_complex_fields():
@@ -92,26 +90,24 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
     assert result.paths is not None
     path_field = torch.complex(result.paths.field_real, result.paths.field_imag)
     expected_phase = torch.remainder(-torch.angle(path_field), 2.0 * torch.pi)
-    # Merged wedge record (audit D-6): one entry for the shared edge with the
-    # 3*pi/2 exterior-angle weight instead of two full half-plane duplicates.
+    # Real UTD complex fields (audit DF-1) with the merged shared-edge wedge
+    # record (audit D-6).
     expected_field_real = torch.tensor(
         [
-            -3.71350278147e-03,
-            0.00171906349715,
-            -0.00198933575302,
-            0.00163817277644,
-            -0.00276799290441,
+            2.77275190456e-04,
+            -3.56407908839e-05,
+            -1.01459103462e-04,
+            6.99604788679e-05,
         ],
         device=result.paths.field_real.device,
         dtype=torch.float32,
     )
     expected_field_imag = torch.tensor(
         [
-            6.62179896608e-04,
-            -0.000917323108297,
-            -0.00495414901525,
-            -0.000702273973729,
-            0.00389089318924,
+            -3.07048641844e-04,
+            2.78221923509e-05,
+            -1.79803435458e-04,
+            -6.53170864098e-05,
         ],
         device=result.paths.field_imag.device,
         dtype=torch.float32,

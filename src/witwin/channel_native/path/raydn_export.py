@@ -206,7 +206,7 @@ def diffraction_paths_order1(
     if not raydn.available:
         raise RuntimeError("diffraction paths require RayDN native scene capability")
 
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid = material_tensors
+    eps_r, sigma_e, mu_r, material_gain, material_valid = material_tensors
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
     return ops.path_diffraction_paths_order1(
         raydn.require_handle(),
@@ -214,6 +214,9 @@ def diffraction_paths_order1(
         tx_power,
         rx_positions,
         _diffraction_edge_geometry(raydn),
+        eps_r,
+        sigma_e,
+        mu_r,
         material_gain,
         material_valid,
         wavelength=float(wavelength),

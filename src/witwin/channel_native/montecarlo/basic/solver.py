@@ -6,6 +6,7 @@ import torch
 
 from witwin.channel_native import Scene
 from witwin.channel_native.core.kernels.extension import build_info
+from witwin.channel_native.core.materials import effective_sigma_e
 from witwin.channel_native.core.kernels.ops import (
     bdpt_face_material_tensors_from_host,
     mc_component_map_buffer,
@@ -41,7 +42,7 @@ def _host_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
     for material_id, structure in enumerate(scene.structures):
         params = structure.material.parameters()
         material_eps_r.append(float(params["eps_r"]))
-        material_sigma_e.append(float(params["sigma_e"]))
+        material_sigma_e.append(effective_sigma_e(params))
         material_mu_r.append(float(params["mu_r"]))
         face_material_id.extend([material_id] * int(structure.faces.shape[0]))
     if not material_eps_r:

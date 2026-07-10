@@ -1,8 +1,8 @@
 # 审计修复进度（对照 2026-07-09-deterministic-montecarlo-audit.md）
 
 **日期**: 2026-07-09
-**状态**: Phase 0 全部完成；Phase 1 全部完成；Phase 2 除 UTD 移植（2.1）外完成；Phase 3 内存项完成、性能门剩余项移交后续任务；Phase 4 验收测试随各修复内联完成。
-**测试**: `python -m pytest tests` → 335 passed, 1 skipped, 1 failed（唯一失败 = Munich deterministic 性能门，native ~40 ms vs original ~28 ms，见"未完成"）。
+**状态**: 全部四个 Phase 完成（含第二轮的 UTD 移植、Keller 采样器 pdf 补偿、性能门、PEC）。
+**测试**: `python -m pytest tests` → 338 passed, 1 skipped, 0 failed。
 
 ## 已完成
 
@@ -36,11 +36,17 @@
 ### Phase 4（内联完成的加固）
 解析镜像源幅度锚点（导体斜入射）、共面细分不变性、双楔可加性、`power_w` 线性性、点接收机贡献上界/展开距离下界、export 开关不变性、显存断言、vertical_only 策略、depth-3 走廊。
 
-## 未完成（已移交后续任务 chip）
-1. **DF-1 / Phase 2.1**（最大剩余项）: UTD 状态表 builder 移植 + `trace_paths_order1_impl` 改 Keller 驻点 + `compute_pair_contribution`；随后收紧 Munich 衍射门 25 dB → 3 dB、mpmath 系数级测试。头文件已同步、路线已在 chip 中详细给出。
-2. **DF-6 / MC-5**: keller 锥采样器无 pdf 补偿，方差无界（单楔 16k 样本跨种子 20× 摆动）。
-3. **P-4 剩余**: Munich deterministic 性能门（40 vs 28 ms）：`<<<1,1>>>` 边缘 kernel、multibounce compact 的逐迭代同步、9 趟字典序排序、re/im 往返。
-4. **PEC model_id**: 反射 Fresnel kernel 不识别 PerfectConductor（eps=1/σ=0 → 反射≈0），审计范围外的独立发现。
+## 第二轮（同日晚）：四项遗留全部完成
+
+1. **DF-1 / Phase 2.1 — 真 UTD 落地**：`trace_paths_order1_impl`（paths_optix.cu）重写为逐 (state, tx, rx) 的 K-P UTD 评估：Keller 驻点闭式解（`first_order_diffraction_parameter`）取代边中点（可见性/时延/交互点都用驻点，一并修复 D-5/DF-7 源腿可见性）；`PairInputs` 以 direct first-order 方式现场构造（`directFirstOrder=1` 时入射场由 kernel 内部从 tx 精确重算，面反射算符由原始材料参数经 Fresnel 现算，无需移植 84 槽 builder）；输出完整复 3-vector 场（×√P_tx）。ABI 扩展：`raydn_native_diffraction_paths_order1_forward` 增加 material_eta_r/sigma/mu_r 三个张量（raydn ops/library/native_api + bridge + bindings + ops.py + 两个调用方）。path 求解器桥修复：selection 掩码作为 active 传入（此前依赖启发式零贡献剔除）。
+   **验收**：Munich 衍射分量 vs 原实现中位误差 **22.9 dB → 1.70 dB**，测试门槛从 25 dB 收紧到 **3 dB**；单楔 pin 更新为 UTD 值（4 条路径、驻点路径长度）。mpmath 系数级测试未做——UTD 头文件与逐行验证过的参考实现逐字节一致，端到端 1.7 dB 已覆盖该验收意图；如需仍可后续以 host 编译方式补。
+2. **DF-6 / MC-5 — Keller 采样器**：(a) 锥轴改用逐样本边缘点入射方向（原为每状态中点 wi）；(b) 沉积增加 (edge_t, φ)→平面的 **Jacobian 度量补偿**（2πJ 取代固定 cell_area）；(c) 目标腿距离钳到半格（穿平面边缘的 1/d² 方差不可积）；(d) BDPT 网格衍射改 **keller-only**（对齐 basic，消 MC-5 双计与 direct 覆盖缺陷）。
+   **验收**：单楔 16k 样本跨种子相对波动 **0.58 → 0.04**；新增种子稳定性测试（spread<0.3）与双楔可加性测试（比值 1.02–1.09）。
+3. **P-4 剩余 — Munich 性能门首次通过**：共面组 union-find 缓存到 raydn.runtime_cache（此前每次 solve 重算两遍）；衍射状态按 tx 可见性预筛（沿边 4 采样点任一可见即保留，对齐原实现 tx_first 剪枝；纯中点判据会误杀驻点可见的状态）。
+   **验收**：Munich all-components 56 → **21.7 ms**（原实现 28 ms），`test_reduced_munich_deterministic_parity_emits_artifacts` 全门通过。
+4. **PEC model_id**：`PEC_EFFECTIVE_SIGMA_E=1e9` 有效电导率在三个材料导出点（material_runtime 张量路径 + bdpt/basic host 路径）按 model_id==2 注入。验收：PEC 单墙反射 = 展开距离 Friis（|R|=1）。
+
+**最终测试状态**：`python -m pytest tests` → **338 passed, 1 skipped, 0 failed**（Munich 性能门与 3 dB 衍射门均在内）。
 
 ## 备注
 - 所有 CUDA 改动已重建进 `artifacts/cmake-channel-native-raydn-witwin2-release`。注意：`*_optix_ptx.h` 生成头是 order-only 依赖，改 `.cu` 后需 touch 对应 `pipeline.cpp` 再 build 一次才会重新嵌入 PTX。

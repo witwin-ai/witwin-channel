@@ -413,6 +413,9 @@ py::tuple diffraction_paths_order1_forward_op(
     at::Tensor state_exterior_angle,
     at::Tensor state_src,
     at::Tensor state_src_power,
+    at::Tensor material_eta_r,
+    at::Tensor material_sigma,
+    at::Tensor material_mu_r,
     at::Tensor material_gain,
     at::Tensor material_valid,
     int64_t state_limit_arg,
@@ -433,6 +436,9 @@ py::tuple diffraction_paths_order1_forward_op(
     require_flat_f32_strided(state_exterior_angle, "state_exterior_angle");
     require_vec3f_strided(state_src, "state_src");
     require_flat_f32_strided(state_src_power, "state_src_power");
+    require_flat_f32_strided(material_eta_r, "material_eta_r");
+    require_flat_f32_strided(material_sigma, "material_sigma");
+    require_flat_f32_strided(material_mu_r, "material_mu_r");
     require_flat_f32_strided(material_gain, "material_gain");
     require_mask_strided(material_valid, "material_valid");
     if (state_limit_arg < 0)
@@ -613,6 +619,12 @@ py::tuple diffraction_paths_order1_forward_op(
     params.state_src_stride1 = stride_i32(state_src, 1, "state_src_stride1");
     params.state_src_power = state_src_power.data_ptr<float>();
     params.state_src_power_stride = stride_i32(state_src_power, 0, "state_src_power_stride");
+    params.material_eta_r = material_eta_r.data_ptr<float>();
+    params.material_eta_r_stride = stride_i32(material_eta_r, 0, "material_eta_r_stride");
+    params.material_sigma = material_sigma.data_ptr<float>();
+    params.material_sigma_stride = stride_i32(material_sigma, 0, "material_sigma_stride");
+    params.material_mu_r = material_mu_r.data_ptr<float>();
+    params.material_mu_r_stride = stride_i32(material_mu_r, 0, "material_mu_r_stride");
     params.material_gain = material_gain.data_ptr<float>();
     params.material_gain_stride = stride_i32(material_gain, 0, "material_gain_stride");
     params.material_valid = mask_ptr(material_valid);
@@ -695,6 +707,9 @@ extern "C" RAYDN_NATIVE_API int64_t raydn_native_diffraction_paths_order1_forwar
     const at::Tensor *state_exterior_angle,
     const at::Tensor *state_src,
     const at::Tensor *state_src_power,
+    const at::Tensor *material_eta_r,
+    const at::Tensor *material_sigma,
+    const at::Tensor *material_mu_r,
     const at::Tensor *material_gain,
     const at::Tensor *material_valid,
     int64_t state_limit,
@@ -735,6 +750,9 @@ extern "C" RAYDN_NATIVE_API int64_t raydn_native_diffraction_paths_order1_forwar
         required(state_exterior_angle, "state_exterior_angle"),
         required(state_src, "state_src"),
         required(state_src_power, "state_src_power"),
+        required(material_eta_r, "material_eta_r"),
+        required(material_sigma, "material_sigma"),
+        required(material_mu_r, "material_mu_r"),
         required(material_gain, "material_gain"),
         required(material_valid, "material_valid"),
         state_limit,

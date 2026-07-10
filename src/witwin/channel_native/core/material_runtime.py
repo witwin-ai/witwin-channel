@@ -4,6 +4,7 @@ import torch
 from typing import TYPE_CHECKING
 
 from witwin.channel_native.core.kernels.ops import mc_face_material_tensors
+from witwin.channel_native.core.materials import PEC_EFFECTIVE_SIGMA_E, PEC_MODEL_ID
 
 if TYPE_CHECKING:
     from .scene import Scene
@@ -19,7 +20,14 @@ def face_material_tensors(
     materials = compiled.materials
     assignments = compiled.assignments
     material_eps_r = materials.eps_r.to(device=device, dtype=torch.float32).contiguous()
-    material_sigma_e = materials.sigma_e.to(device=device, dtype=torch.float32).contiguous()
+    material_sigma_e = materials.sigma_e.to(device=device, dtype=torch.float32)
+    # The Fresnel kernels only see (eps_r, sigma_e, mu_r); realize the PEC
+    # limit through an effective conductivity.
+    material_sigma_e = torch.where(
+        materials.model_id.to(device=material_sigma_e.device) == PEC_MODEL_ID,
+        material_sigma_e.clamp_min(PEC_EFFECTIVE_SIGMA_E),
+        material_sigma_e,
+    ).contiguous()
     material_mu_r = materials.mu_r.to(device=device, dtype=torch.float32).contiguous()
     face_material_id = assignments.face_material_id.to(device=device, dtype=torch.int32).contiguous()
     exported = mc_face_material_tensors(

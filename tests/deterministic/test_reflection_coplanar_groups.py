@@ -164,6 +164,49 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
     )
 
 
+def test_perfect_conductor_reflects_with_unit_magnitude():
+    """PEC materials must reach the |R| = 1 Fresnel limit even though the
+    field kernels only receive (eps_r, sigma_e, mu_r)."""
+
+    _require_native()
+    from witwin.channel_native.core.materials import PerfectConductor
+
+    wall = Structure(
+        vertices=torch.tensor(
+            [
+                [2.5, -3.0, -2.0],
+                [2.5, 3.0, -2.0],
+                [2.5, -3.0, 3.0],
+                [2.5, 3.0, 3.0],
+            ]
+        ),
+        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
+        material=PerfectConductor(),
+        name="pec-wall",
+        surface_id=1,
+    )
+    scene = Scene(
+        structures=[wall],
+        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
+        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 2.0]))],
+        frequency=3.0e9,
+    )
+
+    result = solve(scene, Config(components={"reflection"}, coherent=True, export_paths=True))
+
+    assert result.paths is not None
+    assert int(result.paths.valid.numel()) == 1
+    wavelength = 299_792_458.0 / scene.frequency
+    unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
+    expected_gain = (wavelength / (4.0 * torch.pi * float(unfolded.norm()))) ** 2
+    torch.testing.assert_close(
+        result.paths.path_gain.cpu(),
+        torch.tensor([expected_gain], dtype=torch.float32),
+        rtol=5.0e-3,
+        atol=1.0e-12,
+    )
+
+
 def test_back_wall_reflection_is_blocked_by_front_wall():
     """A reflection off a hidden back wall must be occluded, even within one structure (D-2b)."""
 
