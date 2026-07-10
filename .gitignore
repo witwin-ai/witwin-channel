@@ -30,7 +30,6 @@ reference/
 *.so
 .VSCodeCounter
 
-.slangtorch_cache/
 
 *.lock
 *.npz

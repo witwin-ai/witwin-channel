@@ -8,7 +8,7 @@ import rayd
 import torch
 from witwin.channel import types as wt
 
-from witwin.core import GeometryBase, SceneBase, Structure
+from witwin.core import GeometrySpec, Structure
 from witwin.channel.core.numerics.arrays import broadcast, concat_points, scalar
 from witwin.channel.core.numerics.constants import EPS, RAY_ORIGIN_BIAS
 from witwin.channel.core.geometry import point_in_triangle_3d
@@ -187,7 +187,7 @@ class _SceneEdgeView:
     face_normals_3d: tuple[wt.Vector3f, ...] = ()
 
 
-class Scene(SceneBase):
+class Scene:
     """Declarative channel scene backed by shared core structures."""
 
     @classmethod
@@ -223,14 +223,12 @@ class Scene(SceneBase):
         normalized_transmitters = self._normalize_named_endpoints(transmitters, (Transmitter,), role="Transmitter")
         normalized_receivers = self._normalize_named_endpoints(receivers, (Receiver, ReceiverGrid), role="Receiver")
 
-        super().__init__(
-            structures=normalized_structures,
-            sources=normalized_transmitters,
-            monitors=normalized_receivers,
-            metadata=metadata,
-            device=_resolve_scene_device(device),
-            verbose=verbose,
-        )
+        self.structures = normalized_structures
+        self.sources = normalized_transmitters
+        self.monitors = normalized_receivers
+        self.metadata = dict(metadata or {})
+        self.device = _resolve_scene_device(device)
+        self.verbose = bool(verbose)
         self.transmitters = self.sources
         self.receivers = self.monitors
         self._frequency = None if frequency is None else float(frequency)
@@ -279,22 +277,10 @@ class Scene(SceneBase):
 
     @staticmethod
     def _normalize_structure(structure) -> Structure:
-        structure_like = (
-            isinstance(structure, Structure)
-            or (
-                type(structure).__name__ == "Structure"
-                and hasattr(structure, "geometry")
-                and hasattr(structure, "material")
-                and hasattr(structure, "enabled")
-            )
-        )
-        if not structure_like:
+        if not isinstance(structure, Structure):
             raise TypeError("Channel Scene structures must be witwin.core.Structure instances.")
-        geometry_like = isinstance(structure.geometry, GeometryBase) or (
-            hasattr(structure.geometry, "to_mesh") and hasattr(structure.geometry, "kind")
-        )
-        if not geometry_like:
-            raise TypeError("Channel Scene structures must wrap a GeometryBase geometry.")
+        if not isinstance(structure.geometry, GeometrySpec):
+            raise TypeError("Channel Scene structures must wrap a GeometrySpec geometry.")
         if structure.name is None:
             raise ValueError("Channel Scene structures must define a unique name.")
         return structure
@@ -324,12 +310,7 @@ class Scene(SceneBase):
 
     def add(self, obj) -> Scene:
         """Append a Structure, Transmitter, Receiver, or ReceiverGrid to the scene."""
-        if isinstance(obj, Structure) or (
-            type(obj).__name__ == "Structure"
-            and hasattr(obj, "geometry")
-            and hasattr(obj, "material")
-            and hasattr(obj, "enabled")
-        ):
+        if isinstance(obj, Structure):
             normalized = self._normalize_structure(obj)
             if any(s.name == normalized.name for s in self.structures):
                 raise ValueError(f"Structure '{normalized.name}' already exists.")
