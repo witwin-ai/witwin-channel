@@ -90,7 +90,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, windows-2022]
-        python_version: ["3.10", "3.11", "3.12"]
+        python_version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - name: Check out repository
@@ -102,9 +102,9 @@ jobs:
           python-version: ${{ matrix.python_version }}
 
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.29
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: "12.5.0"
+          cuda: "12.8.1"
           method: local
           log-file-suffix: "${{ runner.os }}-py${{ matrix.python_version }}"
 
@@ -137,7 +137,7 @@ jobs:
 
       - name: Install build frontend
         run: |
-          python -m pip install --upgrade pip build
+          python -m pip install --upgrade pip build drjit==1.3.1
 
       - name: Build platform wheel
         shell: bash
@@ -147,17 +147,53 @@ jobs:
           # drjit==1.3.1 come from build-system.requires, CUDA from the toolkit
           # installed above. Pin the SASS/PTX targets so the wheel is GPU-less
           # build safe and broadly loadable.
-          CMAKE_CUDA_ARCHITECTURES: "70;80;86;89;90"
+          CMAKE_CUDA_ARCHITECTURES: "70-real;75-real;80-real;86-real;89-real;90-real;100-real;101-real;120-real;120-virtual"
         run: |
           python -m build --wheel "$PACKAGE_DIR"
 
-      - name: Verify wheel contains native extensions
+      - name: Verify compiled CUDA architectures
         shell: bash
         env:
           PACKAGE_DIR: ${{ needs.validate_release.outputs.package_dir }}
         run: |
+          python "$PACKAGE_DIR"/scripts/verify_cuda_binary_arches.py \
+            --stem _channel_utils_native \
+            --stem _deterministic_radiomap_native \
+            --stem _monte_carlo_radiomap_native \
+            "$PACKAGE_DIR"/dist/*.whl
+
+      - name: Repair Linux wheel platform tag
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ needs.validate_release.outputs.package_dir }}
+        run: |
+          python -m pip install auditwheel patchelf
+          drjit_dir="$(python -c 'import pathlib, drjit; print(pathlib.Path(drjit.__file__).parent)')"
+          export LD_LIBRARY_PATH="$drjit_dir:${LD_LIBRARY_PATH:-}"
+          mkdir -p "$PACKAGE_DIR"/wheelhouse
+          for whl in "$PACKAGE_DIR"/dist/*-linux_x86_64.whl; do
+            python -m auditwheel repair "$whl" \
+              --plat manylinux_2_35_x86_64 \
+              --wheel-dir "$PACKAGE_DIR"/wheelhouse \
+              --exclude libdrjit-core.so --exclude libdrjit-extra.so \
+              --exclude libnanothread.so \
+              --exclude libcudart.so.12 --exclude libcuda.so.1
+          done
+          rm -f "$PACKAGE_DIR"/dist/*-linux_x86_64.whl
+          mv "$PACKAGE_DIR"/wheelhouse/*.whl "$PACKAGE_DIR"/dist/
+          ls -l "$PACKAGE_DIR"/dist
+
+      - name: Smoke install native wheel layout
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ needs.validate_release.outputs.package_dir }}
+        run: |
+          python -m pip uninstall -y witwin-channel || true
+          python -m pip install --no-deps "$PACKAGE_DIR"/dist/*.whl
           python - <<'PY'
           import os
+          import site
           import zipfile
           from pathlib import Path
 
@@ -175,7 +211,13 @@ jobs:
           for stem in expected:
               if not any(stem in name for name in names):
                   raise SystemExit(f"native extension '{stem}' missing from {wheel.name}")
-          print(f"Verified native extensions {expected} in {wheel.name}")
+
+          roots = [Path(root) for root in site.getsitepackages()]
+          for stem in expected:
+              matches = [path for root in roots for path in root.glob(f"witwin/channel/_native/{stem}*")]
+              binary = next((path for path in matches if path.suffix in {".pyd", ".so"}), None)
+              assert binary is not None, f"installed native extension '{stem}' was not found"
+              print(f"Installed native extension {stem} at {binary}")
           PY
 
       - name: Upload wheel artifact
@@ -238,18 +280,12 @@ jobs:
 
       - name: Select publishable distributions
         shell: bash
-        # The CUDA toolkit action also uploads helper artifacts (e.g.
-        # cuda-installer.log), so prune dist/ to real distributions. PyPI also
-        # rejects bare linux_x86_64 platform tags (only manylinux* is accepted),
-        # and these CUDA wheels link the runner's CUDA/glibc so they are not
-        # portable anyway. Publish the Windows wheels plus the sdist; Linux
-        # users build from the sdist.
+        # The CUDA toolkit action also uploads helper artifacts (for example,
+        # cuda-installer.log), so prune dist/ to real distributions.
         run: |
           shopt -s nullglob dotglob
           for f in dist/*; do
             case "$f" in
-              *linux_x86_64*.whl)
-                echo "Dropping non-publishable Linux wheel: $(basename "$f")"; rm -f "$f" ;;
               *.whl|*.tar.gz)
                 : ;;
               *)

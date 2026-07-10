@@ -44,34 +44,38 @@ Core solver workflows expect:
 
 - Windows or Linux with an NVIDIA GPU.
 - CUDA-capable Python environment.
-- Python 3.10 or newer.
+- CPython 3.10-3.14.
 - Dr.Jit `1.3.1`.
-- PyTorch with CUDA support.
+- PyTorch 2.10 or 2.11 with CUDA 12.8 support.
 - RayD and native extension build dependencies where acceleration paths are
   required.
 
-Repository development uses the `witwin` conda environment.
+Release wheels are built for Linux x86_64 and Windows x86_64 with CUDA 12.8. Their fat binaries contain native code for compute capabilities 7.0, 7.5, 8.0, 8.6, 8.9, 9.0, 10.0, 10.1, and 12.0, plus compute 12.0 PTX. This includes RTX 2080-class Turing and current data-center and RTX/RTX PRO Blackwell coverage. Linux wheels target `manylinux_2_35_x86_64`; the installed NVIDIA driver must support CUDA 12.x.
+
+For full CUDA 12.8 and Blackwell support, use at least driver 570.26 on Linux or 570.65 on Windows. Pre-Blackwell systems can use NVIDIA's CUDA 12.x minor-version compatibility floor (525.60.13 on Linux or 528.33 on Windows), subject to NVIDIA's compatibility-mode feature limits.
+
+Repository development uses the `witwin2` conda environment.
 
 ## Installation
 
 Create and activate a local conda environment:
 
 ```powershell
-conda create -n witwin python=3.11 -y
-conda activate witwin
+conda create -n witwin2 python=3.11 -y
+conda activate witwin2
 ```
 
 Install the CUDA-enabled PyTorch build that matches your driver and platform,
 then install this package. For example:
 
 ```powershell
-python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+python -m pip install "torch>=2.10,<2.12" --index-url https://download.pytorch.org/whl/cu128
 ```
 
 From the `channel` subproject root:
 
 ```powershell
-conda activate witwin
+conda activate witwin2
 python -m pip install -e . --no-build-isolation --no-deps
 ```
 
