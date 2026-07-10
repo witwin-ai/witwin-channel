@@ -331,7 +331,7 @@ static __forceinline__ __device__ void trace_paths_order1_impl() {
     const float path_length = norm3(edge_point - source) + norm3(receiver - edge_point);
     float phase_s;
     float phase_c;
-    sincosf(-params.k * path_length, &phase_s, &phase_c);
+    { const double kd = fmod(static_cast<double>(params.k) * static_cast<double>(path_length), 6.283185307179586476925287); sincosf(-static_cast<float>(kd), &phase_s, &phase_c); }
     const float amplitude = sqrtf(fmaxf(contribution, 0.f));
 
     params.out_valid[out_idx] = 1u;
@@ -494,7 +494,7 @@ static __forceinline__ __device__ void trace_paths_order1_target_export_primary_
     const float path_length = norm3(edge_point - source) + norm3(receiver - edge_point);
     float phase_s;
     float phase_c;
-    sincosf(-params.k * path_length, &phase_s, &phase_c);
+    { const double kd = fmod(static_cast<double>(params.k) * static_cast<double>(path_length), 6.283185307179586476925287); sincosf(-static_cast<float>(kd), &phase_s, &phase_c); }
     const float amplitude = sqrtf(fmaxf(contribution, 0.f));
 
     params.out_valid[out_idx] = 1u;

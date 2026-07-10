@@ -74,7 +74,117 @@ std::vector<at::Tensor> allocate_subpath_state(const at::Tensor& reference, int6
         at::empty({count}, int_options),
         at::empty({count}, int_options),
         at::empty({count}, bool_options),
+        at::empty({count}, float_options),
     };
+}
+
+constexpr float kSubpathEps = 1.0e-9f;
+constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;
+
+struct SubpathComplex {
+    float r;
+    float i;
+};
+
+__device__ SubpathComplex sp_c_make(float r, float i) { return {r, i}; }
+
+__device__ SubpathComplex sp_c_add(SubpathComplex a, SubpathComplex b) { return {a.r + b.r, a.i + b.i}; }
+
+__device__ SubpathComplex sp_c_sub(SubpathComplex a, SubpathComplex b) { return {a.r - b.r, a.i - b.i}; }
+
+__device__ SubpathComplex sp_c_mul(SubpathComplex a, SubpathComplex b) {
+    return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r};
+}
+
+__device__ SubpathComplex sp_c_scale(SubpathComplex a, float s) { return {a.r * s, a.i * s}; }
+
+__device__ SubpathComplex sp_c_div(SubpathComplex a, SubpathComplex b) {
+    const float denom = fmaxf(b.r * b.r + b.i * b.i, kSubpathEps);
+    return {(a.r * b.r + a.i * b.i) / denom, (a.i * b.r - a.r * b.i) / denom};
+}
+
+__device__ SubpathComplex sp_c_sqrt(SubpathComplex z) {
+    const float magnitude = hypotf(z.r, z.i);
+    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + z.r)));
+    const float imag_sign = z.i < 0.0f ? -1.0f : 1.0f;
+    const float imag = imag_sign * sqrtf(fmaxf(0.0f, 0.5f * (magnitude - z.r)));
+    return {real, imag};
+}
+
+__device__ float sp_c_abs2(SubpathComplex a) { return a.r * a.r + a.i * a.i; }
+
+/// Effective power reflectance for the fixed x-hat transmit polarization:
+/// |r_te * e_s|^2 + |r_tm * e_p|^2 with e_s/e_p from the transverse-projected
+/// polarization (matches the deterministic reflection field convention).
+__device__ float effective_power_reflectance(
+    const float* incident_dir,
+    const float* normal_in,
+    float eps_r,
+    float sigma_e,
+    float mu_r,
+    float frequency_hz) {
+    float ix = incident_dir[0];
+    float iy = incident_dir[1];
+    float iz = incident_dir[2];
+    const float inv_ilen = rsqrtf(fmaxf(ix * ix + iy * iy + iz * iz, 1.0e-20f));
+    ix *= inv_ilen;
+    iy *= inv_ilen;
+    iz *= inv_ilen;
+    float nx = normal_in[0];
+    float ny = normal_in[1];
+    float nz = normal_in[2];
+    const float inv_nlen = rsqrtf(fmaxf(nx * nx + ny * ny + nz * nz, 1.0e-20f));
+    nx *= inv_nlen;
+    ny *= inv_nlen;
+    nz *= inv_nlen;
+    float dot_in = ix * nx + iy * ny + iz * nz;
+    if (dot_in > 0.0f) {
+        nx = -nx;
+        ny = -ny;
+        nz = -nz;
+        dot_in = -dot_in;
+    }
+    const float cos_theta = fminf(fmaxf(-dot_in, kSubpathEps), 1.0f);
+    const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
+    const float omega = fmaxf(static_cast<float>(2.0 * kPi) * frequency_hz, kSubpathEps);
+    const SubpathComplex eta = sp_c_make(fmaxf(eps_r, kSubpathEps), -fmaxf(sigma_e, 0.0f) / (omega * kSubpathEpsilon0));
+    const float mu_value = fmaxf(mu_r, kSubpathEps);
+    const SubpathComplex root = sp_c_sqrt(sp_c_sub(sp_c_scale(eta, mu_value), sp_c_make(sin2, 0.0f)));
+    const SubpathComplex mu_cos = sp_c_make(mu_value * cos_theta, 0.0f);
+    const SubpathComplex eta_cos = sp_c_scale(eta, cos_theta);
+    const SubpathComplex r_te = sp_c_div(sp_c_sub(mu_cos, root), sp_c_add(mu_cos, root));
+    const SubpathComplex r_tm = sp_c_div(sp_c_sub(eta_cos, root), sp_c_add(eta_cos, root));
+
+    // s basis = n x incident; p basis = s x incident.
+    float sx = ny * iz - nz * iy;
+    float sy = nz * ix - nx * iz;
+    float sz = nx * iy - ny * ix;
+    const float s_len = sqrtf(fmaxf(sx * sx + sy * sy + sz * sz, 0.0f));
+    if (s_len <= kSubpathEps) {
+        // Normal incidence: r_te == r_tm.
+        return sp_c_abs2(r_te);
+    }
+    sx /= s_len;
+    sy /= s_len;
+    sz /= s_len;
+    const float px = sy * iz - sz * iy;
+    const float py = sz * ix - sx * iz;
+    const float pz = sx * iy - sy * ix;
+    // Transverse projection of the global x-hat transmit polarization.
+    float tx_ = 1.0f - ix * ix;
+    float ty = -ix * iy;
+    float tz = -ix * iz;
+    const float t_len = sqrtf(fmaxf(tx_ * tx_ + ty * ty + tz * tz, 0.0f));
+    float e_s;
+    float e_p;
+    if (t_len <= kSubpathEps) {
+        e_s = 1.0f;
+        e_p = 0.0f;
+    } else {
+        e_s = (tx_ * sx + ty * sy + tz * sz) / t_len;
+        e_p = (tx_ * px + ty * py + tz * pz) / t_len;
+    }
+    return sp_c_abs2(r_te) * e_s * e_s + sp_c_abs2(r_tm) * e_p * e_p;
 }
 
 __global__ void bdpt_light_endpoint_subpaths_kernel(
@@ -97,7 +207,8 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     int* tx_id,
     int* rx_id,
     int* grid_linear_id,
-    bool* valid) {
+    bool* valid,
+    float* path_length) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -129,6 +240,7 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     rx_id[index] = -1;
     grid_linear_id[index] = -1;
     valid[index] = is_valid;
+    path_length[index] = 0.0f;
 }
 
 __global__ void bdpt_sensor_endpoint_subpaths_kernel(
@@ -147,7 +259,8 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     int* tx_id,
     int* rx_id,
     int* grid_linear_id,
-    bool* valid) {
+    bool* valid,
+    float* path_length) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -173,6 +286,7 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     rx_id[index] = static_cast<int>(index);
     grid_linear_id[index] = static_cast<int>(index);
     valid[index] = true;
+    path_length[index] = 0.0f;
 }
 
 __global__ void bdpt_reflected_light_subpaths_kernel(
@@ -188,12 +302,17 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     const int* light_rx_id,
     const int* light_grid_linear_id,
     const bool* light_valid,
+    const float* light_path_length,
     const float* hit_t,
     const float* hit_p,
     const float* hit_n,
     const int* hit_global_prim_id,
     const float* material_gain,
     const bool* material_valid,
+    const float* material_eps_r,
+    const float* material_sigma_e,
+    const float* material_mu_r,
+    float frequency_hz,
     int64_t material_count,
     float* origin,
     float* direction,
@@ -208,7 +327,8 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     int* tx_id,
     int* rx_id,
     int* grid_linear_id,
-    bool* valid) {
+    bool* valid,
+    float* path_length) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -216,8 +336,18 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     const int prim = hit_global_prim_id[index];
     const bool prim_in_range = prim >= 0 && static_cast<int64_t>(prim) < material_count;
     const bool material_ok = prim_in_range && material_valid[prim];
-    const float gain = material_ok ? fmaxf(material_gain[prim], 0.0f) : 0.0f;
     const bool is_valid = light_valid[index] && prim_in_range && material_ok && hit_t[index] >= 0.0f;
+    float gain = 0.0f;
+    if (is_valid) {
+        const float reflectance = effective_power_reflectance(
+            light_direction + index * 3,
+            hit_n + index * 3,
+            material_eps_r[prim],
+            material_sigma_e[prim],
+            material_mu_r[prim],
+            frequency_hz);
+        gain = fmaxf(material_gain[prim], 0.0f) * reflectance;
+    }
     float* dst_origin = origin + index * 3;
     float* dst_direction = direction + index * 3;
     if (is_valid) {
@@ -258,6 +388,7 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     rx_id[index] = is_valid ? light_rx_id[index] : -1;
     grid_linear_id[index] = is_valid ? light_grid_linear_id[index] : -1;
     valid[index] = is_valid;
+    path_length[index] = is_valid ? light_path_length[index] + fmaxf(hit_t[index], 0.0f) : 0.0f;
 }
 
 }  // namespace
@@ -307,7 +438,8 @@ std::vector<at::Tensor> cn_bdpt_light_endpoint_subpath_state_cuda(
             state[10].data_ptr<int>(),
             state[11].data_ptr<int>(),
             state[12].data_ptr<int>(),
-            state[13].data_ptr<bool>());
+            state[13].data_ptr<bool>(),
+            state[14].data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;
@@ -337,7 +469,8 @@ std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(at::Tensor rx
             state[10].data_ptr<int>(),
             state[11].data_ptr<int>(),
             state[12].data_ptr<int>(),
-            state[13].data_ptr<bool>());
+            state[13].data_ptr<bool>(),
+            state[14].data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;
@@ -356,12 +489,17 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor light_rx_id,
     at::Tensor light_grid_linear_id,
     at::Tensor light_valid,
+    at::Tensor light_path_length,
     at::Tensor hit_t,
     at::Tensor hit_p,
     at::Tensor hit_n,
     at::Tensor hit_global_prim_id,
     at::Tensor material_gain,
-    at::Tensor material_valid) {
+    at::Tensor material_valid,
+    at::Tensor material_eps_r,
+    at::Tensor material_sigma_e,
+    at::Tensor material_mu_r,
+    double frequency_hz) {
     check_vec3_table(light_origin, "light.origin");
     check_vec3_table(light_direction, "light.direction");
     check_flat_tensor(light_throughput_real, "light.throughput_real", at::kFloat);
@@ -374,13 +512,20 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     check_flat_tensor(light_rx_id, "light.rx_id", at::kInt);
     check_flat_tensor(light_grid_linear_id, "light.grid_linear_id", at::kInt);
     check_flat_tensor(light_valid, "light.valid", at::kBool);
+    check_flat_tensor(light_path_length, "light.path_length", at::kFloat);
     check_flat_tensor(hit_t, "intersection.t", at::kFloat);
     check_vec3_table(hit_p, "intersection.p");
     check_vec3_table(hit_n, "intersection.n");
     check_flat_tensor(hit_global_prim_id, "intersection.global_prim_id", at::kInt);
     check_flat_tensor(material_gain, "material_gain", at::kFloat);
     check_flat_tensor(material_valid, "material_valid", at::kBool);
+    check_flat_tensor(material_eps_r, "material_eps_r", at::kFloat);
+    check_flat_tensor(material_sigma_e, "material_sigma_e", at::kFloat);
+    check_flat_tensor(material_mu_r, "material_mu_r", at::kFloat);
     TORCH_CHECK(material_gain.size(0) == material_valid.size(0), "material_gain and material_valid must match");
+    TORCH_CHECK(material_eps_r.size(0) == material_gain.size(0), "material_eps_r must match material_gain");
+    TORCH_CHECK(material_sigma_e.size(0) == material_gain.size(0), "material_sigma_e must match material_gain");
+    TORCH_CHECK(material_mu_r.size(0) == material_gain.size(0), "material_mu_r must match material_gain");
 
     const int64_t count = light_origin.size(0);
     for (const auto& tensor : {
@@ -395,6 +540,7 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
              light_rx_id,
              light_grid_linear_id,
              light_valid,
+             light_path_length,
              hit_t,
               hit_p,
               hit_n,
@@ -423,12 +569,17 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
             light_rx_id.data_ptr<int>(),
             light_grid_linear_id.data_ptr<int>(),
             light_valid.data_ptr<bool>(),
+            light_path_length.data_ptr<float>(),
             hit_t.data_ptr<float>(),
             hit_p.data_ptr<float>(),
             hit_n.data_ptr<float>(),
             hit_global_prim_id.data_ptr<int>(),
             material_gain.data_ptr<float>(),
             material_valid.data_ptr<bool>(),
+            material_eps_r.data_ptr<float>(),
+            material_sigma_e.data_ptr<float>(),
+            material_mu_r.data_ptr<float>(),
+            static_cast<float>(frequency_hz),
             material_gain.size(0),
             state[0].data_ptr<float>(),
             state[1].data_ptr<float>(),
@@ -443,7 +594,8 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
             state[10].data_ptr<int>(),
             state[11].data_ptr<int>(),
             state[12].data_ptr<int>(),
-            state[13].data_ptr<bool>());
+            state[13].data_ptr<bool>(),
+            state[14].data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;

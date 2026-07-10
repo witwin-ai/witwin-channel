@@ -56,6 +56,16 @@ using IntersectForwardFn = int64_t (*)(
     at::Tensor *,
     int64_t);
 
+using TraceReflectionsForwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    int64_t,
+    at::Tensor *,
+    int64_t);
+
 using ReflectionEpcPathsForwardFn = int64_t (*)(
     int64_t,
     const at::Tensor *,
@@ -232,6 +242,7 @@ std::unordered_map<std::uintptr_t, SceneCreateFn> g_scene_create_cache;
 std::unordered_map<std::uintptr_t, SceneDestroyFn> g_scene_destroy_cache;
 std::unordered_map<std::uintptr_t, SceneEdgeRecordsFn> g_scene_edge_records_cache;
 std::unordered_map<std::uintptr_t, IntersectForwardFn> g_intersect_forward_cache;
+std::unordered_map<std::uintptr_t, TraceReflectionsForwardFn> g_trace_reflections_forward_cache;
 std::unordered_map<std::uintptr_t, ReflectionEpcPathsForwardFn> g_reflection_epc_paths_forward_cache;
 std::unordered_map<std::uintptr_t, ReflectionAccumulationForwardFn> g_reflection_accumulation_forward_cache;
 std::unordered_map<std::uintptr_t, DiffractionDiscoverEdgesFn> g_diffraction_discover_edges_cache;
@@ -330,6 +341,19 @@ IntersectForwardFn raydn_intersect_forward_fn(std::uintptr_t module_handle) {
     void *symbol = load_symbol(module_handle, "raydn_native_intersect_forward");
     auto fn = reinterpret_cast<IntersectForwardFn>(symbol);
     g_intersect_forward_cache.emplace(module_handle, fn);
+    return fn;
+}
+
+TraceReflectionsForwardFn raydn_trace_reflections_forward_fn(std::uintptr_t module_handle) {
+    if (module_handle == 0)
+        throw std::runtime_error("RayDN native module handle is required");
+    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
+    auto cached = g_trace_reflections_forward_cache.find(module_handle);
+    if (cached != g_trace_reflections_forward_cache.end())
+        return cached->second;
+    void *symbol = load_symbol(module_handle, "raydn_native_trace_reflections_forward");
+    auto fn = reinterpret_cast<TraceReflectionsForwardFn>(symbol);
+    g_trace_reflections_forward_cache.emplace(module_handle, fn);
     return fn;
 }
 
@@ -652,6 +676,35 @@ pybind11::tuple cn_bdpt_visibility_forward(
         &blocker_prim,
         &tape_t);
     return pybind11::make_tuple(visible, blocker_prim, tape_t);
+}
+
+pybind11::tuple cn_raydn_trace_reflections_forward(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    int64_t max_bounces,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    constexpr int64_t kOutputCount = 3;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_trace_reflections_forward_fn(raydn_module_handle)(
+        scene_handle,
+        &ray_o,
+        &ray_d,
+        &ray_tmax,
+        active_ptr,
+        max_bounces,
+        outputs.data(),
+        kOutputCount);
+    if (output_count < 0 || output_count > kOutputCount)
+        throw std::runtime_error("RayDN reflection trace returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
+    return result;
 }
 
 pybind11::tuple cn_raydn_reflection_epc_paths_forward(

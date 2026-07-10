@@ -26,6 +26,7 @@ from witwin.channel_native.core.kernels.ops import (
     mc_store_scaled_component_map,
     mc_surface_group_edge_candidates,
 )
+from witwin.channel_native.core.edge_selection import refine_edge_geometry
 from witwin.channel_native.core.material_runtime import face_material_tensors
 from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
 from witwin.channel_native.core.runtime.raydn import RayDNScene
@@ -343,7 +344,7 @@ def _cached_diffraction_edge_geometry(raydn: RayDNScene) -> tuple[torch.Tensor, 
     cached = cache.get("mc_diffraction_edge_geometry")
     if cached is not None:
         return cached  # type: ignore[return-value]
-    geometry = _diffraction_edge_geometry(raydn.edge_records())
+    geometry = refine_edge_geometry(raydn, _diffraction_edge_geometry(raydn.edge_records()))
     cache["mc_diffraction_edge_geometry"] = geometry
     return geometry
 

@@ -4,11 +4,13 @@ import torch
 
 from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core.kernels.ops import (
+    mc_los_visibility_inputs,
     mc_receiver_grid_points,
     mc_transmitter_tensors,
     mc_zero_matrix,
     path_concat_vec3,
     path_los_export,
+    raydn_visibility_forward,
 )
 
 
@@ -107,3 +109,20 @@ def los_path_gain(scene: Scene, *, device: torch.device) -> torch.Tensor:
         frequency_hz=float(scene.frequency),
     )
     return exported["path_gain_matrix"]
+
+
+def apply_point_los_visibility(scene: Scene, raydn: object, los: torch.Tensor, *, device: torch.device) -> torch.Tensor:
+    """Zero occluded (tx, rx) entries of a point-receiver LoS matrix."""
+
+    if not scene.structures or los.numel() == 0:
+        return los
+    if not raydn.available:
+        raise RuntimeError("LoS visibility requires RayDN native scene capability")
+    handle = raydn.require_handle()
+    tx_pos, _ = transmitter_positions(scene, device=device)
+    rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
+    masks: list[torch.Tensor] = []
+    for tx_index in range(int(tx_pos.shape[0])):
+        inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=int(rx_pos.shape[0]))
+        masks.append(raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0])
+    return los * torch.stack(masks, dim=0).to(dtype=los.dtype)

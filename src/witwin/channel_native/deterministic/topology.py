@@ -19,9 +19,9 @@ from witwin.channel_native.montecarlo.basic.raydn_components import _cached_diff
 from .config import Config
 
 _MAX_MULTIBOUNCE_FACE_SEQUENCES = 100_000
-_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 8192
-_MULTIBOUNCE_PAIR_CHUNK_SIZE = 262_144
-_ORDER1_GROUPED_FACE_THRESHOLD = 4096
+_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 65_536
+_MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
+_ORDER1_EXHAUSTIVE_GROUP_LIMIT = 4096
 _PLANE_GROUP_QUANTIZATION = 1.0e-4
 
 
@@ -60,12 +60,25 @@ def _los_visibility_mask(
     return _raydn_visibility_mask(raydn, tx_for_path, rx_for_path)
 
 
+def _block_sequence_width(block: dict[str, torch.Tensor]) -> int:
+    sequence_field = block.get("primitive_sequence")
+    return int(sequence_field.shape[1]) if isinstance(sequence_field, torch.Tensor) else 0
+
+
 def concatenate_path_blocks(blocks: list[dict[str, torch.Tensor]], *, device: torch.device) -> dict[str, torch.Tensor]:
     nonempty = [block for block in blocks if int(block["valid"].numel()) > 0]
     if not nonempty:
         return _empty_path_block(device)
-    sequence_field = nonempty[0].get("primitive_sequence")
-    sequence_width = int(sequence_field.shape[1]) if isinstance(sequence_field, torch.Tensor) else 0
+    # Blocks from different bounce depths carry different sequence widths
+    # (e.g. depth-2 and depth-3 multibounce blocks); pad to the widest before
+    # the native concat, which requires a uniform width.
+    sequence_width = max(_block_sequence_width(block) for block in nonempty)
+    nonempty = [
+        block
+        if _block_sequence_width(block) == sequence_width
+        else _pad_topology_sequences(block, width=sequence_width)
+        for block in nonempty
+    ]
     return ops.deterministic_concat_topology_blocks(nonempty, sequence_width=sequence_width)
 
 
@@ -152,12 +165,6 @@ def _coplanar_face_groups(
         surface_ids.to(device=tri_a.device, dtype=torch.long).contiguous(),
         quantization=float(quantization),
     )
-
-
-def _surface_face_groups(surface_ids: torch.Tensor) -> dict[str, torch.Tensor | int]:
-    if surface_ids.ndim != 1:
-        raise ValueError("surface_ids must have shape (face_count,)")
-    return ops.deterministic_surface_face_groups(surface_ids.to(dtype=torch.long).contiguous())
 
 
 def apply_receiver_layout(values: torch.Tensor, layout: ReceiverLayout) -> torch.Tensor:
@@ -421,35 +428,53 @@ def _reflection_topology_order1(
     face_material_id = compiled.assignments.face_material_id.to(device=device, dtype=torch.int32).contiguous()
     empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
 
-    grouped_export = int(faces.shape[0]) > _ORDER1_GROUPED_FACE_THRESHOLD
-    groups = _surface_face_groups(compiled.geometry.face_surface_id.to(device=device, dtype=torch.long).contiguous())
-    if grouped_export:
-        sequences = ops.deterministic_mapped_face_sequence_chunk(
-            groups["representative_faces"].contiguous(),
+    # Enumerate one candidate per coplanar face group so that a wall meshed
+    # from several coplanar triangles yields exactly one specular path, and
+    # every planar facade (not one representative per structure) is covered.
+    # The EPC kernel resolves the actual containing triangle per path.
+    groups = _coplanar_face_groups(tri_a, normals, compiled.geometry.face_surface_id.to(device=device, dtype=torch.long).contiguous())
+    grouped_export = True
+    group_count = int(groups["group_count"])
+    representative_faces = groups["representative_faces"].contiguous()
+    exhaustive = group_count <= _ORDER1_EXHAUSTIVE_GROUP_LIMIT
+    base_sequences = (
+        ops.deterministic_mapped_face_sequence_chunk(
+            representative_faces,
             depth=1,
             start=0,
-            end=int(groups["representative_faces"].shape[0]),
+            end=group_count,
         )
-    else:
-        sequences = ops.deterministic_face_sequence_chunk(
-            tx_power.to(dtype=torch.float32).contiguous(),
-            face_count=int(faces.shape[0]),
-            depth=1,
-            start=0,
-            end=int(faces.shape[0]),
-        )
+        if exhaustive
+        else None
+    )
+    face_group_id = (
+        None if exhaustive else groups["face_group_id"].to(dtype=torch.long).contiguous()
+    )
 
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0
-    sequence_count = int(sequences.shape[0])
     rx_count = int(rx_positions.shape[0])
-    if sequence_count <= 0 or rx_count <= 0:
+    if group_count <= 0 or rx_count <= 0:
         return _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)), launch_count
 
-    rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
-    for rx_start in range(0, rx_count, rx_chunk_size):
-        rx_end = min(rx_start + rx_chunk_size, rx_count)
-        for tx_index, tx in enumerate(tx_positions):
+    for tx_index, tx in enumerate(tx_positions):
+        if exhaustive:
+            sequences = base_sequences
+        else:
+            # Large scenes: only transmitter-visible planes can host a valid
+            # first-order specular path; discover them by tracing.
+            chains = _discovered_group_chains(raydn, tx, face_group_id=face_group_id, max_depth=1)
+            launch_count += 1
+            first_groups = torch.unique(chains[chains[:, 0] >= 0][:, 0])
+            if int(first_groups.numel()) == 0:
+                continue
+            sequences = representative_faces[first_groups].reshape(-1, 1).contiguous()
+        sequence_count = int(sequences.shape[0])
+        if sequence_count <= 0:
+            continue
+        rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
+        for rx_start in range(0, rx_count, rx_chunk_size):
+            rx_end = min(rx_start + rx_chunk_size, rx_count)
             epc_inputs = ops.deterministic_reflection_epc_input_batch(
                 tx=tx,
                 rx_positions=rx_positions.contiguous(),
@@ -538,6 +563,44 @@ def _reflection_topology_order1(
 
 def _reflect_points(points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
     return ops.deterministic_reflect_points(points.contiguous(), plane_points.contiguous(), normals.contiguous())
+
+
+_MULTIBOUNCE_DISCOVERY_RAYS = 262_144
+
+
+def _discovered_group_chains(
+    raydn: object,
+    tx: torch.Tensor,
+    *,
+    face_group_id: torch.Tensor,
+    max_depth: int,
+    ray_count: int = _MULTIBOUNCE_DISCOVERY_RAYS,
+) -> torch.Tensor:
+    """Trace specular chains from the transmitter and map them to plane groups.
+
+    Returns an (N, max_depth) long tensor of plane-group ids per bounce with
+    -1 past each ray's last hit. Only chains reachable from the transmitter
+    can host a valid specular path, so validating the unique chains found here
+    replaces the exhaustive plane-sequence product on large scenes.
+    """
+
+    device = face_group_id.device
+    ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
+    ray_d = ops.mc_sample_directions(ray_count, tx.reshape(1, 3))
+    ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
+    out = ops.raydn_trace_reflections_forward(
+        raydn.require_handle(),
+        ray_o,
+        ray_d,
+        ray_tmax,
+        None,
+        int(max_depth),
+    )
+    prim_chain = out[2].to(dtype=torch.long).reshape(ray_count, int(max_depth))
+    chains = torch.full_like(prim_chain, -1)
+    hit = prim_chain >= 0
+    chains[hit] = face_group_id[prim_chain[hit]]
+    return chains
 
 
 def _face_sequence_count(face_count: int, depth: int, *, adjacent_distinct: bool) -> int:
@@ -638,156 +701,186 @@ def _reflection_topology_multibounce(
     face_eps_r, face_sigma_e, face_mu_r, face_gain, _face_valid = face_material_tensors(compiled, device=device)
     face_material_id = compiled.assignments.face_material_id.to(device=device, dtype=torch.int32).contiguous()
     face_group_source = compiled.geometry.face_surface_id.to(device=device, dtype=torch.long).contiguous()
-    surface_groups = _surface_face_groups(face_group_source)
     planning_guard = (
         _MAX_MULTIBOUNCE_FACE_SEQUENCES
         if max_paths is None
         else min(_MAX_MULTIBOUNCE_FACE_SEQUENCES, max(int(max_paths) * 64, int(max_paths)))
     )
-    if face_count > _ORDER1_GROUPED_FACE_THRESHOLD:
-        groups = surface_groups
-    else:
-        plane_groups = _coplanar_face_groups(tri_a, normals, face_group_source)
-        groups = (
-            plane_groups
-            if int(plane_groups["group_count"]) ** max_depth <= planning_guard
-            else surface_groups
-        )
+    # Coplanar plane groups carry the specular semantics (dedup, adjacency,
+    # visibility-ignore scope). When the exhaustive plane-sequence space fits
+    # the planning guard, enumerate it exactly; otherwise discover reachable
+    # plane chains by tracing rays from the transmitter and validate only
+    # those, matching the original discovery-based implementation.
+    groups = _coplanar_face_groups(tri_a, normals, face_group_source)
     group_count = int(groups["group_count"])
-    representative_faces = groups["representative_faces"]
+    representative_faces = groups["representative_faces"].contiguous()
     surface_group_id = groups["surface_group_id"]
     surface_group_size = groups["surface_group_size"]
     surface_group_members = groups["surface_group_members"]
+    exhaustive = all(
+        _face_sequence_count(group_count, depth, adjacent_distinct=True) <= planning_guard
+        for depth in range(min_depth, max_depth + 1)
+    )
+    tx_power_f32 = tx_power.to(dtype=torch.float32).contiguous()
+    rx_count = int(rx_positions.shape[0])
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0
     theoretical_candidate_count = 0
     emitted_count = 0
 
-    for depth in range(min_depth, max_depth + 1):
-        candidate_count = _face_sequence_count(group_count, depth, adjacent_distinct=True)
-        theoretical_candidate_count += candidate_count
-        guard = (
-            _MAX_MULTIBOUNCE_FACE_SEQUENCES
-            if max_paths is None
-            else min(_MAX_MULTIBOUNCE_FACE_SEQUENCES, max(int(max_paths) * 64, int(max_paths)))
+    def emit_epc_chunk(sequences: torch.Tensor, depth: int, tx: torch.Tensor, tx_index: int, rx_start: int, rx_end: int) -> None:
+        nonlocal launch_count, emitted_count
+        epc_inputs = ops.deterministic_reflection_epc_input_batch(
+            tx=tx,
+            rx_positions=rx_positions.contiguous(),
+            sequences=sequences.contiguous(),
+            tri_a=tri_a.contiguous(),
+            normals=normals.contiguous(),
+            rx_start=rx_start,
+            rx_end=rx_end,
         )
-        if candidate_count > guard and max_paths is None:
-            raise RuntimeError(
-                "deterministic multi-bounce reflection candidate count exceeds the current native guardrail "
-                f"({candidate_count} face sequences for depth={depth}, guard={guard}); use a smaller scene, "
-                "lower max_depth, or wait for native sequence compaction"
+        epc = ops.raydn_reflection_epc_paths_forward(
+            raydn.require_handle(),
+            epc_inputs["tx_batch"],
+            epc_inputs["rx_batch"],
+            None,
+            epc_inputs["sequence_batch"],
+            epc_inputs["direct_plane_points"],
+            epc_inputs["direct_plane_normals"],
+            surface_group_id,
+            surface_group_size,
+            surface_group_members,
+            int(depth),
+            1,
+        )
+        launch_count += 1
+        remaining = -1 if max_paths is None else int(max_paths) - emitted_count
+        selected = ops.deterministic_reflection_sequence_compact(
+            visible=epc[0],
+            epc_sequences=epc[2],
+            epc_hits=epc[4],
+            epc_normals=epc[5],
+            rx_indices=epc_inputs["rx_indices"],
+            tx=tx,
+            rx_positions=rx_positions,
+            tx_power=tx_power_f32,
+            tx_index=tx_index,
+            face_eps_r=face_eps_r,
+            face_sigma_e=face_sigma_e,
+            face_mu_r=face_mu_r,
+            face_gain=face_gain,
+            face_material_id=face_material_id,
+            max_count=remaining,
+        )
+        count = int(selected["selected_sequences"].shape[0])
+        if count == 0:
+            return
+        field_result = ops.deterministic_reflection_sequence_field(
+            tx_position=selected["selected_tx"],
+            rx_position=selected["selected_rx"],
+            hit_positions=selected["selected_hits"],
+            normals=selected["selected_normals"],
+            tx_power=selected["tx_power"],
+            eps_r=selected["eps_r"],
+            sigma_e=selected["sigma_e"],
+            mu_r=selected["mu_r"],
+            gain=selected["gain"],
+            frequency_hz=frequency_hz,
+        )
+        path_gain = field_result["path_gain"].to(dtype=torch.float32).contiguous()
+        path_field = ops.deterministic_pack_complex(field_result["field_real"], field_result["field_imag"])
+        path_length = field_result["path_length_m"].to(dtype=torch.float32).contiguous()
+        delay = field_result["delay_s"].to(dtype=torch.float32).contiguous()
+        emitted_count += count
+        empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
+        blocks.append(
+            _ensure_topology_fields(
+                ops.deterministic_topology_base_fields(
+                    rx_id=selected["selected_rx_id"],
+                    path_length_m=path_length,
+                    delay_s=delay,
+                    path_gain=path_gain,
+                    tx_index=tx_index,
+                    component_id=1,
+                    depth_source=empty_i32,
+                    depth_value=depth,
+                    primitive_source=selected["first_face"],
+                    primitive_value=-1,
+                    edge_source=empty_i32,
+                    edge_value=-1,
+                ),
+                interaction_position=selected["first_hit"],
+                interaction_normal=selected["first_normal"],
+                material_id=selected["material_id"],
+                path_field=path_field,
+                primitive_sequence=selected["selected_sequences"],
+                material_sequence=selected["material_sequence"],
+                interaction_positions=selected["selected_hits"],
+                interaction_normals=selected["selected_normals"],
             )
-        chunk_size = min(_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE, max(candidate_count, 1))
-        for sequences in _face_sequence_chunks(
-            group_count,
-            depth,
-            chunk_size=chunk_size,
-            reference=tx_power.to(dtype=torch.float32).contiguous(),
-            face_ids=representative_faces.contiguous(),
-            adjacent_distinct=True,
-        ):
-            if max_paths is not None and emitted_count >= int(max_paths):
-                break
-            sequence_count = int(sequences.shape[0])
-            if sequence_count <= 0:
-                continue
-            rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
-            for rx_start in range(0, int(rx_positions.shape[0]), rx_chunk_size):
-                if max_paths is not None and emitted_count >= int(max_paths):
+        )
+
+    def path_budget_reached() -> bool:
+        return max_paths is not None and emitted_count >= int(max_paths)
+
+    if exhaustive:
+        for depth in range(min_depth, max_depth + 1):
+            candidate_count = _face_sequence_count(group_count, depth, adjacent_distinct=True)
+            theoretical_candidate_count += candidate_count
+            chunk_size = min(_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE, max(candidate_count, 1))
+            for sequences in _face_sequence_chunks(
+                group_count,
+                depth,
+                chunk_size=chunk_size,
+                reference=tx_power_f32,
+                face_ids=representative_faces,
+                adjacent_distinct=True,
+            ):
+                if path_budget_reached():
                     break
-                rx_end = min(rx_start + rx_chunk_size, int(rx_positions.shape[0]))
-                for tx_index, tx in enumerate(tx_positions):
-                    if max_paths is not None and emitted_count >= int(max_paths):
+                sequence_count = int(sequences.shape[0])
+                if sequence_count <= 0:
+                    continue
+                rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
+                for rx_start in range(0, rx_count, rx_chunk_size):
+                    if path_budget_reached():
                         break
-                    epc_inputs = ops.deterministic_reflection_epc_input_batch(
-                        tx=tx,
-                        rx_positions=rx_positions.contiguous(),
-                        sequences=sequences.contiguous(),
-                        tri_a=tri_a.contiguous(),
-                        normals=normals.contiguous(),
-                        rx_start=rx_start,
-                        rx_end=rx_end,
-                    )
-                    epc = ops.raydn_reflection_epc_paths_forward(
-                        raydn.require_handle(),
-                        epc_inputs["tx_batch"],
-                        epc_inputs["rx_batch"],
-                        None,
-                        epc_inputs["sequence_batch"],
-                        epc_inputs["direct_plane_points"],
-                        epc_inputs["direct_plane_normals"],
-                        surface_group_id,
-                        surface_group_size,
-                        surface_group_members,
-                        int(depth),
-                        1,
-                    )
-                    launch_count += 1
-                    remaining = -1 if max_paths is None else int(max_paths) - emitted_count
-                    selected = ops.deterministic_reflection_sequence_compact(
-                        visible=epc[0],
-                        epc_sequences=epc[2],
-                        epc_hits=epc[4],
-                        epc_normals=epc[5],
-                        rx_indices=epc_inputs["rx_indices"],
-                        tx=tx,
-                        rx_positions=rx_positions,
-                        tx_power=tx_power.to(dtype=torch.float32).contiguous(),
-                        tx_index=tx_index,
-                        face_eps_r=face_eps_r,
-                        face_sigma_e=face_sigma_e,
-                        face_mu_r=face_mu_r,
-                        face_gain=face_gain,
-                        face_material_id=face_material_id,
-                        max_count=remaining,
-                    )
-                    count = int(selected["selected_sequences"].shape[0])
-                    if count == 0:
-                        continue
-                    field_result = ops.deterministic_reflection_sequence_field(
-                        tx_position=selected["selected_tx"],
-                        rx_position=selected["selected_rx"],
-                        hit_positions=selected["selected_hits"],
-                        normals=selected["selected_normals"],
-                        tx_power=selected["tx_power"],
-                        eps_r=selected["eps_r"],
-                        sigma_e=selected["sigma_e"],
-                        mu_r=selected["mu_r"],
-                        gain=selected["gain"],
-                        frequency_hz=frequency_hz,
-                    )
-                    path_gain = field_result["path_gain"].to(dtype=torch.float32).contiguous()
-                    path_field = ops.deterministic_pack_complex(field_result["field_real"], field_result["field_imag"])
-                    path_length = field_result["path_length_m"].to(dtype=torch.float32).contiguous()
-                    delay = field_result["delay_s"].to(dtype=torch.float32).contiguous()
-                    emitted_count += count
-                    empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
-                    blocks.append(
-                        _ensure_topology_fields(
-                            ops.deterministic_topology_base_fields(
-                                rx_id=selected["selected_rx_id"],
-                                path_length_m=path_length,
-                                delay_s=delay,
-                                path_gain=path_gain,
-                                tx_index=tx_index,
-                                component_id=1,
-                                depth_source=empty_i32,
-                                depth_value=depth,
-                                primitive_source=selected["first_face"],
-                                primitive_value=-1,
-                                edge_source=empty_i32,
-                                edge_value=-1,
-                            ),
-                            interaction_position=selected["first_hit"],
-                            interaction_normal=selected["first_normal"],
-                            material_id=selected["material_id"],
-                            path_field=path_field,
-                            primitive_sequence=selected["selected_sequences"],
-                            material_sequence=selected["material_sequence"],
-                            interaction_positions=selected["selected_hits"],
-                            interaction_normals=selected["selected_normals"],
-                        )
-                    )
+                    rx_end = min(rx_start + rx_chunk_size, rx_count)
+                    for tx_index, tx in enumerate(tx_positions):
+                        if path_budget_reached():
+                            break
+                        emit_epc_chunk(sequences, depth, tx, tx_index, rx_start, rx_end)
+    else:
+        face_group_id = groups["face_group_id"].to(dtype=torch.long).contiguous()
+        for tx_index, tx in enumerate(tx_positions):
+            if path_budget_reached():
+                break
+            group_chains = _discovered_group_chains(
+                raydn,
+                tx,
+                face_group_id=face_group_id,
+                max_depth=max_depth,
+            )
+            launch_count += 1
+            for depth in range(min_depth, max_depth + 1):
+                if path_budget_reached():
+                    break
+                reached = group_chains[:, depth - 1] >= 0
+                if not bool(reached.any()):
+                    continue
+                unique_chains = torch.unique(group_chains[reached][:, :depth], dim=0)
+                theoretical_candidate_count += int(unique_chains.shape[0])
+                sequences_all = representative_faces[unique_chains].contiguous()
+                for start in range(0, int(sequences_all.shape[0]), _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE):
+                    if path_budget_reached():
+                        break
+                    sequences = sequences_all[start : start + _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE].contiguous()
+                    rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // int(sequences.shape[0]))
+                    for rx_start in range(0, rx_count, rx_chunk_size):
+                        if path_budget_reached():
+                            break
+                        rx_end = min(rx_start + rx_chunk_size, rx_count)
+                        emit_epc_chunk(sequences, depth, tx, tx_index, rx_start, rx_end)
 
     return _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)), launch_count, theoretical_candidate_count
 
@@ -862,74 +955,83 @@ def _diffraction_topology_order1(
     handle = raydn.require_handle()
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0
+    rx_count = int(rx_positions.shape[0])
     for tx_index, tx in enumerate(tx_positions):
         states = _deterministic_diffraction_states(raydn, tx, tx_power, tx_index)
         state_count = int(states[0].shape[0])
         if state_count <= 0:
             continue
-        capacity = int(rx_positions.shape[0]) * state_count
-        out = ops.raydn_diffraction_paths_order1_forward(
-            handle,
-            tx.reshape(1, 3).contiguous(),
-            rx_positions.contiguous(),
-            None,
-            *states,
-            material_gain,
-            material_valid,
-            state_count,
-            capacity,
-            float(wavelength),
-        )
-        launch_count += 1
-        compacted = ops.deterministic_diffraction_order1_compact(
-            valid=out[1],
-            rx_id=out[3],
-            depth=out[4],
-            edge_id=out[5],
-            delay_s=out[8],
-            x_re=out[9],
-            x_im=out[10],
-            y_re=out[11],
-            y_im=out[12],
-            z_re=out[13],
-            z_im=out[14],
-            interaction_position=out[15],
-        )
-        if int(compacted["rx_id"].numel()) == 0:
-            continue
-        field_result = ops.deterministic_diffraction_vector_field(
-            x_re=compacted["x_re"],
-            x_im=compacted["x_im"],
-            y_re=compacted["y_re"],
-            y_im=compacted["y_im"],
-            z_re=compacted["z_re"],
-            z_im=compacted["z_im"],
-        )
-        field_power = field_result["path_gain"]
-        path_field = ops.deterministic_pack_complex(field_result["field_real"], field_result["field_imag"])
-        delay = compacted["delay_s"]
-        path_length = ops.deterministic_delay_to_path_length(delay)
-        empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
-        blocks.append(
-            _ensure_topology_fields(
-                ops.deterministic_topology_base_fields(
-                    rx_id=compacted["rx_id"],
-                    path_length_m=path_length,
-                    delay_s=delay,
-                    path_gain=field_power,
-                    tx_index=tx_index,
-                    component_id=2,
-                    depth_source=compacted["depth"],
-                    depth_value=0,
-                    primitive_source=empty_i32,
-                    primitive_value=-1,
-                    edge_source=compacted["edge_id"],
-                    edge_value=-1,
-                ),
-                interaction_position=compacted["interaction_position"],
-                path_field=path_field,
+        # Chunk receivers so the rx x edge-state workspace stays bounded on
+        # city-scale scenes (audit P-2); the reflection paths already chunk.
+        rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // state_count)
+        for rx_start in range(0, rx_count, rx_chunk_size):
+            rx_end = min(rx_start + rx_chunk_size, rx_count)
+            rx_chunk = rx_positions[rx_start:rx_end].contiguous()
+            capacity = int(rx_chunk.shape[0]) * state_count
+            out = ops.raydn_diffraction_paths_order1_forward(
+                handle,
+                tx.reshape(1, 3).contiguous(),
+                rx_chunk,
+                None,
+                *states,
+                material_gain,
+                material_valid,
+                state_count,
+                capacity,
+                float(wavelength),
             )
-        )
+            launch_count += 1
+            compacted = ops.deterministic_diffraction_order1_compact(
+                valid=out[1],
+                rx_id=out[3],
+                depth=out[4],
+                edge_id=out[5],
+                delay_s=out[8],
+                x_re=out[9],
+                x_im=out[10],
+                y_re=out[11],
+                y_im=out[12],
+                z_re=out[13],
+                z_im=out[14],
+                interaction_position=out[15],
+            )
+            if int(compacted["rx_id"].numel()) == 0:
+                continue
+            if rx_start > 0:
+                compacted["rx_id"] = compacted["rx_id"] + rx_start
+            field_result = ops.deterministic_diffraction_vector_field(
+                x_re=compacted["x_re"],
+                x_im=compacted["x_im"],
+                y_re=compacted["y_re"],
+                y_im=compacted["y_im"],
+                z_re=compacted["z_re"],
+                z_im=compacted["z_im"],
+            )
+            field_power = field_result["path_gain"]
+            path_field = ops.deterministic_pack_complex(field_result["field_real"], field_result["field_imag"])
+            delay = compacted["delay_s"]
+            path_length = ops.deterministic_delay_to_path_length(delay)
+            empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
+            blocks.append(
+                _ensure_topology_fields(
+                    ops.deterministic_topology_base_fields(
+                        rx_id=compacted["rx_id"],
+                        path_length_m=path_length,
+                        delay_s=delay,
+                        path_gain=field_power,
+                        tx_index=tx_index,
+                        component_id=2,
+                        depth_source=compacted["depth"],
+                        depth_value=0,
+                        primitive_source=empty_i32,
+                        primitive_value=-1,
+                        edge_source=compacted["edge_id"],
+                        edge_value=-1,
+                    ),
+                    interaction_position=compacted["interaction_position"],
+                    path_field=path_field,
+                )
+            )
     return _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)), launch_count
 
 

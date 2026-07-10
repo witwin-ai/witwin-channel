@@ -11,6 +11,7 @@ from .runtime.geometry import GeometryStore
 from .runtime.material_store import MaterialStore
 from .runtime.raydn import RayDNScene, build_scene_from_structures
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
+from .edge_selection import resolve_scene_edge_policy
 from .kernels.ops import bdpt_zero_matrix, core_diffraction_edge_count, core_pack_int2
 
 
@@ -105,6 +106,9 @@ class Scene:
         if cached is not None:
             return cached
         raydn = build_scene_from_structures(self.structures)
+        # Expose the scene's edge policy to the diffraction edge-geometry
+        # builders so path generation honors it (audit DF-4).
+        raydn.runtime_cache["edge_policy"] = resolve_scene_edge_policy(self)
         object.__setattr__(self, "_raydn_cache", raydn)
         return raydn
 

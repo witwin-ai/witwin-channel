@@ -18,9 +18,12 @@ def test_bdpt_metadata_reports_contract_fields():
     assert result.metadata["sample_streams"] == 2
     assert result.metadata["mis"] == "power_heuristic"
     assert result.metadata["path_counts_by_strategy"]["los"] == 32 * 2 * 2
+    # The LoS term connects one deterministic endpoint per transmitter
+    # (audit P-1/P-5), so the valid contributions are tx * rx unique rows
+    # rather than the nominal sample budget.
     assert (
         result.metadata["valid_contribution_count"]
-        == result.metadata["path_counts_by_strategy"]["los"] * result.path_gain.shape[1]
+        == result.path_gain.shape[0] * result.path_gain.shape[1]
     )
     assert result.metadata["components"]["los"] == "enabled"
     assert result.metadata["native_capabilities"]["cuda"] is True

@@ -34,10 +34,12 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_los_component_maps_from_matrix,
     bdpt_sample_directions,
     bdpt_selected_edge_indices,
+    bdpt_subpath_intersection_inputs,
     bdpt_zero_matrix,
     mc_component_map_buffer,
     mc_sample_directions,
     mc_store_component_map,
+    mc_store_scaled_component_map,
     raydn_visibility_forward,
 )
 from witwin.channel_native.path.raydn_export import _diffraction_edge_geometry
@@ -54,6 +56,8 @@ from .sampling import make_launch_state
 
 
 _EXPORT_BYTES_PER_PATH = 96
+_CONNECTION_BYTES_PER_ROW = 57
+_VISIBILITY_BYTES_PER_ROW = 25
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 
@@ -70,7 +74,7 @@ class _GridSpec:
     cell_area: float
 
 
-def _estimate_workspace_bytes(config: Config, *, tx_count: int, grid_cells: int) -> int:
+def _estimate_workspace_bytes(config: Config, *, tx_count: int, grid_cells: int, rx_count: int) -> int:
     launch_entries = max(0, int(tx_count)) * int(config.samples) * int(config.sample_streams)
     bytes_estimate = launch_entries * 32
     if grid_cells > 0:
@@ -78,6 +82,22 @@ def _estimate_workspace_bytes(config: Config, *, tx_count: int, grid_cells: int)
     if config.export_paths:
         exported = config.max_exported_paths if config.max_exported_paths is not None else launch_entries
         bytes_estimate += int(exported) * _EXPORT_BYTES_PER_PATH
+
+    # Dense endpoint-connection tables materialize light_count x rx_count rows
+    # (contribution fields + visibility inputs). The LoS term connects one
+    # deterministic endpoint per transmitter, so only the sampled reflection
+    # and diffraction connection paths scale with the sample budget.
+    row_bytes = _CONNECTION_BYTES_PER_ROW + _VISIBILITY_BYTES_PER_ROW
+    rx_rows = max(0, int(rx_count))
+    dense_rows = 0
+    if "los" in config.components:
+        dense_rows += max(0, int(tx_count)) * rx_rows
+    point_receivers = grid_cells <= 0
+    if "reflection" in config.components and (point_receivers or config.export_paths):
+        dense_rows += launch_entries * rx_rows * max(1, int(config.max_depth))
+    if "diffraction" in config.components and point_receivers:
+        dense_rows += launch_entries * rx_rows
+    bytes_estimate += dense_rows * row_bytes
     return int(bytes_estimate)
 
 
@@ -87,7 +107,9 @@ def _check_workspace_guardrail(config: Config, workspace_bytes: int) -> None:
     if workspace_bytes > config.workspace_limit_bytes:
         raise RuntimeError(
             "workspace limit exceeded for BDPT: "
-            f"estimated {workspace_bytes} bytes exceeds {config.workspace_limit_bytes}"
+            f"estimated {workspace_bytes} bytes exceeds {config.workspace_limit_bytes}. "
+            "Reduce samples or the receiver grid resolution, or raise "
+            "Config.workspace_limit_bytes if the device has enough memory."
         )
 
 
@@ -239,77 +261,111 @@ def _native_reflection_connection_samples(
     mis: str,
     beta: float,
     strategy_count: int,
+    max_depth: int,
 ) -> list[dict[str, torch.Tensor]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid = material_tensors
+    eps_r, sigma_e, mu_r, material_gain, material_valid = material_tensors
     sensor = endpoint_subpaths["sensor"]
     sample_blocks: list[dict[str, torch.Tensor]] = []
     for tx_index in range(int(tx_positions.shape[0])):
         launch_inputs = bdpt_reflection_launch_inputs(tx_positions, tx_index=tx_index, sample_count=int(samples))
         ray_d = bdpt_sample_directions(int(samples), tx_positions, seed=int(seed) + tx_index * 65537)
-        hit = bdpt_intersect_forward(
-            raydn.require_handle(),
-            launch_inputs["ray_o"],
-            ray_d,
-            launch_inputs["ray_tmax"],
-            launch_inputs["active"],
-        )
-        light = bdpt_endpoint_subpath_state(
+        state = bdpt_endpoint_subpath_state(
             tx_positions,
             tx_power,
             rx_positions,
             launch_inputs["tx_id"],
             launch_inputs["light_seed"],
         )["light"]
-        light["direction"] = ray_d
-        reflected = bdpt_reflected_light_subpath_state(
-            light,
-            hit,
-            material_gain=material_gain,
-            material_valid=material_valid,
-        )
-        samples_out = bdpt_endpoint_connection_samples(
-            reflected,
-            sensor,
-            frequency_hz=frequency_hz,
-            samples_per_tx=int(samples),
-            max_paths=None,
-            mis=mis,
-            beta=beta,
-            strategy_count=strategy_count,
-        )
-        visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
-            reflected,
-            sensor,
-            sample_count=int(samples_out["valid"].shape[0]),
-        )
-        visible = raydn_visibility_forward(
-            raydn.require_handle(),
-            visibility_inputs["start"],
-            visibility_inputs["end"],
-            visibility_inputs["active"],
-        )[0]
-        sample_blocks.append(bdpt_filter_connection_samples(samples_out, visible))
+        state["direction"] = ray_d
+        ray_inputs = {
+            "ray_o": launch_inputs["ray_o"],
+            "ray_d": ray_d,
+            "ray_tmax": launch_inputs["ray_tmax"],
+            "active": launch_inputs["active"],
+        }
+        for _bounce in range(max(1, int(max_depth))):
+            hit = bdpt_intersect_forward(
+                raydn.require_handle(),
+                ray_inputs["ray_o"],
+                ray_inputs["ray_d"],
+                ray_inputs["ray_tmax"],
+                ray_inputs["active"],
+            )
+            reflected = bdpt_reflected_light_subpath_state(
+                state,
+                hit,
+                material_gain=material_gain,
+                material_valid=material_valid,
+                material_eps_r=eps_r,
+                material_sigma_e=sigma_e,
+                material_mu_r=mu_r,
+                frequency_hz=frequency_hz,
+            )
+            samples_out = bdpt_endpoint_connection_samples(
+                reflected,
+                sensor,
+                frequency_hz=frequency_hz,
+                samples_per_tx=int(samples),
+                max_paths=None,
+                mis=mis,
+                beta=beta,
+                strategy_count=strategy_count,
+            )
+            visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
+                reflected,
+                sensor,
+                sample_count=int(samples_out["valid"].shape[0]),
+            )
+            visible = raydn_visibility_forward(
+                raydn.require_handle(),
+                visibility_inputs["start"],
+                visibility_inputs["end"],
+                visibility_inputs["active"],
+            )[0]
+            sample_blocks.append(bdpt_filter_connection_samples(samples_out, visible))
+            if not bool(reflected["valid"].any()):
+                break
+            state = reflected
+            ray_inputs = bdpt_subpath_intersection_inputs(reflected)
     return sample_blocks
+
+
+def _reduced_light_endpoint_state(
+    tx_reference: torch.Tensor,
+    tx_power: torch.Tensor,
+    rx_positions: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """One light endpoint per transmitter for the deterministic LoS term.
+
+    All depth-0 light samples share the transmitter position, so N samples
+    per tx are N identical rows weighted 1/N. Connecting the T unique
+    endpoints with samples_per_tx=1 yields the identical estimate while the
+    connection table shrinks from T*N*R rows to T*R (audit P-1/P-5).
+    """
+
+    device = tx_reference.device
+    tx_count = int(tx_reference.shape[0])
+    tx_ids = torch.arange(tx_count, device=device, dtype=torch.int32)
+    seeds = torch.zeros((tx_count,), device=device, dtype=torch.int64)
+    return bdpt_endpoint_subpath_state(tx_reference, tx_power, rx_positions, tx_ids, seeds)["light"]
 
 
 def _native_los_connection_samples(
     raydn: Any,
-    endpoint_subpaths: dict[str, dict[str, torch.Tensor]],
+    light: dict[str, torch.Tensor],
+    sensor: dict[str, torch.Tensor],
     *,
     scene_has_structures: bool,
     frequency_hz: float,
-    samples_per_tx: int,
     mis: str,
     beta: float,
     strategy_count: int,
 ) -> dict[str, torch.Tensor]:
-    light = endpoint_subpaths["light"]
-    sensor = endpoint_subpaths["sensor"]
     samples = bdpt_endpoint_connection_samples(
         light,
         sensor,
         frequency_hz=frequency_hz,
-        samples_per_tx=samples_per_tx,
+        samples_per_tx=1,
         max_paths=None,
         mis=mis,
         beta=beta,
@@ -335,6 +391,7 @@ def _native_reflection_component_maps(
     scene: Scene,
     raydn: Any,
     tx_positions: torch.Tensor,
+    tx_power: torch.Tensor,
     material_tensors: tuple[torch.Tensor, ...],
     grid: ReceiverGrid,
     *,
@@ -384,7 +441,13 @@ def _native_reflection_component_maps(
             0,
             False,
         )
-        maps = mc_store_component_map(maps, out[0], tx_index=tx_index)
+        maps = mc_store_scaled_component_map(
+            maps,
+            out[0],
+            tx_power,
+            tx_index=tx_index,
+            scale_index=tx_index,
+        )
     return maps
 
 
@@ -392,6 +455,10 @@ def _diffraction_sample_split(sample_count: int) -> tuple[int, int, int]:
     direct = (int(sample_count) + 2) // 3
     keller = (int(sample_count) + 1) // 3
     return direct, keller, 0
+
+
+def _diffraction_strategy_count(direct_samples: int, keller_samples: int) -> int:
+    return (1 if direct_samples > 0 else 0) + (1 if keller_samples > 0 else 0)
 
 
 def _native_diffraction_component_maps(
@@ -512,7 +579,7 @@ def _native_diffraction_component_maps(
                     keller_samples=int(keller_samples),
                     mis=mis,
                     beta=beta,
-                    strategy_count=1,
+                    strategy_count=_diffraction_strategy_count(direct_samples, keller_samples),
                 )
             )
     return maps, sample_blocks
@@ -570,7 +637,7 @@ def _native_diffraction_point_connection_samples(
             wavelength=float(wavelength),
             mis=mis,
             beta=beta,
-            strategy_count=1,
+            strategy_count=_diffraction_strategy_count(direct_samples, keller_samples),
         )
         samples_out = exported["samples"]
         if not isinstance(samples_out, dict):
@@ -603,6 +670,13 @@ def solve(scene: Scene, config: Config) -> Result:
     diffraction_available = raydn_available and config.max_diffraction_order > 0
     if "diffraction" in config.components and config.max_diffraction_order <= 0:
         raise RuntimeError("diffraction requires max_diffraction_order > 0")
+    if "diffraction" in config.components and config.mis == "none":
+        direct_samples, keller_samples, _suffix = _diffraction_sample_split(_effective_native_samples(config))
+        if _diffraction_strategy_count(direct_samples, keller_samples) > 1:
+            raise RuntimeError(
+                "mis='none' double counts the direct+keller diffraction strategies; "
+                "use mis='balance' or 'power_heuristic'"
+            )
     if "reflection" in config.components and scene.structures and not reflection_available:
         raise RuntimeError("reflection requires RayDN native capability")
     if "diffraction" in config.components and scene.structures and not diffraction_available:
@@ -620,7 +694,13 @@ def solve(scene: Scene, config: Config) -> Result:
         grid_cells=grid_cells,
         estimated_valid_ratio=1.0 if "los" in config.components else 0.05,
     )
-    workspace_bytes = _estimate_workspace_bytes(config, tx_count=len(scene.transmitters), grid_cells=grid_cells)
+    rx_count_estimate = grid_cells if grid is not None else len(scene.receivers)
+    workspace_bytes = _estimate_workspace_bytes(
+        config,
+        tx_count=len(scene.transmitters),
+        grid_cells=grid_cells,
+        rx_count=rx_count_estimate,
+    )
     _check_workspace_guardrail(config, workspace_bytes)
 
     tx_reference, tx_power = transmitter_tensors(scene)
@@ -633,14 +713,19 @@ def solve(scene: Scene, config: Config) -> Result:
         launch_state["tx_id"],
         launch_state["light_seed"],
     )
+    los_light_state = (
+        _reduced_light_endpoint_state(tx_reference, tx_power, rx_positions)
+        if "los" in config.components
+        else None
+    )
     endpoint_connection_samples = None
     endpoint_accumulation = None
-    if "los" in config.components and not scene.structures:
+    if los_light_state is not None and not scene.structures:
         endpoint_connection_samples = bdpt_endpoint_connection_samples(
-            endpoint_subpaths["light"],
+            los_light_state,
             endpoint_subpaths["sensor"],
             frequency_hz=float(scene.frequency),
-            samples_per_tx=native_samples,
+            samples_per_tx=1,
             max_paths=None,
             mis=config.mis,
             beta=config.power_heuristic_beta,
@@ -678,14 +763,14 @@ def solve(scene: Scene, config: Config) -> Result:
             if scene.structures and (("reflection" in config.components) or ("diffraction" in config.components))
             else None
         )
-        if "los" in config.components:
+        if los_light_state is not None:
             sample_blocks.append(
                 _native_los_connection_samples(
                     raydn,
-                    endpoint_subpaths,
+                    los_light_state,
+                    endpoint_subpaths["sensor"],
                     scene_has_structures=bool(scene.structures),
                     frequency_hz=float(scene.frequency),
-                    samples_per_tx=native_samples,
                     mis=config.mis,
                     beta=config.power_heuristic_beta,
                     strategy_count=1,
@@ -705,17 +790,21 @@ def solve(scene: Scene, config: Config) -> Result:
             and native_max_depth >= 1
         )
         if reflection_requested:
-            if grid is not None and not config.export_paths:
+            # The plane-capture accumulation kernel is the reflection
+            # estimator for grids; path export runs the connection sampler in
+            # addition, never instead (the map must not change with export).
+            if grid is not None:
                 reflection_component_map = _native_reflection_component_maps(
                     scene,
                     raydn,
                     tx_reference,
+                    tx_power,
                     material_tensors,
                     grid,
                     samples=native_samples,
                     max_depth=native_max_depth,
                 )
-            else:
+            if grid is None or config.export_paths:
                 sample_blocks.extend(
                     _native_reflection_connection_samples(
                         raydn,
@@ -730,6 +819,7 @@ def solve(scene: Scene, config: Config) -> Result:
                         mis=config.mis,
                         beta=config.power_heuristic_beta,
                         strategy_count=1,
+                        max_depth=native_max_depth,
                     )
                 )
             launch_count += 4
@@ -829,7 +919,9 @@ def solve(scene: Scene, config: Config) -> Result:
                 estimate_samples,
                 tx_count=tx_count,
                 rx_count=rx_count,
-                samples_per_tx=native_samples,
+                # LoS-only estimates are one deterministic row per (tx, rx)
+                # connection, not native_samples Monte Carlo draws.
+                samples_per_tx=1 if endpoint_only else native_samples,
             )
         if grid is not None:
             variance = bdpt_los_component_maps_from_matrix(
@@ -841,10 +933,10 @@ def solve(scene: Scene, config: Config) -> Result:
     if config.export_paths:
         if endpoint_only:
             exported_endpoint_samples = bdpt_endpoint_connection_samples(
-                endpoint_subpaths["light"],
+                los_light_state,
                 endpoint_subpaths["sensor"],
                 frequency_hz=float(scene.frequency),
-                samples_per_tx=native_samples,
+                samples_per_tx=1,
                 max_paths=config.max_exported_paths,
                 mis=config.mis,
                 beta=config.power_heuristic_beta,

@@ -1057,6 +1057,44 @@ py::tuple reflection_epc_paths_forward_op(
     return py::make_tuple(valid, path_length, resolved_flat.reshape({ray_count, max_bounces}).contiguous(), group_flat.reshape({ray_count, max_bounces}).contiguous(), hit_positions, normals);
 }
 
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_trace_reflections_forward(
+    int64_t scene_handle,
+    const at::Tensor *ray_o,
+    const at::Tensor *ray_d,
+    const at::Tensor *ray_tmax,
+    const at::Tensor *active,
+    int64_t max_bounces,
+    at::Tensor *outputs,
+    int64_t output_capacity) {
+    auto required = [](const at::Tensor *tensor, const char *name) -> const at::Tensor & {
+        if (tensor == nullptr)
+            throw std::runtime_error(std::string("raydn_native_trace_reflections_forward received null ") + name);
+        return *tensor;
+    };
+    if (outputs == nullptr)
+        throw std::runtime_error("raydn_native_trace_reflections_forward received null outputs");
+    constexpr int64_t kOutputCount = 3;
+    if (output_capacity < kOutputCount)
+        throw std::runtime_error("raydn_native_trace_reflections_forward output capacity is too small");
+
+    py::object active_obj = active == nullptr || !active->defined()
+        ? py::none()
+        : py::cast(*active);
+    py::tuple result = trace_reflections_forward_reduced_op(
+        scene_handle,
+        required(ray_o, "ray_o"),
+        required(ray_d, "ray_d"),
+        required(ray_tmax, "ray_tmax"),
+        active_obj,
+        max_bounces);
+    const int64_t output_count = static_cast<int64_t>(py::len(result));
+    if (output_count != kOutputCount)
+        throw std::runtime_error("raydn_native_trace_reflections_forward returned an unexpected output count");
+    for (int64_t i = 0; i < output_count; ++i)
+        outputs[i] = result[static_cast<size_t>(i)].cast<at::Tensor>();
+    return output_count;
+}
+
 extern "C" RAYDN_NATIVE_API int64_t raydn_native_reflection_epc_paths_forward(
     int64_t scene_handle,
     const at::Tensor *source,

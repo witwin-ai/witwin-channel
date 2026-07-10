@@ -89,8 +89,87 @@ def test_bdpt_single_wedge_point_diffraction_converges_to_maintained_reference(s
     )
 
     observed = result.component_power["diffraction"].detach().cpu()
-    reference = torch.tensor(1.25e-04, dtype=observed.dtype)
+    # Maintained reference for the single-wedge point-receiver estimate. The
+    # historical value 1.25e-04 fossilized a 2x double count of the identical
+    # direct/keller strategies (strategy_count=1 gave each full MIS weight);
+    # 6.25e-05 still carried the duplicate half-plane record for the shared
+    # wedge edge (audit D-6), now merged into one 3*pi/2 wedge state.
+    reference = torch.tensor(4.66e-05, dtype=observed.dtype)
     torch.testing.assert_close(observed, reference, rtol=relative_tolerance, atol=1.0e-8)
+
+
+def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges(monkeypatch):
+    """Guards audit MC-2: with the round-robin lane mapping the per-lane edge
+    measure must scale by the state count, otherwise adding a second wedge
+    halves each wedge's contribution (1/S underestimate).
+
+    Restricted to the direct strategy: the Keller cone sampler currently has
+    unbounded variance (audit DF-6, no pdf compensation), which would swamp
+    the additivity signal.
+    """
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for BDPT diffraction")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native diffraction is not built")
+
+    monkeypatch.setattr(bdpt_solver, "_diffraction_sample_split", lambda samples: (int(samples), 0, 0))
+
+    from witwin.channel_native import Scene, Structure, Transmitter
+    from witwin.channel_native.core.materials import PerfectConductor
+
+    def wedge_pair(offset_z: float, tag: str) -> list[Structure]:
+        shift = torch.tensor([0.0, 0.0, offset_z])
+        face_a = Structure(
+            vertices=torch.tensor([[2.0, 0.0, -1.0], [2.0, 0.0, 2.0], [2.0, 2.0, -1.0]]) + shift,
+            faces=torch.tensor([[0, 1, 2]]),
+            material=PerfectConductor(),
+            name=f"wedge-a-{tag}",
+            surface_id=2,
+        )
+        face_b = Structure(
+            vertices=torch.tensor([[2.0, 0.0, -1.0], [2.0, 0.0, 2.0], [4.0, 0.0, -1.0]]) + shift,
+            faces=torch.tensor([[0, 2, 1]]),
+            material=PerfectConductor(),
+            name=f"wedge-b-{tag}",
+            surface_id=3,
+        )
+        return [face_a, face_b]
+
+    def scene_with(structures: list[Structure]) -> Scene:
+        return Scene(
+            structures=structures,
+            transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
+            receivers=[],
+            frequency=3.0e9,
+        ).add(_grid())
+
+    config = Config(samples=4096, seed=7, components={"diffraction"})
+    near = solve(scene_with(wedge_pair(0.0, "near")), config)
+    far = solve(scene_with(wedge_pair(30.0, "far")), config)
+    both = solve(scene_with(wedge_pair(0.0, "near") + wedge_pair(30.0, "far")), config)
+
+    separate = near.component_power["diffraction"].item() + far.component_power["diffraction"].item()
+    combined = both.component_power["diffraction"].item()
+    assert separate > 0.0
+    assert combined == pytest.approx(separate, rel=0.1)
+
+
+def test_bdpt_diffraction_rejects_mis_none_with_multiple_strategies():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for BDPT diffraction")
+
+    with pytest.raises(RuntimeError, match="double counts"):
+        solve(
+            wedge_diffraction_scene(),
+            Config(
+                samples=256,
+                seed=7,
+                components={"diffraction"},
+                receiver_strategy="point_sphere",
+                mis="none",
+            ),
+        )
 
 
 def test_bdpt_diffraction_point_receiver_returns_native_component_without_path_block_fallback():

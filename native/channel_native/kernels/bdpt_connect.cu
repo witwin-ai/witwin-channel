@@ -230,6 +230,7 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
     const int* light_component_mask,
     const int* light_tx_id,
     const bool* light_valid,
+    const float* light_path_length,
     const float* sensor_origin,
     const float* sensor_pdf_reverse,
     const int* sensor_depth,
@@ -282,8 +283,11 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
         ? bdpt_connection_pdf_from_distance(distance) * fmaxf(light_pdf_forward[light_index], 0.0f) *
             fmaxf(sensor_pdf_reverse[sensor_index], 0.0f)
         : 0.0f;
+    // The free-space spreading acts over the unfolded path (light-subpath
+    // prefix + connection segment), not the last segment alone.
+    const float total_distance = distance + fmaxf(light_path_length[light_index], 0.0f);
     const float row_contribution = row_valid
-        ? bdpt_free_space_gain(light_throughput_real[light_index], distance, frequency_hz) * inv_samples_per_tx
+        ? bdpt_free_space_gain(light_throughput_real[light_index], total_distance, frequency_hz) * inv_samples_per_tx
         : 0.0f;
 
     tx_id[index] = tx;
@@ -298,7 +302,7 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
     pdf[index] = row_pdf;
     mis_weight[index] = row_valid ? bdpt_single_strategy_mis_weight(row_pdf, mode_id, beta) : 0.0f;
     valid[index] = row_valid;
-    path_length_m[index] = distance;
+    path_length_m[index] = total_distance;
     const int row = static_cast<int>(index * 4);
     topology[row + 0] = tx;
     topology[row + 1] = rx;
@@ -1083,6 +1087,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
     at::Tensor light_component_mask,
     at::Tensor light_tx_id,
     at::Tensor light_valid,
+    at::Tensor light_path_length,
     at::Tensor sensor_origin,
     at::Tensor sensor_pdf_reverse,
     at::Tensor sensor_depth,
@@ -1125,6 +1130,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
              std::pair<const at::Tensor*, const char*>(&light_component_mask, "light_component_mask"),
              std::pair<const at::Tensor*, const char*>(&light_tx_id, "light_tx_id"),
              std::pair<const at::Tensor*, const char*>(&light_valid, "light_valid"),
+             std::pair<const at::Tensor*, const char*>(&light_path_length, "light_path_length"),
          }) {
         TORCH_CHECK(pair.first->size(0) == light_count, pair.second, " must match light count");
         check_same_device(*pair.first, light_origin, pair.second);
@@ -1175,6 +1181,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
             light_component_mask.data_ptr<int>(),
             light_tx_id.data_ptr<int>(),
             light_valid.data_ptr<bool>(),
+            light_path_length.data_ptr<float>(),
             sensor_origin.data_ptr<float>(),
             sensor_pdf_reverse.data_ptr<float>(),
             sensor_depth.data_ptr<int>(),

@@ -14,6 +14,12 @@ namespace {
 
 constexpr float kMinSegmentLength = 2e-5f;
 constexpr float kEpcTolerance = 1e-4f;
+// Relative out-of-plane tolerance for point-in-triangle containment. The
+// barycentric test alone accepts points that merely *project* into the
+// triangle; group members are coplanar within the plane-group quantization,
+// so anything further than ~1e-3 x edge scale off the plane is a different
+// wall and must be rejected.
+constexpr float kEpcPlaneTolerance = 1e-3f;
 constexpr unsigned int kInvalidPrim = 0xFFFFFFFFu;
 constexpr unsigned int kTraceModeReflection = 0u;
 constexpr unsigned int kTraceModeVisibility = 1u;
@@ -268,6 +274,14 @@ static __forceinline__ __device__ bool point_inside_triangle(int prim, float3 po
     const float d21 = dot3(vp, e2);
     const float denom = d00 * d11 - d01 * d01;
     if (fabsf(denom) <= 1e-12f) {
+        return false;
+    }
+    // Reject points that are off the triangle's plane; denom == |e1 x e2|^2,
+    // so deviation^2 = dot(vp, e1 x e2)^2 / denom.
+    const float plane_deviation = dot3(vp, cross3(e1, e2));
+    const float scale_sq = fmaxf(fmaxf(d00, d11), 1.f);
+    if (plane_deviation * plane_deviation >
+        kEpcPlaneTolerance * kEpcPlaneTolerance * scale_sq * denom) {
         return false;
     }
     const float inv_denom = 1.f / denom;

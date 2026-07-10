@@ -83,6 +83,7 @@ def test_bdpt_empty_subpath_state_returns_native_schema():
         "rx_id": ((0,), torch.int32),
         "grid_linear_id": ((0,), torch.int32),
         "valid": ((0,), torch.bool),
+        "path_length": ((0,), torch.float32),
     }
     assert set(state) == set(expected)
     for name, (shape, dtype) in expected.items():
@@ -196,6 +197,7 @@ def test_bdpt_reflected_light_subpath_state_uses_native_hit_geometry():
         "rx_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
         "grid_linear_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
         "valid": torch.tensor([True], device="cuda", dtype=torch.bool),
+        "path_length": torch.tensor([0.0], device="cuda", dtype=torch.float32),
     }
     intersection = {
         "t": torch.tensor([1.0], device="cuda", dtype=torch.float32),
@@ -215,6 +217,10 @@ def test_bdpt_reflected_light_subpath_state_uses_native_hit_geometry():
         intersection,
         material_gain=torch.ones((8,), device="cuda", dtype=torch.float32),
         material_valid=torch.ones((8,), device="cuda", dtype=torch.bool),
+        material_eps_r=torch.ones((8,), device="cuda", dtype=torch.float32),
+        material_sigma_e=torch.full((8,), 1.0e14, device="cuda", dtype=torch.float32),
+        material_mu_r=torch.ones((8,), device="cuda", dtype=torch.float32),
+        frequency_hz=3.0e9,
     )
 
     torch.testing.assert_close(
@@ -253,6 +259,7 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
         "rx_id": torch.tensor([-1, -1], device="cuda", dtype=torch.int32),
         "grid_linear_id": torch.tensor([-1, -1], device="cuda", dtype=torch.int32),
         "valid": torch.tensor([True, True], device="cuda", dtype=torch.bool),
+        "path_length": torch.tensor([0.0, 0.0], device="cuda", dtype=torch.float32),
     }
     intersection = {
         "t": torch.tensor([1.0, 1.0], device="cuda", dtype=torch.float32),
@@ -274,6 +281,10 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
         intersection,
         material_gain=material_gain,
         material_valid=material_valid,
+        material_eps_r=torch.ones((2,), device="cuda", dtype=torch.float32),
+        material_sigma_e=torch.full((2,), 1.0e14, device="cuda", dtype=torch.float32),
+        material_mu_r=torch.ones((2,), device="cuda", dtype=torch.float32),
+        frequency_hz=3.0e9,
     )
 
     torch.testing.assert_close(reflected["throughput_real"].cpu(), torch.tensor([1.0, 0.0], dtype=torch.float32))
@@ -322,6 +333,7 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
         "rx_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
         "grid_linear_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
         "valid": torch.tensor([True], device="cuda", dtype=torch.bool),
+        "path_length": torch.tensor([0.0], device="cuda", dtype=torch.float32),
     }
     intersection = {
         "t": torch.tensor([1.0], device="cuda", dtype=torch.float32),
@@ -340,6 +352,10 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
         intersection,
         material_gain=torch.ones((1,), device="cuda", dtype=torch.float32),
         material_valid=torch.ones((1,), device="cuda", dtype=torch.bool),
+        material_eps_r=torch.ones((1,), device="cuda", dtype=torch.float32),
+        material_sigma_e=torch.full((1,), 1.0e14, device="cuda", dtype=torch.float32),
+        material_mu_r=torch.ones((1,), device="cuda", dtype=torch.float32),
+        frequency_hz=3.0e9,
     )
     sensor = ops.bdpt_empty_subpath_state(light["origin"])
     sensor["origin"] = torch.tensor([[0.0, 0.0, 2.0]], device="cuda", dtype=torch.float32)
@@ -356,6 +372,7 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
     sensor["rx_id"] = torch.tensor([2], device="cuda", dtype=torch.int32)
     sensor["grid_linear_id"] = torch.tensor([5], device="cuda", dtype=torch.int32)
     sensor["valid"] = torch.tensor([True], device="cuda", dtype=torch.bool)
+    sensor["path_length"] = torch.tensor([0.0], device="cuda", dtype=torch.float32)
 
     samples = ops.bdpt_endpoint_connection_samples(
         reflected,

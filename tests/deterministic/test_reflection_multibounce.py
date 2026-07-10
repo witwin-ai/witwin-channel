@@ -132,28 +132,28 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     )
 
     assert result.paths is not None
+    # One specular path per coplanar wall: the historical expectation carried
+    # a twin path per wall triangle (D-1 double counting, +6 dB coherent).
     torch.testing.assert_close(
         result.paths.depth,
-        torch.tensor([1, 1, 1, 1, 2], device=result.paths.depth.device, dtype=torch.int32),
+        torch.tensor([1, 1, 2], device=result.paths.depth.device, dtype=torch.int32),
     )
     torch.testing.assert_close(
         result.paths.primitive_sequence,
         torch.tensor(
-            [[0, -1], [1, -1], [2, -1], [3, -1], [1, 2]],
+            [[0, -1], [2, -1], [1, 2]],
             device=result.paths.primitive_sequence.device,
             dtype=torch.int32,
         ),
     )
     expected_length_all = torch.tensor(
-        [4.123105526, 4.123105526, 3.0, 3.0, 5.0],
+        [4.123105526, 3.0, 5.0],
         device=result.paths.path_length_m.device,
         dtype=torch.float32,
     )
     expected_gain_all = torch.tensor(
         [
             2.48520365176e-07,
-            2.48520365176e-07,
-            7.80931884492e-07,
             7.80931884492e-07,
             1.68501468334e-09,
         ],
@@ -163,8 +163,6 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     expected_field_real_all = torch.tensor(
         [
             -3.44542713719e-05,
-            -3.44542713719e-05,
-            -0.000874996418133,
             -0.000874996418133,
             3.97676703869e-05,
         ],
@@ -174,8 +172,6 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     expected_field_imag_all = torch.tensor(
         [
             -0.000497326138429,
-            -0.000497326138429,
-            0.00012374635844,
             0.00012374635844,
             -1.01758087112e-05,
         ],
@@ -232,6 +228,76 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     torch.testing.assert_close(result.paths.path_gain[depth_two], expected_gain, rtol=5.0e-4, atol=1.0e-10)
     torch.testing.assert_close(path_field, expected_field, rtol=5.0e-4, atol=1.0e-7)
     torch.testing.assert_close(result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
+
+
+def parallel_wall_corridor_scene() -> Scene:
+    wall_left = Structure(
+        vertices=torch.tensor(
+            [
+                [-2.0, -3.0, 0.0],
+                [-2.0, 3.0, 0.0],
+                [-2.0, -3.0, 2.0],
+                [-2.0, 3.0, 2.0],
+            ]
+        ),
+        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
+        material=Dielectric(eps_r=3.0, sigma_e=0.005),
+        name="corridor-left",
+        surface_id=20,
+    )
+    wall_right = Structure(
+        vertices=torch.tensor(
+            [
+                [2.0, -3.0, 0.0],
+                [2.0, 3.0, 0.0],
+                [2.0, -3.0, 2.0],
+                [2.0, 3.0, 2.0],
+            ]
+        ),
+        faces=torch.tensor([[0, 2, 1], [1, 2, 3]]),
+        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        name="corridor-right",
+        surface_id=21,
+    )
+    return Scene(
+        structures=[wall_left, wall_right],
+        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
+        receivers=[ReceiverPoint(position=torch.tensor([0.5, 0.5, 1.0]))],
+        frequency=3.0e9,
+    )
+
+
+def test_three_bounce_reflection_mixes_depth_two_and_three_blocks():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic multi-bounce reflection")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native reflection is not built")
+
+    result = solve(
+        parallel_wall_corridor_scene(),
+        Config(components={"reflection"}, max_depth=3, coherent=True, export_paths=True),
+    )
+
+    assert result.paths is not None
+    depths = result.paths.depth
+    assert bool((depths == 2).any())
+    assert bool((depths == 3).any())
+    assert result.paths.primitive_sequence.shape[1] == 3
+    assert result.paths.material_sequence.shape == result.paths.primitive_sequence.shape
+    assert result.paths.interaction_positions.shape[:2] == result.paths.primitive_sequence.shape
+    depth_two = depths == 2
+    depth_three = depths == 3
+    # Padded tail entries stay -1; active entries carry real primitive ids.
+    assert torch.all(result.paths.primitive_sequence[depth_two, :2] >= 0)
+    assert torch.all(result.paths.primitive_sequence[depth_two, 2] < 0)
+    assert torch.all(result.paths.primitive_sequence[depth_three] >= 0)
+    assert torch.isfinite(result.paths.path_gain).all()
+    assert torch.all(result.paths.path_gain > 0.0)
+    # Corridor double/triple bounces alternate between the two walls, so the
+    # unfolded path lengths must strictly grow with depth.
+    assert float(result.paths.path_length_m[depth_three].min()) > float(
+        result.paths.path_length_m[depth_two].max()
+    )
 
 
 def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):

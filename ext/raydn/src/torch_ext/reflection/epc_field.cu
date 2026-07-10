@@ -349,7 +349,10 @@ __global__ void reflection_epc_field_kernel(ReflEpcFieldParams params) {
     }
 
     const float wave_k = 2.f * kPi / fmaxf(params.wavelength, kReflEps);
-    const Complex phase = c_exp_neg_i(wave_k * path_length);
+    // Reduce k*d mod 2*pi in double before the f32 sincos (audit DF-3).
+    const Complex phase = c_exp_neg_i(static_cast<float>(fmod(
+        static_cast<double>(wave_k) * static_cast<double>(path_length),
+        6.283185307179586476925287)));
     const float amplitude =
         params.wavelength / (4.f * kPi * fmaxf(path_length, kReflEps));
     field = c3_mul_complex(field, c_scale(phase, amplitude));

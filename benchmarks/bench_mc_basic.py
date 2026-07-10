@@ -13,6 +13,10 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
+from tests.support.native_ext import inject_native_paths
+
+inject_native_paths()
+
 from tests.support.scenes import empty_space_los_scene
 from witwin.channel_native.montecarlo.basic import Config, solve
 

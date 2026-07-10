@@ -131,7 +131,10 @@ def test_reduced_munich_native_depth_two_exports_reflection_paths():
     assert result.diagnostics is not None
     assert result.diagnostics["path_planning"]["guardrail_count"] == 0
     assert result.diagnostics["path_planning"]["candidate_count"] < 200_000
-    assert result.diagnostics["native_launch_count"] <= 10
+    # Diffraction chunks receivers to bound the rx x edge-state workspace
+    # (audit P-2), trading a handful of extra launches for city-scale memory
+    # safety; the bound still guards against per-pair launch storms (P-4).
+    assert result.diagnostics["native_launch_count"] <= 24
 
 
 def test_original_munich_worker_timeout_returns_unavailable(monkeypatch):

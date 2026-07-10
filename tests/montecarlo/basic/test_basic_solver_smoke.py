@@ -32,6 +32,22 @@ def test_basic_solver_los_smoke_returns_cuda_result():
     assert result.component_power["diffraction"].item() == 0.0
 
 
+def test_basic_point_receiver_los_is_occluded_by_wall():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic solver")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native visibility is not built")
+
+    from tests.support.scenes import single_wall_reflection_scene
+
+    scene = single_wall_reflection_scene()
+    result = solve(scene, Config(samples=128, seed=7, components={"los"}))
+
+    assert result.path_gain.shape == (1, 1)
+    assert result.path_gain.item() == 0.0
+    assert result.component_power["los"].item() == 0.0
+
+
 def test_basic_solver_does_not_import_python_raydn():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")

@@ -280,7 +280,13 @@ static __forceinline__ __device__ float sample_edge_weight_for_lane(int state_id
     const float edge_length = fmaxf(
         state_edge_t_max_at(state_idx) - state_edge_t_min_at(state_idx),
         0.f);
-    return edge_length / fmaxf(static_cast<float>(sample_count), 1.f);
+    // Lanes are distributed round-robin over states (lane % state_count), so
+    // each state receives sample_count / state_count lanes. The per-lane edge
+    // measure is edge_length / (lanes per state) = edge_length * S / N; using
+    // edge_length / N alone underestimates every multi-edge scene by 1/S.
+    // This matches the point-receiver kernel's edge_length * S / N convention.
+    return edge_length * fmaxf(static_cast<float>(params.state_count), 1.f) /
+           fmaxf(static_cast<float>(sample_count), 1.f);
 }
 
 static __forceinline__ __device__ int state_prim0_at(int idx) {
@@ -487,6 +493,12 @@ static __forceinline__ __device__ utd::PairInputs load_coherent_pair_inputs(int 
     p.face1Material = {params.utd_f1er[sIdx], params.utd_f1mu[sIdx], params.utd_f1sg[sIdx],
                        params.utd_f1g[sIdx], params.utd_f1uf[sIdx], 1.f};
     p.selectStationaryPoint = params.utd_select[sIdx];
+    // The 84-slot table predates the reference header's exact-direct /
+    // edge-caustic fields; preserve the previous semantics (selected states
+    // recompute exactly, spherical first-order spreading) until the slot
+    // layout carries them explicitly.
+    p.directFirstOrder = p.selectStationaryPoint;
+    p.pathLengthPrefix = utd::safe_length(utd::f3_sub(p.edgePos, p.sourcePos));
     return p;
 }
 
@@ -1667,7 +1679,9 @@ static __forceinline__ __device__ void run_diffraction_order1_coherent_accumulat
 
     const float source_distance = fmaxf(norm3(edge_point - source), kDfrEps);
     const float target_distance = fmaxf(norm3(target - edge_point), kDfrEps);
-    const float phase = -params.k * (source_distance + target_distance);
+    const float phase = -static_cast<float>(fmod(
+        static_cast<double>(params.k) * static_cast<double>(source_distance + target_distance),
+        6.283185307179586476925287));
     const float amplitude = sqrtf(fmaxf(contribution, 0.f));
     const float field_re = amplitude * cosf(phase);
     const float field_im = amplitude * sinf(phase);

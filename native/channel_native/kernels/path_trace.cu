@@ -79,6 +79,14 @@ int64_t launch_blocks(int64_t count) {
     return (count + kPathBlockSize - 1) / kPathBlockSize;
 }
 
+
+__device__ float cn_neg_kd_phase(float k, float d) {
+    // Reduce k*d mod 2*pi in double: the f32 product loses ~k*d*2^-24 of
+    // phase, which shifts coherent nulls at mmWave ranges.
+    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), 6.283185307179586476925287);
+    return -static_cast<float>(kd);
+}
+
 __global__ void path_concat_vec3_kernel(
     int64_t count,
     const float* __restrict__ src,
@@ -218,7 +226,7 @@ __global__ void deterministic_los_topology_compact_kernel(
         const float gain = path_gain[index];
         const float amplitude = sqrtf(fmaxf(gain, 0.0f));
         const float wavelength = static_cast<float>(kLightSpeedMetersPerSecond) / frequency_hz;
-        const float phase = -(2.0f * kPi / wavelength) * length;
+        const float phase = cn_neg_kd_phase(2.0f * kPi / wavelength, length);
 
         out_valid[dst] = true;
         out_tx_id[dst] = tx_id[index];
@@ -286,7 +294,7 @@ __global__ void deterministic_los_topology_all_kernel(
         const float gain = path_gain[index];
         const float amplitude = sqrtf(fmaxf(gain, 0.0f));
         const float wavelength = static_cast<float>(kLightSpeedMetersPerSecond) / frequency_hz;
-        const float phase = -(2.0f * kPi / wavelength) * length;
+        const float phase = cn_neg_kd_phase(2.0f * kPi / wavelength, length);
 
         out_valid[index] = true;
         out_tx_id[index] = tx_id[index];

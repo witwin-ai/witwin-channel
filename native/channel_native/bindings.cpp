@@ -23,7 +23,11 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
     pybind11::dict light,
     pybind11::dict intersection,
     torch::Tensor material_gain,
-    torch::Tensor material_valid);
+    torch::Tensor material_valid,
+    torch::Tensor material_eps_r,
+    torch::Tensor material_sigma_e,
+    torch::Tensor material_mu_r,
+    double frequency_hz);
 pybind11::dict cn_bdpt_endpoint_connection_samples(
     pybind11::dict light,
     pybind11::dict sensor,
@@ -180,6 +184,14 @@ pybind11::tuple cn_bdpt_visibility_forward(
     torch::Tensor start,
     torch::Tensor end,
     pybind11::object active,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_trace_reflections_forward(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    int64_t max_bounces,
     std::uintptr_t raydn_module_handle);
 pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     int64_t scene_handle,
@@ -950,6 +962,10 @@ PYBIND11_MODULE(_channel_native, module) {
         "bdpt_visibility_forward",
         &cn_bdpt_visibility_forward,
         "Call RayDN segment visibility through the native C bridge.");
+    module.def(
+        "raydn_trace_reflections_forward",
+        &cn_raydn_trace_reflections_forward,
+        "Call RayDN multibounce reflection chain tracing through the native C bridge.");
     module.def(
         "raydn_reflection_epc_paths_forward",
         &cn_raydn_reflection_epc_paths_forward,

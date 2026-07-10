@@ -46,6 +46,16 @@ extern "C" RAYDN_NATIVE_API int64_t raydn_native_intersect_forward(
     at::Tensor *outputs,
     int64_t output_capacity);
 
+extern "C" RAYDN_NATIVE_API int64_t raydn_native_trace_reflections_forward(
+    int64_t scene_handle,
+    const at::Tensor *ray_o,
+    const at::Tensor *ray_d,
+    const at::Tensor *ray_tmax,
+    const at::Tensor *active,
+    int64_t max_bounces,
+    at::Tensor *outputs,
+    int64_t output_capacity);
+
 extern "C" RAYDN_NATIVE_API int64_t raydn_native_reflection_epc_paths_forward(
     int64_t scene_handle,
     const at::Tensor *source,

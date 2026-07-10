@@ -35,13 +35,15 @@ def test_bdpt_path_export_is_capped_and_schema_stable():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT path export")
 
+    # The deterministic LoS connection table holds tx * rx = 4 unique rows
+    # (audit P-1/P-5), so a cap of 3 must truncate it.
     result = solve(
         empty_space_los_scene(),
-        Config(samples=32, components={"los"}, export_paths=True, max_exported_paths=5),
+        Config(samples=32, components={"los"}, export_paths=True, max_exported_paths=3),
     )
 
     assert isinstance(result.path_samples, BDPTPathSamples)
-    assert result.path_samples.contribution.shape[0] == 5
+    assert result.path_samples.contribution.shape[0] == 3
     assert result.path_samples.contribution.shape[0] == result.path_samples.valid.shape[0]
     assert result.path_samples.valid.dtype == torch.bool
     assert result.path_samples.topology.shape[0] == result.path_samples.contribution.shape[0]
@@ -66,8 +68,10 @@ def test_bdpt_path_export_is_capped_and_schema_stable():
         result.path_samples.mis_weight,
         result.path_samples.valid.to(torch.float32),
     )
+    # Unique (tx, rx) connections in light-major order, truncated by the cap:
+    # tx0->rx0, tx0->rx1, tx1->rx0.
     expected_length = torch.tensor(
-        [5.0, 10.0, 5.0, 10.0, 5.0],
+        [5.0, 10.0, 13.0 ** 0.5],
         device=result.path_samples.path_length_m.device,
         dtype=torch.float32,
     )

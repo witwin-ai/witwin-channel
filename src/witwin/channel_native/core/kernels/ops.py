@@ -128,6 +128,7 @@ _BDPT_SUBPATH_SCHEMA: dict[str, tuple[torch.dtype, tuple[int | None, ...]]] = {
     "rx_id": (torch.int32, (None,)),
     "grid_linear_id": (torch.int32, (None,)),
     "valid": (torch.bool, (None,)),
+    "path_length": (torch.float32, (None,)),
 }
 
 
@@ -266,6 +267,10 @@ def bdpt_reflected_light_subpath_state(
     *,
     material_gain: torch.Tensor,
     material_valid: torch.Tensor,
+    material_eps_r: torch.Tensor,
+    material_sigma_e: torch.Tensor,
+    material_mu_r: torch.Tensor,
+    frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     _validate_bdpt_subpath_state("light", light, None)
     if not isinstance(intersection, dict) or set(intersection) != set(_BDPT_INTERSECTION_FIELDS):
@@ -277,8 +282,20 @@ def bdpt_reflected_light_subpath_state(
     validate_cuda_tensor("intersection.global_prim_id", intersection["global_prim_id"], dtype=torch.int32, ndim=1)
     validate_cuda_tensor("material_gain", material_gain, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_valid", material_valid, dtype=torch.bool, ndim=1)
+    validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("material_sigma_e", material_sigma_e, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
     if int(material_gain.shape[0]) != int(material_valid.shape[0]):
         raise ValueError("material_gain and material_valid must have matching length")
+    for name, tensor in (
+        ("material_eps_r", material_eps_r),
+        ("material_sigma_e", material_sigma_e),
+        ("material_mu_r", material_mu_r),
+    ):
+        if int(tensor.shape[0]) != int(material_gain.shape[0]):
+            raise ValueError(f"{name} must match material_gain length")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
     if material_gain.get_device() != light["origin"].get_device() or material_valid.get_device() != light["origin"].get_device():
         raise ValueError("material tensors must share light device")
     for name in ("t", "p", "n", "global_prim_id"):
@@ -291,6 +308,10 @@ def bdpt_reflected_light_subpath_state(
         intersection,
         material_gain,
         material_valid,
+        material_eps_r,
+        material_sigma_e,
+        material_mu_r,
+        float(frequency_hz),
     )
     _validate_bdpt_subpath_state("_channel_native.bdpt_reflected_light_subpath_state", exported, count)
     return exported
@@ -1606,6 +1627,19 @@ raydn_reflection_accumulation_forward = bdpt_reflection_accumulation_forward
 raydn_diffraction_discover_edges = bdpt_diffraction_discover_edges
 raydn_diffraction_discover_edges_counted = bdpt_diffraction_discover_edges_counted
 raydn_diffraction_accumulation_forward = bdpt_diffraction_accumulation_forward
+
+
+def raydn_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
+    if not args:
+        raise TypeError("raydn_trace_reflections_forward requires a RayDN scene handle")
+    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    out = _required_native_op("raydn_trace_reflections_forward")(
+        *native_args,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)):
+        raise TypeError("_channel_native.raydn_trace_reflections_forward must return a tensor sequence")
+    return tuple(out)
 
 
 def raydn_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]:

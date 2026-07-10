@@ -59,6 +59,10 @@ import json
 import sys
 from pathlib import Path
 
+from tests.support.native_ext import inject_native_paths
+
+inject_native_paths()
+
 from witwin.channel_native import Scene
 from witwin.channel_native.core.edge_policy import EdgePolicy
 

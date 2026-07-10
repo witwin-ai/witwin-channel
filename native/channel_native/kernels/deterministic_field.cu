@@ -79,6 +79,14 @@ __device__ Complex c_make(float r, float i) {
     return {r, i};
 }
 
+/// -k*d reduced mod 2*pi in double precision: the f32 product loses
+/// ~k*d*2^-24 of phase, which shifts coherent multipath nulls at mmWave
+/// ranges (matches the reference cplx_exp_neg_kd convention).
+__device__ float neg_kd_phase(float k, float d) {
+    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), 6.283185307179586476925287);
+    return -static_cast<float>(kd);
+}
+
 __device__ Complex c_add(Complex a, Complex b) {
     return {a.r + b.r, a.i + b.i};
 }
@@ -113,20 +121,47 @@ __device__ Float3 orthogonal_transverse(Float3 direction) {
     return normalize_f3(sub_f3(axis, scale_f3(direction, dot_f3(axis, direction))));
 }
 
-__device__ Complex reflection_coefficient(
-    Float3 incident_direction,
-    Float3 normal,
+struct Complex3 {
+    Complex x;
+    Complex y;
+    Complex z;
+};
+
+__device__ Complex3 c3_zero() {
+    return {c_make(0.0f, 0.0f), c_make(0.0f, 0.0f), c_make(0.0f, 0.0f)};
+}
+
+__device__ Complex3 c3_from_real(Float3 v) {
+    return {c_make(v.x, 0.0f), c_make(v.y, 0.0f), c_make(v.z, 0.0f)};
+}
+
+__device__ Complex3 c3_add(Complex3 a, Complex3 b) {
+    return {c_add(a.x, b.x), c_add(a.y, b.y), c_add(a.z, b.z)};
+}
+
+__device__ Complex3 c3_scale_complex(Float3 v, Complex c) {
+    return {c_scale(c, v.x), c_scale(c, v.y), c_scale(c, v.z)};
+}
+
+__device__ Complex c3_dot_real(Complex3 f, Float3 v) {
+    return c_make(
+        f.x.r * v.x + f.y.r * v.y + f.z.r * v.z,
+        f.x.i * v.x + f.y.i * v.y + f.z.i * v.z);
+}
+
+__device__ float c_abs2(Complex a) {
+    return a.r * a.r + a.i * a.i;
+}
+
+__device__ void fresnel_coefficients(
+    float cos_theta_in,
     float eps_r,
     float sigma_e,
     float mu_r,
-    float gain,
-    float frequency_hz) {
-    Float3 incident = normalize_f3(incident_direction);
-    Float3 n = normalize_f3(normal);
-    if (dot_f3(incident, n) > 0.0f) {
-        n = scale_f3(n, -1.0f);
-    }
-    const float cos_theta = fminf(fmaxf(fabsf(dot_f3(incident, n)), kEps), 1.0f);
+    float frequency_hz,
+    Complex &r_te,
+    Complex &r_tm) {
+    const float cos_theta = fminf(fmaxf(cos_theta_in, kEps), 1.0f);
     const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
     const float omega = fmaxf(2.0f * kPi * frequency_hz, kEps);
     const float eta_r = fmaxf(eps_r, kEps);
@@ -137,23 +172,98 @@ __device__ Complex reflection_coefficient(
     const Complex root = c_sqrt(c_sub(c_mul(mu, eta), c_make(sin2, 0.0f)));
     const Complex mu_cos = c_make(mu_value * cos_theta, 0.0f);
     const Complex eta_cos = c_scale(eta, cos_theta);
-    const Complex r_te = c_div(c_sub(mu_cos, root), c_add(mu_cos, root));
-    const Complex r_tm = c_div(c_sub(eta_cos, root), c_add(eta_cos, root));
+    r_te = c_div(c_sub(mu_cos, root), c_add(mu_cos, root));
+    r_tm = c_div(c_sub(eta_cos, root), c_add(eta_cos, root));
+}
+
+/// Initial transverse polarization: the global x-hat transmit polarization
+/// projected perpendicular to the launch direction.
+__device__ Float3 initial_transverse_polarization(Float3 incident) {
+    const Float3 tx_pol = make_f3(1.0f, 0.0f, 0.0f);
+    Float3 transverse = sub_f3(tx_pol, scale_f3(incident, dot_f3(tx_pol, incident)));
+    const float transverse_norm = norm_f3(transverse);
+    if (transverse_norm > kEps) {
+        return scale_f3(transverse, 1.0f / transverse_norm);
+    }
+    return orthogonal_transverse(incident);
+}
+
+/// Reflect a complex field 3-vector at a planar interface: decompose into
+/// s/p components, apply the Fresnel coefficients, and recompose on the
+/// rotated outgoing basis (mirrors RayDN's epc_field.cu reflect_field_vector).
+__device__ Complex3 reflect_field_vector(
+    Complex3 field,
+    Float3 incident_direction,
+    Float3 normal,
+    float eps_r,
+    float sigma_e,
+    float mu_r,
+    float gain,
+    float frequency_hz,
+    Float3 &reflected_direction) {
+    const Float3 incident = normalize_f3(incident_direction);
+    Float3 n = normalize_f3(normal);
+    if (dot_f3(incident, n) > 0.0f) {
+        n = scale_f3(n, -1.0f);
+    }
+    const float dot_dn = dot_f3(incident, n);
+    reflected_direction = normalize_f3(sub_f3(incident, scale_f3(n, 2.0f * dot_dn)));
 
     Float3 s_hat = cross_f3(n, incident);
     const float s_norm = norm_f3(s_hat);
     const Float3 transverse_basis = orthogonal_transverse(incident);
     s_hat = s_norm > kEps ? scale_f3(s_hat, 1.0f / s_norm) : transverse_basis;
     const Float3 p_in = normalize_f3(cross_f3(s_hat, incident));
-    const Float3 tx_pol = make_f3(1.0f, 0.0f, 0.0f);
-    Float3 transverse = sub_f3(tx_pol, scale_f3(incident, dot_f3(tx_pol, incident)));
-    const float transverse_norm = norm_f3(transverse);
-    transverse = transverse_norm > kEps ? scale_f3(transverse, 1.0f / transverse_norm) : transverse_basis;
+    const Float3 p_out = normalize_f3(cross_f3(s_hat, reflected_direction));
 
-    const Complex e_s = c_make(dot_f3(transverse, s_hat), 0.0f);
-    const Complex e_p = c_make(dot_f3(transverse, p_in), 0.0f);
-    Complex coeff = c_add(c_mul(r_te, e_s), c_mul(r_tm, e_p));
-    return c_scale(coeff, gain);
+    Complex r_te;
+    Complex r_tm;
+    fresnel_coefficients(fabsf(dot_dn), eps_r, sigma_e, mu_r, frequency_hz, r_te, r_tm);
+    const Complex e_s = c3_dot_real(field, s_hat);
+    const Complex e_p = c3_dot_real(field, p_in);
+    Complex3 reflected = c3_add(
+        c3_scale_complex(s_hat, c_mul(r_te, e_s)),
+        c3_scale_complex(p_out, c_mul(r_tm, e_p)));
+    reflected.x = c_scale(reflected.x, gain);
+    reflected.y = c_scale(reflected.y, gain);
+    reflected.z = c_scale(reflected.z, gain);
+    return reflected;
+}
+
+/// Collapse a complex field 3-vector to the exported scalar: total power in
+/// path_gain, and a scalar field carrying the dominant component's phase at
+/// the total amplitude (same convention as the diffraction vector field).
+__device__ void collapse_field_vector(
+    Complex3 field,
+    float &out_real,
+    float &out_imag,
+    float &out_gain) {
+    const float px = c_abs2(field.x);
+    const float py = c_abs2(field.y);
+    const float pz = c_abs2(field.z);
+    const float total = px + py + pz;
+    out_gain = total;
+
+    Complex dominant = field.x;
+    float dominant_power = px;
+    if (py > dominant_power) {
+        dominant_power = py;
+        dominant = field.y;
+    }
+    if (pz > dominant_power) {
+        dominant_power = pz;
+        dominant = field.z;
+    }
+    const float dominant_amplitude = sqrtf(fmaxf(dominant_power, 0.0f));
+    const float total_amplitude = sqrtf(fmaxf(total, 0.0f));
+    if (dominant_amplitude > kEps) {
+        const float scale = total_amplitude / dominant_amplitude;
+        out_real = dominant.r * scale;
+        out_imag = dominant.i * scale;
+    } else {
+        out_real = 0.0f;
+        out_imag = 0.0f;
+    }
 }
 
 __global__ void deterministic_reflection_field_kernel(
@@ -180,26 +290,30 @@ __global__ void deterministic_reflection_field_kernel(
         const Float3 tx = load_f3(tx_position, index);
         const Float3 rx = load_f3(rx_position, index);
         const Float3 hit = load_f3(hit_position, index);
-        Complex coeff = reflection_coefficient(
-            sub_f3(hit, tx),
+        const Float3 incident = normalize_f3(sub_f3(hit, tx));
+        Float3 reflected_direction;
+        Complex3 field_vector = reflect_field_vector(
+            c3_from_real(initial_transverse_polarization(incident)),
+            incident,
             load_f3(normal, index),
             eps_r[index],
             sigma_e[index],
             mu_r[index],
             gain[index],
-            frequency_hz);
+            frequency_hz,
+            reflected_direction);
 
         const float segment0 = norm_f3(sub_f3(hit, tx));
         const float segment1 = norm_f3(sub_f3(rx, hit));
         const float path_length = fmaxf(segment0 + segment1, kEps);
         const float wavelength = kLightSpeed / frequency_hz;
         const float amplitude = sqrtf(fmaxf(tx_power[index], 0.0f)) * (wavelength / (4.0f * kPi)) / path_length;
-        const float phase = -(2.0f * kPi / wavelength) * path_length;
-        const Complex propagation = c_make(cosf(phase), sinf(phase));
-        const Complex field = c_scale(c_mul(coeff, propagation), amplitude);
-        field_real[index] = field.r;
-        field_imag[index] = field.i;
-        path_gain[index] = field.r * field.r + field.i * field.i;
+        const float phase = neg_kd_phase(2.0f * kPi / wavelength, path_length);
+        const Complex scale = c_scale(c_make(cosf(phase), sinf(phase)), amplitude);
+        field_vector.x = c_mul(field_vector.x, scale);
+        field_vector.y = c_mul(field_vector.y, scale);
+        field_vector.z = c_mul(field_vector.z, scale);
+        collapse_field_vector(field_vector, field_real[index], field_imag[index], path_gain[index]);
         path_length_m[index] = path_length;
         delay_s[index] = path_length / kLightSpeed;
     }
@@ -219,7 +333,7 @@ __global__ void deterministic_los_field_kernel(
          index += stride) {
         const float gain = fmaxf(input_path_gain[index], 0.0f);
         const float wavelength = kLightSpeed / frequency_hz;
-        const float phase = -(2.0f * kPi / wavelength) * path_length_m[index];
+        const float phase = neg_kd_phase(2.0f * kPi / wavelength, path_length_m[index]);
         const float amplitude = sqrtf(gain);
         path_gain[index] = input_path_gain[index];
         field_real[index] = amplitude * cosf(phase);
@@ -300,34 +414,42 @@ __global__ void deterministic_reflection_sequence_field_kernel(
         const Float3 tx = load_f3(tx_position, index);
         const Float3 rx = load_f3(rx_position, index);
         Float3 previous = tx;
-        Complex coeff = c_make(1.0f, 0.0f);
+        Complex3 field_vector = c3_zero();
+        bool field_initialized = false;
         float path_length = 0.0f;
         for (int64_t bounce = 0; bounce < depth; ++bounce) {
             const Float3 hit = load_sequence_f3(hit_positions, index, bounce, depth);
             const Float3 segment = sub_f3(hit, previous);
             path_length += norm_f3(segment);
+            const Float3 incident = normalize_f3(segment);
+            if (!field_initialized) {
+                field_vector = c3_from_real(initial_transverse_polarization(incident));
+                field_initialized = true;
+            }
             const int64_t scalar_index = index * depth + bounce;
-            const Complex bounce_coeff = reflection_coefficient(
-                segment,
+            Float3 reflected_direction;
+            field_vector = reflect_field_vector(
+                field_vector,
+                incident,
                 load_sequence_f3(normals, index, bounce, depth),
                 eps_r[scalar_index],
                 sigma_e[scalar_index],
                 mu_r[scalar_index],
                 gain[scalar_index],
-                frequency_hz);
-            coeff = c_mul(coeff, bounce_coeff);
+                frequency_hz,
+                reflected_direction);
             previous = hit;
         }
 
         path_length = fmaxf(path_length + norm_f3(sub_f3(rx, previous)), kEps);
         const float wavelength = kLightSpeed / frequency_hz;
         const float amplitude = sqrtf(fmaxf(tx_power[index], 0.0f)) * (wavelength / (4.0f * kPi)) / path_length;
-        const float phase = -(2.0f * kPi / wavelength) * path_length;
-        const Complex propagation = c_make(cosf(phase), sinf(phase));
-        const Complex field = c_scale(c_mul(coeff, propagation), amplitude);
-        field_real[index] = field.r;
-        field_imag[index] = field.i;
-        path_gain[index] = field.r * field.r + field.i * field.i;
+        const float phase = neg_kd_phase(2.0f * kPi / wavelength, path_length);
+        const Complex scale = c_scale(c_make(cosf(phase), sinf(phase)), amplitude);
+        field_vector.x = c_mul(field_vector.x, scale);
+        field_vector.y = c_mul(field_vector.y, scale);
+        field_vector.z = c_mul(field_vector.z, scale);
+        collapse_field_vector(field_vector, field_real[index], field_imag[index], path_gain[index]);
         path_length_m[index] = path_length;
         delay_s[index] = path_length / kLightSpeed;
     }

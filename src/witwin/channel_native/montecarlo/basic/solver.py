@@ -14,7 +14,7 @@ from witwin.channel_native.core.kernels.ops import (
     mc_zero_matrix,
 )
 
-from .backend import los_path_gain
+from .backend import apply_point_los_visibility, los_path_gain
 from .config import Config
 from .metadata import make_solver_metadata
 from .raydn_components import (
@@ -82,6 +82,8 @@ def solve(scene: Scene, config: Config) -> Result:
     grid = first_receiver_grid(scene)
     if "los" in config.components:
         los = los_path_gain(scene, device=device)
+        if grid is None:
+            los = apply_point_los_visibility(scene, raydn, los, device=device)
         path_count = config.samples
         valid_contribution_count = config.samples
     else:
