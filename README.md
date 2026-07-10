@@ -331,6 +331,6 @@ If you use this work in academic research, please cite:
 
 ## License
 
-All rights reserved. This repository is provided for research use only. For
-commercial use, redistribution, or sublicensing, please contact
-xic063@ucsd.edu.
+Witwin Channel is available under a dual-license model for academic and
+non-commercial research use or commercial and enterprise use. See the
+[Witwin licensing page](https://witwin.ai/license) for the applicable terms.

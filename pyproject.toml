@@ -12,7 +12,8 @@ version = "0.1.0"
 description = "Witwin Channel - Wireless channel simulation (RadioMap & Path/CIR)"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
-license = "MIT"
+license = "LicenseRef-Witwin-Research OR LicenseRef-Witwin-Commercial"
+license-files = ["LICENSE"]
 
 dependencies = [
     "witwin>=0.1,<0.2",
@@ -20,6 +21,9 @@ dependencies = [
     "numpy>=1.24",
     "torch>=2.10,<2.12",
 ]
+
+[project.urls]
+License = "https://witwin.ai/license"
 
 [tool.scikit-build]
 build.verbose = true
