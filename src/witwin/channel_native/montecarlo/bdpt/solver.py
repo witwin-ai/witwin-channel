@@ -673,29 +673,21 @@ def solve(scene: Scene, config: Config) -> Result:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.montecarlo.bdpt requires CUDA")
 
+    grid = first_receiver_grid(scene)
+    if grid is not None and config.receiver_strategy != "grid_area":
+        raise RuntimeError("receiver_strategy='point_sphere' requires point receivers")
+
     info = build_info()
     raydn = scene.raydn_scene()
     raydn_available = bool(info["uses_raydn_native"]) and raydn.available
     reflection_available = raydn_available
     diffraction_available = raydn_available and config.max_diffraction_order > 0
-    if "diffraction" in config.components and config.max_diffraction_order <= 0:
-        raise RuntimeError("diffraction requires max_diffraction_order > 0")
-    if "diffraction" in config.components and config.mis == "none":
-        direct_samples, keller_samples, _suffix = _diffraction_sample_split(_effective_native_samples(config))
-        if _diffraction_strategy_count(direct_samples, keller_samples) > 1:
-            raise RuntimeError(
-                "mis='none' double counts the direct+keller diffraction strategies; "
-                "use mis='balance' or 'power_heuristic'"
-            )
     if "reflection" in config.components and scene.structures and not reflection_available:
         raise RuntimeError("reflection requires RayDN native capability")
     if "diffraction" in config.components and scene.structures and not diffraction_available:
         raise RuntimeError("diffraction requires RayDN native capability")
 
     device = torch.device("cuda")
-    grid = first_receiver_grid(scene)
-    if grid is not None and config.receiver_strategy != "grid_area":
-        raise RuntimeError("receiver_strategy='point_sphere' requires point receivers")
     grid_cells = 0 if grid is None else int(grid.shape[0] * grid.shape[1])
     native_samples = _effective_native_samples(config)
     native_max_depth = _effective_native_depth(config)
@@ -979,6 +971,7 @@ def solve(scene: Scene, config: Config) -> Result:
         workspace_bytes=workspace_bytes,
         variance_enabled=variance is not None,
         launch_count=launch_count,
+        effective_max_depth=native_max_depth,
     )
     edge_policy = resolve_scene_edge_policy(scene)
     metadata["edge_policy"] = {

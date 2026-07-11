@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from witwin.channel_native.core.kernels.metadata import make_metadata
+from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
 
 from .config import Config
 
@@ -57,7 +58,9 @@ def make_solver_metadata(
         raydn_native=reflection_available or diffraction_available,
         ad_status=config.ad_mode if config.ad_mode != "none" else "none",
     )
-    return {
+    requested_config = serialize_config(config)
+    effective_config = dict(requested_config)
+    metadata = {
         "seed": config.seed,
         "samples": config.samples,
         "max_depth": config.max_depth,
@@ -80,3 +83,16 @@ def make_solver_metadata(
         },
         "kernel": kernel_metadata,
     }
+    metadata.update(
+        config_metadata(
+            requested=requested_config,
+            effective=effective_config,
+            component_max_depth={
+                "los": 0 if "los" in config.components else -1,
+                "reflection": config.max_depth if "reflection" in config.components else -1,
+                "diffraction": 1 if "diffraction" in config.components else -1,
+            },
+        )
+    )
+    metadata["semantic_capabilities"] = capabilities()["solvers"]["montecarlo_basic"]
+    return metadata

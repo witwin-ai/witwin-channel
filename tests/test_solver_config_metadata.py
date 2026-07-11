@@ -1,0 +1,118 @@
+from dataclasses import fields
+from types import SimpleNamespace
+
+import pytest
+import torch
+
+from witwin.channel_native import ReceiverGrid
+from witwin.channel_native.deterministic import Config as DeterministicConfig
+from witwin.channel_native.deterministic.solver import _metadata as deterministic_metadata
+from witwin.channel_native.montecarlo.basic import Config as BasicConfig
+from witwin.channel_native.montecarlo.basic.metadata import make_solver_metadata as basic_metadata
+from witwin.channel_native.montecarlo.bdpt import Config as BdptConfig
+from witwin.channel_native.montecarlo.bdpt.metadata import make_solver_metadata as bdpt_metadata
+from witwin.channel_native.montecarlo.bdpt.solver import solve as bdpt_solve
+
+
+def test_deterministic_metadata_reports_effective_component_depths():
+    metadata = deterministic_metadata(
+        config=DeterministicConfig(max_depth=3, components={"los", "reflection"}),
+        native_info={
+            "uses_raydn_native": True,
+            "uses_path_native": True,
+            "cuda_available": True,
+            "optix_available": True,
+        },
+        path_count=2,
+        component_counts={"los": 1, "reflection": 1, "diffraction": 0},
+        launch_count=2,
+    )
+
+    assert metadata["requested_max_depth"] == 3
+    assert metadata["effective_max_depth"] == 3
+    assert metadata["component_max_depth"]["reflection"] == 3
+    assert set(metadata["requested_config"]) == {field.name for field in fields(DeterministicConfig)}
+
+
+def test_deterministic_rejects_depth_above_public_capability_at_config_time():
+    with pytest.raises(RuntimeError, match="max_depth <= 5"):
+        DeterministicConfig(max_depth=6, components={"reflection"})
+
+
+def test_basic_metadata_reports_requested_and_effective_config():
+    metadata = basic_metadata(
+        config=BasicConfig(max_depth=2, components={"reflection"}),
+        path_count=1,
+        valid_contribution_count=1,
+        reflection_available=True,
+        diffraction_available=True,
+    )
+
+    assert metadata["requested_config"] == metadata["effective_config"]
+    assert metadata["component_max_depth"] == {"los": -1, "reflection": 2, "diffraction": -1}
+    assert set(metadata["requested_config"]) == {field.name for field in fields(BasicConfig)}
+
+
+@pytest.mark.parametrize("config_type", [BasicConfig, BdptConfig])
+@pytest.mark.parametrize("component", ["reflection", "diffraction"])
+def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(config_type, component):
+    with pytest.raises(RuntimeError, match="max_depth >= 1"):
+        config_type(max_depth=0, components={component})
+
+
+def test_bdpt_rejects_disabled_diffraction_and_ambiguous_mis_at_config_time():
+    with pytest.raises(RuntimeError, match="max_diffraction_order"):
+        BdptConfig(components={"diffraction"}, max_diffraction_order=0)
+    with pytest.raises(RuntimeError, match="double counts"):
+        BdptConfig(components={"diffraction"}, mis="none", samples=2)
+
+
+def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
+    grid = ReceiverGrid(
+        origin=torch.zeros(3),
+        x_axis=torch.tensor([1.0, 0.0, 0.0]),
+        y_axis=torch.tensor([0.0, 1.0, 0.0]),
+        shape=(1, 1),
+        spacing=(1.0, 1.0),
+    )
+
+    def fail_scene_build():
+        raise AssertionError("raydn_scene must not run for invalid receiver config")
+
+    scene = SimpleNamespace(receivers=[grid], raydn_scene=fail_scene_build)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+
+    with pytest.raises(RuntimeError, match="requires point receivers"):
+        bdpt_solve(
+            scene,
+            BdptConfig(components={"los"}, receiver_strategy="point_sphere"),
+        )
+
+
+def test_bdpt_metadata_exposes_depth_clamp():
+    config = BdptConfig(
+        max_depth=5,
+        max_light_depth=1,
+        max_sensor_depth=1,
+        components={"reflection"},
+    )
+    metadata = bdpt_metadata(
+        config=config,
+        selected_accumulation_strategy="atomic",
+        path_counts_by_strategy={"light": 1, "sensor": 1},
+        valid_contribution_count=1,
+        reflection_available=True,
+        diffraction_available=True,
+        cuda_available=True,
+        optix_available=True,
+        workspace_bytes=0,
+        variance_enabled=False,
+        launch_count=1,
+        effective_max_depth=2,
+    )
+
+    assert metadata["requested_max_depth"] == 5
+    assert metadata["effective_max_depth"] == 2
+    assert metadata["effective_config"]["max_depth"] == 2
+    assert metadata["component_max_depth"]["reflection"] == 2
+    assert set(metadata["requested_config"]) == {field.name for field in fields(BdptConfig)}

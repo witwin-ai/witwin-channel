@@ -23,6 +23,10 @@ class Config:
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(f"components must be a subset of {sorted(_VALID_COMPONENTS)}")
+        if self.max_depth > 1 and components.intersection({"reflection", "diffraction"}):
+            raise RuntimeError(
+                "path reflection and diffraction currently support max_depth <= 1"
+            )
         if self.max_paths is not None and self.max_paths <= 0:
             raise ValueError("max_paths must be positive when set")
         if self.sort_key not in _VALID_SORT_KEYS:

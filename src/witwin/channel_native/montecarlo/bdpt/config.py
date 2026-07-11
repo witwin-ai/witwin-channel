@@ -48,6 +48,19 @@ class Config:
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(f"components must be a non-empty subset of {sorted(_VALID_COMPONENTS)}")
+        if self.max_depth < 1 and components.intersection({"reflection", "diffraction"}):
+            raise RuntimeError("BDPT scattering requires max_depth >= 1")
+        if "diffraction" in components and self.max_diffraction_order == 0:
+            raise RuntimeError("diffraction requires max_diffraction_order > 0")
+        if (
+            "diffraction" in components
+            and self.mis == "none"
+            and self.samples * self.sample_streams >= 2
+        ):
+            raise RuntimeError(
+                "mis='none' double counts the direct+keller diffraction strategies; "
+                "use mis='balance' or 'power_heuristic'"
+            )
         if self.mis not in _VALID_MIS:
             raise ValueError(f"mis must be one of {sorted(_VALID_MIS)}")
         if self.power_heuristic_beta <= 0.0:

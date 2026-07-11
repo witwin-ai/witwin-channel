@@ -5,6 +5,7 @@ from typing import Any
 import torch
 
 from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
@@ -53,7 +54,9 @@ def _metadata(
             raise RuntimeError("deterministic diffraction requires RayDN native capability")
         components["diffraction"] = "enabled"
     raydn_component_enabled = components["reflection"] == "enabled" or components["diffraction"] == "enabled"
-    return {
+    requested_config = serialize_config(config)
+    effective_config = dict(requested_config)
+    metadata = {
         "max_depth": config.max_depth,
         "max_diffraction_order": config.max_diffraction_order,
         "coherent": config.coherent,
@@ -78,6 +81,19 @@ def _metadata(
             ad_status="none",
         ),
     }
+    metadata.update(
+        config_metadata(
+            requested=requested_config,
+            effective=effective_config,
+            component_max_depth={
+                "los": 0 if "los" in config.components else -1,
+                "reflection": config.max_depth if "reflection" in config.components else -1,
+                "diffraction": 1 if "diffraction" in config.components else -1,
+            },
+        )
+    )
+    metadata["semantic_capabilities"] = capabilities()["solvers"]["deterministic"]
+    return metadata
 
 
 def solve(scene: Scene, config: Config) -> Result:

@@ -9,6 +9,7 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.material_runtime import face_material_tensors
+from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
 
 from .config import Config
 from .raydn_export import (
@@ -159,7 +160,11 @@ def _metadata(
         "reflection": reflection_available,
         "diffraction": diffraction_available,
     }
-    return {
+    requested_config = serialize_config(config)
+    effective_max_depth = 1 if config.components.intersection({"reflection", "diffraction"}) else 0
+    effective_config = dict(requested_config)
+    effective_config["max_depth"] = effective_max_depth
+    metadata = {
         "max_depth": config.max_depth,
         "max_paths": config.max_paths,
         "sort_key": config.sort_key,
@@ -181,6 +186,19 @@ def _metadata(
         },
         "kernel": kernel,
     }
+    metadata.update(
+        config_metadata(
+            requested=requested_config,
+            effective=effective_config,
+            component_max_depth={
+                "los": 0 if "los" in config.components else -1,
+                "reflection": 1 if "reflection" in config.components else -1,
+                "diffraction": 1 if "diffraction" in config.components else -1,
+            },
+        )
+    )
+    metadata["semantic_capabilities"] = capabilities()["solvers"]["path"]
+    return metadata
 
 
 def solve(scene: Scene, config: Config) -> Result:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from witwin.channel_native.core.kernels.metadata import make_metadata
+from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
 
 from .config import Config
 
@@ -62,6 +63,7 @@ def make_solver_metadata(
     workspace_bytes: int,
     variance_enabled: bool,
     launch_count: int,
+    effective_max_depth: int,
 ) -> dict[str, Any]:
     raydn_component_enabled = (
         ("reflection" in config.components and reflection_available)
@@ -77,7 +79,10 @@ def make_solver_metadata(
         raydn_native=reflection_available or diffraction_available,
         ad_status="none",
     )
-    return {
+    requested_config = serialize_config(config)
+    effective_config = dict(requested_config)
+    effective_config["max_depth"] = int(effective_max_depth)
+    metadata = {
         "samples": config.samples,
         "seed": config.seed,
         "stream_count": config.sample_streams,
@@ -113,3 +118,16 @@ def make_solver_metadata(
         "ad_status": "none",
         "kernel": kernel_metadata,
     }
+    metadata.update(
+        config_metadata(
+            requested=requested_config,
+            effective=effective_config,
+            component_max_depth={
+                "los": 0 if "los" in config.components else -1,
+                "reflection": int(effective_max_depth) if "reflection" in config.components else -1,
+                "diffraction": min(1, int(effective_max_depth)) if "diffraction" in config.components else -1,
+            },
+        )
+    )
+    metadata["semantic_capabilities"] = capabilities()["solvers"]["montecarlo_bdpt"]
+    return metadata

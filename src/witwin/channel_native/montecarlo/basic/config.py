@@ -37,6 +37,8 @@ class Config:
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(f"components must be a subset of {sorted(_VALID_COMPONENTS)}")
+        if self.max_depth < 1 and components.intersection({"reflection", "diffraction"}):
+            raise RuntimeError("MC basic scattering requires max_depth >= 1")
         if self.accumulation_strategy not in ACCUMULATION_STRATEGIES - {"none"}:
             raise ValueError("accumulation_strategy is not supported for MC basic")
         if self.reflection_accumulation_strategy not in _VALID_REFLECTION_ACCUMULATION_STRATEGIES:

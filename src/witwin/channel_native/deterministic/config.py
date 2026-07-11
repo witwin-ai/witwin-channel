@@ -32,6 +32,8 @@ class Config:
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(f"components must be a non-empty subset of {sorted(_VALID_COMPONENTS)}")
+        if self.max_depth > 5 and "reflection" in components:
+            raise RuntimeError("deterministic reflection currently supports max_depth <= 5")
         if self.max_paths is not None and self.max_paths <= 0:
             raise ValueError("max_paths must be positive when set")
         if self.sort_key not in _VALID_SORT_KEYS:
