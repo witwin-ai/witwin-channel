@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import torch
@@ -9,7 +10,11 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.material_runtime import face_material_tensors
-from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
+from witwin.channel_native.capabilities import (
+    capabilities,
+    config_metadata,
+    serialize_config,
+)
 
 from .config import Config
 from .raydn_export import (
@@ -18,6 +23,7 @@ from .raydn_export import (
     reflection_paths_order1,
 )
 from .result import Result
+from .result_v2 import PathResultV2, from_legacy_result
 
 
 _COMPONENT_ID = {"los": 0, "reflection": 1, "diffraction": 2}
@@ -161,7 +167,9 @@ def _metadata(
         "diffraction": diffraction_available,
     }
     requested_config = serialize_config(config)
-    effective_max_depth = 1 if config.components.intersection({"reflection", "diffraction"}) else 0
+    effective_max_depth = (
+        1 if config.components.intersection({"reflection", "diffraction"}) else 0
+    )
     effective_config = dict(requested_config)
     effective_config["max_depth"] = effective_max_depth
     metadata = {
@@ -212,12 +220,16 @@ def solve(scene: Scene, config: Config) -> Result:
     diffraction_available = bool(info["uses_raydn_native"])
     path_native_available = bool(info.get("uses_path_native", False))
     if not path_native_available:
-        raise RuntimeError("path solver requires _channel_native path native CUDA kernels")
+        raise RuntimeError(
+            "path solver requires _channel_native path native CUDA kernels"
+        )
     if "reflection" in config.components and not reflection_available:
         raise RuntimeError("reflection paths require RayDN native capability")
     if "diffraction" in config.components and not diffraction_available:
         raise RuntimeError("diffraction paths require RayDN native capability")
-    if config.max_depth < 1 and ("reflection" in config.components or "diffraction" in config.components):
+    if config.max_depth < 1 and (
+        "reflection" in config.components or "diffraction" in config.components
+    ):
         raise RuntimeError("requested scattering paths require max_depth >= 1")
 
     if not scene.transmitters:
@@ -236,7 +248,10 @@ def solve(scene: Scene, config: Config) -> Result:
     rx_positions = _receiver_positions(scene, reference=tx_positions)
     material_tensors = (
         face_material_tensors(scene, device=device)
-        if scene.structures and (("reflection" in config.components) or ("diffraction" in config.components))
+        if scene.structures
+        and (
+            ("reflection" in config.components) or ("diffraction" in config.components)
+        )
         else None
     )
     los_block = _empty_path_block(device)
@@ -273,7 +288,11 @@ def solve(scene: Scene, config: Config) -> Result:
             visible,
         )
     reflection_block = _empty_path_block(device)
-    if "reflection" in config.components and reflection_available and config.max_depth >= 1:
+    if (
+        "reflection" in config.components
+        and reflection_available
+        and config.max_depth >= 1
+    ):
         reflection_block = reflection_paths_order1(
             scene,
             compiled.raydn,
@@ -284,7 +303,11 @@ def solve(scene: Scene, config: Config) -> Result:
             material_tensors=material_tensors,
         )
     diffraction_block = _empty_path_block(device)
-    if "diffraction" in config.components and diffraction_available and config.max_depth >= 1:
+    if (
+        "diffraction" in config.components
+        and diffraction_available
+        and config.max_depth >= 1
+    ):
         diffraction_block = diffraction_paths_order1(
             scene,
             compiled.raydn,
@@ -341,3 +364,26 @@ def solve(scene: Scene, config: Config) -> Result:
         metadata=metadata,
         diagnostics=diagnostics,
     )
+
+
+def solve_v2(scene: Scene, config: Config) -> PathResultV2:
+    """Solve and explicitly pack the flat scalar result into PathResultV2."""
+
+    # The V2 contract defines max_paths per endpoint pair. Disable the legacy
+    # global truncation and apply the requested limit during ragged packing.
+    legacy_config = replace(config, max_paths=None)
+    legacy = solve(scene, legacy_config)
+    tx_positions, _tx_power = _transmitter_tensors(scene)
+    rx_positions = _receiver_positions(scene, reference=tx_positions)
+    result = from_legacy_result(
+        legacy,
+        num_rx=int(rx_positions.shape[0]),
+        num_tx=int(tx_positions.shape[0]),
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+        max_paths_per_pair=config.max_paths,
+    )
+    metadata = dict(result.metadata)
+    metadata["requested_max_paths_per_pair"] = config.max_paths
+    metadata["legacy_global_truncation_disabled"] = True
+    return replace(result, metadata=metadata)

@@ -10,8 +10,8 @@ usage remains an explicit migration gate.
 |---|---:|---|---|
 | `Scene/Structure/Transmitter` | 346 | P0 | Supported/partial |
 | `path.solve` | 25 | P0 | Partial: one interaction only |
-| `path.PathResult` | 6 | P0 | Missing until Phase 1 |
-| `cir/cfr/taps/filter_by_type` | 11 | P0 | Missing until Phase 1 |
+| `path.PathResult` | 6 | P0 | `PathResultV2` shape/signals supported; physical coefficient parity pending |
+| `cir/cfr/taps/filter_by_type` | 11 | P0 | Supported by `PathResultV2` |
 | `deterministic.solve` | 5 | P1 | Partial |
 | `Receiver/ReceiverGrid` | 80 | P1 | Partial/supported |
 | `AntennaArray/PlanarArray/ULA/UPA` | 23 | P1/P2 | Missing until Phase 4 |
