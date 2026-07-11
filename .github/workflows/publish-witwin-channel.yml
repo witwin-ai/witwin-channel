@@ -147,7 +147,7 @@ jobs:
           # drjit==1.3.1 come from build-system.requires, CUDA from the toolkit
           # installed above. Pin the SASS/PTX targets so the wheel is GPU-less
           # build safe and broadly loadable.
-          CMAKE_CUDA_ARCHITECTURES: "70-real;75-real;80-real;86-real;89-real;90-real;100-real;101-real;120-real;120-virtual"
+          CMAKE_ARGS: "-DCMAKE_CUDA_ARCHITECTURES=70-real;75-real;80-real;86-real;89-real;90-real;100-real;101-real;120-real;120-virtual"
         run: |
           python -m build --wheel "$PACKAGE_DIR"
 
