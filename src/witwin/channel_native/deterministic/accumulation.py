@@ -181,6 +181,9 @@ def build_path_table(
         ).contiguous(),
         field_real=path_field.real.to(dtype=torch.float32).contiguous(),
         field_imag=path_field.imag.to(dtype=torch.float32).contiguous(),
+        coefficient=paths.coefficient.to(dtype=torch.complex64).contiguous(),
+        field_xyz=paths.field_xyz.to(dtype=torch.complex64).contiguous(),
+        field_direction=paths.field_direction.to(dtype=torch.float32).contiguous(),
         phase_rad=phase,
         interaction_count=paths.depth.to(dtype=torch.int32).contiguous(),
     )

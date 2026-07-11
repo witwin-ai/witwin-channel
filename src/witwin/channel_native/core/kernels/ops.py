@@ -130,6 +130,9 @@ _BDPT_SUBPATH_SCHEMA: dict[str, tuple[torch.dtype, tuple[int | None, ...]]] = {
     "grid_linear_id": (torch.int32, (None,)),
     "valid": (torch.bool, (None,)),
     "path_length": (torch.float32, (None,)),
+    "field_real": (torch.float32, (None, 3)),
+    "field_imag": (torch.float32, (None, 3)),
+    "source_power": (torch.float32, (None,)),
 }
 
 
@@ -215,7 +218,9 @@ def bdpt_empty_subpath_state(reference: torch.Tensor) -> dict[str, torch.Tensor]
 def bdpt_endpoint_subpath_state(
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
     rx_positions: torch.Tensor,
+    rx_polarization: torch.Tensor,
     launch_tx_id: torch.Tensor,
     light_seed: torch.Tensor,
 ) -> dict[str, dict[str, torch.Tensor]]:
@@ -224,18 +229,30 @@ def bdpt_endpoint_subpath_state(
     )
     validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
     validate_cuda_tensor(
+        "tx_polarization", tx_polarization, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
         "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "rx_polarization", rx_polarization, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
     validate_cuda_tensor("launch_tx_id", launch_tx_id, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("light_seed", light_seed, dtype=torch.int64, ndim=1)
     if tx_power.shape != (tx_positions.shape[0],):
         raise ValueError("tx_power must match tx_positions")
+    if tx_polarization.shape != tx_positions.shape:
+        raise ValueError("tx_polarization must match tx_positions")
+    if rx_polarization.shape != rx_positions.shape:
+        raise ValueError("rx_polarization must match rx_positions")
     if light_seed.shape != launch_tx_id.shape:
         raise ValueError("light_seed must match launch_tx_id")
     device = tx_positions.get_device()
     if (
         tx_power.get_device() != device
+        or tx_polarization.get_device() != device
         or rx_positions.get_device() != device
+        or rx_polarization.get_device() != device
         or launch_tx_id.get_device() != device
         or light_seed.get_device() != device
     ):
@@ -243,7 +260,9 @@ def bdpt_endpoint_subpath_state(
     exported = _required_native_op("bdpt_endpoint_subpath_state")(
         tx_positions,
         tx_power,
+        tx_polarization,
         rx_positions,
+        rx_polarization,
         launch_tx_id,
         light_seed,
     )
@@ -314,6 +333,7 @@ def bdpt_reflected_light_subpath_state(
     material_eps_r: torch.Tensor,
     material_sigma_e: torch.Tensor,
     material_mu_r: torch.Tensor,
+    material_thickness: torch.Tensor,
     frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     _validate_bdpt_subpath_state("light", light, None)
@@ -352,12 +372,16 @@ def bdpt_reflected_light_subpath_state(
         "material_sigma_e", material_sigma_e, dtype=torch.float32, ndim=1
     )
     validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor(
+        "material_thickness", material_thickness, dtype=torch.float32, ndim=1
+    )
     if int(material_gain.shape[0]) != int(material_valid.shape[0]):
         raise ValueError("material_gain and material_valid must have matching length")
     for name, tensor in (
         ("material_eps_r", material_eps_r),
         ("material_sigma_e", material_sigma_e),
         ("material_mu_r", material_mu_r),
+        ("material_thickness", material_thickness),
     ):
         if int(tensor.shape[0]) != int(material_gain.shape[0]):
             raise ValueError(f"{name} must match material_gain length")
@@ -366,6 +390,10 @@ def bdpt_reflected_light_subpath_state(
     if (
         material_gain.get_device() != light["origin"].get_device()
         or material_valid.get_device() != light["origin"].get_device()
+        or material_eps_r.get_device() != light["origin"].get_device()
+        or material_sigma_e.get_device() != light["origin"].get_device()
+        or material_mu_r.get_device() != light["origin"].get_device()
+        or material_thickness.get_device() != light["origin"].get_device()
     ):
         raise ValueError("material tensors must share light device")
     for name in ("t", "p", "n", "global_prim_id"):
@@ -381,6 +409,7 @@ def bdpt_reflected_light_subpath_state(
         material_eps_r,
         material_sigma_e,
         material_mu_r,
+        material_thickness,
         float(frequency_hz),
     )
     _validate_bdpt_subpath_state(
@@ -2093,6 +2122,264 @@ def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
         raise ValueError("interaction_positions must have shape (N, 2, 3)")
     if out["interaction_normals"].shape != (count, 2, 3):
         raise ValueError("interaction_normals must have shape (N, 2, 3)")
+    return out
+
+
+def field_free_space(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    for name, value in (
+        ("source", source),
+        ("target", target),
+        ("tx_polarization", tx_polarization),
+        ("rx_polarization", rx_polarization),
+    ):
+        validate_cuda_tensor(
+            name, value, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+        )
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    count = int(source.shape[0])
+    if any(
+        int(value.shape[0]) != count
+        for value in (target, tx_power, tx_polarization, rx_polarization)
+    ):
+        raise ValueError("free-space field tensors must have matching rows")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    out = _required_native_op("field_free_space")(
+        source,
+        target,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.field_free_space must return a dict")
+    schema = {
+        "field_vector": (torch.complex64, 2, (count, 3)),
+        "coefficient": (torch.complex64, 1, (count,)),
+        "path_field": (torch.complex64, 1, (count,)),
+        "path_gain": (torch.float32, 1, (count,)),
+        "path_length_m": (torch.float32, 1, (count,)),
+        "delay_s": (torch.float32, 1, (count,)),
+        "direction": (torch.float32, 2, (count, 3)),
+    }
+    if set(out) != set(schema):
+        raise ValueError("_channel_native.field_free_space returned unexpected fields")
+    for name, (dtype, ndim, shape) in schema.items():
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+        if tuple(out[name].shape) != shape:
+            raise ValueError(f"_channel_native.field_free_space returned bad {name} shape")
+    return out
+
+
+def field_project_complex3(
+    field_vector: torch.Tensor,
+    direction: torch.Tensor,
+    rx_polarization: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("field_vector", field_vector, dtype=torch.complex64, ndim=2)
+    validate_cuda_tensor(
+        "direction", direction, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "rx_polarization",
+        rx_polarization,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    count = int(field_vector.shape[0])
+    if field_vector.shape != (count, 3):
+        raise ValueError("field_vector must have shape (N, 3)")
+    if direction.shape != (count, 3) or rx_polarization.shape != (count, 3):
+        raise ValueError("direction and rx_polarization must match field_vector rows")
+    out = _required_native_op("field_project_complex3")(
+        field_vector, direction, rx_polarization
+    )
+    if not isinstance(out, dict) or set(out) != {"coefficient", "path_gain"}:
+        raise TypeError("_channel_native.field_project_complex3 returned invalid fields")
+    validate_cuda_tensor("coefficient", out["coefficient"], dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("path_gain", out["path_gain"], dtype=torch.float32, ndim=1)
+    if out["coefficient"].shape != (count,) or out["path_gain"].shape != (count,):
+        raise ValueError("field projection returned invalid shapes")
+    return out
+
+
+def field_reflection_sequence(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    eps_r: torch.Tensor,
+    sigma_e: torch.Tensor,
+    mu_r: torch.Tensor,
+    gain: torch.Tensor,
+    thickness: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    for name, value in (
+        ("source", source),
+        ("target", target),
+        ("tx_polarization", tx_polarization),
+        ("rx_polarization", rx_polarization),
+    ):
+        validate_cuda_tensor(
+            name, value, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+        )
+    for name, value in (
+        ("interaction_positions", interaction_positions),
+        ("interaction_normals", interaction_normals),
+    ):
+        validate_cuda_tensor(
+            name, value, dtype=torch.float32, ndim=3, trailing_shape=(3,)
+        )
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    count = int(source.shape[0])
+    depth = int(interaction_positions.shape[1])
+    if interaction_positions.shape != (count, depth, 3) or depth <= 0:
+        raise ValueError("interaction_positions must have shape (N, D, 3), D > 0")
+    if interaction_normals.shape != interaction_positions.shape:
+        raise ValueError("interaction_normals must match interaction_positions")
+    for name, value in (
+        ("eps_r", eps_r),
+        ("sigma_e", sigma_e),
+        ("mu_r", mu_r),
+        ("gain", gain),
+        ("thickness", thickness),
+    ):
+        validate_cuda_tensor(name, value, dtype=torch.float32, ndim=2)
+        if value.shape != (count, depth):
+            raise ValueError(f"{name} must have shape (N, D)")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    out = _required_native_op("field_reflection_sequence")(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        thickness,
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.field_reflection_sequence must return a dict")
+    schema = {
+        "field_vector": (torch.complex64, 2, (count, 3)),
+        "coefficient": (torch.complex64, 1, (count,)),
+        "path_field": (torch.complex64, 1, (count,)),
+        "path_gain": (torch.float32, 1, (count,)),
+        "path_length_m": (torch.float32, 1, (count,)),
+        "delay_s": (torch.float32, 1, (count,)),
+        "direction": (torch.float32, 2, (count, 3)),
+    }
+    if set(out) != set(schema):
+        raise ValueError("field_reflection_sequence returned unexpected fields")
+    for name, (dtype, ndim, shape) in schema.items():
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+        if tuple(out[name].shape) != shape:
+            raise ValueError(f"field_reflection_sequence returned bad {name} shape")
+    return out
+
+
+def field_coupled_rd(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    reflection_position: torch.Tensor,
+    reflection_normal: torch.Tensor,
+    edge_position: torch.Tensor,
+    edge_direction: torch.Tensor,
+    edge_n0: torch.Tensor,
+    edge_n1: torch.Tensor,
+    exterior_angle: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    reflection_material: tuple[torch.Tensor, ...],
+    wedge_material0: tuple[torch.Tensor, ...],
+    wedge_material1: tuple[torch.Tensor, ...],
+    *,
+    frequency_hz: float,
+    reverse: bool,
+) -> dict[str, torch.Tensor]:
+    vectors = (
+        source,
+        target,
+        reflection_position,
+        reflection_normal,
+        edge_position,
+        edge_direction,
+        edge_n0,
+        edge_n1,
+        tx_polarization,
+        rx_polarization,
+    )
+    count = int(source.shape[0])
+    for value in vectors:
+        validate_cuda_tensor(
+            "coupled_vector", value, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+        )
+        if value.shape != (count, 3):
+            raise ValueError("coupled field vector tensors must have shape (N, 3)")
+    if any(len(bundle) != 5 for bundle in (reflection_material, wedge_material0, wedge_material1)):
+        raise ValueError("coupled material bundles must contain eps/sigma/mu/gain/thickness")
+    scalars = (
+        exterior_angle,
+        tx_power,
+        *reflection_material,
+        *wedge_material0,
+        *wedge_material1,
+    )
+    for value in scalars:
+        validate_cuda_tensor("coupled_scalar", value, dtype=torch.float32, ndim=1)
+        if value.shape != (count,):
+            raise ValueError("coupled field scalar tensors must have shape (N,)")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    out = _required_native_op("field_coupled_rd")(
+        *vectors[:8],
+        exterior_angle,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        *reflection_material,
+        *wedge_material0,
+        *wedge_material1,
+        float(frequency_hz),
+        bool(reverse),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.field_coupled_rd must return a dict")
+    schema = {
+        "field_vector": (torch.complex64, 2, (count, 3)),
+        "coefficient": (torch.complex64, 1, (count,)),
+        "path_field": (torch.complex64, 1, (count,)),
+        "path_gain": (torch.float32, 1, (count,)),
+        "direction": (torch.float32, 2, (count, 3)),
+    }
+    if set(out) != set(schema):
+        raise ValueError("field_coupled_rd returned unexpected fields")
+    for name, (dtype, ndim, shape) in schema.items():
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+        if tuple(out[name].shape) != shape:
+            raise ValueError(f"field_coupled_rd returned bad {name} shape")
     return out
 
 

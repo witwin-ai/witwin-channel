@@ -5,7 +5,7 @@ from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel_native.path import solve_v2 as solve_paths
 
 
 def test_single_wedge_diffraction_matches_path_reference():
@@ -85,37 +85,17 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native diffraction is not built")
 
-    result = solve(wedge_diffraction_scene(), Config(components={"diffraction"}, coherent=True, export_paths=True))
+    scene = wedge_diffraction_scene()
+    result = solve(scene, Config(components={"diffraction"}, coherent=True, export_paths=True))
+    reference = solve_paths(scene, PathConfig(components={"diffraction"}))
 
     assert result.paths is not None
     path_field = torch.complex(result.paths.field_real, result.paths.field_imag)
     expected_phase = torch.remainder(-torch.angle(path_field), 2.0 * torch.pi)
-    # Real UTD complex fields (audit DF-1) with the merged shared-edge wedge
-    # record (audit D-6).
-    expected_field_real = torch.tensor(
-        [
-            1.78716931259e-04,
-            -3.69373046851e-05,
-            8.05378658697e-05,
-            8.26043760753e-05,
-        ],
-        device=result.paths.field_real.device,
-        dtype=torch.float32,
-    )
-    expected_field_imag = torch.tensor(
-        [
-            -1.69760358403e-04,
-            2.87007824227e-05,
-            1.47182639921e-04,
-            -7.74830987211e-05,
-        ],
-        device=result.paths.field_imag.device,
-        dtype=torch.float32,
-    )
+    expected_field = reference.a[..., 0][reference.valid]
     assert torch.all(result.paths.valid)
     assert torch.count_nonzero(path_field.abs() > 0.0).item() == result.paths.valid.numel()
-    torch.testing.assert_close(result.paths.field_real, expected_field_real, rtol=5.0e-4, atol=1.0e-7)
-    torch.testing.assert_close(result.paths.field_imag, expected_field_imag, rtol=5.0e-4, atol=1.0e-7)
+    torch.testing.assert_close(path_field, expected_field, rtol=5.0e-4, atol=1.0e-7)
     torch.testing.assert_close(result.paths.path_gain, path_field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
     torch.testing.assert_close(result.paths.phase_rad, expected_phase, rtol=2.0e-4, atol=1.0e-6)
     torch.testing.assert_close(result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10)

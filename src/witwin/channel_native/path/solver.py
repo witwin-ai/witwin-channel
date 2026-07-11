@@ -9,6 +9,7 @@ from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.core.field_state import PHASE_CONVENTION
 from witwin.channel_native.core.path_topology import export_topology
 from witwin.channel_native.capabilities import (
     capabilities,
@@ -199,12 +200,15 @@ def _metadata(
             "diffraction": diffraction_available,
         },
         "kernel": kernel,
+        "field_abi": "complex3_v1",
+        "phase_convention": dict(PHASE_CONVENTION),
+        "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
         "coupled_paths": {
             "requested": config.coupled_paths,
             "geometry": "native_1r1d_reciprocal"
             if config.coupled_paths
             else "not_requested",
-            "coefficient": "unavailable_until_phase_3"
+            "coefficient": "unified_complex3_jones"
             if config.coupled_paths
             else "not_requested",
         },
@@ -249,10 +253,6 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
 
 
 def solve(scene: Scene, config: Config) -> Result:
-    if config.coupled_paths:
-        raise RuntimeError(
-            "coupled_paths require solve_v2 until Phase 3 provides physical complex coefficients"
-        )
     reflection_available, diffraction_available, path_native_available = (
         _validate_runtime(config)
     )
@@ -339,6 +339,6 @@ def solve_v2(scene: Scene, config: Config) -> PathResultV2:
     metadata["requested_max_paths_per_pair"] = config.max_paths
     if config.coupled_paths:
         metadata["coefficient_semantics"] = (
-            "native_scalar_complex_field_with_nan_for_coupled_geometry"
+            "unit_excitation_dimensionless_receiver_projection"
         )
     return replace(result, metadata=metadata)

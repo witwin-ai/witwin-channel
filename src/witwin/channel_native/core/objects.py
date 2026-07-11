@@ -17,6 +17,18 @@ def _as_vector3(name: str, tensor: torch.Tensor) -> torch.Tensor:
     return tensor.to(dtype=torch.float32).contiguous()
 
 
+def _as_polarization(value: torch.Tensor | None) -> torch.Tensor:
+    polarization = (
+        torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
+        if value is None
+        else _as_vector3("polarization", value)
+    )
+    norm = torch.linalg.vector_norm(polarization)
+    if not bool(torch.isfinite(norm)) or float(norm) <= 0.0:
+        raise ValueError("polarization must be finite and non-zero")
+    return (polarization / norm).contiguous()
+
+
 @dataclass(frozen=True, slots=True)
 class Structure:
     vertices: torch.Tensor
@@ -45,17 +57,21 @@ class Structure:
 class Transmitter:
     position: torch.Tensor
     power_w: float = 1.0
+    polarization: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "position", _as_vector3("position", self.position))
+        object.__setattr__(self, "polarization", _as_polarization(self.polarization))
 
 
 @dataclass(frozen=True, slots=True)
 class ReceiverPoint:
     position: torch.Tensor
+    polarization: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "position", _as_vector3("position", self.position))
+        object.__setattr__(self, "polarization", _as_polarization(self.polarization))
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,11 +81,13 @@ class ReceiverGrid:
     y_axis: torch.Tensor
     shape: tuple[int, int]
     spacing: tuple[float, float]
+    polarization: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "origin", _as_vector3("origin", self.origin))
         object.__setattr__(self, "x_axis", _as_vector3("x_axis", self.x_axis))
         object.__setattr__(self, "y_axis", _as_vector3("y_axis", self.y_axis))
+        object.__setattr__(self, "polarization", _as_polarization(self.polarization))
         if len(self.shape) != 2 or self.shape[0] <= 0 or self.shape[1] <= 0:
             raise ValueError("shape must be two positive integers")
         if len(self.spacing) != 2 or self.spacing[0] <= 0.0 or self.spacing[1] <= 0.0:

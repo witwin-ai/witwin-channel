@@ -27,6 +27,9 @@ class PathTable:
     interaction_normals: torch.Tensor
     field_real: torch.Tensor
     field_imag: torch.Tensor
+    coefficient: torch.Tensor
+    field_xyz: torch.Tensor
+    field_direction: torch.Tensor
     phase_rad: torch.Tensor
     interaction_count: torch.Tensor
 

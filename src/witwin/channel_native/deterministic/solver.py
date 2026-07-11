@@ -12,6 +12,7 @@ from witwin.channel_native.capabilities import (
 )
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
+from witwin.channel_native.core.field_state import PHASE_CONVENTION
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
 
 from .accumulation import accumulate_path_result, build_path_table
@@ -99,6 +100,9 @@ def _metadata(
             raydn_native=capability["raydn_native"],
             ad_status="none",
         ),
+        "field_abi": "complex3_v1",
+        "phase_convention": dict(PHASE_CONVENTION),
+        "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
     }
     metadata.update(
         config_metadata(

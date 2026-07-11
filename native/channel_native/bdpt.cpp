@@ -14,11 +14,12 @@ pybind11::tuple tensor_vector_to_tuple(const std::vector<at::Tensor>& tensors) {
 }
 
 pybind11::dict subpath_state_to_dict(const std::vector<at::Tensor>& tensors, const char* name) {
-    TORCH_CHECK(tensors.size() == 15, name, " native result must contain 15 tensors");
-    static constexpr std::array<const char*, 15> kFields = {
+    TORCH_CHECK(tensors.size() == 18, name, " native result must contain 18 tensors");
+    static constexpr std::array<const char*, 18> kFields = {
         "origin", "direction", "throughput_real", "throughput_imag", "pdf_forward",
         "pdf_reverse", "depth", "component_mask", "primitive_id", "edge_id",
         "tx_id", "rx_id", "grid_linear_id", "valid", "path_length",
+        "field_real", "field_imag", "source_power",
     };
     pybind11::dict out;
     for (size_t index = 0; index < kFields.size(); ++index) {
@@ -89,9 +90,11 @@ std::vector<at::Tensor> cn_bdpt_empty_subpath_state_cuda(at::Tensor reference);
 std::vector<at::Tensor> cn_bdpt_light_endpoint_subpath_state_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
+    at::Tensor tx_polarization,
     at::Tensor launch_tx_id,
     at::Tensor light_seed);
-std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(at::Tensor rx_positions);
+std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(
+    at::Tensor rx_positions, at::Tensor rx_polarization);
 std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor light_origin,
     at::Tensor light_direction,
@@ -106,6 +109,9 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor light_grid_linear_id,
     at::Tensor light_valid,
     at::Tensor light_path_length,
+    at::Tensor light_field_real,
+    at::Tensor light_field_imag,
+    at::Tensor light_source_power,
     at::Tensor hit_t,
     at::Tensor hit_p,
     at::Tensor hit_n,
@@ -115,6 +121,7 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
     at::Tensor material_mu_r,
+    at::Tensor material_thickness,
     double frequency_hz);
 
 at::Tensor cn_bdpt_mis_weights_cuda(
@@ -139,6 +146,9 @@ cn_bdpt_endpoint_connection_samples_cuda(
     at::Tensor light_origin,
     at::Tensor light_direction,
     at::Tensor light_throughput_real,
+    at::Tensor light_field_real,
+    at::Tensor light_field_imag,
+    at::Tensor light_source_power,
     at::Tensor light_pdf_forward,
     at::Tensor light_depth,
     at::Tensor light_component_mask,
@@ -146,6 +156,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
     at::Tensor light_valid,
     at::Tensor light_path_length,
     at::Tensor sensor_origin,
+    at::Tensor sensor_field_real,
     at::Tensor sensor_pdf_reverse,
     at::Tensor sensor_depth,
     at::Tensor sensor_rx_id,
@@ -515,15 +526,18 @@ pybind11::dict cn_bdpt_empty_subpath_state(torch::Tensor reference) {
 pybind11::dict cn_bdpt_endpoint_subpath_state(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
     torch::Tensor rx_positions,
+    torch::Tensor rx_polarization,
     torch::Tensor launch_tx_id,
     torch::Tensor light_seed) {
     pybind11::dict out;
     out["light"] = subpath_state_to_dict(
-        cn_bdpt_light_endpoint_subpath_state_cuda(tx_positions, tx_power, launch_tx_id, light_seed),
+        cn_bdpt_light_endpoint_subpath_state_cuda(
+            tx_positions, tx_power, tx_polarization, launch_tx_id, light_seed),
         "bdpt_light_endpoint_subpath_state");
     out["sensor"] = subpath_state_to_dict(
-        cn_bdpt_sensor_endpoint_subpath_state_cuda(rx_positions),
+        cn_bdpt_sensor_endpoint_subpath_state_cuda(rx_positions, rx_polarization),
         "bdpt_sensor_endpoint_subpath_state");
     return out;
 }
@@ -559,6 +573,7 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
     torch::Tensor material_eps_r,
     torch::Tensor material_sigma_e,
     torch::Tensor material_mu_r,
+    torch::Tensor material_thickness,
     double frequency_hz) {
     return subpath_state_to_dict(
         cn_bdpt_reflected_light_subpath_state_cuda(
@@ -575,6 +590,9 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
             tensor_from_dict(light, "grid_linear_id"),
             tensor_from_dict(light, "valid"),
             tensor_from_dict(light, "path_length"),
+            tensor_from_dict(light, "field_real"),
+            tensor_from_dict(light, "field_imag"),
+            tensor_from_dict(light, "source_power"),
             tensor_from_dict(intersection, "t"),
             tensor_from_dict(intersection, "p"),
             tensor_from_dict(intersection, "n"),
@@ -584,6 +602,7 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
             material_eps_r,
             material_sigma_e,
             material_mu_r,
+            material_thickness,
             frequency_hz),
         "bdpt_reflected_light_subpath_state");
 }
@@ -609,6 +628,9 @@ pybind11::dict cn_bdpt_endpoint_connection_samples(
         tensor_from_dict(light, "origin"),
         tensor_from_dict(light, "direction"),
         tensor_from_dict(light, "throughput_real"),
+        tensor_from_dict(light, "field_real"),
+        tensor_from_dict(light, "field_imag"),
+        tensor_from_dict(light, "source_power"),
         tensor_from_dict(light, "pdf_forward"),
         tensor_from_dict(light, "depth"),
         tensor_from_dict(light, "component_mask"),
@@ -616,6 +638,7 @@ pybind11::dict cn_bdpt_endpoint_connection_samples(
         tensor_from_dict(light, "valid"),
         tensor_from_dict(light, "path_length"),
         tensor_from_dict(sensor, "origin"),
+        tensor_from_dict(sensor, "field_real"),
         tensor_from_dict(sensor, "pdf_reverse"),
         tensor_from_dict(sensor, "depth"),
         tensor_from_dict(sensor, "rx_id"),

@@ -6,9 +6,8 @@ from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.core import path_topology as topology
-from witwin.channel_native.deterministic.field import reflection_complex_field
 from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel_native.path import solve_v2 as solve_paths
 
 
 def test_single_plane_reflection_matches_path_reference():
@@ -32,42 +31,18 @@ def test_single_plane_reflection_matches_path_reference():
     assert result.paths is not None
     assert result.paths.valid.numel() == reference.valid.numel()
     torch.testing.assert_close(
-        result.paths.path_length_m, reference.path_length_m, rtol=1.0e-5, atol=1.0e-8
+        result.paths.path_length_m,
+        reference.tau[reference.valid] * 299_792_458.0,
+        rtol=1.0e-5,
+        atol=1.0e-8,
     )
-    tx_position = (
-        scene.transmitters[0]
-        .position.to(device="cuda", dtype=torch.float32)
-        .expand(result.paths.valid.numel(), 3)
-    )
-    rx_position = (
-        scene.receivers[0]
-        .position.to(device="cuda", dtype=torch.float32)
-        .expand(result.paths.valid.numel(), 3)
-    )
-    expected_gain, _expected_field = reflection_complex_field(
-        tx_position=tx_position.contiguous(),
-        rx_position=rx_position.contiguous(),
-        hit_position=result.paths.interaction_position.contiguous(),
-        normal=result.paths.interaction_normal.contiguous(),
-        tx_power_w=torch.ones(
-            (result.paths.valid.numel(),), device="cuda", dtype=torch.float32
-        ),
-        eps_r=torch.full(
-            (result.paths.valid.numel(),), 4.0, device="cuda", dtype=torch.float32
-        ),
-        sigma_e=torch.full(
-            (result.paths.valid.numel(),), 0.01, device="cuda", dtype=torch.float32
-        ),
-        mu_r=torch.ones(
-            (result.paths.valid.numel(),), device="cuda", dtype=torch.float32
-        ),
-        gain=torch.ones(
-            (result.paths.valid.numel(),), device="cuda", dtype=torch.float32
-        ),
-        frequency_hz=float(scene.frequency),
-    )
+    expected_field = reference.a[..., 0][reference.valid]
+    expected_gain = expected_field.abs().square()
     torch.testing.assert_close(
         result.paths.path_gain, expected_gain, rtol=5.0e-4, atol=1.0e-10
+    )
+    torch.testing.assert_close(
+        result.paths.coefficient, expected_field, rtol=5.0e-4, atol=1.0e-7
     )
     torch.testing.assert_close(
         result.path_gain.reshape(-1).sum(),

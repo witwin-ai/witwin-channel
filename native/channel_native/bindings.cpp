@@ -15,7 +15,9 @@ pybind11::dict cn_bdpt_empty_subpath_state(torch::Tensor reference);
 pybind11::dict cn_bdpt_endpoint_subpath_state(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
     torch::Tensor rx_positions,
+    torch::Tensor rx_polarization,
     torch::Tensor launch_tx_id,
     torch::Tensor light_seed);
 pybind11::dict cn_bdpt_subpath_intersection_inputs(pybind11::dict subpath);
@@ -27,6 +29,7 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
     torch::Tensor material_eps_r,
     torch::Tensor material_sigma_e,
     torch::Tensor material_mu_r,
+    torch::Tensor material_thickness,
     double frequency_hz);
 pybind11::dict cn_bdpt_endpoint_connection_samples(
     pybind11::dict light,
@@ -224,6 +227,61 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     torch::Tensor surface_group_members,
     bool reverse,
     std::uintptr_t raydn_module_handle);
+pybind11::dict cn_field_free_space(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    double frequency_hz);
+pybind11::dict cn_field_project_complex3(
+    torch::Tensor field_vector,
+    torch::Tensor direction,
+    torch::Tensor rx_polarization);
+pybind11::dict cn_field_reflection_sequence(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    torch::Tensor thickness,
+    double frequency_hz);
+pybind11::dict cn_field_coupled_rd(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor reflection_position,
+    torch::Tensor reflection_normal,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
+    torch::Tensor exterior_angle,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor reflection_eps_r,
+    torch::Tensor reflection_sigma_e,
+    torch::Tensor reflection_mu_r,
+    torch::Tensor reflection_gain,
+    torch::Tensor reflection_thickness,
+    torch::Tensor wedge_eps_r0,
+    torch::Tensor wedge_sigma_e0,
+    torch::Tensor wedge_mu_r0,
+    torch::Tensor wedge_gain0,
+    torch::Tensor wedge_thickness0,
+    torch::Tensor wedge_eps_r1,
+    torch::Tensor wedge_sigma_e1,
+    torch::Tensor wedge_mu_r1,
+    torch::Tensor wedge_gain1,
+    torch::Tensor wedge_thickness1,
+    double frequency_hz,
+    bool reverse);
 pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -1011,6 +1069,22 @@ PYBIND11_MODULE(_channel_native, module) {
         "raydn_coupled_rd_geometry_forward",
         &cn_raydn_coupled_rd_geometry_forward,
         "Construct one-reflection/one-diffraction geometry with RayDN EPC and visibility; no field coefficient is evaluated.");
+    module.def(
+        "field_free_space",
+        &cn_field_free_space,
+        "Evaluate the canonical complex3 free-space field and receiver projection.");
+    module.def(
+        "field_project_complex3",
+        &cn_field_project_complex3,
+        "Project a world-Cartesian complex3 field onto a receiver polarization.");
+    module.def(
+        "field_reflection_sequence",
+        &cn_field_reflection_sequence,
+        "Transport a canonical complex3 field through a finite-slab reflection sequence.");
+    module.def(
+        "field_coupled_rd",
+        &cn_field_coupled_rd,
+        "Transport a canonical complex3 field through coupled R-D or D-R events.");
     module.def(
         "bdpt_reflection_accumulation_forward",
         &cn_bdpt_reflection_accumulation_forward,

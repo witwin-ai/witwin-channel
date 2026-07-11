@@ -23,6 +23,20 @@ def test_public_scene_objects_capture_structured_inputs():
     assert scene.transmitters == (transmitter,)
     assert scene.receivers == (receiver,)
     assert scene.frequency == 3.5e9
+    torch.testing.assert_close(transmitter.polarization, torch.tensor([0.0, 0.0, 1.0]))
+    torch.testing.assert_close(receiver.polarization, torch.tensor([0.0, 0.0, 1.0]))
+
+
+def test_scene_endpoints_normalize_explicit_polarization():
+    tx = Transmitter(
+        position=torch.zeros(3), polarization=torch.tensor([2.0, 0.0, 0.0])
+    )
+    rx = ReceiverPoint(
+        position=torch.ones(3), polarization=torch.tensor([0.0, -3.0, 0.0])
+    )
+
+    torch.testing.assert_close(tx.polarization, torch.tensor([1.0, 0.0, 0.0]))
+    torch.testing.assert_close(rx.polarization, torch.tensor([0.0, -1.0, 0.0]))
 
 
 def test_receiver_grid_expands_points_in_row_major_order():

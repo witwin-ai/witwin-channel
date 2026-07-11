@@ -7,7 +7,8 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.core import path_topology as topology
-from witwin.channel_native.deterministic.field import reflection_sequence_complex_field
+from witwin.channel_native.path import Config as PathConfig
+from witwin.channel_native.path import solve_v2 as solve_paths
 
 
 def test_multibounce_sort_order_uses_full_primitive_sequence():
@@ -153,11 +154,15 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native reflection is not built")
 
+    scene = two_wall_multibounce_scene()
     result = solve(
-        two_wall_multibounce_scene(),
+        scene,
         Config(
             components={"reflection"}, max_depth=2, coherent=True, export_paths=True
         ),
+    )
+    reference = solve_paths(
+        scene, PathConfig(components={"reflection"}, max_depth=2)
     )
 
     assert result.paths is not None
@@ -180,44 +185,18 @@ def test_two_bounce_reflection_exports_depth_two_fields():
         device=result.paths.path_length_m.device,
         dtype=torch.float32,
     )
-    expected_gain_all = torch.tensor(
-        [
-            2.86288468487e-07,
-            7.80931770805e-07,
-            7.51952455857e-08,
-        ],
-        device=result.paths.path_gain.device,
-        dtype=torch.float32,
-    )
-    expected_field_real_all = torch.tensor(
-        [
-            3.67839857063e-05,
-            -0.000874996883795,
-            0.000266907445621,
-        ],
-        device=result.paths.field_real.device,
-        dtype=torch.float32,
-    )
-    expected_field_imag_all = torch.tensor(
-        [
-            0.000533793412615,
-            0.000123742487631,
-            -6.28940615570e-05,
-        ],
-        device=result.paths.field_imag.device,
-        dtype=torch.float32,
-    )
     torch.testing.assert_close(
         result.paths.path_length_m, expected_length_all, rtol=1.0e-5, atol=1.0e-6
     )
+    expected_field = reference.a[..., 0][reference.valid]
     torch.testing.assert_close(
-        result.paths.path_gain, expected_gain_all, rtol=5.0e-4, atol=1.0e-10
+        result.paths.coefficient, expected_field, rtol=5.0e-4, atol=1.0e-7
     )
     torch.testing.assert_close(
-        result.paths.field_real, expected_field_real_all, rtol=5.0e-4, atol=1.0e-8
-    )
-    torch.testing.assert_close(
-        result.paths.field_imag, expected_field_imag_all, rtol=5.0e-4, atol=1.0e-8
+        result.paths.path_gain,
+        expected_field.abs().square(),
+        rtol=5.0e-4,
+        atol=1.0e-10,
     )
     depth_two = result.paths.depth == 2
     assert bool(depth_two.any())
@@ -244,44 +223,6 @@ def test_two_bounce_reflection_exports_depth_two_fields():
         rtol=2.0e-4,
         atol=1.0e-10,
     )
-    scene = two_wall_multibounce_scene()
-    path_count = int(depth_two.sum().item())
-    material_sequence = result.paths.material_sequence[depth_two, :2]
-    eps_r = torch.where(
-        material_sequence == 0,
-        torch.tensor(3.0, device=material_sequence.device, dtype=torch.float32),
-        torch.tensor(4.0, device=material_sequence.device, dtype=torch.float32),
-    )
-    sigma_e = torch.where(
-        material_sequence == 0,
-        torch.tensor(0.005, device=material_sequence.device, dtype=torch.float32),
-        torch.tensor(0.01, device=material_sequence.device, dtype=torch.float32),
-    )
-    expected_gain, expected_field, expected_length = reflection_sequence_complex_field(
-        tx_position=scene.transmitters[0]
-        .position.to(device="cuda", dtype=torch.float32)
-        .expand(path_count, 3)
-        .contiguous(),
-        rx_position=scene.receivers[0]
-        .position.to(device="cuda", dtype=torch.float32)
-        .expand(path_count, 3)
-        .contiguous(),
-        hit_positions=result.paths.interaction_positions[depth_two, :2].contiguous(),
-        normals=result.paths.interaction_normals[depth_two, :2].contiguous(),
-        tx_power_w=torch.ones((path_count,), device="cuda", dtype=torch.float32),
-        eps_r=eps_r,
-        sigma_e=sigma_e,
-        mu_r=torch.ones((path_count, 2), device="cuda", dtype=torch.float32),
-        gain=torch.ones((path_count, 2), device="cuda", dtype=torch.float32),
-        frequency_hz=float(scene.frequency),
-    )
-    torch.testing.assert_close(
-        result.paths.path_length_m[depth_two], expected_length, rtol=1.0e-5, atol=1.0e-6
-    )
-    torch.testing.assert_close(
-        result.paths.path_gain[depth_two], expected_gain, rtol=5.0e-4, atol=1.0e-10
-    )
-    torch.testing.assert_close(path_field, expected_field, rtol=5.0e-4, atol=1.0e-7)
     torch.testing.assert_close(
         result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10
     )

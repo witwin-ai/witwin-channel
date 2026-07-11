@@ -5,6 +5,40 @@ import math
 from witwin.channel_native.core.kernels import ops
 
 
+def _endpoint_subpath_state(
+    tx_positions: torch.Tensor,
+    tx_power: torch.Tensor,
+    rx_positions: torch.Tensor,
+    launch_tx_id: torch.Tensor,
+    light_seed: torch.Tensor,
+) -> dict[str, dict[str, torch.Tensor]]:
+    tx_polarization = torch.zeros_like(tx_positions)
+    tx_polarization[:, 2] = 1.0
+    rx_polarization = torch.zeros_like(rx_positions)
+    rx_polarization[:, 2] = 1.0
+    return ops.bdpt_endpoint_subpath_state(
+        tx_positions,
+        tx_power,
+        tx_polarization,
+        rx_positions,
+        rx_polarization,
+        launch_tx_id,
+        light_seed,
+    )
+
+
+def _complete_subpath_field_state(
+    state: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    count = int(state["origin"].shape[0])
+    field_real = torch.zeros((count, 3), device="cuda", dtype=torch.float32)
+    field_real[:, 2] = 1.0
+    state["field_real"] = field_real
+    state["field_imag"] = torch.zeros_like(field_real)
+    state["source_power"] = state["throughput_real"].square()
+    return state
+
+
 def test_bdpt_launch_state_validates_cuda_reference():
     reference = torch.zeros((1, 3), dtype=torch.float32)
 
@@ -84,6 +118,9 @@ def test_bdpt_empty_subpath_state_returns_native_schema():
         "grid_linear_id": ((0,), torch.int32),
         "valid": ((0,), torch.bool),
         "path_length": ((0,), torch.float32),
+        "field_real": ((0, 3), torch.float32),
+        "field_imag": ((0, 3), torch.float32),
+        "source_power": ((0,), torch.float32),
     }
     assert set(state) == set(expected)
     for name, (shape, dtype) in expected.items():
@@ -111,12 +148,15 @@ def test_bdpt_endpoint_subpath_state_generates_native_light_and_sensor_endpoints
     launch_tx_id = torch.tensor([0, 1, 0], device="cuda", dtype=torch.int32)
     light_seed = torch.tensor([11, 22, 33], device="cuda", dtype=torch.int64)
 
-    endpoints = ops.bdpt_endpoint_subpath_state(tx_positions, tx_power, rx_positions, launch_tx_id, light_seed)
+    endpoints = _endpoint_subpath_state(tx_positions, tx_power, rx_positions, launch_tx_id, light_seed)
 
     light = endpoints["light"]
     sensor = endpoints["sensor"]
     torch.testing.assert_close(light["origin"], tx_positions[launch_tx_id.to(torch.long)])
-    torch.testing.assert_close(light["throughput_real"], torch.tensor([10.0, 20.0, 10.0], device="cuda"))
+    torch.testing.assert_close(
+        light["throughput_real"],
+        torch.tensor([10.0, 20.0, 10.0], device="cuda").sqrt(),
+    )
     torch.testing.assert_close(
         light["pdf_forward"],
         torch.full((3,), 0.07957747154594767, device="cuda"),
@@ -149,21 +189,21 @@ def test_bdpt_endpoint_subpath_state_uses_launch_seeded_light_directions():
     second_launch = ops.bdpt_launch_state(tx_positions, tx_count=1, samples=4, sample_streams=1, seed=101)
     changed_launch = ops.bdpt_launch_state(tx_positions, tx_count=1, samples=4, sample_streams=1, seed=102)
 
-    first = ops.bdpt_endpoint_subpath_state(
+    first = _endpoint_subpath_state(
         tx_positions,
         tx_power,
         rx_positions,
         first_launch["tx_id"],
         first_launch["light_seed"],
     )
-    second = ops.bdpt_endpoint_subpath_state(
+    second = _endpoint_subpath_state(
         tx_positions,
         tx_power,
         rx_positions,
         second_launch["tx_id"],
         second_launch["light_seed"],
     )
-    changed = ops.bdpt_endpoint_subpath_state(
+    changed = _endpoint_subpath_state(
         tx_positions,
         tx_power,
         rx_positions,
@@ -199,6 +239,7 @@ def test_bdpt_reflected_light_subpath_state_uses_native_hit_geometry():
         "valid": torch.tensor([True], device="cuda", dtype=torch.bool),
         "path_length": torch.tensor([0.0], device="cuda", dtype=torch.float32),
     }
+    light = _complete_subpath_field_state(light)
     intersection = {
         "t": torch.tensor([1.0], device="cuda", dtype=torch.float32),
         "p": torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
@@ -220,6 +261,7 @@ def test_bdpt_reflected_light_subpath_state_uses_native_hit_geometry():
         material_eps_r=torch.ones((8,), device="cuda", dtype=torch.float32),
         material_sigma_e=torch.full((8,), 1.0e14, device="cuda", dtype=torch.float32),
         material_mu_r=torch.ones((8,), device="cuda", dtype=torch.float32),
+        material_thickness=torch.full((8,), 0.1, device="cuda", dtype=torch.float32),
         frequency_hz=3.0e9,
     )
 
@@ -261,6 +303,7 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
         "valid": torch.tensor([True, True], device="cuda", dtype=torch.bool),
         "path_length": torch.tensor([0.0, 0.0], device="cuda", dtype=torch.float32),
     }
+    light = _complete_subpath_field_state(light)
     intersection = {
         "t": torch.tensor([1.0, 1.0], device="cuda", dtype=torch.float32),
         "p": torch.tensor([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
@@ -284,6 +327,7 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
         material_eps_r=torch.ones((2,), device="cuda", dtype=torch.float32),
         material_sigma_e=torch.full((2,), 1.0e14, device="cuda", dtype=torch.float32),
         material_mu_r=torch.ones((2,), device="cuda", dtype=torch.float32),
+        material_thickness=torch.full((2,), 0.1, device="cuda", dtype=torch.float32),
         frequency_hz=3.0e9,
     )
 
@@ -301,7 +345,7 @@ def test_bdpt_subpath_intersection_inputs_expose_native_raydn_ray_schema():
     rx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     launch_tx_id = torch.tensor([0, 1], device="cuda", dtype=torch.int32)
     light_seed = torch.tensor([11, 22], device="cuda", dtype=torch.int64)
-    light = ops.bdpt_endpoint_subpath_state(tx_positions, tx_power, rx_positions, launch_tx_id, light_seed)["light"]
+    light = _endpoint_subpath_state(tx_positions, tx_power, rx_positions, launch_tx_id, light_seed)["light"]
 
     inputs = ops.bdpt_subpath_intersection_inputs(light)
 
@@ -335,6 +379,7 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
         "valid": torch.tensor([True], device="cuda", dtype=torch.bool),
         "path_length": torch.tensor([0.0], device="cuda", dtype=torch.float32),
     }
+    light = _complete_subpath_field_state(light)
     intersection = {
         "t": torch.tensor([1.0], device="cuda", dtype=torch.float32),
         "p": torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
@@ -355,6 +400,7 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
         material_eps_r=torch.ones((1,), device="cuda", dtype=torch.float32),
         material_sigma_e=torch.full((1,), 1.0e14, device="cuda", dtype=torch.float32),
         material_mu_r=torch.ones((1,), device="cuda", dtype=torch.float32),
+        material_thickness=torch.full((1,), 0.1, device="cuda", dtype=torch.float32),
         frequency_hz=3.0e9,
     )
     sensor = ops.bdpt_empty_subpath_state(light["origin"])
@@ -373,6 +419,9 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
     sensor["grid_linear_id"] = torch.tensor([5], device="cuda", dtype=torch.int32)
     sensor["valid"] = torch.tensor([True], device="cuda", dtype=torch.bool)
     sensor["path_length"] = torch.tensor([0.0], device="cuda", dtype=torch.float32)
+    sensor["field_real"] = torch.tensor([[0.0, 0.0, 1.0]], device="cuda")
+    sensor["field_imag"] = torch.zeros((1, 3), device="cuda")
+    sensor["source_power"] = torch.zeros((1,), device="cuda")
 
     samples = ops.bdpt_endpoint_connection_samples(
         reflected,
@@ -405,7 +454,7 @@ def test_bdpt_endpoint_connection_samples_emit_native_connection_schema():
     launch_tx_id = torch.tensor([0, 1], device="cuda", dtype=torch.int32)
     light_seed = torch.tensor([11, 22], device="cuda", dtype=torch.int64)
 
-    endpoints = ops.bdpt_endpoint_subpath_state(tx_positions, tx_power, rx_positions, launch_tx_id, light_seed)
+    endpoints = _endpoint_subpath_state(tx_positions, tx_power, rx_positions, launch_tx_id, light_seed)
     samples = ops.bdpt_endpoint_connection_samples(
         endpoints["light"],
         endpoints["sensor"],
@@ -457,7 +506,7 @@ def test_bdpt_filter_connection_samples_applies_native_visibility_mask():
     tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    endpoints = ops.bdpt_endpoint_subpath_state(
+    endpoints = _endpoint_subpath_state(
         tx_positions,
         tx_power,
         rx_positions,
@@ -493,8 +542,8 @@ def test_bdpt_concat_connection_samples_concatenates_native_blocks():
     launch_tx_id = torch.tensor([0], device="cuda", dtype=torch.int32)
     light_seed = torch.tensor([11], device="cuda", dtype=torch.int64)
 
-    first_endpoints = ops.bdpt_endpoint_subpath_state(tx_positions, tx_power, first_rx, launch_tx_id, light_seed)
-    second_endpoints = ops.bdpt_endpoint_subpath_state(tx_positions, tx_power, second_rx, launch_tx_id, light_seed)
+    first_endpoints = _endpoint_subpath_state(tx_positions, tx_power, first_rx, launch_tx_id, light_seed)
+    second_endpoints = _endpoint_subpath_state(tx_positions, tx_power, second_rx, launch_tx_id, light_seed)
     first = ops.bdpt_endpoint_connection_samples(
         first_endpoints["light"],
         first_endpoints["sensor"],
@@ -525,7 +574,7 @@ def test_bdpt_endpoint_connection_visibility_inputs_match_connection_pair_order(
     tx_positions = torch.tensor([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0, 1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    endpoints = ops.bdpt_endpoint_subpath_state(
+    endpoints = _endpoint_subpath_state(
         tx_positions,
         tx_power,
         rx_positions,
@@ -570,7 +619,7 @@ def test_bdpt_endpoint_connection_samples_has_no_python_fallback(monkeypatch):
         pytest.skip("CUDA is required for BDPT endpoint connections")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    endpoints = ops.bdpt_endpoint_subpath_state(
+    endpoints = _endpoint_subpath_state(
         reference,
         torch.ones((1,), device="cuda", dtype=torch.float32),
         reference,

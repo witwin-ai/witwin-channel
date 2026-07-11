@@ -57,7 +57,7 @@ def test_solve_v2_exports_bounded_reflection_diffraction_sequences():
         result.metadata["semantic_capabilities"][
             "supports_reflection_diffraction_coupling"
         ]
-        is False
+        is True
     )
     assert (
         result.metadata["semantic_capabilities"][
@@ -73,21 +73,22 @@ def test_solve_v2_exports_bounded_reflection_diffraction_sequences():
         (active[coupled], result.primitive_id[result.valid][coupled]), dim=1
     )
     assert torch.unique(canonical, dim=0).shape[0] == canonical.shape[0]
-    assert torch.isnan(result.a[result.valid][coupled]).all()
-    assert (
-        result.metadata["coupled_paths"]["coefficient"] == "unavailable_until_phase_3"
-    )
+    assert torch.isfinite(result.a[result.valid][coupled]).all()
+    assert torch.count_nonzero(result.a[result.valid][coupled].abs() > 0.0) > 0
+    assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
 
 
-def test_legacy_flat_solve_rejects_coupled_geometry_without_coefficients():
+def test_flat_solve_exports_finite_coupled_power():
     _require_native()
     config = Config(
         components={"reflection", "diffraction"},
         max_depth=2,
         coupled_paths=True,
     )
-    with pytest.raises(RuntimeError, match="require solve_v2"):
-        solve(coupled_wall_wedge_scene(), config)
+    result = solve(coupled_wall_wedge_scene(), config)
+    coupled = (result.component_id == 3) | (result.component_id == 4)
+    assert bool(coupled.any())
+    assert torch.isfinite(result.path_gain[coupled]).all()
 
 
 def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypatch):

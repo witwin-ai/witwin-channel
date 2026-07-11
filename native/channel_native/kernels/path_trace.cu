@@ -2943,6 +2943,8 @@ void check_topology_concat_schema(
     const pybind11::dict& block,
     int64_t sequence_width,
     bool has_path_field,
+    bool has_field_xyz,
+    bool has_coefficient,
     bool has_interaction_position,
     bool has_interaction_normal,
     bool has_material_id,
@@ -2970,6 +2972,23 @@ void check_topology_concat_schema(
         check_cuda_tensor(path_field, "path_field", at::kComplexFloat, 1);
         TORCH_CHECK(path_field.size(0) == count, "path_field must match valid");
         TORCH_CHECK(path_field.get_device() == device, "path_field must share valid device");
+    }
+
+    check_optional_field_presence(block, "field_xyz", has_field_xyz);
+    if (has_field_xyz) {
+        at::Tensor field_xyz = block_tensor(block, "field_xyz");
+        check_cuda_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
+        TORCH_CHECK(field_xyz.size(0) == count && field_xyz.size(1) == 3,
+                    "field_xyz must have shape (N, 3)");
+        TORCH_CHECK(field_xyz.get_device() == device, "field_xyz must share valid device");
+    }
+
+    check_optional_field_presence(block, "coefficient", has_coefficient);
+    if (has_coefficient) {
+        at::Tensor coefficient = block_tensor(block, "coefficient");
+        check_cuda_tensor(coefficient, "coefficient", at::kComplexFloat, 1);
+        TORCH_CHECK(coefficient.size(0) == count, "coefficient must match valid");
+        TORCH_CHECK(coefficient.get_device() == device, "coefficient must share valid device");
     }
 
     check_optional_field_presence(block, "interaction_position", has_interaction_position);
@@ -3105,6 +3124,8 @@ pybind11::dict cn_deterministic_concat_topology_blocks(pybind11::sequence blocks
     int device = -1;
     bool schema_initialized = false;
     bool has_path_field = false;
+    bool has_field_xyz = false;
+    bool has_coefficient = false;
     bool has_interaction_position = false;
     bool has_interaction_normal = false;
     bool has_material_id = false;
@@ -3116,6 +3137,8 @@ pybind11::dict cn_deterministic_concat_topology_blocks(pybind11::sequence blocks
         pybind11::dict block = pybind11::cast<pybind11::dict>(item);
         if (!schema_initialized) {
             has_path_field = block_has_field(block, "path_field");
+            has_field_xyz = block_has_field(block, "field_xyz");
+            has_coefficient = block_has_field(block, "coefficient");
             has_interaction_position = block_has_field(block, "interaction_position");
             has_interaction_normal = block_has_field(block, "interaction_normal");
             has_material_id = block_has_field(block, "material_id");
@@ -3129,6 +3152,8 @@ pybind11::dict cn_deterministic_concat_topology_blocks(pybind11::sequence blocks
             block,
             sequence_width,
             has_path_field,
+            has_field_xyz,
+            has_coefficient,
             has_interaction_position,
             has_interaction_normal,
             has_material_id,
@@ -3164,6 +3189,12 @@ pybind11::dict cn_deterministic_concat_topology_blocks(pybind11::sequence blocks
     out["path_gain"] = at::empty({total}, float_options);
     if (has_path_field) {
         out["path_field"] = at::empty({total}, complex_options);
+    }
+    if (has_field_xyz) {
+        out["field_xyz"] = at::empty({total, 3}, complex_options);
+    }
+    if (has_coefficient) {
+        out["coefficient"] = at::empty({total}, complex_options);
     }
     if (has_interaction_position) {
         out["interaction_position"] = at::empty({total, 3}, float_options);
@@ -3208,6 +3239,12 @@ pybind11::dict cn_deterministic_concat_topology_blocks(pybind11::sequence blocks
         if (has_path_field) {
             copy_tensor_rows(block_tensor(block, "path_field"), pybind11::cast<at::Tensor>(out["path_field"]), offset, 1, stream);
         }
+        if (has_field_xyz) {
+            copy_tensor_rows(block_tensor(block, "field_xyz"), pybind11::cast<at::Tensor>(out["field_xyz"]), offset, 3, stream);
+        }
+        if (has_coefficient) {
+            copy_tensor_rows(block_tensor(block, "coefficient"), pybind11::cast<at::Tensor>(out["coefficient"]), offset, 1, stream);
+        }
         if (has_interaction_position) {
             copy_tensor_rows(block_tensor(block, "interaction_position"), pybind11::cast<at::Tensor>(out["interaction_position"]), offset, 3, stream);
         }
@@ -3243,6 +3280,8 @@ pybind11::dict cn_deterministic_gather_topology_block(
     TORCH_CHECK(max_count >= -1, "max_count must be -1 or non-negative");
 
     const bool has_path_field = block_has_field(block, "path_field");
+    const bool has_field_xyz = block_has_field(block, "field_xyz");
+    const bool has_coefficient = block_has_field(block, "coefficient");
     const bool has_interaction_position = block_has_field(block, "interaction_position");
     const bool has_interaction_normal = block_has_field(block, "interaction_normal");
     const bool has_material_id = block_has_field(block, "material_id");
@@ -3254,6 +3293,8 @@ pybind11::dict cn_deterministic_gather_topology_block(
         block,
         sequence_width,
         has_path_field,
+        has_field_xyz,
+        has_coefficient,
         has_interaction_position,
         has_interaction_normal,
         has_material_id,
@@ -3286,6 +3327,12 @@ pybind11::dict cn_deterministic_gather_topology_block(
     out["path_gain"] = at::empty({out_count}, float_options);
     if (has_path_field) {
         out["path_field"] = at::empty({out_count}, complex_options);
+    }
+    if (has_field_xyz) {
+        out["field_xyz"] = at::empty({out_count, 3}, complex_options);
+    }
+    if (has_coefficient) {
+        out["coefficient"] = at::empty({out_count}, complex_options);
     }
     if (has_interaction_position) {
         out["interaction_position"] = at::empty({out_count, 3}, float_options);
@@ -3322,6 +3369,12 @@ pybind11::dict cn_deterministic_gather_topology_block(
     gather_tensor_rows<float>(block_tensor(block, "path_gain"), pybind11::cast<at::Tensor>(out["path_gain"]), order, out_count, 1, stream);
     if (has_path_field) {
         gather_tensor_rows<c10::complex<float>>(block_tensor(block, "path_field"), pybind11::cast<at::Tensor>(out["path_field"]), order, out_count, 1, stream);
+    }
+    if (has_field_xyz) {
+        gather_tensor_rows<c10::complex<float>>(block_tensor(block, "field_xyz"), pybind11::cast<at::Tensor>(out["field_xyz"]), order, out_count, 3, stream);
+    }
+    if (has_coefficient) {
+        gather_tensor_rows<c10::complex<float>>(block_tensor(block, "coefficient"), pybind11::cast<at::Tensor>(out["coefficient"]), order, out_count, 1, stream);
     }
     if (has_interaction_position) {
         gather_tensor_rows<float>(block_tensor(block, "interaction_position"), pybind11::cast<at::Tensor>(out["interaction_position"]), order, out_count, 3, stream);

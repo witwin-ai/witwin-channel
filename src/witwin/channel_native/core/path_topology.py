@@ -8,7 +8,14 @@ import torch
 
 from witwin.channel_native import ReceiverGrid, Scene
 from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.core.material_runtime import face_material_tensors
+from witwin.channel_native.core.field_state import (
+    receiver_polarizations,
+    transmitter_polarizations,
+)
+from witwin.channel_native.core.material_runtime import (
+    face_material_field_bundle,
+    face_material_tensors,
+)
 from witwin.channel_native.montecarlo.basic.backend import (
     _LIGHT_SPEED_M_PER_S,
     receiver_positions as _native_receiver_positions,
@@ -114,6 +121,9 @@ class TopologyBatch:
     delay_s: torch.Tensor
     path_gain: torch.Tensor
     path_field: torch.Tensor
+    field_xyz: torch.Tensor
+    coefficient: torch.Tensor
+    field_direction: torch.Tensor
     interaction_position: torch.Tensor
     interaction_normal: torch.Tensor
     material_id: torch.Tensor
@@ -245,6 +255,17 @@ def _from_path_result(paths: object) -> TopologyBatch:
     path_field = getattr(paths, "path_field", None)
     if path_field is None:
         path_field = topology_defaults()["path_field"]
+    field_xyz = getattr(paths, "field_xyz", None)
+    if field_xyz is None:
+        field_xyz = torch.zeros(
+            (path_count, 3), device=device, dtype=torch.complex64
+        )
+    coefficient = getattr(paths, "coefficient", path_field)
+    field_direction = getattr(paths, "field_direction", None)
+    if field_direction is None:
+        field_direction = torch.zeros(
+            (path_count, 3), device=device, dtype=torch.float32
+        )
     interaction_position = getattr(paths, "interaction_position", None)
     if interaction_position is None:
         interaction_position = topology_defaults()["interaction_position"]
@@ -275,6 +296,9 @@ def _from_path_result(paths: object) -> TopologyBatch:
         delay_s=paths.delay_s.to(dtype=torch.float32).contiguous(),
         path_gain=path_gain,
         path_field=path_field.to(dtype=torch.complex64).contiguous(),
+        field_xyz=field_xyz.to(dtype=torch.complex64).contiguous(),
+        coefficient=coefficient.to(dtype=torch.complex64).contiguous(),
+        field_direction=field_direction.to(dtype=torch.float32).contiguous(),
         interaction_position=interaction_position.to(dtype=torch.float32).contiguous(),
         interaction_normal=interaction_normal.to(dtype=torch.float32).contiguous(),
         material_id=material_id.to(dtype=torch.int32).contiguous(),
@@ -421,6 +445,8 @@ def _ensure_topology_fields(
     interaction_normal: torch.Tensor | None = None,
     material_id: torch.Tensor | None = None,
     path_field: torch.Tensor | None = None,
+    field_xyz: torch.Tensor | None = None,
+    coefficient: torch.Tensor | None = None,
     primitive_sequence: torch.Tensor | None = None,
     material_sequence: torch.Tensor | None = None,
     interaction_positions: torch.Tensor | None = None,
@@ -459,6 +485,18 @@ def _ensure_topology_fields(
     path_field_value = path_field if path_field is not None else block.get("path_field")
     if path_field_value is None:
         path_field_value = topology_defaults()["path_field"]
+    field_xyz_value = field_xyz if field_xyz is not None else block.get("field_xyz")
+    if field_xyz_value is None:
+        field_xyz_value = torch.zeros(
+            (int(block["valid"].shape[0]), 3),
+            device=block["valid"].device,
+            dtype=torch.complex64,
+        )
+    coefficient_value = (
+        coefficient if coefficient is not None else block.get("coefficient")
+    )
+    if coefficient_value is None:
+        coefficient_value = path_field_value
     extended["interaction_position"] = interaction_position_value.to(
         dtype=torch.float32
     ).contiguous()
@@ -467,6 +505,8 @@ def _ensure_topology_fields(
     ).contiguous()
     extended["material_id"] = material_id_value.to(dtype=torch.int32).contiguous()
     extended["path_field"] = path_field_value.to(dtype=torch.complex64).contiguous()
+    extended["field_xyz"] = field_xyz_value.to(dtype=torch.complex64).contiguous()
+    extended["coefficient"] = coefficient_value.to(dtype=torch.complex64).contiguous()
     if primitive_sequence is not None:
         extended["primitive_sequence"] = primitive_sequence.to(
             dtype=torch.int32
@@ -567,6 +607,204 @@ def _from_path_block(
             ),
             guardrail_count=guardrail_count,
         )
+    )
+
+
+def _evaluate_shared_fields(
+    scene: Scene,
+    compiled: object,
+    topology: TopologyBatch,
+    tx_positions: torch.Tensor,
+    tx_power: torch.Tensor,
+    rx_positions: torch.Tensor,
+) -> TopologyBatch:
+    """Evaluate selected canonical rows with the shared complex3 ABI."""
+
+    count = int(topology.valid.shape[0])
+    if count == 0:
+        return topology
+    device = topology.valid.device
+    tx_id = topology.tx_id.to(dtype=torch.int64)
+    rx_id = topology.rx_id.to(dtype=torch.int64)
+    source = tx_positions[tx_id].contiguous()
+    target = rx_positions[rx_id].contiguous()
+    source_power = tx_power[tx_id].to(dtype=torch.float32).contiguous()
+    tx_pol = transmitter_polarizations(scene, device=device)[tx_id].contiguous()
+    rx_pol = receiver_polarizations(scene, device=device)[rx_id].contiguous()
+
+    field_xyz = topology.field_xyz.clone()
+    coefficient = topology.coefficient.clone()
+    path_field = topology.path_field.clone()
+    path_gain = topology.path_gain.clone()
+    path_length = topology.path_length_m.clone()
+    delay = topology.delay_s.clone()
+    direction = topology.field_direction.clone()
+    launch_count = topology.launch_count
+
+    los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
+    if int(los_rows.shape[0]) > 0:
+        evaluated = ops.field_free_space(
+            source[los_rows].contiguous(),
+            target[los_rows].contiguous(),
+            source_power[los_rows].contiguous(),
+            tx_pol[los_rows].contiguous(),
+            rx_pol[los_rows].contiguous(),
+            frequency_hz=float(scene.frequency),
+        )
+        field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
+        coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
+        path_field.index_copy_(0, los_rows, evaluated["path_field"])
+        path_gain.index_copy_(0, los_rows, evaluated["path_gain"])
+        path_length.index_copy_(0, los_rows, evaluated["path_length_m"])
+        delay.index_copy_(0, los_rows, evaluated["delay_s"])
+        direction.index_copy_(0, los_rows, evaluated["direction"])
+        launch_count += 1
+
+    material: dict[str, torch.Tensor] | None = None
+    for depth_value in range(1, 6):
+        rows = torch.nonzero(
+            (topology.component_id == 1) & (topology.depth == depth_value),
+            as_tuple=False,
+        ).reshape(-1)
+        if int(rows.shape[0]) == 0:
+            continue
+        if material is None:
+            material = face_material_field_bundle(compiled, device=device)
+        face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
+        evaluated = ops.field_reflection_sequence(
+            source[rows].contiguous(),
+            target[rows].contiguous(),
+            topology.interaction_positions[rows, :depth_value].contiguous(),
+            topology.interaction_normals[rows, :depth_value].contiguous(),
+            source_power[rows].contiguous(),
+            tx_pol[rows].contiguous(),
+            rx_pol[rows].contiguous(),
+            material["eps_r"][face_id].contiguous(),
+            material["sigma_e"][face_id].contiguous(),
+            material["mu_r"][face_id].contiguous(),
+            material["gain"][face_id].contiguous(),
+            material["thickness"][face_id].contiguous(),
+            frequency_hz=float(scene.frequency),
+        )
+        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
+        coefficient.index_copy_(0, rows, evaluated["coefficient"])
+        path_field.index_copy_(0, rows, evaluated["path_field"])
+        path_gain.index_copy_(0, rows, evaluated["path_gain"])
+        path_length.index_copy_(0, rows, evaluated["path_length_m"])
+        delay.index_copy_(0, rows, evaluated["delay_s"])
+        direction.index_copy_(0, rows, evaluated["direction"])
+        launch_count += 1
+
+    diffraction_rows = torch.nonzero(
+        topology.component_id == 2, as_tuple=False
+    ).reshape(-1)
+    if int(diffraction_rows.shape[0]) > 0:
+        arrival = ops.deterministic_normalize_vec3(
+            (
+                target[diffraction_rows]
+                - topology.interaction_positions[diffraction_rows, 0]
+            ).contiguous(),
+            eps=1.0e-6,
+        )
+        powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
+        projected = ops.field_project_complex3(
+            powered_xyz,
+            arrival,
+            rx_pol[diffraction_rows].contiguous(),
+        )
+        amplitude = source_power[diffraction_rows].clamp_min(1.0e-30).sqrt()
+        field_xyz.index_copy_(0, diffraction_rows, powered_xyz / amplitude[:, None])
+        path_field.index_copy_(0, diffraction_rows, projected["coefficient"])
+        coefficient.index_copy_(
+            0, diffraction_rows, projected["coefficient"] / amplitude
+        )
+        path_gain.index_copy_(0, diffraction_rows, projected["path_gain"])
+        direction.index_copy_(0, diffraction_rows, arrival)
+        launch_count += 1
+
+    coupled_rows = torch.nonzero(
+        (topology.component_id == 3) | (topology.component_id == 4),
+        as_tuple=False,
+    ).reshape(-1)
+    if int(coupled_rows.shape[0]) > 0:
+        if material is None:
+            material = face_material_field_bundle(compiled, device=device)
+        raydn = compiled.raydn
+        records = raydn.edge_records()
+        preserve_imported_edges = bool(
+            isinstance(scene.metadata.get("mitsuba", {}), dict)
+            and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
+        )
+        edge_geometry = (
+            _diffraction_edge_geometry(records)
+            if preserve_imported_edges
+            else _cached_diffraction_edge_geometry(raydn)
+        )
+        edge_n0 = edge_geometry[6]
+        edge_n1 = edge_geometry[7]
+        edge_face0 = edge_geometry[8].to(dtype=torch.int64)
+        edge_face1 = edge_geometry[9].to(dtype=torch.int64)
+        edge_exterior = edge_geometry[10]
+        for component_id, reverse_order in ((3, False), (4, True)):
+            rows = torch.nonzero(
+                topology.component_id == component_id, as_tuple=False
+            ).reshape(-1)
+            if int(rows.shape[0]) == 0:
+                continue
+            edge_id = topology.edge_id[rows].to(dtype=torch.int64)
+            reflection_face = topology.primitive_id[rows].to(dtype=torch.int64)
+            face0 = edge_face0[edge_id]
+            raw_face1 = edge_face1[edge_id]
+            face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
+            reflection_slot = 1 if reverse_order else 0
+            edge_slot = 0 if reverse_order else 1
+
+            def material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
+                return tuple(
+                    material[name][face].contiguous()
+                    for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
+                )
+
+            evaluated = ops.field_coupled_rd(
+                source[rows].contiguous(),
+                target[rows].contiguous(),
+                topology.interaction_positions[
+                    rows, reflection_slot
+                ].contiguous(),
+                topology.interaction_normals[
+                    rows, reflection_slot
+                ].contiguous(),
+                topology.interaction_positions[rows, edge_slot].contiguous(),
+                edge_geometry[2][edge_id].contiguous(),
+                edge_n0[edge_id].contiguous(),
+                edge_n1[edge_id].contiguous(),
+                edge_exterior[edge_id].contiguous(),
+                source_power[rows].contiguous(),
+                tx_pol[rows].contiguous(),
+                rx_pol[rows].contiguous(),
+                material_tuple(reflection_face),
+                material_tuple(face0),
+                material_tuple(face1),
+                frequency_hz=float(scene.frequency),
+                reverse=reverse_order,
+            )
+            field_xyz.index_copy_(0, rows, evaluated["field_vector"])
+            coefficient.index_copy_(0, rows, evaluated["coefficient"])
+            path_field.index_copy_(0, rows, evaluated["path_field"])
+            path_gain.index_copy_(0, rows, evaluated["path_gain"])
+            direction.index_copy_(0, rows, evaluated["direction"])
+            launch_count += 1
+
+    return replace(
+        topology,
+        path_length_m=path_length,
+        delay_s=delay,
+        path_gain=path_gain,
+        path_field=path_field,
+        field_xyz=field_xyz,
+        coefficient=coefficient,
+        field_direction=direction,
+        launch_count=launch_count,
     )
 
 
@@ -1353,6 +1591,14 @@ def _diffraction_topology_order1(
             path_field = ops.deterministic_pack_complex(
                 field_result["field_real"], field_result["field_imag"]
             )
+            field_xyz = torch.stack(
+                (
+                    torch.complex(compacted["x_re"], compacted["x_im"]),
+                    torch.complex(compacted["y_re"], compacted["y_im"]),
+                    torch.complex(compacted["z_re"], compacted["z_im"]),
+                ),
+                dim=1,
+            ).contiguous()
             delay = compacted["delay_s"]
             path_length = ops.deterministic_delay_to_path_length(delay)
             empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
@@ -1374,6 +1620,7 @@ def _diffraction_topology_order1(
                     ),
                     interaction_position=compacted["interaction_position"],
                     path_field=path_field,
+                    field_xyz=field_xyz,
                 )
             )
     return (
@@ -1623,15 +1870,17 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             )[0]
             launch_count += 1
         candidate_count += int(tx_id.numel())
-        los_block = ops.deterministic_los_topology_block(
-            tx_id.to(dtype=torch.int32).contiguous(),
-            rx_id.to(dtype=torch.int32).contiguous(),
-            exported["path_length_m"].to(dtype=torch.float32).contiguous(),
-            exported["delay_s"].to(dtype=torch.float32).contiguous(),
-            exported["path_gain"].to(dtype=torch.float32).contiguous(),
-            visible,
-            frequency_hz=float(scene.frequency),
-            sequence_width=sequence_width,
+        los_block = _ensure_topology_fields(
+            ops.deterministic_los_topology_block(
+                tx_id.to(dtype=torch.int32).contiguous(),
+                rx_id.to(dtype=torch.int32).contiguous(),
+                exported["path_length_m"].to(dtype=torch.float32).contiguous(),
+                exported["delay_s"].to(dtype=torch.float32).contiguous(),
+                exported["path_gain"].to(dtype=torch.float32).contiguous(),
+                visible,
+                frequency_hz=float(scene.frequency),
+                sequence_width=sequence_width,
+            )
         )
         if visible is not None:
             visibility_rejection_count += int(tx_id.numel()) - int(
@@ -1701,7 +1950,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
         candidate_count += coupled_candidates
         blocks.append(block)
     if len(blocks) == 1 and components == {"los"} and config.max_paths is None:
-        return _from_path_result(
+        result = _from_path_result(
             SimpleNamespace(
                 **blocks[0],
                 launch_count=launch_count,
@@ -1710,6 +1959,9 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 candidate_count=candidate_count,
                 guardrail_count=guardrail_count,
             )
+        )
+        return _evaluate_shared_fields(
+            scene, compiled, result, tx_positions, tx_power, rx_positions
         )
     padded_blocks = [
         block
@@ -1734,4 +1986,6 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
     )
     if diffraction_vector_field is not None:
         result = replace(result, diffraction_vector_field=diffraction_vector_field)
-    return result
+    return _evaluate_shared_fields(
+        scene, compiled, result, tx_positions, tx_power, rx_positions
+    )

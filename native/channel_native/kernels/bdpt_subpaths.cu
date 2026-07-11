@@ -4,11 +4,15 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 
+#include "../field_transport.cuh"
+
 #include <vector>
 
 namespace {
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
+namespace utd = witwin::channel::native_ext;
+namespace transport = channel_native::field_transport;
 
 void check_reference(const at::Tensor& tensor) {
     TORCH_CHECK(tensor.is_cuda(), "reference must be a CUDA tensor");
@@ -74,6 +78,9 @@ std::vector<at::Tensor> allocate_subpath_state(const at::Tensor& reference, int6
         at::empty({count}, int_options),
         at::empty({count}, int_options),
         at::empty({count}, bool_options),
+        at::empty({count}, float_options),
+        at::empty({count, 3}, float_options),
+        at::empty({count, 3}, float_options),
         at::empty({count}, float_options),
     };
 }
@@ -191,6 +198,7 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     int64_t count,
     const float* tx_positions,
     const float* tx_power,
+    const float* tx_polarization,
     const int* launch_tx_id,
     const int64_t* light_seed,
     int64_t tx_count,
@@ -208,7 +216,10 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     int* rx_id,
     int* grid_linear_id,
     bool* valid,
-    float* path_length) {
+    float* path_length,
+    float* field_real,
+    float* field_imag,
+    float* source_power) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -228,7 +239,7 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
         dir[1] = 0.0f;
         dir[2] = 0.0f;
     }
-    throughput_real[index] = is_valid ? tx_power[tx] : 0.0f;
+    throughput_real[index] = is_valid ? sqrtf(fmaxf(tx_power[tx], 0.0f)) : 0.0f;
     throughput_imag[index] = 0.0f;
     pdf_forward[index] = is_valid ? static_cast<float>(1.0 / (4.0 * kPi)) : 0.0f;
     pdf_reverse[index] = 0.0f;
@@ -241,11 +252,17 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     grid_linear_id[index] = -1;
     valid[index] = is_valid;
     path_length[index] = 0.0f;
+    for (int axis = 0; axis < 3; ++axis) {
+        field_real[index * 3 + axis] = is_valid ? tx_polarization[tx * 3 + axis] : 0.0f;
+        field_imag[index * 3 + axis] = 0.0f;
+    }
+    source_power[index] = is_valid ? tx_power[tx] : 0.0f;
 }
 
 __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     int64_t count,
     const float* rx_positions,
+    const float* rx_polarization,
     float* origin,
     float* direction,
     float* throughput_real,
@@ -260,7 +277,10 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     int* rx_id,
     int* grid_linear_id,
     bool* valid,
-    float* path_length) {
+    float* path_length,
+    float* field_real,
+    float* field_imag,
+    float* source_power) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -287,6 +307,11 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     grid_linear_id[index] = static_cast<int>(index);
     valid[index] = true;
     path_length[index] = 0.0f;
+    for (int axis = 0; axis < 3; ++axis) {
+        field_real[index * 3 + axis] = rx_polarization[index * 3 + axis];
+        field_imag[index * 3 + axis] = 0.0f;
+    }
+    source_power[index] = 1.0f;
 }
 
 __global__ void bdpt_reflected_light_subpaths_kernel(
@@ -303,6 +328,9 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     const int* light_grid_linear_id,
     const bool* light_valid,
     const float* light_path_length,
+    const float* light_field_real,
+    const float* light_field_imag,
+    const float* light_source_power,
     const float* hit_t,
     const float* hit_p,
     const float* hit_n,
@@ -312,6 +340,7 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     const float* material_eps_r,
     const float* material_sigma_e,
     const float* material_mu_r,
+    const float* material_thickness,
     float frequency_hz,
     int64_t material_count,
     float* origin,
@@ -328,7 +357,10 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     int* rx_id,
     int* grid_linear_id,
     bool* valid,
-    float* path_length) {
+    float* path_length,
+    float* field_real,
+    float* field_imag,
+    float* source_power) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -389,6 +421,43 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     grid_linear_id[index] = is_valid ? light_grid_linear_id[index] : -1;
     valid[index] = is_valid;
     path_length[index] = is_valid ? light_path_length[index] + fmaxf(hit_t[index], 0.0f) : 0.0f;
+    if (is_valid) {
+        const int64_t base = index * 3;
+        const utd::Complex3 incoming = {
+            utd::cplx(light_field_real[base], light_field_imag[base]),
+            utd::cplx(light_field_real[base + 1], light_field_imag[base + 1]),
+            utd::cplx(light_field_real[base + 2], light_field_imag[base + 2]),
+        };
+        const utd::float3a incident = utd::make_f3(
+            light_direction[base], light_direction[base + 1], light_direction[base + 2]);
+        const utd::float3a normal = utd::make_f3(
+            hit_n[base], hit_n[base + 1], hit_n[base + 2]);
+        utd::float3a reflected;
+        const utd::Complex3 updated = transport::reflect_complex3(
+            incoming,
+            incident,
+            normal,
+            material_eps_r[prim],
+            material_sigma_e[prim],
+            material_mu_r[prim],
+            material_gain[prim],
+            material_thickness[prim],
+            frequency_hz,
+            reflected);
+        field_real[base] = updated.x.re;
+        field_real[base + 1] = updated.y.re;
+        field_real[base + 2] = updated.z.re;
+        field_imag[base] = updated.x.im;
+        field_imag[base + 1] = updated.y.im;
+        field_imag[base + 2] = updated.z.im;
+        source_power[index] = light_source_power[index];
+    } else {
+        for (int axis = 0; axis < 3; ++axis) {
+            field_real[index * 3 + axis] = 0.0f;
+            field_imag[index * 3 + axis] = 0.0f;
+        }
+        source_power[index] = 0.0f;
+    }
 }
 
 }  // namespace
@@ -401,13 +470,16 @@ std::vector<at::Tensor> cn_bdpt_empty_subpath_state_cuda(at::Tensor reference) {
 std::vector<at::Tensor> cn_bdpt_light_endpoint_subpath_state_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
+    at::Tensor tx_polarization,
     at::Tensor launch_tx_id,
     at::Tensor light_seed) {
     check_vec3_table(tx_positions, "tx_positions");
     check_flat_tensor(tx_power, "tx_power", at::kFloat);
+    check_vec3_table(tx_polarization, "tx_polarization");
     check_flat_tensor(launch_tx_id, "launch_tx_id", at::kInt);
     check_flat_tensor(light_seed, "light_seed", at::kLong);
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
+    TORCH_CHECK(tx_polarization.size(0) == tx_positions.size(0), "tx_polarization must match tx_positions");
     TORCH_CHECK(light_seed.size(0) == launch_tx_id.size(0), "light_seed must match launch_tx_id");
     TORCH_CHECK(tx_power.get_device() == tx_positions.get_device(), "tx_power must share tx_positions device");
     TORCH_CHECK(launch_tx_id.get_device() == tx_positions.get_device(), "launch_tx_id must share tx_positions device");
@@ -422,6 +494,7 @@ std::vector<at::Tensor> cn_bdpt_light_endpoint_subpath_state_cuda(
             count,
             tx_positions.data_ptr<float>(),
             tx_power.data_ptr<float>(),
+            tx_polarization.data_ptr<float>(),
             launch_tx_id.data_ptr<int>(),
             light_seed.data_ptr<int64_t>(),
             tx_positions.size(0),
@@ -439,14 +512,20 @@ std::vector<at::Tensor> cn_bdpt_light_endpoint_subpath_state_cuda(
             state[11].data_ptr<int>(),
             state[12].data_ptr<int>(),
             state[13].data_ptr<bool>(),
-            state[14].data_ptr<float>());
+            state[14].data_ptr<float>(),
+            state[15].data_ptr<float>(),
+            state[16].data_ptr<float>(),
+            state[17].data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;
 }
 
-std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(at::Tensor rx_positions) {
+std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(
+    at::Tensor rx_positions, at::Tensor rx_polarization) {
     check_vec3_table(rx_positions, "rx_positions");
+    check_vec3_table(rx_polarization, "rx_polarization");
+    TORCH_CHECK(rx_polarization.size(0) == rx_positions.size(0), "rx_polarization must match rx_positions");
     auto state = allocate_subpath_state(rx_positions, rx_positions.size(0));
     const int64_t count = rx_positions.size(0);
     if (count > 0) {
@@ -456,6 +535,7 @@ std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(at::Tensor rx
         bdpt_sensor_endpoint_subpaths_kernel<<<blocks, threads, 0, stream>>>(
             count,
             rx_positions.data_ptr<float>(),
+            rx_polarization.data_ptr<float>(),
             state[0].data_ptr<float>(),
             state[1].data_ptr<float>(),
             state[2].data_ptr<float>(),
@@ -470,7 +550,10 @@ std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(at::Tensor rx
             state[11].data_ptr<int>(),
             state[12].data_ptr<int>(),
             state[13].data_ptr<bool>(),
-            state[14].data_ptr<float>());
+            state[14].data_ptr<float>(),
+            state[15].data_ptr<float>(),
+            state[16].data_ptr<float>(),
+            state[17].data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;
@@ -490,6 +573,9 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor light_grid_linear_id,
     at::Tensor light_valid,
     at::Tensor light_path_length,
+    at::Tensor light_field_real,
+    at::Tensor light_field_imag,
+    at::Tensor light_source_power,
     at::Tensor hit_t,
     at::Tensor hit_p,
     at::Tensor hit_n,
@@ -499,6 +585,7 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
     at::Tensor material_mu_r,
+    at::Tensor material_thickness,
     double frequency_hz) {
     check_vec3_table(light_origin, "light.origin");
     check_vec3_table(light_direction, "light.direction");
@@ -513,6 +600,9 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     check_flat_tensor(light_grid_linear_id, "light.grid_linear_id", at::kInt);
     check_flat_tensor(light_valid, "light.valid", at::kBool);
     check_flat_tensor(light_path_length, "light.path_length", at::kFloat);
+    check_vec3_table(light_field_real, "light.field_real");
+    check_vec3_table(light_field_imag, "light.field_imag");
+    check_flat_tensor(light_source_power, "light.source_power", at::kFloat);
     check_flat_tensor(hit_t, "intersection.t", at::kFloat);
     check_vec3_table(hit_p, "intersection.p");
     check_vec3_table(hit_n, "intersection.n");
@@ -522,10 +612,12 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     check_flat_tensor(material_eps_r, "material_eps_r", at::kFloat);
     check_flat_tensor(material_sigma_e, "material_sigma_e", at::kFloat);
     check_flat_tensor(material_mu_r, "material_mu_r", at::kFloat);
+    check_flat_tensor(material_thickness, "material_thickness", at::kFloat);
     TORCH_CHECK(material_gain.size(0) == material_valid.size(0), "material_gain and material_valid must match");
     TORCH_CHECK(material_eps_r.size(0) == material_gain.size(0), "material_eps_r must match material_gain");
     TORCH_CHECK(material_sigma_e.size(0) == material_gain.size(0), "material_sigma_e must match material_gain");
     TORCH_CHECK(material_mu_r.size(0) == material_gain.size(0), "material_mu_r must match material_gain");
+    TORCH_CHECK(material_thickness.size(0) == material_gain.size(0), "material_thickness must match material_gain");
 
     const int64_t count = light_origin.size(0);
     for (const auto& tensor : {
@@ -541,6 +633,9 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
              light_grid_linear_id,
              light_valid,
              light_path_length,
+             light_field_real,
+             light_field_imag,
+             light_source_power,
              hit_t,
               hit_p,
               hit_n,
@@ -570,6 +665,9 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
             light_grid_linear_id.data_ptr<int>(),
             light_valid.data_ptr<bool>(),
             light_path_length.data_ptr<float>(),
+            light_field_real.data_ptr<float>(),
+            light_field_imag.data_ptr<float>(),
+            light_source_power.data_ptr<float>(),
             hit_t.data_ptr<float>(),
             hit_p.data_ptr<float>(),
             hit_n.data_ptr<float>(),
@@ -579,6 +677,7 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
             material_eps_r.data_ptr<float>(),
             material_sigma_e.data_ptr<float>(),
             material_mu_r.data_ptr<float>(),
+            material_thickness.data_ptr<float>(),
             static_cast<float>(frequency_hz),
             material_gain.size(0),
             state[0].data_ptr<float>(),
@@ -595,7 +694,10 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
             state[11].data_ptr<int>(),
             state[12].data_ptr<int>(),
             state[13].data_ptr<bool>(),
-            state[14].data_ptr<float>());
+            state[14].data_ptr<float>(),
+            state[15].data_ptr<float>(),
+            state[16].data_ptr<float>(),
+            state[17].data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;

@@ -3,6 +3,8 @@
 #include <cuda_runtime_api.h>
 #include <torch/extension.h>
 
+#include "../field_transport.cuh"
+
 #include <algorithm>
 #include <cmath>
 #include <tuple>
@@ -10,6 +12,9 @@
 #include <vector>
 
 namespace {
+
+namespace utd = witwin::channel::native_ext;
+namespace transport = channel_native::field_transport;
 
 constexpr float kLightSpeedMPerS = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;
@@ -225,6 +230,9 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
     const float* light_origin,
     const float* light_direction,
     const float* light_throughput_real,
+    const float* light_field_real,
+    const float* light_field_imag,
+    const float* light_source_power,
     const float* light_pdf_forward,
     const int* light_depth,
     const int* light_component_mask,
@@ -232,6 +240,7 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
     const bool* light_valid,
     const float* light_path_length,
     const float* sensor_origin,
+    const float* sensor_field_real,
     const float* sensor_pdf_reverse,
     const int* sensor_depth,
     const int* sensor_rx_id,
@@ -286,8 +295,29 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
     // The free-space spreading acts over the unfolded path (light-subpath
     // prefix + connection segment), not the last segment alone.
     const float total_distance = distance + fmaxf(light_path_length[light_index], 0.0f);
+    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
+    const float amplitude = 1.0f /
+        (2.0f * fmaxf(wave_number, 1.0e-12f) * fmaxf(total_distance, 1.0e-6f));
+    const utd::Complex propagation = utd::cplx_mul_real(
+        utd::cplx_exp_phase(transport::precise_neg_kd(wave_number, total_distance)),
+        amplitude);
+    const int64_t field_offset = light_index * 3;
+    const utd::Complex3 incident_field = {
+        utd::cplx(light_field_real[field_offset], light_field_imag[field_offset]),
+        utd::cplx(light_field_real[field_offset + 1], light_field_imag[field_offset + 1]),
+        utd::cplx(light_field_real[field_offset + 2], light_field_imag[field_offset + 2])};
+    const utd::Complex3 received_field = utd::c3_scale(incident_field, propagation);
+    const utd::float3a connection_direction = utd::make_f3(dx / distance, dy / distance, dz / distance);
+    const int64_t sensor_field_offset = sensor_index * 3;
+    const utd::float3a receiver_polarization = utd::make_f3(
+        sensor_field_real[sensor_field_offset],
+        sensor_field_real[sensor_field_offset + 1],
+        sensor_field_real[sensor_field_offset + 2]);
+    const utd::Complex coefficient = transport::project_receiver(
+        received_field, connection_direction, receiver_polarization);
+    const float coefficient_power = utd::cplx_abs_sqr(coefficient);
     const float row_contribution = row_valid
-        ? bdpt_free_space_gain(light_throughput_real[light_index], total_distance, frequency_hz) * inv_samples_per_tx
+        ? light_source_power[light_index] * coefficient_power * inv_samples_per_tx
         : 0.0f;
 
     tx_id[index] = tx;
@@ -1092,6 +1122,9 @@ cn_bdpt_endpoint_connection_samples_cuda(
     at::Tensor light_origin,
     at::Tensor light_direction,
     at::Tensor light_throughput_real,
+    at::Tensor light_field_real,
+    at::Tensor light_field_imag,
+    at::Tensor light_source_power,
     at::Tensor light_pdf_forward,
     at::Tensor light_depth,
     at::Tensor light_component_mask,
@@ -1099,6 +1132,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
     at::Tensor light_valid,
     at::Tensor light_path_length,
     at::Tensor sensor_origin,
+    at::Tensor sensor_field_real,
     at::Tensor sensor_pdf_reverse,
     at::Tensor sensor_depth,
     at::Tensor sensor_rx_id,
@@ -1113,12 +1147,16 @@ cn_bdpt_endpoint_connection_samples_cuda(
     check_vec3_cuda(light_origin, "light_origin");
     check_vec3_cuda(light_direction, "light_direction");
     check_float_cuda(light_throughput_real, "light_throughput_real", 1);
+    check_vec3_cuda(light_field_real, "light_field_real");
+    check_vec3_cuda(light_field_imag, "light_field_imag");
+    check_float_cuda(light_source_power, "light_source_power", 1);
     check_float_cuda(light_pdf_forward, "light_pdf_forward", 1);
     check_int_cuda(light_depth, "light_depth", 1);
     check_int_cuda(light_component_mask, "light_component_mask", 1);
     check_int_cuda(light_tx_id, "light_tx_id", 1);
     check_bool_cuda(light_valid, "light_valid", 1);
     check_vec3_cuda(sensor_origin, "sensor_origin");
+    check_vec3_cuda(sensor_field_real, "sensor_field_real");
     check_float_cuda(sensor_pdf_reverse, "sensor_pdf_reverse", 1);
     check_int_cuda(sensor_depth, "sensor_depth", 1);
     check_int_cuda(sensor_rx_id, "sensor_rx_id", 1);
@@ -1135,6 +1173,9 @@ cn_bdpt_endpoint_connection_samples_cuda(
     check_same_device(light_direction, light_origin, "light_direction");
     for (const auto& pair : {
              std::pair<const at::Tensor*, const char*>(&light_throughput_real, "light_throughput_real"),
+             std::pair<const at::Tensor*, const char*>(&light_field_real, "light_field_real"),
+             std::pair<const at::Tensor*, const char*>(&light_field_imag, "light_field_imag"),
+             std::pair<const at::Tensor*, const char*>(&light_source_power, "light_source_power"),
              std::pair<const at::Tensor*, const char*>(&light_pdf_forward, "light_pdf_forward"),
              std::pair<const at::Tensor*, const char*>(&light_depth, "light_depth"),
              std::pair<const at::Tensor*, const char*>(&light_component_mask, "light_component_mask"),
@@ -1147,6 +1188,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
     }
     for (const auto& pair : {
              std::pair<const at::Tensor*, const char*>(&sensor_pdf_reverse, "sensor_pdf_reverse"),
+             std::pair<const at::Tensor*, const char*>(&sensor_field_real, "sensor_field_real"),
              std::pair<const at::Tensor*, const char*>(&sensor_depth, "sensor_depth"),
              std::pair<const at::Tensor*, const char*>(&sensor_rx_id, "sensor_rx_id"),
              std::pair<const at::Tensor*, const char*>(&sensor_grid_linear_id, "sensor_grid_linear_id"),
@@ -1186,6 +1228,9 @@ cn_bdpt_endpoint_connection_samples_cuda(
             light_origin.data_ptr<float>(),
             light_direction.data_ptr<float>(),
             light_throughput_real.data_ptr<float>(),
+            light_field_real.data_ptr<float>(),
+            light_field_imag.data_ptr<float>(),
+            light_source_power.data_ptr<float>(),
             light_pdf_forward.data_ptr<float>(),
             light_depth.data_ptr<int>(),
             light_component_mask.data_ptr<int>(),
@@ -1193,6 +1238,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
             light_valid.data_ptr<bool>(),
             light_path_length.data_ptr<float>(),
             sensor_origin.data_ptr<float>(),
+            sensor_field_real.data_ptr<float>(),
             sensor_pdf_reverse.data_ptr<float>(),
             sensor_depth.data_ptr<int>(),
             sensor_rx_id.data_ptr<int>(),

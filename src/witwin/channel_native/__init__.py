@@ -3,6 +3,7 @@
 from .core.kernels.extension import build_info
 from .capabilities import capabilities
 from .core.objects import ReceiverGrid, ReceiverPoint, Structure, Transmitter
+from .core.field_state import Complex3State, JonesState
 from .core.scene import Scene
 
 __all__ = [
@@ -11,6 +12,8 @@ __all__ = [
     "Scene",
     "Structure",
     "Transmitter",
+    "Complex3State",
+    "JonesState",
     "build_info",
     "capabilities",
 ]

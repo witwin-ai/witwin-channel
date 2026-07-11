@@ -59,3 +59,41 @@ def face_material_thickness(
     )
     face_material_id = compiled.assignments.face_material_id.to(device=device, dtype=torch.int64)
     return material_thickness.index_select(0, face_material_id).contiguous()
+
+
+def face_material_field_bundle(
+    scene_or_compiled: "Scene | CompiledScene", *, device: torch.device
+) -> dict[str, torch.Tensor]:
+    """Return the complete per-face finite-slab field operator inputs."""
+
+    compiled = (
+        scene_or_compiled
+        if hasattr(scene_or_compiled, "materials")
+        else scene_or_compiled.compile()
+    )
+    materials = compiled.materials
+    material_id = compiled.assignments.face_material_id.to(
+        device=device, dtype=torch.int64
+    )
+    sigma_e = materials.sigma_e.to(device=device, dtype=torch.float32)
+    sigma_e = torch.where(
+        materials.model_id.to(device=device) == PEC_MODEL_ID,
+        sigma_e.clamp_min(PEC_EFFECTIVE_SIGMA_E),
+        sigma_e,
+    )
+
+    def per_face(values: torch.Tensor) -> torch.Tensor:
+        return values.to(device=device, dtype=torch.float32).index_select(
+            0, material_id
+        ).contiguous()
+
+    return {
+        "eps_r": per_face(materials.eps_r),
+        "sigma_e": per_face(sigma_e),
+        "mu_r": per_face(materials.mu_r),
+        "gain": per_face(materials.gain),
+        "thickness": per_face(materials.model_params[:, 0]),
+        "valid": torch.ones(
+            (material_id.shape[0],), device=device, dtype=torch.bool
+        ),
+    }

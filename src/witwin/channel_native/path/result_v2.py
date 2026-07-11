@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import torch
@@ -59,6 +59,8 @@ class PathResultV2:
     normal: torch.Tensor
     num_paths: torch.Tensor
     metadata: dict[str, Any]
+    field_xyz: torch.Tensor | None = None
+    field_direction: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         if self.a.ndim != 6 or self.a.dtype != torch.complex64:
@@ -79,6 +81,26 @@ class PathResultV2:
                 raise ValueError(f"{name} must match the vector depth shape")
         if self.num_paths.shape != self.path_count_shape:
             raise ValueError("num_paths must match the endpoint-pair shape")
+        if self.field_xyz is None:
+            object.__setattr__(
+                self,
+                "field_xyz",
+                torch.zeros((*path_shape, 3), device=self.a.device, dtype=torch.complex64),
+            )
+        if self.field_direction is None:
+            object.__setattr__(
+                self,
+                "field_direction",
+                torch.zeros((*path_shape, 3), device=self.a.device, dtype=torch.float32),
+            )
+        if self.field_xyz.shape != (*path_shape, 3):
+            raise ValueError("field_xyz must match the path shape with a complex3 tail")
+        if self.field_direction.shape != (*path_shape, 3):
+            raise ValueError("field_direction must match the path shape with a vec3 tail")
+        if self.field_xyz.dtype != torch.complex64:
+            raise ValueError("field_xyz must use complex64")
+        if self.field_direction.dtype != torch.float32:
+            raise ValueError("field_direction must use float32")
         if self.valid.dtype != torch.bool:
             raise ValueError("valid must use bool")
         if any(
@@ -113,6 +135,8 @@ class PathResultV2:
             self.position,
             self.normal,
             self.num_paths,
+            self.field_xyz,
+            self.field_direction,
         )
         if any(tensor.device != self.a.device for tensor in tensors):
             raise ValueError("all PathResultV2 tensors must share one device")
@@ -519,7 +543,7 @@ def from_topology_result(
         num_tx_ant=1,
         rx_id=rx_id,
         tx_id=tx_id,
-        field=paths.path_field.unsqueeze(-1),
+        field=paths.coefficient.unsqueeze(-1),
         delay_s=paths.delay_s,
         theta_t=theta_t,
         phi_t=phi_t,
@@ -535,12 +559,29 @@ def from_topology_result(
     result_metadata.update(
         {
             "adapter": "canonical_topology_to_PathResultV2",
-            "coefficient_semantics": "native_scalar_complex_field",
-            "coupled_coefficient_semantics": "nan_until_unified_phase_3_transport",
+            "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
+            "coupled_coefficient_semantics": "unified_complex3_jones",
             "interaction_geometry": "canonical_topology",
         }
     )
-    return PathResultV2.from_ragged(ragged, metadata=result_metadata)
+    result = PathResultV2.from_ragged(ragged, metadata=result_metadata)
+    field_xyz = torch.zeros(
+        (*result.path_shape, 3),
+        device=result.a.device,
+        dtype=torch.complex64,
+    )
+    field_direction = torch.zeros(
+        (*result.path_shape, 3),
+        device=result.a.device,
+        dtype=torch.float32,
+    )
+    field_xyz[result.valid] = paths.field_xyz
+    field_direction[result.valid] = paths.field_direction
+    return replace(
+        result,
+        field_xyz=field_xyz,
+        field_direction=field_direction,
+    )
 
 
 __all__ = [

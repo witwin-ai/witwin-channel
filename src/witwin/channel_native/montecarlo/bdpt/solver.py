@@ -9,8 +9,12 @@ import torch
 from witwin.channel_native import Scene
 from witwin.channel_native import ReceiverGrid
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
+from witwin.channel_native.core.field_state import (
+    receiver_polarizations,
+    transmitter_polarizations,
+)
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import effective_sigma_e
+from witwin.channel_native.core.material_runtime import face_material_field_bundle
 from witwin.channel_native.core.kernels.ops import (
     bdpt_accumulate_connection_samples,
     bdpt_compact_connection_samples,
@@ -24,7 +28,6 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_endpoint_subpath_state,
     bdpt_endpoint_connection_samples,
     bdpt_endpoint_connection_visibility_inputs,
-    bdpt_face_material_tensors_from_host,
     bdpt_finalize_component_maps,
     bdpt_finalize_point_components,
     bdpt_filter_connection_samples,
@@ -199,33 +202,17 @@ def _grid_spec(grid: ReceiverGrid) -> _GridSpec:
     )
 
 
-def _face_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
-    material_eps_r: list[float] = []
-    material_sigma_e: list[float] = []
-    material_mu_r: list[float] = []
-    face_material_id: list[int] = []
-    for material_id, structure in enumerate(scene.structures):
-        params = structure.material.parameters()
-        material_eps_r.append(float(params["eps_r"]))
-        material_sigma_e.append(effective_sigma_e(params))
-        material_mu_r.append(float(params["mu_r"]))
-        face_material_id.extend([material_id] * int(structure.faces.shape[0]))
-    if not material_eps_r:
-        material_eps_r = [1.0]
-        material_sigma_e = [0.0]
-        material_mu_r = [1.0]
-    exported = bdpt_face_material_tensors_from_host(
-        tuple(material_eps_r),
-        tuple(material_sigma_e),
-        tuple(material_mu_r),
-        tuple(face_material_id),
-    )
+def _face_material_tensors(
+    scene: Scene, *, device: torch.device
+) -> tuple[torch.Tensor, ...]:
+    bundle = face_material_field_bundle(scene, device=device)
     return (
-        exported["eps_r"],
-        exported["sigma_e"],
-        exported["mu_r"],
-        exported["gain"],
-        exported["valid"],
+        bundle["eps_r"],
+        bundle["sigma_e"],
+        bundle["mu_r"],
+        bundle["gain"],
+        bundle["valid"],
+        bundle["thickness"],
     )
 
 
@@ -264,8 +251,10 @@ def _native_reflection_connection_samples(
     raydn: Any,
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
     endpoint_subpaths: dict[str, dict[str, torch.Tensor]],
     rx_positions: torch.Tensor,
+    rx_polarization: torch.Tensor,
     material_tensors: tuple[torch.Tensor, ...],
     *,
     frequency_hz: float,
@@ -276,7 +265,7 @@ def _native_reflection_connection_samples(
     strategy_count: int,
     max_depth: int,
 ) -> list[dict[str, torch.Tensor]]:
-    eps_r, sigma_e, mu_r, material_gain, material_valid = material_tensors
+    eps_r, sigma_e, mu_r, material_gain, material_valid, material_thickness = material_tensors
     sensor = endpoint_subpaths["sensor"]
     sample_blocks: list[dict[str, torch.Tensor]] = []
     for tx_index in range(int(tx_positions.shape[0])):
@@ -289,7 +278,9 @@ def _native_reflection_connection_samples(
         state = bdpt_endpoint_subpath_state(
             tx_positions,
             tx_power,
+            tx_polarization,
             rx_positions,
+            rx_polarization,
             launch_inputs["tx_id"],
             launch_inputs["light_seed"],
         )["light"]
@@ -316,6 +307,7 @@ def _native_reflection_connection_samples(
                 material_eps_r=eps_r,
                 material_sigma_e=sigma_e,
                 material_mu_r=mu_r,
+                material_thickness=material_thickness,
                 frequency_hz=frequency_hz,
             )
             samples_out = bdpt_endpoint_connection_samples(
@@ -350,7 +342,9 @@ def _native_reflection_connection_samples(
 def _reduced_light_endpoint_state(
     tx_reference: torch.Tensor,
     tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
     rx_positions: torch.Tensor,
+    rx_polarization: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """One light endpoint per transmitter for the deterministic LoS term.
 
@@ -365,7 +359,13 @@ def _reduced_light_endpoint_state(
     tx_ids = torch.arange(tx_count, device=device, dtype=torch.int32)
     seeds = torch.zeros((tx_count,), device=device, dtype=torch.int64)
     return bdpt_endpoint_subpath_state(
-        tx_reference, tx_power, rx_positions, tx_ids, seeds
+        tx_reference,
+        tx_power,
+        tx_polarization,
+        rx_positions,
+        rx_polarization,
+        tx_ids,
+        seeds,
     )["light"]
 
 
@@ -417,9 +417,7 @@ def _native_reflection_component_maps(
     samples: int,
     max_depth: int,
 ) -> torch.Tensor:
-    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid = (
-        material_tensors
-    )
+    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid, _thickness = material_tensors
     spec = _grid_spec(grid)
     dim0, dim1 = grid.shape[1], grid.shape[0]
     maps = mc_component_map_buffer(
@@ -500,7 +498,7 @@ def _native_diffraction_component_maps(
     mis: str,
     beta: float,
 ) -> tuple[torch.Tensor, list[dict[str, torch.Tensor]]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid = material_tensors
+    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = material_tensors
     spec = _grid_spec(grid)
     dim0, dim1 = grid.shape[1], grid.shape[0]
     maps = mc_component_map_buffer(
@@ -647,7 +645,7 @@ def _native_diffraction_point_connection_samples(
     mis: str,
     beta: float,
 ) -> list[dict[str, torch.Tensor]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid = material_tensors
+    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = material_tensors
     edge_geometry = _cached_diffraction_edge_geometry(raydn)
     (
         selected,
@@ -769,18 +767,30 @@ def solve(scene: Scene, config: Config) -> Result:
 
     tx_reference, tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_reference, grid=grid)
+    tx_polarization = transmitter_polarizations(scene, device=tx_reference.device)
+    rx_polarization = receiver_polarizations(
+        scene, device=tx_reference.device, grid=grid
+    )
     launch_state = make_launch_state(
         tx_reference, tx_count=len(scene.transmitters), config=config
     )
     endpoint_subpaths = bdpt_endpoint_subpath_state(
         tx_reference,
         tx_power,
+        tx_polarization,
         rx_positions,
+        rx_polarization,
         launch_state["tx_id"],
         launch_state["light_seed"],
     )
     los_light_state = (
-        _reduced_light_endpoint_state(tx_reference, tx_power, rx_positions)
+        _reduced_light_endpoint_state(
+            tx_reference,
+            tx_power,
+            tx_polarization,
+            rx_positions,
+            rx_polarization,
+        )
         if "los" in config.components
         else None
     )
@@ -827,7 +837,7 @@ def solve(scene: Scene, config: Config) -> Result:
     else:
         sample_blocks: list[dict[str, torch.Tensor]] = []
         material_tensors = (
-            _face_material_tensors(scene)
+            _face_material_tensors(scene, device=tx_reference.device)
             if scene.structures
             and (
                 ("reflection" in config.components)
@@ -882,8 +892,10 @@ def solve(scene: Scene, config: Config) -> Result:
                         raydn,
                         tx_reference,
                         tx_power,
+                        tx_polarization,
                         endpoint_subpaths,
                         rx_positions,
+                        rx_polarization,
                         material_tensors,
                         frequency_hz=float(scene.frequency),
                         samples=native_samples,
