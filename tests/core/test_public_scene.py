@@ -53,6 +53,7 @@ def test_materials_compile_scalar_parameters():
         "sigma_e": 0.0,
         "gain": 1.0,
         "model_id": 1,
+        "thickness_m": 0.1,
     }
     assert lossy.parameters()["sigma_e"] == 0.02
     assert conductor.parameters()["model_id"] == 2

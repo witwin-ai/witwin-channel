@@ -5,6 +5,7 @@ from typing import Any
 import torch
 
 from witwin.channel_native import Scene
+from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import effective_sigma_e
 from witwin.channel_native.core.kernels.ops import (
@@ -124,6 +125,7 @@ def solve(scene: Scene, config: Config) -> Result:
         if needs_reflection_launch or ("diffraction" in config.components and diffraction_available):
             material_tensors = _host_material_tensors(scene)
         reflection_result = None
+        collect_diffraction_wedges = "diffraction" in config.components and diffraction_available
         if needs_reflection_launch:
             if material_tensors is None:
                 raise RuntimeError("material tensors are required for native reflection")
@@ -136,7 +138,7 @@ def solve(scene: Scene, config: Config) -> Result:
                 seed=config.seed,
                 device=device,
                 material_tensors=material_tensors,
-                collect_wedges=False,
+                collect_wedges=collect_diffraction_wedges,
                 reflection_accumulation_strategy=config.reflection_accumulation_strategy,
                 reflection_compact_min_samples=config.reflection_compact_min_samples,
                 reflection_staged_min_samples_per_cell=config.reflection_staged_min_samples_per_cell,
@@ -159,7 +161,11 @@ def solve(scene: Scene, config: Config) -> Result:
                 seed=config.seed,
                 device=device,
                 material_tensors=material_tensors,
-                wedge_events=None,
+                wedge_events=(
+                    reflection_result.wedge_events
+                    if reflection_result is not None and collect_diffraction_wedges
+                    else None
+                ),
             )
             path_count += config.samples
             valid_contribution_count += int(component_maps["diffraction"].numel())
@@ -188,6 +194,12 @@ def solve(scene: Scene, config: Config) -> Result:
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
     )
+    edge_policy = resolve_scene_edge_policy(scene)
+    metadata["edge_policy"] = {
+        "edge_selection_mode": edge_policy.edge_selection_mode,
+        "edge_diffraction": bool(edge_policy.edge_diffraction),
+        "boundary_edge_policy": edge_policy.boundary_edge_policy,
+    }
     diagnostics: dict[str, Any] | None = None
     if config.diagnostics:
         diagnostics = {

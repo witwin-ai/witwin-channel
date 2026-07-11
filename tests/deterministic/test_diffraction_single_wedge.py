@@ -39,10 +39,10 @@ def test_single_wedge_diffraction_matches_path_reference():
     )
     expected_gain = torch.tensor(
         [
-            1.71160394302e-07,
-            2.04434025264e-09,
-            4.26232276141e-08,
-            9.16079212487e-09,
+            6.07583245937e-08,
+            2.18809947938e-09,
+            2.81490724063e-08,
+            1.28271135935e-08,
         ],
         device=result.paths.path_gain.device,
         dtype=torch.float32,
@@ -94,20 +94,20 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
     # record (audit D-6).
     expected_field_real = torch.tensor(
         [
-            2.77275190456e-04,
-            -3.56407908839e-05,
-            -1.01459103462e-04,
-            6.99604788679e-05,
+            1.78716931259e-04,
+            -3.69373046851e-05,
+            8.05378658697e-05,
+            8.26043760753e-05,
         ],
         device=result.paths.field_real.device,
         dtype=torch.float32,
     )
     expected_field_imag = torch.tensor(
         [
-            -3.07048641844e-04,
-            2.78221923509e-05,
-            -1.79803435458e-04,
-            -6.53170864098e-05,
+            -1.69760358403e-04,
+            2.87007824227e-05,
+            1.47182639921e-04,
+            -7.74830987211e-05,
         ],
         device=result.paths.field_imag.device,
         dtype=torch.float32,

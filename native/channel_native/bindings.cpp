@@ -585,7 +585,21 @@ pybind11::dict cn_mc_reflection_launch_inputs(
     torch::Tensor tx_positions,
     int64_t tx_index,
     int64_t sample_count);
+torch::Tensor cn_mc_sionna_reflection_accumulate(
+    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
+    torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
+    torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    int64_t contribution_depth, int64_t axis, double plane_position,
+    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
+    int64_t resolution0, int64_t resolution1, double wavelength,
+    double solid_angle_per_ray, double cell_area);
 torch::Tensor cn_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src);
+torch::Tensor cn_mc_sionna_diffraction_tape_accumulate(
+    torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
+    torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
+    torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,int64_t,double,double,double,double,double,
+    int64_t,int64_t,double,double,int64_t,double);
 torch::Tensor cn_mc_selected_edge_indices(torch::Tensor selected);
 pybind11::tuple cn_mc_diffraction_state_pack(
     torch::Tensor edge_indices,
@@ -1157,9 +1171,17 @@ PYBIND11_MODULE(_channel_native, module) {
         &cn_mc_reflection_launch_inputs,
         "Prepare RayDN reflection launch tensors with a CUDA kernel.");
     module.def(
+        "mc_sionna_reflection_accumulate",
+        &cn_mc_sionna_reflection_accumulate,
+        "Accumulate finite-thickness Sionna/ITU specular reflections from RayDN traces.");
+    module.def(
         "mc_diffraction_state_wi",
         &cn_mc_diffraction_state_wi,
         "Compute MC diffraction incident directions with a CUDA kernel.");
+    module.def(
+        "mc_sionna_diffraction_tape_accumulate",
+        &cn_mc_sionna_diffraction_tape_accumulate,
+        "Evaluate full UTD power for valid Keller-cone diffraction samples.");
     module.def(
         "mc_selected_edge_indices",
         &cn_mc_selected_edge_indices,

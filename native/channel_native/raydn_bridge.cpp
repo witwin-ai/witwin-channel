@@ -840,7 +840,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     at::Tensor tx_pol = at::zeros_like(tx_pos);
     if (tx_pol.numel() != 0)
-        tx_pol.select(1, 0).fill_(1.0);
+        tx_pol.select(1, 2).fill_(1.0);
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
     int64_t output_count = raydn_diffraction_paths_order1_forward_fn(raydn_module_handle)(
@@ -995,7 +995,7 @@ pybind11::dict cn_path_diffraction_paths_order1(
         at::Tensor tx_view = tx_positions.narrow(0, tx_index, 1);
         at::Tensor tx_pol = at::zeros_like(tx_view);
         if (tx_pol.numel() != 0)
-            tx_pol.select(1, 0).fill_(1.0);
+            tx_pol.select(1, 2).fill_(1.0);
         const int64_t state_limit = states[0].size(0);
         const int64_t capacity = rx_positions.size(0) * state_limit;
         std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;

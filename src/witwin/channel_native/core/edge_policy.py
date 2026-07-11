@@ -11,7 +11,7 @@ _EDGE_SELECTION_MODES = {"vertical_only", "all_edges"}
 class EdgePolicy:
     vertical_ratio: float = 0.7
     edge_selection_mode: str = "all_edges"
-    edge_diffraction: bool | None = None
+    edge_diffraction: bool | None = True
     boundary_edge_policy: str | None = None
 
     def __post_init__(self) -> None:

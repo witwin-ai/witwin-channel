@@ -26,6 +26,7 @@ class Dielectric:
     mu_r: float = 1.0
     sigma_e: float = 0.0
     gain: float = 1.0
+    thickness_m: float = 0.1
 
     def parameters(self) -> dict[str, float | int]:
         return {
@@ -33,6 +34,7 @@ class Dielectric:
             "mu_r": float(self.mu_r),
             "sigma_e": float(self.sigma_e),
             "gain": float(self.gain),
+            "thickness_m": float(self.thickness_m),
             "model_id": 1,
         }
 
@@ -45,6 +47,7 @@ class LossyDielectric(Dielectric):
 @dataclass(frozen=True, slots=True)
 class PerfectConductor:
     gain: float = 1.0
+    thickness_m: float = 0.1
 
     def parameters(self) -> dict[str, float | int]:
         return {
@@ -52,5 +55,6 @@ class PerfectConductor:
             "mu_r": 1.0,
             "sigma_e": 0.0,
             "gain": float(self.gain),
+            "thickness_m": float(self.thickness_m),
             "model_id": 2,
         }

@@ -33,9 +33,11 @@ __device__ __forceinline__ Vec3 normalize(Vec3 a, Vec3 default_value=v3(0.f,0.f,
 __device__ __forceinline__ Vec3 load3(const float *p,int i) { return v3(p[i*3],p[i*3+1],p[i*3+2]); }
 
 __device__ __forceinline__ Vec3 silhouette_viewpoint(
-    Vec3 hit_p, Vec3 shading_n, Vec3 geometric_n, Vec3 ray_dir, float local_scale) {
+    Vec3 hit_p, Vec3 shading_n, Vec3 geometric_n, Vec3 ray_dir) {
     Vec3 geo = norm(geometric_n)>kEps ? geometric_n : shading_n;
-    Vec3 surface_n = dot(ray_dir,geo)>0.f ? mul(geo,-1.f) : geo;
+    // Mitsuba's primitive_silhouette_projection uses the unmodified
+    // geometric interaction normal (si.n), not a face-forward normal.
+    Vec3 surface_n = geo;
     Vec3 tangent = sub(ray_dir,mul(surface_n,dot(ray_dir,surface_n)));
     if (norm(tangent)<=kEps) {
         Vec3 fx=cross(surface_n,v3(1.f,0.f,0.f));
@@ -44,8 +46,9 @@ __device__ __forceinline__ Vec3 silhouette_viewpoint(
     }
     tangent=normalize(tangent,v3(1.f,0.f,0.f));
     Vec3 d=add(mul(surface_n,cosf(kHalfPiMinusOffset)),mul(tangent,sinf(kHalfPiMinusOffset)));
-    // Channel heuristic, but scale-relative: avoids the former hard-coded 0.1 m offset.
-    const float offset=fmaxf(1.0e-5f,1.0e-3f*fmaxf(local_scale,kEps));
+    // Sionna's primitive_silhouette_projection uses a fixed 0.1 scene-unit
+    // viewpoint displacement.
+    const float offset=0.1f;
     return add(hit_p,mul(d,offset));
 }
 
@@ -55,20 +58,16 @@ __device__ __forceinline__ bool wedge_exterior(Vec3 from_edge,Vec3 edge_dir,Vec3
     return norm(projected)>kEps && (dot(projected,n0)>=-kEps || dot(projected,n1)>=-kEps);
 }
 
-__device__ int best_edge(
+__device__ int sampled_edge(
     Vec3 tx, Vec3 ray_dir, Vec3 hit_p, Vec3 hit_n, Vec3 hit_geo_n, int prim,
+    int sample_index,
     const int *tri_count,const int *tri_edges,int slots,int tri_n,
     const float *edge_pos,const float *edge_dir,const float *n0p,const float *n1p,
     const float *tminp,const float *tmaxp,const int *face1,int edge_n) {
     if(prim<0||prim>=tri_n) return -1;
     const int count=min(max(tri_count[prim],0),slots);
-    float local_scale=0.f;
-    for(int s=0;s<count;++s){
-        int e=tri_edges[prim*slots+s];
-        if(e>=0&&e<edge_n) local_scale=fmaxf(local_scale,fabsf(tmaxp[e]-tminp[e]));
-    }
-    Vec3 viewpoint=silhouette_viewpoint(hit_p,hit_n,hit_geo_n,ray_dir,local_scale);
-    int best=-1; float best_d=1.0e30f;
+    Vec3 viewpoint=silhouette_viewpoint(hit_p,hit_n,hit_geo_n,ray_dir);
+    int valid_count=0;
     for(int s=0;s<count;++s){
         int e=tri_edges[prim*slots+s]; if(e<0||e>=edge_n) continue;
         Vec3 ep=load3(edge_pos,e), ed=load3(edge_dir,e), eh=normalize(ed);
@@ -77,12 +76,23 @@ __device__ int best_edge(
         Vec3 n0=load3(n0p,e),n1=load3(n1p,e);
         bool flip=dot(ray_dir,n0)>0.f;
         if(!wedge_exterior(sub(tx,point),ed,flip?n1:n0,flip?n0:n1)) continue;
-        Vec3 view=sub(viewpoint,point);
-        bool f0=dot(view,n0)>kEps,f1=dot(view,n1)>kEps;
-        if(!(face1[e]<0 || f0!=f1)) continue;
-        float d=dot(view,view); if(d<best_d){best_d=d;best=e;}
+        ++valid_count;
     }
-    return best;
+    if(valid_count<=0) return -1;
+    unsigned int h=static_cast<unsigned int>(sample_index)^0x9e3779b9u;
+    h^=h>>16; h*=0x7feb352du; h^=h>>15; h*=0x846ca68bu; h^=h>>16;
+    const int wanted=static_cast<int>(h%static_cast<unsigned int>(valid_count));
+    int ordinal=0;
+    for(int s=0;s<count;++s){
+        int e=tri_edges[prim*slots+s]; if(e<0||e>=edge_n) continue;
+        Vec3 ep=load3(edge_pos,e), ed=load3(edge_dir,e), eh=normalize(ed);
+        float ell=fminf(fmaxf(dot(sub(viewpoint,ep),eh),tminp[e]),tmaxp[e]);
+        Vec3 point=add(ep,mul(eh,ell)); Vec3 en0=load3(n0p,e),en1=load3(n1p,e);
+        bool flip=dot(ray_dir,en0)>0.f;
+        if(!wedge_exterior(sub(tx,point),ed,flip?en1:en0,flip?en0:en1)) continue;
+        if(ordinal++==wanted) return e;
+    }
+    return -1;
 }
 
 __global__ void discover_kernel(
@@ -94,8 +104,11 @@ __global__ void discover_kernel(
     int i=blockIdx.x*blockDim.x+threadIdx.x;
     int n=hit_count?min(max(hit_count[0],0),capacity):capacity;
     if(i>=n) return;
-    int e=best_edge(load3(tx,0),load3(ray_dir,i),load3(hit_p,i),load3(hit_n,i),
-        load3(hit_geo_n,i),prim[i],tri_count,tri_edges,slots,tri_n,edge_pos,edge_dir,
+    // Discovery stores support, not a per-path contribution. Select one
+    // exterior primitive-perimeter candidate per first hit with a reproducible
+    // uniform draw; the subsequent estimator samples edge length explicitly.
+    int e=sampled_edge(load3(tx,0),load3(ray_dir,i),load3(hit_p,i),load3(hit_n,i),
+        load3(hit_geo_n,i),prim[i],i,tri_count,tri_edges,slots,tri_n,edge_pos,edge_dir,
         n0,n1,tmin,tmax,face1,edge_n);
     if(e>=0) atomicExch(seen+e,1);
 }

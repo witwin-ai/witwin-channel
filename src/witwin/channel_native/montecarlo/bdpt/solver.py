@@ -8,6 +8,7 @@ import torch
 
 from witwin.channel_native import Scene
 from witwin.channel_native import ReceiverGrid
+from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import effective_sigma_e
 from witwin.channel_native.core.kernels.ops import (
@@ -484,13 +485,6 @@ def _native_diffraction_component_maps(
     selected, edge_pos, edge_dir, _lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle = edge_geometry
     edge_indices = bdpt_selected_edge_indices(selected)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    # A receiver grid has a finite target domain, so sample it directly.  The
-    # Keller-cone plane projection carries an unbounded grazing-angle Jacobian
-    # and produced heavy-tailed maps (nearly 2x cross-seed spread at 8k
-    # samples).  Direct sampling rotates uniformly through grid cells and
-    # samples edge position without that projection singularity.  Point
-    # receivers retain the direct/Keller MIS path below.
-    direct_samples, keller_samples, suffix_samples = int(samples), 0, 0
     sample_blocks: list[dict[str, torch.Tensor]] = []
 
     for tx_index in range(int(tx_positions.shape[0])):
@@ -512,6 +506,10 @@ def _native_diffraction_component_maps(
         if state_count <= 0:
             continue
         state_wi = bdpt_diffraction_state_wi(states[1], states[10])
+        cell_count = int(spec.resolution0) * int(spec.resolution1)
+        direct_samples = int(samples) if int(samples) >= state_count * cell_count else 0
+        keller_samples = 0 if direct_samples else int(samples)
+        suffix_samples = 0
         out = bdpt_diffraction_accumulation_forward(
             raydn.require_handle(),
             None,
@@ -555,9 +553,10 @@ def _native_diffraction_component_maps(
             None,
             None,
         )
+        diffraction_map = out[0] * float(cell_count) if direct_samples else out[0]
         maps = mc_store_component_map(
             maps,
-            out[0] * float(int(spec.resolution0) * int(spec.resolution1)),
+            diffraction_map,
             tx_index=tx_index,
         )
         if export_samples:
@@ -981,6 +980,12 @@ def solve(scene: Scene, config: Config) -> Result:
         variance_enabled=variance is not None,
         launch_count=launch_count,
     )
+    edge_policy = resolve_scene_edge_policy(scene)
+    metadata["edge_policy"] = {
+        "edge_selection_mode": edge_policy.edge_selection_mode,
+        "edge_diffraction": bool(edge_policy.edge_diffraction),
+        "boundary_edge_policy": edge_policy.boundary_edge_policy,
+    }
     diagnostics: dict[str, Any] | None = None
     if config.diagnostics:
         diagnostics = {

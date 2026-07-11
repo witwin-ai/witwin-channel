@@ -43,3 +43,19 @@ def face_material_tensors(
         exported["gain"],
         exported["valid"],
     )
+
+
+def face_material_thickness(
+    scene_or_compiled: "Scene | CompiledScene",
+    *,
+    device: torch.device,
+) -> torch.Tensor:
+    """Expand Sionna/ITU slab thickness to the global face layout."""
+
+    compiled = scene_or_compiled if hasattr(scene_or_compiled, "materials") else scene_or_compiled.compile()
+    material_thickness = compiled.materials.model_params[:, 0].to(
+        device=device,
+        dtype=torch.float32,
+    )
+    face_material_id = compiled.assignments.face_material_id.to(device=device, dtype=torch.int64)
+    return material_thickness.index_select(0, face_material_id).contiguous()

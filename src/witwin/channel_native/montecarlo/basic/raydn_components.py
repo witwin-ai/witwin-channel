@@ -12,7 +12,7 @@ from witwin.channel_native.core.kernels.ops import (
     raydn_diffraction_accumulation_forward,
     raydn_diffraction_discover_edges,
     raydn_diffraction_discover_edges_counted,
-    raydn_reflection_accumulation_forward,
+    raydn_trace_reflections_forward,
     raydn_visibility_forward,
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
@@ -21,13 +21,15 @@ from witwin.channel_native.core.kernels.ops import (
     mc_los_component_maps_from_matrix,
     mc_los_visibility_inputs,
     mc_reflection_launch_inputs,
+    mc_sionna_reflection_accumulate,
     mc_sample_directions,
+    mc_sionna_diffraction_tape_accumulate,
     mc_store_component_map,
     mc_store_scaled_component_map,
     mc_surface_group_edge_candidates,
 )
 from witwin.channel_native.core.edge_selection import refine_edge_geometry
-from witwin.channel_native.core.material_runtime import face_material_tensors
+from witwin.channel_native.core.material_runtime import face_material_tensors, face_material_thickness
 from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
 from witwin.channel_native.core.runtime.raydn import RayDNScene
 
@@ -202,13 +204,8 @@ def reflection_component_maps_with_wedges(
     reflection_staged_min_samples_per_cell: int = 64,
     streaming_los_enabled: bool = False,
 ) -> ReflectionComponentResult:
-    strategy_id = {
-        "auto": 0,
-        "atomic": 1,
-        "staged": 2,
-        "compact": 3,
-        "streaming_planar": 4,
-    }[reflection_accumulation_strategy]
+    del seed, reflection_accumulation_strategy, reflection_compact_min_samples
+    del reflection_staged_min_samples_per_cell, streaming_los_enabled
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
@@ -223,80 +220,78 @@ def reflection_component_maps_with_wedges(
     handle = raydn.require_handle()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid = material_tensors
+    material_eta_r, material_sigma, _material_mu_r, material_gain, material_valid = material_tensors
+    material_thickness = face_material_thickness(scene, device=device)
+    face_normals = raydn.edge_records().face_normals
     solid_angle_per_ray = float(4.0 * math.pi / max(1, int(samples)))
     dim0, dim1 = component_grid_shape(grid)
     maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
-        if reflection_accumulation_strategy == "streaming_planar":
-            launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=1)
-            ray_o = launch_inputs["ray_o"]
-            ray_d = mc_sample_directions(0, tx_pos)
-            ray_tmax = launch_inputs["ray_tmax"]
-            active = launch_inputs["active"]
-            tx_batch = ray_o
-            tx_pol = launch_inputs["tx_pol"]
-        else:
-            ray_d = _sample_directions(samples, reference=tx_pos)
-            launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples)
-            ray_o = launch_inputs["ray_o"]
-            ray_tmax = launch_inputs["ray_tmax"]
-            active = launch_inputs["active"]
-            tx_batch = ray_o
-            tx_pol = launch_inputs["tx_pol"]
-        out = raydn_reflection_accumulation_forward(
+        ray_d = _sample_directions(samples, reference=tx_pos)
+        launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples)
+        ray_o = launch_inputs["ray_o"]
+        ray_tmax = launch_inputs["ray_tmax"]
+        active = launch_inputs["active"]
+        trace = raydn_trace_reflections_forward(
             handle,
             ray_o,
             ray_d,
             ray_tmax,
             active,
-            tx_batch,
-            tx_pol,
+            max(1, int(max_depth) + 1),
+        )
+        reflection_map = mc_sionna_reflection_accumulate(
+            ray_o,
+            ray_d,
+            trace[0],
+            trace[1],
+            trace[2],
+            face_normals,
             material_eta_r,
             material_sigma,
-            material_mu_r,
             material_gain,
             material_valid,
-            int(max_depth),
-            int(spec.axis),
-            float(spec.position),
-            float(spec.coord0_min),
-            float(spec.coord0_max),
-            float(spec.coord1_min),
-            float(spec.coord1_max),
-            int(spec.resolution0),
-            int(spec.resolution1),
-            float(wavelength),
-            solid_angle_per_ray,
-            bool(collect_wedges),
-            False,
-            int(samples) if collect_wedges else 0,
-            1,
-            strategy_id,
-            int(reflection_compact_min_samples),
-            int(reflection_staged_min_samples_per_cell),
-            int(samples) if reflection_accumulation_strategy == "streaming_planar" else 0,
-            bool(streaming_los_enabled),
+            material_thickness,
+            contribution_depth=int(max_depth),
+            grid_axis=int(spec.axis),
+            grid_position=float(spec.position),
+            grid_coord0_min=float(spec.coord0_min),
+            grid_coord0_max=float(spec.coord0_max),
+            grid_coord1_min=float(spec.coord1_min),
+            grid_coord1_max=float(spec.coord1_max),
+            grid_resolution0=int(spec.resolution0),
+            grid_resolution1=int(spec.resolution1),
+            wavelength=float(wavelength),
+            solid_angle_per_ray=solid_angle_per_ray,
+            grid_cell_area=float(spec.cell_area),
         )
         mc_store_scaled_component_map(
             maps,
-            out[0],
+            reflection_map,
             tx_power,
             tx_index=tx_index,
             scale_index=tx_index,
         )
         if collect_wedges:
+            valid_indices = torch.nonzero(trace[0][:, 0], as_tuple=False).flatten()
+            prim_id = trace[2][:, 0].index_select(0, valid_indices)
+            ray_dir = ray_d.index_select(0, valid_indices)
+            hit_p = (
+                ray_o.index_select(0, valid_indices)
+                + trace[1][:, 0].index_select(0, valid_indices)[:, None] * ray_dir
+            )
+            hit_n = face_normals.index_select(0, prim_id.to(dtype=torch.int64))
             wedge_batches.append(
                 WedgeEventBatch(
                     tx_pos=tx,
-                    event_count=out[8],
-                    ray_dir=out[13],
-                    prim_id=out[12],
-                    hit_p=out[10],
-                    hit_n=out[11],
-                    hit_geo_n=out[11],
-                    bounce_depth=out[17],
+                    event_count=None,
+                    ray_dir=ray_dir,
+                    prim_id=prim_id,
+                    hit_p=hit_p,
+                    hit_n=hit_n,
+                    hit_geo_n=hit_n,
+                    bounce_depth=torch.zeros_like(prim_id),
                 )
             )
     return ReflectionComponentResult(maps=maps, wedge_events=tuple(wedge_batches))
@@ -339,13 +334,24 @@ def _diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
     )
 
 
-def _cached_diffraction_edge_geometry(raydn: RayDNScene) -> tuple[torch.Tensor, ...]:
+def _cached_diffraction_edge_geometry(
+    raydn: RayDNScene,
+    *,
+    preserve_imported_edges: bool = False,
+) -> tuple[torch.Tensor, ...]:
     cache = raydn.runtime_cache
-    cached = cache.get("mc_diffraction_edge_geometry")
+    cache_key = (
+        "mc_imported_diffraction_edge_geometry"
+        if preserve_imported_edges
+        else "mc_diffraction_edge_geometry"
+    )
+    cached = cache.get(cache_key)
     if cached is not None:
         return cached  # type: ignore[return-value]
-    geometry = refine_edge_geometry(raydn, _diffraction_edge_geometry(raydn.edge_records()))
-    cache["mc_diffraction_edge_geometry"] = geometry
+    geometry = _diffraction_edge_geometry(raydn.edge_records())
+    if not preserve_imported_edges:
+        geometry = refine_edge_geometry(raydn, geometry)
+    cache[cache_key] = geometry
     return geometry
 
 
@@ -363,19 +369,19 @@ def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tu
     )
 
 
-def _cached_surface_group_edge_candidates(
+def _cached_primitive_edge_candidates(
     raydn: RayDNScene,
     selected: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     key = (int(selected.data_ptr()), int(selected.numel()))
     cache = raydn.runtime_cache
-    cached = cache.get("mc_surface_group_edge_candidates")
+    cached = cache.get("mc_primitive_edge_candidates")
     if cached is not None:
         cached_key, cached_candidates = cached  # type: ignore[misc]
         if cached_key == key:
             return cached_candidates  # type: ignore[return-value]
     candidates = _native_surface_group_edge_candidates(raydn.edge_records(), selected)
-    cache["mc_surface_group_edge_candidates"] = (key, candidates)
+    cache["mc_primitive_edge_candidates"] = (key, candidates)
     return candidates
 
 
@@ -399,7 +405,7 @@ def _discover_diffraction_edges_from_wedges(
         _exterior_angle,
     ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(raydn)
     if edge_candidates is None:
-        edge_candidates = _cached_surface_group_edge_candidates(raydn, selected)
+        edge_candidates = _cached_primitive_edge_candidates(raydn, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
     if wedges.event_count is not None:
         return raydn_diffraction_discover_edges_counted(
@@ -538,22 +544,31 @@ def diffraction_component_map(
     handle = raydn.require_handle()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     material_eta_r, material_sigma, material_mu_r, material_gain, material_valid = material_tensors
+    material_thickness = face_material_thickness(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
     dim0, dim1 = component_grid_shape(grid)
     maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
     edge_geometry: tuple[torch.Tensor, ...] | None = None
     edge_candidates: tuple[torch.Tensor, torch.Tensor] | None = None
+    mitsuba_metadata = scene.metadata.get("mitsuba", {})
+    preserve_imported_edges = (
+        isinstance(mitsuba_metadata, dict)
+        and bool(mitsuba_metadata.get("merge_shapes", False))
+    )
 
     def get_edge_geometry() -> tuple[torch.Tensor, ...]:
         nonlocal edge_geometry
         if edge_geometry is None:
-            edge_geometry = _cached_diffraction_edge_geometry(raydn)
+            edge_geometry = _cached_diffraction_edge_geometry(
+                raydn,
+                preserve_imported_edges=preserve_imported_edges,
+            )
         return edge_geometry
 
     def get_edge_candidates(geometry: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, torch.Tensor]:
         nonlocal edge_candidates
         if edge_candidates is None:
-            edge_candidates = _cached_surface_group_edge_candidates(raydn, geometry[0])
+            edge_candidates = _cached_primitive_edge_candidates(raydn, geometry[0])
         return edge_candidates
 
     for tx_index, tx in enumerate(tx_pos):
@@ -589,56 +604,43 @@ def diffraction_component_map(
         state_count = int(states[0].shape[0])
         if state_count <= 0:
             continue
-        state_wi = mc_diffraction_state_wi(states[1], states[10])
-        out = raydn_diffraction_accumulation_forward(
-            handle,
-            None,
-            *states,
-            state_wi,
-            state_wi,
-            material_eta_r,
-            material_sigma,
-            material_mu_r,
-            material_gain,
-            material_valid,
-            state_count,
-            int(spec.axis),
-            float(spec.position),
-            float(spec.coord0_min),
-            float(spec.coord0_max),
-            float(spec.coord1_min),
-            float(spec.coord1_max),
-            int(spec.resolution0),
-            int(spec.resolution1),
-            float(spec.cell_area),
-            float(wavelength),
+        edge_lengths = (states[4] - states[3]).clamp_min(0.0)
+        total_edge_length = float(edge_lengths.sum().item())
+        if not total_edge_length > 0.0:
+            continue
+        generator = torch.Generator(device=device)
+        generator.manual_seed(int(seed))
+        sample_state_index = torch.multinomial(
+            edge_lengths,
             int(samples),
-            0,
-            0,
-            int(seed),
-            1,
-            0,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            0,
-            None,
-            None,
+            replacement=True,
+            generator=generator,
+        ).to(dtype=torch.int32)
+        sample_edge_weight = torch.full(
+            (int(samples),),
+            total_edge_length / float(samples),
+            device=device,
+            dtype=torch.float32,
         )
-        # Direct lanes rotate over cells as well as states.  RayD's default
-        # edge weight accounts for state selection; restore the discrete
-        # 1 / cell_count target-selection probability on the compact map.
-        mc_store_component_map(
-            maps,
-            out[0] * float(int(spec.resolution0) * int(spec.resolution1)),
-            tx_index=tx_index,
+        state_wi = mc_diffraction_state_wi(states[1], states[10])
+        sampled = raydn_diffraction_accumulation_forward(
+            handle, None, *states, state_wi, state_wi,
+            material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
+            state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),
+            float(spec.coord0_max), float(spec.coord1_min), float(spec.coord1_max),
+            int(spec.resolution0), int(spec.resolution1), float(spec.cell_area), float(wavelength),
+            0, int(samples), 0, int(seed), 1, 0,
+            None, None, None, None, None, None, None, None, None, None, None,
+            1, sample_state_index, sample_edge_weight,
         )
+        diffraction_map = mc_sionna_diffraction_tape_accumulate(
+            sampled[14], sampled[15], sampled[16], sampled[18],
+            states[1], states[2], states[3], states[4], states[5], states[6],
+            states[7], states[8], states[9], states[10], states[11],
+            material_eta_r, material_sigma, material_mu_r, material_gain, material_valid, material_thickness,
+            int(spec.axis), float(spec.position), float(spec.coord0_min), float(spec.coord0_max),
+            float(spec.coord1_min), float(spec.coord1_max), int(spec.resolution0),
+            int(spec.resolution1), float(wavelength), float(spec.cell_area), int(seed), total_edge_length,
+        )
+        mc_store_component_map(maps, diffraction_map, tx_index=tx_index)
     return maps

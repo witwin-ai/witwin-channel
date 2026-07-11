@@ -23,6 +23,13 @@ _MUNICH_XML = (
 _SIONNA_ROOT = Path("E:/Code/witwin-platform/channel/reference/sionna-rt-reference-2.0.1/src")
 
 
+def test_edge_diffraction_is_explicitly_enabled_by_default():
+    policy = EdgePolicy()
+
+    assert policy.edge_diffraction is True
+    assert policy.boundary_edge_policy == "half_plane"
+
+
 def test_munich_load_mitsuba_matches_original_scene_counts():
     if not _MUNICH_XML.exists():
         pytest.skip("Munich reference scene is not available")
@@ -40,6 +47,7 @@ def test_munich_load_mitsuba_matches_original_scene_counts():
     assert sum(int(structure.faces.shape[0]) for structure in scene.structures) == 38936
     assert scene.frequency == 2.4e9
     assert scene.metadata["mitsuba"]["source_path"] == str(_MUNICH_XML.resolve())
+    assert scene.metadata["sionna_import_edge_policy"].edge_diffraction is True
     assert scene.diffraction_edge_count(
         EdgePolicy(edge_selection_mode="all_edges", boundary_edge_policy="half_plane")
     ) == 51650

@@ -107,13 +107,18 @@ def _itu_parameters(material_name: str, frequency_hz: float) -> tuple[float, flo
     raise ValueError(f"ITU material {material_name!r} is not defined for {frequency_hz} Hz")
 
 
-def _native_material(material_name: str | None, frequency_hz: float) -> Dielectric:
+def _native_material(
+    material_name: str | None,
+    frequency_hz: float,
+    *,
+    thickness_m: float = 0.1,
+) -> Dielectric:
     if material_name is None:
-        return Dielectric(eps_r=1.0)
+        return Dielectric(eps_r=1.0, thickness_m=thickness_m)
     if material_name not in _ITU_MATERIALS_PROPERTIES:
         raise ValueError(f"ITU radio material is not recognized: {material_name!r}")
     eps_r, sigma = _itu_parameters(material_name, frequency_hz)
-    return Dielectric(eps_r=eps_r, mu_r=1.0, sigma_e=sigma)
+    return Dielectric(eps_r=eps_r, mu_r=1.0, sigma_e=sigma, thickness_m=thickness_m)
 
 
 def _read_ply_header(handle) -> tuple[list[str], int, list[tuple[str, str]], int]:
@@ -305,8 +310,12 @@ def _load_mitsuba_native_ply(
     structures: list[Structure] = []
     used: set[str] = set()
     for index, mesh in enumerate(native_meshes):
-        material = _native_material(mesh.material_name, frequency)
         material_info = material_defs.get(mesh.material_name or "", {})
+        material = _native_material(
+            mesh.material_name,
+            frequency,
+            thickness_m=float(material_info.get("thickness", 0.1) or 0.1),
+        )
         name = _unique(_sanitize(mesh.name, f"structure-{index}"), used)
         structures.append(
             Structure(
@@ -369,7 +378,7 @@ def load_mitsuba(
     native_loader: bool = True,
     vertical_ratio: float = 0.7,
     edge_selection_mode: str = "vertical_only",
-    edge_diffraction: bool | None = None,
+    edge_diffraction: bool | None = True,
     boundary_edge_policy: str | None = None,
     **_ignored,
 ):

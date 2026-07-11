@@ -26,6 +26,8 @@ def test_bdpt_metadata_reports_contract_fields():
         == result.path_gain.shape[0] * result.path_gain.shape[1]
     )
     assert result.metadata["components"]["los"] == "enabled"
+    assert result.metadata["edge_policy"]["edge_diffraction"] is True
+    assert result.metadata["edge_policy"]["boundary_edge_policy"] == "half_plane"
     assert result.metadata["native_capabilities"]["cuda"] is True
     assert result.metadata["variance"] is True
     assert result.metadata["ad_status"] == "none"

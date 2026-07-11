@@ -2,11 +2,150 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
+#include <rayd/shared/utd/utd_math.h>
 #include <vector>
 
 namespace {
 
 constexpr int kDiffractionBlockSize = 256;
+namespace utd = witwin::channel::native_ext;
+
+__device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
+    x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;
+}
+__device__ __forceinline__ float dfr_uniform(unsigned int lane,unsigned int stream,unsigned int seed) {
+    const unsigned int h=dfr_hash(lane^(stream*0x9e3779b9u)^seed);
+    return static_cast<float>(h&0x00ffffffu)*(1.0f/16777216.0f);
+}
+
+__device__ __forceinline__ void slab_reflection(
+    float ct,float er,float sg,float thickness,float wavelength,utd::Complex &rte,utd::Complex &rtm) {
+    ct=fminf(fmaxf(fabsf(ct),1.0e-6f),1.0f);
+    const float omega=2.0f*utd::UTD_PI*299792458.0f/wavelength;
+    const utd::Complex eta=utd::cplx(er,-sg/(omega*utd::UTD_EPSILON_0));
+    const utd::Complex root=utd::cplx_sqrt(utd::cplx_sub(eta,utd::cplx(1.0f-ct*ct,0)));
+    const utd::Complex rp_te=utd::cplx_div(utd::cplx_sub(utd::cplx(ct,0),root),utd::cplx_add(utd::cplx(ct,0),root));
+    const utd::Complex ect=utd::cplx_mul_real(eta,ct);
+    const utd::Complex rp_tm=utd::cplx_div(utd::cplx_sub(ect,root),utd::cplx_add(ect,root));
+    const utd::Complex q=utd::cplx_mul_real(root,2.0f*utd::UTD_PI*fmaxf(thickness,0.0f)/wavelength);
+    float sn,cs; sincosf(2.0f*q.re,&sn,&cs);
+    const float amplitude=expf(fminf(2.0f*q.im,80.0f));
+    const utd::Complex phase=utd::cplx(amplitude*cs,-amplitude*sn);
+    const utd::Complex one=utd::cplx(1,0), term=utd::cplx_sub(one,phase);
+    rte=utd::cplx_div(utd::cplx_mul(rp_te,term),utd::cplx_sub(one,utd::cplx_mul(utd::cplx_mul(rp_te,rp_te),phase)));
+    rtm=utd::cplx_div(utd::cplx_mul(rp_tm,term),utd::cplx_sub(one,utd::cplx_mul(utd::cplx_mul(rp_tm,rp_tm),phase)));
+}
+
+__device__ __forceinline__ utd::JonesOperator slab_face_operator(
+    float ct,float er,float sg,float gain,float thickness,float wavelength,
+    utd::float3a normal,utd::float3a in_hat,utd::float3a out_hat,
+    utd::Basis3 in_edge,utd::Basis3 out_edge) {
+    utd::Complex rte,rtm; slab_reflection(ct,er,sg,thickness,wavelength,rte,rtm);
+    utd::JonesOperator diag={utd::cplx_mul_real(rte,gain),utd::cplx_zero(),utd::cplx_zero(),utd::cplx_mul_real(rtm,gain)};
+    const utd::float3a face_in=utd::f3_cross(normal,in_hat);
+    const utd::float3a raw_out=utd::f3_cross(normal,out_hat);
+    const utd::float3a reference_axis=utd::stable_perp_basis(out_hat,face_in);
+    const utd::float3a face_out=utd::f3_dot(raw_out,reference_axis)<0?utd::f3_neg(raw_out):raw_out;
+    const utd::Basis3 fin=utd::basis_from_first_vector(in_hat,face_in,utd::stable_perp_basis(in_hat,utd::make_f3(0,0,1)));
+    const utd::Basis3 fout=utd::basis_from_first_vector(out_hat,face_out,reference_axis);
+    return utd::jop_in_basis(diag,fin,fout,in_edge,out_edge);
+}
+
+__device__ __forceinline__ utd::float3a load_utd3(const float *p, int i) {
+    return utd::make_f3(p[3*i], p[3*i+1], p[3*i+2]);
+}
+
+__device__ __forceinline__ float component_utd(utd::float3a v, int axis) {
+    return axis == 0 ? v.x : (axis == 1 ? v.y : v.z);
+}
+
+__global__ void sionna_diffraction_tape_accumulate_kernel(
+    const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
+    const float *edge_pos, const float *edge_dir, const float *t_min, const float *t_max,
+    const float *n0, const float *nn, const int *prim0, const int *prim1,
+    const float *exterior_angle, const float *source, const float *source_power,
+    const float *eta_r, const float *sigma, const float *mu_r, const float *gain, const float *thickness,
+    const bool *material_valid, float *output, int64_t sample_count, int state_count,
+    int axis, float plane, float c0min, float c0max, float c1min, float c1max,
+    int r0, int r1, float wavelength, float cell_area, int seed, float total_edge_length) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
+    for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
+         lane<sample_count; lane+=stride) {
+        if (!tape_active[lane]) continue;
+        const int sidx=tape_state[lane], cell=tape_cell[lane];
+        if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
+        const utd::float3a ep=load_utd3(edge_pos,sidx);
+        const utd::float3a eh=utd::safe_normalize(load_utd3(edge_dir,sidx),utd::make_f3(0,0,1));
+        const float length=fmaxf(t_max[sidx]-t_min[sidx],0.0f);
+        const float ell=t_min[sidx]+tape_u[lane]*length;
+        const utd::float3a edge_point=utd::f3_add(ep,utd::f3_mul(eh,ell));
+        const utd::float3a src=load_utd3(source,sidx);
+        const utd::float3a incident=utd::safe_normalize(utd::f3_sub(edge_point,src),utd::make_f3(0,0,1));
+        const float axial=fminf(fmaxf(utd::f3_dot(incident,eh),-1.0f),1.0f);
+        const float radial=sqrtf(fmaxf(1.0f-axial*axial,0.0f));
+        const utd::float3a basis0=utd::stable_perp_basis(eh,incident);
+        const utd::float3a basis1=utd::safe_normalize(utd::f3_cross(eh,basis0),utd::make_f3(0,1,0));
+        float sa,ca; sincosf(2.0f*utd::UTD_PI*dfr_uniform(static_cast<unsigned int>(lane),1u,static_cast<unsigned int>(seed)),&sa,&ca);
+        const utd::float3a ko_exact=utd::safe_normalize(
+            utd::f3_add(utd::f3_mul(eh,axial),utd::f3_mul(utd::f3_add(utd::f3_mul(basis0,ca),utd::f3_mul(basis1,sa)),radial)),basis0);
+        const float denom=component_utd(ko_exact,axis);
+        if(fabsf(denom)<1.0e-8f) continue;
+        const float distance=(plane-component_utd(edge_point,axis))/denom;
+        if(!(distance>0.0f)) continue;
+        const utd::float3a target=utd::f3_add(edge_point,utd::f3_mul(ko_exact,distance));
+
+        utd::PairInputs p={};
+        p.edgePos=edge_point; p.edgeDir=eh; p.n0=load_utd3(n0,sidx); p.nn=load_utd3(nn,sidx);
+        p.wedgeN=exterior_angle[sidx]/utd::UTD_PI; p.edgeLineMin=-1.0e5f; p.edgeLineMax=1.0e5f;
+        p.sourcePos=src; p.selectStationaryPoint=0.0f;
+        const float k=2.0f*utd::UTD_PI/wavelength;
+        utd::MaterialParams mat={}; mat.useFresnel=1; mat.etaR=1; mat.muR=1; mat.sigma=0; mat.gain=1;
+        mat.omega=2.0f*utd::UTD_PI*299792458.0f/wavelength; mat.txPolZ=1.0f;
+        const utd::float3a incident_dir=incident;
+        const utd::float3a pol=utd::stable_perp_basis(incident_dir,utd::make_f3(0,0,1));
+        p.incidentBasis=utd::basis_from_first_vector(incident_dir,pol,utd::make_f3(1,0,0));
+        p.incidentJones=utd::jones_from_vector(utd::direct_source_vector(src,edge_point,k,mat),p.incidentBasis);
+        auto load_mat=[&](int prim)->utd::FaceMaterialParams {
+            utd::FaceMaterialParams m={1,1,0,1,1,0};
+            if(prim>=0 && material_valid[prim]) { m={eta_r[prim],mu_r[prim],sigma[prim],gain[prim],1,1}; }
+            return m;
+        };
+        p.face0Material=load_mat(prim0[sidx]); p.face1Material=load_mat(prim1[sidx]);
+        float gphi,gphi_p,gs,gs_p,gsb;
+        utd::compute_edge_geometry_3d(src,edge_point,eh,p.n0,target,gphi,gphi_p,gs,gs_p,gsb);
+        const utd::Basis3 in_edge=utd::diffraction_edge_basis(utd::f3_sub(edge_point,src),eh,false);
+        const utd::Basis3 out_edge=utd::diffraction_edge_basis(utd::f3_sub(target,edge_point),eh,true);
+        const int f0=prim0[sidx], f1=prim1[sidx];
+        if(f0>=0 && material_valid[f0]) p.face0Operator=slab_face_operator(
+            fabsf(sinf(gphi_p)),eta_r[f0],sigma[f0],gain[f0],thickness[f0],wavelength,
+            p.n0,in_edge.k,out_edge.k,in_edge,out_edge);
+        if(f1>=0 && material_valid[f1]) p.face1Operator=slab_face_operator(
+            fabsf(sinf(p.wedgeN*utd::UTD_PI-gphi)),eta_r[f1],sigma[f1],gain[f1],thickness[f1],wavelength,
+            p.nn,in_edge.k,out_edge.k,in_edge,out_edge);
+        mat.omega=0.0f;
+        const utd::PairOutputs field=utd::compute_pair_contribution(p,target,k,mat);
+        const float field_power=utd::cplx_abs_sqr(field.vectorField.x)+utd::cplx_abs_sqr(field.vectorField.y)+utd::cplx_abs_sqr(field.vectorField.z);
+        if (!(field_power>0) || !isfinite(field_power)) continue;
+
+        const utd::float3a t0v=utd::safe_normalize(utd::f3_cross(p.n0,eh),utd::make_f3(1,0,0));
+        const utd::float3a ko=ko_exact;
+        float phi=atan2f(utd::f3_dot(ko,p.n0),utd::f3_dot(ko,t0v));
+        if (phi < 0.0f) phi += 2.0f*utd::UTD_PI;
+        // RayD proposes the complete Keller cone. Sionna's lit-region
+        // estimator only accepts the exterior angular interval [0, 2pi-i].
+        // Rejection keeps the full-cone 1/(2pi) proposal density, hence the
+        // accepted sample weight below remains 2pi rather than the interval
+        // width.
+        if (phi > exterior_angle[sidx]) continue;
+        const utd::float3a dko=utd::f3_mul(utd::f3_add(utd::f3_mul(basis0,-sa),utd::f3_mul(basis1,ca)),radial);
+        const utd::float3a je=utd::f3_sub(eh,utd::f3_mul(ko,component_utd(eh,axis)/denom));
+        const utd::float3a jp=utd::f3_mul(utd::f3_sub(dko,utd::f3_mul(ko,component_utd(dko,axis)/denom)),distance);
+        const float jacobian=utd::safe_length(utd::f3_cross(jp,je));
+        const float edge_weight=total_edge_length/fmaxf(static_cast<float>(sample_count),1.0f);
+        const float value=field_power*source_power[sidx]*jacobian*(2.0f*utd::UTD_PI)*edge_weight/fmaxf(cell_area,1.0e-8f);
+        if(value>0 && isfinite(value)) atomicAdd(output+cell,value);
+    }
+}
 
 void check_tensor(
     const at::Tensor &tensor,
@@ -344,89 +483,10 @@ __device__ __forceinline__ int find_root_const(const int *__restrict__ parent, i
     return p;
 }
 
-__device__ int find_root_mutable(int *__restrict__ parent, int x) {
-    int p = parent[x];
-    while (p != parent[p]) {
-        const int gp = parent[p];
-        parent[x] = gp;
-        x = gp;
-        p = parent[x];
-    }
-    return p;
-}
-
 __global__ void init_parent_kernel(int *__restrict__ parent, int count) {
     const int stride = blockDim.x * gridDim.x;
     for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < count; idx += stride) {
         parent[idx] = idx;
-    }
-}
-
-__global__ void compress_parent_kernel(int *__restrict__ parent, int count) {
-    const int stride = blockDim.x * gridDim.x;
-    for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < count; idx += stride) {
-        parent[idx] = find_root_mutable(parent, idx);
-    }
-}
-
-__global__ void surface_group_union_kernel(
-    const float *__restrict__ vertices,
-    const int *__restrict__ faces,
-    const float *__restrict__ face_normals,
-    const int *__restrict__ edge_v0,
-    const int *__restrict__ edge_v1,
-    const int *__restrict__ face0,
-    const int *__restrict__ face1,
-    int *__restrict__ parent,
-    int *__restrict__ changed,
-    int64_t edge_count,
-    float plane_tol) {
-    constexpr float edge_epsilon = 1.0e-6f;
-    constexpr float normal_cos_tol = 1.0f - 1.0e-5f;
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t edge = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         edge < edge_count;
-         edge += stride) {
-        const int f0 = face0[edge];
-        const int f1 = face1[edge];
-        if (f0 < 0 || f1 < 0) {
-            continue;
-        }
-
-        const int v0 = edge_v0[edge];
-        const int v1 = edge_v1[edge];
-        const float3 n0 = normalize3(load_vec3(face_normals, f0), edge_epsilon);
-        const float3 n1 = normalize3(load_vec3(face_normals, f1), edge_epsilon);
-        const float normal_dot = dot3(n0, n1);
-        if (fabsf(normal_dot) < normal_cos_tol) {
-            continue;
-        }
-
-        const float3 plane_point = load_vec3(vertices, v0);
-        const int opp0 = opposite_vertex(faces, f0, v0, v1);
-        const int opp1 = opposite_vertex(faces, f1, v0, v1);
-        const float plane_dist_a = fabsf(dot3(sub3(load_vec3(vertices, opp0), plane_point), n0));
-        const float plane_dist_b = fabsf(dot3(sub3(load_vec3(vertices, opp1), plane_point), n0));
-        if (plane_dist_a > plane_tol || plane_dist_b > plane_tol) {
-            continue;
-        }
-
-        while (true) {
-            int root0 = find_root_mutable(parent, f0);
-            int root1 = find_root_mutable(parent, f1);
-            if (root0 == root1) {
-                break;
-            }
-            const int low = root0 < root1 ? root0 : root1;
-            const int high = root0 < root1 ? root1 : root0;
-            const int old = atomicMin(parent + high, low);
-            if (old != low) {
-                *changed = 1;
-            }
-            if (old == high || old == low) {
-                break;
-            }
-        }
     }
 }
 
@@ -962,11 +1022,9 @@ std::vector<at::Tensor> surface_group_edge_candidates_cuda_impl(
     auto root_count = at::empty({face_count}, int_options);
     auto root_cursor = at::empty({face_count}, int_options);
     auto max_count_tensor = at::empty({1}, int_options);
-    auto changed = at::empty({1}, int_options);
 
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(vertices.get_device()).stream();
     const int face_blocks = static_cast<int>((face_count + kDiffractionBlockSize - 1) / kDiffractionBlockSize);
-    const int edge_blocks = static_cast<int>((edge_count + kDiffractionBlockSize - 1) / kDiffractionBlockSize);
     if (face_count > 0) {
         init_parent_kernel<<<face_blocks, kDiffractionBlockSize, 0, stream>>>(
             parent.data_ptr<int>(),
@@ -974,43 +1032,15 @@ std::vector<at::Tensor> surface_group_edge_candidates_cuda_impl(
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
-    int host_changed = 0;
-    int iteration = 0;
-    constexpr int kMaxUnionIterations = 512;
-    do {
-        host_changed = 0;
-        C10_CUDA_CHECK(cudaMemsetAsync(changed.data_ptr<int>(), 0, sizeof(int), stream));
-        if (edge_count > 0) {
-            surface_group_union_kernel<<<edge_blocks, kDiffractionBlockSize, 0, stream>>>(
-                vertices.data_ptr<float>(),
-                faces.data_ptr<int>(),
-                face_normals.data_ptr<float>(),
-                edge_v0.data_ptr<int>(),
-                edge_v1.data_ptr<int>(),
-                face0.data_ptr<int>(),
-                face1.data_ptr<int>(),
-                parent.data_ptr<int>(),
-                changed.data_ptr<int>(),
-                edge_count,
-                static_cast<float>(plane_tol));
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }
-        if (face_count > 0) {
-            compress_parent_kernel<<<face_blocks, kDiffractionBlockSize, 0, stream>>>(
-                parent.data_ptr<int>(),
-                face_count);
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }
-        C10_CUDA_CHECK(cudaMemcpyAsync(
-            &host_changed,
-            changed.data_ptr<int>(),
-            sizeof(int),
-            cudaMemcpyDeviceToHost,
-            stream));
-        C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-        ++iteration;
-    } while (host_changed != 0 && iteration < kMaxUnionIterations);
-    TORCH_CHECK(iteration < kMaxUnionIterations, "surface group union did not converge");
+    // Mitsuba's primitive_silhouette_projection() samples the perimeter of the
+    // intersected primitive. Keep every triangle as its own root: merging
+    // coplanar neighbours changes the sampling domain and both drops and adds
+    // wedges relative to Sionna RT.
+    (void)vertices;
+    (void)face_normals;
+    (void)edge_v0;
+    (void)edge_v1;
+    (void)plane_tol;
 
     count_surface_group_edges_kernel<<<1, 1, 0, stream>>>(
         selected.data_ptr<bool>(),
@@ -1291,4 +1321,34 @@ std::vector<at::Tensor> cn_bdpt_surface_group_edge_candidates_cuda(
         face1,
         selected,
         plane_tol);
+}
+
+at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
+    at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
+    at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
+    at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
+    at::Tensor exterior_angle, at::Tensor source, at::Tensor source_power,
+    at::Tensor eta_r, at::Tensor sigma, at::Tensor mu_r, at::Tensor gain,
+    at::Tensor material_valid, at::Tensor thickness, int64_t axis, double plane,
+    double c0min, double c0max, double c1min, double c1max,
+    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed, double total_edge_length) {
+    auto output=at::empty({r1,r0},source.options());
+    const auto stream=at::cuda::getCurrentCUDAStream();
+    C10_CUDA_CHECK(cudaMemsetAsync(
+        output.data_ptr<float>(),0,static_cast<size_t>(output.numel())*sizeof(float),stream));
+    const int64_t samples=tape_active.numel();
+    if(samples==0) return output;
+    const int blocks=static_cast<int>(std::min<int64_t>((samples+kDiffractionBlockSize-1)/kDiffractionBlockSize,65535));
+    sionna_diffraction_tape_accumulate_kernel<<<blocks,kDiffractionBlockSize,0,stream>>>(
+        tape_active.data_ptr<bool>(),tape_state.data_ptr<int>(),tape_cell.data_ptr<int>(),tape_u.data_ptr<float>(),
+        edge_pos.data_ptr<float>(),edge_dir.data_ptr<float>(),t_min.data_ptr<float>(),t_max.data_ptr<float>(),
+        n0.data_ptr<float>(),nn.data_ptr<float>(),prim0.data_ptr<int>(),prim1.data_ptr<int>(),
+        exterior_angle.data_ptr<float>(),source.data_ptr<float>(),source_power.data_ptr<float>(),
+        eta_r.data_ptr<float>(),sigma.data_ptr<float>(),mu_r.data_ptr<float>(),gain.data_ptr<float>(),thickness.data_ptr<float>(),
+        material_valid.data_ptr<bool>(),output.data_ptr<float>(),samples,static_cast<int>(edge_pos.size(0)),
+        static_cast<int>(axis),static_cast<float>(plane),static_cast<float>(c0min),static_cast<float>(c0max),
+        static_cast<float>(c1min),static_cast<float>(c1max),static_cast<int>(r0),static_cast<int>(r1),
+        static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return output;
 }

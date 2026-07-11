@@ -314,7 +314,7 @@ def test_diffraction_edge_geometry_native_matches_torch_reference():
         torch.testing.assert_close(native[idx], reference[idx], rtol=1e-6, atol=1e-6)
 
 
-def test_solver_diffraction_path_does_not_size_surface_candidates_per_transmitter(monkeypatch):
+def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmitters(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
     if not build_info()["uses_raydn_native"]:
@@ -342,10 +342,10 @@ def test_solver_diffraction_path_does_not_size_surface_candidates_per_transmitte
 
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
 
-    assert call_count == 0
+    assert call_count == 1
 
 
-def test_solver_diffraction_path_does_not_size_surface_candidates_across_solves(monkeypatch):
+def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
     if not build_info()["uses_raydn_native"]:
@@ -365,4 +365,4 @@ def test_solver_diffraction_path_does_not_size_surface_candidates_across_solves(
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
 
-    assert call_count == 0
+    assert call_count == 1

@@ -38,6 +38,11 @@ def test_basic_solver_metadata_reports_counts_and_capabilities():
     assert result.metadata["components"]["los"] == "enabled"
     assert result.metadata["components"]["reflection"] == ("enabled" if raydn_native else "not_requested")
     assert result.metadata["components"]["diffraction"] == ("enabled" if raydn_native else "not_requested")
+    assert result.metadata["edge_policy"] == {
+        "edge_selection_mode": "all_edges",
+        "edge_diffraction": True,
+        "boundary_edge_policy": "half_plane",
+    }
     assert result.metadata["kernel"]["scheduling_strategy"] in {"native_cuda", "native_fused"}
     assert result.metadata["kernel"]["ad_status"] == "none"
     assert result.diagnostics is not None

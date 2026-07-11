@@ -213,7 +213,14 @@ def _compile_materials(
         sigma_e=torch.tensor([float(p["sigma_e"]) for p in params], dtype=torch.float32),
         gain=torch.tensor([float(p["gain"]) for p in params], dtype=torch.float32),
         model_id=torch.tensor([int(p["model_id"]) for p in params], dtype=torch.int32),
-        model_params=torch.tensor([[0.0, 0.0, 0.0, 0.0] for _ in params], dtype=torch.float32),
+        # Slot zero is the ITU-R P.2040 single-layer slab thickness. Keeping
+        # it in model_params preserves the compact material-store ABI while
+        # making Sionna's finite-thickness reflection model available to the
+        # native solvers.
+        model_params=torch.tensor(
+            [[float(p.get("thickness_m", 0.1)), 0.0, 0.0, 0.0] for p in params],
+            dtype=torch.float32,
+        ),
         frequency_hz=frequency_hz,
         version=version,
     )

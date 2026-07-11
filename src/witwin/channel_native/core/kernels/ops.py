@@ -3419,6 +3419,62 @@ def mc_reflection_launch_inputs(
     return exported
 
 
+def mc_sionna_reflection_accumulate(
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    trace_valid: torch.Tensor,
+    trace_t: torch.Tensor,
+    trace_prim: torch.Tensor,
+    face_normals: torch.Tensor,
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_valid: torch.Tensor,
+    material_thickness: torch.Tensor,
+    *,
+    contribution_depth: int,
+    grid_axis: int,
+    grid_position: float,
+    grid_coord0_min: float,
+    grid_coord0_max: float,
+    grid_coord1_min: float,
+    grid_coord1_max: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    solid_angle_per_ray: float,
+    grid_cell_area: float,
+) -> torch.Tensor:
+    native = native_extension()
+    if native is None or not hasattr(native, "mc_sionna_reflection_accumulate"):
+        raise RuntimeError("_channel_native.mc_sionna_reflection_accumulate CUDA kernel is required")
+    return native.mc_sionna_reflection_accumulate(
+        ray_o,
+        ray_d,
+        trace_valid,
+        trace_t,
+        trace_prim,
+        face_normals,
+        material_eta_r,
+        material_sigma,
+        material_gain,
+        material_valid,
+        material_thickness,
+        int(contribution_depth),
+        int(grid_axis),
+        float(grid_position),
+        float(grid_coord0_min),
+        float(grid_coord0_max),
+        float(grid_coord1_min),
+        float(grid_coord1_max),
+        int(grid_resolution0),
+        int(grid_resolution1),
+        float(wavelength),
+        float(solid_angle_per_ray),
+        float(grid_cell_area),
+    )
+
+
 def mc_diffraction_state_wi(state_edge_pos: torch.Tensor, state_src: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("state_edge_pos", state_edge_pos, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     validate_cuda_tensor("state_src", state_src, dtype=torch.float32, ndim=2, trailing_shape=(3,))
@@ -3432,6 +3488,16 @@ def mc_diffraction_state_wi(state_edge_pos: torch.Tensor, state_src: torch.Tenso
         raise TypeError("_channel_native.mc_diffraction_state_wi must return a tensor")
     validate_cuda_tensor("state_wi", state_wi, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     return state_wi
+
+
+def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
+    native = native_extension()
+    if native is None or not hasattr(native, "mc_sionna_diffraction_tape_accumulate"):
+        raise RuntimeError("_channel_native.mc_sionna_diffraction_tape_accumulate CUDA kernel is required")
+    output = native.mc_sionna_diffraction_tape_accumulate(*args)
+    if not isinstance(output, torch.Tensor):
+        raise TypeError("_channel_native.mc_sionna_diffraction_tape_accumulate must return a tensor")
+    return output
 
 
 def mc_selected_edge_indices(selected: torch.Tensor) -> torch.Tensor:

@@ -153,27 +153,27 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     )
     expected_gain_all = torch.tensor(
         [
-            2.48520365176e-07,
-            7.80931884492e-07,
-            1.68501468334e-09,
+            2.86288468487e-07,
+            7.80931770805e-07,
+            7.51952455857e-08,
         ],
         device=result.paths.path_gain.device,
         dtype=torch.float32,
     )
     expected_field_real_all = torch.tensor(
         [
-            -3.44542713719e-05,
-            -0.000874996418133,
-            3.97676703869e-05,
+            3.67839857063e-05,
+            -0.000874996883795,
+            0.000266907445621,
         ],
         device=result.paths.field_real.device,
         dtype=torch.float32,
     )
     expected_field_imag_all = torch.tensor(
         [
-            -0.000497326138429,
-            0.00012374635844,
-            -1.01758087112e-05,
+            0.000533793412615,
+            0.000123742487631,
+            -6.28940615570e-05,
         ],
         device=result.paths.field_imag.device,
         dtype=torch.float32,

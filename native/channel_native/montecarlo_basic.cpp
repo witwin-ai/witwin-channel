@@ -72,12 +72,25 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_reflection_laun
     at::Tensor tx_positions,
     int64_t tx_index,
     int64_t sample_count);
+at::Tensor cn_mc_sionna_reflection_accumulate_cuda(
+    at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
+    at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    int64_t contribution_depth, int64_t axis, double plane_position,
+    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
+    int64_t resolution0, int64_t resolution1, double wavelength,
+    double solid_angle_per_ray, double cell_area);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_face_material_tensors_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
     at::Tensor material_mu_r,
     at::Tensor face_material_id);
 at::Tensor cn_mc_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor state_src);
+at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
+    at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
+    at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
+    at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,int64_t,double,double,double,double,double,
+    int64_t,int64_t,double,double,int64_t,double);
 at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected);
 std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
@@ -282,8 +295,60 @@ pybind11::dict cn_mc_reflection_launch_inputs(
     return out;
 }
 
+torch::Tensor cn_mc_sionna_reflection_accumulate(
+    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
+    torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
+    torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    int64_t contribution_depth, int64_t axis, double plane_position,
+    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
+    int64_t resolution0, int64_t resolution1, double wavelength,
+    double solid_angle_per_ray, double cell_area) {
+    TORCH_CHECK(ray_o.is_cuda() && ray_d.is_cuda(), "reflection rays must be CUDA tensors");
+    TORCH_CHECK(ray_o.scalar_type() == at::kFloat && ray_d.scalar_type() == at::kFloat,
+                "reflection rays must be float32");
+    TORCH_CHECK(ray_o.dim() == 2 && ray_o.size(1) == 3 && ray_d.sizes() == ray_o.sizes(),
+                "reflection rays must have shape (N, 3)");
+    TORCH_CHECK(trace_valid.scalar_type() == at::kBool && trace_valid.dim() == 2,
+                "trace_valid must be a rank-2 bool tensor");
+    TORCH_CHECK(trace_t.scalar_type() == at::kFloat && trace_t.sizes() == trace_valid.sizes(),
+                "trace_t must match trace_valid");
+    TORCH_CHECK(trace_prim.scalar_type() == at::kInt && trace_prim.sizes() == trace_valid.sizes(),
+                "trace_prim must match trace_valid");
+    TORCH_CHECK(trace_valid.size(0) == ray_o.size(0), "trace batch must match rays");
+    TORCH_CHECK(face_normals.scalar_type() == at::kFloat && face_normals.dim() == 2 && face_normals.size(1) == 3,
+                "face_normals must have shape (F, 3)");
+    TORCH_CHECK(eta_r.sizes() == sigma.sizes() && eta_r.sizes() == gain.sizes() &&
+                eta_r.sizes() == material_valid.sizes() && eta_r.sizes() == thickness.sizes(),
+                "per-face material tensors must have matching shape");
+    TORCH_CHECK(eta_r.numel() == face_normals.size(0), "materials must cover every face");
+    TORCH_CHECK(axis >= 0 && axis <= 2, "axis must be 0, 1, or 2");
+    TORCH_CHECK(resolution0 > 0 && resolution1 > 0, "grid resolution must be positive");
+    TORCH_CHECK(wavelength > 0.0 && cell_area > 0.0, "wavelength and cell_area must be positive");
+    return cn_mc_sionna_reflection_accumulate_cuda(
+        ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(), trace_t.contiguous(),
+        trace_prim.contiguous(), face_normals.contiguous(), eta_r.contiguous(), sigma.contiguous(),
+        gain.contiguous(), material_valid.contiguous(), thickness.contiguous(), contribution_depth,
+        axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max,
+        resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area);
+}
+
 torch::Tensor cn_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src) {
     return cn_mc_diffraction_state_wi_cuda(state_edge_pos, state_src);
+}
+
+torch::Tensor cn_mc_sionna_diffraction_tape_accumulate(
+    torch::Tensor tape_active,torch::Tensor tape_state,torch::Tensor tape_cell,torch::Tensor tape_u,
+    torch::Tensor edge_pos,torch::Tensor edge_dir,torch::Tensor t_min,torch::Tensor t_max,
+    torch::Tensor n0,torch::Tensor nn,torch::Tensor prim0,torch::Tensor prim1,
+    torch::Tensor exterior_angle,torch::Tensor source,torch::Tensor source_power,
+    torch::Tensor eta_r,torch::Tensor sigma,torch::Tensor mu_r,torch::Tensor gain,
+    torch::Tensor material_valid,torch::Tensor thickness,int64_t axis,double plane,double c0min,double c0max,
+    double c1min,double c1max,int64_t r0,int64_t r1,double wavelength,double cell_area,int64_t seed,double total_edge_length) {
+    return cn_mc_sionna_diffraction_tape_accumulate_cuda(
+        tape_active,tape_state,tape_cell,tape_u,edge_pos,edge_dir,t_min,t_max,n0,nn,prim0,prim1,
+        exterior_angle,source,source_power,eta_r,sigma,mu_r,gain,material_valid,thickness,axis,plane,
+        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length);
 }
 
 torch::Tensor cn_mc_selected_edge_indices(torch::Tensor selected) {

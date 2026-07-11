@@ -179,7 +179,8 @@ __device__ void fresnel_coefficients(
 /// Initial transverse polarization: the global x-hat transmit polarization
 /// projected perpendicular to the launch direction.
 __device__ Float3 initial_transverse_polarization(Float3 incident) {
-    const Float3 tx_pol = make_f3(1.0f, 0.0f, 0.0f);
+    // Match Sionna's default vertically polarized isotropic transmitter.
+    const Float3 tx_pol = make_f3(0.0f, 0.0f, 1.0f);
     Float3 transverse = sub_f3(tx_pol, scale_f3(incident, dot_f3(tx_pol, incident)));
     const float transverse_norm = norm_f3(transverse);
     if (transverse_norm > kEps) {
