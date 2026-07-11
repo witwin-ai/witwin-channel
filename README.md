@@ -21,6 +21,6 @@ cmake --build build --config Release --target _channel_native
 
 This integration builds and links `rayd_torch_native_core` directly. It does
 not build/import RayD's Python module, use the Torch dispatcher, or load a
-second DSO with `GetProcAddress`/`dlsym`. The legacy `ext/raydn` directory is no
-longer part of the build graph and is retained only as migration history until
-its remaining audit references are archived.
+second DSO with `GetProcAddress`/`dlsym`. The former vendored `ext` snapshots
+are no longer part of the repository; historical plans and audits may still
+refer to them when describing the earlier architecture.
