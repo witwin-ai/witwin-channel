@@ -3,6 +3,8 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 
+#include "../tensor_checks.h"
+
 #include <algorithm>
 #include <tuple>
 
@@ -209,16 +211,7 @@ __global__ void sionna_reflection_accumulate_kernel(
     }
 }
 
-void check_tensor(
-    const at::Tensor &tensor,
-    const char *name,
-    c10::ScalarType dtype,
-    int64_t dimensions) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
-    TORCH_CHECK(tensor.dim() == dimensions, name, " has the wrong rank");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
+using channel_native::check_tensor;
 
 __global__ void reflection_launch_inputs_kernel(
     const float *__restrict__ tx_positions,

@@ -1,5 +1,6 @@
 #include <torch/extension.h>
 
+#include <array>
 #include <vector>
 
 namespace {
@@ -14,22 +15,15 @@ pybind11::tuple tensor_vector_to_tuple(const std::vector<at::Tensor>& tensors) {
 
 pybind11::dict subpath_state_to_dict(const std::vector<at::Tensor>& tensors, const char* name) {
     TORCH_CHECK(tensors.size() == 15, name, " native result must contain 15 tensors");
+    static constexpr std::array<const char*, 15> kFields = {
+        "origin", "direction", "throughput_real", "throughput_imag", "pdf_forward",
+        "pdf_reverse", "depth", "component_mask", "primitive_id", "edge_id",
+        "tx_id", "rx_id", "grid_linear_id", "valid", "path_length",
+    };
     pybind11::dict out;
-    out["origin"] = tensors[0];
-    out["direction"] = tensors[1];
-    out["throughput_real"] = tensors[2];
-    out["throughput_imag"] = tensors[3];
-    out["pdf_forward"] = tensors[4];
-    out["pdf_reverse"] = tensors[5];
-    out["depth"] = tensors[6];
-    out["component_mask"] = tensors[7];
-    out["primitive_id"] = tensors[8];
-    out["edge_id"] = tensors[9];
-    out["tx_id"] = tensors[10];
-    out["rx_id"] = tensors[11];
-    out["grid_linear_id"] = tensors[12];
-    out["valid"] = tensors[13];
-    out["path_length"] = tensors[14];
+    for (size_t index = 0; index < kFields.size(); ++index) {
+        out[kFields[index]] = tensors[index];
+    }
     return out;
 }
 

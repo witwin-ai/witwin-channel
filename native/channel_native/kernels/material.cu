@@ -3,6 +3,8 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 
+#include "../tensor_checks.h"
+
 #include <tuple>
 #include <vector>
 
@@ -10,16 +12,7 @@ namespace {
 
 constexpr int kMaterialBlockSize = 256;
 
-void check_tensor(
-    const at::Tensor &tensor,
-    const char *name,
-    c10::ScalarType dtype,
-    int64_t dimensions) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
-    TORCH_CHECK(tensor.dim() == dimensions, name, " has the wrong rank");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
+using channel_native::check_tensor;
 
 at::Tensor copy_float_vector_to_cuda(const std::vector<float> &values) {
     auto out = at::empty(

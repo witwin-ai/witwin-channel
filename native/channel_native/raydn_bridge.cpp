@@ -1,4 +1,7 @@
 #include <torch/extension.h>
+
+#include "path_block.h"
+#include "tensor_checks.h"
 #include <rayd/torch/integration.h>
 
 #include <array>
@@ -332,17 +335,6 @@ void destroy_raydn_scene_capsule(PyObject *capsule) {
 
 } // namespace
 
-using PathBlockTuple = std::tuple<
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor>;
 
 std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
     at::Tensor selected,
@@ -388,59 +380,8 @@ PathBlockTuple cn_path_finalize_blocks_cuda(
 
 namespace {
 
-pybind11::dict path_block_dict(const PathBlockTuple& block) {
-    pybind11::dict out;
-    out["valid"] = std::get<0>(block);
-    out["tx_id"] = std::get<1>(block);
-    out["rx_id"] = std::get<2>(block);
-    out["depth"] = std::get<3>(block);
-    out["component_id"] = std::get<4>(block);
-    out["primitive_id"] = std::get<5>(block);
-    out["edge_id"] = std::get<6>(block);
-    out["path_length_m"] = std::get<7>(block);
-    out["delay_s"] = std::get<8>(block);
-    out["path_gain"] = std::get<9>(block);
-    return out;
-}
-
-void append_path_block(
-    const PathBlockTuple& block,
-    std::vector<at::Tensor>& valid_blocks,
-    std::vector<at::Tensor>& tx_id_blocks,
-    std::vector<at::Tensor>& rx_id_blocks,
-    std::vector<at::Tensor>& depth_blocks,
-    std::vector<at::Tensor>& component_id_blocks,
-    std::vector<at::Tensor>& primitive_id_blocks,
-    std::vector<at::Tensor>& edge_id_blocks,
-    std::vector<at::Tensor>& path_length_blocks,
-    std::vector<at::Tensor>& delay_blocks,
-    std::vector<at::Tensor>& path_gain_blocks) {
-    valid_blocks.push_back(std::get<0>(block));
-    tx_id_blocks.push_back(std::get<1>(block));
-    rx_id_blocks.push_back(std::get<2>(block));
-    depth_blocks.push_back(std::get<3>(block));
-    component_id_blocks.push_back(std::get<4>(block));
-    primitive_id_blocks.push_back(std::get<5>(block));
-    edge_id_blocks.push_back(std::get<6>(block));
-    path_length_blocks.push_back(std::get<7>(block));
-    delay_blocks.push_back(std::get<8>(block));
-    path_gain_blocks.push_back(std::get<9>(block));
-}
-
-void check_vec3_table(const at::Tensor& tensor, const char* name) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == at::kFloat, name, " must be float32");
-    TORCH_CHECK(tensor.dim() == 2, name, " must have rank 2");
-    TORCH_CHECK(tensor.size(1) == 3, name, " must have shape (N, 3)");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
-
-void check_flat_tensor(const at::Tensor& tensor, const char* name, c10::ScalarType dtype) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
-    TORCH_CHECK(tensor.dim() == 1, name, " must have rank 1");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
+using channel_native::check_flat_tensor;
+using channel_native::check_vec3_table;
 
 }  // namespace
 
@@ -952,26 +893,8 @@ pybind11::dict cn_path_diffraction_paths_order1(
     }
 
     const int64_t tx_count = tx_positions.size(0);
-    std::vector<at::Tensor> valid_blocks;
-    std::vector<at::Tensor> tx_id_blocks;
-    std::vector<at::Tensor> rx_id_blocks;
-    std::vector<at::Tensor> depth_blocks;
-    std::vector<at::Tensor> component_id_blocks;
-    std::vector<at::Tensor> primitive_id_blocks;
-    std::vector<at::Tensor> edge_id_blocks;
-    std::vector<at::Tensor> path_length_blocks;
-    std::vector<at::Tensor> delay_blocks;
-    std::vector<at::Tensor> path_gain_blocks;
-    valid_blocks.reserve(static_cast<size_t>(tx_count));
-    tx_id_blocks.reserve(static_cast<size_t>(tx_count));
-    rx_id_blocks.reserve(static_cast<size_t>(tx_count));
-    depth_blocks.reserve(static_cast<size_t>(tx_count));
-    component_id_blocks.reserve(static_cast<size_t>(tx_count));
-    primitive_id_blocks.reserve(static_cast<size_t>(tx_count));
-    edge_id_blocks.reserve(static_cast<size_t>(tx_count));
-    path_length_blocks.reserve(static_cast<size_t>(tx_count));
-    delay_blocks.reserve(static_cast<size_t>(tx_count));
-    path_gain_blocks.reserve(static_cast<size_t>(tx_count));
+    PathBlockLists blocks;
+    blocks.reserve(static_cast<size_t>(tx_count));
 
     constexpr int64_t kOutputCount = 18;
     for (int64_t tx_index = 0; tx_index < tx_count; ++tx_index) {
@@ -1044,31 +967,20 @@ pybind11::dict cn_path_diffraction_paths_order1(
             outputs[13],
             outputs[14],
             tx_index);
-        append_path_block(
-            block,
-            valid_blocks,
-            tx_id_blocks,
-            rx_id_blocks,
-            depth_blocks,
-            component_id_blocks,
-            primitive_id_blocks,
-            edge_id_blocks,
-            path_length_blocks,
-            delay_blocks,
-            path_gain_blocks);
+        blocks.append(block);
     }
 
     return path_block_dict(cn_path_finalize_blocks_cuda(
-        valid_blocks,
-        tx_id_blocks,
-        rx_id_blocks,
-        depth_blocks,
-        component_id_blocks,
-        primitive_id_blocks,
-        edge_id_blocks,
-        path_length_blocks,
-        delay_blocks,
-        path_gain_blocks,
+        blocks.valid,
+        blocks.tx_id,
+        blocks.rx_id,
+        blocks.depth,
+        blocks.component_id,
+        blocks.primitive_id,
+        blocks.edge_id,
+        blocks.path_length,
+        blocks.delay,
+        blocks.path_gain,
         -1,
         tx_count,
         1));

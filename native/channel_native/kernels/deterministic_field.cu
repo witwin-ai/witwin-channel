@@ -4,6 +4,8 @@
 #include <c10/util/complex.h>
 #include <torch/extension.h>
 
+#include "../tensor_checks.h"
+
 #include <cmath>
 
 namespace {
@@ -14,12 +16,7 @@ constexpr float kEpsilon0 = 8.854187817e-12f;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kEps = 1.0e-6f;
 
-void check_tensor(const at::Tensor &tensor, const char *name, c10::ScalarType dtype, int64_t dimensions) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
-    TORCH_CHECK(tensor.dim() == dimensions, name, " has the wrong rank");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
+using channel_native::check_tensor;
 
 struct Float3 {
     float x;
