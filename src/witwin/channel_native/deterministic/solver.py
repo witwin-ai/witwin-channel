@@ -5,7 +5,11 @@ from typing import Any
 import torch
 
 from witwin.channel_native import ReceiverGrid, Scene
-from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
+from witwin.channel_native.capabilities import (
+    capabilities,
+    config_metadata,
+    serialize_config,
+)
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
@@ -13,7 +17,11 @@ from witwin.channel_native.core.kernels.ops import deterministic_component_count
 from .accumulation import accumulate_path_result, build_path_table
 from .config import Config
 from .result import Result
-from .topology import apply_receiver_layout, export_topology, receiver_positions_and_layout
+from witwin.channel_native.core.path_topology import (
+    apply_receiver_layout,
+    export_topology,
+    receiver_positions_and_layout,
+)
 
 
 def _validate_requested_components(config: Config) -> None:
@@ -23,7 +31,9 @@ def _validate_requested_components(config: Config) -> None:
         if config.max_depth < 1:
             raise RuntimeError("deterministic diffraction requires max_depth >= 1")
         if config.max_diffraction_order < 1:
-            raise RuntimeError("deterministic diffraction requires max_diffraction_order >= 1")
+            raise RuntimeError(
+                "deterministic diffraction requires max_diffraction_order >= 1"
+            )
 
 
 def _metadata(
@@ -47,13 +57,19 @@ def _metadata(
     }
     if "reflection" in config.components:
         if not capability["raydn_native"]:
-            raise RuntimeError("deterministic reflection requires RayDN native capability")
+            raise RuntimeError(
+                "deterministic reflection requires RayDN native capability"
+            )
         components["reflection"] = "enabled"
     if "diffraction" in config.components:
         if not capability["raydn_native"]:
-            raise RuntimeError("deterministic diffraction requires RayDN native capability")
+            raise RuntimeError(
+                "deterministic diffraction requires RayDN native capability"
+            )
         components["diffraction"] = "enabled"
-    raydn_component_enabled = components["reflection"] == "enabled" or components["diffraction"] == "enabled"
+    raydn_component_enabled = (
+        components["reflection"] == "enabled" or components["diffraction"] == "enabled"
+    )
     requested_config = serialize_config(config)
     effective_config = dict(requested_config)
     metadata = {
@@ -63,6 +79,7 @@ def _metadata(
         "return_field": config.return_field,
         "export_paths": config.export_paths,
         "max_paths": config.max_paths,
+        "max_paths_scope": config.max_paths_scope,
         "sort_key": config.sort_key,
         "accumulation_strategy": "coherent" if config.coherent else "incoherent",
         "components": components,
@@ -76,7 +93,9 @@ def _metadata(
             primitive="deterministic_solver",
             forward_launch_count=launch_count,
             accumulation_strategy="atomic_add",
-            scheduling_strategy="native_fused" if raydn_component_enabled else "native_cuda",
+            scheduling_strategy="native_fused"
+            if raydn_component_enabled
+            else "native_cuda",
             raydn_native=capability["raydn_native"],
             ad_status="none",
         ),
@@ -87,7 +106,9 @@ def _metadata(
             effective=effective_config,
             component_max_depth={
                 "los": 0 if "los" in config.components else -1,
-                "reflection": config.max_depth if "reflection" in config.components else -1,
+                "reflection": config.max_depth
+                if "reflection" in config.components
+                else -1,
                 "diffraction": 1 if "diffraction" in config.components else -1,
             },
         )
@@ -106,7 +127,9 @@ def solve(scene: Scene, config: Config) -> Result:
         raise RuntimeError("deterministic reflection requires RayDN native capability")
     if "diffraction" in config.components and not native_info["uses_raydn_native"]:
         raise RuntimeError("deterministic diffraction requires RayDN native capability")
-    has_grid = any(receiver.__class__.__name__ == "ReceiverGrid" for receiver in scene.receivers)
+    has_grid = any(
+        receiver.__class__.__name__ == "ReceiverGrid" for receiver in scene.receivers
+    )
     if has_grid and len(scene.receivers) > 1 and not config.export_paths:
         raise RuntimeError("mixed point/grid receivers require export_paths=True")
 
@@ -156,15 +179,19 @@ def solve(scene: Scene, config: Config) -> Result:
             "accumulation_mode": "coherent" if config.coherent else "incoherent",
             "native_launch_count": int(path_result.launch_count),
             "diffraction_accumulation": (
-                "exact_vector_coherent_paths" if exact_diffraction is not None else "scalar_path_accumulation"
+                "exact_vector_coherent_paths"
+                if exact_diffraction is not None
+                else "scalar_path_accumulation"
             ),
             "visibility_rejection_count": int(path_result.visibility_rejection_count),
             "selected_edge_count": int(path_result.selected_edge_count),
             "path_planning": {
                 "max_paths": config.max_paths,
+                "max_paths_scope": config.max_paths_scope,
                 "candidate_count": candidate_count,
                 "guardrail_count": int(path_result.guardrail_count),
-                "truncated": config.max_paths is not None and candidate_count > int(config.max_paths),
+                "truncated": config.max_paths is not None
+                and path_count < candidate_count,
             },
         }
     return Result(

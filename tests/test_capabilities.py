@@ -9,7 +9,11 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
 
     assert manifest["schema_version"] == 1
     assert manifest["components"] == ["los", "reflection", "diffraction"]
-    assert manifest["solvers"]["path"]["max_reflection_depth"] == 1
+    path = manifest["solvers"]["path"]
+    assert path["max_reflection_depth"] == 5
+    assert path["supports_reflection_diffraction_coupling"] is False
+    assert path["supports_reflection_diffraction_coupling_geometry"] is True
+    assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
     assert manifest["supports_ad"] is False
     json.dumps(manifest)
 

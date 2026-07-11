@@ -83,6 +83,7 @@ Python_add_library(
     native/channel_native/kernels/bdpt_connect.cu
     native/channel_native/kernels/bdpt_sampling.cu
     native/channel_native/kernels/bdpt_subpaths.cu
+    native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/diffraction.cu
     native/channel_native/kernels/diffraction_discovery.cu
     native/channel_native/kernels/deterministic_accum.cu

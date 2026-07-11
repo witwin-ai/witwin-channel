@@ -9,7 +9,8 @@ usage remains an explicit migration gate.
 | Legacy surface | Reference uses | Priority | Native state |
 |---|---:|---|---|
 | `Scene/Structure/Transmitter` | 346 | P0 | Supported/partial |
-| `path.solve` | 25 | P0 | Partial: one interaction only |
+| `path.solve` | 25 | P0 | Reflection depth 1-5; flat result excludes coupled geometry |
+| `path.solve_v2` coupled topology | 0 | P0/P1 | 1R+1D and reciprocal 1D+1R geometry, globally chunked with a hard 1,000,000-candidate ceiling; complex coefficient pending Phase 3 |
 | `path.PathResult` | 6 | P0 | `PathResultV2` shape/signals supported; physical coefficient parity pending |
 | `cir/cfr/taps/filter_by_type` | 11 | P0 | Supported by `PathResultV2` |
 | `deterministic.solve` | 5 | P1 | Partial |

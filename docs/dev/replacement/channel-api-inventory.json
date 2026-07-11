@@ -41,7 +41,7 @@
     {"legacy_api":"path.InteractionType","observed_calls":13,"priority":"P0","native_api":"channel_native.path.InteractionType","status":"supported"},
     {"legacy_api":"path.PathResult","observed_calls":6,"priority":"P0","native_api":"channel_native.path.PathResultV2","status":"partial"},
     {"legacy_api":"path.Tuning","observed_calls":96,"priority":"P2","native_api":null,"status":"not_planned"},
-    {"legacy_api":"path.solve","observed_calls":25,"priority":"P0","native_api":"channel_native.path.solve","status":"partial"},
+    {"legacy_api":"path.solve","observed_calls":25,"priority":"P0","native_api":"channel_native.path.solve / solve_v2","status":"partial"},
     {"legacy_api":"PathResult.cir","observed_calls":3,"priority":"P0","native_api":"PathResultV2.cir","status":"supported"},
     {"legacy_api":"PathResult.cfr","observed_calls":3,"priority":"P0","native_api":"PathResultV2.cfr","status":"supported"},
     {"legacy_api":"PathResult.taps","observed_calls":1,"priority":"P0","native_api":"PathResultV2.taps","status":"supported"},

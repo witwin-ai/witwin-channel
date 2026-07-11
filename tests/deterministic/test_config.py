@@ -13,6 +13,7 @@ def test_config_defaults_match_public_contract():
     assert config.return_field is True
     assert config.export_paths is False
     assert config.max_paths is None
+    assert config.max_paths_scope == "global"
     assert config.sort_key == "receiver_transmitter_depth_component"
     assert config.diagnostics is False
     assert config.ad_mode == "none"
@@ -33,6 +34,7 @@ def test_config_normalizes_component_iterables_to_frozenset():
         ({"components": set()}, "components must be a non-empty subset"),
         ({"components": {"los", "scatter"}}, "components must be a non-empty subset"),
         ({"max_paths": 0}, "max_paths must be positive"),
+        ({"max_paths_scope": "receiver"}, "max_paths_scope must be"),
         ({"sort_key": "unstable"}, "sort_key must be one of"),
         ({"ad_mode": "vjp"}, "deterministic fixed-topology AD is not enabled"),
     ],

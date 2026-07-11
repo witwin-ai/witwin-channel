@@ -4,14 +4,16 @@ import torch
 from tests.support.scenes import empty_space_los_scene, same_side_wall_reflection_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config
-from witwin.channel_native.deterministic.topology import export_topology
+from witwin.channel_native.core.path_topology import export_topology
 
 
 def test_topology_export_normalizes_los_columns():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic topology export")
 
-    topology = export_topology(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
+    topology = export_topology(
+        empty_space_los_scene(), Config(max_depth=0, components={"los"})
+    )
     path_count = topology.valid.numel()
 
     assert path_count == 4
@@ -27,17 +29,38 @@ def test_topology_export_normalizes_los_columns():
     assert topology.material_id.tolist() == [-1] * path_count
 
 
-def test_topology_applies_max_paths_after_stable_sort():
+def test_topology_applies_global_max_paths_after_stable_sort():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic topology export")
 
-    full = export_topology(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
-    limited = export_topology(empty_space_los_scene(), Config(max_depth=0, components={"los"}, max_paths=2))
+    full = export_topology(
+        empty_space_los_scene(), Config(max_depth=0, components={"los"})
+    )
+    limited = export_topology(
+        empty_space_los_scene(), Config(max_depth=0, components={"los"}, max_paths=2)
+    )
 
     assert limited.valid.numel() == 2
     torch.testing.assert_close(limited.tx_id, full.tx_id[:2])
     torch.testing.assert_close(limited.rx_id, full.rx_id[:2])
     torch.testing.assert_close(limited.path_length_m, full.path_length_m[:2])
+
+
+def test_topology_supports_explicit_per_pair_max_paths_scope():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic topology export")
+
+    limited = export_topology(
+        empty_space_los_scene(),
+        Config(
+            max_depth=0,
+            components={"los"},
+            max_paths=1,
+            max_paths_scope="per_pair",
+        ),
+    )
+
+    assert limited.valid.numel() == 4
 
 
 def test_reflection_topology_exports_interaction_metadata():

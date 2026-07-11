@@ -174,4 +174,5 @@ def test_solve_v2_los_shape_and_per_pair_count():
 
     assert result.a.shape == (2, 1, 2, 1, 1, 1)
     assert torch.all(result.num_paths == 1)
-    assert result.metadata["legacy_global_truncation_disabled"] is True
+    assert result.metadata["adapter"] == "canonical_topology_to_PathResultV2"
+    assert result.metadata["max_paths_scope"] == "per_pair"

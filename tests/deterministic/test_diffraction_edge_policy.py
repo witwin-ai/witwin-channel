@@ -4,7 +4,7 @@ import torch
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config
-from witwin.channel_native.deterministic.topology import export_topology
+from witwin.channel_native.core.path_topology import export_topology
 
 
 def test_diffraction_topology_uses_selected_edge_ids():

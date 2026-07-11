@@ -18,9 +18,11 @@ _CAPABILITIES: dict[str, Any] = {
     "receiver_types": ["point", "grid"],
     "solvers": {
         "path": {
-            "max_reflection_depth": 1,
+            "max_reflection_depth": 5,
             "max_diffraction_order": 1,
             "supports_reflection_diffraction_coupling": False,
+            "supports_reflection_diffraction_coupling_geometry": True,
+            "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": False,
             "supports_polarization": False,
             "supports_arrays": False,
@@ -74,7 +76,9 @@ def config_metadata(
         "effective_config": effective,
         "requested_max_depth": int(requested["max_depth"]),
         "effective_max_depth": int(effective["max_depth"]),
-        "component_max_depth": {key: int(value) for key, value in component_max_depth.items()},
+        "component_max_depth": {
+            key: int(value) for key, value in component_max_depth.items()
+        },
     }
 
 

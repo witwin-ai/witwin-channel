@@ -350,6 +350,28 @@ std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
     at::Tensor tx,
     at::Tensor tx_power,
     int64_t tx_power_index);
+std::vector<at::Tensor> cn_coupled_rd_prepare_cuda(
+    at::Tensor source,
+    at::Tensor receiver,
+    at::Tensor plane_point,
+    at::Tensor plane_normal,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_t_min,
+    at::Tensor edge_t_max);
+pybind11::dict cn_coupled_rd_finalize_cuda(
+    at::Tensor prefix_active,
+    at::Tensor suffix_visible,
+    at::Tensor epc_path_length,
+    at::Tensor resolved_face,
+    at::Tensor edge_id,
+    at::Tensor reflection_point,
+    at::Tensor reflection_normal,
+    at::Tensor edge_point,
+    at::Tensor edge_direction,
+    at::Tensor receiver,
+    bool reverse);
+at::Tensor cn_coupled_active_mask_cuda(at::Tensor lhs, at::Tensor rhs);
 PathBlockTuple cn_path_diffraction_block_cuda(
     at::Tensor valid,
     at::Tensor rx_id,
@@ -1147,4 +1169,122 @@ pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
     for (int64_t i = 0; i < output_count; ++i)
         result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
     return result;
+}
+
+pybind11::dict cn_raydn_coupled_rd_geometry_forward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor face_id,
+    torch::Tensor plane_point,
+    torch::Tensor plane_normal,
+    torch::Tensor edge_id,
+    torch::Tensor edge_pos,
+    torch::Tensor edge_dir,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    torch::Tensor surface_group_id,
+    torch::Tensor surface_group_size,
+    torch::Tensor surface_group_members,
+    bool reverse,
+    std::uintptr_t raydn_module_handle) {
+    check_vec3_table(source, "source");
+    check_vec3_table(receiver, "receiver");
+    check_flat_tensor(face_id, "face_id", at::kInt);
+    check_vec3_table(plane_point, "plane_point");
+    check_vec3_table(plane_normal, "plane_normal");
+    check_flat_tensor(edge_id, "edge_id", at::kInt);
+    check_vec3_table(edge_pos, "edge_pos");
+    check_vec3_table(edge_dir, "edge_dir");
+    check_flat_tensor(edge_t_min, "edge_t_min", at::kFloat);
+    check_flat_tensor(edge_t_max, "edge_t_max", at::kFloat);
+    check_flat_tensor(surface_group_id, "surface_group_id", at::kInt);
+    check_flat_tensor(surface_group_size, "surface_group_size", at::kInt);
+    check_flat_tensor(surface_group_members, "surface_group_members", at::kInt);
+    const int64_t count = source.size(0);
+    TORCH_CHECK(receiver.size(0) == count, "receiver must match source rows");
+    TORCH_CHECK(face_id.size(0) == count && edge_id.size(0) == count,
+                "face_id and edge_id must match source rows");
+    for (const auto &tensor : {plane_point, plane_normal, edge_pos, edge_dir})
+        TORCH_CHECK(tensor.size(0) == count, "coupled geometry vector tables must match source rows");
+    TORCH_CHECK(edge_t_min.size(0) == count && edge_t_max.size(0) == count,
+                "edge bounds must match source rows");
+    TORCH_CHECK(surface_group_size.numel() > 0,
+                "surface_group_size must contain at least one group");
+    TORCH_CHECK(surface_group_members.numel() % surface_group_size.numel() == 0,
+                "surface_group_members must be padded by group count");
+
+    // D->R is the reciprocal R->D problem with endpoints exchanged. The
+    // output interaction sequence is reversed again by the finalize kernel.
+    at::Tensor epc_source = reverse ? receiver : source;
+    at::Tensor epc_receiver = reverse ? source : receiver;
+    std::vector<at::Tensor> prepared = cn_coupled_rd_prepare_cuda(
+        epc_source,
+        epc_receiver,
+        plane_point,
+        plane_normal,
+        edge_pos,
+        edge_dir,
+        edge_t_min,
+        edge_t_max);
+    TORCH_CHECK(prepared.size() == 4, "coupled R-D prepare returned an unexpected tensor count");
+    at::Tensor candidate_active = prepared[0];
+    at::Tensor diffraction_point = prepared[1];
+    at::Tensor expected_faces = face_id.reshape({count, 1}).contiguous();
+    at::Tensor direct_plane_points = plane_point.reshape({count, 1, 3}).contiguous();
+    at::Tensor direct_plane_normals = plane_normal.reshape({count, 1, 3}).contiguous();
+
+    constexpr int64_t kEpcOutputCount = 6;
+    std::array<at::Tensor, static_cast<size_t>(kEpcOutputCount)> epc;
+    const int64_t epc_output_count = raydn_reflection_epc_paths_forward_fn(raydn_module_handle)(
+        scene_handle,
+        &epc_source,
+        &diffraction_point,
+        &candidate_active,
+        &expected_faces,
+        &direct_plane_points,
+        &direct_plane_normals,
+        &surface_group_id,
+        &surface_group_size,
+        &surface_group_members,
+        1,
+        1,
+        1.0e-3,
+        epc.data(),
+        kEpcOutputCount);
+    TORCH_CHECK(epc_output_count == kEpcOutputCount,
+                "RayDN reflection EPC returned an unexpected tensor count for coupled R-D geometry");
+
+    at::Tensor prefix_active = cn_coupled_active_mask_cuda(candidate_active, epc[0]);
+    at::Tensor suffix_visible;
+    at::Tensor suffix_blocker;
+    at::Tensor suffix_tape_t;
+    raydn_visibility_forward_fn(raydn_module_handle)(
+        scene_handle,
+        &diffraction_point,
+        &epc_receiver,
+        &prefix_active,
+        &suffix_visible,
+        &suffix_blocker,
+        &suffix_tape_t);
+    at::Tensor resolved_face = epc[2].select(1, 0).contiguous();
+    at::Tensor reflection_position = epc[4].select(1, 0).contiguous();
+    at::Tensor reflection_normal = epc[5].select(1, 0).contiguous();
+    pybind11::dict out = cn_coupled_rd_finalize_cuda(
+        prefix_active,
+        suffix_visible,
+        epc[1].contiguous(),
+        resolved_face,
+        edge_id,
+        reflection_position,
+        reflection_normal,
+        diffraction_point,
+        edge_dir,
+        epc_receiver,
+        reverse);
+    out["candidate_active"] = candidate_active;
+    out["virtual_source"] = prepared[2];
+    out["predicted_reflection_position"] = prepared[3];
+    out["suffix_blocker_primitive"] = suffix_blocker;
+    return out;
 }

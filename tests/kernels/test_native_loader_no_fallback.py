@@ -81,7 +81,10 @@ def test_raydn_path_exports_use_channel_native_bridge():
 
 def test_simplified_coherent_diffraction_grid_api_is_not_public():
     assert not hasattr(ops, "deterministic_diffraction_coherent_accumulation_forward")
-    assert not hasattr(extension.native_extension(), "deterministic_diffraction_coherent_accumulation_forward")
+    assert not hasattr(
+        extension.native_extension(),
+        "deterministic_diffraction_coherent_accumulation_forward",
+    )
 
 
 def test_raydn_scene_builder_uses_channel_native_scene_bridge():
@@ -175,7 +178,6 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     )
     extra_files = (
         repo / "src" / "witwin" / "channel_native" / "core" / "kernels" / "ops.py",
-        repo / "src" / "witwin" / "channel_native" / "path" / "raydn_export.py",
     )
     forbidden = (".contiguous(", ".reshape(")
 
@@ -194,20 +196,41 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     assert offenders == []
 
 
-def test_bdpt_path_export_does_not_import_basic_component_helpers():
+def test_path_solver_uses_the_shared_core_topology():
     repo = Path(__file__).resolve().parents[2]
-    source = (repo / "src" / "witwin" / "channel_native" / "path" / "raydn_export.py").read_text()
+    source = (
+        repo / "src" / "witwin" / "channel_native" / "path" / "solver.py"
+    ).read_text()
 
-    assert "montecarlo.basic.raydn_components" not in source
-    assert "_diffraction_states" not in source
+    assert "core.path_topology import export_topology" in source
+    assert "reflection_paths_order1" not in source
+    assert "diffraction_paths_order1" not in source
 
 
 def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
     repo = Path(__file__).resolve().parents[2]
     targets = (
-        repo / "src" / "witwin" / "channel_native" / "montecarlo" / "basic" / "backend.py",
-        repo / "src" / "witwin" / "channel_native" / "montecarlo" / "basic" / "raydn_components.py",
-        repo / "src" / "witwin" / "channel_native" / "montecarlo" / "bdpt" / "subpaths.py",
+        repo
+        / "src"
+        / "witwin"
+        / "channel_native"
+        / "montecarlo"
+        / "basic"
+        / "backend.py",
+        repo
+        / "src"
+        / "witwin"
+        / "channel_native"
+        / "montecarlo"
+        / "basic"
+        / "raydn_components.py",
+        repo
+        / "src"
+        / "witwin"
+        / "channel_native"
+        / "montecarlo"
+        / "bdpt"
+        / "subpaths.py",
     )
 
     offenders: list[str] = []
@@ -262,7 +285,9 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
 
 def test_rayd_bridge_is_source_linked_without_dso_lookup():
     repo = Path(__file__).resolve().parents[2]
-    bridge_source = (repo / "native" / "channel_native" / "raydn_bridge.cpp").read_text()
+    bridge_source = (
+        repo / "native" / "channel_native" / "raydn_bridge.cpp"
+    ).read_text()
     ops_source = inspect.getsource(ops._raydn_module_handle)
 
     assert "LoadLibrary" not in bridge_source

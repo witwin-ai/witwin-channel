@@ -100,3 +100,40 @@ def wedge_diffraction_scene() -> Scene:
         receivers=[ReceiverPoint(position=torch.tensor([3.0, 1.0, 0.5]))],
         frequency=3.0e9,
     )
+
+
+def coupled_wall_wedge_scene() -> Scene:
+    """Analytic z=0 reflector plus the convex edge through (2, y, 2)."""
+
+    vertices = torch.tensor(
+        [
+            [-5.0, -5.0, 0.0],
+            [5.0, -5.0, 0.0],
+            [5.0, 5.0, 0.0],
+            [-5.0, 5.0, 0.0],
+            [2.0, -1.0, 2.0],
+            [2.0, 1.0, 2.0],
+            [4.0, -1.0, 2.0],
+            [4.0, 1.0, 2.0],
+            [2.0, -1.0, 4.0],
+            [2.0, 1.0, 4.0],
+        ],
+        dtype=torch.float32,
+    )
+    faces = torch.tensor(
+        [[0, 1, 2], [0, 2, 3], [4, 6, 7], [4, 7, 5], [4, 5, 9], [4, 9, 8]],
+        dtype=torch.int32,
+    )
+    return Scene(
+        structures=[
+            Structure(
+                vertices=vertices,
+                faces=faces,
+                material=PerfectConductor(),
+                surface_id=0,
+            )
+        ],
+        transmitters=[Transmitter(position=torch.tensor([0.0, -2.0, 1.0]))],
+        receivers=[ReceiverPoint(position=torch.tensor([0.0, 2.0, 5.0]))],
+        frequency=3.0e9,
+    )

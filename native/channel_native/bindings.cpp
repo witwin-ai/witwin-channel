@@ -207,6 +207,23 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     int64_t max_bounces,
     int64_t visibility_ignore_mode,
     std::uintptr_t raydn_module_handle);
+pybind11::dict cn_raydn_coupled_rd_geometry_forward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor face_id,
+    torch::Tensor plane_point,
+    torch::Tensor plane_normal,
+    torch::Tensor edge_id,
+    torch::Tensor edge_pos,
+    torch::Tensor edge_dir,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    torch::Tensor surface_group_id,
+    torch::Tensor surface_group_size,
+    torch::Tensor surface_group_members,
+    bool reverse,
+    std::uintptr_t raydn_module_handle);
 pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -990,6 +1007,10 @@ PYBIND11_MODULE(_channel_native, module) {
         "raydn_reflection_epc_paths_forward",
         &cn_raydn_reflection_epc_paths_forward,
         "Call RayDN reflection EPC path export through the native C bridge.");
+    module.def(
+        "raydn_coupled_rd_geometry_forward",
+        &cn_raydn_coupled_rd_geometry_forward,
+        "Construct one-reflection/one-diffraction geometry with RayDN EPC and visibility; no field coefficient is evaluated.");
     module.def(
         "bdpt_reflection_accumulation_forward",
         &cn_bdpt_reflection_accumulation_forward,

@@ -3,11 +3,14 @@ from __future__ import annotations
 import enum
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
 from .schema import RaggedPathSoA
+
+if TYPE_CHECKING:
+    from witwin.channel_native.core.path_topology import TopologyBatch
 
 
 def _validate_tensor_predicate(predicate: torch.Tensor, message: str) -> None:
@@ -473,4 +476,77 @@ def from_legacy_result(
     )
 
 
-__all__ = ["InteractionType", "PathResultV2", "endpoint_angles", "from_legacy_result"]
+def from_topology_result(
+    paths: "TopologyBatch",
+    *,
+    num_rx: int,
+    num_tx: int,
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    metadata: dict[str, Any] | None = None,
+) -> PathResultV2:
+    """Pack the shared canonical topology without losing event sequences."""
+
+    count = int(paths.delay_s.numel())
+    tx_id = paths.tx_id.to(dtype=torch.int32)
+    rx_id = paths.rx_id.to(dtype=torch.int32)
+    tx_for_path = tx_positions[tx_id.to(dtype=torch.int64)]
+    rx_for_path = rx_positions[rx_id.to(dtype=torch.int64)]
+    direct = rx_for_path - tx_for_path
+    width = int(paths.interaction_type.shape[1])
+    if width:
+        first = paths.interaction_positions[:, 0]
+        last_index = torch.clamp(paths.depth.to(dtype=torch.int64) - 1, min=0)
+        row = torch.arange(count, device=paths.delay_s.device)
+        last = paths.interaction_positions[row, last_index]
+        has_interaction = paths.depth > 0
+        departure = torch.where(has_interaction[:, None], first - tx_for_path, direct)
+        arrival = torch.where(has_interaction[:, None], rx_for_path - last, direct)
+    else:
+        departure = direct
+        arrival = direct
+    theta_t, phi_t = endpoint_angles(departure)
+    theta_r, phi_r = endpoint_angles(-arrival)
+
+    object_sequence = paths.primitive_sequence.clone()
+    if width:
+        diffraction = (paths.component_id == 2) & (paths.depth > 0)
+        object_sequence[diffraction, 0] = paths.edge_id[diffraction]
+    ragged = RaggedPathSoA.from_flat(
+        num_rx=num_rx,
+        num_rx_ant=1,
+        num_tx=num_tx,
+        num_tx_ant=1,
+        rx_id=rx_id,
+        tx_id=tx_id,
+        field=paths.path_field.unsqueeze(-1),
+        delay_s=paths.delay_s,
+        theta_t=theta_t,
+        phi_t=phi_t,
+        theta_r=theta_r,
+        phi_r=phi_r,
+        interaction_type=paths.interaction_type,
+        primitive_id=object_sequence,
+        material_id=paths.material_sequence,
+        position=paths.interaction_positions,
+        normal=paths.interaction_normals,
+    )
+    result_metadata = dict(metadata or {})
+    result_metadata.update(
+        {
+            "adapter": "canonical_topology_to_PathResultV2",
+            "coefficient_semantics": "native_scalar_complex_field",
+            "coupled_coefficient_semantics": "nan_until_unified_phase_3_transport",
+            "interaction_geometry": "canonical_topology",
+        }
+    )
+    return PathResultV2.from_ragged(ragged, metadata=result_metadata)
+
+
+__all__ = [
+    "InteractionType",
+    "PathResultV2",
+    "endpoint_angles",
+    "from_legacy_result",
+    "from_topology_result",
+]

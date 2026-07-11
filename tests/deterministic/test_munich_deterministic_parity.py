@@ -23,7 +23,11 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     if not DEFAULT_MUNICH_XML.exists():
         pytest.skip("Munich reference scene is not available")
 
-    artifact_dir = Path(__file__).resolve().parents[2] / "artifacts" / f"test_munich_{uuid.uuid4().hex}"
+    artifact_dir = (
+        Path(__file__).resolve().parents[2]
+        / "artifacts"
+        / f"test_munich_{uuid.uuid4().hex}"
+    )
     args = _parser().parse_args(
         [
             "--artifact-dir",
@@ -51,8 +55,12 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     assert saved["max_depth"] == 2
     assert saved["original"]["available"] is True
     assert saved["delta"]["finite_count"] > 0
-    assert saved["delta"]["max_abs_delta_db"] == pytest.approx(saved["delta"]["max_abs_delta_db"])
-    assert saved["delta"]["median_abs_delta_db"] == pytest.approx(saved["delta"]["median_abs_delta_db"])
+    assert saved["delta"]["max_abs_delta_db"] == pytest.approx(
+        saved["delta"]["max_abs_delta_db"]
+    )
+    assert saved["delta"]["median_abs_delta_db"] == pytest.approx(
+        saved["delta"]["median_abs_delta_db"]
+    )
     assert saved["delta"]["max_abs_delta_db"] < 250.0
     assert saved["delta"]["median_abs_delta_db"] < 20.0
     assert saved["component_delta"]["los"]["max_abs_delta_db"] < 1.0e-3
@@ -62,7 +70,10 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     # close after that intentional convention change.
     assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 2.0
     assert saved["native"]["metadata"]["kernel"]["launch_count"] <= 10
-    assert saved["performance"]["native_solve_time_ms"] < saved["performance"]["original_solve_time_ms"]
+    assert (
+        saved["performance"]["native_solve_time_ms"]
+        < saved["performance"]["original_solve_time_ms"]
+    )
     assert saved["performance"]["original_solve_time_ms"] > 0.0
     assert saved["native"]["path_count_histogram"]["los"] > 0
     assert saved["native"]["path_count_histogram"]["reflection"] > 0
@@ -106,19 +117,24 @@ def test_munich_benchmark_defaults_to_stage8_depth_two():
     assert captured["argv"][warmup_index] == "1"
 
 
-def test_reduced_munich_native_depth_two_exports_reflection_paths():
+@pytest.mark.parametrize("max_depth", [1, 2, 3])
+def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
+    max_depth,
+):
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for Munich deterministic native depth-two coverage")
+        pytest.skip(
+            "CUDA is required for Munich deterministic native depth-two coverage"
+        )
     if not DEFAULT_MUNICH_XML.exists():
         pytest.skip("Munich reference scene is not available")
 
-    args = _parser().parse_args(["--grid-size", "32", "--max-depth", "2"])
+    args = _parser().parse_args(["--grid-size", "32", "--max-depth", str(max_depth)])
     scene = _load_scene(args)
 
     result = solve(
         scene,
         Config(
-            max_depth=2,
+            max_depth=max_depth,
             max_diffraction_order=1,
             components={"los", "reflection", "diffraction"},
             coherent=False,
@@ -130,7 +146,9 @@ def test_reduced_munich_native_depth_two_exports_reflection_paths():
 
     assert result.paths is not None
     assert result.path_gain.shape == (1, 32, 32)
-    assert bool(((result.paths.component_id == 1) & (result.paths.depth == 2)).any())
+    assert bool(
+        ((result.paths.component_id == 1) & (result.paths.depth == max_depth)).any()
+    )
     assert result.diagnostics is not None
     assert result.diagnostics["path_planning"]["guardrail_count"] == 0
     assert result.diagnostics["path_planning"]["candidate_count"] < 200_000
@@ -142,11 +160,15 @@ def test_reduced_munich_native_depth_two_exports_reflection_paths():
 
 def test_original_munich_worker_timeout_returns_unavailable(monkeypatch):
     def fake_run(*args, **kwargs):
-        raise subprocess.TimeoutExpired(cmd=kwargs.get("args", args[0] if args else []), timeout=kwargs["timeout"])
+        raise subprocess.TimeoutExpired(
+            cmd=kwargs.get("args", args[0] if args else []), timeout=kwargs["timeout"]
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     channel_root = Path(__file__).resolve().parents[2]
-    artifact_dir = channel_root / "artifacts" / f"test_original_timeout_{uuid.uuid4().hex}"
+    artifact_dir = (
+        channel_root / "artifacts" / f"test_original_timeout_{uuid.uuid4().hex}"
+    )
     artifact_dir.mkdir(parents=True, exist_ok=True)
     args = _parser().parse_args(
         [
@@ -170,7 +192,10 @@ def test_original_worker_defaults_to_direct_diffraction_without_rd_mixed_path():
 
     assert args.original_enable_rd_diffraction is False
     worker_code = munich_bench._original_worker_code()
-    assert "parser.add_argument(\"--enable-rd-diffraction\", action=\"store_true\")" in worker_code
+    assert (
+        'parser.add_argument("--enable-rd-diffraction", action="store_true")'
+        in worker_code
+    )
     assert "enable_rd_diffraction=bool(args.enable_rd_diffraction)" in worker_code
     assert "max_diffraction_order=1" in worker_code
 
@@ -197,7 +222,7 @@ def test_run_original_sanitizes_pythonpath_and_disables_rd_by_default(monkeypatc
 
         class Completed:
             returncode = 0
-            stdout = "{\"available\": true}\n"
+            stdout = '{"available": true}\n'
             stderr = ""
 
         return Completed()
@@ -207,7 +232,9 @@ def test_run_original_sanitizes_pythonpath_and_disables_rd_by_default(monkeypatc
     channel_root = Path(__file__).resolve().parents[2]
     artifact_dir = channel_root / "artifacts" / f"test_original_env_{uuid.uuid4().hex}"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    args = _parser().parse_args(["--channel-root", str(channel_root), "--max-depth", "2"])
+    args = _parser().parse_args(
+        ["--channel-root", str(channel_root), "--max-depth", "2"]
+    )
 
     original, tensors = _run_original(args, artifact_dir)
 
@@ -257,7 +284,11 @@ def test_run_executes_original_before_native(monkeypatch):
     monkeypatch.setattr(munich_bench, "_run_original", fake_run_original)
     monkeypatch.setattr(munich_bench, "_load_scene", lambda args: object())
     monkeypatch.setattr(munich_bench, "solve", fake_solve)
-    artifact_dir = Path(__file__).resolve().parents[2] / "artifacts" / f"test_order_{uuid.uuid4().hex}"
+    artifact_dir = (
+        Path(__file__).resolve().parents[2]
+        / "artifacts"
+        / f"test_order_{uuid.uuid4().hex}"
+    )
     args = _parser().parse_args(
         [
             "--artifact-dir",

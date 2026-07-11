@@ -44,7 +44,9 @@ from witwin.channel_native.core.kernels.ops import (
     mc_store_scaled_component_map,
     raydn_visibility_forward,
 )
-from witwin.channel_native.path.raydn_export import _diffraction_edge_geometry
+from witwin.channel_native.montecarlo.basic.raydn_components import (
+    _cached_diffraction_edge_geometry,
+)
 from .connections import (
     first_receiver_grid,
     receiver_positions,
@@ -76,13 +78,21 @@ class _GridSpec:
     cell_area: float
 
 
-def _estimate_workspace_bytes(config: Config, *, tx_count: int, grid_cells: int, rx_count: int) -> int:
-    launch_entries = max(0, int(tx_count)) * int(config.samples) * int(config.sample_streams)
+def _estimate_workspace_bytes(
+    config: Config, *, tx_count: int, grid_cells: int, rx_count: int
+) -> int:
+    launch_entries = (
+        max(0, int(tx_count)) * int(config.samples) * int(config.sample_streams)
+    )
     bytes_estimate = launch_entries * 32
     if grid_cells > 0:
         bytes_estimate += tx_count * grid_cells * 3 * 4
     if config.export_paths:
-        exported = config.max_exported_paths if config.max_exported_paths is not None else launch_entries
+        exported = (
+            config.max_exported_paths
+            if config.max_exported_paths is not None
+            else launch_entries
+        )
         bytes_estimate += int(exported) * _EXPORT_BYTES_PER_PATH
 
     # Dense endpoint-connection tables materialize light_count x rx_count rows
@@ -184,7 +194,8 @@ def _grid_spec(grid: ReceiverGrid) -> _GridSpec:
         coord1_max=coord1_max,
         resolution0=rows,
         resolution1=cols,
-        cell_area=abs((coord0_max - coord0_min) * (coord1_max - coord1_min)) / float(rows * cols),
+        cell_area=abs((coord0_max - coord0_min) * (coord1_max - coord1_min))
+        / float(rows * cols),
     )
 
 
@@ -218,8 +229,6 @@ def _face_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
     )
 
 
-
-
 def _component_maps_from_matrices(
     component_matrices: dict[str, torch.Tensor],
     *,
@@ -232,7 +241,9 @@ def _component_maps_from_matrices(
     }
 
 
-def _path_samples_from_connection_export(exported: dict[str, torch.Tensor]) -> BDPTPathSamples:
+def _path_samples_from_connection_export(
+    exported: dict[str, torch.Tensor],
+) -> BDPTPathSamples:
     return BDPTPathSamples(
         topology=exported["topology"],
         contribution=exported["contribution"],
@@ -269,8 +280,12 @@ def _native_reflection_connection_samples(
     sensor = endpoint_subpaths["sensor"]
     sample_blocks: list[dict[str, torch.Tensor]] = []
     for tx_index in range(int(tx_positions.shape[0])):
-        launch_inputs = bdpt_reflection_launch_inputs(tx_positions, tx_index=tx_index, sample_count=int(samples))
-        ray_d = bdpt_sample_directions(int(samples), tx_positions, seed=int(seed) + tx_index * 65537)
+        launch_inputs = bdpt_reflection_launch_inputs(
+            tx_positions, tx_index=tx_index, sample_count=int(samples)
+        )
+        ray_d = bdpt_sample_directions(
+            int(samples), tx_positions, seed=int(seed) + tx_index * 65537
+        )
         state = bdpt_endpoint_subpath_state(
             tx_positions,
             tx_power,
@@ -349,7 +364,9 @@ def _reduced_light_endpoint_state(
     tx_count = int(tx_reference.shape[0])
     tx_ids = torch.arange(tx_count, device=device, dtype=torch.int32)
     seeds = torch.zeros((tx_count,), device=device, dtype=torch.int64)
-    return bdpt_endpoint_subpath_state(tx_reference, tx_power, rx_positions, tx_ids, seeds)["light"]
+    return bdpt_endpoint_subpath_state(
+        tx_reference, tx_power, rx_positions, tx_ids, seeds
+    )["light"]
 
 
 def _native_los_connection_samples(
@@ -400,14 +417,20 @@ def _native_reflection_component_maps(
     samples: int,
     max_depth: int,
 ) -> torch.Tensor:
-    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid = material_tensors
+    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid = (
+        material_tensors
+    )
     spec = _grid_spec(grid)
     dim0, dim1 = grid.shape[1], grid.shape[0]
-    maps = mc_component_map_buffer(tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1)
+    maps = mc_component_map_buffer(
+        tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1
+    )
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
     solid_angle_per_ray = float(4.0 * math.pi / max(1, int(samples)))
     for tx_index in range(int(tx_positions.shape[0])):
-        launch_inputs = bdpt_reflection_launch_inputs(tx_positions, tx_index=tx_index, sample_count=int(samples))
+        launch_inputs = bdpt_reflection_launch_inputs(
+            tx_positions, tx_index=tx_index, sample_count=int(samples)
+        )
         ray_d = mc_sample_directions(int(samples), tx_positions)
         out = bdpt_reflection_accumulation_forward(
             raydn.require_handle(),
@@ -480,9 +503,23 @@ def _native_diffraction_component_maps(
     _eps_r, _sigma_e, _mu_r, material_gain, material_valid = material_tensors
     spec = _grid_spec(grid)
     dim0, dim1 = grid.shape[1], grid.shape[0]
-    maps = mc_component_map_buffer(tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1)
-    edge_geometry = _diffraction_edge_geometry(raydn)
-    selected, edge_pos, edge_dir, _lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle = edge_geometry
+    maps = mc_component_map_buffer(
+        tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1
+    )
+    edge_geometry = _cached_diffraction_edge_geometry(raydn)
+    (
+        selected,
+        edge_pos,
+        edge_dir,
+        _lengths,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+    ) = edge_geometry
     edge_indices = bdpt_selected_edge_indices(selected)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
     sample_blocks: list[dict[str, torch.Tensor]] = []
@@ -589,7 +626,9 @@ def _native_diffraction_component_maps(
                     keller_samples=int(keller_samples),
                     mis=mis,
                     beta=beta,
-                    strategy_count=_diffraction_strategy_count(direct_samples, keller_samples),
+                    strategy_count=_diffraction_strategy_count(
+                        direct_samples, keller_samples
+                    ),
                 )
             )
     return maps, sample_blocks
@@ -609,11 +648,25 @@ def _native_diffraction_point_connection_samples(
     beta: float,
 ) -> list[dict[str, torch.Tensor]]:
     _eps_r, _sigma_e, _mu_r, material_gain, material_valid = material_tensors
-    edge_geometry = _diffraction_edge_geometry(raydn)
-    selected, edge_pos, edge_dir, _lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle = edge_geometry
+    edge_geometry = _cached_diffraction_edge_geometry(raydn)
+    (
+        selected,
+        edge_pos,
+        edge_dir,
+        _lengths,
+        line_min,
+        line_max,
+        n0,
+        n1,
+        face0,
+        face1,
+        exterior_angle,
+    ) = edge_geometry
     edge_indices = bdpt_selected_edge_indices(selected)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    direct_samples, keller_samples, _suffix_samples = _diffraction_sample_split(int(samples))
+    direct_samples, keller_samples, _suffix_samples = _diffraction_sample_split(
+        int(samples)
+    )
     sample_blocks: list[dict[str, torch.Tensor]] = []
 
     for tx_index in range(int(tx_positions.shape[0])):
@@ -651,7 +704,9 @@ def _native_diffraction_point_connection_samples(
         )
         samples_out = exported["samples"]
         if not isinstance(samples_out, dict):
-            raise RuntimeError("native BDPT diffraction point sampler returned invalid samples")
+            raise RuntimeError(
+                "native BDPT diffraction point sampler returned invalid samples"
+            )
         visible_source = raydn_visibility_forward(
             raydn.require_handle(),
             exported["source_start"],
@@ -682,12 +737,19 @@ def solve(scene: Scene, config: Config) -> Result:
     raydn_available = bool(info["uses_raydn_native"]) and raydn.available
     reflection_available = raydn_available
     diffraction_available = raydn_available and config.max_diffraction_order > 0
-    if "reflection" in config.components and scene.structures and not reflection_available:
+    if (
+        "reflection" in config.components
+        and scene.structures
+        and not reflection_available
+    ):
         raise RuntimeError("reflection requires RayDN native capability")
-    if "diffraction" in config.components and scene.structures and not diffraction_available:
+    if (
+        "diffraction" in config.components
+        and scene.structures
+        and not diffraction_available
+    ):
         raise RuntimeError("diffraction requires RayDN native capability")
 
-    device = torch.device("cuda")
     grid_cells = 0 if grid is None else int(grid.shape[0] * grid.shape[1])
     native_samples = _effective_native_samples(config)
     native_max_depth = _effective_native_depth(config)
@@ -707,7 +769,9 @@ def solve(scene: Scene, config: Config) -> Result:
 
     tx_reference, tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_reference, grid=grid)
-    launch_state = make_launch_state(tx_reference, tx_count=len(scene.transmitters), config=config)
+    launch_state = make_launch_state(
+        tx_reference, tx_count=len(scene.transmitters), config=config
+    )
     endpoint_subpaths = bdpt_endpoint_subpath_state(
         tx_reference,
         tx_power,
@@ -743,7 +807,9 @@ def solve(scene: Scene, config: Config) -> Result:
 
     tx_count = len(scene.transmitters)
     rx_count = int(rx_positions.shape[0])
-    endpoint_only = endpoint_accumulation is not None and config.components == frozenset({"los"})
+    endpoint_only = (
+        endpoint_accumulation is not None and config.components == frozenset({"los"})
+    )
 
     def zero_component_matrix() -> torch.Tensor:
         return bdpt_zero_matrix(tx_reference, rows=tx_count, cols=rx_count)
@@ -762,7 +828,11 @@ def solve(scene: Scene, config: Config) -> Result:
         sample_blocks: list[dict[str, torch.Tensor]] = []
         material_tensors = (
             _face_material_tensors(scene)
-            if scene.structures and (("reflection" in config.components) or ("diffraction" in config.components))
+            if scene.structures
+            and (
+                ("reflection" in config.components)
+                or ("diffraction" in config.components)
+            )
             else None
         )
         if los_light_state is not None:
@@ -842,18 +912,20 @@ def solve(scene: Scene, config: Config) -> Result:
                     )
                 )
             else:
-                diffraction_component_map, diffraction_sample_blocks = _native_diffraction_component_maps(
-                    scene,
-                    raydn,
-                    tx_reference,
-                    tx_power,
-                    grid,
-                    material_tensors,
-                    samples=native_samples,
-                    seed=int(config.seed),
-                    export_samples=bool(config.export_paths),
-                    mis=config.mis,
-                    beta=config.power_heuristic_beta,
+                diffraction_component_map, diffraction_sample_blocks = (
+                    _native_diffraction_component_maps(
+                        scene,
+                        raydn,
+                        tx_reference,
+                        tx_power,
+                        grid,
+                        material_tensors,
+                        samples=native_samples,
+                        seed=int(config.seed),
+                        export_samples=bool(config.export_paths),
+                        mis=config.mis,
+                        beta=config.power_heuristic_beta,
+                    )
                 )
                 sample_blocks.extend(diffraction_sample_blocks)
             launch_count += 3
@@ -944,10 +1016,14 @@ def solve(scene: Scene, config: Config) -> Result:
                 beta=config.power_heuristic_beta,
                 strategy_count=1,
             )
-            path_samples = _path_samples_from_connection_export(exported_endpoint_samples)
+            path_samples = _path_samples_from_connection_export(
+                exported_endpoint_samples
+            )
         else:
             if estimate_samples is None:
-                raise RuntimeError("BDPT path export requires native connection samples")
+                raise RuntimeError(
+                    "BDPT path export requires native connection samples"
+                )
             exported_path_samples = bdpt_compact_connection_samples(
                 estimate_samples,
                 max_paths=config.max_exported_paths,
@@ -990,7 +1066,9 @@ def solve(scene: Scene, config: Config) -> Result:
                 "sensor": tuple(endpoint_subpaths["sensor"]["origin"].shape),
             },
             "component_map_shapes": (
-                None if component_maps is None else {key: tuple(value.shape) for key, value in component_maps.items()}
+                None
+                if component_maps is None
+                else {key: tuple(value.shape) for key, value in component_maps.items()}
             ),
         }
     return Result(

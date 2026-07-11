@@ -7,7 +7,11 @@ import torch
 from witwin.channel_native.core.kernels import ops
 
 from .result import PathTable
-from .topology import ReceiverLayout, TopologyBatch, apply_receiver_layout
+from witwin.channel_native.core.path_topology import (
+    ReceiverLayout,
+    TopologyBatch,
+    apply_receiver_layout,
+)
 
 
 _COMPONENT_NAME = {
@@ -32,7 +36,9 @@ def accumulate_flat_components(
     num_tx: int,
     num_rx: int,
     coherent: bool,
-) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+) -> tuple[
+    torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
+]:
     exported = ops.deterministic_accumulate_flat(
         tx_id.to(dtype=torch.int32).contiguous(),
         rx_id.to(dtype=torch.int32).contiguous(),
@@ -73,7 +79,9 @@ def apply_layout_to_accumulation(
     component_fields: Mapping[str, torch.Tensor],
     layout: ReceiverLayout,
     return_field: bool,
-) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+) -> tuple[
+    torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
+]:
     laid_out_power = apply_receiver_layout(path_gain, layout)
     laid_out_field = (
         apply_receiver_layout(field, layout)
@@ -90,7 +98,12 @@ def apply_layout_to_accumulation(
         else torch.empty((0,), device=value.device, dtype=torch.complex64)
         for name, value in component_fields.items()
     }
-    return laid_out_power, laid_out_field, laid_out_component_power, laid_out_component_fields
+    return (
+        laid_out_power,
+        laid_out_field,
+        laid_out_component_power,
+        laid_out_component_fields,
+    )
 
 
 def accumulate_path_result(
@@ -102,7 +115,9 @@ def accumulate_path_result(
     layout: ReceiverLayout,
     coherent: bool,
     return_field: bool,
-) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+) -> tuple[
+    torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
+]:
     power, field, component_power, component_fields = accumulate_flat_components(
         tx_id=paths.tx_id,
         rx_id=paths.rx_id,
@@ -123,7 +138,9 @@ def accumulate_path_result(
     )
 
 
-def build_path_table(paths: TopologyBatch, *, frequency_hz: float, include_fields: bool = True) -> PathTable:
+def build_path_table(
+    paths: TopologyBatch, *, frequency_hz: float, include_fields: bool = True
+) -> PathTable:
     if include_fields:
         path_field = paths.path_field.to(dtype=torch.complex64).contiguous()
         phase = ops.deterministic_phase_from_field(
@@ -131,7 +148,9 @@ def build_path_table(paths: TopologyBatch, *, frequency_hz: float, include_field
             path_field.imag.to(dtype=torch.float32).contiguous(),
         )
     else:
-        zero_field_phase = ops.deterministic_zero_field_phase(paths.path_gain.to(dtype=torch.float32).contiguous())
+        zero_field_phase = ops.deterministic_zero_field_phase(
+            paths.path_gain.to(dtype=torch.float32).contiguous()
+        )
         path_field = zero_field_phase["path_field"]
         phase = zero_field_phase["phase_rad"]
     return PathTable(
@@ -145,13 +164,21 @@ def build_path_table(paths: TopologyBatch, *, frequency_hz: float, include_field
         path_length_m=paths.path_length_m.to(dtype=torch.float32).contiguous(),
         delay_s=paths.delay_s.to(dtype=torch.float32).contiguous(),
         path_gain=paths.path_gain.to(dtype=torch.float32).contiguous(),
-        interaction_position=paths.interaction_position.to(dtype=torch.float32).contiguous(),
-        interaction_normal=paths.interaction_normal.to(dtype=torch.float32).contiguous(),
+        interaction_position=paths.interaction_position.to(
+            dtype=torch.float32
+        ).contiguous(),
+        interaction_normal=paths.interaction_normal.to(
+            dtype=torch.float32
+        ).contiguous(),
         material_id=paths.material_id.to(dtype=torch.int32).contiguous(),
         primitive_sequence=paths.primitive_sequence.to(dtype=torch.int32).contiguous(),
         material_sequence=paths.material_sequence.to(dtype=torch.int32).contiguous(),
-        interaction_positions=paths.interaction_positions.to(dtype=torch.float32).contiguous(),
-        interaction_normals=paths.interaction_normals.to(dtype=torch.float32).contiguous(),
+        interaction_positions=paths.interaction_positions.to(
+            dtype=torch.float32
+        ).contiguous(),
+        interaction_normals=paths.interaction_normals.to(
+            dtype=torch.float32
+        ).contiguous(),
         field_real=path_field.real.to(dtype=torch.float32).contiguous(),
         field_imag=path_field.imag.to(dtype=torch.float32).contiguous(),
         phase_rad=phase,

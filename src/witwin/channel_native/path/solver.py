@@ -9,7 +9,7 @@ from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.core.material_runtime import face_material_tensors
+from witwin.channel_native.core.path_topology import export_topology
 from witwin.channel_native.capabilities import (
     capabilities,
     config_metadata,
@@ -17,16 +17,17 @@ from witwin.channel_native.capabilities import (
 )
 
 from .config import Config
-from .raydn_export import (
-    diffraction_paths_order1,
-    _empty_path_block,
-    reflection_paths_order1,
-)
 from .result import Result
-from .result_v2 import PathResultV2, from_legacy_result
+from .result_v2 import PathResultV2, from_topology_result
 
 
-_COMPONENT_ID = {"los": 0, "reflection": 1, "diffraction": 2}
+_COMPONENT_ID = {
+    "los": 0,
+    "reflection": 1,
+    "diffraction": 2,
+    "reflection_diffraction": 3,
+    "diffraction_reflection": 4,
+}
 
 
 def _vector3_tuple(value: torch.Tensor) -> tuple[float, float, float]:
@@ -167,14 +168,19 @@ def _metadata(
         "diffraction": diffraction_available,
     }
     requested_config = serialize_config(config)
-    effective_max_depth = (
-        1 if config.components.intersection({"reflection", "diffraction"}) else 0
+    reflection_depth = config.max_depth if "reflection" in config.components else -1
+    diffraction_depth = (
+        2 if config.coupled_paths else (1 if "diffraction" in config.components else -1)
+    )
+    effective_max_depth = max(
+        0 if "los" in config.components else -1, reflection_depth, diffraction_depth
     )
     effective_config = dict(requested_config)
     effective_config["max_depth"] = effective_max_depth
     metadata = {
         "max_depth": config.max_depth,
         "max_paths": config.max_paths,
+        "max_paths_scope": config.max_paths_scope,
         "sort_key": config.sort_key,
         "path_count": path_count,
         "valid_contribution_count": valid_contribution_count,
@@ -193,6 +199,15 @@ def _metadata(
             "diffraction": diffraction_available,
         },
         "kernel": kernel,
+        "coupled_paths": {
+            "requested": config.coupled_paths,
+            "geometry": "native_1r1d_reciprocal"
+            if config.coupled_paths
+            else "not_requested",
+            "coefficient": "unavailable_until_phase_3"
+            if config.coupled_paths
+            else "not_requested",
+        },
     }
     metadata.update(
         config_metadata(
@@ -200,8 +215,8 @@ def _metadata(
             effective=effective_config,
             component_max_depth={
                 "los": 0 if "los" in config.components else -1,
-                "reflection": 1 if "reflection" in config.components else -1,
-                "diffraction": 1 if "diffraction" in config.components else -1,
+                "reflection": reflection_depth,
+                "diffraction": diffraction_depth,
             },
         )
     )
@@ -209,12 +224,11 @@ def _metadata(
     return metadata
 
 
-def solve(scene: Scene, config: Config) -> Result:
+def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.path solver requires CUDA")
     if config.ad_mode != "none":
         raise RuntimeError("path topology AD is not enabled")
-
     info = build_info()
     reflection_available = bool(info["uses_raydn_native"])
     diffraction_available = bool(info["uses_raydn_native"])
@@ -231,6 +245,17 @@ def solve(scene: Scene, config: Config) -> Result:
         "reflection" in config.components or "diffraction" in config.components
     ):
         raise RuntimeError("requested scattering paths require max_depth >= 1")
+    return reflection_available, diffraction_available, path_native_available
+
+
+def solve(scene: Scene, config: Config) -> Result:
+    if config.coupled_paths:
+        raise RuntimeError(
+            "coupled_paths require solve_v2 until Phase 3 provides physical complex coefficients"
+        )
+    reflection_available, diffraction_available, path_native_available = (
+        _validate_runtime(config)
+    )
 
     if not scene.transmitters:
         device = torch.device("cuda")
@@ -242,91 +267,9 @@ def solve(scene: Scene, config: Config) -> Result:
             path_native_available=path_native_available,
         )
 
-    compiled = scene.compile()
-    tx_positions, tx_power = _transmitter_tensors(scene)
-    device = tx_positions.device
-    rx_positions = _receiver_positions(scene, reference=tx_positions)
-    material_tensors = (
-        face_material_tensors(scene, device=device)
-        if scene.structures
-        and (
-            ("reflection" in config.components) or ("diffraction" in config.components)
-        )
-        else None
-    )
-    los_block = _empty_path_block(device)
-    if "los" in config.components:
-        exported = ops.path_los_export(
-            tx_positions,
-            tx_power,
-            rx_positions,
-            frequency_hz=scene.frequency,
-        )
-        visibility_inputs = ops.path_los_visibility_inputs(
-            tx_positions,
-            rx_positions,
-            exported["tx_id"],
-            exported["rx_id"],
-        )
-        if scene.structures:
-            if not compiled.raydn.available:
-                raise RuntimeError("LoS visibility requires RayDN native capability")
-            visible = ops.raydn_visibility_forward(
-                compiled.raydn.require_handle(),
-                visibility_inputs["start"],
-                visibility_inputs["end"],
-                visibility_inputs["active"],
-            )[0]
-        else:
-            visible = visibility_inputs["active"]
-        los_block = ops.path_filter_los(
-            exported["tx_id"],
-            exported["rx_id"],
-            exported["path_length_m"],
-            exported["delay_s"],
-            exported["path_gain"],
-            visible,
-        )
-    reflection_block = _empty_path_block(device)
-    if (
-        "reflection" in config.components
-        and reflection_available
-        and config.max_depth >= 1
-    ):
-        reflection_block = reflection_paths_order1(
-            scene,
-            compiled.raydn,
-            tx_positions,
-            tx_power,
-            rx_positions,
-            frequency_hz=scene.frequency,
-            material_tensors=material_tensors,
-        )
-    diffraction_block = _empty_path_block(device)
-    if (
-        "diffraction" in config.components
-        and diffraction_available
-        and config.max_depth >= 1
-    ):
-        diffraction_block = diffraction_paths_order1(
-            scene,
-            compiled.raydn,
-            tx_positions,
-            tx_power,
-            rx_positions,
-            frequency_hz=scene.frequency,
-            material_tensors=material_tensors,
-        )
-
-    exported_paths = ops.path_finalize_blocks(
-        los_block,
-        reflection_block,
-        diffraction_block,
-        max_paths=config.max_paths,
-        tx_count=len(scene.transmitters),
-        max_depth=config.max_depth,
-    )
-    path_count = int(exported_paths["path_gain"].shape[0])
+    exported_paths = export_topology(scene, config)
+    device = exported_paths.valid.device
+    path_count = int(exported_paths.path_gain.shape[0])
     if path_count == 0:
         return _empty_result(
             device=device,
@@ -351,39 +294,51 @@ def solve(scene: Scene, config: Config) -> Result:
             "component_order": dict(_COMPONENT_ID),
         }
     return Result(
-        valid=exported_paths["valid"],
-        tx_id=exported_paths["tx_id"],
-        rx_id=exported_paths["rx_id"],
-        depth=exported_paths["depth"],
-        component_id=exported_paths["component_id"],
-        primitive_id=exported_paths["primitive_id"],
-        edge_id=exported_paths["edge_id"],
-        path_length_m=exported_paths["path_length_m"],
-        delay_s=exported_paths["delay_s"],
-        path_gain=exported_paths["path_gain"],
+        valid=exported_paths.valid,
+        tx_id=exported_paths.tx_id,
+        rx_id=exported_paths.rx_id,
+        depth=exported_paths.depth,
+        component_id=exported_paths.component_id,
+        primitive_id=exported_paths.primitive_id,
+        edge_id=exported_paths.edge_id,
+        path_length_m=exported_paths.path_length_m,
+        delay_s=exported_paths.delay_s,
+        path_gain=exported_paths.path_gain,
         metadata=metadata,
         diagnostics=diagnostics,
     )
 
 
 def solve_v2(scene: Scene, config: Config) -> PathResultV2:
-    """Solve and explicitly pack the flat scalar result into PathResultV2."""
+    """Solve and pack the shared canonical topology into PathResultV2."""
 
-    # The V2 contract defines max_paths per endpoint pair. Disable the legacy
-    # global truncation and apply the requested limit during ragged packing.
-    legacy_config = replace(config, max_paths=None)
-    legacy = solve(scene, legacy_config)
+    reflection_available, diffraction_available, path_native_available = (
+        _validate_runtime(config)
+    )
+    topology = export_topology(scene, config)
+    path_count = int(topology.valid.numel())
+    metadata = _metadata(
+        config=config,
+        path_count=path_count,
+        valid_contribution_count=path_count,
+        reflection_available=reflection_available,
+        diffraction_available=diffraction_available,
+        path_native_available=path_native_available,
+    )
     tx_positions, _tx_power = _transmitter_tensors(scene)
     rx_positions = _receiver_positions(scene, reference=tx_positions)
-    result = from_legacy_result(
-        legacy,
+    result = from_topology_result(
+        topology,
         num_rx=int(rx_positions.shape[0]),
         num_tx=int(tx_positions.shape[0]),
         tx_positions=tx_positions,
         rx_positions=rx_positions,
-        max_paths_per_pair=config.max_paths,
+        metadata=metadata,
     )
     metadata = dict(result.metadata)
     metadata["requested_max_paths_per_pair"] = config.max_paths
-    metadata["legacy_global_truncation_disabled"] = True
+    if config.coupled_paths:
+        metadata["coefficient_semantics"] = (
+            "native_scalar_complex_field_with_nan_for_coupled_geometry"
+        )
     return replace(result, metadata=metadata)
