@@ -612,8 +612,8 @@ def diffraction_component_map(
             int(spec.resolution1),
             float(spec.cell_area),
             float(wavelength),
-            0,
             int(samples),
+            0,
             0,
             int(seed),
             1,
@@ -633,5 +633,12 @@ def diffraction_component_map(
             None,
             None,
         )
-        mc_store_component_map(maps, out[0], tx_index=tx_index)
+        # Direct lanes rotate over cells as well as states.  RayD's default
+        # edge weight accounts for state selection; restore the discrete
+        # 1 / cell_count target-selection probability on the compact map.
+        mc_store_component_map(
+            maps,
+            out[0] * float(int(spec.resolution0) * int(spec.resolution1)),
+            tx_index=tx_index,
+        )
     return maps

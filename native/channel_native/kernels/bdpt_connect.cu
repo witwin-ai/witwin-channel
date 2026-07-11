@@ -407,8 +407,18 @@ __global__ void bdpt_diffraction_connection_samples_from_tape_kernel(
             grid_coord1_max,
             grid_resolution0,
             grid_resolution1);
-        const float edge_measure_weight = edge_length / fmaxf(static_cast<float>(strategy_samples), 1.0f);
-        const float edge_pdf_base = 1.0f / fmaxf(edge_length * grid_cell_area, 1.0e-30f);
+        // The launch samples a state and a receiver cell in addition to the
+        // continuous edge coordinate.  Preserve those discrete proposal
+        // probabilities when reconstructing the exported sample; omitting
+        // state_count * cell_count made the tape disagree with the map
+        // accumulator by exactly that factor.
+        const float discrete_domain =
+            static_cast<float>(state_count) * static_cast<float>(cell_count);
+        const float edge_measure_weight =
+            edge_length * discrete_domain /
+            fmaxf(static_cast<float>(strategy_samples), 1.0f);
+        const float edge_pdf_base = 1.0f /
+            fmaxf(edge_length * discrete_domain * grid_cell_area, 1.0e-30f);
         direct_pdf = direct_samples > 0 ? static_cast<float>(direct_samples) * edge_pdf_base : 0.0f;
         keller_pdf = keller_samples > 0 ? static_cast<float>(keller_samples) * edge_pdf_base : 0.0f;
         row_contribution = bdpt_diffraction_contribution(

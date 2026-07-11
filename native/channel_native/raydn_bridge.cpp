@@ -1,22 +1,24 @@
 #include <torch/extension.h>
+#include <rayd/torch/integration.h>
 
 #include <array>
 #include <cstdint>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <tuple>
-#include <unordered_map>
 #include <vector>
 
-#if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
+extern "C" void channel_native_diffraction_discover_edges(
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, at::Tensor *);
+extern "C" void channel_native_diffraction_discover_edges_counted(
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    at::Tensor *);
 
 namespace {
 
@@ -79,6 +81,7 @@ using ReflectionEpcPathsForwardFn = int64_t (*)(
     const at::Tensor *,
     int64_t,
     int64_t,
+    double,
     at::Tensor *,
     int64_t);
 
@@ -177,6 +180,7 @@ using DiffractionPathsOrder1ForwardFn = int64_t (*)(
     const at::Tensor *,
     const at::Tensor *,
     const at::Tensor *,
+    const at::Tensor *,
     int64_t,
     int64_t,
     double,
@@ -239,203 +243,64 @@ using DiffractionAccumulationForwardFn = int64_t (*)(
     at::Tensor *,
     int64_t);
 
-std::mutex g_raydn_api_mutex;
-std::unordered_map<std::uintptr_t, VisibilityForwardFn> g_visibility_forward_cache;
-std::unordered_map<std::uintptr_t, SceneCreateFn> g_scene_create_cache;
-std::unordered_map<std::uintptr_t, SceneDestroyFn> g_scene_destroy_cache;
-std::unordered_map<std::uintptr_t, SceneEdgeRecordsFn> g_scene_edge_records_cache;
-std::unordered_map<std::uintptr_t, IntersectForwardFn> g_intersect_forward_cache;
-std::unordered_map<std::uintptr_t, TraceReflectionsForwardFn> g_trace_reflections_forward_cache;
-std::unordered_map<std::uintptr_t, ReflectionEpcPathsForwardFn> g_reflection_epc_paths_forward_cache;
-std::unordered_map<std::uintptr_t, ReflectionAccumulationForwardFn> g_reflection_accumulation_forward_cache;
-std::unordered_map<std::uintptr_t, DiffractionDiscoverEdgesFn> g_diffraction_discover_edges_cache;
-std::unordered_map<std::uintptr_t, DiffractionDiscoverEdgesCountedFn> g_diffraction_discover_edges_counted_cache;
-std::unordered_map<std::uintptr_t, DiffractionPathsOrder1ForwardFn> g_diffraction_paths_order1_forward_cache;
-std::unordered_map<std::uintptr_t, DiffractionAccumulationForwardFn> g_diffraction_accumulation_forward_cache;
-
-#if defined(_WIN32)
-void *load_symbol(std::uintptr_t module_handle, const char *symbol) {
-    if (module_handle == 0)
-        throw std::runtime_error("loaded RayDN native module handle is required");
-    HMODULE module = reinterpret_cast<HMODULE>(module_handle);
-    FARPROC proc = GetProcAddress(module, symbol);
-    if (proc == nullptr) {
-        throw std::runtime_error(
-            std::string("RayDN native module does not export ") + symbol + ": Windows error " +
-            std::to_string(GetLastError()));
-    }
-    return reinterpret_cast<void *>(proc);
-}
-#else
-void *load_symbol(std::uintptr_t module_handle, const char *symbol) {
-    if (module_handle == 0)
-        throw std::runtime_error("loaded RayDN native module handle is required");
-    void *module = reinterpret_cast<void *>(module_handle);
-    if (module == nullptr)
-        throw std::runtime_error("loaded RayDN native module handle is required");
-    dlerror();
-    void *proc = dlsym(module, symbol);
-    const char *error = dlerror();
-    if (error != nullptr)
-        throw std::runtime_error(std::string("RayDN native module does not export ") + symbol + ": " + error);
-    return proc;
-}
-#endif
-
 VisibilityForwardFn raydn_visibility_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_visibility_forward_cache.find(module_handle);
-    if (cached != g_visibility_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_visibility_forward");
-    auto fn = reinterpret_cast<VisibilityForwardFn>(symbol);
-    g_visibility_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_visibility_forward;
 }
 
 SceneCreateFn raydn_scene_create_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_scene_create_cache.find(module_handle);
-    if (cached != g_scene_create_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_scene_create");
-    auto fn = reinterpret_cast<SceneCreateFn>(symbol);
-    g_scene_create_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_scene_create;
 }
 
 SceneDestroyFn raydn_scene_destroy_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_scene_destroy_cache.find(module_handle);
-    if (cached != g_scene_destroy_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_scene_destroy");
-    auto fn = reinterpret_cast<SceneDestroyFn>(symbol);
-    g_scene_destroy_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_scene_destroy;
 }
 
 SceneEdgeRecordsFn raydn_scene_edge_records_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_scene_edge_records_cache.find(module_handle);
-    if (cached != g_scene_edge_records_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_scene_edge_records");
-    auto fn = reinterpret_cast<SceneEdgeRecordsFn>(symbol);
-    g_scene_edge_records_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_scene_edge_records;
 }
 
 IntersectForwardFn raydn_intersect_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_intersect_forward_cache.find(module_handle);
-    if (cached != g_intersect_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_intersect_forward");
-    auto fn = reinterpret_cast<IntersectForwardFn>(symbol);
-    g_intersect_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_intersect_forward;
 }
 
 TraceReflectionsForwardFn raydn_trace_reflections_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_trace_reflections_forward_cache.find(module_handle);
-    if (cached != g_trace_reflections_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_trace_reflections_forward");
-    auto fn = reinterpret_cast<TraceReflectionsForwardFn>(symbol);
-    g_trace_reflections_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_trace_reflections_forward;
 }
 
 ReflectionEpcPathsForwardFn raydn_reflection_epc_paths_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_reflection_epc_paths_forward_cache.find(module_handle);
-    if (cached != g_reflection_epc_paths_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_reflection_epc_paths_forward");
-    auto fn = reinterpret_cast<ReflectionEpcPathsForwardFn>(symbol);
-    g_reflection_epc_paths_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_reflection_epc_paths_forward;
 }
 
 ReflectionAccumulationForwardFn raydn_reflection_accumulation_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_reflection_accumulation_forward_cache.find(module_handle);
-    if (cached != g_reflection_accumulation_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_reflection_accumulation_forward");
-    auto fn = reinterpret_cast<ReflectionAccumulationForwardFn>(symbol);
-    g_reflection_accumulation_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_reflection_accumulation_forward;
 }
 
 DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_diffraction_discover_edges_cache.find(module_handle);
-    if (cached != g_diffraction_discover_edges_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_diffraction_discover_edges");
-    auto fn = reinterpret_cast<DiffractionDiscoverEdgesFn>(symbol);
-    g_diffraction_discover_edges_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &channel_native_diffraction_discover_edges;
 }
 
 DiffractionDiscoverEdgesCountedFn raydn_diffraction_discover_edges_counted_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_diffraction_discover_edges_counted_cache.find(module_handle);
-    if (cached != g_diffraction_discover_edges_counted_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_diffraction_discover_edges_counted");
-    auto fn = reinterpret_cast<DiffractionDiscoverEdgesCountedFn>(symbol);
-    g_diffraction_discover_edges_counted_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &channel_native_diffraction_discover_edges_counted;
 }
 
 DiffractionPathsOrder1ForwardFn raydn_diffraction_paths_order1_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_diffraction_paths_order1_forward_cache.find(module_handle);
-    if (cached != g_diffraction_paths_order1_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_diffraction_paths_order1_forward");
-    auto fn = reinterpret_cast<DiffractionPathsOrder1ForwardFn>(symbol);
-    g_diffraction_paths_order1_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_diffraction_paths_order1_forward;
 }
 
 DiffractionAccumulationForwardFn raydn_diffraction_accumulation_forward_fn(std::uintptr_t module_handle) {
-    if (module_handle == 0)
-        throw std::runtime_error("RayDN native module handle is required");
-    std::lock_guard<std::mutex> lock(g_raydn_api_mutex);
-    auto cached = g_diffraction_accumulation_forward_cache.find(module_handle);
-    if (cached != g_diffraction_accumulation_forward_cache.end())
-        return cached->second;
-    void *symbol = load_symbol(module_handle, "raydn_native_diffraction_accumulation_forward");
-    auto fn = reinterpret_cast<DiffractionAccumulationForwardFn>(symbol);
-    g_diffraction_accumulation_forward_cache.emplace(module_handle, fn);
-    return fn;
+    (void) module_handle;
+    return &rayd_torch_native_diffraction_accumulation_forward;
 }
 
 const at::Tensor *optional_tensor(pybind11::object value, at::Tensor &storage) {
@@ -741,6 +606,7 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
         &surface_group_members,
         max_bounces,
         visibility_ignore_mode,
+        1.0e-3,
         outputs.data(),
         kOutputCount);
     if (output_count < 0 || output_count > kOutputCount)
@@ -785,6 +651,42 @@ pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     int64_t procedural_sample_count,
     bool streaming_los_enabled,
     std::uintptr_t raydn_module_handle) {
+    if (accumulation_strategy == 4) {
+        if (procedural_sample_count <= 0)
+            throw std::runtime_error("streaming_planar requires a positive procedural_sample_count");
+        if (tx.dim() != 2 || tx.size(0) != 1 || tx.size(1) != 3)
+            throw std::runtime_error("streaming_planar expects one transmitter position");
+
+        const auto dopts = ray_o.options().dtype(at::kDouble);
+        at::Tensor index = at::arange(procedural_sample_count, dopts);
+        at::Tensor azimuth = index / 1.618033988749894848204586834365638118;
+        at::Tensor azimuth_u = azimuth - at::floor(azimuth);
+        at::Tensor phi = azimuth_u * (2.0 * 3.141592653589793238462643383279502884);
+        at::Tensor elevation = procedural_sample_count == 1
+            ? at::zeros_like(index)
+            : index / static_cast<double>(procedural_sample_count - 1);
+        at::Tensor z = 1.0 - 2.0 * elevation;
+        at::Tensor radial = at::sqrt(at::clamp_min(1.0 - z * z, 0.0));
+        at::Tensor x = radial * at::cos(phi);
+        at::Tensor y = radial * at::sin(phi);
+        ray_d = at::stack({x, y, z}, 1).to(ray_o.scalar_type()).contiguous();
+
+        at::Tensor pole = radial <= 1.0e-6;
+        at::Tensor safe_radial = at::clamp_min(radial, 1.0e-6);
+        at::Tensor pole_x = at::where(z >= 0.0, at::ones_like(z), -at::ones_like(z));
+        at::Tensor pol_x = at::where(pole, pole_x, z * x / safe_radial);
+        at::Tensor pol_y = at::where(pole, at::zeros_like(z), z * y / safe_radial);
+        at::Tensor pol_z = at::where(pole, at::zeros_like(z), -radial);
+        tx_pol = at::stack({pol_x, pol_y, pol_z}, 1).to(ray_o.scalar_type()).contiguous();
+
+        ray_o = tx.select(0, 0).reshape({1, 3})
+                    .expand({procedural_sample_count, 3}).contiguous();
+        tx = ray_o;
+        ray_tmax = at::empty({0}, ray_o.options());
+        active = at::ones({procedural_sample_count}, ray_o.options().dtype(at::kBool));
+        accumulation_strategy = 1;
+        procedural_sample_count = 0;
+    }
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
     int64_t output_count = raydn_reflection_accumulation_forward_fn(raydn_module_handle)(
@@ -936,11 +838,15 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     std::uintptr_t raydn_module_handle) {
     at::Tensor active_storage;
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    at::Tensor tx_pol = at::zeros_like(tx_pos);
+    if (tx_pol.numel() != 0)
+        tx_pol.select(1, 0).fill_(1.0);
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
     int64_t output_count = raydn_diffraction_paths_order1_forward_fn(raydn_module_handle)(
         scene_handle,
         &tx_pos,
+        &tx_pol,
         &rx_pos,
         active_ptr,
         &state_edge_index,
@@ -1087,12 +993,16 @@ pybind11::dict cn_path_diffraction_paths_order1(
         TORCH_CHECK(states.size() == 12, "diffraction state pack must return 12 tensors");
 
         at::Tensor tx_view = tx_positions.narrow(0, tx_index, 1);
+        at::Tensor tx_pol = at::zeros_like(tx_view);
+        if (tx_pol.numel() != 0)
+            tx_pol.select(1, 0).fill_(1.0);
         const int64_t state_limit = states[0].size(0);
         const int64_t capacity = rx_positions.size(0) * state_limit;
         std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
         const int64_t output_count = raydn_diffraction_paths_order1_forward_fn(raydn_module_handle)(
             scene_handle,
             &tx_view,
+            &tx_pol,
             &rx_positions,
             // The packed state table keeps one row per edge; the selection
             // mask must gate the launch so deselected (e.g. merged duplicate)

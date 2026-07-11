@@ -441,7 +441,10 @@ static __forceinline__ __device__ bool accumulate_plane_hit(unsigned int ray_ind
     const float wave_k = fabsf(params.k) > kReflEps
                              ? params.k
                              : (2.f * kPi / fmaxf(params.wavelength, kReflEps));
-    const Complex phase = c_exp_neg_i(wave_k * unfolded_distance);
+    // Reduce k*d mod 2*pi in double before the f32 sincos (audit DF-3).
+    const Complex phase = c_exp_neg_i(static_cast<float>(fmod(
+        static_cast<double>(wave_k) * static_cast<double>(unfolded_distance),
+        6.283185307179586476925287)));
     const Complex coeff = c_scale(phase, amplitude_scale);
     Complex3 contribution_field = c3_mul_complex(field, coeff);
 

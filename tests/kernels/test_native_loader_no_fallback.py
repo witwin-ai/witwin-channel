@@ -24,7 +24,8 @@ def test_raydn_extension_loader_has_no_artifact_fallback():
     assert "spec_from_file_location" not in source
     assert "sys.path" not in source
     assert "ModuleNotFoundError" not in source
-    assert "return None" not in source
+    assert "import_module" not in source
+    assert "return None" in source
 
 
 def test_bdpt_visibility_uses_channel_native_bridge():
@@ -43,7 +44,7 @@ def test_bdpt_intersection_uses_channel_native_bridge():
     assert "torch.ops" not in source
     assert "_required_native_op" in source
     assert "bdpt_intersect_forward" in source
-    assert "native_module_handle" in inspect.getsource(ops._raydn_module_handle)
+    assert "return 0" in inspect.getsource(ops._raydn_module_handle)
 
 
 def test_bdpt_reflection_accumulation_uses_channel_native_bridge():
@@ -76,6 +77,11 @@ def test_raydn_path_exports_use_channel_native_bridge():
         assert "_required_raydn_op" not in source
         assert "torch.ops" not in source
         assert "_required_native_op" in source
+
+
+def test_simplified_coherent_diffraction_grid_api_is_not_public():
+    assert not hasattr(ops, "deterministic_diffraction_coherent_accumulation_forward")
+    assert not hasattr(extension.native_extension(), "deterministic_diffraction_coherent_accumulation_forward")
 
 
 def test_raydn_scene_builder_uses_channel_native_scene_bridge():
@@ -254,12 +260,15 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
     assert offenders == []
 
 
-def test_raydn_bridge_uses_loaded_module_handle_not_dso_reload():
+def test_rayd_bridge_is_source_linked_without_dso_lookup():
     repo = Path(__file__).resolve().parents[2]
     bridge_source = (repo / "native" / "channel_native" / "raydn_bridge.cpp").read_text()
     ops_source = inspect.getsource(ops._raydn_module_handle)
 
     assert "LoadLibrary" not in bridge_source
     assert "dlopen" not in bridge_source
+    assert "GetProcAddress" not in bridge_source
+    assert "dlsym" not in bridge_source
     assert "__file__" not in ops_source
-    assert "native_module_handle" in ops_source
+    assert "return 0" in ops_source
+    assert "rayd_torch_native_scene_create" in bridge_source

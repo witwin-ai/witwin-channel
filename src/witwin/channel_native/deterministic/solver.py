@@ -4,7 +4,7 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native import Scene
+from witwin.channel_native import ReceiverGrid, Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
@@ -12,7 +12,7 @@ from witwin.channel_native.core.kernels.ops import deterministic_component_count
 from .accumulation import accumulate_path_result, build_path_table
 from .config import Config
 from .result import Result
-from .topology import export_topology, receiver_positions_and_layout
+from .topology import apply_receiver_layout, export_topology, receiver_positions_and_layout
 
 
 def _validate_requested_components(config: Config) -> None:
@@ -108,6 +108,19 @@ def solve(scene: Scene, config: Config) -> Result:
         coherent=config.coherent,
         return_field=config.return_field,
     )
+    exact_diffraction = None
+    if (
+        path_result.diffraction_vector_field is not None
+        and len(scene.receivers) == 1
+        and isinstance(scene.receivers[0], ReceiverGrid)
+    ):
+        vector_field = path_result.diffraction_vector_field
+        exact_diffraction_flat = vector_field.abs().square().sum(dim=-1)
+        exact_diffraction = apply_receiver_layout(exact_diffraction_flat, layout)
+        previous_diffraction = component_power["diffraction"]
+        component_power["diffraction"] = exact_diffraction
+        if not config.coherent:
+            path_gain = path_gain - previous_diffraction + exact_diffraction
     metadata = _metadata(
         config=config,
         native_info=native_info,
@@ -126,6 +139,9 @@ def solve(scene: Scene, config: Config) -> Result:
             "coherent": config.coherent,
             "accumulation_mode": "coherent" if config.coherent else "incoherent",
             "native_launch_count": int(path_result.launch_count),
+            "diffraction_accumulation": (
+                "exact_vector_coherent_paths" if exact_diffraction is not None else "scalar_path_accumulation"
+            ),
             "visibility_rejection_count": int(path_result.visibility_rejection_count),
             "selected_edge_count": int(path_result.selected_edge_count),
             "path_planning": {

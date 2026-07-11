@@ -83,8 +83,8 @@ def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -
 def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
     """Build a RayDN native scene from Channel Native structures.
 
-    This function uses only the `_raydn` native extension and Torch custom class
-    registration. It intentionally does not import the Python `raydn` package.
+    This function uses the RayD native core source-linked into
+    `_channel_native`. It does not import a RayD Python package or dispatcher.
     """
 
     if not structures:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 from types import SimpleNamespace
 
@@ -14,7 +14,10 @@ from witwin.channel_native.montecarlo.basic.backend import (
     receiver_positions as _native_receiver_positions,
     transmitter_positions as _native_transmitter_positions,
 )
-from witwin.channel_native.montecarlo.basic.raydn_components import _cached_diffraction_edge_geometry
+from witwin.channel_native.montecarlo.basic.raydn_components import (
+    _cached_diffraction_edge_geometry,
+    _diffraction_edge_geometry,
+)
 
 from .config import Config
 
@@ -107,6 +110,7 @@ class TopologyBatch:
     selected_edge_count: int = 0
     candidate_count: int = 0
     guardrail_count: int = 0
+    diffraction_vector_field: torch.Tensor | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -912,6 +916,8 @@ def _deterministic_diffraction_states(
     tx: torch.Tensor,
     tx_power: torch.Tensor,
     tx_index: int,
+    *,
+    preserve_imported_edges: bool = False,
 ) -> tuple[torch.Tensor, ...]:
     (
         selected,
@@ -925,7 +931,11 @@ def _deterministic_diffraction_states(
         face0,
         face1,
         exterior_angle,
-    ) = _cached_diffraction_edge_geometry(raydn)
+    ) = (
+        _diffraction_edge_geometry(raydn.edge_records())
+        if preserve_imported_edges
+        else _cached_diffraction_edge_geometry(raydn)
+    )
     return ops.deterministic_diffraction_state_pack(
         ops.mc_selected_edge_indices(selected),
         edge_pos,
@@ -989,7 +999,7 @@ def _diffraction_topology_order1(
     rx_positions: torch.Tensor,
     *,
     frequency_hz: float,
-) -> tuple[dict[str, torch.Tensor], int]:
+) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
     device = tx_positions.device
     raydn = compiled.raydn
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
@@ -1006,7 +1016,11 @@ def _diffraction_topology_order1(
                 "delay_s": torch.empty((0,), device=device, dtype=torch.float32),
                 "path_gain": torch.empty((0,), device=device, dtype=torch.float32),
             }
-        ), 0
+        ), 0, torch.zeros(
+            (int(tx_positions.shape[0]), int(rx_positions.shape[0]), 3),
+            device=device,
+            dtype=torch.complex64,
+        )
     if not raydn.available:
         raise RuntimeError("deterministic diffraction requires RayDN native scene capability")
 
@@ -1014,10 +1028,29 @@ def _diffraction_topology_order1(
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
     handle = raydn.require_handle()
     blocks: list[dict[str, torch.Tensor]] = []
+    vector_field = torch.zeros(
+        (int(tx_positions.shape[0]), int(rx_positions.shape[0]), 3),
+        device=device,
+        dtype=torch.complex64,
+    )
     launch_count = 0
     rx_count = int(rx_positions.shape[0])
+    mitsuba_metadata = scene.metadata.get("mitsuba", {})
+    # Channel's merge_shapes import keeps the selected boundary-edge table
+    # intact.  The synthetic-scene path instead merges coincident structure
+    # boundaries into one physical wedge (the single-wedge test contract).
+    preserve_imported_edges = (
+        isinstance(mitsuba_metadata, dict)
+        and bool(mitsuba_metadata.get("merge_shapes", False))
+    )
     for tx_index, tx in enumerate(tx_positions):
-        states = _deterministic_diffraction_states(raydn, tx, tx_power, tx_index)
+        states = _deterministic_diffraction_states(
+            raydn,
+            tx,
+            tx_power,
+            tx_index,
+            preserve_imported_edges=preserve_imported_edges,
+        )
         states = _tx_visible_diffraction_states(raydn, states, tx)
         state_count = int(states[0].shape[0])
         if state_count <= 0:
@@ -1063,6 +1096,17 @@ def _diffraction_topology_order1(
                 continue
             if rx_start > 0:
                 compacted["rx_id"] = compacted["rx_id"] + rx_start
+            # The path kernel has already evaluated the full UTD vector field.
+            # Keep its xyz components until after summing all edges; reducing
+            # each path to an equivalent scalar first loses vector coherence.
+            receiver_index = compacted["rx_id"].to(dtype=torch.long)
+            for axis, real_index in enumerate(("x_re", "y_re", "z_re")):
+                imag_index = real_index.replace("_re", "_im")
+                vector_field[tx_index, :, axis].index_add_(
+                    0,
+                    receiver_index,
+                    torch.complex(compacted[real_index], compacted[imag_index]),
+                )
             field_result = ops.deterministic_diffraction_vector_field(
                 x_re=compacted["x_re"],
                 x_im=compacted["x_im"],
@@ -1096,7 +1140,11 @@ def _diffraction_topology_order1(
                     path_field=path_field,
                 )
             )
-    return _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)), launch_count
+    return (
+        _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
+        launch_count,
+        vector_field,
+    )
 
 
 def export_topology(scene: Scene, config: Config) -> TopologyBatch:
@@ -1111,6 +1159,7 @@ def export_topology(scene: Scene, config: Config) -> TopologyBatch:
     visibility_rejection_count = 0
     candidate_count = 0
     guardrail_count = 0
+    diffraction_vector_field = None
 
     if "los" in components:
         exported = ops.path_los_export(
@@ -1181,7 +1230,7 @@ def export_topology(scene: Scene, config: Config) -> TopologyBatch:
         candidate_count += int(reflection_candidates)
         blocks.append(block)
     if "diffraction" in components and config.max_depth >= 1:
-        block, diffraction_launches = _diffraction_topology_order1(
+        block, diffraction_launches, diffraction_vector_field = _diffraction_topology_order1(
             scene,
             compiled,
             tx_positions,
@@ -1217,7 +1266,7 @@ def export_topology(scene: Scene, config: Config) -> TopologyBatch:
     ]
     paths = concatenate_path_blocks(padded_blocks, device=device)
     selected_edge_count = ops.deterministic_selected_edge_count(paths["edge_id"])
-    return _from_path_block(
+    result = _from_path_block(
         paths,
         max_paths=config.max_paths,
         tx_count=len(scene.transmitters),
@@ -1228,3 +1277,6 @@ def export_topology(scene: Scene, config: Config) -> TopologyBatch:
         candidate_count=candidate_count,
         guardrail_count=guardrail_count,
     )
+    if diffraction_vector_field is not None:
+        result = replace(result, diffraction_vector_field=diffraction_vector_field)
+    return result

@@ -7,6 +7,15 @@ from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
 from witwin.channel_native.core.materials import Dielectric
 
 
+def _source_linked_rayd_available() -> bool:
+    from witwin.channel_native.core.kernels.extension import build_info
+
+    try:
+        return build_info()["rayd_integration"] == "source-linked"
+    except ModuleNotFoundError:
+        return False
+
+
 def test_raydn_scene_wrapper_does_not_import_python_raydn():
     sys.modules.pop("raydn", None)
 
@@ -39,9 +48,7 @@ def test_compile_builds_raydn_scene_handle_when_backend_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN native scene construction")
 
-    from witwin.channel_native.core.kernels import raydn_backend
-
-    if raydn_backend.native_extension() is None:
+    if not _source_linked_rayd_available():
         pytest.skip("RayDN native extension is not built")
 
     scene = Scene(
@@ -71,9 +78,7 @@ def test_scene_reuses_cached_raydn_scene_handle_when_backend_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN native scene construction")
 
-    from witwin.channel_native.core.kernels import raydn_backend
-
-    if raydn_backend.native_extension() is None:
+    if not _source_linked_rayd_available():
         pytest.skip("RayDN native extension is not built")
 
     scene = Scene(
@@ -104,9 +109,7 @@ def test_raydn_scene_exports_non_manifold_edge_records_when_backend_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN native scene construction")
 
-    from witwin.channel_native.core.kernels import raydn_backend
-
-    if raydn_backend.native_extension() is None:
+    if not _source_linked_rayd_available():
         pytest.skip("RayDN native extension is not built")
 
     scene = Scene(
@@ -152,10 +155,9 @@ def test_bdpt_intersect_forward_uses_native_raydn_scene_bridge_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN native intersection")
 
-    from witwin.channel_native.core.kernels import raydn_backend
     from witwin.channel_native.core.kernels.ops import bdpt_intersect_forward
 
-    if raydn_backend.native_extension() is None:
+    if not _source_linked_rayd_available():
         pytest.skip("RayDN native extension is not built")
 
     scene = Scene(

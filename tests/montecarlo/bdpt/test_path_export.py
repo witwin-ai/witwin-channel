@@ -125,13 +125,13 @@ def test_bdpt_reflection_path_export_uses_seeded_native_subpath_samples():
     torch.testing.assert_close(first.path_samples.light_depth, torch.ones_like(first.path_samples.light_depth))
 
 
-def test_bdpt_diffraction_path_export_is_seeded_by_native_direct_keller_tape():
+def test_bdpt_grid_diffraction_path_export_is_seeded_by_native_direct_tape():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction path export")
 
     scene = wedge_diffraction_scene().add(_reflection_grid())
-    # Grid diffraction is Keller-only (audit MC-5): 512 samples ensure cone
-    # rays land on the export grid.
+    # Grid diffraction uses the bounded-variance direct proposal; edge
+    # positions remain seeded and are exported from the native tape.
     first = solve(scene, Config(samples=512, seed=17, components={"diffraction"}, export_paths=True))
     second = solve(scene, Config(samples=512, seed=17, components={"diffraction"}, export_paths=True))
     changed = solve(scene, Config(samples=512, seed=18, components={"diffraction"}, export_paths=True))

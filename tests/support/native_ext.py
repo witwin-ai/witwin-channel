@@ -1,4 +1,4 @@
-"""Locate the compiled ``_channel_native``/``_raydn`` extensions for tests and benchmarks.
+"""Locate the compiled ``_channel_native`` extension for tests and benchmarks.
 
 The extensions live in out-of-tree CMake build directories under
 ``artifacts/cmake-*``. This helper prepends the newest build that matches the
@@ -39,7 +39,7 @@ def _candidate_build_dirs() -> list[Path]:
 
 
 def native_extensions_available() -> bool:
-    return _importable("_channel_native") and _importable("_raydn")
+    return _importable("_channel_native")
 
 
 def inject_native_paths() -> bool:
@@ -48,7 +48,7 @@ def inject_native_paths() -> bool:
     if native_extensions_available():
         return True
     for build_dir in _candidate_build_dirs():
-        paths = [build_dir, build_dir / "ext" / "raydn"]
+        paths = [build_dir]
         inserted = [str(path) for path in paths if path.is_dir()]
         sys.path[:0] = inserted
         if native_extensions_available():
@@ -59,7 +59,7 @@ def inject_native_paths() -> bool:
 
 
 BUILD_GUIDANCE = (
-    "The compiled _channel_native/_raydn extensions were not found. "
+    "The compiled _channel_native extension was not found. "
     "Build them into artifacts/cmake-<name> (see docs/dev/plans/00-channel-native-greenfield-plan.md) "
     "or set PYTHONPATH to a directory containing the built pyds."
 )

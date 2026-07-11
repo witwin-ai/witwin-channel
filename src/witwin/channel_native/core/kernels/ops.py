@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import torch
 
-from . import raydn_backend
 from .extension import native_extension
 from .metadata import make_metadata, validate_metadata
 
@@ -38,14 +37,10 @@ def _required_native_op(name: str):
 
 
 def _raydn_module_handle() -> int:
-    module = raydn_backend.native_extension()
-    handle_fn = getattr(module, "native_module_handle", None)
-    if not callable(handle_fn):
-        raise RuntimeError("_raydn.native_module_handle native helper is required")
-    handle = handle_fn()
-    if not isinstance(handle, int) or handle == 0:
-        raise RuntimeError("_raydn native module handle is required")
-    return handle
+    # Kept temporarily in the internal call signature while the C++ bridge is
+    # converted to direct linkage. RayD no longer has a separately loaded
+    # Python extension, so there is no OS module handle to pass.
+    return 0
 
 
 def _raydn_scene_handle_id(handle: object) -> int:

@@ -10,6 +10,7 @@ _DEFAULT_BUILD_INFO = {
     "backend": "channel-native",
     "uses_dr_jit": False,
     "uses_raydn_native": False,
+    "rayd_integration": "unavailable",
     "uses_path_native": False,
     "cuda_available": False,
     "optix_available": False,

@@ -1906,7 +1906,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
     line_max = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     face1 = torch.tensor([-1], device="cuda", dtype=torch.int32)
 
-    sliced = torch.ops.raydn.diffraction_discover_edges(
+    sliced = ops.raydn_diffraction_discover_edges(
         tx_pos,
         ray_dir[:2].contiguous(),
         prim_index[:2].contiguous(),
@@ -1923,7 +1923,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
         line_max,
         face1,
     )
-    counted = torch.ops.raydn.diffraction_discover_edges_counted(
+    counted = ops.raydn_diffraction_discover_edges_counted(
         tx_pos,
         ray_dir,
         prim_index,

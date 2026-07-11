@@ -484,11 +484,13 @@ def _native_diffraction_component_maps(
     selected, edge_pos, edge_dir, _lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle = edge_geometry
     edge_indices = bdpt_selected_edge_indices(selected)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    # Grid maps use the Keller-cone strategy exclusively (audit MC-5/2.5,
-    # aligned with the basic solver): the deterministic direct cell scan
-    # cannot cover state_count x cell_count pairs within the sample budget,
-    # and the unweighted direct+keller sum double counts covered cells.
-    direct_samples, keller_samples, suffix_samples = 0, int(samples), 0
+    # A receiver grid has a finite target domain, so sample it directly.  The
+    # Keller-cone plane projection carries an unbounded grazing-angle Jacobian
+    # and produced heavy-tailed maps (nearly 2x cross-seed spread at 8k
+    # samples).  Direct sampling rotates uniformly through grid cells and
+    # samples edge position without that projection singularity.  Point
+    # receivers retain the direct/Keller MIS path below.
+    direct_samples, keller_samples, suffix_samples = int(samples), 0, 0
     sample_blocks: list[dict[str, torch.Tensor]] = []
 
     for tx_index in range(int(tx_positions.shape[0])):
@@ -553,7 +555,11 @@ def _native_diffraction_component_maps(
             None,
             None,
         )
-        maps = mc_store_component_map(maps, out[0], tx_index=tx_index)
+        maps = mc_store_component_map(
+            maps,
+            out[0] * float(int(spec.resolution0) * int(spec.resolution1)),
+            tx_index=tx_index,
+        )
         if export_samples:
             tape = {
                 "active": out[14],

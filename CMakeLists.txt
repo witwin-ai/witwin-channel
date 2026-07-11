@@ -20,10 +20,24 @@ endif()
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
-set(RAYDN_BUILD_NATIVE ON CACHE BOOL "Build RayDN native extension for Channel Native." FORCE)
-add_subdirectory(ext/raydn)
-if(NOT TARGET _raydn)
-    message(FATAL_ERROR "Channel Native requires the vendored RayDN native backend target _raydn.")
+set(
+    RAYD_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../RayDi"
+    CACHE PATH
+    "Path to the RayD source tree used by Channel Native.")
+get_filename_component(RAYD_SOURCE_DIR "${RAYD_SOURCE_DIR}" ABSOLUTE)
+if(NOT EXISTS "${RAYD_SOURCE_DIR}/backends/torch/CMakeLists.txt")
+    message(FATAL_ERROR
+        "RAYD_SOURCE_DIR='${RAYD_SOURCE_DIR}' is not a RayD source tree. "
+        "Set -DRAYD_SOURCE_DIR=<path-to-RayDi>.")
+endif()
+set(RAYD_TORCH_BUILD_NATIVE ON CACHE BOOL "Build RayD Torch native core." FORCE)
+set(RAYD_TORCH_BUILD_PYTHON_MODULE OFF CACHE BOOL "Do not build RayD's Python module inside Channel Native." FORCE)
+add_subdirectory(
+    "${RAYD_SOURCE_DIR}/backends/torch"
+    "${CMAKE_CURRENT_BINARY_DIR}/rayd-torch")
+if(NOT TARGET rayd_torch_native_core)
+    message(FATAL_ERROR "RayD did not provide the rayd_torch_native_core target.")
 endif()
 
 execute_process(
@@ -36,6 +50,16 @@ if(NOT TORCH_CMAKE_PREFIX_RESULT EQUAL 0)
     message(FATAL_ERROR "Could not locate PyTorch CMake prefix. Install torch in the build environment.")
 endif()
 list(PREPEND CMAKE_PREFIX_PATH "${TORCH_CMAKE_PREFIX}")
+if(WIN32 AND NOT EXISTS "${TORCH_CMAKE_PREFIX}/Torch/TorchConfig.cmake")
+    get_filename_component(PYTHON_ENV_ROOT "${Python_EXECUTABLE}" DIRECTORY)
+    list(PREPEND CMAKE_PREFIX_PATH
+        "${PYTHON_ENV_ROOT}/Library"
+        "${PYTHON_ENV_ROOT}/Lib/site-packages")
+    set(CONDA_TORCH_DIR "${PYTHON_ENV_ROOT}/Library/share/cmake/Torch")
+    if(EXISTS "${CONDA_TORCH_DIR}/TorchConfig.cmake")
+        set(Torch_DIR "${CONDA_TORCH_DIR}")
+    endif()
+endif()
 find_package(Torch REQUIRED)
 get_filename_component(TORCH_PACKAGE_DIR "${TORCH_CMAKE_PREFIX}/../.." ABSOLUTE)
 find_library(
@@ -60,6 +84,7 @@ Python_add_library(
     native/channel_native/kernels/bdpt_sampling.cu
     native/channel_native/kernels/bdpt_subpaths.cu
     native/channel_native/kernels/diffraction.cu
+    native/channel_native/kernels/diffraction_discovery.cu
     native/channel_native/kernels/deterministic_accum.cu
     native/channel_native/kernels/deterministic_field.cu
     native/channel_native/kernels/los.cu
@@ -72,9 +97,12 @@ Python_add_library(
 )
 
 target_compile_features(_channel_native PRIVATE cxx_std_17)
-target_link_libraries(_channel_native PRIVATE "${TORCH_LIBRARIES}" "${TORCH_PYTHON_LIBRARY}")
-add_dependencies(_channel_native _raydn)
-target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYDN=1 CHANNEL_NATIVE_WITH_OPTIX=1)
+target_link_libraries(
+    _channel_native
+    PRIVATE
+        rayd_torch_native_core
+        "${TORCH_LIBRARIES}"
+        "${TORCH_PYTHON_LIBRARY}")
+target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYD=1 CHANNEL_NATIVE_WITH_OPTIX=1)
 
 install(TARGETS _channel_native LIBRARY DESTINATION witwin/channel_native)
-install(TARGETS _raydn LIBRARY DESTINATION witwin/channel_native/_native RUNTIME DESTINATION witwin/channel_native/_native)

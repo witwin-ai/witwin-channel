@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import raydn_backend
+from witwin.channel_native.core.kernels import ops, raydn_backend
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
@@ -48,7 +48,7 @@ def test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter():
     edge_line_max = torch.tensor([3.0, 2.0, 2.8284271], device=device, dtype=torch.float32)
     adjacent_face1 = torch.tensor([1, -1, -1], device=device, dtype=torch.int32)
 
-    edge_idx = torch.ops.raydn.diffraction_discover_edges(
+    edge_idx = ops.raydn_diffraction_discover_edges(
         tx_pos,
         ray_dir,
         prim_index,
