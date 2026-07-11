@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 from witwin.channel.core.scene import Scene
 from witwin.channel.montecarlo import types as wt
 from witwin.channel.core.grid import Grid

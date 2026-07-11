@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 from witwin.channel.deterministic import types as wt
 
 from witwin.channel.core.numerics.constants import RAY_EPS

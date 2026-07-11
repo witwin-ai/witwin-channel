@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 from witwin.channel.deterministic import types as wt
 
 from witwin.channel.core.runtime import (

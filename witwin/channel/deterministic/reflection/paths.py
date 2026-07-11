@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 from witwin.channel.deterministic import types as wt
 
 from ..kernels.reflection import native_impl as reflection_epc_native

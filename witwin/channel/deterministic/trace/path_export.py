@@ -4,7 +4,7 @@ import time
 from typing import Mapping
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 
 from witwin.channel.core.numerics import arrays
 from witwin.channel.core.numerics.arrays import scalar

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 import torch
 from witwin.channel import types as wt
 

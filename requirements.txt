@@ -1,4 +1,5 @@
 drjit==1.3.1
+rayd-drjit==0.6.0
 matplotlib==3.10.8
 numpy==2.4.1
 tqdm==4.67.1

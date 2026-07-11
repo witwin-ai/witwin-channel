@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 import torch
 from witwin.channel import types as wt
 

@@ -2,7 +2,7 @@
 import math
 import time
 import drjit as dr
-import rayd
+import rayd.drjit as rayd
 from witwin.channel.deterministic import types as wt
 from witwin.channel.core.runtime import Material, Tx, Wave
 from witwin.channel.core.runtime import point_grad_enabled, scene_geometry_grad_enabled, scene_material_grad_enabled
