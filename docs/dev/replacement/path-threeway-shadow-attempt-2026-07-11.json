@@ -1,0 +1,45 @@
+{
+  "schema": {
+    "name": "witwin.channel_native.shadow_attempt",
+    "version": "1.0.0"
+  },
+  "date": "2026-07-11",
+  "release": "0.1.0",
+  "command": "benchmarks/bench_path_solver_threeway.py --reduced-ci",
+  "status": "failed_oracle_environment",
+  "gate_passed": false,
+  "scenario": "san_francisco_reduced_ci",
+  "native": {
+    "completed": true,
+    "build": {
+      "backend": "channel-native",
+      "cuda_available": true,
+      "optix_available": true,
+      "rayd_integration": "source-linked",
+      "uses_dr_jit": false,
+      "uses_path_native": true,
+      "uses_raydn_native": true
+    },
+    "cases": {
+      "los": {"cold_ms": 1554.1357, "steady_median_ms": 58.3271, "gpu_peak_delta_bytes": 19204608},
+      "reflection": {"cold_ms": 1492.0935, "steady_median_ms": 110.3834, "gpu_peak_delta_bytes": 1244802560},
+      "diffraction": {"cold_ms": 6253.3215, "steady_median_ms": 150.5546, "gpu_peak_delta_bytes": 47965696},
+      "all": {"cold_ms": 210.4121, "steady_median_ms": 214.2178, "gpu_peak_delta_bytes": 47986688}
+    }
+  },
+  "oracles": {
+    "original_channel": {
+      "completed": false,
+      "returncode": 3221225477,
+      "error": "jitc_llvm_init(): LLVM API initialization failed"
+    },
+    "sionna": {
+      "completed": false,
+      "returncode": 1,
+      "error": "LLVM API initialization failed, followed by dense coefficient shape IndexError"
+    }
+  },
+  "correctness_metrics": null,
+  "raw_output_retained": false,
+  "notes": "This is a failed shadow attempt, not maintained passing evidence. Native timing and memory completed; both offline oracle providers failed before a valid comparison."
+}

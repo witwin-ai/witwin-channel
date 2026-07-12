@@ -1,11 +1,14 @@
 {
   "schema_version": 1,
-  "generated_from_commit": "80b0148",
+  "generated_from_commit": "91d11ca",
   "scan_scope": {
     "consumer_roots": ["core", "genesis", "maxwell", "radar", "studio"],
     "reference_roots": ["channel/examples", "channel/tests", "channel/tutorials", "channel/scripts"],
     "production_import_references": 0,
-    "notes": "Observed calls are token or qualified-call counts in repository-owned Python reference roots. External consumers are not visible to this repository."
+    "production_dependency_contract": "ci/check_production_dependencies.py",
+    "forbidden_production_modules": ["drjit", "mitsuba", "raydn", "sionna", "witwin.channel"],
+    "offline_oracle_roots_allowed": ["tests", "benchmarks", "channel/examples", "channel/tests", "channel/tutorials", "channel/scripts"],
+    "notes": "Observed calls are token or qualified-call counts in repository-owned Python reference roots. The static contract scans production source only; offline oracle roots are intentionally outside that contract. External consumers are not visible to this repository."
   },
   "ad_audit": {
     "audit_date": "2026-07-11",
@@ -22,6 +25,41 @@
     "supports_ad": false,
     "notes": "Repository production consumers do not import Channel AD. Legacy tests, examples, tutorials, and validation scripts remain offline reference evidence, not production dependencies. Low-level LoS derivative primitives are not connected to a public solver and do not advertise solver AD support. External consumers remain an explicit release gate."
   },
+  "phase_status": {
+    "complex_field_and_polarization": "supported_with_solver_specific_limits",
+    "arrays": "supported_by_path",
+    "materials_7a": "supported",
+    "materials_7b_events": "unsupported_capability_false",
+    "ad": "unsupported_capability_false",
+    "performance_harness": "implemented",
+    "pipeline_cache": "not_implemented",
+    "sm_matrix": "declared_unverified",
+    "wheel_smoke": "not_verified"
+  },
+  "migration": {
+    "production_runtime_dependency_contract": "enforced_in_repository",
+    "shadow_run": {
+      "artifact_contract": "docs/dev/replacement/channel-native-migration.md#shadow-evidence-artifact",
+      "maintained_artifacts": 0,
+      "attempt_artifacts": 1,
+      "last_attempt": "docs/dev/replacement/path-threeway-shadow-attempt-2026-07-11.json",
+      "status": "attempt_failed_oracle_environment"
+    },
+    "default_on": {
+      "repository_native_entrypoint": "witwin.channel_native",
+      "platform_core_optional_dependency": "witwin-channel-native>=0.1,<0.2",
+      "platform_core_cutover_commit": "9ee6655",
+      "consumer_router_status": "not_verifiable_from_this_repository"
+    },
+    "deletion_status": "blocked",
+    "blockers": [
+      "external_consumer_inventory",
+      "maintained_shadow_and_canary_evidence",
+      "consumer_owner_default_on_confirmation",
+      "two_release_cycles_without_fallback_demand",
+      "phase9_wheel_sm_pipeline_cache_runtime_evidence"
+    ]
+  },
   "apis": [
     {"legacy_api":"Bool","observed_calls":37,"priority":"P2","native_api":"torch.bool","status":"replaced_by_torch"},
     {"legacy_api":"Complex2f","observed_calls":95,"priority":"P2","native_api":"torch.complex64","status":"replaced_by_torch"},
@@ -34,29 +72,29 @@
     {"legacy_api":"Vector2f","observed_calls":0,"priority":"P2","native_api":"torch.Tensor","status":"replaced_by_torch"},
     {"legacy_api":"Vector3f","observed_calls":82,"priority":"P2","native_api":"torch.Tensor","status":"replaced_by_torch"},
     {"legacy_api":"Vector3u","observed_calls":5,"priority":"P2","native_api":"torch.Tensor","status":"replaced_by_torch"},
-    {"legacy_api":"AntennaArray","observed_calls":8,"priority":"P1","native_api":null,"status":"missing"},
+    {"legacy_api":"AntennaArray","observed_calls":8,"priority":"P1","native_api":"channel_native.AntennaArray","status":"supported"},
     {"legacy_api":"Box","observed_calls":48,"priority":"P1","native_api":"witwin.core.Box","status":"shared_core"},
     {"legacy_api":"EdgePolicy","observed_calls":74,"priority":"P1","native_api":null,"status":"partial"},
     {"legacy_api":"Grid","observed_calls":14,"priority":"P1","native_api":"ReceiverGrid","status":"partial"},
     {"legacy_api":"GridSpec","observed_calls":12,"priority":"P1","native_api":null,"status":"missing"},
-    {"legacy_api":"Material","observed_calls":115,"priority":"P1","native_api":"witwin.core.Material","status":"partial"},
-    {"legacy_api":"PlanarArray","observed_calls":8,"priority":"P1","native_api":null,"status":"missing"},
+    {"legacy_api":"Material","observed_calls":115,"priority":"P1","native_api":"channel_native Dielectric/DispersiveMaterial/ITUMaterial/PerfectConductor","status":"supported_7a"},
+    {"legacy_api":"PlanarArray","observed_calls":8,"priority":"P1","native_api":"channel_native.AntennaArray.ura","status":"supported_with_adapter"},
     {"legacy_api":"RadioMapResult","observed_calls":18,"priority":"P1","native_api":"solver-specific Result","status":"partial"},
     {"legacy_api":"Receiver","observed_calls":35,"priority":"P1","native_api":"ReceiverPoint","status":"partial"},
     {"legacy_api":"ReceiverGrid","observed_calls":45,"priority":"P1","native_api":"channel_native.ReceiverGrid","status":"supported"},
     {"legacy_api":"Scene","observed_calls":181,"priority":"P0","native_api":"channel_native.Scene","status":"supported"},
     {"legacy_api":"Structure","observed_calls":91,"priority":"P0","native_api":"channel_native.Structure","status":"supported"},
-    {"legacy_api":"Transmitter","observed_calls":74,"priority":"P0","native_api":"channel_native.Transmitter","status":"partial"},
-    {"legacy_api":"ULA","observed_calls":7,"priority":"P1","native_api":null,"status":"missing"},
-    {"legacy_api":"UPA","observed_calls":0,"priority":"P2","native_api":null,"status":"missing"},
-    {"legacy_api":"path","observed_calls":236,"priority":"P0","native_api":"channel_native.path","status":"partial"},
+    {"legacy_api":"Transmitter","observed_calls":74,"priority":"P0","native_api":"channel_native.Transmitter","status":"supported"},
+    {"legacy_api":"ULA","observed_calls":7,"priority":"P1","native_api":"channel_native.AntennaArray.ula","status":"supported_with_adapter"},
+    {"legacy_api":"UPA","observed_calls":0,"priority":"P2","native_api":"channel_native.AntennaArray.ura","status":"supported_with_adapter"},
+    {"legacy_api":"path","observed_calls":236,"priority":"P0","native_api":"channel_native.path","status":"supported_with_advertised_limits"},
     {"legacy_api":"deterministic","observed_calls":134,"priority":"P1","native_api":"channel_native.deterministic","status":"partial"},
     {"legacy_api":"montecarlo","observed_calls":91,"priority":"P1","native_api":"channel_native.montecarlo","status":"partial"},
-    {"legacy_api":"path.Config","observed_calls":25,"priority":"P0","native_api":"channel_native.path.Config","status":"partial"},
+    {"legacy_api":"path.Config","observed_calls":25,"priority":"P0","native_api":"channel_native.path.Config","status":"supported_with_advertised_limits"},
     {"legacy_api":"path.InteractionType","observed_calls":13,"priority":"P0","native_api":"channel_native.path.InteractionType","status":"supported"},
-    {"legacy_api":"path.PathResult","observed_calls":6,"priority":"P0","native_api":"channel_native.path.PathResultV2","status":"partial"},
+    {"legacy_api":"path.PathResult","observed_calls":6,"priority":"P0","native_api":"channel_native.path.PathResultV2","status":"supported_with_v2_adapter"},
     {"legacy_api":"path.Tuning","observed_calls":96,"priority":"P2","native_api":null,"status":"not_planned"},
-    {"legacy_api":"path.solve","observed_calls":25,"priority":"P0","native_api":"channel_native.path.solve / solve_v2","status":"partial"},
+    {"legacy_api":"path.solve","observed_calls":25,"priority":"P0","native_api":"channel_native.path.solve / solve_v2","status":"supported_with_advertised_limits"},
     {"legacy_api":"PathResult.cir","observed_calls":3,"priority":"P0","native_api":"PathResultV2.cir","status":"supported"},
     {"legacy_api":"PathResult.cfr","observed_calls":3,"priority":"P0","native_api":"PathResultV2.cfr","status":"supported"},
     {"legacy_api":"PathResult.taps","observed_calls":1,"priority":"P0","native_api":"PathResultV2.taps","status":"supported"},

@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "witwin-channel-native"
-version = "0.0.0"
+version = "0.1.0"
 description = "DrJit-free Torch/CUDA RF channel runtime."
 requires-python = ">=3.10"
 dependencies = ["torch"]
