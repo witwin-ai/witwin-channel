@@ -5,7 +5,20 @@ from dataclasses import dataclass
 from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
 
 
-_VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+# Public component set. transmission and scattering are accepted plumbing in v1:
+# they validate and emit zero grid/point maps until the physics lands in later
+# waves. Both are surface events that require at least one bounce
+# (max_depth >= 1); transmission chains count wall penetrations, scattering is
+# single-bounce in v1.
+_VALID_COMPONENTS = frozenset(
+    {"los", "reflection", "diffraction", "transmission", "scattering"}
+)
+# Default component set is unchanged: the new components are strictly opt-in.
+_DEFAULT_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+# Components that require at least one interaction bounce to contribute.
+_BOUNCE_COMPONENTS = frozenset(
+    {"reflection", "diffraction", "transmission", "scattering"}
+)
 _VALID_AD_MODES = frozenset({"none"})
 _VALID_REFLECTION_ACCUMULATION_STRATEGIES = frozenset(
     {"auto", "atomic", "staged", "compact", "streaming_planar"}
@@ -17,7 +30,7 @@ class Config:
     samples: int = 4096
     max_depth: int = 1
     seed: int = 0
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _VALID_COMPONENTS
+    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _DEFAULT_COMPONENTS
     accumulation_strategy: str = "atomic_add"
     diagnostics: bool = False
     reflection_accumulation_strategy: str = "auto"
@@ -38,7 +51,7 @@ class Config:
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(f"components must be a subset of {sorted(_VALID_COMPONENTS)}")
-        if self.max_depth < 1 and components.intersection({"reflection", "diffraction"}):
+        if self.max_depth < 1 and components & _BOUNCE_COMPONENTS:
             raise RuntimeError("MC basic scattering requires max_depth >= 1")
         if self.accumulation_strategy not in ACCUMULATION_STRATEGIES - {"none"}:
             raise ValueError("accumulation_strategy is not supported for MC basic")

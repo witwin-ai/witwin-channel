@@ -138,6 +138,44 @@ def _torch_diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
     )
 
 
+def test_basic_solver_emits_zero_maps_for_transmission_and_scattering():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+
+    scene = single_wall_reflection_scene()
+    scene = type(scene)(
+        structures=[],
+        transmitters=scene.transmitters,
+        receivers=[_grid_at_x(5.0)],
+        frequency=scene.frequency,
+    )
+
+    baseline = solve(scene, Config(samples=128, seed=3, components={"los"}))
+    result = solve(
+        scene,
+        Config(
+            samples=128,
+            seed=3,
+            components={"los", "transmission", "scattering"},
+        ),
+    )
+
+    # (a) validates, (b) zero-valued maps and point power for the new components.
+    assert result.component_maps is not None
+    for name in ("transmission", "scattering"):
+        assert torch.count_nonzero(result.component_maps[name]) == 0
+        assert torch.count_nonzero(result.component_power[name]) == 0
+    torch.testing.assert_close(result.path_gain, baseline.path_gain)
+    # (c) truthful requested-but-empty metadata status.
+    assert result.metadata["components"]["transmission"] == "enabled_no_paths"
+    assert result.metadata["components"]["scattering"] == "enabled_no_paths"
+
+
+def test_basic_config_rejects_unknown_component():
+    with pytest.raises(ValueError, match="components"):
+        Config(components={"los", "teleportation"})
+
+
 def test_basic_solver_returns_los_component_map_for_receiver_grid():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic component maps")

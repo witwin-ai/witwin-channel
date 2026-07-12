@@ -7,7 +7,25 @@ from typing import Any
 
 _CAPABILITIES: dict[str, Any] = {
     "schema_version": 1,
-    "components": ["los", "reflection", "diffraction"],
+    "components": ["los", "reflection", "diffraction", "transmission", "scattering"],
+    # transmission and scattering are accepted plumbing in v1: configs, metadata
+    # and result contracts flow them through, but every solver contributes zero
+    # paths / zero power for them. The flags below stay False until the physics
+    # lands in later waves.
+    "component_solver_integration": {
+        "transmission": {
+            "path": False,
+            "deterministic": False,
+            "montecarlo_basic": False,
+            "montecarlo_bdpt": False,
+        },
+        "scattering": {
+            "path": False,
+            "deterministic": False,
+            "montecarlo_basic": False,
+            "montecarlo_bdpt": False,
+        },
+    },
     "max_reflection_depth": 5,
     "max_diffraction_order": 1,
     "supports_reflection_diffraction_coupling": True,

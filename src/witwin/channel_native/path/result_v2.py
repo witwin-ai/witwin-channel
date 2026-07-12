@@ -452,8 +452,12 @@ def from_legacy_result(
     if depth:
         reflection = result.component_id == 1
         diffraction = result.component_id == 2
+        transmission = result.component_id == 5
+        scattering = result.component_id == 6
         interaction_type[reflection, 0] = int(InteractionType.REFLECTION)
         interaction_type[diffraction, 0] = int(InteractionType.DIFFRACTION)
+        interaction_type[transmission, 0] = int(InteractionType.TRANSMISSION)
+        interaction_type[scattering, 0] = int(InteractionType.SCATTERING)
         primitive_id[:, 0] = result.primitive_id.to(dtype=torch.int32)
     position = torch.full(
         (count, depth, 3), float("nan"), device=device, dtype=torch.float32

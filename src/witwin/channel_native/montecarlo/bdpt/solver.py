@@ -125,12 +125,18 @@ def _check_workspace_guardrail(config: Config, workspace_bytes: int) -> None:
 
 
 def _path_counts(config: Config, *, tx_count: int) -> dict[str, int]:
-    return {
+    # transmission and scattering are accepted plumbing in v1: they carry zero
+    # sampled paths until the physics lands, so their count stays 0 even when
+    # requested.
+    counts = {
         component: int(config.samples) * int(config.sample_streams) * int(tx_count)
         if component in config.components
         else 0
         for component in ("los", "reflection", "diffraction")
     }
+    for component in ("transmission", "scattering"):
+        counts[component] = 0
+    return counts
 
 
 def _effective_native_samples(config: Config) -> int:
@@ -904,6 +910,13 @@ def solve(scene: Scene, config: Config) -> Result:
         "reflection": finalized["reflection_power"],
         "diffraction": finalized["diffraction_power"],
     }
+    # transmission and scattering are accepted plumbing in v1: emit structurally
+    # valid zero maps / power for them when requested until the physics lands.
+    for name in ("transmission", "scattering"):
+        if name in config.components:
+            component_power[name] = torch.zeros_like(component_power["los"])
+            if component_maps is not None:
+                component_maps[name] = torch.zeros_like(component_maps["los"])
 
     variance = None
     if config.diagnostics:

@@ -233,8 +233,13 @@ def apply_receiver_layout(values: torch.Tensor, layout: ReceiverLayout) -> torch
 def _path_components(config: TopologyConfig) -> set[str]:
     components = set(config.components)
     if config.max_depth == 0:
+        # Every non-LoS component is a surface interaction that needs at least
+        # one bounce. transmission is a wall penetration event and scattering is
+        # a single-bounce rough-surface event, so both drop out at depth 0.
         components.discard("reflection")
         components.discard("diffraction")
+        components.discard("transmission")
+        components.discard("scattering")
     if int(getattr(config, "max_diffraction_order", 1)) == 0:
         components.discard("diffraction")
     return components
@@ -370,6 +375,13 @@ def _interaction_type_sequence(
     result[active & (component_id.reshape(-1, 1) == 1)] = 1
     diffraction = (component_id == 2) & (depth > 0)
     result[diffraction, 0] = 2
+    # component_id 5=transmission, 6=scattering map to the InteractionType flags
+    # TRANSMISSION=4 and SCATTERING=8. These carry no paths in v1 but keep the
+    # per-event mapping consistent for when the physics lands.
+    transmission = (component_id == 5) & (depth > 0)
+    result[transmission, 0] = 4
+    scattering = (component_id == 6) & (depth > 0)
+    result[scattering, 0] = 8
     if width >= 2:
         reflection_diffraction = (component_id == 3) & (depth >= 2)
         result[reflection_diffraction, 0] = 1

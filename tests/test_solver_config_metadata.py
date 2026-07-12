@@ -49,12 +49,20 @@ def test_basic_metadata_reports_requested_and_effective_config():
     )
 
     assert metadata["requested_config"] == metadata["effective_config"]
-    assert metadata["component_max_depth"] == {"los": -1, "reflection": 2, "diffraction": -1}
+    assert metadata["component_max_depth"] == {
+        "los": -1,
+        "reflection": 2,
+        "diffraction": -1,
+        "transmission": -1,
+        "scattering": -1,
+    }
     assert set(metadata["requested_config"]) == {field.name for field in fields(BasicConfig)}
 
 
 @pytest.mark.parametrize("config_type", [BasicConfig, BdptConfig])
-@pytest.mark.parametrize("component", ["reflection", "diffraction"])
+@pytest.mark.parametrize(
+    "component", ["reflection", "diffraction", "transmission", "scattering"]
+)
 def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(config_type, component):
     with pytest.raises(RuntimeError, match="max_depth >= 1"):
         config_type(max_depth=0, components={component})

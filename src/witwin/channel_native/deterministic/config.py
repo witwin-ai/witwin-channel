@@ -3,7 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-_VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+# Public component set. transmission and scattering are accepted plumbing in v1:
+# they validate and flow through metadata but contribute zero paths until the
+# physics lands in later waves. transmission depth is capped like reflection
+# (chains count wall penetrations); scattering is single-bounce in v1.
+_VALID_COMPONENTS = frozenset(
+    {"los", "reflection", "diffraction", "transmission", "scattering"}
+)
+# Default component set is unchanged: the new components are strictly opt-in.
+_DEFAULT_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+# Components whose chain length is bounded by max_depth (public cap of 5).
+_DEPTH_CAPPED_COMPONENTS = frozenset({"reflection", "transmission"})
 _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
 _VALID_AD_MODES = frozenset({"none"})
 _VALID_MAX_PATHS_SCOPES = frozenset({"global", "per_pair"})
@@ -14,7 +24,7 @@ class Config:
     max_depth: int = 1
     max_diffraction_order: int = 1
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
-        _VALID_COMPONENTS
+        _DEFAULT_COMPONENTS
     )
     coherent: bool = True
     return_field: bool = True
@@ -38,9 +48,9 @@ class Config:
             raise ValueError(
                 f"components must be a non-empty subset of {sorted(_VALID_COMPONENTS)}"
             )
-        if self.max_depth > 5 and "reflection" in components:
+        if self.max_depth > 5 and components & _DEPTH_CAPPED_COMPONENTS:
             raise RuntimeError(
-                "deterministic reflection currently supports max_depth <= 5"
+                "deterministic reflection/transmission currently support max_depth <= 5"
             )
         if self.max_paths is not None and self.max_paths <= 0:
             raise ValueError("max_paths must be positive when set")

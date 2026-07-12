@@ -15,7 +15,11 @@ from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
 
-from .accumulation import accumulate_path_result, build_path_table
+from .accumulation import (
+    _ZERO_CONTRIBUTION_COMPONENTS,
+    accumulate_path_result,
+    build_path_table,
+)
 from .config import Config
 from .result import Result
 from witwin.channel_native.core.path_topology import (
@@ -68,6 +72,12 @@ def _metadata(
                 "deterministic diffraction requires RayDN native capability"
             )
         components["diffraction"] = "enabled"
+    # transmission and scattering are accepted plumbing in v1: reported as
+    # requested-but-empty until the physics lands in later waves.
+    for name in ("transmission", "scattering"):
+        components[name] = (
+            "enabled_no_paths" if name in config.components else "not_requested"
+        )
     raydn_component_enabled = (
         components["reflection"] == "enabled" or components["diffraction"] == "enabled"
     )
@@ -114,6 +124,12 @@ def _metadata(
                 if "reflection" in config.components
                 else -1,
                 "diffraction": 1 if "diffraction" in config.components else -1,
+                # transmission chains are capped like reflection; scattering is
+                # single-bounce in v1. Zero paths until the physics lands.
+                "transmission": config.max_depth
+                if "transmission" in config.components
+                else -1,
+                "scattering": 1 if "scattering" in config.components else -1,
             },
         )
     )
@@ -142,6 +158,9 @@ def solve(scene: Scene, config: Config) -> Result:
     path_result = export_topology(scene, config)
     path_count = int(path_result.valid.numel())
     component_counts = deterministic_component_counts(path_result.component_id)
+    extra_components = tuple(
+        name for name in _ZERO_CONTRIBUTION_COMPONENTS if name in config.components
+    )
     path_gain, field, component_power, component_fields = accumulate_path_result(
         path_result,
         frequency_hz=float(scene.frequency),
@@ -150,6 +169,7 @@ def solve(scene: Scene, config: Config) -> Result:
         layout=layout,
         coherent=config.coherent,
         return_field=config.return_field,
+        extra_components=extra_components,
     )
     exact_diffraction = None
     if (
