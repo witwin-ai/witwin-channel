@@ -49,24 +49,11 @@ yields the expression above. Its hemispheric energy: substituting
 ``d^2 q_par = k0^2 * cos_theta_o dOmega_o`` and Parseval
 ``(1/(2*pi)^2) Int I(q_par; q_n) d^2 q_par = 1 - exp(-g)`` shows
 ``Int f_raw*cos dOmega -> R_bar*(1 - C_r^2) = R_diff`` near specular
-(``exp(-g) = C_r^2`` at ``q_n = 2*k0*cos_theta_i``). The residual error
-(lobe leakage below the horizon, ``q_n``/Fresnel variation across the
-lobe, grid discretization) is removed by an explicit per-incidence-bin
-normalization; the recorded scale factor must stay inside [0.25, 4] or the
-build raises (a wrong SHAPE cannot hide behind renormalization).
-
-The tolerance band is enforced where the split into coherent budget and
-diffuse lobe is physically meaningful: incidence bins with
-``cos_theta_i >= 0.15`` and ``r_diff > 5e-3``. Two documented exemptions:
-(a) extreme grazing, where the tangent-plane kernel (no shadowing in v1)
-over-predicts diffuse scatter while the coherent attenuation ``C_r -> 1``
-sends the budget ``R_diff -> 0``; (b) bins whose diffuse budget is below
-0.5% of the incident power  -  sharp Brewster/interference dips of the
-smooth-stack budget that a lobe of finite angular width cannot follow
-(and near-smooth surfaces whose lobe is narrower than a grid cell). Both
-kinds of bins still receive the exact-energy normalization, so an O(1)
-shape error there contributes well under 0.5% absolute energy error.
-Energy stays budget-true by construction everywhere.
+(``exp(-g) = C_r^2`` at ``q_n = 2*k0*cos_theta_i``). Residual horizon,
+Fresnel-variation and grid errors are removed by reciprocal symmetric matrix
+balancing. Its diagonal factor acts on both incident and outgoing states, so
+the final production table retains Helmholtz reciprocity while matching every
+directional diffuse-energy budget.
 
 Energy accounting is exact on the discrete outgoing grid: the hemisphere
 sum of ``f * cos * dOmega`` over the table bins equals ``r_diff`` bitwise
@@ -103,7 +90,12 @@ __all__ = [
 
 # Grid resolution fixed by the implementation contract (section 6).
 N_COS_THETA_I = 32
-N_PHI_I_ANISO = 16
+# An anisotropic reciprocal table must use the same directional state grid on
+# both sides of f(wi, wo).  A coarser incidence azimuth grid followed by a
+# per-incidence normalization cannot preserve reciprocity.  64 keeps the
+# contract's outgoing resolution and makes the discrete transport matrix
+# square, so symmetric balancing below can enforce both invariants exactly.
+N_PHI_I_ANISO = 64
 N_COS_THETA_O = 32
 N_PHI_O = 64
 
@@ -111,15 +103,6 @@ N_PHI_O = 64
 # needs k0*l >= ~6 and moderate RMS slope sqrt(2)*sigma_h/l <= 0.5.
 MIN_K0_CORR_LENGTH = 6.0
 MAX_RMS_SLOPE = 0.5
-
-# Normalization tolerance band for the shape-only prefactor and the domain
-# on which it is enforced (see module docstring): bins at extreme grazing
-# incidence or with a negligible diffuse budget are exact-energy normalized
-# but exempt from the shape check.
-NORMALIZATION_BAND = (0.25, 4.0)
-BAND_COS_THETA_MIN = 0.15
-BAND_R_DIFF_MIN = 5e-3
-
 
 @dataclass(frozen=True, slots=True)
 class KirchhoffTable:
@@ -143,9 +126,9 @@ class KirchhoffTable:
     r_diff_te: torch.Tensor
     r_diff_tm: torch.Tensor
     r_diff_unpol: torch.Tensor
-    # Per-bin normalization scale applied to the raw lobe [Nti, Nphi_i, 2]
-    # (channel order: TE, TM). Must lie in [0.25, 4] wherever r_diff is
-    # above the floor; recorded for diagnostics and shape regression tests.
+    # Symmetric matrix-balance factor a(w) [Nti, Nphi_i, 2], channel order
+    # TE/TM.  The final table is f(wi,wo)=a(wi)*f_sym(wi,wo)*a(wo), which
+    # preserves reciprocity while enforcing every row's energy budget.
     normalization_applied: torch.Tensor
     # Sampling tables built from the UNPOLARIZED mean lobe:
     # per-bin probability mass and the per-solid-angle density (mass/dOmega),
@@ -256,6 +239,82 @@ def _raw_lobe_grid(
     return f_te, f_tm
 
 
+def _symmetric_energy_balance(
+    symmetric_lobe: np.ndarray,
+    target: np.ndarray,
+    cos_o: np.ndarray,
+    *,
+    isotropic: bool,
+    tolerance: float = 1e-11,
+    max_iterations: int = 256,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Balance a reciprocal nonnegative kernel without breaking symmetry.
+
+    Finds positive diagonal factors ``a`` such that ``F_ij=a_i*S_ij*a_j``
+    and every cosine-weighted row integral of ``F`` equals ``target_i``.
+    This is the symmetric Sinkhorn fixed point with a half-step damping;
+    unlike one-sided row normalization, reciprocity is invariant at every
+    iteration.
+    """
+
+    n_ti, n_pi, n_to, n_po = symmetric_lobe.shape
+    if n_ti != n_to:
+        raise ValueError("reciprocal balance requires identical cos grids")
+    d_omega = (1.0 / n_to) * (2.0 * np.pi / n_po)
+    outgoing_weight = np.broadcast_to(
+        cos_o[:, None] * d_omega, (n_to, n_po)
+    ).reshape(-1)
+
+    if isotropic:
+        # Rotation invariance collapses the incident azimuth state.  The
+        # reverse state factor depends only on cos(theta_o), while the full
+        # relative-azimuth lobe remains in the row integral.
+        s = symmetric_lobe[:, 0]
+        rhs = target[:, 0]
+        factor = np.ones(n_ti, dtype=np.float64)
+        active = rhs > 0.0
+        for _ in range(max_iterations):
+            weighted = outgoing_weight * np.repeat(factor, n_po)
+            denom = (s * weighted[None, :, None].reshape(1, n_to, n_po)).sum(
+                axis=(1, 2)
+            )
+            ratio = np.ones_like(factor)
+            ratio[active] = rhs[active] / np.maximum(
+                factor[active] * denom[active], 1e-300
+            )
+            factor *= np.sqrt(ratio)
+            factor[~active] = 0.0
+            if np.max(np.abs(np.log(np.maximum(ratio[active], 1e-300))), initial=0.0) < tolerance:
+                break
+        else:
+            raise ValueError("symmetric Kirchhoff energy balance did not converge")
+        balanced = s * factor[:, None, None] * factor[None, :, None]
+        return balanced[:, None], factor[:, None]
+
+    if n_pi != n_po:
+        raise ValueError("anisotropic reciprocal balance requires identical phi grids")
+    states = n_ti * n_pi
+    s = symmetric_lobe.reshape(states, states)
+    rhs = target.reshape(states)
+    weights = np.repeat(cos_o * d_omega, n_po)
+    factor = np.ones(states, dtype=np.float64)
+    active = rhs > 0.0
+    for _ in range(max_iterations):
+        denom = s @ (weights * factor)
+        ratio = np.ones_like(factor)
+        ratio[active] = rhs[active] / np.maximum(
+            factor[active] * denom[active], 1e-300
+        )
+        factor *= np.sqrt(ratio)
+        factor[~active] = 0.0
+        if np.max(np.abs(np.log(np.maximum(ratio[active], 1e-300))), initial=0.0) < tolerance:
+            break
+    else:
+        raise ValueError("symmetric Kirchhoff energy balance did not converge")
+    balanced = s * factor[:, None] * factor[None, :]
+    return balanced.reshape(symmetric_lobe.shape), factor.reshape(n_ti, n_pi)
+
+
 def build_kirchhoff_table(
     roughness,
     layers: Sequence[tuple],
@@ -268,8 +327,8 @@ def build_kirchhoff_table(
     (or any object with the same fields); ``layers`` is the oracle layer
     list ``[(thickness_m, eps_r, sigma_e, mu_r), ...]`` in incidence order.
     Raises when the surface is outside the Kirchhoff applicability domain
-    (``kirchhoff_domain_exceeded``) or when the shape-only prefactor needs a
-    normalization outside [0.25, 4] (modeling bug, never silently rescaled).
+    (``kirchhoff_domain_exceeded``) or reciprocal energy balancing fails to
+    converge.
     """
 
     frequency_hz = float(frequency_hz)
@@ -343,7 +402,10 @@ def build_kirchhoff_table(
     f_sym_te = 0.5 * (f_raw_te + swap_te)
     f_sym_tm = 0.5 * (f_raw_tm + swap_tm)
 
-    # 6) Exact per-incidence-bin energy normalization on the discrete grid.
+    # 6) Symmetric energy balance on the discrete directional state matrix.
+    # A one-sided row scale would make the energy exact but destroy
+    # f(wi,wo)==f(wo,wi).  Diagonal scaling on both arguments preserves the
+    # already-symmetric raw kernel and satisfies every row budget jointly.
     d_omega = (1.0 / N_COS_THETA_O) * (2.0 * np.pi / N_PHI_O)
     weight = cos_o[None, None, :, None] * d_omega  # broadcast over [.., to, po]
     r_diff_te_grid = np.broadcast_to(r_diff_te[:, None], (N_COS_THETA_I, n_pi)).copy()
@@ -353,30 +415,25 @@ def build_kirchhoff_table(
         (0, f_sym_te, r_diff_te_grid),
         (1, f_sym_tm, r_diff_tm_grid),
     )
-    band_cos = np.broadcast_to(cos_i[:, None], (N_COS_THETA_I, n_pi))
     for channel, f_sym, r_diff in channels:
+        balanced, factor = _symmetric_energy_balance(
+            f_sym, r_diff, cos_o, isotropic=not anisotropic
+        )
+        f_sym[...] = balanced
         integral = (f_sym * weight).sum(axis=(2, 3))
-        active = (r_diff > 0.0) & (integral > 0.0)
-        scale = np.ones_like(integral)
-        scale[active] = r_diff[active] / integral[active]
-        # Shape check on the physically meaningful subdomain only (module
-        # docstring); the exact-energy normalization itself applies to
-        # every bin with a nonzero budget.
-        checked = active & (band_cos >= BAND_COS_THETA_MIN) & (r_diff > BAND_R_DIFF_MIN)
-        if checked.any():
-            lo, hi = scale[checked].min(), scale[checked].max()
-            if lo < NORMALIZATION_BAND[0] or hi > NORMALIZATION_BAND[1]:
-                raise ValueError(
-                    "kirchhoff lobe normalization outside the "
-                    f"[{NORMALIZATION_BAND[0]:g}, {NORMALIZATION_BAND[1]:g}] "
-                    f"tolerance band (range [{lo:.3g}, {hi:.3g}]): the "
-                    "shape-only prefactor is wrong, refusing to rescale"
-                )
-        f_sym *= scale[:, :, None, None]
-        # Zero the lobe where the budget is exactly zero so the table can
-        # never return diffuse energy that the budget does not grant.
-        f_sym *= (r_diff > 0.0)[:, :, None, None]
-        scales[:, :, channel] = scale
+        active = r_diff > 0.0
+        relative_error = np.zeros_like(integral)
+        relative_error[active] = np.abs(integral[active] - r_diff[active]) / r_diff[active]
+        if relative_error.max(initial=0.0) > 2e-9:
+            raise ValueError(
+                "symmetric Kirchhoff balance failed energy tolerance: "
+                f"max relative error {relative_error.max():.3e}"
+            )
+        # Store the one-direction diagonal factor.  Unlike the obsolete
+        # one-sided row scale, its magnitude alone is not a shape-error
+        # metric: the physical correction on a pair is a(wi)*a(wo), and the
+        # factors are jointly constrained by all directional energy rows.
+        scales[:, :, channel] = factor
 
     # 7) Sampling tables from the UNPOLARIZED mean lobe.
     f_unpol = 0.5 * (f_sym_te + f_sym_tm)
@@ -430,91 +487,6 @@ def build_kirchhoff_table(
     )
 
 
-def _angles(w: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """``(cos_theta, phi in [0, 2*pi))`` of local-frame unit vectors [N, 3]."""
-
-    cos_theta = w[:, 2]
-    phi = torch.atan2(w[:, 1], w[:, 0])
-    phi = torch.where(phi < 0.0, phi + 2.0 * math.pi, phi)
-    return cos_theta, phi
-
-
-def _linear_axis(
-    coord: torch.Tensor, n: int, step: float, periodic: bool
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Linear interpolation indices/weight on a cell-center axis.
-
-    Centers sit at ``(i + 0.5)*step``. Non-periodic axes clamp to the outer
-    centers (constant extrapolation); periodic axes wrap.
-    """
-
-    t = coord / step - 0.5
-    if n == 1:
-        zeros = torch.zeros_like(coord, dtype=torch.long)
-        return zeros, zeros, torch.zeros_like(coord)
-    if periodic:
-        i0 = torch.floor(t)
-        w = t - i0
-        i0 = i0.long() % n
-        i1 = (i0 + 1) % n
-        return i0, i1, w
-    t = t.clamp(0.0, float(n - 1))
-    i0 = torch.floor(t).clamp(max=float(n - 2)).long()
-    w = t - i0.to(t.dtype)
-    return i0, i0 + 1, w
-
-
-def _nearest_axis(coord: torch.Tensor, n: int, step: float, periodic: bool) -> torch.Tensor:
-    """Nearest cell-center index on the same axis layout."""
-
-    idx = torch.floor(coord / step).long()
-    if periodic:
-        return idx % n
-    return idx.clamp(0, n - 1)
-
-
-def _interp4(
-    table: torch.Tensor,
-    ti: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-    pi_: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-    to: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-    po: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-) -> torch.Tensor:
-    """Multilinear interpolation of a [Nti, Npi, Nto, Npo] table (batched)."""
-
-    n_pi, n_to, n_po = table.shape[1], table.shape[2], table.shape[3]
-    flat = table.reshape(-1)
-    out = torch.zeros_like(ti[2])
-    for a, wa in ((ti[0], 1.0 - ti[2]), (ti[1], ti[2])):
-        for b, wb in ((pi_[0], 1.0 - pi_[2]), (pi_[1], pi_[2])):
-            for c, wc in ((to[0], 1.0 - to[2]), (to[1], to[2])):
-                for d, wd in ((po[0], 1.0 - po[2]), (po[1], po[2])):
-                    idx = ((a * n_pi + b) * n_to + c) * n_po + d
-                    out = out + (wa * wb * wc * wd) * flat[idx]
-    return out
-
-
-def _lookup_angles(
-    table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor | None
-):
-    """Table-frame lookup angles shared by eval/sample/pdf.
-
-    Returns ``(cos_i, phi_i, cos_o, phi_o_rel)``. Isotropic tables are
-    built with incidence azimuth 0, so the outgoing azimuth axis stores the
-    RELATIVE azimuth: lookups subtract ``phi_i`` (and the sampler adds it
-    back), which makes the isotropic table exactly rotation-invariant.
-    Anisotropic tables store absolute azimuths in the principal frame.
-    """
-
-    cos_i, phi_i = _angles(wi)
-    if wo is None:
-        return cos_i, phi_i, None, None
-    cos_o, phi_o = _angles(wo)
-    if table.phi_i.shape[0] == 1:
-        phi_o = torch.remainder(phi_o - phi_i, 2.0 * math.pi)
-    return cos_i, phi_i, cos_o, phi_o
-
-
 def eval_bsdf(
     table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -524,16 +496,11 @@ def eval_bsdf(
     surface. Directions below the horizon return 0.
     """
 
-    n_pi = table.phi_i.shape[0]
-    cos_i, phi_i, cos_o, phi_o = _lookup_angles(table, wi, wo)
-    ti = _linear_axis(cos_i, N_COS_THETA_I, 1.0 / N_COS_THETA_I, False)
-    pi_ = _linear_axis(phi_i, n_pi, 2.0 * math.pi / n_pi, True)
-    to = _linear_axis(cos_o, N_COS_THETA_O, 1.0 / N_COS_THETA_O, False)
-    po = _linear_axis(phi_o, N_PHI_O, 2.0 * math.pi / N_PHI_O, True)
-    valid = (wi[:, 2] > 0.0) & (wo[:, 2] > 0.0)
-    f_te = torch.where(valid, _interp4(table.f_te, ti, pi_, to, po), 0.0)
-    f_tm = torch.where(valid, _interp4(table.f_tm, ti, pi_, to, po), 0.0)
-    return f_te, f_tm
+    from witwin.channel_native.core.kernels.ops import scattering_table_eval
+
+    return scattering_table_eval(
+        wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
+    )
 
 
 def sample_directions(
@@ -551,46 +518,17 @@ def sample_directions(
     sampled density is piecewise constant per outgoing bin.
     """
 
-    n_pi = table.phi_i.shape[0]
-    cos_i, phi_i_val, _, _ = _lookup_angles(table, wi, None)
-    ti = _nearest_axis(cos_i, N_COS_THETA_I, 1.0 / N_COS_THETA_I, False)
-    pi_ = (
-        torch.zeros_like(ti)
-        if n_pi == 1
-        else _nearest_axis(phi_i_val, n_pi, 2.0 * math.pi / n_pi, True)
-    )
-    marginal_rows = table.marginal_cdf[ti, pi_]  # [N, Nto]
-    u1 = u1.clamp(0.0, 1.0 - 1e-7).unsqueeze(1)
-    to = torch.searchsorted(marginal_rows, u1, right=True).clamp(
-        max=N_COS_THETA_O - 1
-    )
-    cdf_hi = torch.gather(marginal_rows, 1, to)
-    cdf_lo = torch.where(
-        to > 0, torch.gather(marginal_rows, 1, (to - 1).clamp(min=0)), torch.zeros_like(cdf_hi)
-    )
-    bin_mass = cdf_hi - cdf_lo
-    frac1 = torch.where(bin_mass > 0.0, (u1 - cdf_lo) / bin_mass, torch.full_like(bin_mass, 0.5))
-    cos_o = ((to.to(u1.dtype) + frac1) / N_COS_THETA_O).squeeze(1).clamp(1e-6, 1.0)
+    from witwin.channel_native.core.kernels.ops import scattering_table_sample
 
-    cond_rows = table.conditional_cdf[ti, pi_, to.squeeze(1)]  # [N, Npo]
-    u2 = u2.clamp(0.0, 1.0 - 1e-7).unsqueeze(1)
-    po = torch.searchsorted(cond_rows, u2, right=True).clamp(max=N_PHI_O - 1)
-    ccdf_hi = torch.gather(cond_rows, 1, po)
-    ccdf_lo = torch.where(
-        po > 0, torch.gather(cond_rows, 1, (po - 1).clamp(min=0)), torch.zeros_like(ccdf_hi)
+    uniforms = torch.stack((u1, u2), dim=1).contiguous()
+    out = scattering_table_sample(
+        wi.contiguous(),
+        uniforms,
+        table.marginal_cdf,
+        table.conditional_cdf,
+        table.sample_density,
     )
-    cmass = ccdf_hi - ccdf_lo
-    frac2 = torch.where(cmass > 0.0, (u2 - ccdf_lo) / cmass, torch.full_like(cmass, 0.5))
-    phi = ((po.to(u2.dtype) + frac2) * (2.0 * math.pi / N_PHI_O)).squeeze(1)
-    if n_pi == 1:
-        # Isotropic tables sample the RELATIVE azimuth; rotate back into the
-        # caller's frame around the surface normal.
-        phi = phi + phi_i_val
-
-    sin_o = torch.sqrt((1.0 - cos_o * cos_o).clamp(min=0.0))
-    wo = torch.stack((sin_o * torch.cos(phi), sin_o * torch.sin(phi), cos_o), dim=1)
-    density = table.sample_density[ti, pi_, to.squeeze(1), po.squeeze(1)]
-    return wo, density
+    return out["wo"], out["pdf_forward"]
 
 
 def pdf(table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor) -> torch.Tensor:
@@ -601,19 +539,11 @@ def pdf(table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor) -> torch.Tens
     over the hemisphere by construction. Zero below the horizon.
     """
 
-    n_pi = table.phi_i.shape[0]
-    cos_i, phi_i_val, cos_o, phi_o = _lookup_angles(table, wi, wo)
-    ti = _nearest_axis(cos_i, N_COS_THETA_I, 1.0 / N_COS_THETA_I, False)
-    pi_ = (
-        torch.zeros_like(ti)
-        if n_pi == 1
-        else _nearest_axis(phi_i_val, n_pi, 2.0 * math.pi / n_pi, True)
+    from witwin.channel_native.core.kernels.ops import scattering_table_pdf
+
+    return scattering_table_pdf(
+        wi.contiguous(), wo.contiguous(), table.sample_density, reverse=False
     )
-    to = _nearest_axis(cos_o, N_COS_THETA_O, 1.0 / N_COS_THETA_O, False)
-    po = _nearest_axis(phi_o, N_PHI_O, 2.0 * math.pi / N_PHI_O, True)
-    density = table.sample_density[ti, pi_, to, po]
-    valid = (wi[:, 2] > 0.0) & (wo[:, 2] > 0.0)
-    return torch.where(valid, density, torch.zeros_like(density))
 
 
 def pdf_reverse(table: KirchhoffTable, wo: torch.Tensor, wi: torch.Tensor) -> torch.Tensor:
@@ -624,4 +554,8 @@ def pdf_reverse(table: KirchhoffTable, wo: torch.Tensor, wi: torch.Tensor) -> to
     reverse table exists.
     """
 
-    return pdf(table, wo, wi)
+    from witwin.channel_native.core.kernels.ops import scattering_table_pdf
+
+    return scattering_table_pdf(
+        wi.contiguous(), wo.contiguous(), table.sample_density, reverse=True
+    )

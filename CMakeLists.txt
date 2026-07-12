@@ -94,6 +94,7 @@ Python_add_library(
     native/channel_native/kernels/material.cu
     native/channel_native/kernels/path_trace.cu
     native/channel_native/kernels/reflection.cu
+    native/channel_native/kernels/scattering.cu
     native/channel_native/kernels/sampling.cu
     native/channel_native/montecarlo_basic.cpp
     native/channel_native/path_solver.cpp

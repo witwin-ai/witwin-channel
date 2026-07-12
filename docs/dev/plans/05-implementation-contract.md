@@ -177,17 +177,17 @@ never modified; heights only enter complex phase.
   otherwise hard error); (c) reciprocity `f_pq(wi,wo) = f_qp(wo,wi)`;
   (d) passivity per angle/pol `R+T+A <= 1 + 1e-4`.
 - Tables precomputed at scene compile per rough material at scene frequency:
-  axes `cos_theta_i in (0,1], N=32` (uniform in cos), `phi_i N=16` (only for
-  anisotropic `lx != ly`, else collapsed to 1), outgoing grid
+  axes `cos_theta_i in (0,1], N=32` (uniform in cos), `phi_i N=64` (only for
+  anisotropic `lx != ly`, else collapsed to 1; the matching incoming/outgoing
+  azimuth grid is required by reciprocal symmetric matrix balancing), outgoing grid
   `cos_theta_o N=32 x phi_o N=64`. Channels: TE and TM co-pol power kernels,
   `R_diff` per incident bin, marginal/conditional CDFs for sampling. Sampling
   uses the CDF tables; evaluation always uses the raw high-precision table.
-- Runtime implementation is PyTorch-native GPU tensor code in
-  `src/witwin/channel_native/scattering/` (tables, eval, sample, pdf_fwd,
-  pdf_rev). CUDA-side `em/*.cuh` in v1 covers complex/medium/fresnel/
-  layer_stack only; kirchhoff/event kernels stay torch until profiling says
-  otherwise. This is a deliberate, documented deviation from plan section 9
-  (PyTorch-native is a repo hard requirement; tables are gather+FMA).
+- Tables are built once in float64 at scene compile and remain resident as
+  float32 CUDA tensors. Runtime eval, sample, forward/reverse PDF and rough
+  event budgets require native CUDA kernels; no CPU or PyTorch fallback is
+  permitted. Event budgets consume the already-computed native layer-stack
+  R/T arrays, avoiding duplicate electromagnetic evaluation and H2D traffic.
 - Phase screen (`realization_coherent`): heights sampled from a GPU texture
   via bilinear interpolation in UV; phasor `exp(-j*q_n*h(u,v))`; deterministic
   patch quadrature accumulates the complex field over patch samples. Height

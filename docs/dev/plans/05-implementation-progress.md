@@ -74,6 +74,14 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   (reflect/scatter/transmit) event sampler with seeded selection, continuous
   forward/reverse PDFs from the reciprocal table, NEE connections, native
   `scattering` component slot (mask bit 16 -> component id 6, priority rule).
+- Final Kirchhoff tables use reciprocal symmetric matrix balancing rather
+  than one-sided row normalization: the stored BSDF itself now satisfies
+  `f(wi,wo)=f(wo,wi)` while every directional hemispherical integral matches
+  `R_diff`. Anisotropic incidence/outgoing azimuth grids both use 64 bins.
+- Runtime BSDF eval, CDF sample, forward/reverse PDF and rough-event budgets
+  are native CUDA required ops. The event kernel reuses resident layer-stack
+  R/T outputs; it performs no CPU oracle evaluation, per-bounce H2D upload or
+  duplicate stack solve.
 - Cross-solver agreement on a rough-wall scene: BDPT vs MC basic within
   1.3%, both within ~2% of an independent float64 area-quadrature reference;
   variance scales 1/N; smooth limit collapses to zero scattering with
@@ -100,10 +108,9 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   materials, full-wave references) remains future work per plan.
 
 ## Known deviations from the plan narrative (documented choices)
-- Kirchhoff eval/sample runs as PyTorch GPU tensor code, not dedicated CUDA
-  kernels (`em/kirchhoff_bsdf.cuh` etc. deferred until profiling justifies
-  them); PyTorch-native is a repo hard requirement and the tables are
-  gather+FMA workloads.
+- Kirchhoff eval/sample/PDF and rough event budgets require dedicated native
+  CUDA kernels. Tables are uploaded once at scene compile; production has no
+  CPU/PyTorch fallback or per-bounce H2D transfer.
 - Legacy smooth-reflection kernels (`deterministic_field.cu`,
   `reflection.cu`, `field_transport.cuh::slab_fresnel`) keep their verified
   implementations; the shared `em/` core is authoritative for all NEW code

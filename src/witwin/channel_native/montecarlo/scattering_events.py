@@ -74,9 +74,12 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native.core.kernels.ops import raydn_visibility_forward
+from witwin.channel_native.core.kernels.ops import (
+    raydn_visibility_forward,
+    scattering_event_probabilities,
+    scattering_table_sample,
+)
 from witwin.channel_native.core.materials import Roughness
-from witwin.channel_native.scattering import energy as scattering_energy
 from witwin.channel_native.scattering import tables as kirchhoff_tables
 
 from witwin.channel_native.core.material_runtime import face_material_field_bundle
@@ -191,7 +194,8 @@ def scatter_direction_uniforms(
 def three_way_rough_probabilities(
     cos_theta: torch.Tensor,
     material_id: torch.Tensor,
-    runtimes: dict[int, RoughMaterialRuntime],
+    material_bundle: dict[str, torch.Tensor],
+    stack: dict[str, torch.Tensor],
     *,
     frequency_hz: float,
     floor: float = _EVENT_PROBABILITY_FLOOR,
@@ -211,50 +215,18 @@ def three_way_rough_probabilities(
     probability ever happens).
     """
 
-    device = cos_theta.device
-    zeros = torch.zeros_like(cos_theta)
-    p_scatter = zeros.clone()
-    p_transmit = zeros.clone()
-    r_coh_amplitude = torch.ones_like(cos_theta)
-    rough = torch.zeros_like(cos_theta, dtype=torch.bool)
-    for index, runtime in runtimes.items():
-        rows = torch.nonzero(material_id == index, as_tuple=False).flatten()
-        if int(rows.numel()) == 0:
-            continue
-        budget = scattering_energy.event_budget(
-            cos_theta.index_select(0, rows),
-            runtime.layers,
-            runtime.roughness,
-            frequency_hz,
-        )
-        r_coh = budget["R_coh"]
-        r_diff = budget["R_diff"]
-        t_bar = budget["T"]
-        total = (r_coh + r_diff + t_bar).clamp_min(1.0e-12)
-        raw = torch.stack((r_coh, r_diff, t_bar), dim=0) / total
-        active = torch.stack((r_coh, r_diff, t_bar), dim=0) > 0.0
-        floored = torch.where(active, raw.clamp_min(float(floor)), torch.zeros_like(raw))
-        norm = floored.sum(dim=0).clamp_min(1.0e-12)
-        probabilities = floored / norm
-        p_scatter[rows] = probabilities[1]
-        p_transmit[rows] = probabilities[2]
-        # Coherent branch amplitude attenuation C_r = exp(-2*(k0*cos*sigma)^2)
-        # (contract section 6.2): the reflect event's field must represent
-        # the COHERENT specular amplitude r_stack * C_r, matching the R_coh
-        # budget that drives its selection probability.
-        k0 = 2.0 * math.pi * float(frequency_hz) / scattering_energy.C0
-        sigma_h = float(runtime.roughness.rms_height_m)
-        r_coh_amplitude[rows] = torch.exp(
-            -2.0 * (k0 * cos_theta.index_select(0, rows) * sigma_h) ** 2
-        )
-        rough[rows] = True
-    del device
-    return {
-        "p_scatter": p_scatter,
-        "p_transmit": p_transmit,
-        "r_coh_amplitude": r_coh_amplitude,
-        "rough": rough,
-    }
+    return scattering_event_probabilities(
+        cos_theta.contiguous(),
+        material_id.to(torch.int32).contiguous(),
+        stack["cap_R_te"],
+        stack["cap_R_tm"],
+        stack["cap_T_te"],
+        stack["cap_T_tm"],
+        material_bundle["rough_sigma_h_m"],
+        material_bundle["scatter_model_id"],
+        frequency_hz=float(frequency_hz),
+        probability_floor=float(floor),
+    )
 
 
 def local_frames(normal: torch.Tensor, axis_rad: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -367,15 +339,17 @@ def sample_scatter_directions(
     pdf_reverse = torch.zeros((count,), device=device, dtype=torch.float32)
     for runtime, rows in _grouped_rows(material_id, runtimes):
         wi_rows = wi_local.index_select(0, rows).contiguous()
-        wo_rows, pdf_rows = kirchhoff_tables.sample_directions(
-            runtime.table,
+        sampled = scattering_table_sample(
             wi_rows,
-            uniforms.index_select(0, rows)[:, 0].contiguous(),
-            uniforms.index_select(0, rows)[:, 1].contiguous(),
+            uniforms.index_select(0, rows).contiguous(),
+            runtime.table.marginal_cdf,
+            runtime.table.conditional_cdf,
+            runtime.table.sample_density,
         )
+        wo_rows = sampled["wo"]
         wo_local[rows] = wo_rows
-        pdf_forward[rows] = pdf_rows
-        pdf_reverse[rows] = kirchhoff_tables.pdf_reverse(runtime.table, wo_rows, wi_rows)
+        pdf_forward[rows] = sampled["pdf_forward"]
+        pdf_reverse[rows] = sampled["pdf_reverse"]
     return {"wo_local": wo_local, "pdf_forward": pdf_forward, "pdf_reverse": pdf_reverse}
 
 

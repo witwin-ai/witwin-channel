@@ -944,7 +944,8 @@ def _transmission_sampled_connection_samples(
                 rough_probs = three_way_rough_probabilities(
                     cos_theta,
                     material_id,
-                    runtimes,
+                    material_bundle,
+                    stack,
                     frequency_hz=float(frequency_hz),
                 )
                 rough = rough_probs["rough"] & hit_ok

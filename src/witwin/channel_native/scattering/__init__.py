@@ -1,12 +1,10 @@
 """Rough-surface scattering runtime (Kirchhoff tables + phase screens).
 
-PyTorch-native GPU tensor code per the implementation contract (section 6):
-tables are precomputed in float64 numpy at scene compile and evaluated /
-sampled as float32 torch at runtime. This package deliberately stays torch
-(no CUDA kernels)  -  table lookups are gather+FMA.
+Tables are precomputed once in float64 at scene compile, uploaded once, and
+all production eval/sample/PDF/event-budget operations require native CUDA.
+PyTorch and CPU implementations are not production runtime alternatives.
 """
 
-from .energy import event_budget
 from .phase_screen import (
     PhaseScreenRuntime,
     generate_gaussian_realization,
@@ -27,7 +25,6 @@ __all__ = [
     "PhaseScreenRuntime",
     "build_kirchhoff_table",
     "eval_bsdf",
-    "event_budget",
     "generate_gaussian_realization",
     "patch_phase_integral",
     "pdf",

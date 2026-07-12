@@ -15,11 +15,6 @@ import torch
 
 from witwin.channel_native.core.materials import Roughness
 from witwin.channel_native.scattering import build_kirchhoff_table, eval_bsdf
-from witwin.channel_native.scattering.tables import (
-    BAND_COS_THETA_MIN,
-    BAND_R_DIFF_MIN,
-    NORMALIZATION_BAND,
-)
 
 _EPS0 = 8.8541878128e-12
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -85,26 +80,21 @@ def test_smooth_limit_near_zero_lobe():
 
 
 def test_reciprocity(table_60ghz):
-    """Symmetrized shape is reciprocal; final table is reciprocal up to the
-    recorded per-incidence-bin normalization scales."""
+    """The final energy-normalized production table is reciprocal."""
 
     table = table_60ghz
     assert table.reciprocity_error < 1e-3
-    # Grid-level check: dividing out the per-bin normalization must recover
-    # f(wi, wo) == f(wo, wi). For the isotropic table with implicit
+    # For the isotropic table with implicit
     # incidence azimuth 0, the swapped pair maps to the flipped phi_o index
     # (delta_phi -> -delta_phi).
     f = table.f_te
-    scale = table.normalization_applied[..., 0]
-    shape = f / scale[:, :, None, None].clamp(min=1e-30)
-    swapped = torch.flip(shape.permute(2, 1, 0, 3), dims=(3,))
-    peak = float(shape.max())
-    assert float((shape - swapped).abs().max()) < 1e-3 * peak
+    swapped = torch.flip(f.permute(2, 1, 0, 3), dims=(3,))
+    peak = float(f.max())
+    assert float((f - swapped).abs().max()) < 1e-6 * peak
 
 
 def test_final_table_reciprocity_at_bin_centers(table_60ghz):
-    """eval_bsdf at exact bin centers matches the stored table values and the
-    swap identity holds after compensating the normalization scales."""
+    """Native CUDA evaluation preserves the final table's swap identity."""
 
     table = table_60ghz
     ti, to, po = 20, 12, 17
@@ -121,38 +111,29 @@ def test_final_table_reciprocity_at_bin_centers(table_60ghz):
     assert f_te.item() == pytest.approx(float(table.f_te[ti, 0, to, po]), rel=1e-5)
     assert f_tm.item() == pytest.approx(float(table.f_tm[ti, 0, to, po]), rel=1e-5)
     f_te_rev, _ = eval_bsdf(table, wo, wi)
-    s_fwd = float(table.normalization_applied[ti, 0, 0])
-    s_rev = float(table.normalization_applied[to, 0, 0])
-    assert f_te.item() / s_fwd == pytest.approx(f_te_rev.item() / s_rev, rel=1e-3)
+    assert f_te.item() == pytest.approx(f_te_rev.item(), rel=1e-5, abs=1e-8)
 
 
 def test_anisotropic_table_has_phi_i_axis(table_60ghz):
     rough = Roughness(rms_height_m=1e-3, corr_length_x_m=10e-3, corr_length_y_m=20e-3)
     table = build_kirchhoff_table(rough, _lossy_layers(60e9, 0.1), 60e9, device=DEVICE)
     assert table.anisotropic
-    assert table.phi_i.numel() == 16
-    assert table.f_te.shape == (32, 16, 32, 64)
+    assert table.phi_i.numel() == 64
+    assert table.f_te.shape == (32, 64, 32, 64)
     # Isotropic surface collapses the phi_i axis to one entry.
     assert not table_60ghz.anisotropic
     assert table_60ghz.phi_i.numel() == 1
     assert table_60ghz.f_te.shape == (32, 1, 32, 64)
 
 
-def test_normalization_scales_within_band(table_60ghz):
-    """Scale factors stay in [0.25, 4] on the checked domain and are
-    finite/positive everywhere (including exempt grazing/Brewster bins)."""
+def test_symmetric_balance_factors_are_finite(table_60ghz):
+    """The two-sided balance factors are finite and nonnegative."""
 
     table = table_60ghz
     scales = table.normalization_applied
     assert bool(torch.isfinite(scales).all())
-    assert float(scales.min()) > 0.0
-    cos_grid = table.cos_theta_i[:, None].expand(scales.shape[0], scales.shape[1])
-    for channel, r_diff in ((0, table.r_diff_te), (1, table.r_diff_tm)):
-        checked = (cos_grid >= BAND_COS_THETA_MIN) & (r_diff > BAND_R_DIFF_MIN)
-        assert bool(checked.any())
-        values = scales[..., channel][checked]
-        assert float(values.min()) >= NORMALIZATION_BAND[0]
-        assert float(values.max()) <= NORMALIZATION_BAND[1]
+    assert float(scales.min()) >= 0.0
+    assert float(scales.max()) > 0.0
 
 
 def test_out_of_domain_roughness_raises():
