@@ -337,8 +337,21 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
         frequency_hz=3.0e9,
     )
 
-    torch.testing.assert_close(reflected["throughput_real"].cpu(), torch.tensor([1.0, 0.0], dtype=torch.float32))
-    torch.testing.assert_close(reflected["throughput_imag"].cpu(), torch.tensor([1.5, 0.0], dtype=torch.float32))
+    # Throughput is a real amplitude proxy: specular reflection scales it by
+    # sqrt(material_gain * R_eff); the near-PEC wall has R_eff ~= 1.
+    amplitude = math.sqrt(0.5)
+    torch.testing.assert_close(
+        reflected["throughput_real"].cpu(),
+        torch.tensor([2.0 * amplitude, 0.0], dtype=torch.float32),
+        rtol=1.0e-4,
+        atol=1.0e-6,
+    )
+    torch.testing.assert_close(
+        reflected["throughput_imag"].cpu(),
+        torch.tensor([3.0 * amplitude, 0.0], dtype=torch.float32),
+        rtol=1.0e-4,
+        atol=1.0e-6,
+    )
     torch.testing.assert_close(reflected["valid"].cpu(), torch.tensor([True, False], dtype=torch.bool))
 
 

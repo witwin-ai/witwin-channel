@@ -123,6 +123,35 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
     at::Tensor material_mu_r,
     at::Tensor material_thickness,
     double frequency_hz);
+std::vector<at::Tensor> cn_bdpt_transmitted_light_subpath_state_cuda(
+    at::Tensor light_origin,
+    at::Tensor light_direction,
+    at::Tensor light_throughput_real,
+    at::Tensor light_throughput_imag,
+    at::Tensor light_pdf_forward,
+    at::Tensor light_pdf_reverse,
+    at::Tensor light_depth,
+    at::Tensor light_component_mask,
+    at::Tensor light_tx_id,
+    at::Tensor light_rx_id,
+    at::Tensor light_grid_linear_id,
+    at::Tensor light_valid,
+    at::Tensor light_path_length,
+    at::Tensor light_field_real,
+    at::Tensor light_field_imag,
+    at::Tensor light_source_power,
+    at::Tensor hit_t,
+    at::Tensor hit_p,
+    at::Tensor hit_n,
+    at::Tensor hit_global_prim_id,
+    at::Tensor face_material_id,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
+    double frequency_hz);
 
 at::Tensor cn_bdpt_mis_weights_cuda(
     at::Tensor pdf,
@@ -605,6 +634,50 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
             material_thickness,
             frequency_hz),
         "bdpt_reflected_light_subpath_state");
+}
+
+pybind11::dict cn_bdpt_transmitted_light_subpath_state(
+    pybind11::dict light,
+    pybind11::dict intersection,
+    torch::Tensor face_material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz) {
+    return subpath_state_to_dict(
+        cn_bdpt_transmitted_light_subpath_state_cuda(
+            tensor_from_dict(light, "origin"),
+            tensor_from_dict(light, "direction"),
+            tensor_from_dict(light, "throughput_real"),
+            tensor_from_dict(light, "throughput_imag"),
+            tensor_from_dict(light, "pdf_forward"),
+            tensor_from_dict(light, "pdf_reverse"),
+            tensor_from_dict(light, "depth"),
+            tensor_from_dict(light, "component_mask"),
+            tensor_from_dict(light, "tx_id"),
+            tensor_from_dict(light, "rx_id"),
+            tensor_from_dict(light, "grid_linear_id"),
+            tensor_from_dict(light, "valid"),
+            tensor_from_dict(light, "path_length"),
+            tensor_from_dict(light, "field_real"),
+            tensor_from_dict(light, "field_imag"),
+            tensor_from_dict(light, "source_power"),
+            tensor_from_dict(intersection, "t"),
+            tensor_from_dict(intersection, "p"),
+            tensor_from_dict(intersection, "n"),
+            tensor_from_dict(intersection, "global_prim_id"),
+            face_material_id,
+            layer_offset,
+            layer_count,
+            layer_thickness_m,
+            layer_eps_r,
+            layer_sigma_e,
+            layer_mu_r,
+            frequency_hz),
+        "bdpt_transmitted_light_subpath_state");
 }
 
 torch::Tensor cn_bdpt_mis_weights(

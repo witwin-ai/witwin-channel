@@ -419,6 +419,122 @@ def bdpt_reflected_light_subpath_state(
     return exported
 
 
+def _validate_layer_csr(
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    device: int,
+) -> None:
+    validate_cuda_tensor("layer_offset", layer_offset, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("layer_count", layer_count, dtype=torch.int32, ndim=1)
+    if layer_count.shape != layer_offset.shape:
+        raise ValueError("layer_count must match layer_offset length")
+    for name, tensor in (
+        ("layer_thickness_m", layer_thickness_m),
+        ("layer_eps_r", layer_eps_r),
+        ("layer_sigma_e", layer_sigma_e),
+        ("layer_mu_r", layer_mu_r),
+    ):
+        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
+        if tensor.shape != layer_thickness_m.shape:
+            raise ValueError(f"{name} must match layer_thickness_m length")
+    for name, tensor in (
+        ("layer_offset", layer_offset),
+        ("layer_count", layer_count),
+        ("layer_thickness_m", layer_thickness_m),
+        ("layer_eps_r", layer_eps_r),
+        ("layer_sigma_e", layer_sigma_e),
+        ("layer_mu_r", layer_mu_r),
+    ):
+        if tensor.get_device() != device:
+            raise ValueError(f"{name} must share the op device")
+
+
+def bdpt_transmitted_light_subpath_state(
+    light: dict[str, torch.Tensor],
+    intersection: dict[str, torch.Tensor],
+    *,
+    face_material_id: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    _validate_bdpt_subpath_state("light", light, None)
+    if not isinstance(intersection, dict) or set(intersection) != set(
+        _BDPT_INTERSECTION_FIELDS
+    ):
+        raise ValueError("intersection returned unexpected fields")
+    count = int(light["origin"].shape[0])
+    validate_cuda_tensor(
+        "intersection.t", intersection["t"], dtype=torch.float32, ndim=1
+    )
+    validate_cuda_tensor(
+        "intersection.p",
+        intersection["p"],
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor(
+        "intersection.n",
+        intersection["n"],
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor(
+        "intersection.global_prim_id",
+        intersection["global_prim_id"],
+        dtype=torch.int32,
+        ndim=1,
+    )
+    validate_cuda_tensor(
+        "face_material_id", face_material_id, dtype=torch.int32, ndim=1
+    )
+    device = light["origin"].get_device()
+    if face_material_id.get_device() != device:
+        raise ValueError("face_material_id must share light device")
+    _validate_layer_csr(
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        device,
+    )
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    for name in ("t", "p", "n", "global_prim_id"):
+        if int(intersection[name].shape[0]) != count:
+            raise ValueError("intersection must match light subpath count")
+        if intersection[name].get_device() != device:
+            raise ValueError("intersection tensors must share light device")
+    exported = _required_native_op("bdpt_transmitted_light_subpath_state")(
+        light,
+        intersection,
+        face_material_id,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+    )
+    _validate_bdpt_subpath_state(
+        "_channel_native.bdpt_transmitted_light_subpath_state", exported, count
+    )
+    return exported
+
+
 def bdpt_endpoint_connection_samples(
     light: dict[str, torch.Tensor],
     sensor: dict[str, torch.Tensor],
@@ -2297,6 +2413,180 @@ def field_reflection_sequence(
         validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
         if tuple(out[name].shape) != shape:
             raise ValueError(f"field_reflection_sequence returned bad {name} shape")
+    return out
+
+
+def field_transmission_sequence(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor,
+    interaction_valid: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    for name, value in (
+        ("source", source),
+        ("target", target),
+        ("tx_polarization", tx_polarization),
+        ("rx_polarization", rx_polarization),
+    ):
+        validate_cuda_tensor(
+            name, value, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+        )
+    for name, value in (
+        ("interaction_positions", interaction_positions),
+        ("interaction_normals", interaction_normals),
+    ):
+        validate_cuda_tensor(
+            name, value, dtype=torch.float32, ndim=3, trailing_shape=(3,)
+        )
+    validate_cuda_tensor(
+        "interaction_material_id", interaction_material_id, dtype=torch.int32, ndim=2
+    )
+    validate_cuda_tensor(
+        "interaction_valid", interaction_valid, dtype=torch.bool, ndim=2
+    )
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    count = int(source.shape[0])
+    depth = int(interaction_positions.shape[1])
+    if interaction_positions.shape != (count, depth, 3) or depth <= 0:
+        raise ValueError("interaction_positions must have shape (N, D, 3), D > 0")
+    if interaction_normals.shape != interaction_positions.shape:
+        raise ValueError("interaction_normals must match interaction_positions")
+    if interaction_material_id.shape != (count, depth):
+        raise ValueError("interaction_material_id must have shape (N, D)")
+    if interaction_valid.shape != (count, depth):
+        raise ValueError("interaction_valid must have shape (N, D)")
+    if any(
+        int(value.shape[0]) != count
+        for value in (target, tx_power, tx_polarization, rx_polarization)
+    ):
+        raise ValueError("transmission endpoint tensors must have matching rows")
+    _validate_layer_csr(
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        source.get_device(),
+    )
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    out = _required_native_op("field_transmission_sequence")(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        interaction_material_id,
+        interaction_valid,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.field_transmission_sequence must return a dict")
+    schema = {
+        "field_vector": (torch.complex64, 2, (count, 3)),
+        "coefficient": (torch.complex64, 1, (count,)),
+        "path_field": (torch.complex64, 1, (count,)),
+        "path_gain": (torch.float32, 1, (count,)),
+        "path_length_m": (torch.float32, 1, (count,)),
+        "delay_s": (torch.float32, 1, (count,)),
+        "direction": (torch.float32, 2, (count, 3)),
+    }
+    if set(out) != set(schema):
+        raise ValueError("field_transmission_sequence returned unexpected fields")
+    for name, (dtype, ndim, shape) in schema.items():
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+        if tuple(out[name].shape) != shape:
+            raise ValueError(f"field_transmission_sequence returned bad {name} shape")
+    return out
+
+
+_EM_LAYER_STACK_FIELDS = (
+    "r_te_real",
+    "r_te_imag",
+    "r_tm_real",
+    "r_tm_imag",
+    "t_te_real",
+    "t_te_imag",
+    "t_tm_real",
+    "t_tm_imag",
+    "cap_R_te",
+    "cap_R_tm",
+    "cap_T_te",
+    "cap_T_tm",
+)
+
+
+def em_layer_stack_eval(
+    cos_theta: torch.Tensor,
+    material_id: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("cos_theta", cos_theta, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
+    count = int(cos_theta.shape[0])
+    if material_id.shape != (count,):
+        raise ValueError("material_id must match cos_theta length")
+    if material_id.get_device() != cos_theta.get_device():
+        raise ValueError("material_id must share cos_theta device")
+    _validate_layer_csr(
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        cos_theta.get_device(),
+    )
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    out = _required_native_op("em_layer_stack_eval")(
+        cos_theta,
+        material_id,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.em_layer_stack_eval must return a dict")
+    if set(out) != set(_EM_LAYER_STACK_FIELDS):
+        raise ValueError("em_layer_stack_eval returned unexpected fields")
+    for name in _EM_LAYER_STACK_FIELDS:
+        validate_cuda_tensor(name, out[name], dtype=torch.float32, ndim=1)
+        if out[name].shape != (count,):
+            raise ValueError(f"em_layer_stack_eval returned bad {name} shape")
     return out
 
 
