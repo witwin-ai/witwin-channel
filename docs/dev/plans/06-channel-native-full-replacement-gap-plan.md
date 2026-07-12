@@ -1,9 +1,97 @@
 # Channel Native 完整替代原 Channel：功能缺口与验收计划
 
 **状态：** Active / No-Go for unconditional replacement
-**基线日期：** 2026-07-11
-**代码基线：** `d39da66`（`main` 与 `master` 同步）
+**基线日期：** 2026-07-12
+**代码基线：** `b54f7dc`（`main`）
 **目标：** 在不依赖原 Channel、Python RayD、DrJit、Mitsuba 或 Sionna 热路径回退的前提下，使 `witwin.channel_native` 在明确支持的场景中成为可验证、可维护、可迁移的主实现，并最终满足删除原 Channel 运行时依赖的条件。
+
+---
+
+## 0. 2026-07-12 状态审计与剩余执行板
+
+本节是本计划的当前权威状态。后文保留完整设计背景；后文未勾选的原始任务不再等同于“尚未开始”，应以本节的状态和验收证据为准。
+
+### 0.1 Phase 状态
+
+| Phase | 状态 | 已落地 | 完成前仍需满足 |
+|---|---|---|---|
+| 0 契约与诚实失败 | 部分完成 | 公共 capability manifest；四类 Solver 明确 `supports_ad=False`；不支持的 AD mode 在配置阶段失败 | 完成原 Channel API 使用清单、replacement matrix JSON、所有 requested/effective metadata 审计 |
+| 1 PathResultV2 | 大部分完成 | ragged SoA、padded `PathResultV2`、legacy/topology adapter、signal views、synthetic-array 展开和对应单元测试 | 与原 Channel 的完整 shape/mask/排序契约；真实 Solver 输出上的复系数、角度、交互序列和阵列端到端验收 |
+| 2 共享多阶拓扑 | 部分完成 | Deterministic 多阶反射；公共 topology 和几何/张量工具已抽取 | Path 高阶反射以及 reflection-diffraction 组合拓扑；跨 Solver canonical ordering 与去重 |
+| 3 复场与极化 | 部分完成 | 公共 native field transport；反射、衍射和 deterministic 场计算已统一部分约定 | BDPT Jones/complex3 状态；所有 Solver 对同一解析路径的幅度、相位和极化三方一致性门禁 |
+| 4 天线、阵列与角度 | 部分完成 | `PathResultV2` synthetic-array 基础能力 | 真实方向图、orientation、polarization port、explicit array、precoding/combining 与多 TX/RX 验收 |
+| 5 Path 三方验收 | 部分完成 | LOS/反射时延和候选覆盖抽样；PathResultV2 单元测试 | 对原 Channel/Sionna 的复系数、AoA/AoD、序列、CIR/CFR/taps 和大场景 CI 门禁 |
+| 6 BDPT 物理状态与 MIS | 部分完成 | Native BDPT、基础 MIS/连接逻辑、Munich 与 single-plane 压力测试 | 极化场状态、PDF/测度逐项审计、可重复统计区间、冷启动和高深度稳定性门禁 |
+| 7 材料、透射与散射 | 核心完成、覆盖未闭合 | Material ABI v3、稳定 multilayer slab、specular transmission、rough-surface scattering、UV/phase-screen/Kirchhoff 路线 | 完整材料目录与频散、复杂 XML/UV/instancing、跨 Solver 能量与互易性场景矩阵 |
+| 8 可微分能力 | 未完成 | 仅有孤立的 `mc_los_path_gain_jvp` CUDA 原语和 AD 元数据结构 | Solver 级 fixed-topology JVP/VJP、PyTorch autograd 接入、参数梯度、有限差分/解析/原 Channel 三方验收 |
+| 9 性能、显存与部署 | 部分完成 | 小中型场景 steady-state 基准和若干 Munich/SF 产物 | 统一 cold/steady/p95、峰值显存、100M sample、depth 3/5、多 GPU 架构和 wheel smoke 门禁 |
+| 10 迁移与删除旧运行时 | 未完成 | Native 热路径已不依赖 Python fallback | 公共 API 迁移、生产调用方切换、双跑观察期及删除原 Channel runtime |
+
+### 0.2 当前发布边界
+
+- Channel Native 可以作为明确 capability 范围内的前向仿真后端；不能宣称无条件替代原 Channel。
+- 可微分求解当前是产品级缺口。所有公开 Solver 的有效 `ad_mode` 仍只有 `none`。
+- `mc_los_path_gain_jvp` 只证明一个 LOS path-gain 原语可计算方向导数；它没有接入任一 Solver，也不构成通用 JVP、VJP 或 PyTorch autograd 支持。
+- 衍射采用物理正确、数值稳定优先的版本；由于 MC 衍射方差高，不以单 seed 像素级一致作为发布门槛，而采用解析极限、能量范围、跨 seed 置信区间和无 NaN/Inf 验收。
+
+### 0.3 剩余缺口与改进方案
+
+#### Milestone A：前向功能闭合（P0）
+
+- [ ] 生成 machine-readable replacement matrix，逐项映射原 Channel API、Native API、capability、失败语义和测试证据。
+- [ ] 使 Path 的 `requested_max_depth`、`effective_max_depth` 和逐 component 深度完全可审计；未实现组合拓扑必须在 GPU allocation 前失败。
+- [ ] 将真实 Path Solver 输出完整接入 `PathResultV2`：complex field、AoA/AoD、interaction/material/primitive 序列、稳定排序和每 pair 上限。
+- [ ] 对同一解析路径建立 Path、Deterministic、MC Basic、BDPT 的复场/相位/极化一致性测试。
+- [ ] 补齐高阶 reflection 以及最多一次 diffraction 前后带反射的组合拓扑；定义 canonical ordering、去重和截断策略。
+
+完成门槛：所有 P0 capability 都有正向测试和超范围失败测试；不存在配置被接受但热路径静默忽略的情况。
+
+#### Milestone B：信道与阵列契约（P1）
+
+- [ ] 在真实 Solver 结果上验收 `cir()`、`cfr()`、`taps()`、`filter_by_type()`，覆盖 0 path、padding、mask 和多 pair。
+- [ ] 实现并验证 TX/RX orientation、天线方向图、极化端口、ULA/URA synthetic array 和 explicit array。
+- [ ] 增加多 TX/RX、precoding/combining 和全局旋转/平移不变性测试。
+- [ ] 明确移动信道是否进入替代范围；若进入，实现 velocity、Doppler、time axis 和动态场景 cache invalidation。
+
+完成门槛：公共输出 shape、单位、mask、角度、阵列相位和时间语义与替代契约一致。
+
+#### Milestone C：BDPT、材料与数值稳定性（P1）
+
+- [ ] 将 BDPT scalar complex throughput 升级为 Jones/complex3 + local frame 状态，禁止场幅与功率权重混用。
+- [ ] 审计每种连接策略的 forward/reverse PDF、Jacobian、delta 事件和 MIS measure；用可枚举小场景验证无偏性。
+- [ ] 建立材料频散、multilayer、transmission、rough scattering 的跨 Solver 能量守恒、互易性和 grazing-angle 测试矩阵。
+- [ ] 对 MC Basic/BDPT/衍射执行跨 seed 压力测试，报告均值、方差、置信区间、finite ratio 和极端几何失败率。
+
+完成门槛：不以单 seed parity 作为结论；统计门槛预先固定，并在 Munich、SF 与解析小场景同时通过。
+
+#### Milestone D：可微分求解（P1，替代原 Channel AD 的阻塞项）
+
+- [ ] 冻结第一版可微参数：TX/RX position、frequency、material continuous parameters；vertices 延后到第二批。
+- [ ] 将 topology discovery 与 fixed-topology field evaluation 分离，明确 visibility/topology discontinuity 不提供普通连续梯度。
+- [ ] 先为 LOS、单反射、单透射实现 Solver 级 JVP，再实现 VJP/autograd；不得用 metadata launch count 代替真实导数路径。
+- [ ] 增加解析导数、中心有限差分、JVP-VJP 对偶性和原 Channel AD 四类测试。
+- [ ] 扩展到多反射、UTD 和 rough scattering 前，先定义不连续点、随机数重参数化和梯度方差政策。
+- [ ] 只有在公开 Solver 接受 `ad_mode=jvp/vjp` 且端到端测试通过后，才将 capability manifest 的 `supports_ad` 改为 `True`。
+
+完成门槛：至少一个生产 Solver 对声明的参数集合提供稳定 JVP/VJP；梯度误差、显存 tape 和运行时间均有门禁。
+
+#### Milestone E：性能、部署与迁移（P0/P1）
+
+- [ ] 固化 analytic、three-cube、Munich、SF planar、terrain 的 cold/steady/p95 与峰值显存基准。
+- [ ] 覆盖 1x1、8x1k、16x1k、128²/512² grid，MC 1k/1M/10M/100M samples 和 depth 0/1/3/5。
+- [ ] 增加支持矩阵内的 CUDA/driver/OptiX/PyTorch/Python/SM wheel smoke 和清晰 import diagnostics。
+- [ ] 建立至少一个发布周期的原 Channel/Native 双跑观察；记录精度、性能、失败率和回滚条件。
+- [ ] 全部门禁通过后迁移调用方，再删除原 Channel runtime、fallback 和仅供迁移使用的 adapter。
+
+完成门槛：发布报告同时包含功能、物理、统计、性能、显存、冷启动和部署结果；任何一项缺失均不宣布完整替代。
+
+### 0.4 推荐执行顺序
+
+1. Milestone A：先消除错误成功和输出契约缺口。
+2. Milestone C 中的 BDPT 场状态与统计门禁，与 Milestone B 阵列工作并行推进。
+3. Milestone D：以 fixed-topology LOS/单反射为最小可验证 AD 垂直切片。
+4. Milestone E：在接口和物理契约冻结后固化最终性能门槛。
+5. Phase 10：只在 A-E 的发布门槛全部完成后执行。
 
 ---
 
