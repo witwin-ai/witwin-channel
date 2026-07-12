@@ -105,8 +105,17 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
     for structure in structures:
         mesh_vertices = structure.vertices.to(device=device, dtype=torch.float32).contiguous()
         mesh_faces = structure.faces.to(device=device, dtype=torch.int32).contiguous()
-        mesh_uv = _empty_tensor((0, 2), dtype=torch.float32, device=device)
-        mesh_face_uv = _empty_tensor((0, 3), dtype=torch.int32, device=device)
+        # Structures that carry a UV parametrization forward it to the native
+        # mesh (RayD carries UV end-to-end); structures without UV keep the
+        # empty per-mesh tensors, preserving the pre-UV behavior exactly.
+        structure_uv = getattr(structure, "uv", None)
+        structure_face_uv = getattr(structure, "face_uv", None)
+        if structure_uv is not None and structure_face_uv is not None:
+            mesh_uv = structure_uv.to(device=device, dtype=torch.float32).contiguous()
+            mesh_face_uv = structure_face_uv.to(device=device, dtype=torch.int32).contiguous()
+        else:
+            mesh_uv = _empty_tensor((0, 2), dtype=torch.float32, device=device)
+            mesh_face_uv = _empty_tensor((0, 3), dtype=torch.int32, device=device)
         mesh_to_world_left = _empty_tensor((0, 4), dtype=torch.float32, device=device)
         mesh_to_world_right = _empty_tensor((0, 4), dtype=torch.float32, device=device)
         vertices.append(mesh_vertices)

@@ -67,6 +67,39 @@ def _as_weights(
     return value
 
 
+def planar_uv(
+    vertices: torch.Tensor,
+    axis_u: torch.Tensor,
+    axis_v: torch.Tensor,
+    origin: torch.Tensor | None = None,
+    scale: float = 1.0,
+) -> torch.Tensor:
+    """Planar UV generation: project vertices onto two in-plane axes.
+
+    ``uv[i] = scale * ((vertices[i] - origin) . axis_u,
+    (vertices[i] - origin) . axis_v)``. The axes are used as given (not
+    normalized) so callers control the metric-to-UV mapping; ``origin``
+    defaults to the world origin. Returns float32 ``(N, 2)``. Intended for
+    rectangle/box test structures whose faces share one plane per axis pair.
+    """
+
+    if vertices.ndim != 2 or vertices.shape[1] != 3:
+        raise ValueError("vertices must have shape (N, 3)")
+    axis_u = _as_vector3("axis_u", axis_u)
+    axis_v = _as_vector3("axis_v", axis_v)
+    base = vertices.to(dtype=torch.float32)
+    if origin is not None:
+        base = base - _as_vector3("origin", origin).to(device=base.device)
+    uv = torch.stack(
+        (
+            base @ axis_u.to(device=base.device),
+            base @ axis_v.to(device=base.device),
+        ),
+        dim=1,
+    )
+    return (float(scale) * uv).contiguous()
+
+
 @dataclass(frozen=True, slots=True)
 class Structure:
     vertices: torch.Tensor
@@ -75,6 +108,11 @@ class Structure:
     name: str = ""
     surface_id: int = 0
     metadata: dict[str, object] | None = None
+    # Optional UV parametrization for phase-screen height sampling. UV
+    # vertices are indexed by face_uv (RayD mesh layout), so their count is
+    # independent of the position vertex count. Both must be given together.
+    uv: torch.Tensor | None = None
+    face_uv: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         if self.vertices.ndim != 2 or self.vertices.shape[1] != 3:
@@ -83,6 +121,23 @@ class Structure:
             raise ValueError("faces must have shape (F, 3)")
         object.__setattr__(self, "vertices", self.vertices.to(dtype=torch.float32).contiguous())
         object.__setattr__(self, "faces", self.faces.to(dtype=torch.int32).contiguous())
+        if (self.uv is None) != (self.face_uv is None):
+            raise ValueError("uv and face_uv must be provided together")
+        if self.uv is not None:
+            if self.uv.ndim != 2 or self.uv.shape[1] != 2:
+                raise ValueError("uv must have shape (V, 2)")
+            if self.face_uv.ndim != 2 or self.face_uv.shape[1] != 3:
+                raise ValueError("face_uv must have shape (F, 3)")
+            if self.face_uv.shape[0] != self.faces.shape[0]:
+                raise ValueError("face_uv must have one row per face")
+            uv = self.uv.to(dtype=torch.float32).contiguous()
+            face_uv = self.face_uv.to(dtype=torch.int32).contiguous()
+            if face_uv.numel() and (
+                int(face_uv.min()) < 0 or int(face_uv.max()) >= uv.shape[0]
+            ):
+                raise ValueError("face_uv indices must be in [0, uv rows)")
+            object.__setattr__(self, "uv", uv)
+            object.__setattr__(self, "face_uv", face_uv)
 
     def with_vertices(self, vertices: torch.Tensor) -> Structure:
         return replace(self, vertices=vertices)
