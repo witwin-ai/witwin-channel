@@ -36,6 +36,11 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     assert path["supports_reflection_diffraction_coupling"] is True
     assert path["supports_arrays"] is True
     assert path["supports_reflection_diffraction_coupling_geometry"] is True
+    assert (
+        path["reflection_diffraction_coupling_topology"]
+        == "one_reflection_one_diffraction_both_orders"
+    )
+    assert path["max_reflections_in_coupled_path"] == 1
     assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
     assert manifest["supports_ad"] is False
     materials = manifest["materials"]

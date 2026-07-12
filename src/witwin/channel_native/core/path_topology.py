@@ -433,8 +433,20 @@ def _canonical_selection_order(
         same = (tx_id[1:] == tx_id[:-1]) & (rx_id[1:] == rx_id[:-1])
         if int(key.shape[1]) > 0:
             same &= (key[1:] == key[:-1]).all(dim=1)
-        unique = torch.ones((count,), device=order.device, dtype=torch.bool)
-        unique[1:] = ~same
+        group_start = torch.ones((count,), device=order.device, dtype=torch.bool)
+        group_start[1:] = ~same
+        group_id = group_start.cumsum(dim=0, dtype=torch.int64) - 1
+        length = paths["path_length_m"][order]
+        minimum = torch.full(
+            (count,), float("inf"), device=order.device, dtype=length.dtype
+        )
+        minimum.scatter_reduce_(0, group_id, length, reduce="amin", include_self=True)
+        shortest = length == minimum[group_id]
+        shortest_group = group_id[shortest]
+        unique_shortest = torch.ones_like(shortest_group, dtype=torch.bool)
+        unique_shortest[1:] = shortest_group[1:] != shortest_group[:-1]
+        unique = torch.zeros((count,), device=order.device, dtype=torch.bool)
+        unique[torch.nonzero(shortest, as_tuple=False).reshape(-1)[unique_shortest]] = True
         order = order[unique]
 
     if max_paths is not None and max_paths_scope == "global":

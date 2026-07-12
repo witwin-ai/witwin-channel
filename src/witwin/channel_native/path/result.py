@@ -472,6 +472,13 @@ def from_topology_result(
     if width:
         diffraction = (paths.component_id == 2) & (paths.depth > 0)
         object_sequence[diffraction, 0] = paths.edge_id[diffraction]
+    interaction_normals = paths.interaction_normals
+    diffraction = paths.interaction_type == int(InteractionType.DIFFRACTION)
+    interaction_normals = torch.where(
+        diffraction.unsqueeze(-1) & ~torch.isfinite(interaction_normals),
+        torch.zeros_like(interaction_normals),
+        interaction_normals,
+    )
     ragged = RaggedPathSoA.from_flat(
         num_rx=num_rx,
         num_rx_ant=1,
@@ -489,7 +496,7 @@ def from_topology_result(
         primitive_id=object_sequence,
         material_id=paths.material_sequence,
         position=paths.interaction_positions,
-        normal=paths.interaction_normals,
+        normal=interaction_normals,
     )
     result_metadata = dict(metadata or {})
     result_metadata.update(

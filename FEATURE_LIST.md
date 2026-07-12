@@ -52,6 +52,11 @@ priority `scattering > diffraction > transmission > reflection > los`.
 - `Structure.uv` / `face_uv` texture coordinates threaded to the ray tracer
   (`planar_uv` helper for planar surfaces); required for phase-screen
   realizations.
+- Path topology supports specular reflection depths 1 through 5 and bounded
+  reflection-diffraction coupling with exactly one reflection and one
+  diffraction, in both R-D and D-R orders.
+- Canonical path selection orders by endpoint, depth, component, and event
+  identity; it deduplicates before applying global or per-pair path caps.
 
 ## Results
 

@@ -87,11 +87,11 @@
 
 ### Phase B：拓扑与场计算闭合（P0）
 
-- [ ] Path 支持 `1..max_depth` 高阶镜面反射；
-- [ ] 支持最多一次衍射及其前后的受限反射组合；
-- [ ] 定义组合路径的 canonical ordering、去重与截断；
-- [ ] 建立 LOS、单反射、双反射、单透射、单衍射解析场景；
-- [ ] 对四类 Solver 比较复场、wrapped phase、极化分量和 delay。
+- [x] Path 支持 `1..max_depth` 高阶镜面反射；
+- [x] 支持最多一次衍射及其前后的受限反射组合（当前边界为恰好 `1R1D`，覆盖 R-D 与 D-R）；
+- [x] 定义组合路径的 canonical ordering、去重与截断；
+- [x] 建立 LOS、单反射、双反射、单透射、单衍射解析场景；
+- [x] Path/Deterministic 比较复场、wrapped phase、极化分量和 delay；MC Basic/BDPT 按公开 capability 验收共同可观测的 power、finite 与 convergence，不伪造复场能力。
 
 验收：增加深度会增加真实可构造路径，而不是只改变 padding 或日志字段。
 

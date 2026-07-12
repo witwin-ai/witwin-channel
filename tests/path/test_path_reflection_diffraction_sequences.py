@@ -66,12 +66,25 @@ def test_solve_exports_bounded_reflection_diffraction_sequences():
     assert bool((active == torch.tensor([1, 2], device=active.device)).all(dim=1).any())
     assert bool((active == torch.tensor([2, 1], device=active.device)).all(dim=1).any())
     coupled = (active[:, 0] != 0) & (active[:, 1] != 0) & (active[:, 0] != active[:, 1])
+    coupled_types = active[coupled]
+    coupled_objects = result.primitive_id[result.valid][coupled]
+    coupled_materials = result.material_id[result.valid][coupled]
+    coupled_positions = result.position[result.valid][coupled]
+    coupled_normals = result.normal[result.valid][coupled]
     canonical = torch.cat(
-        (active[coupled], result.primitive_id[result.valid][coupled]), dim=1
+        (coupled_types, coupled_objects), dim=1
     )
     assert torch.unique(canonical, dim=0).shape[0] == canonical.shape[0]
     assert torch.isfinite(result.a[result.valid][coupled]).all()
     assert torch.count_nonzero(result.a[result.valid][coupled].abs() > 0.0) > 0
+    assert torch.isfinite(coupled_positions).all()
+    assert torch.isfinite(coupled_normals).all()
+    assert bool((coupled_objects >= 0).all())
+    reflection = coupled_types == 1
+    diffraction = coupled_types == 2
+    assert bool((coupled_materials[reflection] >= 0).all())
+    assert bool((coupled_materials[diffraction] == -1).all())
+    assert bool((torch.linalg.vector_norm(coupled_normals[reflection], dim=-1) > 0.0).all())
     assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
 
 
