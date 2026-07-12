@@ -47,8 +47,8 @@ def test_bdpt_component_maps_include_transmission_and_zero_scattering():
     assert result.component_maps is not None
     assert set(result.component_maps) == components
     # (b) the wall sits between the transmitter and the grid, so the
-    # transmission component carries real power now; scattering remains a
-    # structurally valid zero until its wave lands.
+    # transmission component carries real power; the wall material is
+    # SMOOTH, so the scattering component is a structurally valid zero.
     assert result.component_power["transmission"].item() > 0.0
     assert torch.count_nonzero(result.component_maps["transmission"]) > 0
     assert torch.count_nonzero(result.component_maps["scattering"]) == 0
@@ -61,9 +61,10 @@ def test_bdpt_component_maps_include_transmission_and_zero_scattering():
         + result.component_maps["scattering"]
     )
     torch.testing.assert_close(result.path_gain, total, rtol=1.0e-5, atol=1.0e-8)
-    # (c) truthful metadata status: transmission is live, scattering is not.
+    # (c) truthful metadata status for both requested optional components.
     assert result.metadata["components"]["transmission"] == "enabled"
-    assert result.metadata["components"]["scattering"] == "enabled_no_paths"
+    assert result.metadata["components"]["scattering"] == "enabled"
+    assert result.metadata["scattering"]["component_mask_bit"] == 16
     assert result.metadata["transmission"]["component_mask_bit"] == 8
     assert result.metadata["transmission"]["straight_chain_paths"] > 0
 

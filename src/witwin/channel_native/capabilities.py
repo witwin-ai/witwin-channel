@@ -10,9 +10,11 @@ _CAPABILITIES: dict[str, Any] = {
     "components": ["los", "reflection", "diffraction", "transmission", "scattering"],
     # transmission physics is live in all four solvers: endpoint-connection
     # (path, deterministic) and shooting-context Monte Carlo (straight
-    # penetration chains; BDPT adds event-selected mixed chains). scattering
-    # remains accepted plumbing (zero paths / zero power) until its solver
-    # integrations land.
+    # penetration chains; BDPT adds event-selected mixed chains). Kirchhoff
+    # ensemble scattering is live in the Monte Carlo solvers (MC basic:
+    # area-sampled diffuse radiomap; BDPT: three-way event sampler with NEE
+    # connections); the deterministic and path solver integrations land in
+    # their own wave.
     "component_solver_integration": {
         "transmission": {
             "path": True,
@@ -23,8 +25,8 @@ _CAPABILITIES: dict[str, Any] = {
         "scattering": {
             "path": False,
             "deterministic": False,
-            "montecarlo_basic": False,
-            "montecarlo_bdpt": False,
+            "montecarlo_basic": True,
+            "montecarlo_bdpt": True,
         },
     },
     "max_reflection_depth": 5,

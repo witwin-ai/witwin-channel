@@ -55,6 +55,16 @@ from witwin.channel_native.core.kernels.ops import (
 from witwin.channel_native.montecarlo.basic.raydn_components import (
     _cached_diffraction_edge_geometry,
 )
+from witwin.channel_native.montecarlo.scattering_events import (
+    local_frames,
+    rough_material_runtimes,
+    scatter_direction_uniforms,
+    scattered_subpath_state,
+    scattering_nee_connection_samples,
+    te_tm_incident_power,
+    three_way_rough_probabilities,
+    world_to_local,
+)
 from witwin.channel_native.montecarlo.transmission import (
     event_uniforms,
     layer_csr_view,
@@ -131,6 +141,10 @@ def _estimate_workspace_bytes(
         # Sampled mixed reflection+transmission chains retain a connection
         # block per light depth.
         dense_rows += launch_entries * rx_rows * max(1, int(config.max_depth))
+    if "scattering" in config.components:
+        # NEE rows from scatter-selected vertices: bounded by one block of
+        # (scatter events x receivers) per light depth.
+        dense_rows += launch_entries * rx_rows * max(1, int(config.max_depth))
     bytes_estimate += dense_rows * row_bytes
     return int(bytes_estimate)
 
@@ -146,16 +160,18 @@ def _check_workspace_guardrail(config: Config, workspace_bytes: int) -> None:
 
 
 def _path_counts(config: Config, *, tx_count: int) -> dict[str, int]:
-    # scattering is accepted plumbing in v1: it carries zero sampled paths
-    # until the physics lands, so its count stays 0 even when requested.
-    counts = {
+    return {
         component: int(config.samples) * int(config.sample_streams) * int(tx_count)
         if component in config.components
         else 0
-        for component in ("los", "reflection", "diffraction", "transmission")
+        for component in (
+            "los",
+            "reflection",
+            "diffraction",
+            "transmission",
+            "scattering",
+        )
     }
-    counts["scattering"] = 0
-    return counts
 
 
 def _effective_native_samples(config: Config) -> int:
@@ -791,6 +807,23 @@ def _transmission_straight_connection_samples(
     return samples, chain_count
 
 
+def _merge_scattered_state(
+    merged: dict[str, torch.Tensor],
+    scattered: dict[str, torch.Tensor],
+    choose_scatter: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Row-wise overlay of the scattered branch onto the reflect/transmit
+    merge (same evaluate-everywhere-select-per-row pattern as
+    :func:`_merge_event_states`)."""
+
+    wide = choose_scatter[:, None]
+    out: dict[str, torch.Tensor] = {}
+    for key, merged_value in merged.items():
+        condition = wide if merged_value.dim() == 2 else choose_scatter
+        out[key] = torch.where(condition, scattered[key], merged_value)
+    return out
+
+
 def _transmission_sampled_connection_samples(
     raydn: Any,
     tx_positions: torch.Tensor,
@@ -807,27 +840,49 @@ def _transmission_sampled_connection_samples(
     seed: int,
     mis: str,
     beta: float,
+    scattering_runtimes: dict[int, Any] | None = None,
+    emit_mixed_transmission: bool = True,
+    scene_diagonal: float = 0.0,
 ) -> tuple[list[dict[str, torch.Tensor]], dict[str, int]]:
-    """Shooting-context light subpaths with reflect/transmit event selection.
+    """Shooting-context light subpaths with three-way event selection.
 
-    Implements plan section 7.1: at every surface hit the smooth-stack power
-    budgets (R_eff, T_eff) drive a seeded, reproducible choice between the
-    delta specular reflection and transmission events; the selected branch's
-    field is divided by sqrt(p_event) so the power estimator stays unbiased
-    (see the inline algebra note). Only MIXED chains (component_mask carrying
-    both the reflection and transmission bits) contribute connections here:
-    pure reflection is counted exactly by the discrete enumeration and pure
-    transmission by the straight endpoint chains, so this sampler never
-    double counts either.
+    Implements plan section 7.1. At every surface hit a seeded, reproducible
+    uniform selects among the delta specular reflection, the continuous
+    Kirchhoff scattering (rough faces only, when ``scattering_runtimes`` is
+    provided) and the delta transmission events; the selected branch's field
+    is divided by sqrt(p_event) so the power estimator stays unbiased (see
+    the inline algebra note).
+
+    Event probabilities: smooth faces keep the wave-2 two-way split
+    p_t = T/(R+T) from the native stack budgets BIT-IDENTICALLY (their
+    scatter probability is exactly zero, so the same uniform partitions the
+    same way); rough faces use the (R_coh, R_diff, T_bar) budgets from
+    scattering.energy with the same floor pattern. The rough reflect branch
+    additionally multiplies the field by the coherent attenuation C_r so its
+    amplitude represents sqrt(R_coh), matching the budget that selected it.
+
+    Contribution routing (never double counts):
+    - MIXED reflection+transmission chains connect through the native
+      endpoint kernel (component 5), as in wave 2; emitted only when
+      ``emit_mixed_transmission`` (the transmission component is requested).
+    - Scatter-selected vertices emit torch-side NEE rows (component 6) and
+      then TERMINATE (v1 single-bounce rule; reflection/transmission never
+      follow a scattering event).
+    - Pure reflection stays with the discrete enumeration and pure
+      transmission with the straight endpoint chains.
     """
 
     device = tx_positions.device
     layer_csr = layer_csr_view(material_bundle)
     face_material_id = material_bundle["material_id"]
+    material_axis_rad = material_bundle["rough_axis_rad"]
+    runtimes = scattering_runtimes or {}
     sensor_count = int(sensor["origin"].shape[0])
     sample_blocks: list[dict[str, torch.Tensor]] = []
     transmit_events = 0
     reflect_events = 0
+    scatter_events = 0
+    nee_rows = 0
     for tx_index in range(int(tx_positions.shape[0])):
         launch_inputs = bdpt_reflection_launch_inputs(
             tx_positions, tx_index=tx_index, sample_count=int(samples)
@@ -885,7 +940,36 @@ def _transmission_sampled_connection_samples(
             uniforms = event_uniforms(
                 int(samples), seed=seed, tx_index=tx_index, depth=bounce, device=device
             )
-            choose_transmit = hit_ok & (uniforms < p_transmit)
+            if runtimes:
+                rough_probs = three_way_rough_probabilities(
+                    cos_theta,
+                    material_id,
+                    runtimes,
+                    frequency_hz=float(frequency_hz),
+                )
+                rough = rough_probs["rough"] & hit_ok
+                p_scatter = torch.where(
+                    rough, rough_probs["p_scatter"], torch.zeros_like(p_transmit)
+                )
+                # Smooth rows keep the exact wave-2 two-way probability;
+                # rough rows switch to the three-way budget split.
+                p_transmit = torch.where(rough, rough_probs["p_transmit"], p_transmit)
+                coherent_amplitude = torch.where(
+                    rough,
+                    rough_probs["r_coh_amplitude"],
+                    torch.ones_like(p_transmit),
+                )
+            else:
+                rough = torch.zeros_like(hit_ok)
+                p_scatter = torch.zeros_like(p_transmit)
+                coherent_amplitude = torch.ones_like(p_transmit)
+            # One uniform partitions the three events: [0, p_s) scatter,
+            # [p_s, p_s + p_t) transmit, else reflect. Smooth faces have
+            # p_s = 0 exactly, so their transmit test u < p_t is unchanged.
+            choose_scatter = hit_ok & (uniforms < p_scatter)
+            choose_transmit = hit_ok & ~choose_scatter & (
+                uniforms < p_scatter + p_transmit
+            )
             reflected = bdpt_reflected_light_subpath_state(
                 state,
                 hit,
@@ -918,26 +1002,124 @@ def _transmission_sampled_connection_samples(
             #   E[|field_e / sqrt(p_e)|^2] = sum_e p_e * |field_e|^2 / p_e
             #                              = sum_e |field_e|^2.
             # source_power is deliberately untouched; scaling it too would
-            # double count the correction.
-            p_event = torch.where(choose_transmit, p_transmit, 1.0 - p_transmit)
+            # double count the correction. The reflect probability is
+            # 1 - p_s - p_t (p_s = 0 on smooth faces, reproducing wave 2).
+            p_event = torch.where(
+                choose_transmit, p_transmit, 1.0 - p_scatter - p_transmit
+            )
             inv_amplitude = torch.where(
                 merged["valid"],
                 torch.rsqrt(p_event.clamp_min(1.0e-4)),
                 torch.ones_like(p_event),
             )
+            # Rough reflect branch: the native kernel applied the SMOOTH
+            # stack Jones (amplitude sqrt(R_bar)); multiplying by C_r turns
+            # it into the coherent amplitude sqrt(R_coh) that matches the
+            # budget driving its selection probability (contract 6.2).
+            reflect_scale = torch.where(
+                rough & ~choose_transmit & ~choose_scatter,
+                coherent_amplitude,
+                torch.ones_like(coherent_amplitude),
+            )
+            amplitude_scale = inv_amplitude * reflect_scale
             for key in ("throughput_real", "throughput_imag"):
-                merged[key] = merged[key] * inv_amplitude
+                merged[key] = merged[key] * amplitude_scale
             for key in ("field_real", "field_imag"):
-                merged[key] = merged[key] * inv_amplitude[:, None]
+                merged[key] = merged[key] * amplitude_scale[:, None]
+
+            scattered_valid = torch.zeros_like(choose_scatter)
+            if runtimes and bool(choose_scatter.any()):
+                # Local roughness frames from the shading normal flipped
+                # toward the incident side (roughness applies to whichever
+                # side is illuminated in v1; the store carries front-surface
+                # statistics only).
+                direction = state["direction"]
+                hit_normal = hit["n"]
+                normal_flipped = torch.where(
+                    ((direction * hit_normal).sum(dim=-1) > 0.0)[:, None],
+                    -hit_normal,
+                    hit_normal,
+                )
+                axis_rad = material_axis_rad.index_select(
+                    0, material_id.clamp_min(0).to(torch.int64)
+                )
+                frame_t1, frame_t2 = local_frames(normal_flipped, axis_rad)
+                wi_world = -direction
+                wi_local = world_to_local(
+                    wi_world, frame_t1, frame_t2, normal_flipped
+                )
+                p_te, p_tm = te_tm_incident_power(
+                    state["field_real"],
+                    state["field_imag"],
+                    direction,
+                    normal_flipped,
+                )
+                direction_uniforms = scatter_direction_uniforms(
+                    int(samples),
+                    seed=seed,
+                    tx_index=tx_index,
+                    depth=bounce,
+                    device=device,
+                )
+                scattered = scattered_subpath_state(
+                    state,
+                    hit,
+                    choose_scatter=choose_scatter,
+                    normal=normal_flipped,
+                    frame_t1=frame_t1,
+                    frame_t2=frame_t2,
+                    wi_local=wi_local,
+                    p_te=p_te,
+                    p_tm=p_tm,
+                    p_scatter=p_scatter,
+                    material_id=material_id,
+                    runtimes=runtimes,
+                    uniforms=direction_uniforms,
+                    scene_diagonal=scene_diagonal,
+                )
+                scattered_valid = scattered["valid"]
+                merged = _merge_scattered_state(merged, scattered, choose_scatter)
+                rows = torch.nonzero(scattered_valid, as_tuple=False).flatten()
+                if int(rows.numel()):
+                    nee_block = scattering_nee_connection_samples(
+                        raydn,
+                        sensor,
+                        runtimes,
+                        position=hit["p"].index_select(0, rows),
+                        normal=normal_flipped.index_select(0, rows),
+                        frame_t1=frame_t1.index_select(0, rows),
+                        frame_t2=frame_t2.index_select(0, rows),
+                        wi_local=wi_local.index_select(0, rows),
+                        p_te=p_te.index_select(0, rows),
+                        p_tm=p_tm.index_select(0, rows),
+                        p_scatter=p_scatter.index_select(0, rows),
+                        material_id=material_id.index_select(0, rows),
+                        source_power=state["source_power"].index_select(0, rows),
+                        tx_id=state["tx_id"].index_select(0, rows),
+                        light_depth=scattered["depth"].index_select(0, rows),
+                        path_length_at_vertex=scattered["path_length"].index_select(
+                            0, rows
+                        ),
+                        frequency_hz=float(frequency_hz),
+                        samples=int(samples),
+                        scene_diagonal=scene_diagonal,
+                    )
+                    if nee_block is not None:
+                        sample_blocks.append(nee_block)
+                        nee_rows += int(nee_block["valid"].sum())
             transmit_events += int((choose_transmit & merged["valid"]).sum())
-            reflect_events += int((~choose_transmit & merged["valid"]).sum())
+            scatter_events += int(scattered_valid.sum())
+            reflect_events += int(
+                (~choose_transmit & ~choose_scatter & merged["valid"]).sum()
+            )
             mask = merged["component_mask"]
             mixed = (
                 merged["valid"]
+                & ~choose_scatter
                 & ((mask & _MASK_REFLECTION) != 0)
                 & ((mask & _MASK_TRANSMISSION) != 0)
             )
-            if bool(mixed.any()):
+            if emit_mixed_transmission and bool(mixed.any()):
                 samples_out = bdpt_endpoint_connection_samples(
                     merged,
                     sensor,
@@ -963,11 +1145,19 @@ def _transmission_sampled_connection_samples(
                 sample_blocks.append(
                     bdpt_filter_connection_samples(samples_out, keep)
                 )
+            # v1 single-bounce rule: scattered subpaths connected above and
+            # terminate here; reflection/transmission never follow them.
+            merged["valid"] = merged["valid"] & ~choose_scatter
             if not bool(merged["valid"].any()):
                 break
             state = merged
             ray_inputs = bdpt_subpath_intersection_inputs(merged)
-    return sample_blocks, {"transmit": transmit_events, "reflect": reflect_events}
+    return sample_blocks, {
+        "transmit": transmit_events,
+        "reflect": reflect_events,
+        "scatter": scatter_events,
+        "scattering_nee_rows": nee_rows,
+    }
 
 
 def solve(scene: Scene, config: Config) -> Result:
@@ -1092,13 +1282,15 @@ def solve(scene: Scene, config: Config) -> Result:
 
     estimate_samples: dict[str, torch.Tensor] | None = None
     transmission_chain_count = 0
-    transmission_event_counts = {"transmit": 0, "reflect": 0}
+    event_counts = {"transmit": 0, "reflect": 0, "scatter": 0, "scattering_nee_rows": 0}
+    scattering_runtimes: dict[int, Any] = {}
     if endpoint_only:
         component_matrices = {
             "los": endpoint_accumulation["los"],
             "reflection": zero_component_matrix(),
             "diffraction": zero_component_matrix(),
             "transmission": zero_component_matrix(),
+            "scattering": zero_component_matrix(),
         }
         estimate_samples = endpoint_connection_samples
     else:
@@ -1108,6 +1300,7 @@ def solve(scene: Scene, config: Config) -> Result:
             "reflection": zero_component_matrix(),
             "diffraction": zero_component_matrix(),
             "transmission": zero_component_matrix(),
+            "scattering": zero_component_matrix(),
         }
         material_tensors = (
             _face_material_tensors(scene, device=tx_reference.device)
@@ -1192,11 +1385,23 @@ def solve(scene: Scene, config: Config) -> Result:
             and transmission_available
             and native_max_depth >= 1
         )
-        if transmission_requested:
+        scattering_requested = (
+            "scattering" in config.components
+            and scene.structures
+            and transmission_available
+            and native_max_depth >= 1
+        )
+        if scattering_requested:
+            # Kirchhoff tables per rough material (scatter_model_id == 1);
+            # raises kirchhoff_domain_exceeded for out-of-domain roughness.
+            scattering_runtimes = rough_material_runtimes(scene.compile())
+        sampler_requested = transmission_requested or bool(scattering_runtimes)
+        if sampler_requested:
             material_bundle = face_material_field_bundle(
                 scene, device=tx_reference.device
             )
             scene_diagonal = scene_diagonal_m(scene)
+        if transmission_requested:
             transmission_light_state = _reduced_light_endpoint_state(
                 tx_reference,
                 tx_power,
@@ -1222,23 +1427,25 @@ def solve(scene: Scene, config: Config) -> Result:
             if straight_samples is not None:
                 sample_blocks.append(straight_samples)
             launch_count += 2
-            mixed_blocks, transmission_event_counts = (
-                _transmission_sampled_connection_samples(
-                    raydn,
-                    tx_reference,
-                    tx_power,
-                    tx_polarization,
-                    rx_positions,
-                    rx_polarization,
-                    endpoint_subpaths["sensor"],
-                    material_bundle,
-                    frequency_hz=float(scene.frequency),
-                    samples=native_samples,
-                    max_depth=native_max_depth,
-                    seed=int(config.seed),
-                    mis=config.mis,
-                    beta=config.power_heuristic_beta,
-                )
+        if sampler_requested:
+            mixed_blocks, event_counts = _transmission_sampled_connection_samples(
+                raydn,
+                tx_reference,
+                tx_power,
+                tx_polarization,
+                rx_positions,
+                rx_polarization,
+                endpoint_subpaths["sensor"],
+                material_bundle,
+                frequency_hz=float(scene.frequency),
+                samples=native_samples,
+                max_depth=native_max_depth,
+                seed=int(config.seed),
+                mis=config.mis,
+                beta=config.power_heuristic_beta,
+                scattering_runtimes=scattering_runtimes,
+                emit_mixed_transmission=transmission_requested,
+                scene_diagonal=scene_diagonal,
             )
             sample_blocks.extend(mixed_blocks)
             launch_count += 3
@@ -1274,6 +1481,7 @@ def solve(scene: Scene, config: Config) -> Result:
             component_maps["reflection"],
             component_maps["diffraction"],
             component_maps["transmission"],
+            component_maps["scattering"],
         )
     else:
         point_component_matrices = component_matrices
@@ -1282,6 +1490,7 @@ def solve(scene: Scene, config: Config) -> Result:
             point_component_matrices["reflection"],
             point_component_matrices["diffraction"],
             point_component_matrices["transmission"],
+            point_component_matrices["scattering"],
         )
     path_gain = finalized["path_gain"]
     component_power = {
@@ -1289,18 +1498,13 @@ def solve(scene: Scene, config: Config) -> Result:
         "reflection": finalized["reflection_power"],
         "diffraction": finalized["diffraction_power"],
     }
-    if "transmission" in config.components:
-        component_power["transmission"] = finalized["transmission_power"]
-    elif component_maps is not None:
-        # The transmission map is always finalized (zeros when the component
-        # is off) but only exposed when requested.
-        component_maps.pop("transmission")
-    # scattering is accepted plumbing in v1: emit structurally valid zero
-    # maps / power when requested until the physics lands.
-    if "scattering" in config.components:
-        component_power["scattering"] = torch.zeros_like(component_power["los"])
-        if component_maps is not None:
-            component_maps["scattering"] = torch.zeros_like(component_maps["los"])
+    # transmission and scattering maps are always finalized (zeros when the
+    # component is off) but only exposed when requested.
+    for optional in ("transmission", "scattering"):
+        if optional in config.components:
+            component_power[optional] = finalized[f"{optional}_power"]
+        elif component_maps is not None:
+            component_maps.pop(optional)
 
     variance = None
     if config.diagnostics:
@@ -1372,8 +1576,22 @@ def solve(scene: Scene, config: Config) -> Result:
         # component_mask bit 8 marks transmitted subpaths (contract section 1).
         metadata["transmission"] = {
             "straight_chain_paths": int(transmission_chain_count),
-            "event_counts": dict(transmission_event_counts),
+            "event_counts": {
+                "transmit": int(event_counts["transmit"]),
+                "reflect": int(event_counts["reflect"]),
+            },
             "component_mask_bit": 8,
+        }
+    if "scattering" in config.components:
+        # component_mask bit 16 marks scattered subpaths (contract section 1).
+        metadata["scattering"] = {
+            "event_counts": {"scatter": int(event_counts["scatter"])},
+            "nee_connection_rows": int(event_counts["scattering_nee_rows"]),
+            "rough_material_count": len(scattering_runtimes),
+            "component_mask_bit": 16,
+            # v1 depth rule: one Kirchhoff event per path; scattered
+            # subpaths connect to the receivers and terminate.
+            "max_scattering_order": 1,
         }
     edge_policy = resolve_scene_edge_policy(scene)
     metadata["edge_policy"] = {

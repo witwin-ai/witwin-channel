@@ -15,8 +15,9 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
         "transmission",
         "scattering",
     ]
-    # transmission is integrated in all four solvers as of wave 2; every
-    # scattering flag stays False until its solver integration lands.
+    # transmission is integrated in all four solvers as of wave 2;
+    # Kirchhoff scattering is integrated in the Monte Carlo solvers as of
+    # wave 3 (deterministic/path integrations land in their own wave).
     integration = manifest["component_solver_integration"]
     assert set(integration) == {"transmission", "scattering"}
     assert integration["transmission"] == {
@@ -25,9 +26,8 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
         "montecarlo_basic": True,
         "montecarlo_bdpt": True,
     }
-    assert all(
-        enabled is False for enabled in integration["scattering"].values()
-    )
+    assert integration["scattering"]["montecarlo_basic"] is True
+    assert integration["scattering"]["montecarlo_bdpt"] is True
     path = manifest["solvers"]["path"]
     assert path["max_reflection_depth"] == 5
     assert path["supports_reflection_diffraction_coupling"] is True

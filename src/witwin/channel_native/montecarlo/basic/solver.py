@@ -29,6 +29,7 @@ from .raydn_components import (
     first_receiver_grid,
     los_component_map,
     reflection_component_maps_with_wedges,
+    scattering_component_map,
     transmission_component_map,
 )
 from .result import Result
@@ -105,12 +106,15 @@ def solve(scene: Scene, config: Config) -> Result:
     reflection_available = bool(info["uses_raydn_native"])
     diffraction_available = bool(info["uses_raydn_native"])
     transmission_available = bool(info["uses_raydn_native"])
+    scattering_available = bool(info["uses_raydn_native"])
     if "reflection" in config.components and not reflection_available:
         raise RuntimeError("reflection requires RayDN native capability")
     if "diffraction" in config.components and not diffraction_available:
         raise RuntimeError("diffraction requires RayDN native capability")
     if "transmission" in config.components and not transmission_available:
         raise RuntimeError("transmission requires RayDN native capability")
+    if "scattering" in config.components and not scattering_available:
+        raise RuntimeError("scattering requires RayDN native capability")
 
     device = torch.device("cuda")
     make_cuda_generator(config.seed)
@@ -134,6 +138,7 @@ def solve(scene: Scene, config: Config) -> Result:
         valid_contribution_count = 0
 
     component_maps: dict[str, torch.Tensor] | None = None
+    scattering_stats: dict[str, int] | None = None
     if grid is not None:
         component_maps = {}
         grid_dim0, grid_dim1 = component_grid_shape(grid)
@@ -220,9 +225,20 @@ def solve(scene: Scene, config: Config) -> Result:
             )
         elif "transmission" in config.components:
             component_maps["transmission"] = zero_component_map()
-        # scattering is accepted plumbing in v1: emit zero grid maps when
-        # requested until the physics lands.
-        if "scattering" in config.components:
+        if "scattering" in config.components and scene.structures:
+            component_maps["scattering"], scattering_stats = scattering_component_map(
+                scene,
+                raydn,
+                grid,
+                samples=config.samples,
+                seed=config.seed,
+                device=device,
+            )
+            path_count += scattering_stats["sample_count"]
+            valid_contribution_count += int(
+                torch.count_nonzero(component_maps["scattering"])
+            )
+        elif "scattering" in config.components:
             component_maps["scattering"] = zero_component_map()
 
     path_gain = los
@@ -232,6 +248,7 @@ def solve(scene: Scene, config: Config) -> Result:
             component_maps["reflection"],
             component_maps["diffraction"],
             component_maps.get("transmission", zero_component_map()),
+            component_maps.get("scattering", zero_component_map()),
         )
         path_gain = finalized["path_gain"]
         component_power = {
@@ -241,14 +258,16 @@ def solve(scene: Scene, config: Config) -> Result:
         }
         if "transmission" in config.components:
             component_power["transmission"] = finalized["transmission_power"]
+        if "scattering" in config.components:
+            component_power["scattering"] = finalized["scattering_power"]
     else:
         component_power = mc_point_component_power(los, include_los=("los" in config.components))
-        # Point receivers carry no transmission map in MC basic; report zero.
+        # Point receivers carry no transmission or scattering map in MC
+        # basic; report zero (grid receivers carry the real physics).
         if "transmission" in config.components:
             component_power["transmission"] = torch.zeros_like(component_power["los"])
-    # Zero point-power for the accepted-but-empty v1 scattering when requested.
-    if "scattering" in config.components:
-        component_power["scattering"] = torch.zeros_like(component_power["los"])
+        if "scattering" in config.components:
+            component_power["scattering"] = torch.zeros_like(component_power["los"])
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,
@@ -256,6 +275,12 @@ def solve(scene: Scene, config: Config) -> Result:
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
     )
+    if "scattering" in config.components:
+        metadata["scattering"] = {
+            "component_mask_bit": 16,
+            "max_scattering_order": 1,
+            **(scattering_stats or {}),
+        }
     edge_policy = resolve_scene_edge_policy(scene)
     metadata["edge_policy"] = {
         "edge_selection_mode": edge_policy.edge_selection_mode,

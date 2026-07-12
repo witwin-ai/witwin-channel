@@ -15,8 +15,8 @@ _KERNEL_ACCUMULATION = {
 }
 
 # BDPT per-path component_mask bit scheme (see subpaths.component_mask).
-# Transmitted subpaths set bit 8 (delta specular transmission events); the
-# scattering bit is accepted plumbing until its wave lands.
+# Transmitted subpaths set bit 8 (delta specular transmission events);
+# scattered subpaths set bit 16 (continuous Kirchhoff scattering events).
 COMPONENT_MASK_LOS = 1
 COMPONENT_MASK_REFLECTION = 2
 COMPONENT_MASK_DIFFRACTION = 4
@@ -64,13 +64,13 @@ def component_status(
             raise RuntimeError("BDPT diffraction requires RayDN native capability")
         status["diffraction"] = "enabled"
     # transmission carries real physics (straight endpoint chains plus the
-    # event-selected shooting sampler); scattering is accepted plumbing until
-    # its wave lands.
+    # event-selected shooting sampler); scattering runs the three-way event
+    # sampler with Kirchhoff NEE connections on rough faces.
     status["transmission"] = (
         "enabled" if "transmission" in config.components else "not_requested"
     )
     status["scattering"] = (
-        "enabled_no_paths" if "scattering" in config.components else "not_requested"
+        "enabled" if "scattering" in config.components else "not_requested"
     )
     return status
 
