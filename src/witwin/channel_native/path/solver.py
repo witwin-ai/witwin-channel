@@ -29,6 +29,9 @@ _COMPONENT_ID = {
     "diffraction": 2,
     "reflection_diffraction": 3,
     "diffraction_reflection": 4,
+    # Accepted plumbing in v1: zero exported paths until the physics lands.
+    "transmission": 5,
+    "scattering": 6,
 }
 
 
@@ -110,6 +113,12 @@ def _component_status(
         if config.max_depth < 1:
             raise RuntimeError("diffraction paths require max_depth >= 1")
         status["diffraction"] = "enabled"
+    # transmission and scattering are accepted plumbing in v1: reported as
+    # requested-but-empty until the physics lands in later waves.
+    for name in ("transmission", "scattering"):
+        status[name] = (
+            "enabled_no_paths" if name in config.components else "not_requested"
+        )
     return status
 
 
@@ -222,6 +231,12 @@ def _metadata(
                 "los": 0 if "los" in config.components else -1,
                 "reflection": reflection_depth,
                 "diffraction": diffraction_depth,
+                # transmission chains are capped like reflection; scattering is
+                # single-bounce in v1. Zero paths until the physics lands.
+                "transmission": config.max_depth
+                if "transmission" in config.components
+                else -1,
+                "scattering": 1 if "scattering" in config.components else -1,
             },
         )
     )

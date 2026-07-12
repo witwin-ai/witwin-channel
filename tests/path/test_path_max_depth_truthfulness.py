@@ -29,6 +29,8 @@ def test_path_los_only_reports_requested_and_effective_depth():
         "los": 0,
         "reflection": -1,
         "diffraction": -1,
+        "transmission": -1,
+        "scattering": -1,
     }
     assert metadata["requested_config"]["components"] == ["los"]
     assert metadata["effective_config"]["max_depth"] == 0

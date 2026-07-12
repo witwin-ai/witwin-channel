@@ -31,3 +31,37 @@ def test_bdpt_component_maps_include_all_components_and_total():
     torch.testing.assert_close(result.path_gain, total, rtol=1.0e-5, atol=1.0e-8)
     if build_info()["uses_raydn_native"]:
         assert torch.isfinite(result.component_maps["reflection"]).all()
+
+
+def test_bdpt_component_maps_include_zero_transmission_and_scattering():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for BDPT component maps")
+
+    scene = single_wall_reflection_scene().add(_grid())
+    components = {"los", "reflection", "diffraction", "transmission", "scattering"}
+    result = solve(scene, Config(samples=512, seed=5, components=components))
+
+    # (a) validates and every requested component is present in the maps.
+    assert result.component_maps is not None
+    assert set(result.component_maps) == components
+    # (b) the new components carry structurally valid zeros, so the total still
+    # equals the sum of all component maps.
+    for name in ("transmission", "scattering"):
+        assert torch.count_nonzero(result.component_maps[name]) == 0
+        assert torch.count_nonzero(result.component_power[name]) == 0
+    total = (
+        result.component_maps["los"]
+        + result.component_maps["reflection"]
+        + result.component_maps["diffraction"]
+        + result.component_maps["transmission"]
+        + result.component_maps["scattering"]
+    )
+    torch.testing.assert_close(result.path_gain, total, rtol=1.0e-5, atol=1.0e-8)
+    # (c) truthful requested-but-empty metadata status.
+    assert result.metadata["components"]["transmission"] == "enabled_no_paths"
+    assert result.metadata["components"]["scattering"] == "enabled_no_paths"
+
+
+def test_bdpt_config_rejects_unknown_component():
+    with pytest.raises(ValueError, match="components"):
+        Config(components={"los", "teleportation"})

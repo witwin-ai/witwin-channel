@@ -14,12 +14,25 @@ from witwin.channel_native.core.path_topology import (
 )
 
 
+# Canonical component_id -> name identity. 3=reflection->diffraction and
+# 4=diffraction->reflection are path-solver coupled classes that the
+# deterministic accumulator folds into their primary component, so they are not
+# listed here. 5=transmission and 6=scattering are accepted plumbing in v1: they
+# carry zero paths until the physics lands in later waves.
 _COMPONENT_NAME = {
     0: "los",
     1: "reflection",
     2: "diffraction",
+    5: "transmission",
+    6: "scattering",
 }
 _COMPONENT_ID = {name: component_id for component_id, name in _COMPONENT_NAME.items()}
+
+# Component slots materialized by the native accumulator (kComponentCount=3).
+# The v1 zero-contribution components are synthesized in Python instead.
+_NATIVE_COMPONENT_SLOTS = {"los": 0, "reflection": 1, "diffraction": 2}
+# Opt-in components that flow through the result as structurally valid zeros.
+_ZERO_CONTRIBUTION_COMPONENTS = ("transmission", "scattering")
 
 
 def empty_field_like_power(path_gain: torch.Tensor) -> torch.Tensor:
@@ -36,6 +49,7 @@ def accumulate_flat_components(
     num_tx: int,
     num_rx: int,
     coherent: bool,
+    extra_components: tuple[str, ...] = (),
 ) -> tuple[
     torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
 ]:
@@ -62,12 +76,15 @@ def accumulate_flat_components(
     ).reshape(exported["component_field_real"].shape)
     component_power = {
         name: component_power_tensor[cid].contiguous()
-        for name, cid in _COMPONENT_ID.items()
+        for name, cid in _NATIVE_COMPONENT_SLOTS.items()
     }
     component_fields = {
         name: component_field_tensor[cid].contiguous()
-        for name, cid in _COMPONENT_ID.items()
+        for name, cid in _NATIVE_COMPONENT_SLOTS.items()
     }
+    for name in extra_components:
+        component_power[name] = torch.zeros_like(component_power["los"])
+        component_fields[name] = torch.zeros_like(component_fields["los"])
     return power_total, field_total, component_power, component_fields
 
 
@@ -115,6 +132,7 @@ def accumulate_path_result(
     layout: ReceiverLayout,
     coherent: bool,
     return_field: bool,
+    extra_components: tuple[str, ...] = (),
 ) -> tuple[
     torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
 ]:
@@ -127,6 +145,7 @@ def accumulate_path_result(
         num_tx=num_tx,
         num_rx=num_rx,
         coherent=coherent,
+        extra_components=extra_components,
     )
     return apply_layout_to_accumulation(
         path_gain=power,

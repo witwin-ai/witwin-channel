@@ -72,6 +72,31 @@ def test_path_solver_exports_native_diffraction_paths_when_available():
     assert torch.all(result.path_gain[result.component_id == 2] > 0)
 
 
+def test_path_solver_accepts_transmission_and_scattering_as_empty_plumbing():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for path solver")
+
+    scene = empty_space_los_scene()
+    result = solve(
+        scene, Config(components={"los", "transmission", "scattering"})
+    )
+
+    # (a) validates and the LoS paths still export, (b) no transmission (5) or
+    # scattering (6) paths are produced in v1.
+    assert int((result.component_id == 0).sum().item()) == 4
+    assert int((result.component_id == 5).sum().item()) == 0
+    assert int((result.component_id == 6).sum().item()) == 0
+    # (c) truthful requested-but-empty metadata status.
+    assert result.metadata["components"]["transmission"] == "enabled_no_paths"
+    assert result.metadata["components"]["scattering"] == "enabled_no_paths"
+    assert result.metadata["components"]["los"] == "enabled"
+
+
+def test_path_config_rejects_unknown_component():
+    with pytest.raises(ValueError, match="components"):
+        Config(components={"los", "teleportation"})
+
+
 def test_path_solver_calls_kernel_facade(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")

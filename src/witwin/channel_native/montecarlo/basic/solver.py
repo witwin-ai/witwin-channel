@@ -201,6 +201,11 @@ def solve(scene: Scene, config: Config) -> Result:
             valid_contribution_count += int(component_maps["diffraction"].numel())
         else:
             component_maps["diffraction"] = zero_component_map()
+        # transmission and scattering are accepted plumbing in v1: emit zero
+        # grid maps for them when requested until the physics lands.
+        for name in ("transmission", "scattering"):
+            if name in config.components:
+                component_maps[name] = zero_component_map()
 
     path_gain = los
     if component_maps is not None:
@@ -217,6 +222,10 @@ def solve(scene: Scene, config: Config) -> Result:
         }
     else:
         component_power = mc_point_component_power(los, include_los=("los" in config.components))
+    # Zero point-power for the accepted-but-empty v1 components when requested.
+    for name in ("transmission", "scattering"):
+        if name in config.components:
+            component_power[name] = torch.zeros_like(component_power["los"])
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,

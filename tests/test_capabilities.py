@@ -8,7 +8,22 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     manifest = capabilities()
 
     assert manifest["schema_version"] == 1
-    assert manifest["components"] == ["los", "reflection", "diffraction"]
+    assert manifest["components"] == [
+        "los",
+        "reflection",
+        "diffraction",
+        "transmission",
+        "scattering",
+    ]
+    # transmission and scattering are accepted plumbing in v1: no solver has
+    # integrated their physics yet, so every integration flag stays False.
+    integration = manifest["component_solver_integration"]
+    assert set(integration) == {"transmission", "scattering"}
+    assert all(
+        enabled is False
+        for flags in integration.values()
+        for enabled in flags.values()
+    )
     path = manifest["solvers"]["path"]
     assert path["max_reflection_depth"] == 5
     assert path["supports_reflection_diffraction_coupling"] is True

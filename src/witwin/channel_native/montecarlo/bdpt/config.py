@@ -3,7 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-_VALID_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+# Public component set. transmission and scattering are accepted plumbing in v1:
+# they validate and emit zero component maps until the physics lands in later
+# waves. Both are surface events that require at least one bounce
+# (max_depth >= 1); transmission chains count wall penetrations, scattering is
+# single-bounce in v1. component_mask bits: 1=los, 2=reflection, 4=diffraction,
+# 8=transmission, 16=scattering.
+_VALID_COMPONENTS = frozenset(
+    {"los", "reflection", "diffraction", "transmission", "scattering"}
+)
+# Default component set is unchanged: the new components are strictly opt-in.
+_DEFAULT_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
+# Components that require at least one interaction bounce to contribute.
+_BOUNCE_COMPONENTS = frozenset(
+    {"reflection", "diffraction", "transmission", "scattering"}
+)
 _VALID_MIS = frozenset({"balance", "power_heuristic", "none"})
 _VALID_RECEIVER_STRATEGIES = frozenset({"grid_area", "point_sphere"})
 _VALID_ACCUMULATION_STRATEGIES = frozenset({"auto", "atomic", "staged", "compact"})
@@ -20,7 +34,7 @@ class Config:
     max_diffraction_order: int = 1
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _VALID_COMPONENTS
+    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _DEFAULT_COMPONENTS
     mis: str = "power_heuristic"
     power_heuristic_beta: float = 2.0
     receiver_strategy: str = "grid_area"
@@ -50,7 +64,7 @@ class Config:
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(f"components must be a non-empty subset of {sorted(_VALID_COMPONENTS)}")
-        if self.max_depth < 1 and components.intersection({"reflection", "diffraction"}):
+        if self.max_depth < 1 and components & _BOUNCE_COMPONENTS:
             raise RuntimeError("BDPT scattering requires max_depth >= 1")
         if "diffraction" in components and self.max_diffraction_order == 0:
             raise RuntimeError("diffraction requires max_diffraction_order > 0")
