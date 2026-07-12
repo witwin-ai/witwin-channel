@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Protocol
@@ -622,6 +623,91 @@ def _from_path_block(
     )
 
 
+def _rough_reflection_factor(
+    compiled: object,
+    topology: TopologyBatch,
+    rows: torch.Tensor,
+    depth_value: int,
+    source: torch.Tensor,
+    material: dict[str, torch.Tensor],
+    *,
+    frequency_hz: float,
+    scattering_active: bool,
+) -> torch.Tensor | None:
+    """Per-row field scale for rough-surface specular reflection rows.
+
+    Kirchhoff-rough faces (scatter_model_id == 1) attenuate their coherent
+    specular Jones by C_r = exp(-2*(k0*cos_theta_i*sigma_h)^2) per bounce
+    (plan 05 section 6.2, contract section 6). C_r is a real positive scalar,
+    so this first-order Python-side attenuation of the native smooth-stack
+    field is exact for the field magnitude and phase-neutral.
+
+    When the scattering component is active, single-bounce specular rows on a
+    surface carrying a realization_coherent phase screen are zeroed: the
+    coherent patch integral REPLACES the delta specular for that surface
+    (contract 6.7.3, never summed).
+    """
+
+    device = topology.valid.device
+    # Early exits stay on CPU (the MaterialStore tensors live on the host):
+    # smooth scenes must not pay any extra GPU sync in the reflection loop.
+    rough_face_any = bool((compiled.materials.scatter_model_id == 1).any())
+    realization_ids: list[int] = []
+    if scattering_active:
+        screens = getattr(compiled.assignments, "structure_phase_screens", {})
+        realization_ids = [
+            index
+            for index, screen in screens.items()
+            if getattr(screen, "mode", None) == "realization_coherent"
+        ]
+    if not rough_face_any and not realization_ids:
+        return None
+
+    face_material = material["material_id"].to(dtype=torch.int64)
+    rough_face = material["scatter_model_id"] == 1
+    realization_face = None
+    if realization_ids:
+        face_structure = compiled.geometry.face_structure_id.to(
+            device=device, dtype=torch.int64
+        )
+        realization_face = torch.zeros(
+            (int(face_structure.numel()),), device=device, dtype=torch.bool
+        )
+        for index in realization_ids:
+            realization_face |= face_structure == index
+
+    face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
+    factor = torch.ones((int(rows.numel()),), device=device, dtype=torch.float32)
+    if rough_face_any:
+        sigma_face = material["rough_sigma_h_m"][face_material]
+        sigma_b = sigma_face[face_id]
+        rough_b = rough_face[face_material][face_id]
+        positions = topology.interaction_positions[rows, :depth_value]
+        prev = torch.cat(
+            (source[rows].unsqueeze(1), positions[:, : depth_value - 1]), dim=1
+        )
+        seg = positions - prev
+        seg_dir = seg / torch.linalg.vector_norm(seg, dim=-1, keepdim=True).clamp_min(
+            1.0e-9
+        )
+        cos_b = (
+            (seg_dir * topology.interaction_normals[rows, :depth_value])
+            .sum(-1)
+            .abs()
+        )
+        k0 = 2.0 * math.pi * float(frequency_hz) / _LIGHT_SPEED_M_PER_S
+        c_r = torch.where(
+            rough_b,
+            torch.exp(-2.0 * (k0 * cos_b * sigma_b).square()),
+            torch.ones_like(cos_b),
+        )
+        factor = c_r.prod(dim=1)
+    if realization_face is not None and depth_value == 1:
+        replaced = realization_face[face_id[:, 0]]
+        factor = torch.where(replaced, torch.zeros_like(factor), factor)
+    return factor
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -629,6 +715,8 @@ def _evaluate_shared_fields(
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
     rx_positions: torch.Tensor,
+    *,
+    components: frozenset[str] | set[str] = frozenset(),
 ) -> TopologyBatch:
     """Evaluate selected canonical rows with the shared complex3 ABI."""
 
@@ -698,6 +786,27 @@ def _evaluate_shared_fields(
             material["thickness"][face_id].contiguous(),
             frequency_hz=float(scene.frequency),
         )
+        # Rough-surface coherent attenuation / realization delta replacement
+        # (see _rough_reflection_factor). Applied Python-side on the native
+        # smooth-stack result; C_r is real, so field magnitude scaling is
+        # exact and phase-neutral.
+        rough_factor = _rough_reflection_factor(
+            compiled,
+            topology,
+            rows,
+            depth_value,
+            source,
+            material,
+            frequency_hz=float(scene.frequency),
+            scattering_active="scattering" in components,
+        )
+        if rough_factor is not None:
+            field_scale = rough_factor.to(torch.float32)
+            evaluated = dict(evaluated)
+            evaluated["field_vector"] = evaluated["field_vector"] * field_scale[:, None]
+            evaluated["coefficient"] = evaluated["coefficient"] * field_scale
+            evaluated["path_field"] = evaluated["path_field"] * field_scale
+            evaluated["path_gain"] = evaluated["path_gain"] * field_scale.square()
         field_xyz.index_copy_(0, rows, evaluated["field_vector"])
         coefficient.index_copy_(0, rows, evaluated["coefficient"])
         path_field.index_copy_(0, rows, evaluated["path_field"])
@@ -2203,7 +2312,13 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             )
         )
         return _evaluate_shared_fields(
-            scene, compiled, result, tx_positions, tx_power, rx_positions
+            scene,
+            compiled,
+            result,
+            tx_positions,
+            tx_power,
+            rx_positions,
+            components=components,
         )
     padded_blocks = [
         block
@@ -2229,5 +2344,11 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
     if diffraction_vector_field is not None:
         result = replace(result, diffraction_vector_field=diffraction_vector_field)
     return _evaluate_shared_fields(
-        scene, compiled, result, tx_positions, tx_power, rx_positions
+        scene,
+        compiled,
+        result,
+        tx_positions,
+        tx_power,
+        rx_positions,
+        components=components,
     )

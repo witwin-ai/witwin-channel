@@ -22,6 +22,7 @@ from .accumulation import (
 )
 from .config import Config
 from .result import Result
+from .scattering import append_scattering_paths
 from witwin.channel_native.core.path_topology import (
     apply_receiver_layout,
     export_topology,
@@ -48,6 +49,7 @@ def _metadata(
     path_count: int,
     component_counts: dict[str, int],
     launch_count: int,
+    scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     capability = {
         "raydn_native": bool(native_info["uses_raydn_native"]),
@@ -72,9 +74,10 @@ def _metadata(
                 "deterministic diffraction requires RayDN native capability"
             )
         components["diffraction"] = "enabled"
-    # transmission carries real specular wall-penetration paths since wave 2;
-    # scattering is still accepted plumbing that carries zero paths. Both keep
-    # the truthful requested-but-empty status when no paths were found.
+    # transmission carries specular wall-penetration paths since wave 2 and
+    # scattering carries Kirchhoff rough-surface patch paths since wave 3.
+    # Both keep the truthful requested-but-empty status when no paths were
+    # found (e.g. every surface in the scene is smooth).
     for name in ("transmission", "scattering"):
         if name not in config.components:
             components[name] = "not_requested"
@@ -132,6 +135,10 @@ def _metadata(
     }
     if metadata_transmission is not None:
         metadata["transmission"] = metadata_transmission
+    if scattering_info is not None:
+        # Incoherent Kirchhoff patch quadrature (plan 05 wave 3); the flag
+        # documents that per-path phases are NOT physical for ensemble rows.
+        metadata["scattering"] = dict(scattering_info)
     metadata.update(
         config_metadata(
             requested=requested_config,
@@ -143,7 +150,7 @@ def _metadata(
                 else -1,
                 "diffraction": 1 if "diffraction" in config.components else -1,
                 # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1 (zero paths until its physics lands).
+                # single-bounce in v1.
                 "transmission": config.max_depth
                 if "transmission" in config.components
                 else -1,
@@ -174,6 +181,11 @@ def solve(scene: Scene, config: Config) -> Result:
     device = torch.device("cuda")
     _, layout = receiver_positions_and_layout(scene, device=device)
     path_result = export_topology(scene, config)
+    scattering_info = None
+    if "scattering" in config.components:
+        path_result, scattering_info = append_scattering_paths(
+            scene, config, path_result
+        )
     path_count = int(path_result.valid.numel())
     component_counts = deterministic_component_counts(path_result.component_id)
     # The native counter materializes only los/reflection/diffraction slots.
@@ -214,6 +226,7 @@ def solve(scene: Scene, config: Config) -> Result:
         path_count=path_count,
         component_counts=component_counts,
         launch_count=path_result.launch_count,
+        scattering_info=scattering_info,
     )
     diagnostics = None
     if config.diagnostics:

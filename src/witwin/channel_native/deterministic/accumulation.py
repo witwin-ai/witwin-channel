@@ -29,10 +29,14 @@ _COMPONENT_ID = {name: component_id for component_id, name in _COMPONENT_NAME.it
 
 # Component slots materialized by the native accumulator (kComponentCount=3).
 # The remaining components are accumulated in Python from the same flat path
-# tensors: transmission carries real paths since wave 2; scattering still
-# carries zero paths and therefore accumulates structurally valid zeros.
+# tensors: transmission carries specular wall-penetration paths (wave 2) and
+# scattering carries Kirchhoff rough-surface patch paths (wave 3). Scattering
+# is an incoherent POWER component (plan 05 sections 6.7.3 / 7.3): its rows
+# always fold into the totals in the power domain, never as zero-phase
+# amplitudes.
 _NATIVE_COMPONENT_SLOTS = {"los": 0, "reflection": 1, "diffraction": 2}
 _PYTHON_ACCUMULATED_COMPONENTS = ("transmission", "scattering")
+_INCOHERENT_POWER_COMPONENTS = frozenset({"scattering"})
 
 
 def empty_field_like_power(path_gain: torch.Tensor) -> torch.Tensor:
@@ -87,7 +91,9 @@ def accumulate_flat_components(
     # and fold into the totals with the same coherent/incoherent semantics.
     extra_field_sum = torch.zeros_like(field_total)
     extra_power_sum = torch.zeros_like(power_total)
+    incoherent_power_sum = torch.zeros_like(power_total)
     has_extra_paths = False
+    has_incoherent_power = False
     for name in extra_components:
         rows = torch.nonzero(
             component_id == _COMPONENT_ID[name], as_tuple=False
@@ -96,7 +102,6 @@ def accumulate_flat_components(
             component_power[name] = torch.zeros_like(component_power["los"])
             component_fields[name] = torch.zeros_like(component_fields["los"])
             continue
-        has_extra_paths = True
         cell = tx_id[rows].to(dtype=torch.int64) * int(num_rx) + rx_id[rows].to(
             dtype=torch.int64
         )
@@ -114,6 +119,20 @@ def accumulate_flat_components(
         )
         power_map = power_map.reshape(int(num_tx), int(num_rx))
         field_map = field_map.reshape(int(num_tx), int(num_rx))
+        if name in _INCOHERENT_POWER_COMPONENTS:
+            # Scattering rows are incoherent power contributions (ensemble
+            # rows carry zero-phase sqrt(power) fields), so a coherent
+            # amplitude sum would overestimate power quadratically. The
+            # component and the total accumulate in the power domain in both
+            # modes; the complex field map is kept as a diagnostic for
+            # realization_coherent rows but never enters the coherent field
+            # total (power_total == |field_total|^2 + scattering power).
+            component_power[name] = power_map.contiguous()
+            component_fields[name] = field_map.contiguous()
+            incoherent_power_sum = incoherent_power_sum + power_map
+            has_incoherent_power = True
+            continue
+        has_extra_paths = True
         component_power[name] = (
             field_map.abs().square() if coherent else power_map
         ).contiguous()
@@ -126,9 +145,12 @@ def accumulate_flat_components(
             power_total = field_total.abs().square()
         else:
             power_total = power_total + extra_power_sum
-            field_total = torch.complex(
-                power_total.clamp_min(0.0).sqrt(), torch.zeros_like(power_total)
-            )
+    if has_incoherent_power:
+        power_total = power_total + incoherent_power_sum
+    if (has_extra_paths or has_incoherent_power) and not coherent:
+        field_total = torch.complex(
+            power_total.clamp_min(0.0).sqrt(), torch.zeros_like(power_total)
+        )
     return power_total, field_total, component_power, component_fields
 
 

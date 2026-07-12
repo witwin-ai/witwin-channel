@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-# Public component set. transmission and scattering are accepted plumbing in v1:
-# they validate and flow through metadata but contribute zero paths until the
-# physics lands in later waves. transmission depth is capped like reflection
-# (chains count wall penetrations); scattering is single-bounce in v1.
+# Public component set. transmission carries specular wall-penetration paths
+# (wave 2); scattering carries single-bounce Kirchhoff rough-surface paths
+# (wave 3). transmission depth is capped like reflection (chains count wall
+# penetrations); scattering is single-bounce in v1.
 _VALID_COMPONENTS = frozenset(
     {"los", "reflection", "diffraction", "transmission", "scattering"}
 )
@@ -34,10 +34,25 @@ class Config:
     sort_key: str = "receiver_transmitter_depth_component"
     diagnostics: bool = False
     ad_mode: str = "none"
+    # Rough-surface scattering quadrature (wave 3). The patch density is a
+    # fixed per-area sample count with a documented per-face cap of 4096
+    # samples; per (tx, rx) pair only the strongest samples up to
+    # scattering_max_paths_per_pair survive (dropped power is reported in the
+    # scattering metadata, never silently redistributed) and samples below
+    # scattering_power_threshold (absolute path_gain floor) are discarded.
+    scattering_samples_per_m2: float = 8.0
+    scattering_max_paths_per_pair: int = 4096
+    scattering_power_threshold: float = 0.0
 
     def __post_init__(self) -> None:
         if self.max_depth < 0:
             raise ValueError("max_depth must be non-negative")
+        if self.scattering_samples_per_m2 <= 0.0:
+            raise ValueError("scattering_samples_per_m2 must be positive")
+        if self.scattering_max_paths_per_pair <= 0:
+            raise ValueError("scattering_max_paths_per_pair must be positive")
+        if self.scattering_power_threshold < 0.0:
+            raise ValueError("scattering_power_threshold must be non-negative")
         if self.max_diffraction_order < 0:
             raise ValueError("max_diffraction_order must be 0 or 1")
         if self.max_diffraction_order > 1:

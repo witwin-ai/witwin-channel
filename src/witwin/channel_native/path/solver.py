@@ -16,6 +16,7 @@ from witwin.channel_native.capabilities import (
     config_metadata,
     serialize_config,
 )
+from witwin.channel_native.deterministic.scattering import append_scattering_paths
 
 from .config import Config
 from .arrays import explicit_array_scene, pack_explicit_arrays, pack_synthetic_arrays
@@ -29,8 +30,8 @@ _COMPONENT_ID = {
     "diffraction": 2,
     "reflection_diffraction": 3,
     "diffraction_reflection": 4,
-    # transmission exports real specular wall-penetration paths since wave 2;
-    # scattering is accepted plumbing with zero exported paths.
+    # transmission exports specular wall-penetration paths since wave 2;
+    # scattering exports incoherent Kirchhoff patch paths since wave 3.
     "transmission": 5,
     "scattering": 6,
 }
@@ -97,6 +98,7 @@ def _component_status(
     reflection_available: bool,
     diffraction_available: bool,
     transmission_path_count: int,
+    scattering_path_count: int = 0,
 ) -> dict[str, str]:
     status = {
         "los": "enabled" if "los" in config.components else "not_requested",
@@ -115,18 +117,21 @@ def _component_status(
         if config.max_depth < 1:
             raise RuntimeError("diffraction paths require max_depth >= 1")
         status["diffraction"] = "enabled"
-    # transmission exports real paths since wave 2; the truthful
-    # requested-but-empty status remains when no wall penetration was found.
-    # scattering is still accepted plumbing that always reports empty.
+    # transmission (wave 2) and scattering (wave 3) export real paths; the
+    # truthful requested-but-empty status remains when no wall penetration /
+    # rough surface produced a path.
     if "transmission" in config.components:
         status["transmission"] = (
             "enabled" if transmission_path_count > 0 else "enabled_no_paths"
         )
     else:
         status["transmission"] = "not_requested"
-    status["scattering"] = (
-        "enabled_no_paths" if "scattering" in config.components else "not_requested"
-    )
+    if "scattering" in config.components:
+        status["scattering"] = (
+            "enabled" if scattering_path_count > 0 else "enabled_no_paths"
+        )
+    else:
+        status["scattering"] = "not_requested"
     return status
 
 
@@ -172,6 +177,8 @@ def _metadata(
     diffraction_available: bool,
     path_native_available: bool,
     transmission_path_count: int = 0,
+    scattering_path_count: int = 0,
+    scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     kernel = make_metadata(
         primitive="path_solver",
@@ -214,6 +221,7 @@ def _metadata(
             reflection_available=reflection_available,
             diffraction_available=diffraction_available,
             transmission_path_count=transmission_path_count,
+            scattering_path_count=scattering_path_count,
         ),
         "raydn": {
             "reflection": reflection_available,
@@ -239,6 +247,10 @@ def _metadata(
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",
         }
+    if scattering_info is not None:
+        # Incoherent Kirchhoff patch quadrature (plan 05 wave 3); the flag
+        # documents that per-path phases are NOT physical for ensemble rows.
+        metadata["scattering"] = dict(scattering_info)
     metadata.update(
         config_metadata(
             requested=requested_config,
@@ -248,7 +260,7 @@ def _metadata(
                 "reflection": reflection_depth,
                 "diffraction": diffraction_depth,
                 # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1 (zero paths until its physics lands).
+                # single-bounce in v1.
                 "transmission": config.max_depth
                 if "transmission" in config.components
                 else -1,
@@ -300,6 +312,11 @@ def solve(scene: Scene, config: Config) -> Result:
         )
 
     exported_paths = export_topology(scene, config)
+    scattering_info = None
+    if "scattering" in config.components:
+        exported_paths, scattering_info = append_scattering_paths(
+            scene, config, exported_paths
+        )
     device = exported_paths.valid.device
     path_count = int(exported_paths.path_gain.shape[0])
     if path_count == 0:
@@ -322,6 +339,10 @@ def solve(scene: Scene, config: Config) -> Result:
             .sum()
             .item()
         ),
+        scattering_path_count=int(
+            (exported_paths.component_id == _COMPONENT_ID["scattering"]).sum().item()
+        ),
+        scattering_info=scattering_info,
     )
     diagnostics = None
     if config.diagnostics:
@@ -351,6 +372,9 @@ def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
         _validate_runtime(config)
     )
     topology = export_topology(scene, config)
+    scattering_info = None
+    if "scattering" in config.components:
+        topology, scattering_info = append_scattering_paths(scene, config, topology)
     path_count = int(topology.valid.numel())
     metadata = _metadata(
         config=config,
@@ -362,6 +386,10 @@ def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
         transmission_path_count=int(
             (topology.component_id == _COMPONENT_ID["transmission"]).sum().item()
         ),
+        scattering_path_count=int(
+            (topology.component_id == _COMPONENT_ID["scattering"]).sum().item()
+        ),
+        scattering_info=scattering_info,
     )
     tx_positions, _tx_power = _transmitter_tensors(scene)
     rx_positions = _receiver_positions(scene, reference=tx_positions)
