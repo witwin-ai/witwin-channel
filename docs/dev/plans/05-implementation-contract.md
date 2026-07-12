@@ -115,9 +115,21 @@ New specular transmission event (`TRANSMIT_SPECULAR`).
   over exterior segments ONLY (interior handled by `t_stack` + transverse
   term). `delay_s = geometric_length_m/c0` in v1 (narrowband; metadata notes
   `group_delay: "geometric"`).
+- Two evaluation contexts share the same per-wall Jones/phase algebra but
+  differ in geometry:
+  - Shooting (MC basic / BDPT continuation): apply the exact lateral exit
+    offset above and continue the ray from `x_e`.
+  - Endpoint connection (deterministic / path solver Tx->Rx transmission
+    paths): use the straight Tx->Rx segment; per wall, evaluate the stack at
+    the straight-line incidence angle, subtract the interior chord
+    `d/cos(theta_i)` from the free-space phase length, and apply
+    `t_stack * exp(-j*k_par*d*tan(theta_i))` (the chord's lateral run). This
+    is exact for vacuum and index-matched walls and a documented
+    small-angle-error approximation otherwise
+    (`metadata: thin_sheet_straight_path_approximation=true`).
 - Decisive unit test: a vacuum layer (`eps_r=1, sigma_e=0`) thin_sheet wall
   must reproduce the no-wall complex LoS field to 1e-5 relative accuracy
-  (amplitude AND phase), at normal and oblique incidence.
+  (amplitude AND phase), at normal and oblique incidence — in BOTH contexts.
 - Exit-validity: offset exit point is re-validated (ray epsilon + primitive
   ignore); if the exit projection leaves the surface group, the path is
   invalid and counted in diagnostics, never teleported.
