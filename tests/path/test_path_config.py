@@ -12,8 +12,6 @@ def test_path_config_defaults_are_explicit():
     assert config.max_paths is None
     assert config.max_paths_scope == "per_pair"
     assert config.coupled_candidate_limit == 1_000_000
-    assert config.sort_key == "receiver_transmitter_depth_component"
-    assert config.diagnostics is False
     assert config.ad_mode == "none"
 
 
@@ -32,9 +30,6 @@ def test_path_config_validates_inputs():
         Config(coupled_candidate_limit=0)
     with pytest.raises(ValueError, match="hard limit"):
         Config(coupled_candidate_limit=1_000_001)
-
-    with pytest.raises(ValueError, match="sort_key"):
-        Config(sort_key="random")
 
     with pytest.raises(ValueError, match="ad_mode"):
         Config(ad_mode="vjp")

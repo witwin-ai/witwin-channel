@@ -49,11 +49,11 @@
 
 必须直接完成以下清理：
 
-- [ ] 将 `PathResultV2` 重命名为 `PathResult`；
-- [ ] 将 `result_v2.py` 重命名为 `result.py`；
-- [ ] 删除 legacy flat-result adapter 和兼容分支；
-- [ ] 更新公开导出、类型注解、测试和文档；
-- [ ] 不保留 `PathResultV2` alias；旧调用方应直接升级。
+- [x] 将旧版本化结果类型重命名为 `PathResult`；
+- [x] 将版本化结果实现收敛到 `result.py`；
+- [x] 删除旧 flat-result adapter 和兼容分支；
+- [x] 更新公开导出、类型注解、测试和文档；
+- [x] 不保留旧类型 alias；旧调用方应直接升级。
 
 `PathResult` 的最小公共契约：
 
@@ -77,11 +77,11 @@
 
 ### Phase A：结果与公共 API 收敛（P0）
 
-- [ ] 完成 `PathResult` 的破坏性重命名和兼容代码删除；
-- [ ] 让真实 Path Solver 直接输出复场、角度和完整交互序列；
-- [ ] 在真实求解结果上验收 `cir/cfr/taps/filter_by_type`；
-- [ ] 删除未使用配置、重复 metadata 和只为旧接口存在的字段；
-- [ ] 所有超出支持范围的配置在 GPU allocation 前失败。
+- [x] 完成 `PathResult` 的破坏性重命名和兼容代码删除；
+- [x] 让真实 Path Solver 直接输出复场、角度和完整交互序列；
+- [x] 在真实求解结果上验收 `cir/cfr/taps/filter_by_type`；
+- [x] 删除未使用配置、重复 metadata 和只为旧接口存在的字段；
+- [x] 所有超出支持范围的配置在 GPU allocation 前失败。
 
 验收：公开 API 中不再出现 `V2`、legacy adapter 或静默降级路径。
 

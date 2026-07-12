@@ -2,20 +2,16 @@
 
 from .config import Config
 from .arrays import explicit_array_scene, pack_explicit_arrays, pack_synthetic_arrays
-from .result import Result
-from .result_v2 import InteractionType, PathResultV2, from_legacy_result
+from .result import InteractionType, PathResult
 from .schema import RaggedPathSoA
-from .solver import solve, solve_v2
+from .solver import solve
 
 __all__ = [
     "Config",
     "InteractionType",
-    "PathResultV2",
+    "PathResult",
     "RaggedPathSoA",
-    "Result",
     "solve",
-    "solve_v2",
-    "from_legacy_result",
     "pack_synthetic_arrays",
     "explicit_array_scene",
     "pack_explicit_arrays",

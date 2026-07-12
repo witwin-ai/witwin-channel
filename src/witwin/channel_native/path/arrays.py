@@ -9,7 +9,7 @@ from witwin.channel_native.core.antenna import orientation_matrix, steering_vect
 from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint, Transmitter
 from witwin.channel_native.core.scene import Scene
 
-from .result_v2 import PathResultV2
+from .result import PathResult
 
 
 Receiver = ReceiverPoint | ReceiverGrid
@@ -44,13 +44,26 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
     return flattened
 
 
+def validate_synthetic_array_scene(scene: Scene) -> None:
+    """Reject unsupported synthetic layouts before native scene allocation."""
+
+    flat_receivers = _flatten_receivers(scene.receivers)
+    endpoints = [*scene.transmitters, *flat_receivers]
+    if any(not endpoint.synthetic_array for endpoint in endpoints):
+        raise ValueError("explicit arrays require per-element topology tracing")
+    tx_antennas = {transmitter.array.num_antennas for transmitter in scene.transmitters}
+    rx_antennas = {receiver.array.num_antennas for receiver in flat_receivers}
+    if len(tx_antennas) > 1 or len(rx_antennas) > 1:
+        raise ValueError("all endpoints on each side must use the same antenna count")
+
+
 def pack_synthetic_arrays(
-    result: PathResultV2,
+    result: PathResult,
     *,
     frequency_hz: float,
     transmitters: Sequence[Transmitter],
     receivers: Sequence[Receiver],
-) -> PathResultV2:
+) -> PathResult:
     """Expand centre-reference paths using far-field array phase weighting.
 
     Synthetic arrays share one geometric path set across their elements. An
@@ -217,12 +230,12 @@ def explicit_array_scene(scene: Scene) -> tuple[Scene, int, int]:
 
 
 def pack_explicit_arrays(
-    result: PathResultV2,
+    result: PathResult,
     *,
     scene: Scene,
     num_rx_ant: int,
     num_tx_ant: int,
-) -> PathResultV2:
+) -> PathResult:
     """Pack independently traced element endpoints into antenna dimensions."""
 
     num_rx = len(scene.receivers)
@@ -282,4 +295,9 @@ def pack_explicit_arrays(
     )
 
 
-__all__ = ["explicit_array_scene", "pack_explicit_arrays", "pack_synthetic_arrays"]
+__all__ = [
+    "explicit_array_scene",
+    "pack_explicit_arrays",
+    "pack_synthetic_arrays",
+    "validate_synthetic_array_scene",
+]

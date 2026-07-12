@@ -2,10 +2,10 @@ import math
 
 import torch
 
-from witwin.channel_native.path import InteractionType, PathResultV2, RaggedPathSoA
+from witwin.channel_native.path import InteractionType, PathResult, RaggedPathSoA
 
 
-def _signal_result() -> PathResultV2:
+def _signal_result() -> PathResult:
     field = torch.tensor([[1.0 + 0.0j], [0.0 + 2.0j]], dtype=torch.complex64)
     types = torch.tensor(
         [[int(InteractionType.REFLECTION)], [int(InteractionType.DIFFRACTION)]],
@@ -30,7 +30,7 @@ def _signal_result() -> PathResultV2:
         position=torch.zeros((2, 1, 3)),
         normal=torch.zeros((2, 1, 3)),
     )
-    return PathResultV2.from_ragged(ragged)
+    return PathResult.from_ragged(ragged)
 
 
 def test_cir_masks_padding_and_normalizes_delay_per_pair():

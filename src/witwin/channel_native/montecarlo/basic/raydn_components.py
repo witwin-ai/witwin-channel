@@ -238,17 +238,10 @@ def reflection_component_maps_with_wedges(
     *,
     samples: int,
     max_depth: int,
-    seed: int,
     device: torch.device,
     material_tensors: MaterialTensors,
     collect_wedges: bool = False,
-    reflection_accumulation_strategy: str = "auto",
-    reflection_compact_min_samples: int = 262_144,
-    reflection_staged_min_samples_per_cell: int = 64,
-    streaming_los_enabled: bool = False,
 ) -> ReflectionComponentResult:
-    del seed, reflection_accumulation_strategy, reflection_compact_min_samples
-    del reflection_staged_min_samples_per_cell, streaming_los_enabled
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)

@@ -55,7 +55,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Results
 
-- `PathResultV2` per-event `InteractionType` includes `TRANSMISSION` and
+- `PathResult` per-event `InteractionType` includes `TRANSMISSION` and
   `SCATTERING`; scattering paths are exported as incoherent power paths
   (`scattering_paths_incoherent: true` metadata).
 - Component power maps / grids include `transmission` and `scattering`

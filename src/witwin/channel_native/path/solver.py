@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 import torch
@@ -14,17 +13,16 @@ from witwin.channel_native.core.scene_tensors import (
     receiver_positions as _shared_receiver_positions,
     transmitter_positions as _shared_transmitter_positions,
 )
-from witwin.channel_native.capabilities import (
-    capabilities,
-    config_metadata,
-    serialize_config,
-)
 from witwin.channel_native.deterministic.scattering import append_scattering_paths
 
 from .config import Config
-from .arrays import explicit_array_scene, pack_explicit_arrays, pack_synthetic_arrays
-from .result import Result
-from .result_v2 import PathResultV2, from_topology_result
+from .arrays import (
+    explicit_array_scene,
+    pack_explicit_arrays,
+    pack_synthetic_arrays,
+    validate_synthetic_array_scene,
+)
+from .result import PathResult, from_topology_result
 
 
 _COMPONENT_ID = {
@@ -93,44 +91,10 @@ def _component_status(
     return status
 
 
-def _empty_result(
-    *,
-    device: torch.device,
-    config: Config,
-    reflection_available: bool,
-    diffraction_available: bool,
-    path_native_available: bool,
-    diagnostics: dict[str, Any] | None = None,
-) -> Result:
-    metadata = _metadata(
-        config=config,
-        path_count=0,
-        valid_contribution_count=0,
-        reflection_available=reflection_available,
-        diffraction_available=diffraction_available,
-        path_native_available=path_native_available,
-    )
-    return Result(
-        valid=torch.empty((0,), device=device, dtype=torch.bool),
-        tx_id=torch.empty((0,), device=device, dtype=torch.int32),
-        rx_id=torch.empty((0,), device=device, dtype=torch.int32),
-        depth=torch.empty((0,), device=device, dtype=torch.int32),
-        component_id=torch.empty((0,), device=device, dtype=torch.int32),
-        primitive_id=torch.empty((0,), device=device, dtype=torch.int32),
-        edge_id=torch.empty((0,), device=device, dtype=torch.int32),
-        path_length_m=torch.empty((0,), device=device, dtype=torch.float32),
-        delay_s=torch.empty((0,), device=device, dtype=torch.float32),
-        path_gain=torch.empty((0,), device=device, dtype=torch.float32),
-        metadata=metadata,
-        diagnostics=diagnostics,
-    )
-
-
 def _metadata(
     *,
     config: Config,
     path_count: int,
-    valid_contribution_count: int,
     reflection_available: bool,
     diffraction_available: bool,
     path_native_available: bool,
@@ -152,7 +116,6 @@ def _metadata(
         "reflection": reflection_available,
         "diffraction": diffraction_available,
     }
-    requested_config = serialize_config(config)
     reflection_depth = config.max_depth if "reflection" in config.components else -1
     diffraction_depth = (
         2 if config.coupled_paths else (1 if "diffraction" in config.components else -1)
@@ -160,20 +123,22 @@ def _metadata(
     effective_max_depth = max(
         0 if "los" in config.components else -1, reflection_depth, diffraction_depth
     )
-    effective_config = dict(requested_config)
-    effective_config["max_depth"] = effective_max_depth
     metadata = {
-        "max_depth": config.max_depth,
-        "max_paths": config.max_paths,
-        "max_paths_scope": config.max_paths_scope,
-        "sort_key": config.sort_key,
+        "solver": "path",
+        "device": "cuda",
         "path_count": path_count,
-        "valid_contribution_count": valid_contribution_count,
-        "counts": {
-            "path_count": path_count,
-            "valid_path_count": valid_contribution_count,
+        "effective_max_depth": effective_max_depth,
+        "component_max_depth": {
+            "los": 0 if "los" in config.components else -1,
+            "reflection": reflection_depth,
+            "diffraction": diffraction_depth,
+            "transmission": config.max_depth
+            if "transmission" in config.components
+            else -1,
+            "scattering": 1 if "scattering" in config.components else -1,
         },
-        "capability": capability,
+        "max_paths_per_pair": config.max_paths,
+        "native_capabilities": capability,
         "components": _component_status(
             config=config,
             reflection_available=reflection_available,
@@ -181,10 +146,6 @@ def _metadata(
             transmission_path_count=transmission_path_count,
             scattering_path_count=scattering_path_count,
         ),
-        "raydn": {
-            "reflection": reflection_available,
-            "diffraction": diffraction_available,
-        },
         "kernel": kernel,
         "field_abi": "complex3_v1",
         "phase_convention": dict(PHASE_CONVENTION),
@@ -209,24 +170,6 @@ def _metadata(
         # Incoherent Kirchhoff patch quadrature (plan 05 wave 3); the flag
         # documents that per-path phases are NOT physical for ensemble rows.
         metadata["scattering"] = dict(scattering_info)
-    metadata.update(
-        config_metadata(
-            requested=requested_config,
-            effective=effective_config,
-            component_max_depth={
-                "los": 0 if "los" in config.components else -1,
-                "reflection": reflection_depth,
-                "diffraction": diffraction_depth,
-                # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1.
-                "transmission": config.max_depth
-                if "transmission" in config.components
-                else -1,
-                "scattering": 1 if "scattering" in config.components else -1,
-            },
-        )
-    )
-    metadata["semantic_capabilities"] = capabilities()["solvers"]["path"]
     return metadata
 
 
@@ -254,78 +197,7 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     return reflection_available, diffraction_available, path_native_available
 
 
-def solve(scene: Scene, config: Config) -> Result:
-    reflection_available, diffraction_available, path_native_available = (
-        _validate_runtime(config)
-    )
-
-    if not scene.transmitters:
-        device = torch.device("cuda")
-        return _empty_result(
-            device=device,
-            config=config,
-            reflection_available=reflection_available,
-            diffraction_available=diffraction_available,
-            path_native_available=path_native_available,
-        )
-
-    exported_paths = export_topology(scene, config)
-    scattering_info = None
-    if "scattering" in config.components:
-        exported_paths, scattering_info = append_scattering_paths(
-            scene, config, exported_paths
-        )
-    device = exported_paths.valid.device
-    path_count = int(exported_paths.path_gain.shape[0])
-    if path_count == 0:
-        return _empty_result(
-            device=device,
-            config=config,
-            reflection_available=reflection_available,
-            diffraction_available=diffraction_available,
-            path_native_available=path_native_available,
-        )
-    metadata = _metadata(
-        config=config,
-        path_count=path_count,
-        valid_contribution_count=path_count,
-        reflection_available=reflection_available,
-        diffraction_available=diffraction_available,
-        path_native_available=path_native_available,
-        transmission_path_count=int(
-            (exported_paths.component_id == _COMPONENT_ID["transmission"])
-            .sum()
-            .item()
-        ),
-        scattering_path_count=int(
-            (exported_paths.component_id == _COMPONENT_ID["scattering"]).sum().item()
-        ),
-        scattering_info=scattering_info,
-    )
-    diagnostics = None
-    if config.diagnostics:
-        diagnostics = {
-            "device": str(device),
-            "path_count": path_count,
-            "component_order": dict(_COMPONENT_ID),
-        }
-    return Result(
-        valid=exported_paths.valid,
-        tx_id=exported_paths.tx_id,
-        rx_id=exported_paths.rx_id,
-        depth=exported_paths.depth,
-        component_id=exported_paths.component_id,
-        primitive_id=exported_paths.primitive_id,
-        edge_id=exported_paths.edge_id,
-        path_length_m=exported_paths.path_length_m,
-        delay_s=exported_paths.delay_s,
-        path_gain=exported_paths.path_gain,
-        metadata=metadata,
-        diagnostics=diagnostics,
-    )
-
-
-def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
+def _solve_base(scene: Scene, config: Config) -> PathResult:
     reflection_available, diffraction_available, path_native_available = (
         _validate_runtime(config)
     )
@@ -337,7 +209,6 @@ def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
     metadata = _metadata(
         config=config,
         path_count=path_count,
-        valid_contribution_count=path_count,
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
         path_native_available=path_native_available,
@@ -359,29 +230,24 @@ def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
         rx_positions=rx_positions,
         metadata=metadata,
     )
-    metadata = dict(result.metadata)
-    metadata["requested_max_paths_per_pair"] = config.max_paths
-    if config.coupled_paths:
-        metadata["coefficient_semantics"] = (
-            "unit_excitation_dimensionless_receiver_projection"
-        )
-    return replace(result, metadata=metadata)
+    return result
 
 
-def solve_v2(scene: Scene, config: Config) -> PathResultV2:
+def solve(scene: Scene, config: Config) -> PathResult:
     """Solve canonical paths and pack synthetic or explicit antenna arrays."""
 
     endpoints = [*scene.transmitters, *scene.receivers]
     if any(not endpoint.synthetic_array for endpoint in endpoints):
         expanded_scene, num_rx_ant, num_tx_ant = explicit_array_scene(scene)
-        expanded = _solve_v2_base(expanded_scene, config)
+        expanded = _solve_base(expanded_scene, config)
         return pack_explicit_arrays(
             expanded,
             scene=scene,
             num_rx_ant=num_rx_ant,
             num_tx_ant=num_tx_ant,
         )
-    result = _solve_v2_base(scene, config)
+    validate_synthetic_array_scene(scene)
+    result = _solve_base(scene, config)
     return pack_synthetic_arrays(
         result,
         frequency_hz=scene.frequency,

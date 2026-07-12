@@ -8,7 +8,7 @@ from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.core import path_topology as topology
 from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve_v2 as solve_paths
+from witwin.channel_native.path import solve as solve_paths
 
 
 def test_multibounce_sort_order_uses_full_primitive_sequence():

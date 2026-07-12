@@ -11,19 +11,14 @@ def test_path_solver_metadata_reports_counts_and_capabilities():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
 
-    result = solve(empty_space_los_scene(), Config(components={"los"}, diagnostics=True))
+    result = solve(empty_space_los_scene(), Config(components={"los"}))
 
     validate_metadata(result.metadata["kernel"])
     assert result.metadata["path_count"] == 4
-    assert result.metadata["valid_contribution_count"] == 4
-    assert result.metadata["counts"] == {
-        "path_count": 4,
-        "valid_path_count": 4,
-    }
     path_native = build_info()["uses_path_native"]
     raydn_native = build_info()["uses_raydn_native"]
-    assert result.metadata["capability"]["path_native"] is path_native
-    assert result.metadata["capability"]["raydn_native"] is raydn_native
+    assert result.metadata["native_capabilities"]["path_native"] is path_native
+    assert result.metadata["native_capabilities"]["raydn_native"] is raydn_native
     assert result.metadata["components"]["los"] == "enabled"
     assert result.metadata["components"]["reflection"] == "not_requested"
     assert result.metadata["components"]["diffraction"] == "not_requested"
@@ -32,4 +27,3 @@ def test_path_solver_metadata_reports_counts_and_capabilities():
     assert result.metadata["kernel"]["scheduling_strategy"] == "native_cuda"
     assert "fusion_debt" not in result.metadata["kernel"]
     assert result.metadata["kernel"]["ad_status"] == "none"
-    assert result.diagnostics is not None

@@ -39,7 +39,7 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   `material_abi_version: 3`.
 - Deterministic + path solvers: transmission topology by batched visibility
   marching (component_id 5), field evaluation through the stack op,
-  PathResultV2 export with per-event `InteractionType.TRANSMISSION`,
+  PathResult export with per-event `InteractionType.TRANSMISSION`,
   `thin_sheet_straight_path_approximation` metadata.
 - MC basic: straight penetration-chain transmission radiomap.
 - BDPT: hybrid estimator - exact straight endpoint chains (discrete measure)
@@ -67,7 +67,7 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   mode via Fresnel-zone-bounded phase-screen patch integrals (reproducible
   per `(scene_seed, surface_id, realization_id)`); C_r coherent attenuation
   applied to specular reflection on rough faces (material property, active
-  regardless of requested components); PathResultV2 export as incoherent
+  regardless of requested components); PathResult export as incoherent
   power paths. Normalization validated three ways (analytic lobe integral,
   independent float64 quadrature ~0.1%, C_r^2 specular attenuation 1e-3).
 - MC basic: area-sampled diffuse scattering radiomap; BDPT: three-way

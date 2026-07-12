@@ -6,7 +6,6 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.path import solve as solve_paths
-from witwin.channel_native.path import solve_v2 as solve_paths_v2
 
 
 def test_single_wedge_diffraction_matches_path_reference():
@@ -21,7 +20,7 @@ def test_single_wedge_diffraction_matches_path_reference():
 
     assert result.paths is not None
     assert result.paths.valid.numel() == reference.valid.numel()
-    torch.testing.assert_close(result.paths.edge_id, reference.edge_id)
+    torch.testing.assert_close(result.paths.edge_id, reference.primitive_id[reference.valid, 0])
     # Real UTD paths (audit DF-1): one merged record for the shared wedge
     # edge (audit D-6), Keller stationary-point delays, and K-P amplitudes.
     torch.testing.assert_close(
@@ -50,7 +49,12 @@ def test_single_wedge_diffraction_matches_path_reference():
     )
     torch.testing.assert_close(result.paths.path_length_m, expected_length, rtol=1.0e-5, atol=1.0e-6)
     torch.testing.assert_close(result.paths.path_gain, expected_gain, rtol=5.0e-3, atol=1.0e-8)
-    torch.testing.assert_close(result.path_gain.reshape(-1).sum(), reference.path_gain.sum(), rtol=5.0e-3, atol=1.0e-8)
+    torch.testing.assert_close(
+        result.path_gain.reshape(-1).sum(),
+        reference.a[reference.valid].abs().square().sum(),
+        rtol=5.0e-3,
+        atol=1.0e-8,
+    )
 
 
 def test_vertical_only_edge_policy_filters_horizontal_edges():
@@ -88,7 +92,7 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
 
     scene = wedge_diffraction_scene()
     result = solve(scene, Config(components={"diffraction"}, coherent=True, export_paths=True))
-    reference = solve_paths_v2(scene, PathConfig(components={"diffraction"}))
+    reference = solve_paths(scene, PathConfig(components={"diffraction"}))
 
     assert result.paths is not None
     path_field = torch.complex(result.paths.field_real, result.paths.field_imag)

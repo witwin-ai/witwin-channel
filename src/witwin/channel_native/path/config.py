@@ -16,7 +16,6 @@ from witwin.channel_native.core.components import (
 # Default component set is unchanged: the new components are strictly opt-in.
 # Components whose chain length is bounded by max_depth (public cap of 5).
 _DEPTH_CAPPED_COMPONENTS = frozenset({"reflection", "transmission"})
-_VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
 _VALID_MAX_PATHS_SCOPES = frozenset({"per_pair"})
 _MAX_COUPLED_CANDIDATES = 1_000_000
 
@@ -29,8 +28,6 @@ class Config:
     )
     max_paths: int | None = None
     max_paths_scope: str = "per_pair"
-    sort_key: str = "receiver_transmitter_depth_component"
-    diagnostics: bool = False
     ad_mode: str = "none"
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
@@ -74,8 +71,6 @@ class Config:
             raise ValueError(
                 "coupled_candidate_limit cannot exceed the hard limit of 1000000"
             )
-        if self.sort_key not in _VALID_SORT_KEYS:
-            raise ValueError(f"sort_key must be one of {sorted(_VALID_SORT_KEYS)}")
         if self.ad_mode not in _VALID_AD_MODES:
             raise ValueError(
                 "path supports_ad=False in the first replacement release; "

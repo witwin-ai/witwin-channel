@@ -409,7 +409,6 @@ def _load_mitsuba_native_ply(
         "compatible_loader": "sionna.rt.load_scene",
         "merge_shapes": bool(merge_shapes),
         "merge_shapes_exclude_regex": merge_shapes_exclude_regex,
-        "remove_duplicate_vertices": False,
         "frequency": float(frequency),
         "sionna_source_root": str(Path(source_root).resolve())
         if source_root is not None
@@ -436,10 +435,8 @@ def load_mitsuba(
     *,
     scene_cls,
     source_root: str | Path | None = None,
-    prefer_local: bool = True,
     merge_shapes: bool = True,
     merge_shapes_exclude_regex: str | None = None,
-    remove_duplicate_vertices: bool = False,
     frequency: float | None = None,
     metadata: dict[str, object] | None = None,
     native_loader: bool = True,
@@ -447,7 +444,6 @@ def load_mitsuba(
     edge_selection_mode: str = "vertical_only",
     edge_diffraction: bool | None = True,
     boundary_edge_policy: str | None = None,
-    **_ignored,
 ):
     scene_path = Path(filename).expanduser().resolve()
     if not scene_path.exists():

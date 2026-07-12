@@ -14,8 +14,7 @@ import torch
 from tests.support.scenes import rough_wall_structure
 from witwin.channel_native import ReceiverPoint, Scene, Transmitter
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.path import Config, solve, solve_v2
-from witwin.channel_native.path.result_v2 import InteractionType
+from witwin.channel_native.path import Config, InteractionType, solve
 
 _FREQUENCY_HZ = 3.0e9
 _LIGHT_SPEED = 299_792_458.0
@@ -52,27 +51,32 @@ def _config(**overrides) -> Config:
     return Config(**settings)
 
 
-def test_scattering_paths_export_flat_result():
+def _scattering_mask(result):
+    return result.valid & (
+        result.interaction_type == int(InteractionType.SCATTERING)
+    ).any(dim=-1)
+
+
+def test_scattering_paths_export_result():
     _require_raydn()
     result = solve(_scene(), _config())
-    scattering = result.component_id == 6
+    scattering = _scattering_mask(result)
     count = int(scattering.sum())
     assert count > 0
     assert result.metadata["components"]["scattering"] == "enabled"
     assert result.metadata["scattering"]["scattering_paths_incoherent"] is True
     assert result.metadata["scattering"]["path_count"] == count
     # Incoherent power paths carry positive gains and depth 1.
-    assert bool((result.path_gain[scattering] > 0.0).all())
-    assert bool((result.depth[scattering] == 1).all())
+    assert bool((result.a[scattering].abs() > 0.0).all())
     # tau is the tx -> patch -> rx geometric delay, longer than the LoS.
     los_delay = 2.0 / _LIGHT_SPEED
-    assert bool((result.delay_s[scattering] > los_delay).all())
+    assert bool((result.tau[scattering] > los_delay).all())
 
 
-def test_scattering_paths_export_v2_contract():
+def test_scattering_paths_export_contract():
     _require_raydn()
     scene = _scene()
-    result = solve_v2(scene, _config())
+    result = solve(scene, _config())
     types = result.interaction_type
     scattering_paths = result.valid & (types == int(InteractionType.SCATTERING)).any(
         dim=-1
@@ -108,24 +112,27 @@ def test_scattering_path_cap_keeps_strongest():
     _require_raydn()
     full = solve(_scene(), _config())
     capped = solve(_scene(), _config(scattering_max_paths_per_pair=8))
-    full_count = int((full.component_id == 6).sum())
+    full_rows = _scattering_mask(full)
+    full_count = int(full_rows.sum())
     assert full_count > 8
-    capped_rows = capped.component_id == 6
+    capped_rows = _scattering_mask(capped)
     assert int(capped_rows.sum()) == 8
     assert capped.metadata["scattering"]["capped_path_count"] == full_count - 8
     # The kept rows are the strongest ones of the full set.
-    strongest = torch.topk(full.path_gain[full.component_id == 6], 8).values.sort().values
-    kept = capped.path_gain[capped_rows].sort().values
+    strongest = torch.topk(full.a[full_rows, 0].abs().square(), 8).values.sort().values
+    kept = capped.a[capped_rows, 0].abs().square().sort().values
     torch.testing.assert_close(kept, strongest, rtol=1.0e-6, atol=0.0)
 
 
 def test_scattering_power_threshold_filters_rows():
     _require_raydn()
     full = solve(_scene(), _config())
-    gains = full.path_gain[full.component_id == 6]
+    full_rows = _scattering_mask(full)
+    gains = full.a[full_rows, 0].abs().square()
     cutoff = float(gains.median())
     filtered = solve(_scene(), _config(scattering_power_threshold=cutoff))
-    kept = filtered.path_gain[filtered.component_id == 6]
+    filtered_rows = _scattering_mask(filtered)
+    kept = filtered.a[filtered_rows, 0].abs().square()
     assert int(kept.numel()) < int(gains.numel())
     assert bool((kept > cutoff).all())
 
@@ -133,7 +140,7 @@ def test_scattering_power_threshold_filters_rows():
 def test_smooth_scene_reports_no_scattering_paths():
     _require_raydn()
     result = solve(_scene(0.0), _config())
-    assert int((result.component_id == 6).sum()) == 0
+    assert int(_scattering_mask(result).sum()) == 0
     assert result.metadata["components"]["scattering"] == "enabled_no_paths"
 
 

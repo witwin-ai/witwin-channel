@@ -9,8 +9,8 @@ but external consumers remain a release blocker.
 |---|---:|---|
 | `Scene/Structure/Transmitter` | 346 | Supported within the public capability manifest |
 | `path.solve` | 25 | Depth 1-5 reflection, one diffraction with supported R/D coupling, complex field, polarization and angles |
-| `path.PathResult` | 6 | Versioned `PathResultV2`, signal views and explicit legacy adapter |
-| `cir/cfr/taps/filter_by_type` | 11 | Supported by `PathResultV2` |
+| `path.PathResult` | 6 | Native `PathResult` with complex fields, geometry, and signal views |
+| `cir/cfr/taps/filter_by_type` | 11 | Supported by `PathResult` |
 | `AntennaArray/PlanarArray/ULA/UPA` | 23 | `AntennaArray`, `ula`/`ura`, synthetic and explicit Path arrays; adapters are required for legacy constructors |
 | `Material` | 115 | Phase 7A ABI v2, frequency evaluation, XML fields, explicit PEC and traceable IDs supported |
 | Transmission/rough/layered/BSDF events | 0 observed production uses | Phase 7B not integrated; every related capability is false |

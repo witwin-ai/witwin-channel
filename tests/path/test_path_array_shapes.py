@@ -1,6 +1,6 @@
 import torch
 
-from witwin.channel_native.path import PathResultV2, RaggedPathSoA
+from witwin.channel_native.path import PathResult, RaggedPathSoA
 
 
 def test_explicit_antenna_and_time_dimensions_pack_without_shape_collapse():
@@ -25,7 +25,7 @@ def test_explicit_antenna_and_time_dimensions_pack_without_shape_collapse():
         position=torch.empty((2, 0, 3)),
         normal=torch.empty((2, 0, 3)),
     )
-    result = PathResultV2.from_ragged(ragged)
+    result = PathResult.from_ragged(ragged)
 
     assert result.a.shape == (1, 2, 1, 2, 1, 2)
     assert result.num_paths.tolist() == [[[[0, 1]], [[1, 0]]]]

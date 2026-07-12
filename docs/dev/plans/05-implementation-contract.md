@@ -17,7 +17,7 @@ Five public components: `los`, `reflection`, `diffraction`, `transmission`,
 - `core/path_topology.py` integer `component_id` scheme is extended:
   `0=los, 1=reflection, 2=diffraction, 3=reflection->diffraction,
   4=diffraction->reflection, 5=transmission, 6=scattering`.
-- `path/result_v2.py` `InteractionType` IntFlag stays as-is
+- `path/result.py` `InteractionType` IntFlag stays as-is
   (`REFLECTION=1, DIFFRACTION=2, TRANSMISSION=4, SCATTERING=8`); adapters map
   `component_id 5 -> TRANSMISSION` per-event sequence, `6 -> SCATTERING`.
 - BDPT `component_mask` bits: `1=los, 2=reflection, 4=diffraction,

@@ -6,7 +6,7 @@ from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config as DeterministicConfig
 from witwin.channel_native.deterministic import solve as solve_deterministic
-from witwin.channel_native.path import Config, solve, solve_v2
+from witwin.channel_native.path import Config, solve
 
 
 def _require_native() -> None:
@@ -21,30 +21,31 @@ def test_single_wedge_sequence_length_and_delay_match_deterministic():
     scene = wedge_diffraction_scene()
     config = Config(components={"diffraction"}, max_depth=1)
 
-    flat = solve(scene, config)
-    padded = solve_v2(scene, config)
+    paths = solve(scene, config)
     deterministic = solve_deterministic(
         scene,
         DeterministicConfig(components={"diffraction"}, max_depth=1, export_paths=True),
     )
 
     assert deterministic.paths is not None
-    torch.testing.assert_close(flat.edge_id, deterministic.paths.edge_id)
     torch.testing.assert_close(
-        flat.path_length_m, deterministic.paths.path_length_m, rtol=0.0, atol=0.0
+        paths.primitive_id[paths.valid, 0], deterministic.paths.edge_id
     )
     torch.testing.assert_close(
-        flat.delay_s, deterministic.paths.delay_s, rtol=0.0, atol=0.0
+        paths.path_length_m[paths.valid], deterministic.paths.path_length_m, rtol=0.0, atol=0.0
     )
-    assert torch.all(padded.interaction_type[padded.valid] == 2)
     torch.testing.assert_close(
-        padded.primitive_id[padded.valid, 0], deterministic.paths.edge_id
+        paths.tau[paths.valid], deterministic.paths.delay_s, rtol=0.0, atol=0.0
+    )
+    assert torch.all(paths.interaction_type[paths.valid] == 2)
+    torch.testing.assert_close(
+        paths.primitive_id[paths.valid, 0], deterministic.paths.edge_id
     )
 
 
-def test_solve_v2_exports_bounded_reflection_diffraction_sequences():
+def test_solve_exports_bounded_reflection_diffraction_sequences():
     _require_native()
-    result = solve_v2(
+    result = solve(
         coupled_wall_wedge_scene(),
         Config(
             components={"reflection", "diffraction"},
@@ -54,16 +55,12 @@ def test_solve_v2_exports_bounded_reflection_diffraction_sequences():
     )
 
     assert (
-        result.metadata["semantic_capabilities"][
-            "supports_reflection_diffraction_coupling"
-        ]
-        is True
+        result.metadata["coupled_paths"]["geometry"]
+        == "native_1r1d_reciprocal"
     )
     assert (
-        result.metadata["semantic_capabilities"][
-            "supports_reflection_diffraction_coupling_geometry"
-        ]
-        is True
+        result.metadata["coupled_paths"]["coefficient"]
+        == "unified_complex3_jones"
     )
     active = result.interaction_type[result.valid]
     assert bool((active == torch.tensor([1, 2], device=active.device)).all(dim=1).any())
@@ -86,9 +83,10 @@ def test_flat_solve_exports_finite_coupled_power():
         coupled_paths=True,
     )
     result = solve(coupled_wall_wedge_scene(), config)
-    coupled = (result.component_id == 3) | (result.component_id == 4)
+    active = result.interaction_type[result.valid]
+    coupled = (active[:, 0] != 0) & (active[:, 1] != 0) & (active[:, 0] != active[:, 1])
     assert bool(coupled.any())
-    assert torch.isfinite(result.path_gain[coupled]).all()
+    assert torch.isfinite(result.a[result.valid][coupled]).all()
 
 
 def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypatch):
@@ -105,4 +103,4 @@ def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypat
         coupled_candidate_limit=1,
     )
     with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
-        solve_v2(coupled_wall_wedge_scene(), config)
+        solve(coupled_wall_wedge_scene(), config)

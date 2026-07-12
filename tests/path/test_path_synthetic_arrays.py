@@ -12,14 +12,15 @@ from witwin.channel_native import (
 )
 from witwin.channel_native.path import (
     Config,
-    PathResultV2,
+    PathResult,
     RaggedPathSoA,
     pack_synthetic_arrays,
-    solve_v2,
+    solve,
 )
+from witwin.channel_native.path import solver as path_solver
 
 
-def _centre_result() -> PathResultV2:
+def _centre_result() -> PathResult:
     ragged = RaggedPathSoA.from_flat(
         num_rx=1,
         num_rx_ant=1,
@@ -39,7 +40,7 @@ def _centre_result() -> PathResultV2:
         position=torch.empty((1, 0, 3)),
         normal=torch.empty((1, 0, 3)),
     )
-    return PathResultV2.from_ragged(ragged)
+    return PathResult.from_ragged(ragged)
 
 
 def test_synthetic_array_packing_preserves_paths_and_adds_steering_phase():
@@ -88,7 +89,7 @@ def test_explicit_array_traces_exact_per_element_free_space_distance():
         frequency=1.0e9,
     )
 
-    result = solve_v2(scene, Config(components={"los"}))
+    result = solve(scene, Config(components={"los"}))
 
     assert result.a.shape == (1, 2, 1, 2, 1, 1)
     expected_distance = torch.tensor(
@@ -103,3 +104,26 @@ def test_explicit_array_traces_exact_per_element_free_space_distance():
     )
     assert result.metadata["array_semantics"] == "explicit_per_element_topology"
     assert capabilities()["solvers"]["path"]["supports_arrays"]
+
+
+def test_unsupported_synthetic_layout_fails_before_native_solve(monkeypatch):
+    scene = Scene(
+        structures=[],
+        transmitters=[
+            Transmitter(position=torch.zeros(3), array=AntennaArray.single()),
+            Transmitter(
+                position=torch.ones(3),
+                array=AntennaArray.ula(2, 0.5),
+            ),
+        ],
+        receivers=[ReceiverPoint(position=torch.tensor([0.0, 2.0, 0.0]))],
+        frequency=1.0e9,
+    )
+    monkeypatch.setattr(
+        path_solver,
+        "_solve_base",
+        lambda *_args, **_kwargs: pytest.fail("native solve ran before array preflight"),
+    )
+
+    with pytest.raises(ValueError, match="same antenna count"):
+        solve(scene, Config(components={"los"}))

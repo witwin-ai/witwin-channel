@@ -9,7 +9,7 @@ from tests.support.scenes import transmission_wall_structure
 from witwin.channel_native import ReceiverPoint, Scene, Transmitter
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Layer, PhysicalSurface
-from witwin.channel_native.path import Config, InteractionType, solve, solve_v2
+from witwin.channel_native.path import Config, InteractionType, solve
 
 _FREQUENCY_HZ = 3.0e9
 _LIGHT_SPEED_M_PER_S = 299792458.0
@@ -45,11 +45,11 @@ def _lossy_wall() -> PhysicalSurface:
     )
 
 
-def test_transmission_path_result_v2_events_and_delay():
+def test_transmission_path_result_events_and_delay():
     _require_raydn()
 
     rx_position = [5.0, 0.0, 0.0]
-    result = solve_v2(
+    result = solve(
         _scene([transmission_wall_structure(2.5, _lossy_wall())], rx_position),
         Config(components={"transmission"}, max_depth=1),
     )
@@ -80,11 +80,11 @@ def test_transmission_complex_a_matches_empty_scene_los_for_vacuum_wall():
     _require_raydn()
 
     rx_position = [5.0, 5.0, 0.0]  # 45 degree oblique incidence
-    wall = solve_v2(
+    wall = solve(
         _scene([transmission_wall_structure(2.5, _vacuum_wall())], rx_position),
         Config(components={"transmission"}, max_depth=1),
     )
-    empty = solve_v2(_scene([], rx_position), Config(components={"los"}))
+    empty = solve(_scene([], rx_position), Config(components={"los"}))
 
     ratio = wall.a[0, 0, 0, 0, 0, 0] / empty.a[0, 0, 0, 0, 0, 0]
     assert torch.abs(ratio - 1.0).item() <= 1.0e-4
@@ -101,7 +101,7 @@ def test_transmission_depth2_sequence_and_type_filter():
         transmission_wall_structure(2.0, _lossy_wall(), name="wall-a", surface_id=1),
         transmission_wall_structure(3.0, _vacuum_wall(), name="wall-b", surface_id=2),
     ]
-    result = solve_v2(
+    result = solve(
         _scene(structures, rx_position),
         Config(components={"transmission"}, max_depth=2),
     )
@@ -121,7 +121,7 @@ def test_transmission_depth2_sequence_and_type_filter():
     assert int(dropped.num_paths.sum()) == 0
 
 
-def test_transmission_flat_solver_exports_component_id_5():
+def test_transmission_solver_exports_complex_path():
     _require_raydn()
 
     rx_position = [5.0, 0.0, 0.0]
@@ -130,8 +130,7 @@ def test_transmission_flat_solver_exports_component_id_5():
         Config(components={"los", "transmission"}, max_depth=1),
     )
 
-    # The blocked direct segment contributes to transmission only.
-    assert int((result.component_id == 0).sum()) == 0
-    assert int((result.component_id == 5).sum()) == 1
-    assert bool((result.path_gain[result.component_id == 5] > 0).all())
+    assert int(result.num_paths.sum()) == 1
+    assert result.interaction_type[result.valid].tolist() == [[int(InteractionType.TRANSMISSION)]]
+    assert bool((result.a[result.valid].abs() > 0).all())
     assert result.metadata["components"]["transmission"] == "enabled"

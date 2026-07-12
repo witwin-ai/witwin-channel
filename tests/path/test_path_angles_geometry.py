@@ -2,7 +2,7 @@ import math
 
 import torch
 
-from witwin.channel_native.path.result_v2 import endpoint_angles
+from witwin.channel_native.path.result import endpoint_angles
 
 
 def test_endpoint_angles_use_standard_spherical_convention():

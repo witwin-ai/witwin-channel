@@ -11,7 +11,7 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config as DeterministicConfig
 from witwin.channel_native.deterministic import solve as solve_deterministic
-from witwin.channel_native.path import Config, solve, solve_v2
+from witwin.channel_native.path import Config, solve
 
 
 def _require_native() -> None:
@@ -80,28 +80,29 @@ def test_path_and_deterministic_share_two_wall_canonical_sequences():
     scene = two_wall_multibounce_scene()
     config = Config(components={"reflection"}, max_depth=2)
 
-    flat = solve(scene, config)
-    padded = solve_v2(scene, config)
+    paths = solve(scene, config)
     deterministic = solve_deterministic(
         scene,
         DeterministicConfig(components={"reflection"}, max_depth=2, export_paths=True),
     )
 
     assert deterministic.paths is not None
-    torch.testing.assert_close(flat.depth, deterministic.paths.depth)
     torch.testing.assert_close(
-        flat.path_length_m, deterministic.paths.path_length_m, rtol=0.0, atol=0.0
+        paths.path_length_m[paths.valid],
+        deterministic.paths.path_length_m,
+        rtol=0.0,
+        atol=0.0,
     )
     torch.testing.assert_close(
-        flat.delay_s, deterministic.paths.delay_s, rtol=0.0, atol=0.0
+        paths.tau[paths.valid], deterministic.paths.delay_s, rtol=0.0, atol=0.0
     )
     torch.testing.assert_close(
-        padded.primitive_id[padded.valid], deterministic.paths.primitive_sequence
+        paths.primitive_id[paths.valid], deterministic.paths.primitive_sequence
     )
     torch.testing.assert_close(
-        padded.interaction_type[padded.valid],
+        paths.interaction_type[paths.valid],
         torch.tensor(
-            [[1, 0], [1, 0], [1, 1]], device=flat.depth.device, dtype=torch.int32
+            [[1, 0], [1, 0], [1, 1]], device=paths.a.device, dtype=torch.int32
         ),
     )
 
@@ -109,8 +110,7 @@ def test_path_and_deterministic_share_two_wall_canonical_sequences():
 def test_path_and_deterministic_match_three_cube_depth_three_topology():
     _require_native()
     scene = _three_cube_scene()
-    flat = solve(scene, Config(components={"reflection"}, max_depth=3))
-    path = solve_v2(scene, Config(components={"reflection"}, max_depth=3))
+    path = solve(scene, Config(components={"reflection"}, max_depth=3))
     deterministic = solve_deterministic(
         scene,
         DeterministicConfig(components={"reflection"}, max_depth=3, export_paths=True),
@@ -123,13 +123,13 @@ def test_path_and_deterministic_match_three_cube_depth_three_topology():
         path.primitive_id[valid], deterministic.paths.primitive_sequence
     )
     torch.testing.assert_close(
-        flat.path_length_m,
+        path.path_length_m[path.valid],
         deterministic.paths.path_length_m,
         rtol=0.0,
         atol=1.0e-5,
     )
     torch.testing.assert_close(
-        flat.delay_s, deterministic.paths.delay_s, rtol=0.0, atol=1.0e-12
+        path.tau[path.valid], deterministic.paths.delay_s, rtol=0.0, atol=1.0e-12
     )
     canonical = torch.cat(
         (path.interaction_type[valid], path.primitive_id[valid]), dim=1
@@ -145,7 +145,8 @@ def test_path_reflection_depth_one_through_five_is_effective(max_depth):
         Config(components={"reflection"}, max_depth=max_depth),
     )
 
-    assert set(result.depth.tolist()) == set(range(1, max_depth + 1))
+    depth = (result.interaction_type[result.valid] != 0).sum(dim=-1)
+    assert set(depth.tolist()) == set(range(1, max_depth + 1))
     assert result.metadata["effective_max_depth"] == max_depth
     assert result.metadata["component_max_depth"]["reflection"] == max_depth
 

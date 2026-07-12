@@ -9,7 +9,7 @@ from tests.support.scenes import (
 )
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.path import Config, Result, solve
+from witwin.channel_native.path import Config, InteractionType, PathResult, solve
 
 
 def test_path_solver_empty_space_los_returns_one_path_per_pair():
@@ -19,16 +19,13 @@ def test_path_solver_empty_space_los_returns_one_path_per_pair():
     scene = empty_space_los_scene()
     result = solve(scene, Config(components={"los"}))
 
-    assert isinstance(result, Result)
+    assert isinstance(result, PathResult)
     assert result.valid.is_cuda
-    assert result.valid.tolist() == [True, True, True, True]
-    assert result.tx_id.tolist() == [0, 1, 0, 1]
-    assert result.rx_id.tolist() == [0, 0, 1, 1]
-    assert result.depth.tolist() == [0, 0, 0, 0]
-    assert result.component_id.tolist() == [0, 0, 0, 0]
-    assert torch.all(result.path_length_m > 0)
-    assert torch.all(result.delay_s > 0)
-    assert torch.all(result.path_gain > 0)
+    assert int(result.valid.sum()) == 4
+    assert torch.all(result.num_paths == 1)
+    assert torch.all(result.path_length_m[result.valid] > 0)
+    assert torch.all(result.tau[result.valid] > 0)
+    assert torch.all(result.a[result.valid].abs() > 0)
 
 
 def test_path_solver_reflection_is_capability_gated():
@@ -41,7 +38,7 @@ def test_path_solver_reflection_is_capability_gated():
     else:
         result = solve(single_wall_reflection_scene(), Config(components={"reflection"}))
         assert result.metadata["components"]["reflection"] == "enabled"
-        assert result.valid.numel() == 0
+        assert int(result.valid.sum()) == 0
 
 
 def test_path_solver_exports_native_reflection_paths_when_available():
@@ -53,9 +50,9 @@ def test_path_solver_exports_native_reflection_paths_when_available():
     result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}))
 
     assert result.metadata["components"]["reflection"] == "enabled"
-    assert int((result.component_id == 1).sum().item()) >= 1
-    assert torch.all(result.depth[result.component_id == 1] == 1)
-    assert torch.all(result.path_gain[result.component_id == 1] > 0)
+    reflection = result.valid & (result.interaction_type == int(InteractionType.REFLECTION)).any(dim=-1)
+    assert int(reflection.sum().item()) >= 1
+    assert torch.all(result.a[reflection].abs() > 0)
 
 
 def test_path_solver_exports_native_diffraction_paths_when_available():
@@ -67,9 +64,10 @@ def test_path_solver_exports_native_diffraction_paths_when_available():
     result = solve(wedge_diffraction_scene(), Config(components={"diffraction"}))
 
     assert result.metadata["components"]["diffraction"] == "enabled"
-    assert int((result.component_id == 2).sum().item()) >= 1
-    assert torch.all(result.edge_id[result.component_id == 2] >= 0)
-    assert torch.all(result.path_gain[result.component_id == 2] > 0)
+    diffraction = result.valid & (result.interaction_type == int(InteractionType.DIFFRACTION)).any(dim=-1)
+    assert int(diffraction.sum().item()) >= 1
+    assert torch.all(result.primitive_id[diffraction, 0] >= 0)
+    assert torch.all(result.a[diffraction].abs() > 0)
 
 
 def test_path_solver_accepts_transmission_and_scattering_as_empty_plumbing():
@@ -83,9 +81,9 @@ def test_path_solver_accepts_transmission_and_scattering_as_empty_plumbing():
 
     # (a) validates and the LoS paths still export, (b) no transmission (5) or
     # scattering (6) paths are produced in v1.
-    assert int((result.component_id == 0).sum().item()) == 4
-    assert int((result.component_id == 5).sum().item()) == 0
-    assert int((result.component_id == 6).sum().item()) == 0
+    assert int(result.valid.sum()) == 4
+    assert not (result.interaction_type == int(InteractionType.TRANSMISSION)).any()
+    assert not (result.interaction_type == int(InteractionType.SCATTERING)).any()
     # (c) truthful requested-but-empty metadata status.
     assert result.metadata["components"]["transmission"] == "enabled_no_paths"
     assert result.metadata["components"]["scattering"] == "enabled_no_paths"

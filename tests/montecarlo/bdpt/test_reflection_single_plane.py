@@ -7,7 +7,7 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.montecarlo.bdpt import Config, solve
 from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
 from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve_v2
+from witwin.channel_native.path import solve as solve_paths
 
 
 def _scene_with_tx_power(power_w: float) -> Scene:
@@ -124,7 +124,7 @@ def test_bdpt_single_plane_reflection_converges_to_maintained_reference(samples,
     )
 
     observed = result.component_power["reflection"].detach().cpu()
-    paths = solve_v2(scene, PathConfig(components={"reflection"}))
+    paths = solve_paths(scene, PathConfig(components={"reflection"}))
     reference = paths.a[..., 0].abs().square()[paths.valid].sum().cpu()
     torch.testing.assert_close(observed, reference, rtol=1.0e-5, atol=1.0e-12)
 
