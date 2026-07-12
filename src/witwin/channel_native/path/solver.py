@@ -29,7 +29,8 @@ _COMPONENT_ID = {
     "diffraction": 2,
     "reflection_diffraction": 3,
     "diffraction_reflection": 4,
-    # Accepted plumbing in v1: zero exported paths until the physics lands.
+    # transmission exports real specular wall-penetration paths since wave 2;
+    # scattering is accepted plumbing with zero exported paths.
     "transmission": 5,
     "scattering": 6,
 }
@@ -95,6 +96,7 @@ def _component_status(
     config: Config,
     reflection_available: bool,
     diffraction_available: bool,
+    transmission_path_count: int,
 ) -> dict[str, str]:
     status = {
         "los": "enabled" if "los" in config.components else "not_requested",
@@ -113,12 +115,18 @@ def _component_status(
         if config.max_depth < 1:
             raise RuntimeError("diffraction paths require max_depth >= 1")
         status["diffraction"] = "enabled"
-    # transmission and scattering are accepted plumbing in v1: reported as
-    # requested-but-empty until the physics lands in later waves.
-    for name in ("transmission", "scattering"):
-        status[name] = (
-            "enabled_no_paths" if name in config.components else "not_requested"
+    # transmission exports real paths since wave 2; the truthful
+    # requested-but-empty status remains when no wall penetration was found.
+    # scattering is still accepted plumbing that always reports empty.
+    if "transmission" in config.components:
+        status["transmission"] = (
+            "enabled" if transmission_path_count > 0 else "enabled_no_paths"
         )
+    else:
+        status["transmission"] = "not_requested"
+    status["scattering"] = (
+        "enabled_no_paths" if "scattering" in config.components else "not_requested"
+    )
     return status
 
 
@@ -163,6 +171,7 @@ def _metadata(
     reflection_available: bool,
     diffraction_available: bool,
     path_native_available: bool,
+    transmission_path_count: int = 0,
 ) -> dict[str, Any]:
     kernel = make_metadata(
         primitive="path_solver",
@@ -204,6 +213,7 @@ def _metadata(
             config=config,
             reflection_available=reflection_available,
             diffraction_available=diffraction_available,
+            transmission_path_count=transmission_path_count,
         ),
         "raydn": {
             "reflection": reflection_available,
@@ -223,6 +233,12 @@ def _metadata(
             else "not_requested",
         },
     }
+    if "transmission" in config.components:
+        # Endpoint-connection thin_sheet contract (plan 05 section 4).
+        metadata["transmission"] = {
+            "thin_sheet_straight_path_approximation": True,
+            "group_delay": "geometric",
+        }
     metadata.update(
         config_metadata(
             requested=requested_config,
@@ -232,7 +248,7 @@ def _metadata(
                 "reflection": reflection_depth,
                 "diffraction": diffraction_depth,
                 # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1. Zero paths until the physics lands.
+                # single-bounce in v1 (zero paths until its physics lands).
                 "transmission": config.max_depth
                 if "transmission" in config.components
                 else -1,
@@ -301,6 +317,11 @@ def solve(scene: Scene, config: Config) -> Result:
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
         path_native_available=path_native_available,
+        transmission_path_count=int(
+            (exported_paths.component_id == _COMPONENT_ID["transmission"])
+            .sum()
+            .item()
+        ),
     )
     diagnostics = None
     if config.diagnostics:
@@ -338,6 +359,9 @@ def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
         path_native_available=path_native_available,
+        transmission_path_count=int(
+            (topology.component_id == _COMPONENT_ID["transmission"]).sum().item()
+        ),
     )
     tx_positions, _tx_power = _transmitter_tensors(scene)
     rx_positions = _receiver_positions(scene, reference=tx_positions)

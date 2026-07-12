@@ -67,6 +67,32 @@ def same_side_wall_reflection_scene() -> Scene:
     )
 
 
+def transmission_wall_structure(
+    x_m: float,
+    material: object,
+    *,
+    name: str = "wall",
+    surface_id: int = 1,
+    half_size: float = 4.0,
+) -> Structure:
+    """Axis-aligned thin-sheet wall in the x = ``x_m`` plane (normal +x)."""
+
+    return Structure(
+        vertices=torch.tensor(
+            [
+                [x_m, -half_size, -half_size],
+                [x_m, half_size, -half_size],
+                [x_m, -half_size, half_size],
+                [x_m, half_size, half_size],
+            ]
+        ),
+        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
+        material=material,
+        name=name,
+        surface_id=surface_id,
+    )
+
+
 def wedge_diffraction_scene() -> Scene:
     face_a = Structure(
         vertices=torch.tensor(

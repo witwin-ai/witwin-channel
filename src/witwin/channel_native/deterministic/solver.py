@@ -16,7 +16,7 @@ from witwin.channel_native.core.field_state import PHASE_CONVENTION
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
 
 from .accumulation import (
-    _ZERO_CONTRIBUTION_COMPONENTS,
+    _PYTHON_ACCUMULATED_COMPONENTS,
     accumulate_path_result,
     build_path_table,
 )
@@ -72,12 +72,28 @@ def _metadata(
                 "deterministic diffraction requires RayDN native capability"
             )
         components["diffraction"] = "enabled"
-    # transmission and scattering are accepted plumbing in v1: reported as
-    # requested-but-empty until the physics lands in later waves.
+    # transmission carries real specular wall-penetration paths since wave 2;
+    # scattering is still accepted plumbing that carries zero paths. Both keep
+    # the truthful requested-but-empty status when no paths were found.
     for name in ("transmission", "scattering"):
-        components[name] = (
-            "enabled_no_paths" if name in config.components else "not_requested"
-        )
+        if name not in config.components:
+            components[name] = "not_requested"
+        elif component_counts.get(name, 0) > 0:
+            components[name] = "enabled"
+        else:
+            components[name] = "enabled_no_paths"
+    if "transmission" in config.components:
+        if not capability["raydn_native"]:
+            raise RuntimeError(
+                "deterministic transmission requires RayDN native capability"
+            )
+        # Endpoint-connection thin_sheet contract (plan 05 section 4).
+        metadata_transmission = {
+            "thin_sheet_straight_path_approximation": True,
+            "group_delay": "geometric",
+        }
+    else:
+        metadata_transmission = None
     raydn_component_enabled = (
         components["reflection"] == "enabled" or components["diffraction"] == "enabled"
     )
@@ -114,6 +130,8 @@ def _metadata(
         "phase_convention": dict(PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
     }
+    if metadata_transmission is not None:
+        metadata["transmission"] = metadata_transmission
     metadata.update(
         config_metadata(
             requested=requested_config,
@@ -125,7 +143,7 @@ def _metadata(
                 else -1,
                 "diffraction": 1 if "diffraction" in config.components else -1,
                 # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1. Zero paths until the physics lands.
+                # single-bounce in v1 (zero paths until its physics lands).
                 "transmission": config.max_depth
                 if "transmission" in config.components
                 else -1,
@@ -158,8 +176,14 @@ def solve(scene: Scene, config: Config) -> Result:
     path_result = export_topology(scene, config)
     path_count = int(path_result.valid.numel())
     component_counts = deterministic_component_counts(path_result.component_id)
+    # The native counter materializes only los/reflection/diffraction slots.
+    for name, cid in (("transmission", 5), ("scattering", 6)):
+        if name in config.components:
+            component_counts[name] = int(
+                (path_result.component_id == cid).sum().item()
+            )
     extra_components = tuple(
-        name for name in _ZERO_CONTRIBUTION_COMPONENTS if name in config.components
+        name for name in _PYTHON_ACCUMULATED_COMPONENTS if name in config.components
     )
     path_gain, field, component_power, component_fields = accumulate_path_result(
         path_result,

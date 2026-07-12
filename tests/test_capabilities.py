@@ -15,14 +15,19 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
         "transmission",
         "scattering",
     ]
-    # transmission and scattering are accepted plumbing in v1: no solver has
-    # integrated their physics yet, so every integration flag stays False.
+    # transmission is integrated in the endpoint-connection solvers as of
+    # wave 2; the Monte Carlo shooting-context flags and every scattering flag
+    # stay False until their physics lands.
     integration = manifest["component_solver_integration"]
     assert set(integration) == {"transmission", "scattering"}
+    assert integration["transmission"] == {
+        "path": True,
+        "deterministic": True,
+        "montecarlo_basic": False,
+        "montecarlo_bdpt": False,
+    }
     assert all(
-        enabled is False
-        for flags in integration.values()
-        for enabled in flags.values()
+        enabled is False for enabled in integration["scattering"].values()
     )
     path = manifest["solvers"]["path"]
     assert path["max_reflection_depth"] == 5

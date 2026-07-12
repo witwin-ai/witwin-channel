@@ -17,8 +17,7 @@ from witwin.channel_native.core.path_topology import (
 # Canonical component_id -> name identity. 3=reflection->diffraction and
 # 4=diffraction->reflection are path-solver coupled classes that the
 # deterministic accumulator folds into their primary component, so they are not
-# listed here. 5=transmission and 6=scattering are accepted plumbing in v1: they
-# carry zero paths until the physics lands in later waves.
+# listed here.
 _COMPONENT_NAME = {
     0: "los",
     1: "reflection",
@@ -29,10 +28,11 @@ _COMPONENT_NAME = {
 _COMPONENT_ID = {name: component_id for component_id, name in _COMPONENT_NAME.items()}
 
 # Component slots materialized by the native accumulator (kComponentCount=3).
-# The v1 zero-contribution components are synthesized in Python instead.
+# The remaining components are accumulated in Python from the same flat path
+# tensors: transmission carries real paths since wave 2; scattering still
+# carries zero paths and therefore accumulates structurally valid zeros.
 _NATIVE_COMPONENT_SLOTS = {"los": 0, "reflection": 1, "diffraction": 2}
-# Opt-in components that flow through the result as structurally valid zeros.
-_ZERO_CONTRIBUTION_COMPONENTS = ("transmission", "scattering")
+_PYTHON_ACCUMULATED_COMPONENTS = ("transmission", "scattering")
 
 
 def empty_field_like_power(path_gain: torch.Tensor) -> torch.Tensor:
@@ -82,9 +82,53 @@ def accumulate_flat_components(
         name: component_field_tensor[cid].contiguous()
         for name, cid in _NATIVE_COMPONENT_SLOTS.items()
     }
+    # The native accumulator materializes only the three slots above; the
+    # remaining requested components accumulate here from the same flat paths
+    # and fold into the totals with the same coherent/incoherent semantics.
+    extra_field_sum = torch.zeros_like(field_total)
+    extra_power_sum = torch.zeros_like(power_total)
+    has_extra_paths = False
     for name in extra_components:
-        component_power[name] = torch.zeros_like(component_power["los"])
-        component_fields[name] = torch.zeros_like(component_fields["los"])
+        rows = torch.nonzero(
+            component_id == _COMPONENT_ID[name], as_tuple=False
+        ).reshape(-1)
+        if int(rows.shape[0]) == 0:
+            component_power[name] = torch.zeros_like(component_power["los"])
+            component_fields[name] = torch.zeros_like(component_fields["los"])
+            continue
+        has_extra_paths = True
+        cell = tx_id[rows].to(dtype=torch.int64) * int(num_rx) + rx_id[rows].to(
+            dtype=torch.int64
+        )
+        cells = int(num_tx) * int(num_rx)
+        power_map = torch.zeros(
+            (cells,), device=power_total.device, dtype=torch.float32
+        ).index_add_(0, cell, path_gain[rows].to(dtype=torch.float32))
+        field_map = torch.complex(
+            torch.zeros(
+                (cells,), device=power_total.device, dtype=torch.float32
+            ).index_add_(0, cell, path_field.real[rows].to(dtype=torch.float32)),
+            torch.zeros(
+                (cells,), device=power_total.device, dtype=torch.float32
+            ).index_add_(0, cell, path_field.imag[rows].to(dtype=torch.float32)),
+        )
+        power_map = power_map.reshape(int(num_tx), int(num_rx))
+        field_map = field_map.reshape(int(num_tx), int(num_rx))
+        component_power[name] = (
+            field_map.abs().square() if coherent else power_map
+        ).contiguous()
+        component_fields[name] = field_map.contiguous()
+        extra_field_sum = extra_field_sum + field_map
+        extra_power_sum = extra_power_sum + component_power[name]
+    if has_extra_paths:
+        if coherent:
+            field_total = field_total + extra_field_sum
+            power_total = field_total.abs().square()
+        else:
+            power_total = power_total + extra_power_sum
+            field_total = torch.complex(
+                power_total.clamp_min(0.0).sqrt(), torch.zeros_like(power_total)
+            )
     return power_total, field_total, component_power, component_fields
 
 
