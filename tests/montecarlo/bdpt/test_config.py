@@ -44,6 +44,7 @@ def test_bdpt_config_defaults_match_public_contract():
         ({"sample_streams": 0}, "sample_streams"),
         ({"max_exported_paths": -1}, "max_exported_paths"),
         ({"ad_mode": "vjp"}, "ad_mode"),
+        ({"workspace_limit_bytes": -1}, "workspace_limit_bytes"),
     ],
 )
 def test_bdpt_config_rejects_invalid_values(kwargs, message):

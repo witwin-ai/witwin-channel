@@ -26,6 +26,7 @@ class Config:
     ad_mode: str = "none"
     fixed_topology: bool = True
     requires_fixed_seed: bool = True
+    workspace_limit_bytes: int | None = 1 << 30
 
     def __post_init__(self) -> None:
         if self.samples <= 0:
@@ -52,4 +53,6 @@ class Config:
                 "montecarlo_basic supports_ad=False in the first replacement release; "
                 "ad_mode must be 'none'"
             )
+        if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
+            raise ValueError("workspace_limit_bytes must be non-negative")
         object.__setattr__(self, "components", components)

@@ -1,6 +1,7 @@
 """DrJit-free Torch/CUDA RF channel runtime."""
 
 from .core.kernels.extension import build_info
+from .deployment import pipeline_cache_key, runtime_diagnostics
 from .capabilities import capabilities
 from .core.antenna import AntennaArray, AntennaPattern
 from .core.objects import ReceiverGrid, ReceiverPoint, Structure, Transmitter
@@ -19,6 +20,8 @@ __all__ = [
     "Complex3State",
     "JonesState",
     "build_info",
+    "pipeline_cache_key",
+    "runtime_diagnostics",
     "capabilities",
     "Dielectric",
     "DispersiveMaterial",

@@ -25,3 +25,8 @@ def test_basic_config_validates_samples_and_components():
 def test_basic_config_rejects_unknown_accumulation_strategy():
     with pytest.raises(ValueError, match="accumulation_strategy"):
         Config(accumulation_strategy="python_loop")
+
+
+def test_basic_config_rejects_negative_workspace_limit():
+    with pytest.raises(ValueError, match="workspace_limit_bytes"):
+        Config(workspace_limit_bytes=-1)

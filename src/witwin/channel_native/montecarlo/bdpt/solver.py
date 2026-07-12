@@ -15,6 +15,10 @@ from witwin.channel_native.core.field_state import (
 )
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.core.memory_budget import (
+    MemoryEstimate,
+    enforce_memory_budget,
+)
 from witwin.channel_native.core.path_topology import export_topology
 from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.core.kernels.ops import (
@@ -113,13 +117,11 @@ def _estimate_workspace_bytes(
 def _check_workspace_guardrail(config: Config, workspace_bytes: int) -> None:
     if config.workspace_limit_bytes is None:
         return
-    if workspace_bytes > config.workspace_limit_bytes:
-        raise RuntimeError(
-            "workspace limit exceeded for BDPT: "
-            f"estimated {workspace_bytes} bytes exceeds {config.workspace_limit_bytes}. "
-            "Reduce samples or the receiver grid resolution, or raise "
-            "Config.workspace_limit_bytes if the device has enough memory."
-        )
+    enforce_memory_budget(
+        MemoryEstimate(temporary_bytes=workspace_bytes),
+        budget_bytes=config.workspace_limit_bytes,
+        workload="workspace for BDPT",
+    )
 
 
 def _path_counts(config: Config, *, tx_count: int) -> dict[str, int]:
@@ -653,12 +655,29 @@ def _coupled_discrete_connection_samples(
 
 
 def solve(scene: Scene, config: Config) -> Result:
-    if not torch.cuda.is_available():
-        raise RuntimeError("witwin.channel_native.montecarlo.bdpt requires CUDA")
-
     grid = first_receiver_grid(scene)
     if grid is not None and config.receiver_strategy != "grid_area":
         raise RuntimeError("receiver_strategy='point_sphere' requires point receivers")
+
+    grid_cells = 0 if grid is None else int(grid.shape[0] * grid.shape[1])
+    native_samples = _effective_native_samples(config)
+    native_max_depth = _effective_native_depth(config)
+    selected_accumulation = select_accumulation_strategy(
+        config,
+        grid_cells=grid_cells,
+        estimated_valid_ratio=1.0 if "los" in config.components else 0.05,
+    )
+    rx_count_estimate = grid_cells if grid is not None else len(scene.receivers)
+    workspace_bytes = _estimate_workspace_bytes(
+        config,
+        tx_count=len(scene.transmitters),
+        grid_cells=grid_cells,
+        rx_count=rx_count_estimate,
+    )
+    _check_workspace_guardrail(config, workspace_bytes)
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("witwin.channel_native.montecarlo.bdpt requires CUDA")
 
     info = build_info()
     raydn = scene.raydn_scene()
@@ -677,23 +696,6 @@ def solve(scene: Scene, config: Config) -> Result:
         and not diffraction_available
     ):
         raise RuntimeError("diffraction requires RayDN native capability")
-
-    grid_cells = 0 if grid is None else int(grid.shape[0] * grid.shape[1])
-    native_samples = _effective_native_samples(config)
-    native_max_depth = _effective_native_depth(config)
-    selected_accumulation = select_accumulation_strategy(
-        config,
-        grid_cells=grid_cells,
-        estimated_valid_ratio=1.0 if "los" in config.components else 0.05,
-    )
-    rx_count_estimate = grid_cells if grid is not None else len(scene.receivers)
-    workspace_bytes = _estimate_workspace_bytes(
-        config,
-        tx_count=len(scene.transmitters),
-        grid_cells=grid_cells,
-        rx_count=rx_count_estimate,
-    )
-    _check_workspace_guardrail(config, workspace_bytes)
 
     tx_reference, tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_reference, grid=grid)

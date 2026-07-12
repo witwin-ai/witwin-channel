@@ -4,10 +4,14 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native import Scene
+from witwin.channel_native import ReceiverGrid, Scene
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import effective_sigma_e
+from witwin.channel_native.core.memory_budget import (
+    enforce_memory_budget,
+    estimate_monte_carlo_memory,
+)
 from witwin.channel_native.core.kernels.ops import (
     bdpt_face_material_tensors_from_host,
     mc_component_map_buffer,
@@ -33,6 +37,31 @@ from .sampling import make_cuda_generator
 def _validate_ad_config(config: Config) -> None:
     if config.ad_mode != "none":
         raise RuntimeError("MC basic ad_mode must be 'none'")
+
+
+def _receiver_count(scene: Scene) -> int:
+    return sum(
+        int(receiver.shape[0]) * int(receiver.shape[1])
+        if isinstance(receiver, ReceiverGrid)
+        else 1
+        for receiver in scene.receivers
+    )
+
+
+def _enforce_workspace_budget(scene: Scene, config: Config) -> None:
+    if config.workspace_limit_bytes is None:
+        return
+    estimate = estimate_monte_carlo_memory(
+        samples=config.samples,
+        transmitters=len(scene.transmitters),
+        receivers=_receiver_count(scene),
+        depth=config.max_depth,
+    )
+    enforce_memory_budget(
+        estimate,
+        budget_bytes=config.workspace_limit_bytes,
+        workload="workspace for Monte Carlo basic",
+    )
 
 
 def _host_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
@@ -66,6 +95,7 @@ def _host_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
 
 
 def solve(scene: Scene, config: Config) -> Result:
+    _enforce_workspace_budget(scene, config)
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.montecarlo.basic requires CUDA")
     _validate_ad_config(config)
