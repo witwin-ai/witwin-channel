@@ -12,7 +12,7 @@ Binding conventions (docs/dev/plans/05-implementation-contract.md, section 2):
 - Powers ``R = |r|^2``, ``T = Re(Y2)/Re(Y1)*|t|^2``, ``A = 1 - R - T``.
 
 Everything here is a slow, explicit float64/complex128 reference used as the
-ground truth for torch/CUDA production code. No clamping, no fallbacks.
+ground truth for torch/CUDA production code. No clamping, no silent degradation.
 """
 
 from __future__ import annotations
