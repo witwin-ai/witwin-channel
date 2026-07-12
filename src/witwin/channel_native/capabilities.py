@@ -8,16 +8,16 @@ from typing import Any
 _CAPABILITIES: dict[str, Any] = {
     "schema_version": 1,
     "components": ["los", "reflection", "diffraction", "transmission", "scattering"],
-    # transmission and scattering are accepted plumbing in v1: configs, metadata
-    # and result contracts flow them through, but every solver contributes zero
-    # paths / zero power for them. The flags below stay False until the physics
-    # lands in later waves.
+    # transmission physics is live in the Monte Carlo solvers (straight
+    # penetration chains; BDPT adds event-selected mixed chains). scattering
+    # remains accepted plumbing (zero paths / zero power) and the remaining
+    # False flags flip when their solver integrations land.
     "component_solver_integration": {
         "transmission": {
             "path": False,
             "deterministic": False,
-            "montecarlo_basic": False,
-            "montecarlo_bdpt": False,
+            "montecarlo_basic": True,
+            "montecarlo_bdpt": True,
         },
         "scattering": {
             "path": False,

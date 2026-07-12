@@ -205,7 +205,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_bdpt_endpoint_connection_visib
     at::Tensor sensor_rx_id,
     at::Tensor sensor_valid,
     int64_t sample_count);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_bdpt_accumulate_connection_samples_cuda(
     at::Tensor contribution,
     at::Tensor mis_weight,
@@ -393,19 +393,21 @@ at::Tensor cn_bdpt_store_point_component_column_cuda(
     at::Tensor target,
     at::Tensor source,
     int64_t rx_index);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_point_components_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_point_components_cuda(
     at::Tensor los,
     at::Tensor reflection,
-    at::Tensor diffraction);
+    at::Tensor diffraction,
+    at::Tensor transmission);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_los_export_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
     at::Tensor rx_positions,
     double frequency_hz);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_component_maps_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
-    at::Tensor diffraction);
+    at::Tensor diffraction,
+    at::Tensor transmission);
 at::Tensor cn_bdpt_component_map_buffer_cuda(
     at::Tensor reference,
     int64_t tx_count,
@@ -730,7 +732,7 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
     int64_t tx_count,
     int64_t rx_count,
     int64_t accumulation_strategy) {
-    auto [path_gain, los, reflection, diffraction] = cn_bdpt_accumulate_connection_samples_cuda(
+    auto [path_gain, los, reflection, diffraction, transmission] = cn_bdpt_accumulate_connection_samples_cuda(
         tensor_from_dict(samples, "contribution"),
         tensor_from_dict(samples, "mis_weight"),
         tensor_from_dict(samples, "tx_id"),
@@ -745,6 +747,7 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
     out["los"] = los;
     out["reflection"] = reflection;
     out["diffraction"] = diffraction;
+    out["transmission"] = transmission;
     return out;
 }
 
@@ -1064,14 +1067,16 @@ torch::Tensor cn_bdpt_store_point_component_column(
 pybind11::dict cn_bdpt_finalize_point_components(
     torch::Tensor los,
     torch::Tensor reflection,
-    torch::Tensor diffraction) {
-    auto [path_gain, los_power, reflection_power, diffraction_power] =
-        cn_bdpt_finalize_point_components_cuda(los, reflection, diffraction);
+    torch::Tensor diffraction,
+    torch::Tensor transmission) {
+    auto [path_gain, los_power, reflection_power, diffraction_power, transmission_power] =
+        cn_bdpt_finalize_point_components_cuda(los, reflection, diffraction, transmission);
     pybind11::dict out;
     out["path_gain"] = path_gain;
     out["los_power"] = los_power;
     out["reflection_power"] = reflection_power;
     out["diffraction_power"] = diffraction_power;
+    out["transmission_power"] = transmission_power;
     return out;
 }
 
@@ -1096,15 +1101,17 @@ pybind11::dict cn_bdpt_los_export(
 pybind11::dict cn_bdpt_finalize_component_maps(
     torch::Tensor los,
     torch::Tensor reflection,
-    torch::Tensor diffraction) {
-    auto [path_gain, los_power, reflection_power, diffraction_power] =
-        cn_bdpt_finalize_component_maps_cuda(los, reflection, diffraction);
+    torch::Tensor diffraction,
+    torch::Tensor transmission) {
+    auto [path_gain, los_power, reflection_power, diffraction_power, transmission_power] =
+        cn_bdpt_finalize_component_maps_cuda(los, reflection, diffraction, transmission);
 
     pybind11::dict out;
     out["path_gain"] = path_gain;
     out["los_power"] = los_power;
     out["reflection_power"] = reflection_power;
     out["diffraction_power"] = diffraction_power;
+    out["transmission_power"] = transmission_power;
     return out;
 }
 

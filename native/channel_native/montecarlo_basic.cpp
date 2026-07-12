@@ -1,10 +1,11 @@
 #include <torch/extension.h>
 #include <vector>
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_finalize_component_maps_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
-    at::Tensor diffraction);
+    at::Tensor diffraction,
+    at::Tensor transmission);
 at::Tensor cn_mc_component_map_buffer_cuda(
     at::Tensor reference,
     int64_t tx_count,
@@ -464,14 +465,16 @@ pybind11::dict cn_mc_face_material_tensors(
 pybind11::dict cn_mc_finalize_component_maps(
     torch::Tensor los,
     torch::Tensor reflection,
-    torch::Tensor diffraction) {
-    auto [path_gain, los_power, reflection_power, diffraction_power] =
-        cn_mc_finalize_component_maps_cuda(los, reflection, diffraction);
+    torch::Tensor diffraction,
+    torch::Tensor transmission) {
+    auto [path_gain, los_power, reflection_power, diffraction_power, transmission_power] =
+        cn_mc_finalize_component_maps_cuda(los, reflection, diffraction, transmission);
 
     pybind11::dict out;
     out["path_gain"] = path_gain;
     out["los_power"] = los_power;
     out["reflection_power"] = reflection_power;
     out["diffraction_power"] = diffraction_power;
+    out["transmission_power"] = transmission_power;
     return out;
 }

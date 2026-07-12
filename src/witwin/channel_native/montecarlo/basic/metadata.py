@@ -27,12 +27,14 @@ def component_status(
         if not diffraction_available:
             raise RuntimeError("diffraction requires RayDN native capability")
         status["diffraction"] = "enabled"
-    # transmission and scattering are accepted plumbing in v1: reported as
-    # requested-but-empty until the physics lands in later waves.
-    for name in ("transmission", "scattering"):
-        status[name] = (
-            "enabled_no_paths" if name in config.components else "not_requested"
-        )
+    # transmission carries real straight-penetration physics; scattering is
+    # accepted plumbing until its wave lands.
+    status["transmission"] = (
+        "enabled" if "transmission" in config.components else "not_requested"
+    )
+    status["scattering"] = (
+        "enabled_no_paths" if "scattering" in config.components else "not_requested"
+    )
     return status
 
 

@@ -160,14 +160,17 @@ def test_basic_solver_emits_zero_maps_for_transmission_and_scattering():
         ),
     )
 
-    # (a) validates, (b) zero-valued maps and point power for the new components.
+    # (a) validates, (b) zero-valued maps and point power: the scene has no
+    # structures, so there is nothing to transmit through; scattering is
+    # plumbing-only regardless.
     assert result.component_maps is not None
     for name in ("transmission", "scattering"):
         assert torch.count_nonzero(result.component_maps[name]) == 0
         assert torch.count_nonzero(result.component_power[name]) == 0
     torch.testing.assert_close(result.path_gain, baseline.path_gain)
-    # (c) truthful requested-but-empty metadata status.
-    assert result.metadata["components"]["transmission"] == "enabled_no_paths"
+    # (c) truthful metadata status: transmission physics is live (it just has
+    # no walls here); scattering stays requested-but-empty.
+    assert result.metadata["components"]["transmission"] == "enabled"
     assert result.metadata["components"]["scattering"] == "enabled_no_paths"
 
 

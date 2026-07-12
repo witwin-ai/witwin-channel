@@ -43,7 +43,9 @@ def _csr(materials: list[list[tuple[float, float, float, float]]]) -> dict[str, 
     }
 
 
-def _light_state(direction: list[float], field: list[float]) -> dict[str, torch.Tensor]:
+def _light_state(
+    direction: list[float], field: list[float], *, component_mask: int = 3
+) -> dict[str, torch.Tensor]:
     return {
         "origin": torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32),
         "direction": torch.tensor([direction], device="cuda", dtype=torch.float32),
@@ -52,7 +54,9 @@ def _light_state(direction: list[float], field: list[float]) -> dict[str, torch.
         "pdf_forward": torch.tensor([0.25], device="cuda", dtype=torch.float32),
         "pdf_reverse": torch.tensor([0.0], device="cuda", dtype=torch.float32),
         "depth": torch.tensor([1], device="cuda", dtype=torch.int32),
-        "component_mask": torch.tensor([3], device="cuda", dtype=torch.int32),
+        "component_mask": torch.tensor(
+            [component_mask], device="cuda", dtype=torch.int32
+        ),
         "primitive_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
         "edge_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
         "tx_id": torch.tensor([4], device="cuda", dtype=torch.int32),
@@ -205,6 +209,60 @@ def test_lossy_wall_scales_throughput_by_sqrt_power_transmittance():
     )
     assert transmitted["component_mask"].item() == (3 | 8)
     assert transmitted["event_type"].item() == 2
+
+
+def _sensor_state() -> dict[str, torch.Tensor]:
+    return {
+        "origin": torch.tensor([[5.0, 0.0, 1.0]], device="cuda", dtype=torch.float32),
+        "direction": torch.tensor([[0.0, 0.0, -1.0]], device="cuda", dtype=torch.float32),
+        "throughput_real": torch.tensor([1.0], device="cuda", dtype=torch.float32),
+        "throughput_imag": torch.tensor([0.0], device="cuda", dtype=torch.float32),
+        "pdf_forward": torch.tensor([1.0], device="cuda", dtype=torch.float32),
+        "pdf_reverse": torch.tensor([1.0], device="cuda", dtype=torch.float32),
+        "depth": torch.tensor([0], device="cuda", dtype=torch.int32),
+        "component_mask": torch.tensor([1], device="cuda", dtype=torch.int32),
+        "primitive_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
+        "edge_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
+        "tx_id": torch.tensor([-1], device="cuda", dtype=torch.int32),
+        "rx_id": torch.tensor([0], device="cuda", dtype=torch.int32),
+        "grid_linear_id": torch.tensor([0], device="cuda", dtype=torch.int32),
+        "valid": torch.tensor([True], device="cuda", dtype=torch.bool),
+        "path_length": torch.tensor([0.0], device="cuda", dtype=torch.float32),
+        "field_real": torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
+        "field_imag": torch.zeros((1, 3), device="cuda", dtype=torch.float32),
+        "source_power": torch.tensor([1.0], device="cuda", dtype=torch.float32),
+        "event_type": torch.tensor([0], device="cuda", dtype=torch.int32),
+    }
+
+
+@pytest.mark.parametrize(
+    ("component_mask", "expected_component"),
+    [
+        (1, 0),  # los only
+        (1 | 2, 1),  # reflection
+        (1 | 8, 5),  # transmission
+        (1 | 2 | 8, 5),  # exclusive priority: transmission beats reflection
+        (1 | 4 | 8, 2),  # exclusive priority: diffraction beats transmission
+    ],
+)
+def test_connection_component_classification_uses_exclusive_priority(
+    component_mask, expected_component
+):
+    """Contract section 1: path_class priority is
+    scattering > diffraction > transmission > reflection > los."""
+
+    light = _light_state(
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], component_mask=component_mask
+    )
+    samples = ops.bdpt_endpoint_connection_samples(
+        light,
+        _sensor_state(),
+        frequency_hz=3.0e9,
+        samples_per_tx=1,
+    )
+    assert samples["valid"].item() is True
+    assert samples["component_id"].item() == expected_component
+    assert samples["topology"][0, 2].item() == expected_component
 
 
 def test_invalid_material_id_invalidates_the_path():

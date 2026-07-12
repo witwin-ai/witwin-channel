@@ -29,9 +29,18 @@ from witwin.channel_native.core.kernels.ops import (
     mc_surface_group_edge_candidates,
 )
 from witwin.channel_native.core.edge_selection import refine_edge_geometry
-from witwin.channel_native.core.material_runtime import face_material_tensors, face_material_thickness
+from witwin.channel_native.core.material_runtime import (
+    face_material_field_bundle,
+    face_material_tensors,
+    face_material_thickness,
+)
 from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
 from witwin.channel_native.core.runtime.raydn import RayDNScene
+from witwin.channel_native.montecarlo.transmission import (
+    layer_csr_view,
+    scene_diagonal_m,
+    straight_transmission_chains,
+)
 
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
 
@@ -186,6 +195,70 @@ def los_component_map(
 
 def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
     return mc_sample_directions(count, reference)
+
+
+def transmission_component_map(
+    scene: Scene,
+    raydn: RayDNScene,
+    grid: ReceiverGrid,
+    *,
+    max_depth: int,
+    device: torch.device,
+    los: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Straight-penetration transmission radiomap (contract section 4,
+    endpoint-connection context).
+
+    Mirrors the LoS map's geometric convention exactly: the analytic per-cell
+    Friis gain along the straight tx->cell segment, with the binary LoS
+    visibility mask replaced by the through-wall power transmittance product
+    (unpolarized TE/TM mean per wall, evaluated at the straight-line incidence
+    angle). Cells whose segment crosses no wall belong to the exclusive los
+    path class and stay zero here, so los + transmission never double counts.
+    A single eps_r=1 vacuum wall has unit power transmittance, which makes
+    this map reproduce the unobstructed LoS map exactly (acceptance test);
+    chains needing more than ``max_depth`` penetrations are truthfully zero.
+    """
+
+    if not scene.structures:
+        tx_pos, _ = transmitter_positions(scene, device=device)
+        dim0, dim1 = component_grid_shape(grid)
+        return mc_component_map_buffer(
+            tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
+        )
+    if not raydn.available:
+        raise RuntimeError("transmission requires RayDN native scene capability")
+    los_matrix = _grid_los_matrix(scene, grid, device=device, los=los)
+    tx_pos, _ = transmitter_positions(scene, device=device)
+    rx_pos = receiver_grid_points(grid, reference=tx_pos)
+    bundle = face_material_field_bundle(scene, device=device)
+    layer_csr = layer_csr_view(bundle)
+    diagonal = scene_diagonal_m(scene)
+    rx_count = int(rx_pos.shape[0])
+    gains = []
+    for tx_index in range(int(tx_pos.shape[0])):
+        origins = tx_pos[tx_index].unsqueeze(0).repeat(rx_count, 1)
+        chain = straight_transmission_chains(
+            raydn,
+            origins,
+            rx_pos,
+            face_material_id=bundle["material_id"],
+            layer_csr=layer_csr,
+            frequency_hz=float(scene.frequency),
+            max_depth=int(max_depth),
+            scene_diagonal=diagonal,
+        )
+        gains.append(
+            torch.where(
+                chain["penetrated"],
+                chain["transmittance"],
+                torch.zeros_like(chain["transmittance"]),
+            )
+        )
+    matrix = los_matrix * torch.stack(gains, dim=0)
+    return mc_los_component_maps_from_matrix(
+        matrix, rows=grid.shape[0], cols=grid.shape[1]
+    )
 
 
 def reflection_component_maps_with_wedges(

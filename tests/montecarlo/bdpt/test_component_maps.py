@@ -33,9 +33,11 @@ def test_bdpt_component_maps_include_all_components_and_total():
         assert torch.isfinite(result.component_maps["reflection"]).all()
 
 
-def test_bdpt_component_maps_include_zero_transmission_and_scattering():
+def test_bdpt_component_maps_include_transmission_and_zero_scattering():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT component maps")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native transmission is not built")
 
     scene = single_wall_reflection_scene().add(_grid())
     components = {"los", "reflection", "diffraction", "transmission", "scattering"}
@@ -44,11 +46,13 @@ def test_bdpt_component_maps_include_zero_transmission_and_scattering():
     # (a) validates and every requested component is present in the maps.
     assert result.component_maps is not None
     assert set(result.component_maps) == components
-    # (b) the new components carry structurally valid zeros, so the total still
-    # equals the sum of all component maps.
-    for name in ("transmission", "scattering"):
-        assert torch.count_nonzero(result.component_maps[name]) == 0
-        assert torch.count_nonzero(result.component_power[name]) == 0
+    # (b) the wall sits between the transmitter and the grid, so the
+    # transmission component carries real power now; scattering remains a
+    # structurally valid zero until its wave lands.
+    assert result.component_power["transmission"].item() > 0.0
+    assert torch.count_nonzero(result.component_maps["transmission"]) > 0
+    assert torch.count_nonzero(result.component_maps["scattering"]) == 0
+    assert torch.count_nonzero(result.component_power["scattering"]) == 0
     total = (
         result.component_maps["los"]
         + result.component_maps["reflection"]
@@ -57,9 +61,11 @@ def test_bdpt_component_maps_include_zero_transmission_and_scattering():
         + result.component_maps["scattering"]
     )
     torch.testing.assert_close(result.path_gain, total, rtol=1.0e-5, atol=1.0e-8)
-    # (c) truthful requested-but-empty metadata status.
-    assert result.metadata["components"]["transmission"] == "enabled_no_paths"
+    # (c) truthful metadata status: transmission is live, scattering is not.
+    assert result.metadata["components"]["transmission"] == "enabled"
     assert result.metadata["components"]["scattering"] == "enabled_no_paths"
+    assert result.metadata["transmission"]["component_mask_bit"] == 8
+    assert result.metadata["transmission"]["straight_chain_paths"] > 0
 
 
 def test_bdpt_config_rejects_unknown_component():
