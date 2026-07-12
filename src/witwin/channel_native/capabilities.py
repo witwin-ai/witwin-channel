@@ -13,7 +13,7 @@ _CAPABILITIES: dict[str, Any] = {
     "supports_reflection_diffraction_coupling": True,
     "supports_complex_path_coefficients": True,
     "supports_polarization": True,
-    "supports_arrays": False,
+    "supports_arrays": True,
     "supports_ad": False,
     "receiver_types": ["point", "grid"],
     "solvers": {
@@ -25,7 +25,7 @@ _CAPABILITIES: dict[str, Any] = {
             "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
-            "supports_arrays": False,
+            "supports_arrays": True,
             "supports_ad": False,
         },
         "deterministic": {

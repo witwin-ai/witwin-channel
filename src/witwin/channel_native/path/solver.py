@@ -18,6 +18,7 @@ from witwin.channel_native.capabilities import (
 )
 
 from .config import Config
+from .arrays import explicit_array_scene, pack_explicit_arrays, pack_synthetic_arrays
 from .result import Result
 from .result_v2 import PathResultV2, from_topology_result
 
@@ -309,9 +310,7 @@ def solve(scene: Scene, config: Config) -> Result:
     )
 
 
-def solve_v2(scene: Scene, config: Config) -> PathResultV2:
-    """Solve and pack the shared canonical topology into PathResultV2."""
-
+def _solve_v2_base(scene: Scene, config: Config) -> PathResultV2:
     reflection_available, diffraction_available, path_native_available = (
         _validate_runtime(config)
     )
@@ -342,3 +341,25 @@ def solve_v2(scene: Scene, config: Config) -> PathResultV2:
             "unit_excitation_dimensionless_receiver_projection"
         )
     return replace(result, metadata=metadata)
+
+
+def solve_v2(scene: Scene, config: Config) -> PathResultV2:
+    """Solve canonical paths and pack synthetic or explicit antenna arrays."""
+
+    endpoints = [*scene.transmitters, *scene.receivers]
+    if any(not endpoint.synthetic_array for endpoint in endpoints):
+        expanded_scene, num_rx_ant, num_tx_ant = explicit_array_scene(scene)
+        expanded = _solve_v2_base(expanded_scene, config)
+        return pack_explicit_arrays(
+            expanded,
+            scene=scene,
+            num_rx_ant=num_rx_ant,
+            num_tx_ant=num_tx_ant,
+        )
+    result = _solve_v2_base(scene, config)
+    return pack_synthetic_arrays(
+        result,
+        frequency_hz=scene.frequency,
+        transmitters=scene.transmitters,
+        receivers=scene.receivers,
+    )
