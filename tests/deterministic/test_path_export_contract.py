@@ -27,7 +27,17 @@ def test_export_paths_preserves_path_table_columns_and_field_values():
     assert torch.all(result.paths.edge_id == -1)
     torch.testing.assert_close(result.paths.path_length_m, reference.path_length_m[valid])
     torch.testing.assert_close(result.paths.delay_s, reference.tau[valid])
-    reference_gain = reference.a[valid, 0].abs().square()
+    reference_coefficient = reference.a[..., 0][valid]
+    torch.testing.assert_close(result.paths.coefficient, reference_coefficient)
+    tx_power = torch.tensor(
+        [transmitter.power_w for transmitter in scene.transmitters],
+        device=reference.a.device,
+        dtype=torch.float32,
+    )
+    reference_gain = (
+        reference_coefficient.abs().square()
+        * tx_power[result.paths.tx_id.to(torch.int64)]
+    )
     torch.testing.assert_close(result.paths.path_gain, reference_gain)
     assert result.paths.interaction_position.shape == (path_count, 3)
     assert result.paths.interaction_normal.shape == (path_count, 3)
@@ -37,6 +47,8 @@ def test_export_paths_preserves_path_table_columns_and_field_values():
     assert result.paths.interaction_positions.shape == (path_count, 0, 3)
     assert result.paths.interaction_normals.shape == (path_count, 0, 3)
     exported_field = torch.complex(result.paths.field_real, result.paths.field_imag)
-    torch.testing.assert_close(exported_field.abs().square(), reference_gain, rtol=1.0e-5, atol=1.0e-8)
+    torch.testing.assert_close(
+        exported_field.abs().square(), reference_gain, rtol=1.0e-5, atol=1.0e-8
+    )
     assert result.paths.phase_rad.dtype == torch.float32
     assert result.paths.interaction_count.tolist() == [0] * path_count

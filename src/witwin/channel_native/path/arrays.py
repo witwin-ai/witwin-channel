@@ -45,7 +45,7 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
 
 
 def validate_synthetic_array_scene(scene: Scene) -> None:
-    """Reject unsupported synthetic layouts before native scene allocation."""
+    """Reject unavailable synthetic layouts before native scene allocation."""
 
     flat_receivers = _flatten_receivers(scene.receivers)
     endpoints = [*scene.transmitters, *flat_receivers]

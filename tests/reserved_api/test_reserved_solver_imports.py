@@ -7,7 +7,7 @@ def test_reserved_solver_packages_import():
     assert deterministic.Config.__name__ == "Config"
     assert deterministic.Result.__name__ == "Result"
     assert path.Config.__name__ == "Config"
-    assert path.Result.__name__ == "Result"
+    assert path.PathResult.__name__ == "PathResult"
     assert psdr.Config.__name__ == "Config"
     assert psdr.Result.__name__ == "Result"
     assert bdpt.Config.__name__ == "Config"

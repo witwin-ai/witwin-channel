@@ -56,7 +56,6 @@ def test_primal_metadata_reports_no_ad_for_every_solver():
     path = path_metadata(
         config=PathConfig(max_depth=0, components={"los"}),
         path_count=1,
-        valid_contribution_count=1,
         reflection_available=False,
         diffraction_available=False,
         path_native_available=True,
