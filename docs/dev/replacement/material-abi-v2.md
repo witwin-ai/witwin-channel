@@ -18,3 +18,7 @@ Phase 7B remains unsupported. Transmission/refraction, absorption, layered
 media, rough scattering, tabulated polarimetric BSDFs, medium stacks, and
 energy-accounting events are all reported as `false` in the capability
 manifest, and no solver claims those event types.
+
+The capability manifest distinguishes the two boundaries explicitly:
+`runtime_material_abi_integration` reports the Phase 7A ABI path used by every
+solver, while `event_solver_integration` remains false for all Phase 7B events.

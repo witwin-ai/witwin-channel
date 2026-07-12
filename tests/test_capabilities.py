@@ -19,7 +19,13 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     materials = manifest["materials"]
     assert materials["abi_version"] == 2
     assert materials["perfect_conductor_model"] == "explicit"
-    assert all(enabled is False for enabled in materials["solver_integration"].values())
+    assert all(
+        enabled is True
+        for enabled in materials["runtime_material_abi_integration"].values()
+    )
+    assert all(
+        enabled is False for enabled in materials["event_solver_integration"].values()
+    )
     json.dumps(manifest)
 
     manifest["components"].append("invalid")

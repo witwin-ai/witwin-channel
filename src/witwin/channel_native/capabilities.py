@@ -41,7 +41,13 @@ _CAPABILITIES: dict[str, Any] = {
             "medium_stack": False,
             "energy_accounting": False,
         },
-        "solver_integration": {
+        "runtime_material_abi_integration": {
+            "path": True,
+            "deterministic": True,
+            "montecarlo_basic": True,
+            "montecarlo_bdpt": True,
+        },
+        "event_solver_integration": {
             "path": False,
             "deterministic": False,
             "montecarlo_basic": False,
