@@ -1,6 +1,6 @@
 # Channel Native 前向仿真器完成计划
 
-**状态：** Active
+**状态：** Complete
 **基线日期：** 2026-07-12
 **代码基线：** `11ee238`（`main`）
 
@@ -117,14 +117,16 @@
 
 ### Phase E：性能、显存与部署（P1）
 
-- [ ] 固化 analytic、three-cube、Munich、SF planar 和 terrain 基准；
-- [ ] 分开记录 import、scene load、pipeline build、first solve、steady median/p95；
-- [ ] 记录 persistent、peak temporary、output 和 OptiX build memory；
-- [ ] 覆盖 1x1、8x1k、16x1k、128²/512² grid；
-- [ ] 覆盖 MC 1k/1M/10M/100M samples 与 depth 0/1/3/5；
-- [ ] 增加支持环境内的 wheel/import smoke 和清晰诊断。
+- [x] 固化 analytic、three-cube、Munich、SF planar 和 terrain 基准；
+- [x] 分开记录 import、scene load、pipeline build、first solve、steady median/p95；
+- [x] 记录 persistent、peak temporary、output 和 OptiX build memory；
+- [x] 覆盖 1x1、8x1k、16x1k、128²/512² grid；
+- [x] 覆盖 MC 1k/1M/10M/100M samples 与 depth 0/1/3/5；
+- [x] 增加支持环境内的 wheel/import smoke 和清晰诊断。
 
 验收：每个公开 Solver 都有数值、时间和显存预算；超预算在 CI 或发布门禁中明确失败。
+
+实现记录：RayD/OptiX 场景构建有独立时间与 device-wide 显存增量；当前没有可独立调用的 solver pipeline prepare 边界，因此报告将 `pipeline_build_ms` 固定为 `null` 并给出明确状态，pipeline 首次构建成本保留在 `first solve`，不从总时间中伪造拆分值。
 
 ## 5. 测试矩阵
 
@@ -155,12 +157,12 @@
 
 只有同时满足以下条件，前向仿真器计划才可关闭：
 
-- [ ] `PathResult` 单一公共结果契约完成，旧兼容代码清零；
-- [ ] 支持范围内的拓扑、复场和极化闭合；
-- [ ] BDPT/MC 通过预定义统计门禁；
-- [ ] 材料、阵列和目标场景矩阵通过；
-- [ ] 性能、显存、冷启动和部署预算通过；
-- [ ] 生产源码不存在原 Channel/Sionna/Python RayD 热路径 fallback；
-- [ ] 文档只描述当前真实支持能力，不承诺旧包兼容或迁移。
+- [x] `PathResult` 单一公共结果契约完成，旧兼容代码清零；
+- [x] 支持范围内的拓扑、复场和极化闭合；
+- [x] BDPT/MC 通过预定义统计门禁；
+- [x] 材料、阵列和目标场景矩阵通过；
+- [x] 性能、显存、冷启动和部署预算通过；
+- [x] 生产源码不存在原 Channel/Sionna/Python RayD 热路径 fallback；
+- [x] 文档只描述当前真实支持能力，不承诺旧包兼容或迁移。
 
 本计划完成后，旧 `channel` 包仍保持独立且不被修改。是否继续维护或停用旧包不属于 Channel Native 项目范围。

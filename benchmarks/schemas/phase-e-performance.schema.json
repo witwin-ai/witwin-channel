@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://witwin.dev/schemas/channel-native-phase-e-performance-1.0.0.json",
+  "title": "Channel Native Phase E performance acceptance artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile",
+    "matrix",
+    "environment",
+    "budget",
+    "measurements",
+    "preflight",
+    "gate"
+  ],
+  "properties": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "witwin.channel_native.phase-e-performance"},
+        "version": {"const": "1.0.0"}
+      }
+    },
+    "profile": {"enum": ["reduced", "full"]},
+    "matrix": {"$ref": "#/$defs/matrix"},
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit_sha", "python", "platform", "runtime"],
+      "properties": {
+        "commit_sha": {"type": ["string", "null"]},
+        "python": {"type": "string"},
+        "platform": {"type": "string"},
+        "runtime": {"type": "object"}
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "name", "version"],
+      "properties": {
+        "path": {"type": "string"},
+        "name": {"const": "channel-native-phase-e-sm120"},
+        "version": {"const": "1.0.0"}
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/measurement"}
+    },
+    "preflight": {
+      "type": "array",
+      "minItems": 8,
+      "items": {"$ref": "#/$defs/preflight"}
+    },
+    "gate": {"$ref": "#/$defs/gate"}
+  },
+  "$defs": {
+    "nonNegativeNumber": {"type": "number", "minimum": 0},
+    "nullableNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "sampleTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_ms", "cuda_event_ms"],
+      "properties": {
+        "wall_ms": {"$ref": "#/$defs/nonNegativeNumber"},
+        "cuda_event_ms": {"$ref": "#/$defs/nullableNonNegativeNumber"}
+      }
+    },
+    "matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint_pairs",
+        "grid_shapes",
+        "depths",
+        "mc_samples",
+        "preflight_mc_samples",
+        "scenarios"
+      ],
+      "properties": {
+        "endpoint_pairs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/pair"}
+        },
+        "grid_shapes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/pair"}
+        },
+        "depths": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0}
+        },
+        "mc_samples": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1}
+        },
+        "preflight_mc_samples": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1}
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "pair": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "integer", "minimum": 1},
+        {"type": "integer", "minimum": 1}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "scenario",
+        "solver",
+        "depth",
+        "samples",
+        "tx_count",
+        "receiver_count",
+        "grid_shape"
+      ],
+      "properties": {
+        "case_id": {"type": "string"},
+        "scenario": {"type": "string"},
+        "solver": {"enum": ["path", "deterministic", "basic", "bdpt"]},
+        "depth": {"type": "integer", "minimum": 0},
+        "samples": {"type": ["integer", "null"], "minimum": 1},
+        "tx_count": {"type": ["integer", "null"], "minimum": 1},
+        "receiver_count": {"type": ["integer", "null"], "minimum": 1},
+        "grid_shape": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/pair"}
+          ]
+        }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "mode",
+        "source_sha256",
+        "scene_sha256",
+        "triangle_count",
+        "transmitter_count",
+        "receiver_count",
+        "receiver_container_count",
+        "receiver_grid_cells",
+        "source_path"
+      ],
+      "properties": {
+        "name": {"type": "string"},
+        "mode": {"enum": ["generated", "full_external"]},
+        "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "scene_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "triangle_count": {"type": "integer", "minimum": 0},
+        "transmitter_count": {"type": "integer", "minimum": 1},
+        "receiver_count": {"type": "integer", "minimum": 1},
+        "receiver_container_count": {"type": "integer", "minimum": 1},
+        "receiver_grid_cells": {"type": "integer", "minimum": 0},
+        "source_path": {"type": ["string", "null"]}
+      }
+    },
+    "memorySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allocated_bytes", "reserved_bytes"],
+      "properties": {
+        "allocated_bytes": {"type": "integer", "minimum": 0},
+        "reserved_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "deviceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["free_bytes", "total_bytes"],
+      "properties": {
+        "free_bytes": {"type": "integer", "minimum": 0},
+        "total_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "case", "scene", "timing", "memory", "correctness"],
+      "properties": {
+        "kind": {"const": "benchmark"},
+        "case": {"$ref": "#/$defs/case"},
+        "scene": {"$ref": "#/$defs/scene"},
+        "timing": {"$ref": "#/$defs/timing"},
+        "memory": {"$ref": "#/$defs/memory"},
+        "correctness": {"$ref": "#/$defs/correctness"}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scene_load_ms",
+        "optix_scene_build_ms",
+        "scene_compile_ms",
+        "pipeline_build_ms",
+        "pipeline_build_status",
+        "first",
+        "steady",
+        "steady_wall_median_ms",
+        "steady_wall_p95_ms",
+        "steady_cuda_median_ms",
+        "steady_cuda_p95_ms"
+      ],
+      "properties": {
+        "scene_load_ms": {"$ref": "#/$defs/nonNegativeNumber"},
+        "optix_scene_build_ms": {"$ref": "#/$defs/nonNegativeNumber"},
+        "scene_compile_ms": {"$ref": "#/$defs/nonNegativeNumber"},
+        "pipeline_build_ms": {"type": "null"},
+        "pipeline_build_status": {
+          "const": "unavailable_without_solver_native_instrumentation"
+        },
+        "first": {"$ref": "#/$defs/sampleTiming"},
+        "steady": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/sampleTiming"}
+        },
+        "steady_wall_median_ms": {"$ref": "#/$defs/nonNegativeNumber"},
+        "steady_wall_p95_ms": {"$ref": "#/$defs/nonNegativeNumber"},
+        "steady_cuda_median_ms": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+        "steady_cuda_p95_ms": {"$ref": "#/$defs/nullableNonNegativeNumber"}
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "output_bytes",
+        "torch_allocator",
+        "device_wide",
+        "optix_build_bytes",
+        "optix_build_status"
+      ],
+      "properties": {
+        "output_bytes": {"type": "integer", "minimum": 0},
+        "torch_allocator": {"$ref": "#/$defs/torchAllocator"},
+        "device_wide": {"$ref": "#/$defs/deviceWide"},
+        "optix_build_bytes": {"type": "integer", "minimum": 0},
+        "optix_build_status": {
+          "const": "device_wide_delta_for_raydn_optix_scene_build"
+        }
+      }
+    },
+    "torchAllocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scene_before",
+        "scene_after",
+        "scene_peak",
+        "solve_after",
+        "solve_peak_allocated_bytes",
+        "solve_peak_reserved_bytes",
+        "solve_peak_temporary_allocated_bytes",
+        "solve_persistent_growth_excluding_output_bytes"
+      ],
+      "properties": {
+        "scene_before": {"$ref": "#/$defs/memorySnapshot"},
+        "scene_after": {"$ref": "#/$defs/memorySnapshot"},
+        "scene_peak": {"$ref": "#/$defs/memorySnapshot"},
+        "solve_after": {"$ref": "#/$defs/memorySnapshot"},
+        "solve_peak_allocated_bytes": {"type": "integer", "minimum": 0},
+        "solve_peak_reserved_bytes": {"type": "integer", "minimum": 0},
+        "solve_peak_temporary_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "solve_persistent_growth_excluding_output_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "deviceWide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scene_before",
+        "scene_after",
+        "solve_before",
+        "solve_after",
+        "peak_bytes",
+        "peak_status"
+      ],
+      "properties": {
+        "scene_before": {"$ref": "#/$defs/deviceSnapshot"},
+        "scene_after": {"$ref": "#/$defs/deviceSnapshot"},
+        "solve_before": {"$ref": "#/$defs/deviceSnapshot"},
+        "solve_after": {"$ref": "#/$defs/deviceSnapshot"},
+        "peak_bytes": {"type": "null"},
+        "peak_status": {"const": "unavailable_without_device_memory_sampling"}
+      }
+    },
+    "correctness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finite", "checksum_abs_sum", "observable_numel"],
+      "properties": {
+        "finite": {"type": "boolean"},
+        "checksum_abs_sum": {"type": "number", "minimum": 0},
+        "observable_numel": {"type": "integer", "minimum": 0}
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "persistent_bytes",
+        "temporary_bytes",
+        "output_bytes",
+        "tape_bytes",
+        "total_bytes"
+      ],
+      "properties": {
+        "persistent_bytes": {"type": "integer", "minimum": 0},
+        "temporary_bytes": {"type": "integer", "minimum": 0},
+        "output_bytes": {"type": "integer", "minimum": 0},
+        "tape_bytes": {"type": "integer", "minimum": 0},
+        "total_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "solver",
+        "samples",
+        "depth",
+        "tx",
+        "rx",
+        "estimate",
+        "budget_bytes",
+        "headroom_bytes",
+        "rejected_before_launch",
+        "error"
+      ],
+      "properties": {
+        "kind": {"const": "preflight"},
+        "solver": {"enum": ["basic", "bdpt"]},
+        "samples": {"const": 100000000},
+        "depth": {"enum": [0, 1, 3, 5]},
+        "tx": {"const": 16},
+        "rx": {"const": 1000},
+        "estimate": {"$ref": "#/$defs/estimate"},
+        "budget_bytes": {"type": "integer", "minimum": 1},
+        "headroom_bytes": {"type": "integer", "minimum": 0},
+        "rejected_before_launch": {"const": true},
+        "error": {"type": "string", "minLength": 1}
+      }
+    },
+    "gateCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "metric", "actual", "limit", "passed"],
+      "properties": {
+        "case_id": {"type": "string"},
+        "metric": {"type": "string"},
+        "actual": {"type": ["number", "boolean", "null"]},
+        "limit": {"type": ["number", "boolean"]},
+        "passed": {"type": "boolean"}
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "eligible",
+        "passed",
+        "actual_sm",
+        "target_sm",
+        "checks"
+      ],
+      "properties": {
+        "status": {"enum": ["passed", "failed", "not_gating_environment"]},
+        "eligible": {"type": "boolean"},
+        "passed": {"type": ["boolean", "null"]},
+        "actual_sm": {"type": ["integer", "null"]},
+        "target_sm": {"const": 120},
+        "checks": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/gateCheck"}
+        }
+      }
+    }
+  }
+}

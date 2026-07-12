@@ -182,7 +182,6 @@ def run_native_planar_benchmark(
     samples: int,
     repeats: int,
     components: set[str],
-    strategy: str = "auto",
 ) -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
@@ -198,8 +197,6 @@ def run_native_planar_benchmark(
         max_depth=MAX_DEPTH,
         seed=0,
         components=components,
-        require_reflection="reflection" in components,
-        reflection_accumulation_strategy=strategy,
     )
 
     times_ms: list[float] = []
@@ -233,7 +230,6 @@ def run_native_planar_benchmark(
     return {
         "backend": "native",
         "samples": int(samples),
-        "strategy": strategy,
         "times_ms": times_ms,
         "median_ms": _median(times_ms),
         "shape": shape or [],
@@ -254,11 +250,6 @@ def main() -> None:
         nargs="+",
         choices=("los", "reflection"),
         default=list(COMPONENTS),
-    )
-    parser.add_argument(
-        "--strategy",
-        choices=("auto", "atomic", "staged", "compact", "streaming_planar"),
-        default="auto",
     )
     parser.add_argument("--json", type=pathlib.Path, default=pathlib.Path("artifacts/sf_planar_radiomap_benchmark.json"))
     parser.add_argument("--_sionna-child", action="store_true", help=argparse.SUPPRESS)
@@ -284,7 +275,6 @@ def main() -> None:
                 samples=args.samples,
                 repeats=args.repeats,
                 components=components,
-                strategy=args.strategy,
             )
         )
     payload = {
@@ -299,7 +289,6 @@ def main() -> None:
             "frequency": FREQUENCY,
             "max_depth": MAX_DEPTH,
             "components": sorted(components),
-            "native_strategy": args.strategy,
         },
         "results": results,
     }

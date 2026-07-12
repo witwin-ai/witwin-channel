@@ -13,12 +13,12 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.support.native_ext import inject_native_paths
+from tests.support.native_ext import inject_native_paths  # noqa: E402
 
 inject_native_paths()
 
-from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.montecarlo.basic import Config, solve
+from tests.support.scenes import empty_space_los_scene  # noqa: E402
+from witwin.channel_native.montecarlo.basic import Config, solve  # noqa: E402
 
 
 def _output_bytes(result: Any) -> int:
@@ -52,7 +52,6 @@ def run_benchmark(*, scene_name: str, samples: int) -> dict[str, Any]:
         "output_bytes": _output_bytes(result),
         "raydn_native": kernel["raydn_native"],
         "accumulation_strategy": kernel["accumulation_strategy"],
-        "performance_budget_ms": None,
     }
 
 

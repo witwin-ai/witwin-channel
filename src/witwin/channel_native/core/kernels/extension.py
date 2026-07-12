@@ -18,6 +18,9 @@ _DEFAULT_BUILD_INFO = {
 
 
 def native_extension() -> object:
+    package_module = "witwin.channel_native._channel_native"
+    if importlib.util.find_spec(package_module) is not None:
+        return importlib.import_module("._channel_native", package="witwin.channel_native")
     return importlib.import_module("_channel_native")
 
 

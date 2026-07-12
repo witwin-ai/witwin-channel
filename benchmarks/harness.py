@@ -102,6 +102,7 @@ def benchmark_operation(
     torch.cuda.reset_peak_memory_stats()
     allocated_before = int(torch.cuda.memory_allocated())
     reserved_before = int(torch.cuda.memory_reserved())
+    device_free_before, device_total = torch.cuda.mem_get_info()
     tracemalloc.start()
     tracemalloc.reset_peak()
     result, first = _measure_once(operation, synchronize)
@@ -119,6 +120,10 @@ def benchmark_operation(
     cuda = [row.cuda_event_ms for row in steady_rows if row.cuda_event_ms is not None]
     peak_allocated = int(torch.cuda.max_memory_allocated())
     peak_reserved = int(torch.cuda.max_memory_reserved())
+    allocated_after = int(torch.cuda.memory_allocated())
+    reserved_after = int(torch.cuda.memory_reserved())
+    device_free_after, _ = torch.cuda.mem_get_info()
+    output_bytes = tensor_bytes(result)
     measurement = BenchmarkMeasurement(
         first=first,
         steady=tuple(steady_rows),
@@ -129,9 +134,23 @@ def benchmark_operation(
         memory={
             "persistent_allocated_before_bytes": allocated_before,
             "persistent_reserved_before_bytes": reserved_before,
+            "persistent_allocated_after_bytes": allocated_after,
+            "persistent_reserved_after_bytes": reserved_after,
+            "persistent_growth_excluding_output_bytes": max(
+                0, allocated_after - allocated_before - output_bytes
+            ),
+            "output_bytes": output_bytes,
             "peak_allocated_bytes": peak_allocated,
             "peak_reserved_bytes": peak_reserved,
-            "peak_temporary_allocated_bytes": max(0, peak_allocated - allocated_before),
+            "peak_temporary_allocated_bytes": max(
+                0, peak_allocated - max(allocated_before, allocated_after)
+            ),
+            "device_total_bytes": int(device_total),
+            "device_used_before_bytes": int(device_total - device_free_before),
+            "device_used_after_bytes": int(device_total - device_free_after),
+            "device_persistent_growth_bytes": max(
+                0, int(device_free_before - device_free_after)
+            ),
             "host_traced_current_bytes": int(host_current),
             "host_traced_peak_bytes": int(host_peak),
         },
@@ -144,12 +163,19 @@ def measure_cold_import(
 ) -> dict[str, Any]:
     """Measure a source-tree fresh import; this is not an installed-wheel smoke."""
 
+    repo_root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ)
+    source_paths = [str(repo_root / "src"), str(repo_root)]
+    inherited = env.get("PYTHONPATH")
+    if inherited:
+        source_paths.append(inherited)
+    env["PYTHONPATH"] = os.pathsep.join(source_paths)
     command = [sys.executable, "-c", f"import {module}"]
     started = time.perf_counter()
     completed = subprocess.run(
         command,
-        cwd=Path(__file__).resolve().parents[1],
-        env=dict(os.environ),
+        cwd=repo_root,
+        env=env,
         capture_output=True,
         text=True,
         timeout=timeout_s,

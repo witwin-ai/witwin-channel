@@ -310,7 +310,7 @@ def _run_native(args: argparse.Namespace) -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT))
     from witwin.channel_native import ReceiverPoint, Scene, Transmitter, build_info
     from witwin.channel_native.core.edge_policy import EdgePolicy
-    from witwin.channel_native.path import Config, solve_v2 as solve
+    from witwin.channel_native.path import Config, solve
 
     tx_points = _parse_points(args.tx)
     rx_points = _parse_points(args.rx)

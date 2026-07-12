@@ -1,0 +1,116 @@
+{
+  "name": "channel-native-phase-e-sm120",
+  "version": "1.0.0",
+  "environment": {
+    "sm": 120,
+    "policy": "Only exact SM 120 runs are gating; all other environments are reported as non-gating."
+  },
+  "profiles": {
+    "reduced": {
+      "scenario": "reduced-three-cube",
+      "solver_budgets": {
+        "path": {
+      "first_wall_ms": 30000.0,
+      "steady_wall_median_ms": 5000.0,
+      "steady_wall_p95_ms": 10000.0,
+      "steady_cuda_median_ms": 5000.0,
+      "steady_cuda_p95_ms": 10000.0,
+      "torch_peak_allocated_bytes": 4294967296,
+      "torch_peak_temporary_bytes": 4294967296,
+      "torch_persistent_growth_bytes": 4294967296,
+      "optix_build_bytes": 1073741824,
+      "output_bytes": 536870912
+        },
+        "deterministic": {
+      "first_wall_ms": 30000.0,
+      "steady_wall_median_ms": 5000.0,
+      "steady_wall_p95_ms": 10000.0,
+      "steady_cuda_median_ms": 5000.0,
+      "steady_cuda_p95_ms": 10000.0,
+      "torch_peak_allocated_bytes": 4294967296,
+      "torch_peak_temporary_bytes": 4294967296,
+      "torch_persistent_growth_bytes": 4294967296,
+      "optix_build_bytes": 1073741824,
+      "output_bytes": 536870912
+        },
+        "basic": {
+      "first_wall_ms": 30000.0,
+      "steady_wall_median_ms": 5000.0,
+      "steady_wall_p95_ms": 10000.0,
+      "steady_cuda_median_ms": 5000.0,
+      "steady_cuda_p95_ms": 10000.0,
+      "torch_peak_allocated_bytes": 4294967296,
+      "torch_peak_temporary_bytes": 4294967296,
+      "torch_persistent_growth_bytes": 4294967296,
+      "optix_build_bytes": 1073741824,
+      "output_bytes": 536870912
+        },
+        "bdpt": {
+      "first_wall_ms": 30000.0,
+      "steady_wall_median_ms": 5000.0,
+      "steady_wall_p95_ms": 10000.0,
+      "steady_cuda_median_ms": 5000.0,
+      "steady_cuda_p95_ms": 10000.0,
+      "torch_peak_allocated_bytes": 4294967296,
+      "torch_peak_temporary_bytes": 4294967296,
+      "torch_persistent_growth_bytes": 4294967296,
+      "optix_build_bytes": 1073741824,
+      "output_bytes": 536870912
+        }
+      }
+    },
+    "full": {
+      "scenario": "phase-e-full-matrix",
+      "solver_budgets": {
+        "path": {
+          "first_wall_ms": 1800000.0,
+          "steady_wall_median_ms": 900000.0,
+          "steady_wall_p95_ms": 1200000.0,
+          "steady_cuda_median_ms": 900000.0,
+          "steady_cuda_p95_ms": 1200000.0,
+          "torch_peak_allocated_bytes": 16106127360,
+          "torch_peak_temporary_bytes": 16106127360,
+          "torch_persistent_growth_bytes": 16106127360,
+          "optix_build_bytes": 4294967296,
+          "output_bytes": 8589934592
+        },
+        "deterministic": {
+          "first_wall_ms": 1800000.0,
+          "steady_wall_median_ms": 900000.0,
+          "steady_wall_p95_ms": 1200000.0,
+          "steady_cuda_median_ms": 900000.0,
+          "steady_cuda_p95_ms": 1200000.0,
+          "torch_peak_allocated_bytes": 16106127360,
+          "torch_peak_temporary_bytes": 16106127360,
+          "torch_persistent_growth_bytes": 16106127360,
+          "optix_build_bytes": 4294967296,
+          "output_bytes": 8589934592
+        },
+        "basic": {
+          "first_wall_ms": 1800000.0,
+          "steady_wall_median_ms": 900000.0,
+          "steady_wall_p95_ms": 1200000.0,
+          "steady_cuda_median_ms": 900000.0,
+          "steady_cuda_p95_ms": 1200000.0,
+          "torch_peak_allocated_bytes": 16106127360,
+          "torch_peak_temporary_bytes": 16106127360,
+          "torch_persistent_growth_bytes": 16106127360,
+          "optix_build_bytes": 4294967296,
+          "output_bytes": 8589934592
+        },
+        "bdpt": {
+          "first_wall_ms": 1800000.0,
+          "steady_wall_median_ms": 900000.0,
+          "steady_wall_p95_ms": 1200000.0,
+          "steady_cuda_median_ms": 900000.0,
+          "steady_cuda_p95_ms": 1200000.0,
+          "torch_peak_allocated_bytes": 16106127360,
+          "torch_peak_temporary_bytes": 16106127360,
+          "torch_persistent_growth_bytes": 16106127360,
+          "optix_build_bytes": 4294967296,
+          "output_bytes": 8589934592
+        }
+      }
+    }
+  }
+}

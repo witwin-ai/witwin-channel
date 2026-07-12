@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import subprocess
 import sys
 
@@ -34,4 +35,14 @@ def test_basic_benchmark_outputs_required_json_fields():
     assert payload["output_bytes"] > 0
     assert isinstance(payload["raydn_native"], bool)
     assert payload["accumulation_strategy"] == "atomic_add"
-    assert payload["performance_budget_ms"] is None
+    assert "performance_budget_ms" not in payload
+
+    root = Path(__file__).resolve().parents[3]
+    budget = json.loads(
+        (root / "benchmarks/gates/phase_e_performance.sm120.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )["profiles"]["reduced"]["solver_budgets"]["basic"]
+    assert budget["steady_wall_p95_ms"] > 0.0
+    assert budget["torch_peak_allocated_bytes"] > 0
+    assert budget["output_bytes"] > 0

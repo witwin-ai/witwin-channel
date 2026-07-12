@@ -1,0 +1,77 @@
+{
+  "schema": {
+    "name": "witwin.channel_native.phase_e_scenarios",
+    "version": "1.0.0"
+  },
+  "asset_policy": {
+    "external_root_env": "WITWIN_CHANNEL_NATIVE_SCENE_ROOT",
+    "full_asset_missing": "fail",
+    "reduced_fallback": false
+  },
+  "endpoint_profiles": [
+    {"id": "point-1x1", "tx": 1, "rx": 1},
+    {"id": "points-8x1k", "tx": 8, "rx": 1000},
+    {"id": "points-16x1k", "tx": 16, "rx": 1000}
+  ],
+  "grid_profiles": [[128, 128], [512, 512]],
+  "scenarios": [
+    {
+      "name": "analytic",
+      "mode": "generated",
+      "generator_revision": 1,
+      "source_sha256": "03919ae566a64b7ed30093ed1c90ac15a38fb7808e98db8fda906b60c913ce16",
+      "expected_triangle_count": 2,
+      "frequency_hz": 3000000000.0,
+      "default_tx_count": 1,
+      "default_receiver_count": 1
+    },
+    {
+      "name": "three_cube",
+      "mode": "generated",
+      "generator_revision": 1,
+      "source_sha256": "4ffb9d14c6760f286c2de7c0b7a4edee6523a91f4a1c862d77311e31208b5ab9",
+      "expected_triangle_count": 36,
+      "frequency_hz": 3000000000.0,
+      "default_tx_count": 1,
+      "default_receiver_count": 1
+    },
+    {
+      "name": "terrain",
+      "mode": "generated",
+      "generator_revision": 1,
+      "source_sha256": "b3b39f30438645592cdb21c42239d29b79806855362830ddcd67fe024d130a20",
+      "expected_triangle_count": 128,
+      "frequency_hz": 3500000000.0,
+      "default_tx_count": 1,
+      "default_grid_shape": [128, 128]
+    },
+    {
+      "name": "munich_full",
+      "mode": "full_external",
+      "asset_name": "munich",
+      "source_sha256": "976b137d833bd5fb886533bfca6ba49763384f1457539612a0817a06060f507d",
+      "expected_triangle_count": 38936,
+      "frequency_hz": 2400000000.0,
+      "default_tx_count": 1,
+      "default_grid_shape": [128, 128],
+      "transmitter": [8.5, 21.0, 27.0],
+      "bounds_x": [-120.0, 120.0],
+      "bounds_y": [-120.0, 140.0],
+      "plane_z": 1.5
+    },
+    {
+      "name": "sf_full",
+      "mode": "full_external",
+      "asset_name": "san_francisco",
+      "source_sha256": "64f2e2a0119a00b11d83d051f8a9687d187c722514c0f4fe3d7beb8cfb813ec1",
+      "expected_triangle_count": 268041,
+      "frequency_hz": 3500000000.0,
+      "default_tx_count": 1,
+      "default_grid_shape": [512, 512],
+      "transmitter": [468.0, 106.0, 70.0],
+      "bounds_x": [-520.0, 720.0],
+      "bounds_y": [-480.0, 470.0],
+      "plane_z": 1.5
+    }
+  ]
+}

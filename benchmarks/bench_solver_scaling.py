@@ -13,19 +13,21 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT))
 
-from benchmarks.harness import (
+from benchmarks.harness import (  # noqa: E402
     benchmark_operation,
     tensor_bytes,
     versioned_report,
     write_report,
 )
-from tests.support.native_ext import inject_native_paths
+from tests.support.native_ext import inject_native_paths  # noqa: E402
 
 inject_native_paths()
 
-from tests.support.scenes import same_side_wall_reflection_scene
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.memory_budget import estimate_monte_carlo_memory
+from tests.support.scenes import same_side_wall_reflection_scene  # noqa: E402
+from witwin.channel_native import ReceiverPoint, Scene, Transmitter  # noqa: E402
+from witwin.channel_native.core.memory_budget import (  # noqa: E402
+    estimate_monte_carlo_memory,
+)
 
 
 def _ints(value: str) -> tuple[int, ...]:
@@ -49,25 +51,26 @@ def _expanded_scene(tx_count: int, rx_count: int) -> Scene:
 
 
 def _operation(solver: str, scene: Scene, *, depth: int, samples: int):
+    components = {"los"} if depth == 0 else {"los", "reflection"}
     if solver == "path":
-        from witwin.channel_native.path import Config, solve_v2
+        from witwin.channel_native.path import Config, solve
 
-        config = Config(max_depth=depth, components={"los", "reflection"})
-        return lambda: solve_v2(scene, config)
+        config = Config(max_depth=depth, components=components)
+        return lambda: solve(scene, config)
     if solver == "deterministic":
         from witwin.channel_native.deterministic import Config, solve
 
-        config = Config(max_depth=depth, components={"los", "reflection"})
+        config = Config(max_depth=depth, components=components)
         return lambda: solve(scene, config)
     if solver == "basic":
         from witwin.channel_native.montecarlo.basic import Config, solve
 
-        config = Config(samples=samples, max_depth=depth, components={"los", "reflection"})
+        config = Config(samples=samples, max_depth=depth, components=components)
         return lambda: solve(scene, config)
     if solver == "bdpt":
         from witwin.channel_native.montecarlo.bdpt import Config, solve
 
-        config = Config(samples=samples, max_depth=depth, components={"los", "reflection"})
+        config = Config(samples=samples, max_depth=depth, components=components)
         return lambda: solve(scene, config)
     raise ValueError(f"unknown solver: {solver}")
 
@@ -90,11 +93,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                             operation, warmup=args.warmup, repeats=args.repeats
                         )
                         output_bytes = tensor_bytes(result)
-                        estimate = estimate_monte_carlo_memory(
-                            samples=samples,
-                            transmitters=tx_count,
-                            receivers=rx_count,
-                            depth=depth,
+                        estimate = (
+                            estimate_monte_carlo_memory(
+                                samples=samples,
+                                transmitters=tx_count,
+                                receivers=rx_count,
+                                depth=depth,
+                            )
+                            if solver in {"basic", "bdpt"}
+                            else None
                         )
                         rows.append(
                             {
@@ -105,7 +112,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 "samples": samples,
                                 "timing": measurement.as_dict(),
                                 "output_bytes": int(output_bytes),
-                                "estimated_scale_memory": estimate.as_dict(),
+                                "estimated_scale_memory": (
+                                    estimate.as_dict() if estimate is not None else None
+                                ),
                             }
                         )
     return versioned_report(
