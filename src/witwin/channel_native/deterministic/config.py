@@ -49,6 +49,9 @@ class Config:
         if self.sort_key not in _VALID_SORT_KEYS:
             raise ValueError(f"sort_key must be one of {sorted(_VALID_SORT_KEYS)}")
         if self.ad_mode not in _VALID_AD_MODES:
-            raise RuntimeError("deterministic fixed-topology AD is not enabled")
+            raise RuntimeError(
+                "deterministic fixed-topology AD is not enabled because "
+                "supports_ad=False in the first replacement release; ad_mode must be 'none'"
+            )
 
         object.__setattr__(self, "components", components)

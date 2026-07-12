@@ -17,8 +17,14 @@ usage remains an explicit migration gate.
 | `Receiver/ReceiverGrid` | 80 | P1 | Partial/supported |
 | `AntennaArray/PlanarArray/ULA/UPA` | 23 | P1/P2 | Missing until Phase 4 |
 | `montecarlo.solve` | 6 | P1 | Split into Basic/BDPT partial implementations |
+| Differentiable solver workflows | 19 reference files; 0 production consumers | P2 decision | Explicitly unsupported in the first replacement release; every solver accepts only `ad_mode="none"` |
 
 The public `witwin.channel_native.capabilities()` manifest is the launch-time
 source of truth. A configuration outside a solver's advertised range must fail
 before scene compilation or tensor allocation. Solver results report both the
 requested and effective configuration and per-component effective depth.
+
+The AD decision and migration boundary are recorded in
+`channel-native-ad-migration.md`. The two native MC LoS derivative primitives
+are analytic test/reference surfaces only; they are not reachable through a
+public solver and therefore do not change `supports_ad=False`.

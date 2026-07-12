@@ -48,5 +48,8 @@ class Config:
         if self.reflection_staged_min_samples_per_cell < 0:
             raise ValueError("reflection_staged_min_samples_per_cell must be non-negative")
         if self.ad_mode not in _VALID_AD_MODES:
-            raise ValueError("ad_mode must be 'none' for MC basic native CUDA")
+            raise ValueError(
+                "montecarlo_basic supports_ad=False in the first replacement release; "
+                "ad_mode must be 'none'"
+            )
         object.__setattr__(self, "components", components)

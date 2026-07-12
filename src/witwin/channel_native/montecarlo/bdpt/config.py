@@ -76,7 +76,10 @@ class Config:
         if self.max_exported_paths is not None and self.max_exported_paths < 0:
             raise ValueError("max_exported_paths must be non-negative")
         if self.ad_mode not in _VALID_AD_MODES:
-            raise ValueError("BDPT ad_mode must be 'none'")
+            raise ValueError(
+                "montecarlo_bdpt supports_ad=False in the first replacement release; "
+                "ad_mode must be 'none'"
+            )
         if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
             raise ValueError("workspace_limit_bytes must be non-negative")
 

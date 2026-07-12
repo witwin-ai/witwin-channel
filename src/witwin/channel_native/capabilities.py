@@ -15,6 +15,17 @@ _CAPABILITIES: dict[str, Any] = {
     "supports_polarization": True,
     "supports_arrays": True,
     "supports_ad": False,
+    "ad_contract": {
+        "decision": "primal_only_first_replacement",
+        "public_modes": ["none"],
+        "fixed_topology_jvp": False,
+        "fixed_topology_vjp": False,
+        "visibility_discontinuity_estimator": False,
+        "experimental_low_level_primitives": [
+            "mc_los_path_gain_backward",
+            "mc_los_path_gain_jvp",
+        ],
+    },
     "receiver_types": ["point", "grid"],
     "materials": {
         "abi_version": 2,
@@ -48,6 +59,7 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_polarization": True,
             "supports_arrays": True,
             "supports_ad": False,
+            "ad_modes": ["none"],
         },
         "deterministic": {
             "max_reflection_depth": 5,
@@ -57,6 +69,7 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_polarization": True,
             "supports_arrays": False,
             "supports_ad": False,
+            "ad_modes": ["none"],
         },
         "montecarlo_basic": {
             "max_diffraction_order": 1,
@@ -65,6 +78,7 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_polarization": False,
             "supports_arrays": False,
             "supports_ad": False,
+            "ad_modes": ["none"],
         },
         "montecarlo_bdpt": {
             "max_diffraction_order": 1,
@@ -73,6 +87,7 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_polarization": True,
             "supports_arrays": False,
             "supports_ad": False,
+            "ad_modes": ["none"],
         },
     },
 }
