@@ -1087,8 +1087,7 @@ def _run_provider_subprocess(
         str(args.repeats),
         "--seed",
         str(args.seed if seed is None else seed),
-        "--cfr-offsets-hz",
-        args.cfr_offsets_hz,
+        f"--cfr-offsets-hz={args.cfr_offsets_hz}",
     ]
     env = dict(os.environ)
     completed = subprocess.run(

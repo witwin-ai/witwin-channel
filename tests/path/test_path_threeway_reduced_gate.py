@@ -145,3 +145,34 @@ def test_native_v2_stats_extracts_padded_signal_and_geometry() -> None:
         0.5,
         0.25,
     ]
+
+
+def test_provider_subprocess_preserves_negative_cfr_offsets(monkeypatch) -> None:
+    captured: dict[str, list[str]] = {}
+
+    def run(cmd, **kwargs):
+        del kwargs
+        captured["cmd"] = cmd
+        return SimpleNamespace(returncode=1, stdout="", stderr="expected")
+
+    monkeypatch.setattr(benchmark.subprocess, "run", run)
+    args = SimpleNamespace(
+        scene="san_francisco",
+        sionna_source_root="sionna",
+        channel_root="channel",
+        frequency_hz=3.5e9,
+        tx="0,0,180",
+        rx="250,0,180",
+        samples=256,
+        max_num_paths=16,
+        diffraction_state_budget=1024,
+        inserted_reflection_state_budget=1024,
+        warmup=0,
+        repeats=1,
+        seed=7,
+        cfr_offsets_hz="-1000000,0,1000000",
+    )
+
+    benchmark._run_provider_subprocess(args, "native")
+
+    assert "--cfr-offsets-hz=-1000000,0,1000000" in captured["cmd"]
