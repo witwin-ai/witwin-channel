@@ -4,6 +4,7 @@ from typing import Any
 
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
+from witwin.channel_native.core.components import component_availability_status
 
 from .config import Config
 
@@ -14,28 +15,13 @@ def component_status(
     reflection_available: bool,
     diffraction_available: bool,
 ) -> dict[str, str]:
-    status = {
-        "los": "enabled" if "los" in config.components else "not_requested",
-        "reflection": "not_requested",
-        "diffraction": "not_requested",
-    }
-    if "reflection" in config.components:
-        if not reflection_available:
-            raise RuntimeError("reflection requires RayDN native capability")
-        status["reflection"] = "enabled"
-    if "diffraction" in config.components:
-        if not diffraction_available:
-            raise RuntimeError("diffraction requires RayDN native capability")
-        status["diffraction"] = "enabled"
-    # transmission carries real straight-penetration physics; scattering
-    # deposits the Kirchhoff diffuse radiomap from area-sampled rough faces.
-    status["transmission"] = (
-        "enabled" if "transmission" in config.components else "not_requested"
+    return component_availability_status(
+        config.components,
+        reflection_available=reflection_available,
+        diffraction_available=diffraction_available,
+        reflection_error="reflection requires RayDN native capability",
+        diffraction_error="diffraction requires RayDN native capability",
     )
-    status["scattering"] = (
-        "enabled" if "scattering" in config.components else "not_requested"
-    )
-    return status
 
 
 def make_solver_metadata(

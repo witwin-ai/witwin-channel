@@ -17,14 +17,14 @@ from witwin.channel_native.core.material_runtime import (
     face_material_field_bundle,
     face_material_tensors,
 )
-from witwin.channel_native.montecarlo.basic.backend import (
-    _LIGHT_SPEED_M_PER_S,
+from witwin.channel_native.core.scene_tensors import (
+    LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
     receiver_positions as _native_receiver_positions,
     transmitter_positions as _native_transmitter_positions,
 )
-from witwin.channel_native.montecarlo.basic.raydn_components import (
-    _cached_diffraction_edge_geometry,
-    _diffraction_edge_geometry,
+from witwin.channel_native.core.diffraction_geometry import (
+    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
+    diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 
 

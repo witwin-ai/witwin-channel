@@ -5,12 +5,15 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
+from witwin.channel_native import Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
 from witwin.channel_native.core.path_topology import export_topology
+from witwin.channel_native.core.scene_tensors import (
+    receiver_positions as _shared_receiver_positions,
+    transmitter_positions as _shared_transmitter_positions,
+)
 from witwin.channel_native.capabilities import (
     capabilities,
     config_metadata,
@@ -37,59 +40,14 @@ _COMPONENT_ID = {
 }
 
 
-def _vector3_tuple(value: torch.Tensor) -> tuple[float, float, float]:
-    return (float(value[0]), float(value[1]), float(value[2]))
-
-
 def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
-    flat_positions = tuple(
-        component
-        for transmitter in scene.transmitters
-        for component in _vector3_tuple(transmitter.position)
-    )
-    powers = tuple(float(transmitter.power_w) for transmitter in scene.transmitters)
-    exported = ops.mc_transmitter_tensors(flat_positions, powers)
-    return exported["positions"], exported["power"]
-
-
-def _host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
-    powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
-    return ops.mc_transmitter_tensors(flat_positions, powers)["positions"]
+    return _shared_transmitter_positions(scene, device=torch.device("cuda"))
 
 
 def _receiver_positions(scene: Scene, *, reference: torch.Tensor) -> torch.Tensor:
-    blocks: list[torch.Tensor] = []
-    point_positions: list[float] = []
-
-    def flush_points() -> None:
-        nonlocal point_positions
-        if point_positions:
-            blocks.append(_host_vec3_tensor(tuple(point_positions)))
-            point_positions = []
-
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverPoint):
-            point_positions.extend(_vector3_tuple(receiver.position))
-        elif isinstance(receiver, ReceiverGrid):
-            flush_points()
-            blocks.append(
-                ops.mc_receiver_grid_points(
-                    reference,
-                    origin=_vector3_tuple(receiver.origin),
-                    x_axis=_vector3_tuple(receiver.x_axis),
-                    y_axis=_vector3_tuple(receiver.y_axis),
-                    shape=receiver.shape,
-                    spacing=receiver.spacing,
-                )
-            )
-        else:
-            raise TypeError(f"receiver type is not accepted: {type(receiver).__name__}")
-    flush_points()
-    if not blocks:
-        return _host_vec3_tensor(())
-    if len(blocks) == 1:
-        return blocks[0]
-    return ops.path_concat_vec3(blocks)
+    return _shared_receiver_positions(
+        scene, device=reference.device, reference=reference
+    )
 
 
 def _component_status(

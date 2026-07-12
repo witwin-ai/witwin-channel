@@ -52,6 +52,155 @@ __device__ __forceinline__ utd::Complex exp_neg_2i(utd::Complex value) {
     return utd::cplx(amplitude * cosine, -amplitude * sine);
 }
 
+// Frozen Sionna radiomap slab arithmetic. This intentionally preserves the
+// original hypotf/sqrtf evaluation order and denominator floor used by the MC
+// reflection estimator; changing it shifts seeded FP32 radiomap fingerprints.
+struct LegacySlabComplex {
+    float re;
+    float im;
+};
+
+__device__ __forceinline__ LegacySlabComplex legacy_add(
+    LegacySlabComplex a, LegacySlabComplex b) {
+    return {a.re + b.re, a.im + b.im};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_sub(
+    LegacySlabComplex a, LegacySlabComplex b) {
+    return {a.re - b.re, a.im - b.im};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_mul(
+    LegacySlabComplex a, LegacySlabComplex b) {
+    return {a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_scale(
+    LegacySlabComplex a, float value) {
+    return {a.re * value, a.im * value};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_div(
+    LegacySlabComplex a, LegacySlabComplex b) {
+    const float denominator = fmaxf(b.re * b.re + b.im * b.im, 1.0e-30f);
+    return {
+        (a.re * b.re + a.im * b.im) / denominator,
+        (a.im * b.re - a.re * b.im) / denominator};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_div_floor(
+    LegacySlabComplex a, LegacySlabComplex b, float denominator_floor) {
+    const float denominator = fmaxf(
+        b.re * b.re + b.im * b.im, denominator_floor);
+    return {
+        (a.re * b.re + a.im * b.im) / denominator,
+        (a.im * b.re - a.re * b.im) / denominator};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_sqrt(
+    LegacySlabComplex value) {
+    const float magnitude = hypotf(value.re, value.im);
+    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + value.re)));
+    const float imag = copysignf(
+        sqrtf(fmaxf(0.0f, 0.5f * (magnitude - value.re))), value.im);
+    return {real, imag};
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_interface_sqrt(
+    LegacySlabComplex value) {
+    const float magnitude = hypotf(value.re, value.im);
+    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + value.re)));
+    const float imag_sign = value.im < 0.0f ? -1.0f : 1.0f;
+    const float imag = imag_sign * sqrtf(
+        fmaxf(0.0f, 0.5f * (magnitude - value.re)));
+    return {real, imag};
+}
+
+__device__ __forceinline__ void legacy_interface_fresnel(
+    float cos_theta_in,
+    float eps_r,
+    float sigma_e,
+    float mu_r,
+    float omega,
+    float vacuum_permittivity,
+    float epsilon,
+    utd::Complex& r_te,
+    utd::Complex& r_tm) {
+    const float cos_theta = fminf(fmaxf(cos_theta_in, epsilon), 1.0f);
+    const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
+    const LegacySlabComplex eta = {
+        eps_r, -sigma_e / (omega * vacuum_permittivity)};
+    const LegacySlabComplex root = legacy_interface_sqrt(
+        legacy_sub(legacy_scale(eta, mu_r), {sin2, 0.0f}));
+    const LegacySlabComplex mu_cos = {mu_r * cos_theta, 0.0f};
+    const LegacySlabComplex eta_cos = legacy_scale(eta, cos_theta);
+    const LegacySlabComplex result_te = legacy_div_floor(
+        legacy_sub(mu_cos, root), legacy_add(mu_cos, root), epsilon);
+    const LegacySlabComplex result_tm = legacy_div_floor(
+        legacy_sub(eta_cos, root), legacy_add(eta_cos, root), epsilon);
+    r_te = utd::cplx(result_te.re, result_te.im);
+    r_tm = utd::cplx(result_tm.re, result_tm.im);
+}
+
+__device__ __forceinline__ LegacySlabComplex legacy_exp_neg_2i(
+    LegacySlabComplex value) {
+    const float amplitude = expf(fminf(2.0f * value.im, 80.0f));
+    float sine;
+    float cosine;
+    sincosf(2.0f * value.re, &sine, &cosine);
+    return {amplitude * cosine, -amplitude * sine};
+}
+
+__device__ __forceinline__ void legacy_sionna_slab_fresnel(
+    float cos_theta,
+    float eps_r,
+    float sigma_e,
+    float gain,
+    float thickness,
+    float wavelength,
+    utd::Complex& r_te,
+    utd::Complex& r_tm) {
+    const float omega = 2.0f * utd::UTD_PI * kSpeedOfLight /
+                        fmaxf(wavelength, utd::UTD_SMALL_EPS);
+    const LegacySlabComplex eta = {
+        fmaxf(eps_r, utd::UTD_SMALL_EPS),
+        -fmaxf(sigma_e, 0.0f) / (omega * utd::UTD_EPSILON_0)};
+    const float ct = fminf(
+        fmaxf(fabsf(cos_theta), utd::UTD_SMALL_EPS), 1.0f);
+    const float sin2 = fmaxf(0.0f, 1.0f - ct * ct);
+    const LegacySlabComplex root = legacy_sqrt(
+        legacy_sub(eta, {sin2, 0.0f}));
+    const LegacySlabComplex ct_complex = {ct, 0.0f};
+    const LegacySlabComplex eta_ct = legacy_scale(eta, ct);
+    const LegacySlabComplex interface_te = legacy_div(
+        legacy_sub(ct_complex, root), legacy_add(ct_complex, root));
+    const LegacySlabComplex interface_tm = legacy_div(
+        legacy_sub(eta_ct, root), legacy_add(eta_ct, root));
+    const LegacySlabComplex q = legacy_scale(
+        root,
+        2.0f * utd::UTD_PI * fmaxf(thickness, 0.0f) /
+            fmaxf(wavelength, utd::UTD_SMALL_EPS));
+    const LegacySlabComplex phase = legacy_exp_neg_2i(q);
+    const LegacySlabComplex one = {1.0f, 0.0f};
+    const LegacySlabComplex numerator = legacy_sub(one, phase);
+    const LegacySlabComplex result_te = legacy_scale(
+        legacy_div(
+            legacy_mul(interface_te, numerator),
+            legacy_sub(
+                one,
+                legacy_mul(legacy_mul(interface_te, interface_te), phase))),
+        gain);
+    const LegacySlabComplex result_tm = legacy_scale(
+        legacy_div(
+            legacy_mul(interface_tm, numerator),
+            legacy_sub(
+                one,
+                legacy_mul(legacy_mul(interface_tm, interface_tm), phase))),
+        gain);
+    r_te = utd::cplx(result_te.re, result_te.im);
+    r_tm = utd::cplx(result_tm.re, result_tm.im);
+}
+
 __device__ __forceinline__ void slab_fresnel(
     float cos_theta,
     float eps_r,

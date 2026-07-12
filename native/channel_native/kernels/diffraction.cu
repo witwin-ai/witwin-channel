@@ -5,12 +5,14 @@
 #include <rayd/shared/utd/utd_math.h>
 
 #include "../tensor_checks.h"
+#include "../field_transport.cuh"
 #include <vector>
 
 namespace {
 
 constexpr int kDiffractionBlockSize = 256;
 namespace utd = witwin::channel::native_ext;
+namespace transport = channel_native::field_transport;
 
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;
@@ -20,37 +22,14 @@ __device__ __forceinline__ float dfr_uniform(unsigned int lane,unsigned int stre
     return static_cast<float>(h&0x00ffffffu)*(1.0f/16777216.0f);
 }
 
-__device__ __forceinline__ void slab_reflection(
-    float ct,float er,float sg,float thickness,float wavelength,utd::Complex &rte,utd::Complex &rtm) {
-    ct=fminf(fmaxf(fabsf(ct),1.0e-6f),1.0f);
-    const float omega=2.0f*utd::UTD_PI*299792458.0f/wavelength;
-    const utd::Complex eta=utd::cplx(er,-sg/(omega*utd::UTD_EPSILON_0));
-    const utd::Complex root=utd::cplx_sqrt(utd::cplx_sub(eta,utd::cplx(1.0f-ct*ct,0)));
-    const utd::Complex rp_te=utd::cplx_div(utd::cplx_sub(utd::cplx(ct,0),root),utd::cplx_add(utd::cplx(ct,0),root));
-    const utd::Complex ect=utd::cplx_mul_real(eta,ct);
-    const utd::Complex rp_tm=utd::cplx_div(utd::cplx_sub(ect,root),utd::cplx_add(ect,root));
-    const utd::Complex q=utd::cplx_mul_real(root,2.0f*utd::UTD_PI*fmaxf(thickness,0.0f)/wavelength);
-    float sn,cs; sincosf(2.0f*q.re,&sn,&cs);
-    const float amplitude=expf(fminf(2.0f*q.im,80.0f));
-    const utd::Complex phase=utd::cplx(amplitude*cs,-amplitude*sn);
-    const utd::Complex one=utd::cplx(1,0), term=utd::cplx_sub(one,phase);
-    rte=utd::cplx_div(utd::cplx_mul(rp_te,term),utd::cplx_sub(one,utd::cplx_mul(utd::cplx_mul(rp_te,rp_te),phase)));
-    rtm=utd::cplx_div(utd::cplx_mul(rp_tm,term),utd::cplx_sub(one,utd::cplx_mul(utd::cplx_mul(rp_tm,rp_tm),phase)));
-}
-
 __device__ __forceinline__ utd::JonesOperator slab_face_operator(
     float ct,float er,float sg,float gain,float thickness,float wavelength,
     utd::float3a normal,utd::float3a in_hat,utd::float3a out_hat,
     utd::Basis3 in_edge,utd::Basis3 out_edge) {
-    utd::Complex rte,rtm; slab_reflection(ct,er,sg,thickness,wavelength,rte,rtm);
-    utd::JonesOperator diag={utd::cplx_mul_real(rte,gain),utd::cplx_zero(),utd::cplx_zero(),utd::cplx_mul_real(rtm,gain)};
-    const utd::float3a face_in=utd::f3_cross(normal,in_hat);
-    const utd::float3a raw_out=utd::f3_cross(normal,out_hat);
-    const utd::float3a reference_axis=utd::stable_perp_basis(out_hat,face_in);
-    const utd::float3a face_out=utd::f3_dot(raw_out,reference_axis)<0?utd::f3_neg(raw_out):raw_out;
-    const utd::Basis3 fin=utd::basis_from_first_vector(in_hat,face_in,utd::stable_perp_basis(in_hat,utd::make_f3(0,0,1)));
-    const utd::Basis3 fout=utd::basis_from_first_vector(out_hat,face_out,reference_axis);
-    return utd::jop_in_basis(diag,fin,fout,in_edge,out_edge);
+    return transport::slab_face_operator(
+        ct, er, sg, 1.0f, gain, thickness,
+        transport::kSpeedOfLight / wavelength,
+        normal, in_hat, out_hat, in_edge, out_edge);
 }
 
 __device__ __forceinline__ utd::float3a load_utd3(const float *p, int i) {

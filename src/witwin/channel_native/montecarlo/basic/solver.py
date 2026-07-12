@@ -12,6 +12,7 @@ from witwin.channel_native.core.memory_budget import (
     enforce_memory_budget,
     estimate_monte_carlo_memory,
 )
+from witwin.channel_native.core.receiver_geometry import first_receiver_grid
 from witwin.channel_native.core.kernels.ops import (
     bdpt_face_material_tensors_from_host,
     mc_component_map_buffer,
@@ -26,7 +27,6 @@ from .metadata import make_solver_metadata
 from .raydn_components import (
     component_grid_shape,
     diffraction_component_map,
-    first_receiver_grid,
     los_component_map,
     reflection_component_maps_with_wedges,
     scattering_component_map,

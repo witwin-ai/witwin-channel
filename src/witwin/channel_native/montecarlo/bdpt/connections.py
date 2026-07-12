@@ -8,10 +8,9 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_receiver_grid_points,
     bdpt_transmitter_tensors,
 )
-
-
-def _vector3_tuple(value: torch.Tensor) -> tuple[float, float, float]:
-    return (float(value[0]), float(value[1]), float(value[2]))
+from witwin.channel_native.core.receiver_geometry import (
+    vector3_tuple as _vector3_tuple,
+)
 
 
 def transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
@@ -23,13 +22,6 @@ def transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
     powers = tuple(float(transmitter.power_w) for transmitter in scene.transmitters)
     exported = bdpt_transmitter_tensors(flat_positions, powers)
     return exported["positions"], exported["power"]
-
-
-def first_receiver_grid(scene: Scene) -> ReceiverGrid | None:
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverGrid):
-            return receiver
-    return None
 
 
 def receiver_positions(

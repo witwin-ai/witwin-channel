@@ -5,6 +5,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "../field_transport.cuh"
 
 #include <cmath>
 
@@ -17,6 +18,8 @@ constexpr float kPi = 3.14159265358979323846f;
 constexpr float kEps = 1.0e-6f;
 
 using channel_native::check_tensor;
+namespace transport = channel_native::field_transport;
+namespace utd = witwin::channel::native_ext;
 
 struct Float3 {
     float x;
@@ -80,16 +83,11 @@ __device__ Complex c_make(float r, float i) {
 /// ~k*d*2^-24 of phase, which shifts coherent multipath nulls at mmWave
 /// ranges (matches the reference cplx_exp_neg_kd convention).
 __device__ float neg_kd_phase(float k, float d) {
-    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), 6.283185307179586476925287);
-    return -static_cast<float>(kd);
+    return transport::precise_neg_kd(k, d);
 }
 
 __device__ Complex c_add(Complex a, Complex b) {
     return {a.r + b.r, a.i + b.i};
-}
-
-__device__ Complex c_sub(Complex a, Complex b) {
-    return {a.r - b.r, a.i - b.i};
 }
 
 __device__ Complex c_mul(Complex a, Complex b) {
@@ -98,19 +96,6 @@ __device__ Complex c_mul(Complex a, Complex b) {
 
 __device__ Complex c_scale(Complex a, float s) {
     return {a.r * s, a.i * s};
-}
-
-__device__ Complex c_div(Complex a, Complex b) {
-    const float denom = fmaxf(b.r * b.r + b.i * b.i, kEps);
-    return {(a.r * b.r + a.i * b.i) / denom, (a.i * b.r - a.r * b.i) / denom};
-}
-
-__device__ Complex c_sqrt(Complex z) {
-    const float magnitude = hypotf(z.r, z.i);
-    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + z.r)));
-    const float imag_sign = z.i < 0.0f ? -1.0f : 1.0f;
-    const float imag = imag_sign * sqrtf(fmaxf(0.0f, 0.5f * (magnitude - z.r)));
-    return {real, imag};
 }
 
 __device__ Float3 orthogonal_transverse(Float3 direction) {
@@ -159,18 +144,24 @@ __device__ void fresnel_coefficients(
     Complex &r_te,
     Complex &r_tm) {
     const float cos_theta = fminf(fmaxf(cos_theta_in, kEps), 1.0f);
-    const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
     const float omega = fmaxf(2.0f * kPi * frequency_hz, kEps);
     const float eta_r = fmaxf(eps_r, kEps);
     const float sigma = fmaxf(sigma_e, 0.0f);
     const float mu_value = fmaxf(mu_r, kEps);
-    const Complex eta = c_make(eta_r, -sigma / (omega * kEpsilon0));
-    const Complex mu = c_make(mu_value, 0.0f);
-    const Complex root = c_sqrt(c_sub(c_mul(mu, eta), c_make(sin2, 0.0f)));
-    const Complex mu_cos = c_make(mu_value * cos_theta, 0.0f);
-    const Complex eta_cos = c_scale(eta, cos_theta);
-    r_te = c_div(c_sub(mu_cos, root), c_add(mu_cos, root));
-    r_tm = c_div(c_sub(eta_cos, root), c_add(eta_cos, root));
+    utd::Complex shared_te;
+    utd::Complex shared_tm;
+    transport::legacy_interface_fresnel(
+        cos_theta,
+        eta_r,
+        sigma,
+        mu_value,
+        omega,
+        kEpsilon0,
+        kEps,
+        shared_te,
+        shared_tm);
+    r_te = c_make(shared_te.re, shared_te.im);
+    r_tm = c_make(shared_tm.re, shared_tm.im);
 }
 
 /// Initial transverse polarization: the global x-hat transmit polarization

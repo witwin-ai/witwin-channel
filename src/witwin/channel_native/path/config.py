@@ -2,20 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from witwin.channel_native.core.components import (
+    DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
+    NO_AD_MODES as _VALID_AD_MODES,
+    validated_components,
+)
+
 
 # Public component set. transmission exports specular wall-penetration paths
 # (wave 2); scattering exports single-bounce incoherent Kirchhoff patch paths
 # (wave 3). transmission depth is capped like reflection (chains count wall
 # penetrations); scattering is single-bounce in v1.
-_VALID_COMPONENTS = frozenset(
-    {"los", "reflection", "diffraction", "transmission", "scattering"}
-)
 # Default component set is unchanged: the new components are strictly opt-in.
-_DEFAULT_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
 # Components whose chain length is bounded by max_depth (public cap of 5).
 _DEPTH_CAPPED_COMPONENTS = frozenset({"reflection", "transmission"})
 _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
-_VALID_AD_MODES = frozenset({"none"})
 _VALID_MAX_PATHS_SCOPES = frozenset({"per_pair"})
 _MAX_COUPLED_CANDIDATES = 1_000_000
 
@@ -49,11 +50,9 @@ class Config:
             raise ValueError("scattering_max_paths_per_pair must be positive")
         if self.scattering_power_threshold < 0.0:
             raise ValueError("scattering_power_threshold must be non-negative")
-        components = frozenset(self.components)
-        if not components or not components.issubset(_VALID_COMPONENTS):
-            raise ValueError(
-                f"components must be a subset of {sorted(_VALID_COMPONENTS)}"
-            )
+        components = validated_components(
+            self.components, error_message="components must be a subset of {valid}"
+        )
         if self.max_depth > 5 and components & _DEPTH_CAPPED_COMPONENTS:
             raise RuntimeError("path reflection/transmission support max_depth <= 5")
         if self.coupled_paths:

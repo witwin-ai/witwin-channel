@@ -3,22 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
+from witwin.channel_native.core.components import (
+    BOUNCE_COMPONENTS as _BOUNCE_COMPONENTS,
+    DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
+    NO_AD_MODES as _VALID_AD_MODES,
+    validated_components,
+)
 
 
 # Public component set. transmission traces straight penetration chains
 # through up to max_depth walls (grid radiomaps only); scattering is accepted
 # plumbing that emits zero maps until its wave lands. Both are surface events
 # that require at least one bounce (max_depth >= 1).
-_VALID_COMPONENTS = frozenset(
-    {"los", "reflection", "diffraction", "transmission", "scattering"}
-)
 # Default component set is unchanged: the new components are strictly opt-in.
-_DEFAULT_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
 # Components that require at least one interaction bounce to contribute.
-_BOUNCE_COMPONENTS = frozenset(
-    {"reflection", "diffraction", "transmission", "scattering"}
-)
-_VALID_AD_MODES = frozenset({"none"})
 _VALID_REFLECTION_ACCUMULATION_STRATEGIES = frozenset(
     {"auto", "atomic", "staged", "compact", "streaming_planar"}
 )
@@ -47,9 +45,9 @@ class Config:
             raise ValueError("max_depth must be non-negative")
         if self.seed < 0:
             raise ValueError("seed must be non-negative")
-        components = frozenset(self.components)
-        if not components or not components.issubset(_VALID_COMPONENTS):
-            raise ValueError(f"components must be a subset of {sorted(_VALID_COMPONENTS)}")
+        components = validated_components(
+            self.components, error_message="components must be a subset of {valid}"
+        )
         if self.max_depth < 1 and components & _BOUNCE_COMPONENTS:
             raise RuntimeError("MC basic scattering requires max_depth >= 1")
         if self.accumulation_strategy not in ACCUMULATION_STRATEGIES - {"none"}:

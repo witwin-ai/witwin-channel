@@ -254,45 +254,15 @@ at::Tensor cn_bdpt_component_map_buffer_cuda(
     int64_t tx_count,
     int64_t dim0,
     int64_t dim1) {
-    TORCH_CHECK(reference.is_cuda(), "reference must be a CUDA tensor");
-    TORCH_CHECK(reference.scalar_type() == at::kFloat, "reference must be float32");
-    TORCH_CHECK(tx_count >= 0, "tx_count must be non-negative");
-    TORCH_CHECK(dim0 >= 0, "dim0 must be non-negative");
-    TORCH_CHECK(dim1 >= 0, "dim1 must be non-negative");
-    auto maps = at::empty({tx_count, dim0, dim1}, reference.options());
-    if (maps.numel() > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
-        C10_CUDA_CHECK(cudaMemsetAsync(maps.data_ptr<float>(), 0, maps.numel() * sizeof(float), stream));
-    }
-    return maps;
+    return cn_mc_component_map_buffer_cuda(
+        reference, tx_count, dim0, dim1);
 }
 
 at::Tensor cn_bdpt_store_component_map_cuda(
     at::Tensor maps,
     at::Tensor source,
     int64_t tx_index) {
-    check_component_map(maps, "maps");
-    check_source_map(source, "source");
-    TORCH_CHECK(tx_index >= 0 && tx_index < maps.size(0), "tx_index is out of bounds");
-    TORCH_CHECK(source.size(0) == maps.size(1), "source dim0 must match maps");
-    TORCH_CHECK(source.size(1) == maps.size(2), "source dim1 must match maps");
-
-    const int64_t element_count = source.numel();
-    if (element_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(maps.get_device()).stream();
-        const int block_count = static_cast<int>(
-            (element_count + kComponentMapBlockSize - 1) / kComponentMapBlockSize);
-        store_component_map_kernel<<<block_count, kComponentMapBlockSize, 0, stream>>>(
-            maps.data_ptr<float>(),
-            source.data_ptr<float>(),
-            nullptr,
-            tx_index,
-            0,
-            0,
-            element_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return maps;
+    return cn_mc_store_component_map_cuda(maps, source, tx_index);
 }
 
 at::Tensor cn_bdpt_store_scaled_component_map_cuda(
@@ -301,33 +271,8 @@ at::Tensor cn_bdpt_store_scaled_component_map_cuda(
     at::Tensor scale_values,
     int64_t tx_index,
     int64_t scale_index) {
-    check_component_map(maps, "maps");
-    check_source_map(source, "source");
-    TORCH_CHECK(scale_values.is_cuda(), "scale_values must be a CUDA tensor");
-    TORCH_CHECK(scale_values.scalar_type() == at::kFloat, "scale_values must be float32");
-    TORCH_CHECK(scale_values.dim() == 1, "scale_values must have shape (N,)");
-    TORCH_CHECK(scale_values.is_contiguous(), "scale_values must be contiguous");
-    TORCH_CHECK(tx_index >= 0 && tx_index < maps.size(0), "tx_index is out of bounds");
-    TORCH_CHECK(scale_index >= 0 && scale_index < scale_values.size(0), "scale_index is out of bounds");
-    TORCH_CHECK(source.size(0) == maps.size(1), "source dim0 must match maps");
-    TORCH_CHECK(source.size(1) == maps.size(2), "source dim1 must match maps");
-
-    const int64_t element_count = source.numel();
-    if (element_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(maps.get_device()).stream();
-        const int block_count = static_cast<int>(
-            (element_count + kComponentMapBlockSize - 1) / kComponentMapBlockSize);
-        store_component_map_kernel<<<block_count, kComponentMapBlockSize, 0, stream>>>(
-            maps.data_ptr<float>(),
-            source.data_ptr<float>(),
-            scale_values.data_ptr<float>(),
-            tx_index,
-            scale_index,
-            1,
-            element_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return maps;
+    return cn_mc_store_scaled_component_map_cuda(
+        maps, source, scale_values, tx_index, scale_index);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_component_maps_cuda(
@@ -336,49 +281,15 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     at::Tensor diffraction,
     at::Tensor transmission,
     at::Tensor scattering) {
-    check_component_map(los, "los");
-    check_component_map(reflection, "reflection");
-    check_component_map(diffraction, "diffraction");
-    check_component_map(transmission, "transmission");
-    check_component_map(scattering, "scattering");
-    TORCH_CHECK(reflection.sizes() == los.sizes(), "reflection must match los shape");
-    TORCH_CHECK(diffraction.sizes() == los.sizes(), "diffraction must match los shape");
-    TORCH_CHECK(transmission.sizes() == los.sizes(), "transmission must match los shape");
-    TORCH_CHECK(scattering.sizes() == los.sizes(), "scattering must match los shape");
-
-    auto path_gain = at::empty(los.sizes(), los.options());
-    auto los_power = at::empty({}, los.options());
-    auto reflection_power = at::empty({}, los.options());
-    auto diffraction_power = at::empty({}, los.options());
-    auto transmission_power = at::empty({}, los.options());
-    auto scattering_power = at::empty({}, los.options());
-
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
-    C10_CUDA_CHECK(cudaMemsetAsync(los_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(reflection_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(diffraction_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(transmission_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(scattering_power.data_ptr<float>(), 0, sizeof(float), stream));
-
-    const int64_t element_count = los.numel();
-    if (element_count > 0) {
-        const int block_count = static_cast<int>(
-            (element_count + kFinalizeBlockSize - 1) / kFinalizeBlockSize);
-        finalize_component_maps_kernel<<<block_count, kFinalizeBlockSize, 0, stream>>>(
-            los.data_ptr<float>(),
-            reflection.data_ptr<float>(),
-            diffraction.data_ptr<float>(),
-            transmission.data_ptr<float>(),
-            scattering.data_ptr<float>(),
-            path_gain.data_ptr<float>(),
-            los_power.data_ptr<float>(),
-            reflection_power.data_ptr<float>(),
-            diffraction_power.data_ptr<float>(),
-            transmission_power.data_ptr<float>(),
-            scattering_power.data_ptr<float>(),
-            element_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
+    auto [path_gain, los_power, reflection_power, diffraction_power,
+          transmission_power, scattering_power] =
+        cn_mc_finalize_component_maps_cuda(
+            los, reflection, diffraction, transmission, scattering);
+    return {
+        path_gain.view(los.sizes()),
+        los_power,
+        reflection_power,
+        diffraction_power,
+        transmission_power,
+        scattering_power};
 }

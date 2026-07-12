@@ -73,6 +73,7 @@ import math
 from typing import Any
 
 import torch
+from witwin.channel_native.core.tensor_math import normalize_vec3
 
 from witwin.channel_native.core.kernels.ops import (
     raydn_visibility_forward,
@@ -247,7 +248,7 @@ def local_frames(normal: torch.Tensor, axis_rad: torch.Tensor) -> tuple[torch.Te
         torch.tensor([1.0, 0.0, 0.0], device=normal.device),
     )
     t1 = torch.linalg.cross(reference, normal)
-    t1 = t1 / t1.norm(dim=-1, keepdim=True).clamp_min(1.0e-12)
+    t1 = normalize_vec3(t1)
     t2 = torch.linalg.cross(normal, t1)
     cos_a = torch.cos(axis_rad)[:, None]
     sin_a = torch.sin(axis_rad)[:, None]
@@ -299,7 +300,7 @@ def te_tm_incident_power(
     )
     s = torch.where(
         s_norm_sq > _DEGENERATE_SIN_SQ,
-        s / s_norm_sq.clamp_min(1.0e-12).sqrt(),
+        normalize_vec3(s),
         substitute,
     )
     p = torch.linalg.cross(s, direction)

@@ -4,6 +4,7 @@
 #include <cuda_runtime_api.h>
 
 #include "../tensor_checks.h"
+#include "../field_transport.cuh"
 
 #include <algorithm>
 #include <tuple>
@@ -12,9 +13,8 @@ namespace {
 
 constexpr int kReflectionBlockSize = 256;
 constexpr float kPi = 3.14159265358979323846f;
-constexpr float kEpsilon0 = 8.854187817e-12f;
-constexpr float kSpeedOfLight = 299792458.0f;
 constexpr float kReflectionEpsilon = 1.0e-6f;
+namespace transport = channel_native::field_transport;
 
 struct Complex {
     float r;
@@ -29,27 +29,10 @@ struct Complex3 {
 
 __device__ __forceinline__ Complex c_make(float r, float i) { return {r, i}; }
 __device__ __forceinline__ Complex c_add(Complex a, Complex b) { return {a.r + b.r, a.i + b.i}; }
-__device__ __forceinline__ Complex c_sub(Complex a, Complex b) { return {a.r - b.r, a.i - b.i}; }
 __device__ __forceinline__ Complex c_mul(Complex a, Complex b) {
     return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r};
 }
 __device__ __forceinline__ Complex c_scale(Complex a, float s) { return {a.r * s, a.i * s}; }
-__device__ __forceinline__ Complex c_div(Complex a, Complex b) {
-    const float d = fmaxf(b.r * b.r + b.i * b.i, 1.0e-30f);
-    return {(a.r * b.r + a.i * b.i) / d, (a.i * b.r - a.r * b.i) / d};
-}
-__device__ __forceinline__ Complex c_sqrt(Complex z) {
-    const float m = hypotf(z.r, z.i);
-    float r = sqrtf(fmaxf(0.0f, 0.5f * (m + z.r)));
-    float i = copysignf(sqrtf(fmaxf(0.0f, 0.5f * (m - z.r))), z.i);
-    return {r, i};
-}
-__device__ __forceinline__ Complex c_exp_neg_2i(Complex q) {
-    const float amplitude = expf(fminf(2.0f * q.i, 80.0f));
-    float s, c;
-    sincosf(2.0f * q.r, &s, &c);
-    return {amplitude * c, -amplitude * s};
-}
 __device__ __forceinline__ float c_abs2(Complex a) { return a.r * a.r + a.i * a.i; }
 
 __device__ __forceinline__ float3 f3(float x, float y, float z) { return make_float3(x, y, z); }
@@ -97,25 +80,19 @@ __device__ __forceinline__ void slab_coefficients(
     float wavelength,
     Complex &r_te,
     Complex &r_tm) {
-    const float omega = 2.0f * kPi * kSpeedOfLight / fmaxf(wavelength, kReflectionEpsilon);
-    const Complex eta = c_make(fmaxf(eta_r, kReflectionEpsilon),
-                               -fmaxf(sigma, 0.0f) / (omega * kEpsilon0));
-    const float ct = fminf(fmaxf(fabsf(cos_theta), kReflectionEpsilon), 1.0f);
-    const float sin2 = fmaxf(0.0f, 1.0f - ct * ct);
-    const Complex root = c_sqrt(c_sub(eta, c_make(sin2, 0.0f)));
-    const Complex ct_c = c_make(ct, 0.0f);
-    const Complex eta_ct = c_scale(eta, ct);
-    const Complex rp_te = c_div(c_sub(ct_c, root), c_add(ct_c, root));
-    const Complex rp_tm = c_div(c_sub(eta_ct, root), c_add(eta_ct, root));
-    const Complex q = c_scale(root, 2.0f * kPi * fmaxf(thickness, 0.0f) /
-                                      fmaxf(wavelength, kReflectionEpsilon));
-    const Complex phase = c_exp_neg_2i(q);
-    const Complex one = c_make(1.0f, 0.0f);
-    const Complex phase_term = c_sub(one, phase);
-    r_te = c_scale(c_div(c_mul(rp_te, phase_term),
-                         c_sub(one, c_mul(c_mul(rp_te, rp_te), phase))), gain);
-    r_tm = c_scale(c_div(c_mul(rp_tm, phase_term),
-                         c_sub(one, c_mul(c_mul(rp_tm, rp_tm), phase))), gain);
+    witwin::channel::native_ext::Complex shared_te;
+    witwin::channel::native_ext::Complex shared_tm;
+    transport::legacy_sionna_slab_fresnel(
+        cos_theta,
+        eta_r,
+        sigma,
+        gain,
+        thickness,
+        wavelength,
+        shared_te,
+        shared_tm);
+    r_te = c_make(shared_te.re, shared_te.im);
+    r_tm = c_make(shared_tm.re, shared_tm.im);
 }
 
 __global__ void sionna_reflection_accumulate_kernel(

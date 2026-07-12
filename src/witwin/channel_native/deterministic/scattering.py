@@ -67,6 +67,7 @@ from dataclasses import replace
 from typing import Any
 
 import torch
+from witwin.channel_native.core.tensor_math import normalize_vec3
 
 from witwin.channel_native import Scene
 from witwin.channel_native.core.field_state import (
@@ -99,7 +100,7 @@ _R2_ALPHA = (0.7548776662466927, 0.5698402909980532)
 
 
 def _unit(v: torch.Tensor, eps: float = 1.0e-12) -> torch.Tensor:
-    return v / torch.linalg.vector_norm(v, dim=-1, keepdim=True).clamp_min(eps)
+    return normalize_vec3(v, eps=eps)
 
 
 def _stable_tangent(n: torch.Tensor) -> torch.Tensor:

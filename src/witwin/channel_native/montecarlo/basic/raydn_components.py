@@ -16,7 +16,6 @@ from witwin.channel_native.core.kernels.ops import (
     raydn_visibility_forward,
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
-    mc_diffraction_edge_geometry,
     mc_diffraction_state_wi,
     mc_los_component_maps_from_matrix,
     mc_los_visibility_inputs,
@@ -28,13 +27,18 @@ from witwin.channel_native.core.kernels.ops import (
     mc_store_scaled_component_map,
     mc_surface_group_edge_candidates,
 )
-from witwin.channel_native.core.edge_selection import refine_edge_geometry
+from witwin.channel_native.core.diffraction_geometry import (
+    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
+    diffraction_edge_geometry as _diffraction_edge_geometry,
+)
+from witwin.channel_native.core.receiver_geometry import (
+    axis_aligned_grid_spec as grid_spec,
+    component_grid_shape,
+)
 from witwin.channel_native.core.material_runtime import (
     face_material_field_bundle,
-    face_material_tensors,
     face_material_thickness,
 )
-from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
 from witwin.channel_native.core.runtime.raydn import RayDNScene
 from witwin.channel_native.montecarlo.scattering_events import scattering_map_matrix
 from witwin.channel_native.montecarlo.transmission import (
@@ -45,19 +49,7 @@ from witwin.channel_native.montecarlo.transmission import (
 
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
 
-
-@dataclass(frozen=True, slots=True)
-class GridSpec:
-    grid: ReceiverGrid
-    axis: int
-    position: float
-    coord0_min: float
-    coord0_max: float
-    coord1_min: float
-    coord1_max: float
-    resolution0: int
-    resolution1: int
-    cell_area: float
+__all__ = ["_diffraction_edge_geometry"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,76 +71,6 @@ class ReflectionComponentResult:
 
 
 MaterialTensors = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
-
-
-def first_receiver_grid(scene: Scene) -> ReceiverGrid | None:
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverGrid):
-            return receiver
-    return None
-
-
-def component_grid_shape(grid: ReceiverGrid) -> tuple[int, int]:
-    return (grid.shape[1], grid.shape[0])
-
-
-def _vector3_values(vector: torch.Tensor) -> tuple[float, float, float]:
-    return (float(vector[0]), float(vector[1]), float(vector[2]))
-
-
-def _axis_index(values: tuple[float, float, float], *, name: str) -> tuple[int, float]:
-    nonzero = [idx for idx, value in enumerate(values) if abs(value) > 1.0e-6]
-    if len(nonzero) != 1:
-        raise ValueError(f"{name} must be axis-aligned")
-    index = nonzero[0]
-    value = values[index]
-    sign = 1.0 if value > 0.0 else -1.0
-    if abs(abs(value) - 1.0) > 1.0e-5:
-        raise ValueError(f"{name} must be a unit axis vector")
-    return index, sign
-
-
-def grid_spec(grid: ReceiverGrid) -> GridSpec:
-    rows, cols = grid.shape
-    origin = _vector3_values(grid.origin)
-    axis0, sign0 = _axis_index(_vector3_values(grid.x_axis), name="ReceiverGrid.x_axis")
-    axis1, sign1 = _axis_index(_vector3_values(grid.y_axis), name="ReceiverGrid.y_axis")
-    if axis0 == axis1:
-        raise ValueError("ReceiverGrid axes must be orthogonal")
-    axis = ({0, 1, 2} - {axis0, axis1}).pop()
-    if axis == 0:
-        expected = (1, 2)
-    elif axis == 1:
-        expected = (0, 2)
-    else:
-        expected = (0, 1)
-    if (axis0, axis1) != expected:
-        raise ValueError("ReceiverGrid axes must match RayDN grid coordinate order")
-
-    step0 = float(grid.spacing[0]) * sign0
-    step1 = float(grid.spacing[1]) * sign1
-    first0 = origin[axis0]
-    first1 = origin[axis1]
-    last0 = first0 + step0 * float(rows - 1)
-    last1 = first1 + step1 * float(cols - 1)
-    half0 = abs(float(grid.spacing[0])) * 0.5
-    half1 = abs(float(grid.spacing[1])) * 0.5
-    coord0_min = min(first0, last0) - half0
-    coord0_max = max(first0, last0) + half0
-    coord1_min = min(first1, last1) - half1
-    coord1_max = max(first1, last1) + half1
-    return GridSpec(
-        grid=grid,
-        axis=axis,
-        position=origin[axis],
-        coord0_min=coord0_min,
-        coord0_max=coord0_max,
-        coord1_min=coord1_min,
-        coord1_max=coord1_max,
-        resolution0=rows,
-        resolution1=cols,
-        cell_area=abs((coord0_max - coord0_min) * (coord1_max - coord1_min)) / float(rows * cols),
-    )
 
 
 def _grid_los_matrix(
@@ -440,40 +362,6 @@ def reflection_component_map(
         material_tensors=material_tensors,
         collect_wedges=False,
     ).maps
-
-
-def _diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
-    return mc_diffraction_edge_geometry(
-        records.vertices,
-        records.faces,
-        records.face_normals,
-        records.edge_v0,
-        records.edge_v1,
-        records.face0,
-        records.face1,
-        plane_tol=_RAYD_EDGE_INFO_PLANE_TOL,
-    )
-
-
-def _cached_diffraction_edge_geometry(
-    raydn: RayDNScene,
-    *,
-    preserve_imported_edges: bool = False,
-) -> tuple[torch.Tensor, ...]:
-    cache = raydn.runtime_cache
-    cache_key = (
-        "mc_imported_diffraction_edge_geometry"
-        if preserve_imported_edges
-        else "mc_diffraction_edge_geometry"
-    )
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached  # type: ignore[return-value]
-    geometry = _diffraction_edge_geometry(raydn.edge_records())
-    if not preserve_imported_edges:
-        geometry = refine_edge_geometry(raydn, geometry)
-    cache[cache_key] = geometry
-    return geometry
 
 
 def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

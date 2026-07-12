@@ -14,6 +14,7 @@ from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
 from witwin.channel_native.core.kernels.ops import deterministic_component_counts
+from witwin.channel_native.core.components import component_availability_status
 
 from .accumulation import (
     _PYTHON_ACCUMULATED_COMPONENTS,
@@ -57,23 +58,13 @@ def _metadata(
         "cuda_available": bool(native_info["cuda_available"]),
         "optix_available": bool(native_info["optix_available"]),
     }
-    components = {
-        "los": "enabled" if "los" in config.components else "not_requested",
-        "reflection": "not_requested",
-        "diffraction": "not_requested",
-    }
-    if "reflection" in config.components:
-        if not capability["raydn_native"]:
-            raise RuntimeError(
-                "deterministic reflection requires RayDN native capability"
-            )
-        components["reflection"] = "enabled"
-    if "diffraction" in config.components:
-        if not capability["raydn_native"]:
-            raise RuntimeError(
-                "deterministic diffraction requires RayDN native capability"
-            )
-        components["diffraction"] = "enabled"
+    components = component_availability_status(
+        config.components,
+        reflection_available=capability["raydn_native"],
+        diffraction_available=capability["raydn_native"],
+        reflection_error="deterministic reflection requires RayDN native capability",
+        diffraction_error="deterministic diffraction requires RayDN native capability",
+    )
     # transmission carries specular wall-penetration paths since wave 2 and
     # scattering carries Kirchhoff rough-surface patch paths since wave 3.
     # Both keep the truthful requested-but-empty status when no paths were
