@@ -98,7 +98,7 @@ def receiver_polarizations(
         elif isinstance(receiver, ReceiverPoint):
             values.append(receiver.polarization)
         else:
-            raise TypeError(f"unsupported receiver type: {type(receiver)!r}")
+            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
     if not values:
         return torch.empty((0, 3), device=device, dtype=torch.float32)
     return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()

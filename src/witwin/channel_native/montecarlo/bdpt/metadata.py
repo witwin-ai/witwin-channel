@@ -115,6 +115,19 @@ def make_solver_metadata(
         "accumulation_strategy": selected_accumulation_strategy,
         "workspace_bytes": int(workspace_bytes),
         "variance": bool(variance_enabled),
+        "throughput_domain": "unit_excitation_complex3",
+        "pdf_domain": "cumulative_non_delta_proposal_density",
+        "event_classification": {
+            "endpoint": 0,
+            "delta_specular_reflection": 1,
+        },
+        "delta_strategy": "canonical_enumeration_unit_bidirectional_mass",
+        "mis_capabilities": {
+            "delta_specular_classification": True,
+            "continuous_diffraction_strategies": True,
+            "reflection_diffraction_coupled_bidirectional_pdf": True,
+            "coupled_pdf_domain": "enumerated_bidirectional_discrete_mass",
+        },
         "ad_status": "none",
         "kernel": kernel_metadata,
     }

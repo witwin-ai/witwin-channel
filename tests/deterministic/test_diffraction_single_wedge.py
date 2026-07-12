@@ -5,7 +5,8 @@ from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve_v2 as solve_paths
+from witwin.channel_native.path import solve as solve_paths
+from witwin.channel_native.path import solve_v2 as solve_paths_v2
 
 
 def test_single_wedge_diffraction_matches_path_reference():
@@ -87,7 +88,7 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
 
     scene = wedge_diffraction_scene()
     result = solve(scene, Config(components={"diffraction"}, coherent=True, export_paths=True))
-    reference = solve_paths(scene, PathConfig(components={"diffraction"}))
+    reference = solve_paths_v2(scene, PathConfig(components={"diffraction"}))
 
     assert result.paths is not None
     path_field = torch.complex(result.paths.field_real, result.paths.field_imag)

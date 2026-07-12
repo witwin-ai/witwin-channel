@@ -15,6 +15,8 @@ def test_bdpt_config_defaults_match_public_contract():
     assert config.components == frozenset({"los", "reflection", "diffraction"})
     assert config.mis == "power_heuristic"
     assert config.power_heuristic_beta == 2.0
+    assert config.coupled_paths is False
+    assert config.coupled_candidate_limit == 1_000_000
     assert config.receiver_strategy == "grid_area"
     assert config.accumulation_strategy == "auto"
     assert config.sample_streams == 1
@@ -67,3 +69,15 @@ def test_bdpt_config_accepts_supported_variants_and_normalizes_components():
     assert config.max_light_depth == config.max_depth
     assert config.max_sensor_depth == config.max_depth
     assert config.components == frozenset({"los"})
+
+
+def test_bdpt_coupled_paths_require_mixed_components_and_depth_two():
+    with pytest.raises(RuntimeError, match="max_depth"):
+        Config(max_depth=1, coupled_paths=True)
+    with pytest.raises(RuntimeError, match="reflection and diffraction"):
+        Config(max_depth=2, components={"reflection"}, coupled_paths=True)
+    assert Config(max_depth=2, coupled_paths=True).coupled_paths
+
+
+def test_bdpt_mis_none_selects_one_diffraction_strategy():
+    assert Config(components={"diffraction"}, mis="none").mis == "none"

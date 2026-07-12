@@ -18,6 +18,8 @@ class Config:
     max_light_depth: int | None = None
     max_sensor_depth: int | None = None
     max_diffraction_order: int = 1
+    coupled_paths: bool = False
+    coupled_candidate_limit: int = 1_000_000
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _VALID_COMPONENTS
     mis: str = "power_heuristic"
     power_heuristic_beta: float = 2.0
@@ -52,15 +54,15 @@ class Config:
             raise RuntimeError("BDPT scattering requires max_depth >= 1")
         if "diffraction" in components and self.max_diffraction_order == 0:
             raise RuntimeError("diffraction requires max_diffraction_order > 0")
-        if (
-            "diffraction" in components
-            and self.mis == "none"
-            and self.samples * self.sample_streams >= 2
-        ):
-            raise RuntimeError(
-                "mis='none' double counts the direct+keller diffraction strategies; "
-                "use mis='balance' or 'power_heuristic'"
-            )
+        if self.coupled_paths:
+            if self.max_depth < 2:
+                raise RuntimeError("coupled paths require max_depth >= 2")
+            if not {"reflection", "diffraction"}.issubset(components):
+                raise RuntimeError(
+                    "coupled paths require reflection and diffraction components"
+                )
+        if self.coupled_candidate_limit <= 0 or self.coupled_candidate_limit > 1_000_000:
+            raise ValueError("coupled_candidate_limit must be in [1, 1000000]")
         if self.mis not in _VALID_MIS:
             raise ValueError(f"mis must be one of {sorted(_VALID_MIS)}")
         if self.power_heuristic_beta <= 0.0:

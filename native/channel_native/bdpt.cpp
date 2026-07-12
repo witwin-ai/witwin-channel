@@ -14,12 +14,12 @@ pybind11::tuple tensor_vector_to_tuple(const std::vector<at::Tensor>& tensors) {
 }
 
 pybind11::dict subpath_state_to_dict(const std::vector<at::Tensor>& tensors, const char* name) {
-    TORCH_CHECK(tensors.size() == 18, name, " native result must contain 18 tensors");
-    static constexpr std::array<const char*, 18> kFields = {
+    TORCH_CHECK(tensors.size() == 19, name, " native result must contain 19 tensors");
+    static constexpr std::array<const char*, 19> kFields = {
         "origin", "direction", "throughput_real", "throughput_imag", "pdf_forward",
         "pdf_reverse", "depth", "component_mask", "primitive_id", "edge_id",
         "tx_id", "rx_id", "grid_linear_id", "valid", "path_length",
-        "field_real", "field_imag", "source_power",
+        "field_real", "field_imag", "source_power", "event_type",
     };
     pybind11::dict out;
     for (size_t index = 0; index < kFields.size(); ++index) {

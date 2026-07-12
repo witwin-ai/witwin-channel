@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-import math
 from typing import Any
 
 import torch
@@ -15,6 +15,8 @@ from witwin.channel_native.core.field_state import (
 )
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.core.path_topology import export_topology
+from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.core.kernels.ops import (
     bdpt_accumulate_connection_samples,
     bdpt_compact_connection_samples,
@@ -31,20 +33,12 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_finalize_component_maps,
     bdpt_finalize_point_components,
     bdpt_filter_connection_samples,
-    bdpt_intersect_forward,
-    bdpt_reflection_accumulation_forward,
-    bdpt_reflection_launch_inputs,
-    bdpt_reflected_light_subpath_state,
     bdpt_connection_variance,
     bdpt_los_component_maps_from_matrix,
-    bdpt_sample_directions,
     bdpt_selected_edge_indices,
-    bdpt_subpath_intersection_inputs,
     bdpt_zero_matrix,
     mc_component_map_buffer,
-    mc_sample_directions,
     mc_store_component_map,
-    mc_store_scaled_component_map,
     raydn_visibility_forward,
 )
 from witwin.channel_native.montecarlo.basic.raydn_components import (
@@ -247,96 +241,24 @@ def _path_samples_from_connection_export(
     )
 
 
-def _native_reflection_connection_samples(
-    raydn: Any,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    endpoint_subpaths: dict[str, dict[str, torch.Tensor]],
-    rx_positions: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    material_tensors: tuple[torch.Tensor, ...],
-    *,
-    frequency_hz: float,
-    samples: int,
-    seed: int,
-    mis: str,
-    beta: float,
-    strategy_count: int,
-    max_depth: int,
-) -> list[dict[str, torch.Tensor]]:
-    eps_r, sigma_e, mu_r, material_gain, material_valid, material_thickness = material_tensors
-    sensor = endpoint_subpaths["sensor"]
-    sample_blocks: list[dict[str, torch.Tensor]] = []
-    for tx_index in range(int(tx_positions.shape[0])):
-        launch_inputs = bdpt_reflection_launch_inputs(
-            tx_positions, tx_index=tx_index, sample_count=int(samples)
-        )
-        ray_d = bdpt_sample_directions(
-            int(samples), tx_positions, seed=int(seed) + tx_index * 65537
-        )
-        state = bdpt_endpoint_subpath_state(
-            tx_positions,
-            tx_power,
-            tx_polarization,
-            rx_positions,
-            rx_polarization,
-            launch_inputs["tx_id"],
-            launch_inputs["light_seed"],
-        )["light"]
-        state["direction"] = ray_d
-        ray_inputs = {
-            "ray_o": launch_inputs["ray_o"],
-            "ray_d": ray_d,
-            "ray_tmax": launch_inputs["ray_tmax"],
-            "active": launch_inputs["active"],
-        }
-        for _bounce in range(max(1, int(max_depth))):
-            hit = bdpt_intersect_forward(
-                raydn.require_handle(),
-                ray_inputs["ray_o"],
-                ray_inputs["ray_d"],
-                ray_inputs["ray_tmax"],
-                ray_inputs["active"],
-            )
-            reflected = bdpt_reflected_light_subpath_state(
-                state,
-                hit,
-                material_gain=material_gain,
-                material_valid=material_valid,
-                material_eps_r=eps_r,
-                material_sigma_e=sigma_e,
-                material_mu_r=mu_r,
-                material_thickness=material_thickness,
-                frequency_hz=frequency_hz,
-            )
-            samples_out = bdpt_endpoint_connection_samples(
-                reflected,
-                sensor,
-                frequency_hz=frequency_hz,
-                samples_per_tx=int(samples),
-                max_paths=None,
-                mis=mis,
-                beta=beta,
-                strategy_count=strategy_count,
-            )
-            visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
-                reflected,
-                sensor,
-                sample_count=int(samples_out["valid"].shape[0]),
-            )
-            visible = raydn_visibility_forward(
-                raydn.require_handle(),
-                visibility_inputs["start"],
-                visibility_inputs["end"],
-                visibility_inputs["active"],
-            )[0]
-            sample_blocks.append(bdpt_filter_connection_samples(samples_out, visible))
-            if not bool(reflected["valid"].any()):
-                break
-            state = reflected
-            ray_inputs = bdpt_subpath_intersection_inputs(reflected)
-    return sample_blocks
+def _empty_path_samples(reference: torch.Tensor) -> BDPTPathSamples:
+    device = reference.device
+    empty_float = torch.empty((0,), device=device, dtype=torch.float32)
+    empty_int = torch.empty((0,), device=device, dtype=torch.int32)
+    return BDPTPathSamples(
+        topology=torch.empty((0, 4), device=device, dtype=torch.int32),
+        contribution=empty_float,
+        pdf=empty_float.clone(),
+        mis_weight=empty_float.clone(),
+        component_id=empty_int,
+        valid=torch.empty((0,), device=device, dtype=torch.bool),
+        tx_id=empty_int.clone(),
+        rx_id=empty_int.clone(),
+        grid_linear_id=empty_int.clone(),
+        light_depth=empty_int.clone(),
+        sensor_depth=empty_int.clone(),
+        path_length_m=empty_float.clone(),
+    )
 
 
 def _reduced_light_endpoint_state(
@@ -406,75 +328,11 @@ def _native_los_connection_samples(
     return bdpt_filter_connection_samples(samples, visible)
 
 
-def _native_reflection_component_maps(
-    scene: Scene,
-    raydn: Any,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    material_tensors: tuple[torch.Tensor, ...],
-    grid: ReceiverGrid,
-    *,
-    samples: int,
-    max_depth: int,
-) -> torch.Tensor:
-    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid, _thickness = material_tensors
-    spec = _grid_spec(grid)
-    dim0, dim1 = grid.shape[1], grid.shape[0]
-    maps = mc_component_map_buffer(
-        tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1
-    )
-    wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    solid_angle_per_ray = float(4.0 * math.pi / max(1, int(samples)))
-    for tx_index in range(int(tx_positions.shape[0])):
-        launch_inputs = bdpt_reflection_launch_inputs(
-            tx_positions, tx_index=tx_index, sample_count=int(samples)
-        )
-        ray_d = mc_sample_directions(int(samples), tx_positions)
-        out = bdpt_reflection_accumulation_forward(
-            raydn.require_handle(),
-            launch_inputs["ray_o"],
-            ray_d,
-            launch_inputs["ray_tmax"],
-            launch_inputs["active"],
-            launch_inputs["ray_o"],
-            launch_inputs["tx_pol"],
-            material_eta_r,
-            material_sigma,
-            material_mu_r,
-            material_gain,
-            material_valid,
-            int(max_depth),
-            int(spec.axis),
-            float(spec.position),
-            float(spec.coord0_min),
-            float(spec.coord0_max),
-            float(spec.coord1_min),
-            float(spec.coord1_max),
-            int(spec.resolution0),
-            int(spec.resolution1),
-            float(wavelength),
-            float(solid_angle_per_ray),
-            False,
-            False,
-            0,
-            1,
-            1,
-            262144,
-            64,
-            0,
-            False,
-        )
-        maps = mc_store_scaled_component_map(
-            maps,
-            out[0],
-            tx_power,
-            tx_index=tx_index,
-            scale_index=tx_index,
-        )
-    return maps
-
-
-def _diffraction_sample_split(sample_count: int) -> tuple[int, int, int]:
+def _diffraction_sample_split(
+    sample_count: int, *, mis: str
+) -> tuple[int, int, int]:
+    if mis == "none":
+        return int(sample_count), 0, 0
     direct = (int(sample_count) + 2) // 3
     keller = (int(sample_count) + 1) // 3
     return direct, keller, 0
@@ -644,7 +502,7 @@ def _native_diffraction_point_connection_samples(
     seed: int,
     mis: str,
     beta: float,
-) -> list[dict[str, torch.Tensor]]:
+) -> Iterator[dict[str, torch.Tensor]]:
     _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = material_tensors
     edge_geometry = _cached_diffraction_edge_geometry(raydn)
     (
@@ -663,10 +521,8 @@ def _native_diffraction_point_connection_samples(
     edge_indices = bdpt_selected_edge_indices(selected)
     wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
     direct_samples, keller_samples, _suffix_samples = _diffraction_sample_split(
-        int(samples)
+        int(samples), mis=mis
     )
-    sample_blocks: list[dict[str, torch.Tensor]] = []
-
     for tx_index in range(int(tx_positions.shape[0])):
         states = bdpt_diffraction_state_pack(
             edge_indices,
@@ -685,41 +541,115 @@ def _native_diffraction_point_connection_samples(
         state_count = int(states[0].shape[0])
         if state_count <= 0:
             continue
-        exported = bdpt_diffraction_point_connection_samples(
-            rx_positions,
-            states,
-            material_gain,
-            material_valid,
-            tx_index=tx_index,
-            state_count=state_count,
-            direct_samples=int(direct_samples),
-            keller_samples=int(keller_samples),
-            seed=int(seed) + tx_index * 104729,
-            wavelength=float(wavelength),
-            mis=mis,
-            beta=beta,
-            strategy_count=_diffraction_strategy_count(direct_samples, keller_samples),
-        )
-        samples_out = exported["samples"]
-        if not isinstance(samples_out, dict):
-            raise RuntimeError(
-                "native BDPT diffraction point sampler returned invalid samples"
+        for rx_start in range(0, int(rx_positions.shape[0]), 64):
+            rx_end = min(rx_start + 64, int(rx_positions.shape[0]))
+            exported = bdpt_diffraction_point_connection_samples(
+                rx_positions[rx_start:rx_end],
+                states,
+                material_gain,
+                material_valid,
+                tx_index=tx_index,
+                state_count=state_count,
+                direct_samples=int(direct_samples),
+                keller_samples=int(keller_samples),
+                seed=int(seed) + tx_index * 104729,
+                wavelength=float(wavelength),
+                mis=mis,
+                beta=beta,
+                strategy_count=_diffraction_strategy_count(
+                    direct_samples, keller_samples
+                ),
             )
-        visible_source = raydn_visibility_forward(
-            raydn.require_handle(),
-            exported["source_start"],
-            exported["source_end"],
-            exported["visibility_active"],
-        )[0]
-        filtered = bdpt_filter_connection_samples(samples_out, visible_source)
-        visible_target = raydn_visibility_forward(
-            raydn.require_handle(),
-            exported["target_start"],
-            exported["target_end"],
-            exported["visibility_active"],
-        )[0]
-        sample_blocks.append(bdpt_filter_connection_samples(filtered, visible_target))
-    return sample_blocks
+            samples_out = exported["samples"]
+            if not isinstance(samples_out, dict):
+                raise RuntimeError(
+                    "native BDPT diffraction point sampler returned invalid samples"
+                )
+            if rx_start:
+                samples_out["rx_id"].add_(rx_start)
+                samples_out["grid_linear_id"].add_(rx_start)
+                samples_out["topology"][:, 1].add_(rx_start)
+            visible_source = raydn_visibility_forward(
+                raydn.require_handle(),
+                exported["source_start"],
+                exported["source_end"],
+                exported["visibility_active"],
+            )[0]
+            filtered = bdpt_filter_connection_samples(samples_out, visible_source)
+            visible_target = raydn_visibility_forward(
+                raydn.require_handle(),
+                exported["target_start"],
+                exported["target_end"],
+                exported["visibility_active"],
+            )[0]
+            yield bdpt_filter_connection_samples(filtered, visible_target)
+
+
+def _topology_connection_samples(
+    topology: Any,
+    selected: torch.Tensor,
+    *,
+    component_out: int,
+) -> dict[str, torch.Tensor] | None:
+    if int(selected.numel()) == 0:
+        return None
+    tx_id = topology.tx_id.index_select(0, selected).to(torch.int32)
+    rx_id = topology.rx_id.index_select(0, selected).to(torch.int32)
+    depth = topology.depth.index_select(0, selected).to(torch.int32)
+    contribution = topology.path_gain.index_select(0, selected)
+    count = int(selected.numel())
+    component_id = torch.full_like(tx_id, int(component_out))
+    one = torch.ones((count,), device=tx_id.device, dtype=torch.float32)
+    valid = torch.ones((count,), device=tx_id.device, dtype=torch.bool)
+    zero_depth = torch.zeros_like(depth)
+    return {
+        "topology": torch.stack((tx_id, rx_id, component_id, depth), dim=1),
+        "contribution": contribution,
+        "pdf": one,
+        "mis_weight": one,
+        "component_id": component_id,
+        "valid": valid,
+        "tx_id": tx_id,
+        "rx_id": rx_id,
+        "grid_linear_id": rx_id.clone(),
+        "light_depth": depth,
+        "sensor_depth": zero_depth,
+        "path_length_m": topology.path_length_m.index_select(0, selected),
+    }
+
+
+def _reflection_discrete_connection_samples(
+    scene: Scene, config: Config
+) -> dict[str, torch.Tensor] | None:
+    """Enumerate delta-specular paths with unit forward/reverse discrete mass."""
+
+    topology = export_topology(
+        scene,
+        PathConfig(
+            max_depth=int(config.max_depth),
+            components={"reflection"},
+        ),
+    )
+    selected = torch.nonzero(topology.component_id == 1, as_tuple=False).flatten()
+    return _topology_connection_samples(topology, selected, component_out=1)
+
+
+def _coupled_discrete_connection_samples(
+    scene: Scene, config: Config
+) -> dict[str, torch.Tensor] | None:
+    """Enumerate mixed delta/UTD paths with unit bidirectional discrete mass."""
+
+    topology = export_topology(
+        scene,
+        PathConfig(
+            max_depth=int(config.max_depth),
+            components={"reflection", "diffraction"},
+            coupled_paths=True,
+            coupled_candidate_limit=int(config.coupled_candidate_limit),
+        ),
+    )
+    selected = torch.nonzero(topology.component_id >= 3, as_tuple=False).flatten()
+    return _topology_connection_samples(topology, selected, component_out=2)
 
 
 def solve(scene: Scene, config: Config) -> Result:
@@ -767,6 +697,17 @@ def solve(scene: Scene, config: Config) -> Result:
 
     tx_reference, tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_reference, grid=grid)
+    topology_scene = (
+        scene
+        if grid is None
+        else Scene(
+            structures=scene.structures,
+            transmitters=scene.transmitters,
+            receivers=[grid],
+            frequency=scene.frequency,
+            metadata=scene.metadata,
+        )
+    )
     tx_polarization = transmitter_polarizations(scene, device=tx_reference.device)
     rx_polarization = receiver_polarizations(
         scene, device=tx_reference.device, grid=grid
@@ -825,8 +766,6 @@ def solve(scene: Scene, config: Config) -> Result:
         return bdpt_zero_matrix(tx_reference, rows=tx_count, cols=rx_count)
 
     estimate_samples: dict[str, torch.Tensor] | None = None
-    reflection_component_map: torch.Tensor | None = None
-    diffraction_component_map: torch.Tensor | None = None
     if endpoint_only:
         component_matrices = {
             "los": endpoint_accumulation["los"],
@@ -836,6 +775,11 @@ def solve(scene: Scene, config: Config) -> Result:
         estimate_samples = endpoint_connection_samples
     else:
         sample_blocks: list[dict[str, torch.Tensor]] = []
+        streamed_matrices = {
+            "los": zero_component_matrix(),
+            "reflection": zero_component_matrix(),
+            "diffraction": zero_component_matrix(),
+        }
         material_tensors = (
             _face_material_tensors(scene, device=tx_reference.device)
             if scene.structures
@@ -872,75 +816,47 @@ def solve(scene: Scene, config: Config) -> Result:
             and native_max_depth >= 1
         )
         if reflection_requested:
-            # The plane-capture accumulation kernel is the reflection
-            # estimator for grids; path export runs the connection sampler in
-            # addition, never instead (the map must not change with export).
-            if grid is not None:
-                reflection_component_map = _native_reflection_component_maps(
-                    scene,
-                    raydn,
-                    tx_reference,
-                    tx_power,
-                    material_tensors,
-                    grid,
-                    samples=native_samples,
-                    max_depth=native_max_depth,
-                )
-            if grid is None or config.export_paths:
-                sample_blocks.extend(
-                    _native_reflection_connection_samples(
-                        raydn,
-                        tx_reference,
-                        tx_power,
-                        tx_polarization,
-                        endpoint_subpaths,
-                        rx_positions,
-                        rx_polarization,
-                        material_tensors,
-                        frequency_hz=float(scene.frequency),
-                        samples=native_samples,
-                        seed=int(config.seed),
-                        mis=config.mis,
-                        beta=config.power_heuristic_beta,
-                        strategy_count=1,
-                        max_depth=native_max_depth,
-                    )
-                )
-            launch_count += 4
+            reflection_samples = _reflection_discrete_connection_samples(
+                topology_scene, config
+            )
+            if reflection_samples is not None:
+                sample_blocks.append(reflection_samples)
+                launch_count += 1
         if diffraction_requested:
-            if grid is None:
-                sample_blocks.extend(
-                    _native_diffraction_point_connection_samples(
-                        scene,
-                        raydn,
-                        tx_reference,
-                        tx_power,
-                        rx_positions,
-                        material_tensors,
-                        samples=native_samples,
-                        seed=int(config.seed),
-                        mis=config.mis,
-                        beta=config.power_heuristic_beta,
-                    )
+            retain_diffraction_samples = (
+                grid is None or config.export_paths or config.diagnostics
+            )
+            for diffraction_samples in _native_diffraction_point_connection_samples(
+                scene,
+                raydn,
+                tx_reference,
+                tx_power,
+                rx_positions,
+                material_tensors,
+                samples=native_samples,
+                seed=int(config.seed),
+                mis=config.mis,
+                beta=config.power_heuristic_beta,
+            ):
+                if retain_diffraction_samples:
+                    sample_blocks.append(diffraction_samples)
+                    continue
+                chunk = bdpt_accumulate_connection_samples(
+                    diffraction_samples,
+                    tx_count=tx_count,
+                    rx_count=rx_count,
+                    accumulation_strategy=selected_accumulation,
                 )
-            else:
-                diffraction_component_map, diffraction_sample_blocks = (
-                    _native_diffraction_component_maps(
-                        scene,
-                        raydn,
-                        tx_reference,
-                        tx_power,
-                        grid,
-                        material_tensors,
-                        samples=native_samples,
-                        seed=int(config.seed),
-                        export_samples=bool(config.export_paths),
-                        mis=config.mis,
-                        beta=config.power_heuristic_beta,
-                    )
-                )
-                sample_blocks.extend(diffraction_sample_blocks)
+                for component in streamed_matrices:
+                    streamed_matrices[component].add_(chunk[component])
             launch_count += 3
+        if config.coupled_paths:
+            coupled_samples = _coupled_discrete_connection_samples(
+                topology_scene, config
+            )
+            if coupled_samples is not None:
+                sample_blocks.append(coupled_samples)
+                launch_count += 1
         if sample_blocks:
             estimate_samples = (
                 sample_blocks[0]
@@ -954,16 +870,11 @@ def solve(scene: Scene, config: Config) -> Result:
                 accumulation_strategy=selected_accumulation,
             )
             component_matrices = {
-                "los": accumulated["los"],
-                "reflection": accumulated["reflection"],
-                "diffraction": accumulated["diffraction"],
+                component: accumulated[component] + streamed_matrices[component]
+                for component in streamed_matrices
             }
         else:
-            component_matrices = {
-                "los": zero_component_matrix(),
-                "reflection": zero_component_matrix(),
-                "diffraction": zero_component_matrix(),
-            }
+            component_matrices = streamed_matrices
 
     component_maps: dict[str, torch.Tensor] | None = None
     point_component_matrices: dict[str, torch.Tensor] | None = None
@@ -973,10 +884,6 @@ def solve(scene: Scene, config: Config) -> Result:
             rows=grid.shape[0],
             cols=grid.shape[1],
         )
-        if diffraction_component_map is not None:
-            component_maps["diffraction"] = diffraction_component_map
-        if reflection_component_map is not None:
-            component_maps["reflection"] = reflection_component_map
         finalized = bdpt_finalize_component_maps(
             component_maps["los"],
             component_maps["reflection"],
@@ -1033,14 +940,15 @@ def solve(scene: Scene, config: Config) -> Result:
             )
         else:
             if estimate_samples is None:
-                raise RuntimeError(
-                    "BDPT path export requires native connection samples"
+                path_samples = _empty_path_samples(tx_reference)
+            else:
+                exported_path_samples = bdpt_compact_connection_samples(
+                    estimate_samples,
+                    max_paths=config.max_exported_paths,
                 )
-            exported_path_samples = bdpt_compact_connection_samples(
-                estimate_samples,
-                max_paths=config.max_exported_paths,
-            )
-            path_samples = _path_samples_from_connection_export(exported_path_samples)
+                path_samples = _path_samples_from_connection_export(
+                    exported_path_samples
+                )
     valid_contribution_count = (
         bdpt_count_valid_connection_samples(estimate_samples)
         if estimate_samples is not None

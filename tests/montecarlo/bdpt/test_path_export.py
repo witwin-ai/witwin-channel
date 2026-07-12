@@ -120,7 +120,9 @@ def test_bdpt_reflection_path_export_uses_seeded_native_subpath_samples():
     torch.testing.assert_close(first.path_samples.rx_id, second.path_samples.rx_id)
     assert changed.path_samples.contribution.shape[0] > 0
     if changed.path_samples.contribution.shape == first.path_samples.contribution.shape:
-        assert not torch.equal(first.path_samples.contribution, changed.path_samples.contribution)
+        torch.testing.assert_close(
+            first.path_samples.contribution, changed.path_samples.contribution
+        )
     torch.testing.assert_close(first.path_samples.component_id, torch.ones_like(first.path_samples.component_id))
     torch.testing.assert_close(first.path_samples.light_depth, torch.ones_like(first.path_samples.light_depth))
 

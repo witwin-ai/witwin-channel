@@ -65,9 +65,10 @@ def test_bdpt_single_wedge_diffraction_fixed_seed_is_stable():
 
 
 def test_bdpt_single_wedge_diffraction_uses_original_direct_keller_split():
-    assert bdpt_solver._diffraction_sample_split(16) == (6, 5, 0)
-    assert bdpt_solver._diffraction_sample_split(17) == (6, 6, 0)
-    assert bdpt_solver._diffraction_sample_split(512) == (171, 171, 0)
+    assert bdpt_solver._diffraction_sample_split(16, mis="power_heuristic") == (6, 5, 0)
+    assert bdpt_solver._diffraction_sample_split(17, mis="balance") == (6, 6, 0)
+    assert bdpt_solver._diffraction_sample_split(512, mis="power_heuristic") == (171, 171, 0)
+    assert bdpt_solver._diffraction_sample_split(16, mis="none") == (16, 0, 0)
 
 
 @pytest.mark.parametrize(
@@ -170,21 +171,22 @@ def test_bdpt_grid_diffraction_is_seed_stable():
     assert spread < 0.3
 
 
-def test_bdpt_diffraction_rejects_mis_none_with_multiple_strategies():
+def test_bdpt_diffraction_mis_none_uses_one_unbiased_strategy():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
 
-    with pytest.raises(RuntimeError, match="double counts"):
-        solve(
-            wedge_diffraction_scene(),
-            Config(
-                samples=256,
-                seed=7,
-                components={"diffraction"},
-                receiver_strategy="point_sphere",
-                mis="none",
-            ),
-        )
+    result = solve(
+        wedge_diffraction_scene(),
+        Config(
+            samples=256,
+            seed=7,
+            components={"diffraction"},
+            receiver_strategy="point_sphere",
+            mis="none",
+        ),
+    )
+    assert result.metadata["mis"] == "none"
+    assert bool(torch.isfinite(result.path_gain).all())
 
 
 def test_bdpt_diffraction_point_receiver_returns_native_component_without_path_block_fallback():

@@ -47,9 +47,9 @@ _CAPABILITIES: dict[str, Any] = {
         },
         "montecarlo_bdpt": {
             "max_diffraction_order": 1,
-            "supports_reflection_diffraction_coupling": False,
-            "supports_complex_path_coefficients": False,
-            "supports_polarization": False,
+            "supports_reflection_diffraction_coupling": True,
+            "supports_complex_path_coefficients": True,
+            "supports_polarization": True,
             "supports_arrays": False,
             "supports_ad": False,
         },

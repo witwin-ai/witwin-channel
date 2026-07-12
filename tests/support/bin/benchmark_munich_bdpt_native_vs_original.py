@@ -17,9 +17,9 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric, PerfectConductor
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
+from witwin.channel_native.core.materials import Dielectric, PerfectConductor  # noqa: E402
+from witwin.channel_native.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
 DEFAULT_SIONNA_ROOT = pathlib.Path(
@@ -548,8 +548,25 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     # (audit MC-2), so its absolute diffraction scale is not a valid
     # reference. Gate the summed parity on LoS+reflection, and keep the
     # diffraction map gated by the scale-invariant correlation below.
-    native_sum_gate = native_total - native_components.get("diffraction", torch.zeros_like(native_total))
-    original_sum_gate = original_total - original_tensors.get("diffraction", torch.zeros_like(original_total))
+    delta_enumerated = (
+        result.metadata.get("delta_strategy")
+        == "canonical_enumeration_unit_bidirectional_mass"
+    )
+    if delta_enumerated:
+        # The maintained solver now enumerates ideal specular delta paths,
+        # while the legacy oracle bins sampled rays by grid area. Their
+        # reflection maps are different estimators and cannot share a
+        # correlation/energy gate. Reflection correctness is gated against
+        # the shared Path solver in the analytic and Munich path suites.
+        native_sum_gate = native_components["los"]
+        original_sum_gate = original_tensors["los"]
+    else:
+        native_sum_gate = native_total - native_components.get(
+            "diffraction", torch.zeros_like(native_total)
+        )
+        original_sum_gate = original_total - original_tensors.get(
+            "diffraction", torch.zeros_like(original_total)
+        )
     _, sum_gate_delta = _delta_metrics(native_sum_gate, original_sum_gate)
 
     component_delta: dict[str, dict[str, float | int]] = {}
@@ -577,7 +594,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         _gate_payload("original_components_nonzero", all(_component_nonzero(original_tensors).values())),
     ]
     for name, corr in component_correlation.items():
-        if name == "diffraction":
+        if name == "diffraction" or (name == "reflection" and delta_enumerated):
             # The Keller-cone diffraction sampler currently has unbounded
             # variance (audit DF-6): at benchmark sample counts the native
             # map is Monte Carlo noise and its correlation with the original

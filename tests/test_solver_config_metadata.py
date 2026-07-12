@@ -60,11 +60,10 @@ def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(config_typ
         config_type(max_depth=0, components={component})
 
 
-def test_bdpt_rejects_disabled_diffraction_and_ambiguous_mis_at_config_time():
+def test_bdpt_rejects_disabled_diffraction_and_accepts_single_strategy_without_mis():
     with pytest.raises(RuntimeError, match="max_diffraction_order"):
         BdptConfig(components={"diffraction"}, max_diffraction_order=0)
-    with pytest.raises(RuntimeError, match="double counts"):
-        BdptConfig(components={"diffraction"}, mis="none", samples=2)
+    assert BdptConfig(components={"diffraction"}, mis="none", samples=2).mis == "none"
 
 
 def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):

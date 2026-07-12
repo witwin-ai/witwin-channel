@@ -36,6 +36,7 @@ def _complete_subpath_field_state(
     state["field_real"] = field_real
     state["field_imag"] = torch.zeros_like(field_real)
     state["source_power"] = state["throughput_real"].square()
+    state["event_type"] = torch.zeros((count,), device="cuda", dtype=torch.int32)
     return state
 
 
@@ -121,6 +122,7 @@ def test_bdpt_empty_subpath_state_returns_native_schema():
         "field_real": ((0, 3), torch.float32),
         "field_imag": ((0, 3), torch.float32),
         "source_power": ((0,), torch.float32),
+        "event_type": ((0,), torch.int32),
     }
     assert set(state) == set(expected)
     for name, (shape, dtype) in expected.items():
@@ -163,18 +165,20 @@ def test_bdpt_endpoint_subpath_state_generates_native_light_and_sensor_endpoints
         rtol=1.0e-6,
         atol=1.0e-8,
     )
-    torch.testing.assert_close(light["pdf_reverse"], torch.zeros(3, device="cuda"))
+    torch.testing.assert_close(light["pdf_reverse"], light["pdf_forward"])
+    torch.testing.assert_close(light["event_type"], torch.zeros(3, device="cuda", dtype=torch.int32))
     torch.testing.assert_close(light["tx_id"], launch_tx_id)
     torch.testing.assert_close(light["rx_id"], torch.full((3,), -1, device="cuda", dtype=torch.int32))
     assert light["valid"].all()
 
     torch.testing.assert_close(sensor["origin"], rx_positions)
     torch.testing.assert_close(sensor["throughput_real"], torch.ones(2, device="cuda"))
-    torch.testing.assert_close(sensor["pdf_forward"], torch.zeros(2, device="cuda"))
+    torch.testing.assert_close(sensor["pdf_forward"], torch.ones(2, device="cuda"))
     torch.testing.assert_close(sensor["pdf_reverse"], torch.ones(2, device="cuda"))
     torch.testing.assert_close(sensor["tx_id"], torch.full((2,), -1, device="cuda", dtype=torch.int32))
     torch.testing.assert_close(sensor["rx_id"], torch.tensor([0, 1], device="cuda", dtype=torch.int32))
     torch.testing.assert_close(sensor["grid_linear_id"], torch.tensor([0, 1], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(sensor["event_type"], torch.zeros(2, device="cuda", dtype=torch.int32))
     assert sensor["valid"].all()
 
 
@@ -275,8 +279,10 @@ def test_bdpt_reflected_light_subpath_state_uses_native_hit_geometry():
     )
     torch.testing.assert_close(reflected["throughput_real"].cpu(), torch.tensor([2.0], dtype=torch.float32))
     torch.testing.assert_close(reflected["pdf_forward"].cpu(), torch.tensor([0.25], dtype=torch.float32))
+    torch.testing.assert_close(reflected["pdf_reverse"].cpu(), torch.tensor([0.25], dtype=torch.float32))
     torch.testing.assert_close(reflected["depth"].cpu(), torch.tensor([1], dtype=torch.int32))
     torch.testing.assert_close(reflected["component_mask"].cpu(), torch.tensor([3], dtype=torch.int32))
+    torch.testing.assert_close(reflected["event_type"].cpu(), torch.tensor([1], dtype=torch.int32))
     torch.testing.assert_close(reflected["primitive_id"].cpu(), torch.tensor([7], dtype=torch.int32))
     torch.testing.assert_close(reflected["tx_id"].cpu(), torch.tensor([3], dtype=torch.int32))
     torch.testing.assert_close(reflected["valid"].cpu(), torch.tensor([True], dtype=torch.bool))
@@ -422,6 +428,7 @@ def test_bdpt_endpoint_connection_samples_classifies_reflected_light_as_reflecti
     sensor["field_real"] = torch.tensor([[0.0, 0.0, 1.0]], device="cuda")
     sensor["field_imag"] = torch.zeros((1, 3), device="cuda")
     sensor["source_power"] = torch.zeros((1,), device="cuda")
+    sensor["event_type"] = torch.zeros((1,), device="cuda", dtype=torch.int32)
 
     samples = ops.bdpt_endpoint_connection_samples(
         reflected,

@@ -133,6 +133,7 @@ _BDPT_SUBPATH_SCHEMA: dict[str, tuple[torch.dtype, tuple[int | None, ...]]] = {
     "field_real": (torch.float32, (None, 3)),
     "field_imag": (torch.float32, (None, 3)),
     "source_power": (torch.float32, (None,)),
+    "event_type": (torch.int32, (None,)),
 }
 
 

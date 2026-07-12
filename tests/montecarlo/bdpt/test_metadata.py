@@ -17,6 +17,14 @@ def test_bdpt_metadata_reports_contract_fields():
     assert result.metadata["seed"] == 123
     assert result.metadata["sample_streams"] == 2
     assert result.metadata["mis"] == "power_heuristic"
+    assert result.metadata["throughput_domain"] == "unit_excitation_complex3"
+    assert result.metadata["pdf_domain"] == "cumulative_non_delta_proposal_density"
+    assert result.metadata["event_classification"]["delta_specular_reflection"] == 1
+    assert result.metadata["mis_capabilities"]["reflection_diffraction_coupled_bidirectional_pdf"] is True
+    assert (
+        result.metadata["mis_capabilities"]["coupled_pdf_domain"]
+        == "enumerated_bidirectional_discrete_mass"
+    )
     assert result.metadata["path_counts_by_strategy"]["los"] == 32 * 2 * 2
     # The LoS term connects one deterministic endpoint per transmitter
     # (audit P-1/P-5), so the valid contributions are tx * rx unique rows

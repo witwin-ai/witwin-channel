@@ -23,6 +23,11 @@ class SubpathState:
     rx_id: torch.Tensor
     grid_linear_id: torch.Tensor
     valid: torch.Tensor
+    path_length: torch.Tensor
+    field_real: torch.Tensor
+    field_imag: torch.Tensor
+    source_power: torch.Tensor
+    event_type: torch.Tensor
 
 
 def empty_subpath_state(reference: torch.Tensor) -> SubpathState:
@@ -42,4 +47,9 @@ def empty_subpath_state(reference: torch.Tensor) -> SubpathState:
         rx_id=state["rx_id"],
         grid_linear_id=state["grid_linear_id"],
         valid=state["valid"],
+        path_length=state["path_length"],
+        field_real=state["field_real"],
+        field_imag=state["field_imag"],
+        source_power=state["source_power"],
+        event_type=state["event_type"],
     )

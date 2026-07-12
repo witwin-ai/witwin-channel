@@ -82,6 +82,7 @@ std::vector<at::Tensor> allocate_subpath_state(const at::Tensor& reference, int6
         at::empty({count, 3}, float_options),
         at::empty({count, 3}, float_options),
         at::empty({count}, float_options),
+        at::empty({count}, int_options),
     };
 }
 
@@ -219,7 +220,8 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     float* path_length,
     float* field_real,
     float* field_imag,
-    float* source_power) {
+    float* source_power,
+    int* event_type) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -242,7 +244,9 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
     throughput_real[index] = is_valid ? sqrtf(fmaxf(tx_power[tx], 0.0f)) : 0.0f;
     throughput_imag[index] = 0.0f;
     pdf_forward[index] = is_valid ? static_cast<float>(1.0 / (4.0 * kPi)) : 0.0f;
-    pdf_reverse[index] = 0.0f;
+    // Store cumulative non-delta proposal densities. Endpoint masses and
+    // specular Dirac masses are classified separately by event_type.
+    pdf_reverse[index] = is_valid ? static_cast<float>(1.0 / (4.0 * kPi)) : 0.0f;
     depth[index] = 0;
     component_mask[index] = 1;
     primitive_id[index] = -1;
@@ -257,6 +261,7 @@ __global__ void bdpt_light_endpoint_subpaths_kernel(
         field_imag[index * 3 + axis] = 0.0f;
     }
     source_power[index] = is_valid ? tx_power[tx] : 0.0f;
+    event_type[index] = is_valid ? 0 : -1;
 }
 
 __global__ void bdpt_sensor_endpoint_subpaths_kernel(
@@ -280,7 +285,8 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     float* path_length,
     float* field_real,
     float* field_imag,
-    float* source_power) {
+    float* source_power,
+    int* event_type) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -296,7 +302,7 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
     dir[2] = -1.0f;
     throughput_real[index] = 1.0f;
     throughput_imag[index] = 0.0f;
-    pdf_forward[index] = 0.0f;
+    pdf_forward[index] = 1.0f;
     pdf_reverse[index] = 1.0f;
     depth[index] = 0;
     component_mask[index] = 1;
@@ -312,6 +318,7 @@ __global__ void bdpt_sensor_endpoint_subpaths_kernel(
         field_imag[index * 3 + axis] = 0.0f;
     }
     source_power[index] = 1.0f;
+    event_type[index] = 0;
 }
 
 __global__ void bdpt_reflected_light_subpaths_kernel(
@@ -360,7 +367,8 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     float* path_length,
     float* field_real,
     float* field_imag,
-    float* source_power) {
+    float* source_power,
+    int* event_type) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -411,7 +419,9 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     throughput_real[index] = is_valid ? light_throughput_real[index] * gain : 0.0f;
     throughput_imag[index] = is_valid ? light_throughput_imag[index] * gain : 0.0f;
     pdf_forward[index] = is_valid ? light_pdf_forward[index] : 0.0f;
-    pdf_reverse[index] = is_valid ? light_pdf_reverse[index] : 0.0f;
+    // Ideal specular reflection has unit discrete mass; it does not multiply
+    // the stored non-delta proposal density in either orientation.
+    pdf_reverse[index] = is_valid ? light_pdf_forward[index] : 0.0f;
     depth[index] = is_valid ? light_depth[index] + 1 : 0;
     component_mask[index] = is_valid ? (light_component_mask[index] | 2) : 0;
     primitive_id[index] = is_valid ? prim : -1;
@@ -458,6 +468,7 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
         }
         source_power[index] = 0.0f;
     }
+    event_type[index] = is_valid ? 1 : -1;
 }
 
 }  // namespace
@@ -515,7 +526,8 @@ std::vector<at::Tensor> cn_bdpt_light_endpoint_subpath_state_cuda(
             state[14].data_ptr<float>(),
             state[15].data_ptr<float>(),
             state[16].data_ptr<float>(),
-            state[17].data_ptr<float>());
+            state[17].data_ptr<float>(),
+            state[18].data_ptr<int>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;
@@ -553,7 +565,8 @@ std::vector<at::Tensor> cn_bdpt_sensor_endpoint_subpath_state_cuda(
             state[14].data_ptr<float>(),
             state[15].data_ptr<float>(),
             state[16].data_ptr<float>(),
-            state[17].data_ptr<float>());
+            state[17].data_ptr<float>(),
+            state[18].data_ptr<int>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;
@@ -697,7 +710,8 @@ std::vector<at::Tensor> cn_bdpt_reflected_light_subpath_state_cuda(
             state[14].data_ptr<float>(),
             state[15].data_ptr<float>(),
             state[16].data_ptr<float>(),
-            state[17].data_ptr<float>());
+            state[17].data_ptr<float>(),
+            state[18].data_ptr<int>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return state;

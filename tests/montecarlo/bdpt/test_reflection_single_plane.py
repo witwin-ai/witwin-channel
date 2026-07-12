@@ -6,6 +6,8 @@ from witwin.channel_native import ReceiverGrid, Scene, Transmitter
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.montecarlo.bdpt import Config, solve
 from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel_native.path import Config as PathConfig
+from witwin.channel_native.path import solve_v2
 
 
 def _scene_with_tx_power(power_w: float) -> Scene:
@@ -108,17 +110,26 @@ def test_bdpt_single_plane_reflection_converges_to_maintained_reference(samples,
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native reflection is not built")
 
+    base = same_side_wall_reflection_scene()
+    grid = _grid()
+    scene = Scene(
+        structures=base.structures,
+        transmitters=base.transmitters,
+        receivers=[grid],
+        frequency=base.frequency,
+    )
     result = solve(
-        same_side_wall_reflection_scene().add(_grid()),
+        scene,
         Config(samples=samples, seed=5, components={"reflection"}),
     )
 
     observed = result.component_power["reflection"].detach().cpu()
-    reference = torch.tensor(3.98e-06, dtype=observed.dtype)
-    torch.testing.assert_close(observed, reference, rtol=relative_tolerance, atol=1.0e-10)
+    paths = solve_v2(scene, PathConfig(components={"reflection"}))
+    reference = paths.a[..., 0].abs().square()[paths.valid].sum().cpu()
+    torch.testing.assert_close(observed, reference, rtol=1.0e-5, atol=1.0e-12)
 
 
-def test_bdpt_point_reflection_samples_use_unfolded_distance_and_fresnel_bound():
+def test_bdpt_point_delta_reflection_uses_unfolded_distance_and_fresnel_bound():
     """Guards audit MC-1: contributions must attenuate over the unfolded path
     (tx -> surface -> rx), bounded by the |R| <= 1 free-space gain."""
 
@@ -153,7 +164,7 @@ def test_bdpt_point_reflection_samples_use_unfolded_distance_and_fresnel_bound()
     assert float(lengths.min()) > direct
     assert float(lengths.min()) > 2.0 * 2.5
     wavelength = 299_792_458.0 / scene.frequency
-    free_space_bound = (wavelength / (4.0 * torch.pi * lengths)) ** 2 / float(samples)
+    free_space_bound = (wavelength / (4.0 * torch.pi * lengths)) ** 2
     assert bool((contributions <= free_space_bound * 1.0001).all())
     assert bool((contributions > 0.0).all())
 
@@ -192,3 +203,32 @@ def test_bdpt_grid_reflection_map_scales_linearly_with_tx_power():
         rtol=1.0e-5,
         atol=1.0e-12,
     )
+
+
+def test_bdpt_point_and_single_cell_grid_reflection_are_identical():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for BDPT reflection")
+    if not build_info()["uses_raydn_native"]:
+        pytest.skip("RayDN native reflection is not built")
+
+    point_scene = same_side_wall_reflection_scene()
+    point = solve(
+        point_scene,
+        Config(samples=2048, seed=29, components={"reflection"}, receiver_strategy="point_sphere"),
+    )
+    receiver_position = point_scene.receivers[0].position
+    grid_scene = point_scene.add(
+        ReceiverGrid(
+            origin=receiver_position,
+            x_axis=torch.tensor([0.0, 1.0, 0.0]),
+            y_axis=torch.tensor([0.0, 0.0, 1.0]),
+            shape=(1, 1),
+            spacing=(1.0, 1.0),
+        )
+    )
+    grid = solve(
+        grid_scene,
+        Config(samples=2048, seed=29, components={"reflection"}),
+    )
+
+    torch.testing.assert_close(grid.path_gain.reshape(1, 1), point.path_gain, rtol=1.0e-6, atol=1.0e-12)

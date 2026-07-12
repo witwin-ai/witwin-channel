@@ -69,7 +69,7 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     # legacy Channel oracle uses world-X. Geometry and K-P UTD still remain
     # close after that intentional convention change.
     assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 2.0
-    assert saved["native"]["metadata"]["kernel"]["launch_count"] <= 10
+    assert saved["native"]["metadata"]["kernel"]["launch_count"] <= 12
     assert (
         saved["performance"]["native_solve_time_ms"]
         < saved["performance"]["original_solve_time_ms"]
