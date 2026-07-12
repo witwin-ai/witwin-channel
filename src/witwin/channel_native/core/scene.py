@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+import hashlib
+import json
 
 import torch
 
@@ -13,6 +15,7 @@ from .runtime.raydn import RayDNScene, build_scene_from_structures
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
 from .kernels.ops import bdpt_zero_matrix, core_diffraction_edge_count, core_pack_int2
+from .materials import MATERIAL_ABI_VERSION
 
 
 Receiver = ReceiverPoint | ReceiverGrid
@@ -30,8 +33,12 @@ class Scene:
     _geometry_version: int = 0
     _material_version: int = 0
     _assignment_version: int = 0
-    _compiled_cache: CompiledScene | None = field(default=None, init=False, compare=False, repr=False)
-    _raydn_cache: RayDNScene | None = field(default=None, init=False, compare=False, repr=False)
+    _compiled_cache: CompiledScene | None = field(
+        default=None, init=False, compare=False, repr=False
+    )
+    _raydn_cache: RayDNScene | None = field(
+        default=None, init=False, compare=False, repr=False
+    )
 
     def __init__(
         self,
@@ -76,15 +83,25 @@ class Scene:
     def with_structure_vertices(self, index: int, vertices: torch.Tensor) -> Scene:
         structures = list(self.structures)
         structures[index] = structures[index].with_vertices(vertices)
-        return replace(self, structures=tuple(structures), _geometry_version=self._geometry_version + 1)
+        return replace(
+            self,
+            structures=tuple(structures),
+            _geometry_version=self._geometry_version + 1,
+        )
 
     def with_structure_material(self, index: int, material: object) -> Scene:
         structures = list(self.structures)
         structures[index] = structures[index].with_material(material)  # type: ignore[arg-type]
-        return replace(self, structures=tuple(structures), _material_version=self._material_version + 1)
+        return replace(
+            self,
+            structures=tuple(structures),
+            _material_version=self._material_version + 1,
+        )
 
     def with_frequency(self, frequency: float) -> Scene:
-        return replace(self, frequency=frequency, _material_version=self._material_version + 1)
+        return replace(
+            self, frequency=frequency, _material_version=self._material_version + 1
+        )
 
     def diffraction_edge_count(self, edge_policy: EdgePolicy | None = None) -> int:
         policy = DEFAULT_EDGE_POLICY if edge_policy is None else edge_policy
@@ -94,7 +111,9 @@ class Scene:
             return 0
         raydn_scene = self.raydn_scene()
         if not raydn_scene.available:
-            raise RuntimeError("diffraction edge counting requires RayDN native scene capability")
+            raise RuntimeError(
+                "diffraction edge counting requires RayDN native scene capability"
+            )
         return _diffraction_edge_count_from_raydn_scene(raydn_scene, policy)
 
     @property
@@ -114,16 +133,28 @@ class Scene:
 
     def compile(self) -> CompiledScene:
         cached = self._compiled_cache
+        material_records, material_keys, material_cache_token = _material_records(
+            self.structures, self.frequency
+        )
         if (
             cached is not None
             and cached.geometry_version == self._geometry_version
             and cached.material_version == self._material_version
             and cached.assignment_version == self._assignment_version
+            and cached.materials.cache_token == material_cache_token
         ):
             return cached
         raydn = self.raydn_scene()
-        geometry = _compile_geometry(self.structures, self._geometry_version, raydn=raydn)
-        materials = _compile_materials(self.structures, self.frequency, self._material_version)
+        geometry = _compile_geometry(
+            self.structures, self._geometry_version, raydn=raydn
+        )
+        materials = _compile_materials(
+            material_records,
+            material_keys,
+            self.frequency,
+            self._material_version,
+            material_cache_token,
+        )
         assignments = _compile_assignments(
             self.structures,
             num_faces=geometry.faces.shape[0],
@@ -144,7 +175,9 @@ class Scene:
         return compiled
 
 
-def _diffraction_edge_count_from_raydn_scene(raydn_scene: RayDNScene, edge_policy: EdgePolicy) -> int:
+def _diffraction_edge_count_from_raydn_scene(
+    raydn_scene: RayDNScene, edge_policy: EdgePolicy
+) -> int:
     records = raydn_scene.edge_records()
     return core_diffraction_edge_count(
         vertices=records.vertices,
@@ -161,7 +194,9 @@ def _diffraction_edge_count_from_raydn_scene(raydn_scene: RayDNScene, edge_polic
     )
 
 
-def _compile_geometry(structures: tuple[Structure, ...], version: int, *, raydn: RayDNScene) -> GeometryStore:
+def _compile_geometry(
+    structures: tuple[Structure, ...], version: int, *, raydn: RayDNScene
+) -> GeometryStore:
     if not structures:
         empty_vertices = torch.empty((0, 3), dtype=torch.float32)
         empty_faces = torch.empty((0, 3), dtype=torch.int32)
@@ -193,35 +228,80 @@ def _compile_geometry(structures: tuple[Structure, ...], version: int, *, raydn:
         face_normals=records.face_normals,
         edges=core_pack_int2(records.edge_v0, records.edge_v1),
         edge_adj_faces=core_pack_int2(records.face0, records.face1),
-        edge_param_range=bdpt_zero_matrix(records.vertices, rows=records.edge_v0.shape[0], cols=2),
+        edge_param_range=bdpt_zero_matrix(
+            records.vertices, rows=records.edge_v0.shape[0], cols=2
+        ),
         face_structure_id=torch.tensor(face_structure_id, dtype=torch.int32),
         face_surface_id=torch.tensor(face_surface_id, dtype=torch.int32),
         version=version,
     )
 
 
-def _compile_materials(
-    structures: tuple[Structure, ...], frequency_hz: float, version: int
-) -> MaterialStore:
-    params = [structure.material.parameters() for structure in structures]
+def _material_records(
+    structures: tuple[Structure, ...], frequency_hz: float
+) -> tuple[list[dict[str, float | int | str]], tuple[str, ...], str]:
+    params = [structure.material.parameters(frequency_hz) for structure in structures]
+    keys = tuple(
+        f"{index}:{structure.name or 'structure'}:{params[index].get('name', 'material')}"
+        for index, structure in enumerate(structures)
+    )
     if not params:
-        params = [{"eps_r": 1.0, "mu_r": 1.0, "sigma_e": 0.0, "gain": 1.0, "model_id": 1}]
+        params = [
+            {
+                "eps_r": 1.0,
+                "mu_r": 1.0,
+                "sigma_e": 0.0,
+                "gain": 1.0,
+                "thickness_m": 0.1,
+                "scattering_coefficient": 0.0,
+                "xpd_coefficient": 0.0,
+                "model_id": 1,
+                "name": "vacuum",
+            }
+        ]
+        keys = ("0:vacuum:vacuum",)
+    payload = {
+        "abi_version": MATERIAL_ABI_VERSION,
+        "frequency_hz": float(frequency_hz),
+        "materials": params,
+        "keys": keys,
+    }
+    cache_token = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return params, keys, cache_token
+
+
+def _compile_materials(
+    params: list[dict[str, float | int | str]],
+    material_keys: tuple[str, ...],
+    frequency_hz: float,
+    version: int,
+    cache_token: str,
+) -> MaterialStore:
 
     return MaterialStore(
+        material_id=torch.arange(len(params), dtype=torch.int32),
         eps_r=torch.tensor([float(p["eps_r"]) for p in params], dtype=torch.float32),
         mu_r=torch.tensor([float(p["mu_r"]) for p in params], dtype=torch.float32),
-        sigma_e=torch.tensor([float(p["sigma_e"]) for p in params], dtype=torch.float32),
+        sigma_e=torch.tensor(
+            [float(p["sigma_e"]) for p in params], dtype=torch.float32
+        ),
         gain=torch.tensor([float(p["gain"]) for p in params], dtype=torch.float32),
         model_id=torch.tensor([int(p["model_id"]) for p in params], dtype=torch.int32),
-        # Slot zero is the ITU-R P.2040 single-layer slab thickness. Keeping
-        # it in model_params preserves the compact material-store ABI while
-        # making Sionna's finite-thickness reflection model available to the
-        # native solvers.
-        model_params=torch.tensor(
-            [[float(p.get("thickness_m", 0.1)), 0.0, 0.0, 0.0] for p in params],
-            dtype=torch.float32,
+        thickness_m=torch.tensor(
+            [float(p["thickness_m"]) for p in params], dtype=torch.float32
         ),
+        scattering_coefficient=torch.tensor(
+            [float(p["scattering_coefficient"]) for p in params], dtype=torch.float32
+        ),
+        xpd_coefficient=torch.tensor(
+            [float(p["xpd_coefficient"]) for p in params], dtype=torch.float32
+        ),
+        material_keys=material_keys,
         frequency_hz=frequency_hz,
+        abi_version=MATERIAL_ABI_VERSION,
+        cache_token=cache_token,
         version=version,
     )
 
@@ -236,11 +316,13 @@ def _compile_assignments(
         face_material_id=torch.tensor(face_material_ids, dtype=torch.int32),
         edge_material_id0=torch.tensor([0] * num_edges, dtype=torch.int32),
         edge_material_id1=torch.tensor([0] * num_edges, dtype=torch.int32),
-        surface_material_id=torch.tensor(list(range(len(structures))), dtype=torch.int32),
-        structure_material_id=torch.tensor(list(range(len(structures))), dtype=torch.int32),
+        surface_material_id=torch.tensor(
+            list(range(len(structures))), dtype=torch.int32
+        ),
+        structure_material_id=torch.tensor(
+            list(range(len(structures))), dtype=torch.int32
+        ),
         num_faces=num_faces,
         num_edges=num_edges,
         version=version,
     )
-
-

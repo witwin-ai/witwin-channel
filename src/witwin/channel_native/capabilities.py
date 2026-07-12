@@ -16,6 +16,27 @@ _CAPABILITIES: dict[str, Any] = {
     "supports_arrays": True,
     "supports_ad": False,
     "receiver_types": ["point", "grid"],
+    "materials": {
+        "abi_version": 2,
+        "supports_dispersive_evaluation": True,
+        "perfect_conductor_model": "explicit",
+        "traceable_material_ids": True,
+        "event_api": {
+            "transmission_refraction": False,
+            "absorption": False,
+            "layered_media": False,
+            "rough_scattering": False,
+            "tabulated_polarimetric_bsdf": False,
+            "medium_stack": False,
+            "energy_accounting": False,
+        },
+        "solver_integration": {
+            "path": False,
+            "deterministic": False,
+            "montecarlo_basic": False,
+            "montecarlo_bdpt": False,
+        },
+    },
     "solvers": {
         "path": {
             "max_reflection_depth": 5,

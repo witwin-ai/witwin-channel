@@ -24,13 +24,19 @@ def test_geometry_store_rejects_wrong_vertex_shape():
 def test_material_store_rejects_per_face_parameter_expansion():
     with pytest.raises(ValueError, match="same length"):
         MaterialStore(
+            material_id=torch.arange(1, dtype=torch.int32),
             eps_r=torch.ones((2,), dtype=torch.float32),
             mu_r=torch.ones((1,), dtype=torch.float32),
             sigma_e=torch.zeros((1,), dtype=torch.float32),
             gain=torch.ones((1,), dtype=torch.float32),
             model_id=torch.ones((1,), dtype=torch.int32),
-            model_params=torch.zeros((1, 4), dtype=torch.float32),
+            thickness_m=torch.ones((1,), dtype=torch.float32),
+            scattering_coefficient=torch.zeros((1,), dtype=torch.float32),
+            xpd_coefficient=torch.zeros((1,), dtype=torch.float32),
+            material_keys=("0:test:test",),
             frequency_hz=3.5e9,
+            abi_version=2,
+            cache_token="test",
             version=0,
         )
 

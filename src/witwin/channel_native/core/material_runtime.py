@@ -16,7 +16,11 @@ def face_material_tensors(
     *,
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    compiled = scene_or_compiled if hasattr(scene_or_compiled, "materials") else scene_or_compiled.compile()
+    compiled = (
+        scene_or_compiled
+        if hasattr(scene_or_compiled, "materials")
+        else scene_or_compiled.compile()
+    )
     materials = compiled.materials
     assignments = compiled.assignments
     material_eps_r = materials.eps_r.to(device=device, dtype=torch.float32).contiguous()
@@ -29,7 +33,9 @@ def face_material_tensors(
         material_sigma_e,
     ).contiguous()
     material_mu_r = materials.mu_r.to(device=device, dtype=torch.float32).contiguous()
-    face_material_id = assignments.face_material_id.to(device=device, dtype=torch.int32).contiguous()
+    face_material_id = assignments.face_material_id.to(
+        device=device, dtype=torch.int32
+    ).contiguous()
     exported = mc_face_material_tensors(
         material_eps_r,
         material_sigma_e,
@@ -52,12 +58,18 @@ def face_material_thickness(
 ) -> torch.Tensor:
     """Expand Sionna/ITU slab thickness to the global face layout."""
 
-    compiled = scene_or_compiled if hasattr(scene_or_compiled, "materials") else scene_or_compiled.compile()
-    material_thickness = compiled.materials.model_params[:, 0].to(
+    compiled = (
+        scene_or_compiled
+        if hasattr(scene_or_compiled, "materials")
+        else scene_or_compiled.compile()
+    )
+    material_thickness = compiled.materials.thickness_m.to(
         device=device,
         dtype=torch.float32,
     )
-    face_material_id = compiled.assignments.face_material_id.to(device=device, dtype=torch.int64)
+    face_material_id = compiled.assignments.face_material_id.to(
+        device=device, dtype=torch.int64
+    )
     return material_thickness.index_select(0, face_material_id).contiguous()
 
 
@@ -83,17 +95,21 @@ def face_material_field_bundle(
     )
 
     def per_face(values: torch.Tensor) -> torch.Tensor:
-        return values.to(device=device, dtype=torch.float32).index_select(
-            0, material_id
-        ).contiguous()
+        return (
+            values.to(device=device, dtype=torch.float32)
+            .index_select(0, material_id)
+            .contiguous()
+        )
 
     return {
         "eps_r": per_face(materials.eps_r),
         "sigma_e": per_face(sigma_e),
         "mu_r": per_face(materials.mu_r),
         "gain": per_face(materials.gain),
-        "thickness": per_face(materials.model_params[:, 0]),
-        "valid": torch.ones(
-            (material_id.shape[0],), device=device, dtype=torch.bool
-        ),
+        "thickness": per_face(materials.thickness_m),
+        "material_id": material_id.to(dtype=torch.int32).contiguous(),
+        "model_id": materials.model_id.to(device=device, dtype=torch.int32)
+        .index_select(0, material_id)
+        .contiguous(),
+        "valid": torch.ones((material_id.shape[0],), device=device, dtype=torch.bool),
     }

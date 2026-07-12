@@ -1,14 +1,26 @@
 import torch
 
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric, LossyDielectric, PerfectConductor
+from witwin.channel_native import (
+    ReceiverGrid,
+    ReceiverPoint,
+    Scene,
+    Structure,
+    Transmitter,
+)
+from witwin.channel_native.core.materials import (
+    Dielectric,
+    LossyDielectric,
+    PerfectConductor,
+)
 
 
 def test_public_scene_objects_capture_structured_inputs():
     vertices = torch.zeros((3, 3), dtype=torch.float32)
     faces = torch.tensor([[0, 1, 2]], dtype=torch.int32)
     material = Dielectric(eps_r=2.5)
-    structure = Structure(vertices=vertices, faces=faces, material=material, name="wall")
+    structure = Structure(
+        vertices=vertices, faces=faces, material=material, name="wall"
+    )
     transmitter = Transmitter(position=torch.tensor([0.0, 0.0, 1.0]), power_w=2.0)
     receiver = ReceiverPoint(position=torch.tensor([1.0, 0.0, 1.0]))
 
@@ -66,8 +78,11 @@ def test_materials_compile_scalar_parameters():
         "mu_r": 1.1,
         "sigma_e": 0.0,
         "gain": 1.0,
+        "scattering_coefficient": 0.0,
+        "xpd_coefficient": 0.0,
         "model_id": 1,
         "thickness_m": 0.1,
+        "name": "dielectric",
     }
     assert lossy.parameters()["sigma_e"] == 0.02
     assert conductor.parameters()["model_id"] == 2

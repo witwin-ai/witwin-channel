@@ -9,7 +9,7 @@ from .antenna import AntennaArray, AntennaPattern, orientation_matrix
 
 
 class Material(Protocol):
-    def parameters(self) -> dict[str, float | int]:
+    def parameters(self, frequency_hz: float | None = None) -> dict[str, float | int | str]:
         ...
 
 
