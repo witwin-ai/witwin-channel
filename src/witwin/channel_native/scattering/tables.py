@@ -34,7 +34,7 @@ the micro-plane normal that specularly maps ``wi`` to ``wo``; it equals
 stack reflectance ``R_bar_q(theta_i)`` there and tracks its angular /
 Fabry-Perot structure across the lobe. (Evaluating at ``|h . n|`` instead
 would sample the stack at NORMAL incidence for every near-specular pair
-and misses the budget by ``R_bar(theta_i)/R_bar(0)`` — measured up to 4x —
+and misses the budget by ``R_bar(theta_i)/R_bar(0)``  -  measured up to 4x  - 
 so it cannot satisfy the normalization tolerance band.) ``wi . h`` is
 exactly reciprocal, as are ``q`` and the geometry prefactor.
 
@@ -61,7 +61,7 @@ diffuse lobe is physically meaningful: incidence bins with
 (a) extreme grazing, where the tangent-plane kernel (no shadowing in v1)
 over-predicts diffuse scatter while the coherent attenuation ``C_r -> 1``
 sends the budget ``R_diff -> 0``; (b) bins whose diffuse budget is below
-0.5% of the incident power — sharp Brewster/interference dips of the
+0.5% of the incident power  -  sharp Brewster/interference dips of the
 smooth-stack budget that a lobe of finite angular width cannot follow
 (and near-smooth surfaces whose lobe is narrower than a grid cell). Both
 kinds of bins still receive the exact-energy normalization, so an O(1)
@@ -213,7 +213,7 @@ def _raw_lobe_grid(
     Returns arrays ``[len(inc_cos), len(inc_phi), len(out_cos),
     len(out_phi)]``. Used twice per build: once on the table axes and once
     with incidence/outgoing axes swapped (the exact grid-resample of
-    ``f(wo, wi)`` — the analytic kernel is reciprocal, so re-evaluating at
+    ``f(wo, wi)``  -  the analytic kernel is reciprocal, so re-evaluating at
     the swapped nodes is the lossless way to symmetrize; interpolating the
     coarse ``phi_i`` axis would smear the specular peak instead).
     """

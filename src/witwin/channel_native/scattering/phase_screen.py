@@ -188,7 +188,7 @@ def patch_phase_integral(
     ``oracle.phase_screen_patch_integral`` for the same height field.
 
     Quadrature: Duffy-mapped tensor-product Gauss-Legendre with ``n_quad``
-    points per axis — the unit square ``(xi, eta)`` maps to barycentric
+    points per axis  -  the unit square ``(xi, eta)`` maps to barycentric
     ``(a, b) = (xi, eta*(1 - xi))`` with Jacobian ``(1 - xi)``, so
     refinement in ``n_quad`` converges to the exact triangle integral.
     Returns a 0-dim complex64 tensor on the runtime device.
