@@ -14,6 +14,7 @@ pybind11::dict cn_build_info() {
     info["rayd_integration"] = "unavailable";
 #endif
     info["uses_path_native"] = true;
+    info["material_abi_version"] = 3;
     info["cuda_available"] = torch::cuda::is_available();
 #if CHANNEL_NATIVE_WITH_OPTIX
     info["optix_available"] = true;

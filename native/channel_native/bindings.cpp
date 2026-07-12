@@ -31,6 +31,27 @@ pybind11::dict cn_bdpt_reflected_light_subpath_state(
     torch::Tensor material_mu_r,
     torch::Tensor material_thickness,
     double frequency_hz);
+pybind11::dict cn_bdpt_transmitted_light_subpath_state(
+    pybind11::dict light,
+    pybind11::dict intersection,
+    torch::Tensor face_material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz);
+pybind11::dict cn_em_layer_stack_eval(
+    torch::Tensor cos_theta,
+    torch::Tensor material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz);
 pybind11::dict cn_bdpt_endpoint_connection_samples(
     pybind11::dict light,
     pybind11::dict sensor,
@@ -251,6 +272,23 @@ pybind11::dict cn_field_reflection_sequence(
     torch::Tensor mu_r,
     torch::Tensor gain,
     torch::Tensor thickness,
+    double frequency_hz);
+pybind11::dict cn_field_transmission_sequence(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor interaction_material_id,
+    torch::Tensor interaction_valid,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
     double frequency_hz);
 pybind11::dict cn_field_coupled_rd(
     torch::Tensor source,
@@ -926,6 +964,14 @@ PYBIND11_MODULE(_channel_native, module) {
         &cn_bdpt_reflected_light_subpath_state,
         "Propagate BDPT light subpaths through native RayDN hit geometry with CUDA reflection.");
     module.def(
+        "bdpt_transmitted_light_subpath_state",
+        &cn_bdpt_transmitted_light_subpath_state,
+        "Continue BDPT light subpaths through thin_sheet walls with CUDA layer-stack transmission.");
+    module.def(
+        "em_layer_stack_eval",
+        &cn_em_layer_stack_eval,
+        "Evaluate shared em/ layer-stack reflection/transmission coefficients for parity tests.");
+    module.def(
         "bdpt_endpoint_connection_samples",
         &cn_bdpt_endpoint_connection_samples,
         "Connect BDPT endpoint subpaths and emit native connection samples.");
@@ -1081,6 +1127,10 @@ PYBIND11_MODULE(_channel_native, module) {
         "field_reflection_sequence",
         &cn_field_reflection_sequence,
         "Transport a canonical complex3 field through a finite-slab reflection sequence.");
+    module.def(
+        "field_transmission_sequence",
+        &cn_field_transmission_sequence,
+        "Transport a canonical complex3 field through a thin_sheet transmission sequence.");
     module.def(
         "field_coupled_rd",
         &cn_field_coupled_rd,
