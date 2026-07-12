@@ -61,7 +61,40 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   checks); lazy `CompiledScene.kirchhoff_tables` / `phase_screen_runtimes`.
 
 ### Wave 3 solvers - scattering integration
-(in progress; deterministic/path and MC basic/BDPT agents running)
+- Deterministic/path: `deterministic/scattering.py` appends component_id=6
+  rows to the canonical topology - ensemble mode via R2 low-discrepancy patch
+  sampling, chunked visibility, polarized table eval; realization_coherent
+  mode via Fresnel-zone-bounded phase-screen patch integrals (reproducible
+  per `(scene_seed, surface_id, realization_id)`); C_r coherent attenuation
+  applied to specular reflection on rough faces (material property, active
+  regardless of requested components); PathResultV2 export as incoherent
+  power paths. Normalization validated three ways (analytic lobe integral,
+  independent float64 quadrature ~0.1%, C_r^2 specular attenuation 1e-3).
+- MC basic: area-sampled diffuse scattering radiomap; BDPT: three-way
+  (reflect/scatter/transmit) event sampler with seeded selection, continuous
+  forward/reverse PDFs from the reciprocal table, NEE connections, native
+  `scattering` component slot (mask bit 16 -> component id 6, priority rule).
+- Cross-solver agreement on a rough-wall scene: BDPT vs MC basic within
+  1.3%, both within ~2% of an independent float64 area-quadrature reference;
+  variance scales 1/N; smooth limit collapses to zero scattering with
+  unchanged reflection.
+
+## Validation status (plan section 11)
+- 11.1 analytic unit tests: all covered in tests/physics + tests/kernels
+  (normal incidence, Brewster, TIR, PEC, zero-thickness, Fabry-Perot,
+  high-loss, Jones transversality via vacuum identities).
+- 11.2 invariants: passivity and reciprocity tested at oracle, table, and
+  solver level; smooth/isotropic limits tested; phase-integral convergence
+  tested (patch quadrature refinement); rotation invariance not explicitly
+  tested (gap, low risk - all frames are constructed covariantly).
+- 11.3 statistics: sampling chi-square vs PDF; BDPT/MC-basic/quadrature
+  three-way agreement; seed reproducibility; 1/N variance scaling.
+- Munich deterministic parity: accuracy component deltas bit-stable at the
+  historical values (median 1.7048 dB); the wall-clock native<original gate
+  flakes when the GPU is loaded (a game was running during final
+  validation) - accuracy assertions never failed.
+- 11.4 external validation beyond the analytic/oracle tiers (measured
+  materials, full-wave references) remains future work per plan.
 
 ## Known deviations from the plan narrative (documented choices)
 - Kirchhoff eval/sample runs as PyTorch GPU tensor code, not dedicated CUDA
