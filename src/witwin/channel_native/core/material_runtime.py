@@ -101,6 +101,9 @@ def face_material_field_bundle(
             .contiguous()
         )
 
+    def material_level(values: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+        return values.to(device=device, dtype=dtype).contiguous()
+
     return {
         "eps_r": per_face(materials.eps_r),
         "sigma_e": per_face(sigma_e),
@@ -112,4 +115,18 @@ def face_material_field_bundle(
         .index_select(0, material_id)
         .contiguous(),
         "valid": torch.ones((material_id.shape[0],), device=device, dtype=torch.bool),
+        # ABI v3 material-level views: faces index the CSR via material_id,
+        # layers are never expanded per face.
+        "layer_offset": material_level(materials.layer_offset, torch.int32),
+        "layer_count": material_level(materials.layer_count, torch.int32),
+        "layer_thickness_m": material_level(materials.layer_thickness_m, torch.float32),
+        "layer_eps_r": material_level(materials.layer_eps_r, torch.float32),
+        "layer_sigma_e": material_level(materials.layer_sigma_e, torch.float32),
+        "layer_mu_r": material_level(materials.layer_mu_r, torch.float32),
+        "rough_sigma_h_m": material_level(materials.rough_sigma_h_m, torch.float32),
+        "rough_corr_x_m": material_level(materials.rough_corr_x_m, torch.float32),
+        "rough_corr_y_m": material_level(materials.rough_corr_y_m, torch.float32),
+        "rough_axis_rad": material_level(materials.rough_axis_rad, torch.float32),
+        "geometry_mode_id": material_level(materials.geometry_mode_id, torch.int32),
+        "scatter_model_id": material_level(materials.scatter_model_id, torch.int32),
     }

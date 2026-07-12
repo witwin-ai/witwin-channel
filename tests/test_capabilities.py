@@ -17,8 +17,10 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
     assert manifest["supports_ad"] is False
     materials = manifest["materials"]
-    assert materials["abi_version"] == 2
+    assert materials["abi_version"] == 3
     assert materials["perfect_conductor_model"] == "explicit"
+    assert materials["physical_surface"] is True
+    assert materials["layer_csr"] is True
     assert all(
         enabled is True
         for enabled in materials["runtime_material_abi_integration"].values()

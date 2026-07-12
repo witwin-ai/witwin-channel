@@ -15,7 +15,13 @@ from .runtime.raydn import RayDNScene, build_scene_from_structures
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
 from .kernels.ops import bdpt_zero_matrix, core_diffraction_edge_count, core_pack_int2
-from .materials import MATERIAL_ABI_VERSION
+from .materials import (
+    GEOMETRY_MODE_IDS,
+    MATERIAL_ABI_VERSION,
+    PhaseScreen,
+    SurfaceAssignment,
+    effective_sigma_e,
+)
 
 
 Receiver = ReceiverPoint | ReceiverGrid
@@ -133,9 +139,12 @@ class Scene:
 
     def compile(self) -> CompiledScene:
         cached = self._compiled_cache
-        material_records, material_keys, material_cache_token = _material_records(
-            self.structures, self.frequency
-        )
+        (
+            material_records,
+            material_keys,
+            material_cache_token,
+            phase_screens,
+        ) = _material_records(self.structures, self.frequency)
         if (
             cached is not None
             and cached.geometry_version == self._geometry_version
@@ -160,6 +169,7 @@ class Scene:
             num_faces=geometry.faces.shape[0],
             num_edges=geometry.edges.shape[0],
             version=self._assignment_version,
+            phase_screens=phase_screens,
         )
         compiled = CompiledScene(
             geometry=geometry,
@@ -237,10 +247,83 @@ def _compile_geometry(
     )
 
 
+def _abi_v3_layer_view(
+    params: dict[str, object],
+) -> dict[str, object]:
+    """Derive the ABI v3 CSR/roughness view for any compiled material record.
+
+    Legacy scalar materials become a single layer from
+    ``(eps_r, sigma_e, mu_r, thickness_m)``; PEC keeps its effective-sigma
+    encoding so the finite-sigma layer kernels see the conductor limit.
+    """
+
+    if "layers" in params:
+        layers = [[float(v) for v in row] for row in params["layers"]]
+        roughness = params.get("roughness")
+        geometry_mode_id = GEOMETRY_MODE_IDS[str(params["geometry_mode"])]
+    else:
+        layers = [
+            [
+                float(params["thickness_m"]),
+                float(params["eps_r"]),
+                effective_sigma_e(params),
+                float(params["mu_r"]),
+            ]
+        ]
+        roughness = None
+        geometry_mode_id = GEOMETRY_MODE_IDS["thin_sheet"]
+    if roughness is None:
+        roughness = [0.0, 0.0, 0.0, 0.0]
+    else:
+        roughness = [float(v) for v in roughness]
+    return {
+        "layers": layers,
+        "roughness": roughness,
+        "geometry_mode_id": geometry_mode_id,
+        "scatter_model_id": 1 if roughness[0] > 0.0 else 0,
+    }
+
+
+def _phase_screen_descriptor(screen: PhaseScreen) -> dict[str, object]:
+    """JSON-serializable cache-token descriptor (excludes bulk height data)."""
+
+    correlation = screen.correlation
+    return {
+        "shape": list(screen.shape()),
+        "height_scale_m": float(screen.height_scale_m),
+        "height_offset_m": float(screen.height_offset_m),
+        "realization_id": int(screen.realization_id),
+        "mode": str(screen.mode),
+        "quadrature_tolerance": float(screen.quadrature_tolerance),
+        "correlation": None
+        if correlation is None
+        else [
+            float(correlation.rms_height_m),
+            float(correlation.corr_length_x_m),
+            float(correlation.corr_length_y_m),
+            float(correlation.principal_axis_rad),
+            str(correlation.correlation),
+        ],
+    }
+
+
 def _material_records(
     structures: tuple[Structure, ...], frequency_hz: float
-) -> tuple[list[dict[str, float | int | str]], tuple[str, ...], str]:
-    params = [structure.material.parameters(frequency_hz) for structure in structures]
+) -> tuple[
+    list[dict[str, object]],
+    tuple[str, ...],
+    str,
+    dict[int, PhaseScreen],
+]:
+    params: list[dict[str, object]] = []
+    phase_screens: dict[int, PhaseScreen] = {}
+    for index, structure in enumerate(structures):
+        material = structure.material
+        if isinstance(material, SurfaceAssignment):
+            if material.phase_screen is not None:
+                phase_screens[index] = material.phase_screen
+            material = material.material
+        params.append(dict(material.parameters(frequency_hz)))
     keys = tuple(
         f"{index}:{structure.name or 'structure'}:{params[index].get('name', 'material')}"
         for index, structure in enumerate(structures)
@@ -260,25 +343,49 @@ def _material_records(
             }
         ]
         keys = ("0:vacuum:vacuum",)
+    for record in params:
+        record.update(_abi_v3_layer_view(record))
     payload = {
         "abi_version": MATERIAL_ABI_VERSION,
         "frequency_hz": float(frequency_hz),
         "materials": params,
         "keys": keys,
+        "phase_screens": {
+            str(index): _phase_screen_descriptor(screen)
+            for index, screen in phase_screens.items()
+        },
     }
     cache_token = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
-    return params, keys, cache_token
+    return params, keys, cache_token, phase_screens
 
 
 def _compile_materials(
-    params: list[dict[str, float | int | str]],
+    params: list[dict[str, object]],
     material_keys: tuple[str, ...],
     frequency_hz: float,
     version: int,
     cache_token: str,
 ) -> MaterialStore:
+    layer_offset: list[int] = []
+    layer_count: list[int] = []
+    layer_rows: list[list[float]] = []
+    for p in params:
+        rows = p["layers"]
+        layer_offset.append(len(layer_rows))
+        layer_count.append(len(rows))
+        layer_rows.extend(rows)
+
+    def layer_column(column: int) -> torch.Tensor:
+        return torch.tensor(
+            [row[column] for row in layer_rows], dtype=torch.float32
+        )
+
+    def rough_column(column: int) -> torch.Tensor:
+        return torch.tensor(
+            [float(p["roughness"][column]) for p in params], dtype=torch.float32
+        )
 
     return MaterialStore(
         material_id=torch.arange(len(params), dtype=torch.int32),
@@ -298,6 +405,22 @@ def _compile_materials(
         xpd_coefficient=torch.tensor(
             [float(p["xpd_coefficient"]) for p in params], dtype=torch.float32
         ),
+        layer_offset=torch.tensor(layer_offset, dtype=torch.int32),
+        layer_count=torch.tensor(layer_count, dtype=torch.int32),
+        layer_thickness_m=layer_column(0),
+        layer_eps_r=layer_column(1),
+        layer_sigma_e=layer_column(2),
+        layer_mu_r=layer_column(3),
+        rough_sigma_h_m=rough_column(0),
+        rough_corr_x_m=rough_column(1),
+        rough_corr_y_m=rough_column(2),
+        rough_axis_rad=rough_column(3),
+        geometry_mode_id=torch.tensor(
+            [int(p["geometry_mode_id"]) for p in params], dtype=torch.int32
+        ),
+        scatter_model_id=torch.tensor(
+            [int(p["scatter_model_id"]) for p in params], dtype=torch.int32
+        ),
         material_keys=material_keys,
         frequency_hz=frequency_hz,
         abi_version=MATERIAL_ABI_VERSION,
@@ -307,7 +430,12 @@ def _compile_materials(
 
 
 def _compile_assignments(
-    structures: tuple[Structure, ...], *, num_faces: int, num_edges: int, version: int
+    structures: tuple[Structure, ...],
+    *,
+    num_faces: int,
+    num_edges: int,
+    version: int,
+    phase_screens: dict[int, PhaseScreen] | None = None,
 ) -> AssignmentStore:
     face_material_ids = []
     for material_id, structure in enumerate(structures):
@@ -325,4 +453,5 @@ def _compile_assignments(
         num_faces=num_faces,
         num_edges=num_edges,
         version=version,
+        structure_phase_screens=dict(phase_screens or {}),
     )
