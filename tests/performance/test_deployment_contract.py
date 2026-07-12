@@ -54,4 +54,4 @@ def test_runtime_diagnostics_are_import_safe_and_report_sm_policy():
     assert declared["runtime_verified"] is False
     assert declared["status"] == "declared_unverified"
     assert declared["evidence"] == []
-    assert sm_support(90)["status"] == "unsupported"
+    assert sm_support(90)["status"] == "not_declared"

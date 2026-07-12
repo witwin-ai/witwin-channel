@@ -30,14 +30,14 @@ def sm_support(sm: int) -> dict[str, Any]:
         "sm": sm,
         "declared_supported": declared,
         "runtime_verified": False,
-        "status": "declared_unverified" if declared else "unsupported",
+        "status": "declared_unverified" if declared else "not_declared",
         "evidence": [],
         "mode": (
             "sass+ptx"
             if sm == PTX_FORWARD_COMPATIBILITY_SM
             else "sass"
             if sm in DECLARED_SM_ARCHITECTURES
-            else "unsupported"
+            else "not_available"
         ),
     }
 
@@ -114,7 +114,7 @@ def require_supported_runtime() -> dict[str, Any]:
             f"{list(DECLARED_SM_ARCHITECTURES)}"
         )
     if errors:
-        raise RuntimeError("Channel Native runtime is unsupported: " + "; ".join(errors))
+        raise RuntimeError("Channel Native runtime requirements failed: " + "; ".join(errors))
     return diagnostics
 
 
