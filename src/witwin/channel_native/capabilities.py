@@ -28,10 +28,12 @@ _CAPABILITIES: dict[str, Any] = {
     },
     "receiver_types": ["point", "grid"],
     "materials": {
-        "abi_version": 2,
+        "abi_version": 3,
         "supports_dispersive_evaluation": True,
         "perfect_conductor_model": "explicit",
         "traceable_material_ids": True,
+        "physical_surface": True,
+        "layer_csr": True,
         "event_api": {
             "transmission_refraction": False,
             "absorption": False,
