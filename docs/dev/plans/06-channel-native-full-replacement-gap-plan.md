@@ -107,11 +107,11 @@
 
 ### Phase D：材料、场景与阵列（P1）
 
-- [ ] 完成频散材料、multilayer、transmission 和 rough scattering 的能量/互易性测试；
-- [ ] 补齐 XML transform、UV、instancing、boundary/non-manifold edge；
-- [ ] 实现 TX/RX orientation、方向图和极化端口；
-- [ ] 实现并验证 ULA/URA synthetic array 与 explicit array；
-- [ ] 覆盖多 TX/RX、precoding/combining 和全局旋转/平移不变性。
+- [x] 完成频散材料、multilayer、transmission 和 rough scattering 的能量/互易性测试；
+- [x] 补齐 XML transform、UV、instancing、boundary/non-manifold edge；
+- [x] 实现 TX/RX orientation、方向图和极化端口；
+- [x] 实现并验证 ULA/URA synthetic array 与 explicit array；
+- [x] 覆盖多 TX/RX、precoding/combining 和全局旋转/平移不变性。
 
 验收：解析小场景和 Munich/San Francisco 场景同时通过，不依赖旧包运行时。
 

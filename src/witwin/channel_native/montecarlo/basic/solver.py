@@ -5,6 +5,7 @@ from typing import Any
 import torch
 
 from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import effective_sigma_e
@@ -97,6 +98,9 @@ def _host_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
 
 
 def solve(scene: Scene, config: Config) -> Result:
+    validate_scalar_endpoint_features(
+        scene.transmitters, scene.receivers, solver="Monte Carlo basic"
+    )
     _enforce_workspace_budget(scene, config)
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.montecarlo.basic requires CUDA")

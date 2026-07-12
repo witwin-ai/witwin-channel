@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import torch
@@ -195,10 +195,67 @@ def apply_precoding_combining(
     return torch.einsum("...rt,t,r->...", coefficients, tx, rx.conj())
 
 
+def apply_endpoint_weights(
+    coefficients: torch.Tensor,
+    *,
+    tx_weights: torch.Tensor,
+    rx_weights: torch.Tensor,
+) -> torch.Tensor:
+    """Combine ``(rx, rx_ant, tx, tx_ant, ...)`` endpoint channels.
+
+    The leading endpoint and antenna dimensions match :class:`PathResult`.
+    Any trailing signal dimensions (path, time, frequency, or tap) are
+    preserved.  Receiver weights follow the usual conjugating convention.
+    """
+
+    if coefficients.ndim < 4:
+        raise ValueError(
+            "coefficients must have (rx, rx_ant, tx, tx_ant, ...) dimensions"
+        )
+    expected_tx = (coefficients.shape[2], coefficients.shape[3])
+    expected_rx = (coefficients.shape[0], coefficients.shape[1])
+    if tx_weights.shape != expected_tx:
+        raise ValueError(f"tx_weights must have shape {expected_tx}")
+    if rx_weights.shape != expected_rx:
+        raise ValueError(f"rx_weights must have shape {expected_rx}")
+    tx = tx_weights.to(device=coefficients.device, dtype=torch.complex64)
+    rx = rx_weights.to(device=coefficients.device, dtype=torch.complex64)
+    tail = (1,) * (coefficients.ndim - 4)
+    weighted = coefficients * tx.reshape(1, 1, *expected_tx, *tail)
+    weighted = weighted * rx.conj().reshape(*expected_rx, 1, 1, *tail)
+    return weighted.sum(dim=3).sum(dim=1)
+
+
+def validate_scalar_endpoint_features(
+    transmitters: Sequence[object],
+    receivers: Sequence[object],
+    *,
+    solver: str,
+) -> None:
+    """Reject endpoint features that a scalar/power solver cannot consume."""
+
+    for endpoint in (*tuple(transmitters), *tuple(receivers)):
+        if endpoint.array.num_antennas != 1:
+            raise ValueError(f"{solver} does not support antenna arrays")
+        if endpoint.pattern.kind != "isotropic":
+            raise ValueError(
+                f"{solver} does not support directional antenna patterns"
+            )
+        weights = (
+            endpoint.precoding
+            if hasattr(endpoint, "precoding")
+            else endpoint.combining
+        )
+        if weights is not None:
+            raise ValueError(f"{solver} does not support precoding or combining")
+
+
 __all__ = [
     "AntennaArray",
     "AntennaPattern",
+    "apply_endpoint_weights",
     "apply_precoding_combining",
     "orientation_matrix",
     "steering_vector",
+    "validate_scalar_endpoint_features",
 ]

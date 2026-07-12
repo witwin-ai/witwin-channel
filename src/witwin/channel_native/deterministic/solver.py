@@ -5,6 +5,7 @@ from typing import Any
 import torch
 
 from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.capabilities import (
     capabilities,
     config_metadata,
@@ -154,6 +155,9 @@ def _metadata(
 
 
 def solve(scene: Scene, config: Config) -> Result:
+    validate_scalar_endpoint_features(
+        scene.transmitters, scene.receivers, solver="deterministic"
+    )
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.deterministic requires CUDA")
 

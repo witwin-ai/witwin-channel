@@ -44,6 +44,27 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
     return flattened
 
 
+def _stack_endpoint_weights(
+    endpoints: Sequence[object], *, attribute: str, device: torch.device
+) -> torch.Tensor | None:
+    values = [getattr(endpoint, attribute) for endpoint in endpoints]
+    if not values or all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise ValueError(f"{attribute} must be configured on every endpoint or none")
+    return torch.stack(values).to(device=device, dtype=torch.complex64)
+
+
+def _validate_endpoint_weight_coverage(
+    endpoints: Sequence[object], *, attribute: str
+) -> None:
+    values = [getattr(endpoint, attribute) for endpoint in endpoints]
+    if any(value is None for value in values) and any(
+        value is not None for value in values
+    ):
+        raise ValueError(f"{attribute} must be configured on every endpoint or none")
+
+
 def validate_synthetic_array_scene(scene: Scene) -> None:
     """Reject unavailable synthetic layouts before native scene allocation."""
 
@@ -55,6 +76,8 @@ def validate_synthetic_array_scene(scene: Scene) -> None:
     rx_antennas = {receiver.array.num_antennas for receiver in flat_receivers}
     if len(tx_antennas) > 1 or len(rx_antennas) > 1:
         raise ValueError("all endpoints on each side must use the same antenna count")
+    _validate_endpoint_weight_coverage(scene.transmitters, attribute="precoding")
+    _validate_endpoint_weight_coverage(flat_receivers, attribute="combining")
 
 
 def pack_synthetic_arrays(
@@ -87,6 +110,12 @@ def pack_synthetic_arrays(
         raise ValueError("all endpoints on each side must use the same antenna count")
     num_tx_ant = next(iter(tx_antennas), 1)
     num_rx_ant = next(iter(rx_antennas), 1)
+    tx_weights = _stack_endpoint_weights(
+        transmitters, attribute="precoding", device=result.a.device
+    )
+    rx_weights = _stack_endpoint_weights(
+        flat_receivers, attribute="combining", device=result.a.device
+    )
     if result.num_tx == 0 or result.num_rx == 0:
         metadata = dict(result.metadata)
         metadata.update(
@@ -97,7 +126,12 @@ def pack_synthetic_arrays(
                 "num_tx_ant": num_tx_ant,
             }
         )
-        return replace(result, metadata=metadata)
+        return replace(
+            result,
+            metadata=metadata,
+            tx_weights=tx_weights,
+            rx_weights=rx_weights,
+        )
 
     theta_t = result.theta_t[:, 0, :, 0]
     phi_t = result.phi_t[:, 0, :, 0]
@@ -178,6 +212,8 @@ def pack_synthetic_arrays(
         metadata=metadata,
         field_xyz=field_xyz.to(torch.complex64),
         field_direction=expand_path(result.field_direction),
+        tx_weights=tx_weights,
+        rx_weights=rx_weights,
     )
 
 
@@ -190,6 +226,8 @@ def explicit_array_scene(scene: Scene) -> tuple[Scene, int, int]:
     rx_counts = {rx.array.num_antennas for rx in scene.receivers}
     if len(tx_counts) > 1 or len(rx_counts) > 1:
         raise ValueError("all explicit endpoints on each side must share antenna count")
+    _validate_endpoint_weight_coverage(scene.transmitters, attribute="precoding")
+    _validate_endpoint_weight_coverage(scene.receivers, attribute="combining")
     num_tx_ant = next(iter(tx_counts), 1)
     num_rx_ant = next(iter(rx_counts), 1)
     expanded_tx: list[Transmitter] = []
@@ -274,6 +312,12 @@ def pack_explicit_arrays(
             "num_tx_ant": num_tx_ant,
         }
     )
+    tx_weights = _stack_endpoint_weights(
+        scene.transmitters, attribute="precoding", device=result.a.device
+    )
+    rx_weights = _stack_endpoint_weights(
+        scene.receivers, attribute="combining", device=result.a.device
+    )
     return replace(
         result,
         a=a.contiguous(),
@@ -292,6 +336,8 @@ def pack_explicit_arrays(
         metadata=metadata,
         field_xyz=field_xyz.contiguous(),
         field_direction=reshape(result.field_direction),
+        tx_weights=tx_weights,
+        rx_weights=rx_weights,
     )
 
 

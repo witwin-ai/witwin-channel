@@ -7,6 +7,7 @@ import torch
 
 from witwin.channel_native import Scene
 from witwin.channel_native import ReceiverGrid
+from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
@@ -1103,6 +1104,9 @@ def solve(scene: Scene, config: Config) -> Result:
     grid = first_receiver_grid(scene)
     if grid is not None and config.receiver_strategy != "grid_area":
         raise RuntimeError("receiver_strategy='point_sphere' requires point receivers")
+    validate_scalar_endpoint_features(
+        scene.transmitters, scene.receivers, solver="BDPT"
+    )
 
     grid_cells = 0 if grid is None else int(grid.shape[0] * grid.shape[1])
     native_samples = _effective_native_samples(config)

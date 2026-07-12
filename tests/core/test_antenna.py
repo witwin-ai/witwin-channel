@@ -4,6 +4,7 @@ import torch
 
 from witwin.channel_native import AntennaArray, AntennaPattern, Transmitter
 from witwin.channel_native.core.antenna import (
+    apply_endpoint_weights,
     apply_precoding_combining,
     orientation_matrix,
     steering_vector,
@@ -74,3 +75,26 @@ def test_precoding_and_combining_use_receiver_conjugate_weights():
     )
 
     torch.testing.assert_close(value, torch.tensor(2.0 - 5.0j))
+
+
+def test_endpoint_weights_support_multi_tx_rx_and_preserve_signal_dimensions():
+    coefficients = torch.arange(2 * 2 * 2 * 2 * 3, dtype=torch.float32).reshape(
+        2, 2, 2, 2, 3
+    ).to(torch.complex64)
+    tx_weights = torch.tensor([[1.0, 0.5j], [-0.25j, 2.0]], dtype=torch.complex64)
+    rx_weights = torch.tensor([[1.0, -1.0j], [0.5j, 0.25]], dtype=torch.complex64)
+
+    combined = apply_endpoint_weights(
+        coefficients, tx_weights=tx_weights, rx_weights=rx_weights
+    )
+    expected = torch.empty((2, 2, 3), dtype=torch.complex64)
+    for rx in range(2):
+        for tx in range(2):
+            expected[rx, tx] = torch.einsum(
+                "abk,b,a->k",
+                coefficients[rx, :, tx],
+                tx_weights[tx],
+                rx_weights[rx].conj(),
+            )
+
+    torch.testing.assert_close(combined, expected)

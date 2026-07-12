@@ -63,6 +63,8 @@ class PathResult:
     metadata: dict[str, Any]
     field_xyz: torch.Tensor | None = None
     field_direction: torch.Tensor | None = None
+    tx_weights: torch.Tensor | None = None
+    rx_weights: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         if self.a.ndim != 6 or self.a.dtype != torch.complex64:
@@ -103,6 +105,16 @@ class PathResult:
             raise ValueError("field_xyz must use complex64")
         if self.field_direction.dtype != torch.float32:
             raise ValueError("field_direction must use float32")
+        if self.tx_weights is not None:
+            if self.tx_weights.shape != (self.num_tx, self.num_tx_ant):
+                raise ValueError("tx_weights must match the transmitter antenna shape")
+            if self.tx_weights.device != self.a.device:
+                raise ValueError("tx_weights must share the PathResult device")
+        if self.rx_weights is not None:
+            if self.rx_weights.shape != (self.num_rx, self.num_rx_ant):
+                raise ValueError("rx_weights must match the receiver antenna shape")
+            if self.rx_weights.device != self.a.device:
+                raise ValueError("rx_weights must share the PathResult device")
         if self.valid.dtype != torch.bool:
             raise ValueError("valid must use bool")
         if any(
@@ -377,6 +389,42 @@ class PathResult:
         )
         return output
 
+    def beamform(
+        self,
+        *,
+        tx_weights: torch.Tensor | None = None,
+        rx_weights: torch.Tensor | None = None,
+    ) -> "BeamformedPathResult":
+        """Return a signal view using complex per-endpoint antenna weights.
+
+        The raw antenna channel in this result is unchanged.  When weights are
+        omitted, the precoding/combining weights captured from the solved
+        scene are used.
+        """
+
+        tx = self.tx_weights if tx_weights is None else tx_weights
+        rx = self.rx_weights if rx_weights is None else rx_weights
+        if tx is None or rx is None:
+            raise ValueError(
+                "beamform requires tx_weights and rx_weights, either explicitly "
+                "or on every solved endpoint"
+            )
+        tx = tx.to(device=self.a.device, dtype=torch.complex64)
+        rx = rx.to(device=self.a.device, dtype=torch.complex64)
+        if tx.ndim == 1 and self.num_tx == 1:
+            tx = tx.unsqueeze(0)
+        if rx.ndim == 1 and self.num_rx == 1:
+            rx = rx.unsqueeze(0)
+        if tx.shape != (self.num_tx, self.num_tx_ant):
+            raise ValueError(
+                f"tx_weights must have shape {(self.num_tx, self.num_tx_ant)}"
+            )
+        if rx.shape != (self.num_rx, self.num_rx_ant):
+            raise ValueError(
+                f"rx_weights must have shape {(self.num_rx, self.num_rx_ant)}"
+            )
+        return BeamformedPathResult(source=self, tx_weights=tx, rx_weights=rx)
+
     def filter_by_type(self, *interaction_types: int) -> "PathResult":
         if not interaction_types:
             return self
@@ -421,11 +469,109 @@ class PathResult:
         )
         metadata = dict(self.metadata)
         metadata["filtered_interaction_types"] = sorted(requested)
-        return PathResult.from_ragged(
+        filtered = PathResult.from_ragged(
             ragged,
             minimum_path_width=1,
             metadata=metadata,
         )
+        return replace(
+            filtered,
+            tx_weights=self.tx_weights,
+            rx_weights=self.rx_weights,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BeamformedPathResult:
+    """Beamformed signal views backed by an immutable raw :class:`PathResult`."""
+
+    source: PathResult
+    tx_weights: torch.Tensor
+    rx_weights: torch.Tensor
+
+    def cir(
+        self, *, normalize_delays: bool = True
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        source = self.source
+        factor = (
+            self.rx_weights.conj().reshape(source.num_rx, source.num_rx_ant, 1, 1, 1, 1)
+            * self.tx_weights.reshape(1, 1, source.num_tx, source.num_tx_ant, 1, 1)
+        )
+        coefficient = torch.where(
+            source.valid.unsqueeze(-1), source.a * factor, torch.zeros_like(source.a)
+        )
+        coefficient = coefficient.permute(0, 2, 1, 3, 4, 5).reshape(
+            source.num_rx,
+            source.num_tx,
+            source.num_rx_ant * source.num_tx_ant * source.max_num_paths,
+            source.num_time_steps,
+        )
+        valid = source.valid.permute(0, 2, 1, 3, 4).reshape(
+            source.num_rx, source.num_tx, -1
+        )
+        tau = source.tau.permute(0, 2, 1, 3, 4).reshape(
+            source.num_rx, source.num_tx, -1
+        )
+        if normalize_delays:
+            tau = tau - _masked_min(tau, valid)
+        tau = torch.where(valid, tau, torch.full_like(tau, -1.0))
+        return coefficient, tau
+
+    def cfr(
+        self, frequencies: torch.Tensor, *, normalize_delays: bool = True
+    ) -> torch.Tensor:
+        if frequencies.ndim != 1:
+            raise ValueError("frequencies must have shape (frequency,)")
+        coefficient, tau = self.cir(normalize_delays=normalize_delays)
+        valid = tau >= 0.0
+        safe_tau = torch.where(valid, tau, torch.zeros_like(tau))
+        frequency = frequencies.to(device=coefficient.device, dtype=torch.float32)
+        phase = torch.exp(-2.0j * math.pi * safe_tau.unsqueeze(-1) * frequency)
+        return (coefficient.unsqueeze(-1) * phase.unsqueeze(-2)).sum(dim=-3)
+
+    def taps(
+        self, bandwidth: float, num_taps: int, *, normalize_delays: bool = True
+    ) -> torch.Tensor:
+        if bandwidth <= 0.0:
+            raise ValueError("bandwidth must be > 0")
+        if num_taps <= 0:
+            raise ValueError("num_taps must be > 0")
+        coefficient, tau = self.cir(normalize_delays=normalize_delays)
+        tap_index = torch.round(tau * float(bandwidth)).to(dtype=torch.int64)
+        output = torch.zeros(
+            (
+                self.source.num_rx,
+                self.source.num_tx,
+                self.source.num_time_steps,
+                int(num_taps),
+            ),
+            device=coefficient.device,
+            dtype=torch.complex64,
+        )
+        if coefficient.shape[2] == 0:
+            return output
+        base_count = self.source.num_rx * self.source.num_tx
+        coefficient = coefficient.reshape(
+            base_count, coefficient.shape[2], self.source.num_time_steps
+        )
+        tap_index = tap_index.reshape(base_count, tap_index.shape[2])
+        keep = (tap_index >= 0) & (tap_index < num_taps)
+        base = (
+            torch.arange(base_count, device=coefficient.device)
+            .view(-1, 1, 1)
+            .expand_as(coefficient.real)
+        )
+        time = (
+            torch.arange(self.source.num_time_steps, device=coefficient.device)
+            .view(1, 1, -1)
+            .expand_as(coefficient.real)
+        )
+        tap = tap_index.unsqueeze(-1).expand_as(coefficient.real)
+        keep = keep.unsqueeze(-1).expand_as(coefficient.real)
+        output.reshape(base_count, self.source.num_time_steps, num_taps).index_put_(
+            (base[keep], time[keep], tap[keep]), coefficient[keep], accumulate=True
+        )
+        return output
 
 
 def endpoint_angles(direction: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

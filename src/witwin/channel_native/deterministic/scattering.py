@@ -586,7 +586,6 @@ def _realization_rows(
         tri = records.vertices[faces]  # [F, 3, 3]
         uv_vertices = structure.uv.to(device=device, dtype=torch.float32)
         face_uv = structure.face_uv.to(device=device, dtype=torch.int64)
-        normals = _unit(records.face_normals[global_faces])
         material_index = int(face_material[first_face])
 
         # UV -> world metric scale for the geometry guard: compare face area
@@ -826,7 +825,29 @@ def _extend_topology(
     count = int(rows["path_gain"].shape[0])
     width = int(topology.primitive_sequence.shape[1])
     if width < 1:
-        raise RuntimeError("scattering rows require sequence width >= 1")
+        # A scattering-only request has no specular block from which to infer
+        # sequence width. Give any existing zero-depth rows one inactive slot
+        # before appending the single SCATTERING interaction.
+        existing = int(topology.valid.numel())
+        topology = replace(
+            topology,
+            primitive_sequence=torch.full(
+                (existing, 1), -1, device=device, dtype=torch.int32
+            ),
+            material_sequence=torch.full(
+                (existing, 1), -1, device=device, dtype=torch.int32
+            ),
+            interaction_type=torch.zeros(
+                (existing, 1), device=device, dtype=torch.int32
+            ),
+            interaction_positions=torch.zeros(
+                (existing, 1, 3), device=device, dtype=torch.float32
+            ),
+            interaction_normals=torch.zeros(
+                (existing, 1, 3), device=device, dtype=torch.float32
+            ),
+        )
+        width = 1
 
     depth = torch.ones((count,), device=device, dtype=torch.int32)
     component = torch.full((count,), 6, device=device, dtype=torch.int32)
