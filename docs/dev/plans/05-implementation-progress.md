@@ -89,10 +89,13 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   tested (gap, low risk - all frames are constructed covariantly).
 - 11.3 statistics: sampling chi-square vs PDF; BDPT/MC-basic/quadrature
   three-way agreement; seed reproducibility; 1/N variance scaling.
-- Munich deterministic parity: accuracy component deltas bit-stable at the
-  historical values (median 1.7048 dB); the wall-clock native<original gate
-  flakes when the GPU is loaded (a game was running during final
-  validation) - accuracy assertions never failed.
+- Munich parity gates (deterministic + BDPT) pass on an idle GPU, including
+  the wall-clock native<original race. Accuracy component deltas are
+  bit-stable at the historical values (median 1.7048 dB) in every run. The
+  timing race is inherently flaky on this box: the PRE-plan-05 baseline
+  commit also fails it ~1/3 of runs (native 164-229 ms, original swinging
+  63-2219 ms single-shot) - failures of that assertion are environmental,
+  not a plan-05 regression (verified by A/B: old pyd + old code vs new).
 - 11.4 external validation beyond the analytic/oracle tiers (measured
   materials, full-wave references) remains future work per plan.
 
