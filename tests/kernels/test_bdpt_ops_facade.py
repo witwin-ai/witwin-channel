@@ -980,6 +980,7 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
                 "reflection": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
                 "diffraction": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
                 "transmission": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
+                "scattering": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
             }
 
     samples = {

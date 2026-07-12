@@ -243,6 +243,10 @@ def _sensor_state() -> dict[str, torch.Tensor]:
         (1 | 8, 5),  # transmission
         (1 | 2 | 8, 5),  # exclusive priority: transmission beats reflection
         (1 | 4 | 8, 2),  # exclusive priority: diffraction beats transmission
+        (1 | 16, 6),  # scattering
+        (1 | 2 | 16, 6),  # exclusive priority: scattering beats reflection
+        (1 | 4 | 16, 6),  # exclusive priority: scattering beats diffraction
+        (1 | 2 | 8 | 16, 6),  # scattering wins over every other bit
     ],
 )
 def test_connection_component_classification_uses_exclusive_priority(

@@ -20,23 +20,26 @@ constexpr float kLightSpeedMPerS = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;
 
 // BDPT component_mask bits (contract section 1): 1=los, 2=reflection,
-// 4=diffraction, 8=transmission, 16=scattering. The scattering bit is
-// reserved for the scattering wave; no subpath kernel sets it yet.
+// 4=diffraction, 8=transmission, 16=scattering.
 constexpr int kMaskReflection = 2;
 constexpr int kMaskDiffraction = 4;
 constexpr int kMaskTransmission = 8;
-constexpr int kMaskScattering = 16;  // reserved (future wave)
+constexpr int kMaskScattering = 16;
 // Connection-sample component ids follow core/path_topology.py:
-// 0=los, 1=reflection, 2=diffraction, 5=transmission (6=scattering later).
+// 0=los, 1=reflection, 2=diffraction, 5=transmission, 6=scattering.
 constexpr int kComponentLos = 0;
 constexpr int kComponentReflection = 1;
 constexpr int kComponentDiffraction = 2;
 constexpr int kComponentTransmission = 5;
+constexpr int kComponentScattering = 6;
 
 // Collapse a per-path component mask to the EXCLUSIVE path_class with the
 // contract priority scattering > diffraction > transmission > reflection >
 // los, so mixed paths are never double counted across component buckets.
 __device__ int bdpt_component_from_mask(int mask) {
+    if (mask & kMaskScattering) {
+        return kComponentScattering;
+    }
     if (mask & kMaskDiffraction) {
         return kComponentDiffraction;
     }
@@ -51,7 +54,8 @@ __device__ int bdpt_component_from_mask(int mask) {
 
 __device__ bool bdpt_component_accumulable(int component) {
     return component == kComponentLos || component == kComponentReflection ||
-        component == kComponentDiffraction || component == kComponentTransmission;
+        component == kComponentDiffraction || component == kComponentTransmission ||
+        component == kComponentScattering;
 }
 
 __device__ unsigned long long bdpt_splitmix64(unsigned long long x) {
@@ -718,7 +722,8 @@ __global__ void bdpt_accumulate_connection_samples_double_kernel(
     double* los,
     double* reflection,
     double* diffraction,
-    double* transmission) {
+    double* transmission,
+    double* scattering) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count || !valid[index]) {
         return;
@@ -740,6 +745,8 @@ __global__ void bdpt_accumulate_connection_samples_double_kernel(
         atomicAdd(diffraction + out_index, value);
     } else if (component == kComponentTransmission) {
         atomicAdd(transmission + out_index, value);
+    } else if (component == kComponentScattering) {
+        atomicAdd(scattering + out_index, value);
     }
 }
 
@@ -918,7 +925,8 @@ __global__ void bdpt_accumulate_connection_samples_compacted_kernel(
     float* los,
     float* reflection,
     float* diffraction,
-    float* transmission) {
+    float* transmission,
+    float* scattering) {
     int64_t compact_linear = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (compact_linear >= capacity || compact_linear >= static_cast<int64_t>(compact_count[0])) {
         return;
@@ -938,6 +946,8 @@ __global__ void bdpt_accumulate_connection_samples_compacted_kernel(
         atomicAdd(diffraction + out_index, value);
     } else if (component == kComponentTransmission) {
         atomicAdd(transmission + out_index, value);
+    } else if (component == kComponentScattering) {
+        atomicAdd(scattering + out_index, value);
     }
 }
 
@@ -955,7 +965,8 @@ __global__ void bdpt_accumulate_connection_samples_staged_kernel(
     float* los,
     float* reflection,
     float* diffraction,
-    float* transmission) {
+    float* transmission,
+    float* scattering) {
     int64_t out_index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (out_index >= out_count) {
         return;
@@ -967,6 +978,7 @@ __global__ void bdpt_accumulate_connection_samples_staged_kernel(
     double reflection_sum = 0.0;
     double diffraction_sum = 0.0;
     double transmission_sum = 0.0;
+    double scattering_sum = 0.0;
     for (int64_t index = 0; index < sample_count; ++index) {
         if (!valid[index] || tx_id[index] != out_tx || rx_id[index] != out_rx) {
             continue;
@@ -985,6 +997,8 @@ __global__ void bdpt_accumulate_connection_samples_staged_kernel(
             diffraction_sum += value;
         } else if (component == kComponentTransmission) {
             transmission_sum += value;
+        } else if (component == kComponentScattering) {
+            scattering_sum += value;
         }
     }
     path_gain[out_index] = static_cast<float>(path_sum);
@@ -992,6 +1006,7 @@ __global__ void bdpt_accumulate_connection_samples_staged_kernel(
     reflection[out_index] = static_cast<float>(reflection_sum);
     diffraction[out_index] = static_cast<float>(diffraction_sum);
     transmission[out_index] = static_cast<float>(transmission_sum);
+    scattering[out_index] = static_cast<float>(scattering_sum);
 }
 
 __global__ void bdpt_cast_connection_accumulation_kernel(
@@ -1001,11 +1016,13 @@ __global__ void bdpt_cast_connection_accumulation_kernel(
     const double* reflection_sum,
     const double* diffraction_sum,
     const double* transmission_sum,
+    const double* scattering_sum,
     float* path_gain,
     float* los,
     float* reflection,
     float* diffraction,
-    float* transmission) {
+    float* transmission,
+    float* scattering) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -1015,6 +1032,7 @@ __global__ void bdpt_cast_connection_accumulation_kernel(
     reflection[index] = static_cast<float>(reflection_sum[index]);
     diffraction[index] = static_cast<float>(diffraction_sum[index]);
     transmission[index] = static_cast<float>(transmission_sum[index]);
+    scattering[index] = static_cast<float>(scattering_sum[index]);
 }
 
 __global__ void bdpt_connection_variance_accum_double_kernel(
@@ -1726,7 +1744,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_bdpt_endpoint_connection_visib
     return {start, end, active};
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_bdpt_accumulate_connection_samples_cuda(
     at::Tensor contribution,
     at::Tensor mis_weight,
@@ -1761,6 +1779,7 @@ cn_bdpt_accumulate_connection_samples_cuda(
     auto reflection = at::empty({tx_count, rx_count}, float_options);
     auto diffraction = at::empty({tx_count, rx_count}, float_options);
     auto transmission = at::empty({tx_count, rx_count}, float_options);
+    auto scattering = at::empty({tx_count, rx_count}, float_options);
     const int64_t count = contribution.numel();
     const int64_t out_count = tx_count * rx_count;
     if (accumulation_strategy == 1) {
@@ -1782,10 +1801,11 @@ cn_bdpt_accumulate_connection_samples_cuda(
                 los.data_ptr<float>(),
                 reflection.data_ptr<float>(),
                 diffraction.data_ptr<float>(),
-                transmission.data_ptr<float>());
+                transmission.data_ptr<float>(),
+                scattering.data_ptr<float>());
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
-        return {path_gain, los, reflection, diffraction, transmission};
+        return {path_gain, los, reflection, diffraction, transmission, scattering};
     }
     if (accumulation_strategy == 2) {
         zero_float_tensor(path_gain);
@@ -1793,6 +1813,7 @@ cn_bdpt_accumulate_connection_samples_cuda(
         zero_float_tensor(reflection);
         zero_float_tensor(diffraction);
         zero_float_tensor(transmission);
+        zero_float_tensor(scattering);
         auto int_options = tx_id.options().dtype(at::kInt);
         auto compact_count = at::empty({}, int_options);
         auto compact_indices = at::empty({count}, int_options);
@@ -1826,10 +1847,11 @@ cn_bdpt_accumulate_connection_samples_cuda(
                 los.data_ptr<float>(),
                 reflection.data_ptr<float>(),
                 diffraction.data_ptr<float>(),
-                transmission.data_ptr<float>());
+                transmission.data_ptr<float>(),
+                scattering.data_ptr<float>());
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
-        return {path_gain, los, reflection, diffraction, transmission};
+        return {path_gain, los, reflection, diffraction, transmission, scattering};
     }
     auto double_options = contribution.options().dtype(at::kDouble);
     auto path_gain_sum = at::empty({tx_count, rx_count}, double_options);
@@ -1837,11 +1859,13 @@ cn_bdpt_accumulate_connection_samples_cuda(
     auto reflection_sum = at::empty({tx_count, rx_count}, double_options);
     auto diffraction_sum = at::empty({tx_count, rx_count}, double_options);
     auto transmission_sum = at::empty({tx_count, rx_count}, double_options);
+    auto scattering_sum = at::empty({tx_count, rx_count}, double_options);
     zero_double_tensor(path_gain_sum);
     zero_double_tensor(los_sum);
     zero_double_tensor(reflection_sum);
     zero_double_tensor(diffraction_sum);
     zero_double_tensor(transmission_sum);
+    zero_double_tensor(scattering_sum);
     if (count > 0) {
         constexpr int threads = 256;
         int blocks = static_cast<int>((count + threads - 1) / threads);
@@ -1860,7 +1884,8 @@ cn_bdpt_accumulate_connection_samples_cuda(
             los_sum.data_ptr<double>(),
             reflection_sum.data_ptr<double>(),
             diffraction_sum.data_ptr<double>(),
-            transmission_sum.data_ptr<double>());
+            transmission_sum.data_ptr<double>(),
+            scattering_sum.data_ptr<double>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     if (out_count > 0) {
@@ -1874,14 +1899,16 @@ cn_bdpt_accumulate_connection_samples_cuda(
             reflection_sum.data_ptr<double>(),
             diffraction_sum.data_ptr<double>(),
             transmission_sum.data_ptr<double>(),
+            scattering_sum.data_ptr<double>(),
             path_gain.data_ptr<float>(),
             los.data_ptr<float>(),
             reflection.data_ptr<float>(),
             diffraction.data_ptr<float>(),
-            transmission.data_ptr<float>());
+            transmission.data_ptr<float>(),
+            scattering.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    return {path_gain, los, reflection, diffraction, transmission};
+    return {path_gain, los, reflection, diffraction, transmission, scattering};
 }
 
 void cn_bdpt_filter_connection_samples_cuda(

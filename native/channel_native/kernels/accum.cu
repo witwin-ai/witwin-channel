@@ -47,16 +47,19 @@ __global__ void finalize_component_maps_kernel(
     const float *__restrict__ reflection,
     const float *__restrict__ diffraction,
     const float *__restrict__ transmission,
+    const float *__restrict__ scattering,
     float *__restrict__ path_gain,
     float *__restrict__ los_power,
     float *__restrict__ reflection_power,
     float *__restrict__ diffraction_power,
     float *__restrict__ transmission_power,
+    float *__restrict__ scattering_power,
     int64_t element_count) {
     __shared__ float los_sum[kFinalizeBlockSize];
     __shared__ float reflection_sum[kFinalizeBlockSize];
     __shared__ float diffraction_sum[kFinalizeBlockSize];
     __shared__ float transmission_sum[kFinalizeBlockSize];
+    __shared__ float scattering_sum[kFinalizeBlockSize];
 
     const int tid = threadIdx.x;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -64,6 +67,7 @@ __global__ void finalize_component_maps_kernel(
     float local_reflection = 0.0f;
     float local_diffraction = 0.0f;
     float local_transmission = 0.0f;
+    float local_scattering = 0.0f;
 
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + tid;
          idx < element_count;
@@ -72,17 +76,21 @@ __global__ void finalize_component_maps_kernel(
         const float reflection_value = reflection[idx];
         const float diffraction_value = diffraction[idx];
         const float transmission_value = transmission[idx];
-        path_gain[idx] = los_value + reflection_value + diffraction_value + transmission_value;
+        const float scattering_value = scattering[idx];
+        path_gain[idx] = los_value + reflection_value + diffraction_value +
+            transmission_value + scattering_value;
         local_los += los_value;
         local_reflection += reflection_value;
         local_diffraction += diffraction_value;
         local_transmission += transmission_value;
+        local_scattering += scattering_value;
     }
 
     los_sum[tid] = local_los;
     reflection_sum[tid] = local_reflection;
     diffraction_sum[tid] = local_diffraction;
     transmission_sum[tid] = local_transmission;
+    scattering_sum[tid] = local_scattering;
     __syncthreads();
 
     for (int offset = blockDim.x / 2; offset > 0; offset >>= 1) {
@@ -91,6 +99,7 @@ __global__ void finalize_component_maps_kernel(
             reflection_sum[tid] += reflection_sum[tid + offset];
             diffraction_sum[tid] += diffraction_sum[tid + offset];
             transmission_sum[tid] += transmission_sum[tid + offset];
+            scattering_sum[tid] += scattering_sum[tid + offset];
         }
         __syncthreads();
     }
@@ -100,6 +109,7 @@ __global__ void finalize_component_maps_kernel(
         atomicAdd(reflection_power, reflection_sum[0]);
         atomicAdd(diffraction_power, diffraction_sum[0]);
         atomicAdd(transmission_power, transmission_sum[0]);
+        atomicAdd(scattering_power, scattering_sum[0]);
     }
 }
 
@@ -186,30 +196,35 @@ at::Tensor cn_mc_store_scaled_component_map_cuda(
     return maps;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_finalize_component_maps_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
     at::Tensor diffraction,
-    at::Tensor transmission) {
+    at::Tensor transmission,
+    at::Tensor scattering) {
     check_component_map(los, "los");
     check_component_map(reflection, "reflection");
     check_component_map(diffraction, "diffraction");
     check_component_map(transmission, "transmission");
+    check_component_map(scattering, "scattering");
     TORCH_CHECK(reflection.sizes() == los.sizes(), "reflection must match los shape");
     TORCH_CHECK(diffraction.sizes() == los.sizes(), "diffraction must match los shape");
     TORCH_CHECK(transmission.sizes() == los.sizes(), "transmission must match los shape");
+    TORCH_CHECK(scattering.sizes() == los.sizes(), "scattering must match los shape");
 
     auto path_gain = at::empty({los.size(0), los.size(1) * los.size(2)}, los.options());
     auto los_power = at::empty({}, los.options());
     auto reflection_power = at::empty({}, los.options());
     auto diffraction_power = at::empty({}, los.options());
     auto transmission_power = at::empty({}, los.options());
+    auto scattering_power = at::empty({}, los.options());
 
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
     C10_CUDA_CHECK(cudaMemsetAsync(los_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(reflection_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(diffraction_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(transmission_power.data_ptr<float>(), 0, sizeof(float), stream));
+    C10_CUDA_CHECK(cudaMemsetAsync(scattering_power.data_ptr<float>(), 0, sizeof(float), stream));
 
     const int64_t element_count = los.numel();
     if (element_count > 0) {
@@ -220,16 +235,18 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_fin
             reflection.data_ptr<float>(),
             diffraction.data_ptr<float>(),
             transmission.data_ptr<float>(),
+            scattering.data_ptr<float>(),
             path_gain.data_ptr<float>(),
             los_power.data_ptr<float>(),
             reflection_power.data_ptr<float>(),
             diffraction_power.data_ptr<float>(),
             transmission_power.data_ptr<float>(),
+            scattering_power.data_ptr<float>(),
             element_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
-    return {path_gain, los_power, reflection_power, diffraction_power, transmission_power};
+    return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
 }
 
 at::Tensor cn_bdpt_component_map_buffer_cuda(
@@ -313,30 +330,35 @@ at::Tensor cn_bdpt_store_scaled_component_map_cuda(
     return maps;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_component_maps_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
     at::Tensor diffraction,
-    at::Tensor transmission) {
+    at::Tensor transmission,
+    at::Tensor scattering) {
     check_component_map(los, "los");
     check_component_map(reflection, "reflection");
     check_component_map(diffraction, "diffraction");
     check_component_map(transmission, "transmission");
+    check_component_map(scattering, "scattering");
     TORCH_CHECK(reflection.sizes() == los.sizes(), "reflection must match los shape");
     TORCH_CHECK(diffraction.sizes() == los.sizes(), "diffraction must match los shape");
     TORCH_CHECK(transmission.sizes() == los.sizes(), "transmission must match los shape");
+    TORCH_CHECK(scattering.sizes() == los.sizes(), "scattering must match los shape");
 
     auto path_gain = at::empty(los.sizes(), los.options());
     auto los_power = at::empty({}, los.options());
     auto reflection_power = at::empty({}, los.options());
     auto diffraction_power = at::empty({}, los.options());
     auto transmission_power = at::empty({}, los.options());
+    auto scattering_power = at::empty({}, los.options());
 
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
     C10_CUDA_CHECK(cudaMemsetAsync(los_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(reflection_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(diffraction_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(transmission_power.data_ptr<float>(), 0, sizeof(float), stream));
+    C10_CUDA_CHECK(cudaMemsetAsync(scattering_power.data_ptr<float>(), 0, sizeof(float), stream));
 
     const int64_t element_count = los.numel();
     if (element_count > 0) {
@@ -347,14 +369,16 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_f
             reflection.data_ptr<float>(),
             diffraction.data_ptr<float>(),
             transmission.data_ptr<float>(),
+            scattering.data_ptr<float>(),
             path_gain.data_ptr<float>(),
             los_power.data_ptr<float>(),
             reflection_power.data_ptr<float>(),
             diffraction_power.data_ptr<float>(),
             transmission_power.data_ptr<float>(),
+            scattering_power.data_ptr<float>(),
             element_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
-    return {path_gain, los_power, reflection_power, diffraction_power, transmission_power};
+    return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
 }

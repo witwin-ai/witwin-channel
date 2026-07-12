@@ -36,6 +36,7 @@ from witwin.channel_native.core.material_runtime import (
 )
 from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
 from witwin.channel_native.core.runtime.raydn import RayDNScene
+from witwin.channel_native.montecarlo.scattering_events import scattering_map_matrix
 from witwin.channel_native.montecarlo.transmission import (
     layer_csr_view,
     scene_diagonal_m,
@@ -258,6 +259,53 @@ def transmission_component_map(
     matrix = los_matrix * torch.stack(gains, dim=0)
     return mc_los_component_maps_from_matrix(
         matrix, rows=grid.shape[0], cols=grid.shape[1]
+    )
+
+
+def scattering_component_map(
+    scene: Scene,
+    raydn: RayDNScene,
+    grid: ReceiverGrid,
+    *,
+    samples: int,
+    seed: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, dict[str, int]]:
+    """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
+
+    Thin grid wrapper around
+    :func:`witwin.channel_native.montecarlo.scattering_events.scattering_map_matrix`
+    (which documents the estimator and its v1 simplifications): the matrix
+    holds the per-cell scattering PATH GAIN at the cell center times the
+    transmitter power, mirroring the LoS / transmission map conventions, so
+    component_power equals the map sum.
+    """
+
+    tx_pos, tx_power = transmitter_positions(scene, device=device)
+    dim0, dim1 = component_grid_shape(grid)
+    if not scene.structures:
+        maps = mc_component_map_buffer(
+            tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
+        )
+        return maps, {"sample_count": 0, "rough_face_count": 0, "tx_visible_samples": 0, "deposited_rows": 0}
+    if not raydn.available:
+        raise RuntimeError("scattering requires RayDN native scene capability")
+    rx_pos = receiver_grid_points(grid, reference=tx_pos)
+    matrix, stats = scattering_map_matrix(
+        scene,
+        raydn,
+        tx_pos,
+        tx_power,
+        rx_pos,
+        samples=samples,
+        seed=seed,
+        device=device,
+    )
+    return (
+        mc_los_component_maps_from_matrix(
+            matrix, rows=grid.shape[0], cols=grid.shape[1]
+        ),
+        stats,
     )
 
 

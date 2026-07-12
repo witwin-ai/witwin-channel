@@ -15,9 +15,8 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
         "transmission",
         "scattering",
     ]
-    # transmission is integrated in all four solvers as of wave 2; scattering
-    # is integrated in the deterministic and path solvers as of wave 3 (the
-    # Monte Carlo integrations land separately).
+    # transmission is integrated in all four solvers as of wave 2; Kirchhoff
+    # scattering is integrated in all four solvers as of wave 3.
     integration = manifest["component_solver_integration"]
     assert set(integration) == {"transmission", "scattering"}
     assert integration["transmission"] == {
@@ -26,10 +25,12 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
         "montecarlo_basic": True,
         "montecarlo_bdpt": True,
     }
-    assert integration["scattering"]["path"] is True
-    assert integration["scattering"]["deterministic"] is True
-    assert integration["scattering"]["montecarlo_basic"] is False
-    assert integration["scattering"]["montecarlo_bdpt"] is False
+    assert integration["scattering"] == {
+        "path": True,
+        "deterministic": True,
+        "montecarlo_basic": True,
+        "montecarlo_bdpt": True,
+    }
     path = manifest["solvers"]["path"]
     assert path["max_reflection_depth"] == 5
     assert path["supports_reflection_diffraction_coupling"] is True

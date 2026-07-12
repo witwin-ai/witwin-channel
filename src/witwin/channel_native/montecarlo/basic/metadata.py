@@ -27,13 +27,13 @@ def component_status(
         if not diffraction_available:
             raise RuntimeError("diffraction requires RayDN native capability")
         status["diffraction"] = "enabled"
-    # transmission carries real straight-penetration physics; scattering is
-    # accepted plumbing until its wave lands.
+    # transmission carries real straight-penetration physics; scattering
+    # deposits the Kirchhoff diffuse radiomap from area-sampled rough faces.
     status["transmission"] = (
         "enabled" if "transmission" in config.components else "not_requested"
     )
     status["scattering"] = (
-        "enabled_no_paths" if "scattering" in config.components else "not_requested"
+        "enabled" if "scattering" in config.components else "not_requested"
     )
     return status
 
@@ -99,8 +99,8 @@ def make_solver_metadata(
                 "los": 0 if "los" in config.components else -1,
                 "reflection": config.max_depth if "reflection" in config.components else -1,
                 "diffraction": 1 if "diffraction" in config.components else -1,
-                # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1. Zero paths until the physics lands.
+                # transmission chains are capped like reflection; scattering
+                # is single-bounce in v1.
                 "transmission": config.max_depth if "transmission" in config.components else -1,
                 "scattering": 1 if "scattering" in config.components else -1,
             },
