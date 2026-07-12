@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-# Public component set. transmission and scattering are accepted plumbing in v1:
-# they validate and flow through the result contract but export zero paths until
-# the physics lands in later waves. transmission depth is capped like reflection
-# (chains count wall penetrations); scattering is single-bounce in v1.
+# Public component set. transmission exports specular wall-penetration paths
+# (wave 2); scattering exports single-bounce incoherent Kirchhoff patch paths
+# (wave 3). transmission depth is capped like reflection (chains count wall
+# penetrations); scattering is single-bounce in v1.
 _VALID_COMPONENTS = frozenset(
     {"los", "reflection", "diffraction", "transmission", "scattering"}
 )
@@ -33,10 +33,22 @@ class Config:
     ad_mode: str = "none"
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
+    # Rough-surface scattering quadrature (wave 3): fixed per-area sample
+    # density (per-face cap of 4096 samples), a per-pair strongest-paths cap,
+    # and an absolute path_gain floor for exported patch paths.
+    scattering_samples_per_m2: float = 8.0
+    scattering_max_paths_per_pair: int = 4096
+    scattering_power_threshold: float = 0.0
 
     def __post_init__(self) -> None:
         if self.max_depth < 0:
             raise ValueError("max_depth must be non-negative")
+        if self.scattering_samples_per_m2 <= 0.0:
+            raise ValueError("scattering_samples_per_m2 must be positive")
+        if self.scattering_max_paths_per_pair <= 0:
+            raise ValueError("scattering_max_paths_per_pair must be positive")
+        if self.scattering_power_threshold < 0.0:
+            raise ValueError("scattering_power_threshold must be non-negative")
         components = frozenset(self.components)
         if not components or not components.issubset(_VALID_COMPONENTS):
             raise ValueError(

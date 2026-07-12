@@ -3,7 +3,84 @@ from __future__ import annotations
 import torch
 
 from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric, PerfectConductor
+from witwin.channel_native.core.materials import (
+    Dielectric,
+    Layer,
+    PerfectConductor,
+    PhysicalSurface,
+    Roughness,
+    SurfaceAssignment,
+)
+from witwin.channel_native.core.objects import planar_uv
+
+
+def rough_wall_structure(
+    x_m: float,
+    *,
+    rms_height_m: float,
+    corr_length_m: float,
+    half_size: float = 2.0,
+    eps_r: float = 4.0,
+    sigma_e: float = 0.01,
+    thickness_m: float = 0.1,
+    phase_screen: object | None = None,
+    with_uv: bool = False,
+    name: str = "rough-wall",
+    surface_id: int = 1,
+) -> Structure:
+    """Axis-aligned wall in the x = ``x_m`` plane with front-surface roughness.
+
+    ``rms_height_m == 0`` compiles as a smooth wall with the same layer stack
+    (scatter_model_id 0). ``phase_screen`` wraps the material in a
+    ``SurfaceAssignment``; ``with_uv`` adds a planar unit-square UV chart
+    (u along +y, v along +z), required for realization_coherent screens.
+    """
+
+    vertices = torch.tensor(
+        [
+            [x_m, -half_size, -half_size],
+            [x_m, half_size, -half_size],
+            [x_m, -half_size, half_size],
+            [x_m, half_size, half_size],
+        ]
+    )
+    faces = torch.tensor([[0, 1, 2], [1, 3, 2]], dtype=torch.int32)
+    roughness = (
+        None
+        if rms_height_m <= 0.0
+        else Roughness(
+            rms_height_m=rms_height_m,
+            corr_length_x_m=corr_length_m,
+            corr_length_y_m=corr_length_m,
+        )
+    )
+    material: object = PhysicalSurface(
+        layers=(Layer(thickness_m=thickness_m, eps_r=eps_r, sigma_e=sigma_e),),
+        roughness_front=roughness,
+        name=name,
+    )
+    if phase_screen is not None:
+        material = SurfaceAssignment(material=material, phase_screen=phase_screen)
+    kwargs = {}
+    if with_uv:
+        kwargs = {
+            "uv": planar_uv(
+                vertices,
+                axis_u=torch.tensor([0.0, 1.0, 0.0]),
+                axis_v=torch.tensor([0.0, 0.0, 1.0]),
+                origin=torch.tensor([x_m, -half_size, -half_size]),
+                scale=1.0 / (2.0 * half_size),
+            ),
+            "face_uv": faces.clone(),
+        }
+    return Structure(
+        vertices=vertices,
+        faces=faces,
+        material=material,
+        name=name,
+        surface_id=surface_id,
+        **kwargs,
+    )
 
 
 def empty_space_los_scene() -> Scene:

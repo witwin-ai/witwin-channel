@@ -11,8 +11,9 @@ _CAPABILITIES: dict[str, Any] = {
     # transmission physics is live in all four solvers: endpoint-connection
     # (path, deterministic) and shooting-context Monte Carlo (straight
     # penetration chains; BDPT adds event-selected mixed chains). scattering
-    # remains accepted plumbing (zero paths / zero power) until its solver
-    # integrations land.
+    # (Kirchhoff ensemble patch quadrature + realization_coherent phase
+    # screens) is live in the deterministic and path solvers as of wave 3;
+    # the Monte Carlo integrations land separately.
     "component_solver_integration": {
         "transmission": {
             "path": True,
@@ -21,8 +22,8 @@ _CAPABILITIES: dict[str, Any] = {
             "montecarlo_bdpt": True,
         },
         "scattering": {
-            "path": False,
-            "deterministic": False,
+            "path": True,
+            "deterministic": True,
             "montecarlo_basic": False,
             "montecarlo_bdpt": False,
         },
