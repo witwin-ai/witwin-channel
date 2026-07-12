@@ -32,6 +32,26 @@ priority `scattering > diffraction > transmission > reflection > los`.
   reproducible height-map phase screen per `(scene_seed, surface_id,
   realization_id)`.
 
+## BDPT estimator contract
+
+- Coherent endpoint, reflection, transmission, and connection events use an
+  authoritative Complex3/Jones field. Local s/p frames are reconstructed at
+  every interaction. Scalar throughput is only a sampling-probability proxy
+  and never contributes to the received field.
+- Ensemble Kirchhoff scattering is explicitly incoherent power-only. It does
+  not manufacture a zero-phase Complex3 carrier or claim cross-polarized phase.
+- Receiver endpoints have `sensor_depth == 0`; sensor subpaths are not a
+  declared capability. `max_light_depth` is the only subpath depth control.
+- Reported proposal PDFs exclude free-space and solid-angle-to-area geometry
+  Jacobians. Canonically enumerated delta paths have unit discrete mass;
+  sampled reflection/transmission events retain their event-selection mass.
+- Endpoint connections are single-strategy. Diffraction MIS supports the
+  native direct and Keller proposals, with the declared strategy count checked
+  against the proposals actually enabled.
+- `benchmarks/bench_phase_c_statistics.py` provides the versioned multi-seed
+  statistical gate. Full acceptance always runs the 16 seeds fixed in
+  `benchmarks/gates/phase_c_statistics.v1.json`.
+
 ## Materials (ABI v3)
 
 - `Dielectric`, `LossyDielectric`, `DispersiveMaterial`, `ITUMaterial`,

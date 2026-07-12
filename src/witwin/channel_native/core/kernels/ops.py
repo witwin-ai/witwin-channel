@@ -105,7 +105,7 @@ def bdpt_launch_state(
             raise ValueError(
                 f"_channel_native.bdpt_launch_state returned bad {name} shape"
             )
-    for name in ("light_seed", "sensor_seed", "connection_seed", "diffraction_seed"):
+    for name in ("light_seed",):
         validate_cuda_tensor(name, exported[name], dtype=torch.int64, ndim=1)
         if exported[name].shape != (expected,):
             raise ValueError(
@@ -554,8 +554,8 @@ def bdpt_endpoint_connection_samples(
         raise ValueError("samples_per_tx must be positive")
     if beta <= 0.0:
         raise ValueError("beta must be positive")
-    if strategy_count <= 0:
-        raise ValueError("strategy_count must be positive")
+    if strategy_count != 1:
+        raise ValueError("endpoint connections support exactly one strategy")
     max_paths_value = -1 if max_paths is None else int(max_paths)
     if max_paths_value < -1:
         raise ValueError("max_paths must be non-negative")
@@ -940,6 +940,11 @@ def bdpt_diffraction_connection_samples_from_tape(
         raise ValueError("sample counts must be non-negative")
     if strategy_count <= 0:
         raise ValueError("strategy_count must be positive")
+    actual_strategy_count = int(direct_samples > 0) + int(keller_samples > 0)
+    if strategy_count != actual_strategy_count:
+        raise ValueError("strategy_count must match enabled direct/Keller proposals")
+    if mis == "none" and actual_strategy_count != 1:
+        raise ValueError("mis='none' requires exactly one diffraction proposal")
     if beta <= 0.0:
         raise ValueError("beta must be positive")
     mode_id = _bdpt_mis_mode_id(mis)
@@ -1009,6 +1014,11 @@ def bdpt_diffraction_point_connection_samples(
         raise ValueError("wavelength must be positive")
     if strategy_count <= 0:
         raise ValueError("strategy_count must be positive")
+    actual_strategy_count = int(direct_samples > 0) + int(keller_samples > 0)
+    if strategy_count != actual_strategy_count:
+        raise ValueError("strategy_count must match enabled direct/Keller proposals")
+    if mis == "none" and actual_strategy_count != 1:
+        raise ValueError("mis='none' requires exactly one diffraction proposal")
     if beta <= 0.0:
         raise ValueError("beta must be positive")
     mode_id = _bdpt_mis_mode_id(mis)

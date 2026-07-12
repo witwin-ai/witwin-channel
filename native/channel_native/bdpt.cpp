@@ -78,7 +78,7 @@ pybind11::dict connection_samples_to_dict(
 
 }  // namespace
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_bdpt_launch_state_cuda(
     at::Tensor reference,
     int64_t tx_count,
@@ -539,16 +539,13 @@ pybind11::dict cn_bdpt_launch_state(
     int64_t samples,
     int64_t sample_streams,
     int64_t seed) {
-    auto [tx_id, sample_id, stream_id, light_seed, sensor_seed, connection_seed, diffraction_seed] =
+    auto [tx_id, sample_id, stream_id, light_seed] =
         cn_bdpt_launch_state_cuda(reference, tx_count, samples, sample_streams, seed);
     pybind11::dict out;
     out["tx_id"] = tx_id;
     out["sample_id"] = sample_id;
     out["stream_id"] = stream_id;
     out["light_seed"] = light_seed;
-    out["sensor_seed"] = sensor_seed;
-    out["connection_seed"] = connection_seed;
-    out["diffraction_seed"] = diffraction_seed;
     return out;
 }
 

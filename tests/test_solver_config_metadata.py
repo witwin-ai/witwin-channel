@@ -99,8 +99,7 @@ def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
 def test_bdpt_metadata_exposes_depth_clamp():
     config = BdptConfig(
         max_depth=5,
-        max_light_depth=1,
-        max_sensor_depth=1,
+        max_light_depth=2,
         components={"reflection"},
     )
     metadata = bdpt_metadata(

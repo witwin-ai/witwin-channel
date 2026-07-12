@@ -34,10 +34,7 @@ __global__ void bdpt_launch_state_kernel(
     int* tx_id,
     int* sample_id,
     int* stream_id,
-    int64_t* light_seed,
-    int64_t* sensor_seed,
-    int64_t* connection_seed,
-    int64_t* diffraction_seed) {
+    int64_t* light_seed) {
     int64_t linear = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (linear >= total) {
         return;
@@ -54,9 +51,6 @@ __global__ void bdpt_launch_state_kernel(
         ^ (static_cast<unsigned long long>(sample) * 0x94d049bb133111ebULL)
         ^ (static_cast<unsigned long long>(stream) * 0xbf58476d1ce4e5b9ULL);
     light_seed[linear] = static_cast<int64_t>(splitmix64(base ^ 0x1111111111111111ULL) & 0x7fffffffffffffffULL);
-    sensor_seed[linear] = static_cast<int64_t>(splitmix64(base ^ 0x2222222222222222ULL) & 0x7fffffffffffffffULL);
-    connection_seed[linear] = static_cast<int64_t>(splitmix64(base ^ 0x3333333333333333ULL) & 0x7fffffffffffffffULL);
-    diffraction_seed[linear] = static_cast<int64_t>(splitmix64(base ^ 0x4444444444444444ULL) & 0x7fffffffffffffffULL);
 }
 
 __global__ void bdpt_sample_directions_kernel(
@@ -81,7 +75,7 @@ __global__ void bdpt_sample_directions_kernel(
 
 }  // namespace
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_bdpt_launch_state_cuda(
     at::Tensor reference,
     int64_t tx_count,
@@ -100,9 +94,6 @@ cn_bdpt_launch_state_cuda(
     auto sample_id = at::empty({total}, int_options);
     auto stream_id = at::empty({total}, int_options);
     auto light_seed = at::empty({total}, long_options);
-    auto sensor_seed = at::empty({total}, long_options);
-    auto connection_seed = at::empty({total}, long_options);
-    auto diffraction_seed = at::empty({total}, long_options);
     if (total > 0) {
         constexpr int threads = 256;
         int blocks = static_cast<int>((total + threads - 1) / threads);
@@ -115,13 +106,10 @@ cn_bdpt_launch_state_cuda(
             tx_id.data_ptr<int>(),
             sample_id.data_ptr<int>(),
             stream_id.data_ptr<int>(),
-            light_seed.data_ptr<int64_t>(),
-            sensor_seed.data_ptr<int64_t>(),
-            connection_seed.data_ptr<int64_t>(),
-            diffraction_seed.data_ptr<int64_t>());
+            light_seed.data_ptr<int64_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    return {tx_id, sample_id, stream_id, light_seed, sensor_seed, connection_seed, diffraction_seed};
+    return {tx_id, sample_id, stream_id, light_seed};
 }
 
 at::Tensor cn_bdpt_sample_directions_cuda(int64_t count, at::Tensor reference, int64_t seed) {

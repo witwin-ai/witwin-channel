@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from witwin.channel_native.core.kernels.metadata import make_metadata
-from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
+from witwin.channel_native.capabilities import (
+    capabilities,
+    config_metadata,
+    serialize_config,
+)
 from witwin.channel_native.core.components import component_availability_status
 
 from .config import Config
@@ -32,7 +36,9 @@ _COMPONENT_MASK_BITS = {
 }
 
 
-def select_accumulation_strategy(config: Config, *, grid_cells: int, estimated_valid_ratio: float) -> str:
+def select_accumulation_strategy(
+    config: Config, *, grid_cells: int, estimated_valid_ratio: float
+) -> str:
     if config.accumulation_strategy != "auto":
         return config.accumulation_strategy
     if grid_cells <= 0:
@@ -76,16 +82,17 @@ def make_solver_metadata(
     effective_max_depth: int,
 ) -> dict[str, Any]:
     raydn_component_enabled = (
-        ("reflection" in config.components and reflection_available)
-        or ("diffraction" in config.components and diffraction_available)
-    )
+        "reflection" in config.components and reflection_available
+    ) or ("diffraction" in config.components and diffraction_available)
     kernel_metadata = make_metadata(
         primitive="montecarlo_bdpt_primal",
         forward_launch_count=max(1, int(launch_count)),
         fused_stages=1 if raydn_component_enabled else 0,
         intermediate_bytes=int(workspace_bytes),
         accumulation_strategy=_KERNEL_ACCUMULATION[selected_accumulation_strategy],
-        scheduling_strategy="native_fused" if raydn_component_enabled else "native_cuda",
+        scheduling_strategy="native_fused"
+        if raydn_component_enabled
+        else "native_cuda",
         raydn_native=reflection_available or diffraction_available,
         ad_status="none",
     )
@@ -101,7 +108,6 @@ def make_solver_metadata(
         "power_heuristic_beta": config.power_heuristic_beta,
         "max_depth": config.max_depth,
         "max_light_depth": config.max_light_depth,
-        "max_sensor_depth": config.max_sensor_depth,
         "max_diffraction_order": config.max_diffraction_order,
         "path_counts_by_strategy": path_counts_by_strategy,
         "valid_contribution_count": valid_contribution_count,
@@ -125,8 +131,15 @@ def make_solver_metadata(
         "accumulation_strategy": selected_accumulation_strategy,
         "workspace_bytes": int(workspace_bytes),
         "variance": bool(variance_enabled),
-        "throughput_domain": "unit_excitation_complex3",
-        "pdf_domain": "cumulative_non_delta_proposal_density",
+        "throughput_domain": "complex3_jones_coherent_events",
+        "field_transport": {
+            "authoritative_carrier": "complex3_jones",
+            "scalar_throughput_role": "sampling_probability_proxy_only",
+            "local_frame": "interaction_local_s_p_recomputed_per_event",
+            "scattering": "incoherent_power_only_no_complex_field",
+            "sensor_depth": "receiver_endpoint_only_always_zero",
+        },
+        "pdf_domain": "proposal_density_excludes_geometry_jacobian",
         "event_classification": {
             "endpoint": 0,
             "delta_specular_reflection": 1,
@@ -134,6 +147,7 @@ def make_solver_metadata(
         },
         "component_mask_bits": dict(_COMPONENT_MASK_BITS),
         "delta_strategy": "canonical_enumeration_unit_bidirectional_mass",
+        "sampled_delta_mass": "event_selection_probability_in_forward_reverse_pdf",
         "mis_capabilities": {
             "delta_specular_classification": True,
             "continuous_diffraction_strategies": True,
@@ -149,12 +163,20 @@ def make_solver_metadata(
             effective=effective_config,
             component_max_depth={
                 "los": 0 if "los" in config.components else -1,
-                "reflection": int(effective_max_depth) if "reflection" in config.components else -1,
-                "diffraction": min(1, int(effective_max_depth)) if "diffraction" in config.components else -1,
+                "reflection": int(effective_max_depth)
+                if "reflection" in config.components
+                else -1,
+                "diffraction": min(1, int(effective_max_depth))
+                if "diffraction" in config.components
+                else -1,
                 # transmission chains are capped like reflection; scattering is
                 # single-bounce in v1 and carries zero paths until its wave.
-                "transmission": int(effective_max_depth) if "transmission" in config.components else -1,
-                "scattering": min(1, int(effective_max_depth)) if "scattering" in config.components else -1,
+                "transmission": int(effective_max_depth)
+                if "transmission" in config.components
+                else -1,
+                "scattering": min(1, int(effective_max_depth))
+                if "scattering" in config.components
+                else -1,
             },
         )
     )

@@ -10,7 +10,6 @@ def test_bdpt_config_defaults_match_public_contract():
     assert config.seed == 0
     assert config.max_depth == 3
     assert config.max_light_depth == 3
-    assert config.max_sensor_depth == 3
     assert config.max_diffraction_order == 1
     assert config.components == frozenset({"los", "reflection", "diffraction"})
     assert config.mis == "power_heuristic"
@@ -33,7 +32,6 @@ def test_bdpt_config_defaults_match_public_contract():
         ({"seed": -1}, "seed"),
         ({"max_depth": -1}, "max_depth"),
         ({"max_light_depth": -1}, "max_light_depth"),
-        ({"max_sensor_depth": -1}, "max_sensor_depth"),
         ({"max_diffraction_order": 2}, "max_diffraction_order"),
         ({"components": {"scatter"}}, "components"),
         ({"components": set()}, "components"),
@@ -56,7 +54,6 @@ def test_bdpt_config_accepts_supported_variants_and_normalizes_components():
     config = Config(
         samples=16,
         max_light_depth=None,
-        max_sensor_depth=None,
         max_diffraction_order=0,
         components=["los"],
         mis="balance",
@@ -68,7 +65,6 @@ def test_bdpt_config_accepts_supported_variants_and_normalizes_components():
     )
 
     assert config.max_light_depth == config.max_depth
-    assert config.max_sensor_depth == config.max_depth
     assert config.components == frozenset({"los"})
 
 

@@ -17,8 +17,19 @@ def test_bdpt_metadata_reports_contract_fields():
     assert result.metadata["seed"] == 123
     assert result.metadata["sample_streams"] == 2
     assert result.metadata["mis"] == "power_heuristic"
-    assert result.metadata["throughput_domain"] == "unit_excitation_complex3"
-    assert result.metadata["pdf_domain"] == "cumulative_non_delta_proposal_density"
+    assert result.metadata["throughput_domain"] == "complex3_jones_coherent_events"
+    assert result.metadata["field_transport"] == {
+        "authoritative_carrier": "complex3_jones",
+        "scalar_throughput_role": "sampling_probability_proxy_only",
+        "local_frame": "interaction_local_s_p_recomputed_per_event",
+        "scattering": "incoherent_power_only_no_complex_field",
+        "sensor_depth": "receiver_endpoint_only_always_zero",
+    }
+    assert result.metadata["pdf_domain"] == "proposal_density_excludes_geometry_jacobian"
+    assert (
+        result.metadata["sampled_delta_mass"]
+        == "event_selection_probability_in_forward_reverse_pdf"
+    )
     assert result.metadata["event_classification"]["delta_specular_reflection"] == 1
     assert result.metadata["mis_capabilities"]["reflection_diffraction_coupled_bidirectional_pdf"] is True
     assert (

@@ -104,6 +104,19 @@ void check_mis_args(int64_t mode_id, int64_t strategy_count) {
     TORCH_CHECK(strategy_count > 0, "strategy_count must be positive");
 }
 
+void check_diffraction_mis_args(
+    int64_t mode_id,
+    int64_t strategy_count,
+    int64_t direct_samples,
+    int64_t keller_samples) {
+    check_mis_args(mode_id, strategy_count);
+    const int64_t actual = (direct_samples > 0 ? 1 : 0) + (keller_samples > 0 ? 1 : 0);
+    TORCH_CHECK(
+        strategy_count == actual,
+        "strategy_count must match enabled direct/Keller proposals");
+    TORCH_CHECK(mode_id != 0 || actual == 1, "MIS none requires exactly one diffraction proposal");
+}
+
 __device__ float bdpt_connection_mis_weight_from_sums(
     float pdf,
     float balance_pdf_sum,
@@ -141,11 +154,6 @@ __device__ float bdpt_diffraction_strategy_mis_weight(
         powf(fmaxf(direct_pdf, 0.0f), beta) +
         powf(fmaxf(keller_pdf, 0.0f), beta);
     return bdpt_connection_mis_weight_from_sums(pdf, balance_sum, power_sum, mode_id, beta);
-}
-
-__device__ float bdpt_connection_pdf_from_distance(float distance) {
-    const float d2 = fmaxf(distance * distance, 1.0e-12f);
-    return 1.0f / (4.0f * kPi * d2);
 }
 
 __device__ float bdpt_free_space_gain(float tx_power, float distance, float frequency_hz) {
@@ -327,8 +335,11 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
         : 1.0f;
     const bool direction_valid = dir_dot > 0.0f;
     const bool row_valid = is_valid && direction_valid;
+    // Proposal density excludes free-space geometry. The deterministic
+    // endpoint connection has unit discrete mass; inverse-square spreading
+    // belongs to the contribution, not to the sampling PDF.
     const float row_pdf = row_valid
-        ? bdpt_connection_pdf_from_distance(distance) * fmaxf(light_pdf_forward[light_index], 0.0f) *
+        ? fmaxf(light_pdf_forward[light_index], 0.0f) *
             fmaxf(sensor_pdf_reverse[sensor_index], 0.0f)
         : 0.0f;
     // The free-space spreading acts over the unfolded path (light-subpath
@@ -1233,6 +1244,7 @@ cn_bdpt_endpoint_connection_samples_cuda(
     TORCH_CHECK(samples_per_tx > 0, "samples_per_tx must be positive");
     TORCH_CHECK(beta > 0.0, "beta must be positive");
     check_mis_args(mode_id, strategy_count);
+    TORCH_CHECK(strategy_count == 1, "endpoint connections support exactly one strategy");
     TORCH_CHECK(max_paths >= -1, "max_paths must be -1 or non-negative");
     const int64_t light_count = light_origin.size(0);
     const int64_t sensor_count = sensor_origin.size(0);
@@ -1409,7 +1421,7 @@ cn_bdpt_diffraction_connection_samples_from_tape_cuda(
     TORCH_CHECK(wavelength > 0.0, "wavelength must be positive");
     TORCH_CHECK(direct_samples >= 0 && keller_samples >= 0, "sample counts must be non-negative");
     TORCH_CHECK(beta > 0.0, "beta must be positive");
-    check_mis_args(mode_id, strategy_count);
+    check_diffraction_mis_args(mode_id, strategy_count, direct_samples, keller_samples);
     const int64_t count = tape_active.size(0);
     for (const auto& pair : {
              std::pair<const at::Tensor*, const char*>(&tape_state_idx, "tape_state_idx"),
@@ -1579,7 +1591,7 @@ cn_bdpt_diffraction_point_connection_samples_cuda(
     TORCH_CHECK(seed >= 0, "seed must be non-negative");
     TORCH_CHECK(wavelength > 0.0, "wavelength must be positive");
     TORCH_CHECK(beta > 0.0, "beta must be positive");
-    check_mis_args(mode_id, strategy_count);
+    check_diffraction_mis_args(mode_id, strategy_count, direct_samples, keller_samples);
     TORCH_CHECK(material_valid.size(0) == material_gain.size(0), "material_valid must match material_gain");
     const int64_t physical_state_count = state_edge_index.size(0);
     TORCH_CHECK(state_count <= physical_state_count, "state_count exceeds state tensors");

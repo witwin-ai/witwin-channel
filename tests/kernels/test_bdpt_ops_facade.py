@@ -63,6 +63,7 @@ def test_bdpt_launch_state_returns_stable_cuda_tensors():
     second = ops.bdpt_launch_state(reference, tx_count=2, samples=3, sample_streams=2, seed=11)
     changed = ops.bdpt_launch_state(reference, tx_count=2, samples=3, sample_streams=2, seed=12)
 
+    assert set(first) == {"tx_id", "sample_id", "stream_id", "light_seed"}
     assert first["tx_id"].shape == (12,)
     assert first["sample_id"].shape == (12,)
     assert first["stream_id"].shape == (12,)
@@ -728,8 +729,8 @@ def test_bdpt_diffraction_connection_samples_from_tape_emits_native_schema():
         grid_resolution1=1,
         grid_cell_area=1.0,
         wavelength=0.125,
-        direct_samples=1,
-        keller_samples=1,
+        direct_samples=2,
+        keller_samples=0,
         mis="none",
         beta=2.0,
         strategy_count=1,
@@ -857,8 +858,8 @@ def test_bdpt_diffraction_point_connection_samples_emits_native_schema_and_visib
         torch.tensor([True], device="cuda", dtype=torch.bool),
         tx_index=3,
         state_count=1,
-        direct_samples=1,
-        keller_samples=1,
+        direct_samples=2,
+        keller_samples=0,
         seed=123,
         wavelength=0.125,
         mis="none",

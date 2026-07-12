@@ -168,10 +168,7 @@ def _effective_native_samples(config: Config) -> int:
 
 
 def _effective_native_depth(config: Config) -> int:
-    return min(
-        int(config.max_depth),
-        int(config.max_light_depth) + int(config.max_sensor_depth),
-    )
+    return min(int(config.max_depth), int(config.max_light_depth))
 
 
 def _face_material_tensors(
@@ -306,9 +303,7 @@ def _native_los_connection_samples(
     return bdpt_filter_connection_samples(samples, visible)
 
 
-def _diffraction_sample_split(
-    sample_count: int, *, mis: str
-) -> tuple[int, int, int]:
+def _diffraction_sample_split(sample_count: int, *, mis: str) -> tuple[int, int, int]:
     if mis == "none":
         return int(sample_count), 0, 0
     direct = (int(sample_count) + 2) // 3
@@ -334,7 +329,9 @@ def _native_diffraction_component_maps(
     mis: str,
     beta: float,
 ) -> tuple[torch.Tensor, list[dict[str, torch.Tensor]]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = material_tensors
+    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = (
+        material_tensors
+    )
     spec = _grid_spec(grid)
     dim0, dim1 = grid.shape[1], grid.shape[0]
     maps = mc_component_map_buffer(
@@ -481,7 +478,9 @@ def _native_diffraction_point_connection_samples(
     mis: str,
     beta: float,
 ) -> Iterator[dict[str, torch.Tensor]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = material_tensors
+    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = (
+        material_tensors
+    )
     edge_geometry = _cached_diffraction_edge_geometry(raydn)
     (
         selected,
@@ -903,8 +902,8 @@ def _transmission_sampled_connection_samples(
             # [p_s, p_s + p_t) transmit, else reflect. Smooth faces have
             # p_s = 0 exactly, so their transmit test u < p_t is unchanged.
             choose_scatter = hit_ok & (uniforms < p_scatter)
-            choose_transmit = hit_ok & ~choose_scatter & (
-                uniforms < p_scatter + p_transmit
+            choose_transmit = (
+                hit_ok & ~choose_scatter & (uniforms < p_scatter + p_transmit)
             )
             reflected = bdpt_reflected_light_subpath_state(
                 state,
@@ -962,6 +961,14 @@ def _transmission_sampled_connection_samples(
                 merged[key] = merged[key] * amplitude_scale
             for key in ("field_real", "field_imag"):
                 merged[key] = merged[key] * amplitude_scale[:, None]
+            # Reflection/transmission directions are delta events, but the
+            # sampled event class still has a discrete probability mass. Keep
+            # that mass in the proposal density; canonical enumerated delta
+            # paths use a separate unit-mass block.
+            for key in ("pdf_forward", "pdf_reverse"):
+                merged[key] = torch.where(
+                    merged["valid"], merged[key] * p_event, torch.zeros_like(p_event)
+                )
 
             scattered_valid = torch.zeros_like(choose_scatter)
             if runtimes and bool(choose_scatter.any()):
@@ -981,9 +988,7 @@ def _transmission_sampled_connection_samples(
                 )
                 frame_t1, frame_t2 = local_frames(normal_flipped, axis_rad)
                 wi_world = -direction
-                wi_local = world_to_local(
-                    wi_world, frame_t1, frame_t2, normal_flipped
-                )
+                wi_local = world_to_local(wi_world, frame_t1, frame_t2, normal_flipped)
                 p_te, p_tm = te_tm_incident_power(
                     state["field_real"],
                     state["field_imag"],
@@ -1078,9 +1083,7 @@ def _transmission_sampled_connection_samples(
                     visibility_inputs["active"],
                 )[0]
                 keep = visible & mixed.repeat_interleave(sensor_count)
-                sample_blocks.append(
-                    bdpt_filter_connection_samples(samples_out, keep)
-                )
+                sample_blocks.append(bdpt_filter_connection_samples(samples_out, keep))
             # v1 single-bounce rule: scattered subpaths connected above and
             # terminate here; reflection/transmission never follow them.
             merged["valid"] = merged["valid"] & ~choose_scatter

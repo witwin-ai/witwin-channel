@@ -102,6 +102,7 @@ __all__ = [
     "RoughMaterialRuntime",
     "eval_bsdf_rows",
     "local_frames",
+    "solid_angle_to_area_jacobian",
     "local_to_world",
     "rough_material_runtimes",
     "sample_scatter_directions",
@@ -187,7 +188,9 @@ def scatter_direction_uniforms(
     """
 
     generator = torch.Generator(device=device)
-    salted = _splitmix64(event_selection_seed(seed, tx_index, depth) ^ _DIRECTION_SEED_SALT)
+    salted = _splitmix64(
+        event_selection_seed(seed, tx_index, depth) ^ _DIRECTION_SEED_SALT
+    )
     generator.manual_seed(salted & _MASK63)
     return torch.rand((int(count), 2), device=device, generator=generator)
 
@@ -230,7 +233,9 @@ def three_way_rough_probabilities(
     )
 
 
-def local_frames(normal: torch.Tensor, axis_rad: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def local_frames(
+    normal: torch.Tensor, axis_rad: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Deterministic tangent frame ``(t1, t2)`` of unit normals ``[N, 3]``.
 
     ``t1`` is the table's local x axis (roughness principal axis): the
@@ -274,6 +279,14 @@ def local_to_world(
     w: torch.Tensor, t1: torch.Tensor, t2: torch.Tensor, normal: torch.Tensor
 ) -> torch.Tensor:
     return w[:, 0:1] * t1 + w[:, 1:2] * t2 + w[:, 2:3] * normal
+
+
+def solid_angle_to_area_jacobian(
+    cosine: torch.Tensor, distance: torch.Tensor
+) -> torch.Tensor:
+    """Return ``|cos(theta)|/r^2`` without folding it into a proposal PDF."""
+
+    return cosine.clamp_min(0.0) / distance.clamp_min(1.0e-6).square()
 
 
 def te_tm_incident_power(
@@ -351,7 +364,11 @@ def sample_scatter_directions(
         wo_local[rows] = wo_rows
         pdf_forward[rows] = sampled["pdf_forward"]
         pdf_reverse[rows] = sampled["pdf_reverse"]
-    return {"wo_local": wo_local, "pdf_forward": pdf_forward, "pdf_reverse": pdf_reverse}
+    return {
+        "wo_local": wo_local,
+        "pdf_forward": pdf_forward,
+        "pdf_reverse": pdf_reverse,
+    }
 
 
 def eval_bsdf_rows(
@@ -497,8 +514,9 @@ def scattering_nee_connection_samples(
     valid = valid & visible
     contribution = torch.where(valid, contribution, torch.zeros_like(contribution))
 
-    # Directional-strategy density in the connection (area) measure, kept
-    # for diagnostics / future multi-bounce MIS: p_s * pdf(wo|wi) * cos/r2^2.
+    # Store only the sampled proposal density. The solid-angle-to-area
+    # Jacobian is a geometry conversion and is deliberately kept out of the
+    # public ``pdf`` diagnostic.
     pdf_omega = torch.zeros_like(contribution)
     for index, runtime in runtimes.items():
         rows = torch.nonzero(material_rows == index, as_tuple=False).flatten()
@@ -509,7 +527,7 @@ def scattering_nee_connection_samples(
             wi_rows.index_select(0, rows),
             wo_local.index_select(0, rows).contiguous(),
         )
-    pdf_dir = p_s_rows * pdf_omega * flat(cos_o).clamp_min(0.0) / (flat(r2) ** 2)
+    pdf_dir = p_s_rows * pdf_omega
     mis_weight = torch.where(
         valid, torch.ones_like(contribution), torch.zeros_like(contribution)
     )
@@ -561,10 +579,11 @@ def scattered_subpath_state(
 
     Assembled directly in torch with the native subpath tensor layout (no
     native kernel: the update is gather+FMA on the sampled table values).
-    The field magnitude is scaled by sqrt(f_K_polweighted * cos_theta_o /
-    (pdf * p_scatter)); the phase is 0 and the transverse orientation a
-    deterministic placeholder - scattering contributions are POWER-ONLY
-    (ensemble average), so only |field|^2 is ever consumed.
+    Scattering contributions are POWER-ONLY ensemble estimates. No coherent
+    phase or cross-polarized Jones amplitude is available from the current
+    Kirchhoff table, so the Complex3 carrier is explicitly cleared instead of
+    manufacturing a zero-phase field. ``throughput_real`` remains a sampling
+    proxy and must never be consumed as a field amplitude.
     """
 
     sampled = sample_scatter_directions(material_id, wi_local, uniforms, runtimes)
@@ -575,30 +594,35 @@ def scattered_subpath_state(
     incident_power = (p_te + p_tm).clamp_min(1.0e-20)
     f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power
     cos_o = wo_local[:, 2].clamp_min(0.0)
-    power_scale = f_weighted * cos_o / (pdf_forward.clamp_min(1.0e-12) * p_scatter.clamp_min(1.0e-4))
+    power_scale = (
+        f_weighted
+        * cos_o
+        / (pdf_forward.clamp_min(1.0e-12) * p_scatter.clamp_min(1.0e-4))
+    )
     valid = choose_scatter & (pdf_forward > 0.0) & (cos_o > 0.0) & state["valid"]
-    amplitude_scale = torch.where(valid, power_scale.sqrt(), torch.zeros_like(power_scale))
+    amplitude_scale = torch.where(
+        valid, power_scale.sqrt(), torch.zeros_like(power_scale)
+    )
 
     epsilon = scale_aware_epsilon(hit["p"], scene_diagonal=scene_diagonal)
     origin = hit["p"] + wo_world * epsilon[:, None]
-    # Deterministic transverse orientation for the phase-0 power carrier.
-    s_out, _ = local_frames(wo_world, torch.zeros_like(cos_o))
-    magnitude = incident_power.sqrt() * amplitude_scale
     scattered = dict(state)
     scattered["origin"] = origin
     scattered["direction"] = wo_world
-    scattered["field_real"] = s_out * magnitude[:, None]
-    scattered["field_imag"] = torch.zeros_like(s_out)
+    scattered["field_real"] = torch.zeros_like(state["field_real"])
+    scattered["field_imag"] = torch.zeros_like(state["field_imag"])
     throughput_amp = torch.sqrt(
         state["throughput_real"] ** 2 + state["throughput_imag"] ** 2
     )
     scattered["throughput_real"] = throughput_amp * amplitude_scale
     scattered["throughput_imag"] = torch.zeros_like(throughput_amp)
-    scattered["pdf_forward"] = state["pdf_forward"] * pdf_forward
-    scattered["pdf_reverse"] = state["pdf_reverse"] * sampled["pdf_reverse"]
+    scattered["pdf_forward"] = state["pdf_forward"] * p_scatter * pdf_forward
+    scattered["pdf_reverse"] = state["pdf_reverse"] * p_scatter * sampled["pdf_reverse"]
     scattered["depth"] = state["depth"] + 1
     scattered["component_mask"] = state["component_mask"] | MASK_SCATTERING
-    scattered["event_type"] = torch.full_like(state["event_type"], SCATTERING_EVENT_TYPE)
+    scattered["event_type"] = torch.full_like(
+        state["event_type"], SCATTERING_EVENT_TYPE
+    )
     scattered["primitive_id"] = hit["global_prim_id"]
     scattered["path_length"] = state["path_length"] + hit["t"].clamp_min(0.0)
     scattered["valid"] = valid
@@ -639,9 +663,7 @@ def scattering_map_matrix(
     Scattering is single-bounce: tx -> rough point -> receiver only.
     """
 
-    matrix = torch.zeros(
-        (int(tx_pos.shape[0]), int(rx_pos.shape[0])), device=device
-    )
+    matrix = torch.zeros((int(tx_pos.shape[0]), int(rx_pos.shape[0])), device=device)
     stats = {
         "sample_count": 0,
         "rough_face_count": 0,
@@ -731,9 +753,7 @@ def scattering_map_matrix(
         stats["tx_visible_samples"] += int(active.sum())
         if not bool(active.any()):
             continue
-        incident = torch.where(
-            active, cos_i / (r1 * r1), torch.zeros_like(cos_i)
-        )
+        incident = torch.where(active, cos_i / (r1 * r1), torch.zeros_like(cos_i))
         for start in range(0, rx_count, cell_chunk):
             end = min(start + cell_chunk, rx_count)
             cells = rx_pos[start:end]
@@ -750,7 +770,9 @@ def scattering_map_matrix(
                 (
                     (wo_flat * frame_t1.repeat_interleave(block, dim=0)).sum(dim=-1),
                     (wo_flat * frame_t2.repeat_interleave(block, dim=0)).sum(dim=-1),
-                    (wo_flat * normal_flipped.repeat_interleave(block, dim=0)).sum(dim=-1),
+                    (wo_flat * normal_flipped.repeat_interleave(block, dim=0)).sum(
+                        dim=-1
+                    ),
                 ),
                 dim=-1,
             )
@@ -763,12 +785,13 @@ def scattering_map_matrix(
             f_unpol = 0.5 * (f_te + f_tm)
             visible_rx = raydn_visibility_forward(
                 handle,
-                (
-                    points[:, None, :] + wo_world * epsilon[:, None, None]
-                ).reshape(count * block, 3).contiguous(),
-                cells[None, :, :].expand(count, block, 3).reshape(
-                    count * block, 3
-                ).contiguous(),
+                (points[:, None, :] + wo_world * epsilon[:, None, None])
+                .reshape(count * block, 3)
+                .contiguous(),
+                cells[None, :, :]
+                .expand(count, block, 3)
+                .reshape(count * block, 3)
+                .contiguous(),
                 pair_active.reshape(count * block).contiguous(),
             )[0]
             deposit = (

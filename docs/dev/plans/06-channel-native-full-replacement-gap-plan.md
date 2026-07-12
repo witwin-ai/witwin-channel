@@ -97,11 +97,11 @@
 
 ### Phase C：BDPT 与随机求解稳定性（P1）
 
-- [ ] 将 BDPT scalar throughput 改为 Jones/complex3 + local frame；
-- [ ] 审计 forward/reverse PDF、Jacobian、delta event 与 MIS measure；
-- [ ] 用可枚举小场景检查估计无偏性；
-- [ ] 对 MC Basic、BDPT 和衍射执行跨 seed 压力测试；
-- [ ] 固定报告 mean、variance、confidence interval、finite ratio 和失败率。
+- [x] 将 BDPT scalar throughput 改为 Jones/complex3 + local frame；
+- [x] 审计 forward/reverse PDF、Jacobian、delta event 与 MIS measure；
+- [x] 用可枚举小场景检查估计无偏性；
+- [x] 对 MC Basic、BDPT 和衍射执行跨 seed 压力测试；
+- [x] 固定报告 mean、variance、confidence interval、finite ratio 和失败率。
 
 验收：统计阈值预先固定；不以单 seed parity 作为通过条件。
 

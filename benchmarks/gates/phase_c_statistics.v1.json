@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "full_seeds": [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59],
+  "cases": {
+    "bdpt_wedge_diffraction": {
+      "samples": 4096,
+      "reference": 0.0000466,
+      "thresholds": {
+        "failure_rate_max": 0.0,
+        "finite_ratio_min": 1.0,
+        "relative_bias_max": 0.35,
+        "relative_ci95_half_width_max": 0.35
+      }
+    },
+    "mc_basic_rough_scattering": {
+      "samples": 8192,
+      "thresholds": {
+        "failure_rate_max": 0.0,
+        "finite_ratio_min": 1.0,
+        "relative_bias_max": 0.20,
+        "relative_ci95_half_width_max": 0.25
+      }
+    },
+    "bdpt_mixed_reflection_transmission": {
+      "samples": 2048,
+      "thresholds": {
+        "failure_rate_max": 0.0,
+        "finite_ratio_min": 1.0,
+        "mean_min": 1e-30
+      }
+    }
+  }
+}

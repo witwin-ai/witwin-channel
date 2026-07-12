@@ -29,11 +29,12 @@ class Config:
     seed: int = 0
     max_depth: int = 3
     max_light_depth: int | None = None
-    max_sensor_depth: int | None = None
     max_diffraction_order: int = 1
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = _DEFAULT_COMPONENTS
+    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
+        _DEFAULT_COMPONENTS
+    )
     mis: str = "power_heuristic"
     power_heuristic_beta: float = 2.0
     receiver_strategy: str = "grid_area"
@@ -52,12 +53,11 @@ class Config:
             raise ValueError("seed must be non-negative")
         if self.max_depth < 0:
             raise ValueError("max_depth must be non-negative")
-        max_light_depth = self.max_depth if self.max_light_depth is None else self.max_light_depth
-        max_sensor_depth = self.max_depth if self.max_sensor_depth is None else self.max_sensor_depth
+        max_light_depth = (
+            self.max_depth if self.max_light_depth is None else self.max_light_depth
+        )
         if max_light_depth < 0:
             raise ValueError("max_light_depth must be non-negative")
-        if max_sensor_depth < 0:
-            raise ValueError("max_sensor_depth must be non-negative")
         if self.max_diffraction_order not in {0, 1}:
             raise ValueError("max_diffraction_order must be 0 or 1")
         components = validated_components(
@@ -75,16 +75,23 @@ class Config:
                 raise RuntimeError(
                     "coupled paths require reflection and diffraction components"
                 )
-        if self.coupled_candidate_limit <= 0 or self.coupled_candidate_limit > 1_000_000:
+        if (
+            self.coupled_candidate_limit <= 0
+            or self.coupled_candidate_limit > 1_000_000
+        ):
             raise ValueError("coupled_candidate_limit must be in [1, 1000000]")
         if self.mis not in _VALID_MIS:
             raise ValueError(f"mis must be one of {sorted(_VALID_MIS)}")
         if self.power_heuristic_beta <= 0.0:
             raise ValueError("power_heuristic_beta must be positive")
         if self.receiver_strategy not in _VALID_RECEIVER_STRATEGIES:
-            raise ValueError(f"receiver_strategy must be one of {sorted(_VALID_RECEIVER_STRATEGIES)}")
+            raise ValueError(
+                f"receiver_strategy must be one of {sorted(_VALID_RECEIVER_STRATEGIES)}"
+            )
         if self.accumulation_strategy not in _VALID_ACCUMULATION_STRATEGIES:
-            raise ValueError(f"accumulation_strategy must be one of {sorted(_VALID_ACCUMULATION_STRATEGIES)}")
+            raise ValueError(
+                f"accumulation_strategy must be one of {sorted(_VALID_ACCUMULATION_STRATEGIES)}"
+            )
         if self.sample_streams <= 0:
             raise ValueError("sample_streams must be positive")
         if self.max_exported_paths is not None and self.max_exported_paths < 0:
@@ -98,5 +105,4 @@ class Config:
             raise ValueError("workspace_limit_bytes must be non-negative")
 
         object.__setattr__(self, "max_light_depth", max_light_depth)
-        object.__setattr__(self, "max_sensor_depth", max_sensor_depth)
         object.__setattr__(self, "components", components)
