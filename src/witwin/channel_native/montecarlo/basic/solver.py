@@ -41,7 +41,7 @@ def _host_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
     material_mu_r: list[float] = []
     face_material_id: list[int] = []
     for material_id, structure in enumerate(scene.structures):
-        params = structure.material.parameters()
+        params = structure.material.parameters(scene.frequency)
         material_eps_r.append(float(params["eps_r"]))
         material_sigma_e.append(effective_sigma_e(params))
         material_mu_r.append(float(params["mu_r"]))
