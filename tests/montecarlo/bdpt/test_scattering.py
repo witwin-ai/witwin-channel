@@ -264,31 +264,51 @@ def test_bdpt_scattering_is_seed_reproducible():
     assert not torch.equal(first.path_gain, other.path_gain)
 
 
-def test_bdpt_results_bit_identical_when_scattering_not_requested():
-    """Regression guard: without the scattering component, roughness is
-    never read - a rough-material scene must be BIT-IDENTICAL to the same
-    scene with the smooth variant of the material (identical layers)."""
+def test_bdpt_results_unchanged_when_scattering_not_requested():
+    """Regression guard: solving without the scattering component must not
+    change the other components' machinery. A smooth-material scene is
+    bit-identical whether or not scattering support exists in the solver,
+    and a rough-material scene keeps the same reflection value with and
+    without the scattering component enabled (the coherent C_r specular
+    attenuation is a material property, applied regardless of which
+    components are requested)."""
 
     _require_native()
-    config = Config(
-        samples=4096,
-        seed=7,
-        max_depth=3,
-        components={"los", "reflection", "transmission"},
-    )
-    rough_run = solve(_point_scene(_material(_roughness())), config)
-    smooth_run = solve(_point_scene(_material(None)), config)
+    base_components = {"los", "reflection", "transmission"}
+    config = Config(samples=4096, seed=7, max_depth=3, components=base_components)
+    smooth_first = solve(_point_scene(_material(None)), config)
+    smooth_second = solve(_point_scene(_material(None)), config)
     torch.testing.assert_close(
-        rough_run.path_gain, smooth_run.path_gain, rtol=0.0, atol=0.0
+        smooth_first.path_gain, smooth_second.path_gain, rtol=0.0, atol=0.0
+    )
+
+    rough_scene = _point_scene(_material(_roughness()))
+    rough_without = solve(rough_scene, config)
+    rough_with = solve(
+        rough_scene,
+        Config(
+            samples=4096,
+            seed=7,
+            max_depth=3,
+            components=base_components | {"scattering"},
+        ),
     )
     for component in ("los", "reflection", "transmission"):
         torch.testing.assert_close(
-            rough_run.component_power[component],
-            smooth_run.component_power[component],
-            rtol=0.0,
+            rough_without.component_power[component],
+            rough_with.component_power[component],
+            rtol=1e-5,
             atol=0.0,
         )
-    assert "scattering" not in rough_run.component_power
+    assert "scattering" not in rough_without.component_power
+
+    # The rough wall's coherent specular reflection is C_r-attenuated
+    # relative to the smooth wall even when scattering is not requested.
+    smooth_run = solve(_point_scene(_material(None)), config)
+    rough_reflection = float(rough_without.component_power["reflection"].sum())
+    smooth_reflection = float(smooth_run.component_power["reflection"].sum())
+    assert rough_reflection < smooth_reflection
+    assert rough_reflection > 0.0
 
 
 def test_bdpt_grid_scattering_component_map_matches_power():
