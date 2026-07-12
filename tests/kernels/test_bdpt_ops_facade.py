@@ -916,6 +916,7 @@ def test_bdpt_accumulate_connection_samples_applies_mis_weight(accumulation_stra
     torch.testing.assert_close(accumulated["reflection"], expected)
     torch.testing.assert_close(accumulated["los"], torch.zeros_like(expected))
     torch.testing.assert_close(accumulated["diffraction"], torch.zeros_like(expected))
+    torch.testing.assert_close(accumulated["transmission"], torch.zeros_like(expected))
 
 
 def test_bdpt_count_valid_connection_samples_uses_native_valid_mask():
@@ -978,6 +979,7 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
                 "los": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
                 "reflection": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
                 "diffraction": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
+                "transmission": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
             }
 
     samples = {
@@ -1016,7 +1018,7 @@ def test_bdpt_accumulation_strategies_agree_with_invalid_and_duplicate_samples()
         "contribution": torch.tensor([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0], device="cuda"),
         "pdf": torch.ones((9,), device="cuda", dtype=torch.float32),
         "mis_weight": torch.tensor([1.0, 0.5, 0.25, 0.125, 1.0, 1.0, 1.0, 1.0, 1.0], device="cuda"),
-        "component_id": torch.tensor([0, 0, 1, 2, 1, 2, 1, 0, 7], device="cuda", dtype=torch.int32),
+        "component_id": torch.tensor([0, 5, 1, 2, 1, 2, 1, 0, 7], device="cuda", dtype=torch.int32),
         "valid": torch.tensor([True, True, True, True, False, True, True, True, True], device="cuda", dtype=torch.bool),
         "tx_id": torch.tensor([0, 0, 0, 0, 1, 1, 3, 1, 1], device="cuda", dtype=torch.int32),
         "rx_id": torch.tensor([0, 0, 1, 1, 0, 2, 0, 5, 1], device="cuda", dtype=torch.int32),
@@ -1039,7 +1041,7 @@ def test_bdpt_accumulation_strategies_agree_with_invalid_and_duplicate_samples()
             rx_count=3,
             accumulation_strategy=strategy,
         )
-        for name in ("path_gain", "los", "reflection", "diffraction"):
+        for name in ("path_gain", "los", "reflection", "diffraction", "transmission"):
             torch.testing.assert_close(accumulated[name], atomic[name], rtol=2.0e-6, atol=1.0e-12)
 
 

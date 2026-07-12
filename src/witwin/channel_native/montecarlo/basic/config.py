@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from witwin.channel_native.core.kernels.metadata import ACCUMULATION_STRATEGIES
 
 
-# Public component set. transmission and scattering are accepted plumbing in v1:
-# they validate and emit zero grid/point maps until the physics lands in later
-# waves. Both are surface events that require at least one bounce
-# (max_depth >= 1); transmission chains count wall penetrations, scattering is
-# single-bounce in v1.
+# Public component set. transmission traces straight penetration chains
+# through up to max_depth walls (grid radiomaps only); scattering is accepted
+# plumbing that emits zero maps until its wave lands. Both are surface events
+# that require at least one bounce (max_depth >= 1).
 _VALID_COMPONENTS = frozenset(
     {"los", "reflection", "diffraction", "transmission", "scattering"}
 )

@@ -29,6 +29,7 @@ from .raydn_components import (
     first_receiver_grid,
     los_component_map,
     reflection_component_maps_with_wedges,
+    transmission_component_map,
 )
 from .result import Result
 from .sampling import make_cuda_generator
@@ -103,10 +104,13 @@ def solve(scene: Scene, config: Config) -> Result:
     info = build_info()
     reflection_available = bool(info["uses_raydn_native"])
     diffraction_available = bool(info["uses_raydn_native"])
+    transmission_available = bool(info["uses_raydn_native"])
     if "reflection" in config.components and not reflection_available:
         raise RuntimeError("reflection requires RayDN native capability")
     if "diffraction" in config.components and not diffraction_available:
         raise RuntimeError("diffraction requires RayDN native capability")
+    if "transmission" in config.components and not transmission_available:
+        raise RuntimeError("transmission requires RayDN native capability")
 
     device = torch.device("cuda")
     make_cuda_generator(config.seed)
@@ -201,11 +205,25 @@ def solve(scene: Scene, config: Config) -> Result:
             valid_contribution_count += int(component_maps["diffraction"].numel())
         else:
             component_maps["diffraction"] = zero_component_map()
-        # transmission and scattering are accepted plumbing in v1: emit zero
-        # grid maps for them when requested until the physics lands.
-        for name in ("transmission", "scattering"):
-            if name in config.components:
-                component_maps[name] = zero_component_map()
+        if "transmission" in config.components and scene.structures:
+            component_maps["transmission"] = transmission_component_map(
+                scene,
+                raydn,
+                grid,
+                max_depth=config.max_depth,
+                device=device,
+                los=los if "los" in config.components else None,
+            )
+            path_count += len(scene.transmitters) * grid_dim0 * grid_dim1
+            valid_contribution_count += int(
+                torch.count_nonzero(component_maps["transmission"])
+            )
+        elif "transmission" in config.components:
+            component_maps["transmission"] = zero_component_map()
+        # scattering is accepted plumbing in v1: emit zero grid maps when
+        # requested until the physics lands.
+        if "scattering" in config.components:
+            component_maps["scattering"] = zero_component_map()
 
     path_gain = los
     if component_maps is not None:
@@ -213,6 +231,7 @@ def solve(scene: Scene, config: Config) -> Result:
             component_maps["los"],
             component_maps["reflection"],
             component_maps["diffraction"],
+            component_maps.get("transmission", zero_component_map()),
         )
         path_gain = finalized["path_gain"]
         component_power = {
@@ -220,12 +239,16 @@ def solve(scene: Scene, config: Config) -> Result:
             "reflection": finalized["reflection_power"],
             "diffraction": finalized["diffraction_power"],
         }
+        if "transmission" in config.components:
+            component_power["transmission"] = finalized["transmission_power"]
     else:
         component_power = mc_point_component_power(los, include_los=("los" in config.components))
-    # Zero point-power for the accepted-but-empty v1 components when requested.
-    for name in ("transmission", "scattering"):
-        if name in config.components:
-            component_power[name] = torch.zeros_like(component_power["los"])
+        # Point receivers carry no transmission map in MC basic; report zero.
+        if "transmission" in config.components:
+            component_power["transmission"] = torch.zeros_like(component_power["los"])
+    # Zero point-power for the accepted-but-empty v1 scattering when requested.
+    if "scattering" in config.components:
+        component_power["scattering"] = torch.zeros_like(component_power["los"])
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,

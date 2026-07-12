@@ -38,15 +38,30 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_finalize_point_components,
     bdpt_filter_connection_samples,
     bdpt_connection_variance,
+    bdpt_intersect_forward,
     bdpt_los_component_maps_from_matrix,
+    bdpt_reflected_light_subpath_state,
+    bdpt_reflection_launch_inputs,
+    bdpt_sample_directions,
     bdpt_selected_edge_indices,
+    bdpt_subpath_intersection_inputs,
+    bdpt_transmitted_light_subpath_state,
     bdpt_zero_matrix,
+    em_layer_stack_eval,
     mc_component_map_buffer,
     mc_store_component_map,
     raydn_visibility_forward,
 )
 from witwin.channel_native.montecarlo.basic.raydn_components import (
     _cached_diffraction_edge_geometry,
+)
+from witwin.channel_native.montecarlo.transmission import (
+    event_uniforms,
+    layer_csr_view,
+    scene_diagonal_m,
+    straight_transmission_chains,
+    transmission_event_probability,
+    unpolarized_power_budgets,
 )
 from .connections import (
     first_receiver_grid,
@@ -110,6 +125,12 @@ def _estimate_workspace_bytes(
         dense_rows += launch_entries * rx_rows * max(1, int(config.max_depth))
     if "diffraction" in config.components and point_receivers:
         dense_rows += launch_entries * rx_rows
+    if "transmission" in config.components:
+        # Straight endpoint chains: one deterministic row per (tx, rx) pair.
+        dense_rows += max(0, int(tx_count)) * rx_rows
+        # Sampled mixed reflection+transmission chains retain a connection
+        # block per light depth.
+        dense_rows += launch_entries * rx_rows * max(1, int(config.max_depth))
     bytes_estimate += dense_rows * row_bytes
     return int(bytes_estimate)
 
@@ -125,17 +146,15 @@ def _check_workspace_guardrail(config: Config, workspace_bytes: int) -> None:
 
 
 def _path_counts(config: Config, *, tx_count: int) -> dict[str, int]:
-    # transmission and scattering are accepted plumbing in v1: they carry zero
-    # sampled paths until the physics lands, so their count stays 0 even when
-    # requested.
+    # scattering is accepted plumbing in v1: it carries zero sampled paths
+    # until the physics lands, so its count stays 0 even when requested.
     counts = {
         component: int(config.samples) * int(config.sample_streams) * int(tx_count)
         if component in config.components
         else 0
-        for component in ("los", "reflection", "diffraction")
+        for component in ("los", "reflection", "diffraction", "transmission")
     }
-    for component in ("transmission", "scattering"):
-        counts[component] = 0
+    counts["scattering"] = 0
     return counts
 
 
@@ -660,6 +679,297 @@ def _coupled_discrete_connection_samples(
     return _topology_connection_samples(topology, selected, component_out=2)
 
 
+_TRANSMISSION_COMPONENT_ID = 5
+_MASK_REFLECTION = 2
+_MASK_TRANSMISSION = 8
+
+
+def _merge_event_states(
+    reflected: dict[str, torch.Tensor],
+    transmitted: dict[str, torch.Tensor],
+    choose_transmit: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Row-wise merge of the two event kernels' outputs.
+
+    Both kernels are evaluated on the full batch and the per-row winner is
+    selected, which preserves the tensor layout exactly (equivalent to
+    partitioning the hit indices, running each kernel on its partition, and
+    scattering back by original index).
+    """
+
+    wide = choose_transmit[:, None]
+    merged: dict[str, torch.Tensor] = {}
+    for key, reflected_value in reflected.items():
+        condition = wide if reflected_value.dim() == 2 else choose_transmit
+        merged[key] = torch.where(condition, transmitted[key], reflected_value)
+    return merged
+
+
+def _transmission_straight_connection_samples(
+    raydn: Any,
+    light: dict[str, torch.Tensor],
+    sensor: dict[str, torch.Tensor],
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor],
+    *,
+    frequency_hz: float,
+    max_depth: int,
+    scene_diagonal: float,
+    mis: str,
+    beta: float,
+) -> tuple[dict[str, torch.Tensor] | None, int]:
+    """Exact pure-transmission Tx->Rx chains (endpoint-connection context).
+
+    Specular thin_sheet transmission never bends the ray (parallel-plate
+    exit), so every pure-transmission path topology IS the straight Tx->Rx
+    segment. Marching that segment yields the per-pair power transmittance
+    product, which scales the analytic endpoint-connection LoS contribution
+    and is reclassified as the exclusive transmission path class (component
+    id 5). Like the discrete reflection enumeration, these chains carry unit
+    bidirectional mass (mis weight 1). Pairs whose segment crosses no wall
+    belong to the los class and are filtered out here; a vacuum wall has unit
+    power transmittance, so the transmission component reproduces the
+    unobstructed LoS value exactly.
+    """
+
+    rx_count = int(rx_positions.shape[0])
+    if int(tx_positions.shape[0]) == 0 or rx_count == 0:
+        return None, 0
+    samples = bdpt_endpoint_connection_samples(
+        light,
+        sensor,
+        frequency_hz=frequency_hz,
+        samples_per_tx=1,
+        max_paths=None,
+        mis=mis,
+        beta=beta,
+        strategy_count=1,
+    )
+    layer_csr = layer_csr_view(material_bundle)
+    transmittance_rows = []
+    penetrated_rows = []
+    wall_rows = []
+    for tx_index in range(int(tx_positions.shape[0])):
+        origins = tx_positions[tx_index].unsqueeze(0).repeat(rx_count, 1)
+        chain = straight_transmission_chains(
+            raydn,
+            origins,
+            rx_positions,
+            face_material_id=material_bundle["material_id"],
+            layer_csr=layer_csr,
+            frequency_hz=frequency_hz,
+            max_depth=max_depth,
+            scene_diagonal=scene_diagonal,
+        )
+        transmittance_rows.append(chain["transmittance"])
+        penetrated_rows.append(chain["penetrated"])
+        wall_rows.append(chain["wall_count"])
+    # Connection rows are light-major (light_index * sensor_count + sensor)
+    # and the reduced light state carries exactly one row per transmitter, so
+    # the concatenated per-tx march aligns 1:1 with the connection table.
+    transmittance = torch.cat(transmittance_rows, dim=0)
+    penetrated = torch.cat(penetrated_rows, dim=0)
+    wall_count = torch.cat(wall_rows, dim=0)
+    samples["contribution"] = samples["contribution"] * transmittance
+    samples = bdpt_filter_connection_samples(samples, penetrated)
+    chain_count = int(samples["valid"].sum())
+    if chain_count == 0:
+        return None, 0
+    component_id = torch.where(
+        samples["valid"],
+        torch.full_like(samples["component_id"], _TRANSMISSION_COMPONENT_ID),
+        samples["component_id"],
+    )
+    light_depth = torch.where(samples["valid"], wall_count, samples["light_depth"])
+    topology = samples["topology"].clone()
+    topology[:, 2] = component_id
+    topology[:, 3] = light_depth
+    samples["component_id"] = component_id
+    samples["light_depth"] = light_depth
+    samples["topology"] = topology
+    return samples, chain_count
+
+
+def _transmission_sampled_connection_samples(
+    raydn: Any,
+    tx_positions: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    sensor: dict[str, torch.Tensor],
+    material_bundle: dict[str, torch.Tensor],
+    *,
+    frequency_hz: float,
+    samples: int,
+    max_depth: int,
+    seed: int,
+    mis: str,
+    beta: float,
+) -> tuple[list[dict[str, torch.Tensor]], dict[str, int]]:
+    """Shooting-context light subpaths with reflect/transmit event selection.
+
+    Implements plan section 7.1: at every surface hit the smooth-stack power
+    budgets (R_eff, T_eff) drive a seeded, reproducible choice between the
+    delta specular reflection and transmission events; the selected branch's
+    field is divided by sqrt(p_event) so the power estimator stays unbiased
+    (see the inline algebra note). Only MIXED chains (component_mask carrying
+    both the reflection and transmission bits) contribute connections here:
+    pure reflection is counted exactly by the discrete enumeration and pure
+    transmission by the straight endpoint chains, so this sampler never
+    double counts either.
+    """
+
+    device = tx_positions.device
+    layer_csr = layer_csr_view(material_bundle)
+    face_material_id = material_bundle["material_id"]
+    sensor_count = int(sensor["origin"].shape[0])
+    sample_blocks: list[dict[str, torch.Tensor]] = []
+    transmit_events = 0
+    reflect_events = 0
+    for tx_index in range(int(tx_positions.shape[0])):
+        launch_inputs = bdpt_reflection_launch_inputs(
+            tx_positions, tx_index=tx_index, sample_count=int(samples)
+        )
+        ray_d = bdpt_sample_directions(
+            int(samples), tx_positions, seed=int(seed) + tx_index * 65537
+        )
+        state = bdpt_endpoint_subpath_state(
+            tx_positions,
+            tx_power,
+            tx_polarization,
+            rx_positions,
+            rx_polarization,
+            launch_inputs["tx_id"],
+            launch_inputs["light_seed"],
+        )["light"]
+        state["direction"] = ray_d
+        ray_inputs = {
+            "ray_o": launch_inputs["ray_o"],
+            "ray_d": ray_d,
+            "ray_tmax": launch_inputs["ray_tmax"],
+            "active": launch_inputs["active"],
+        }
+        for bounce in range(max(1, int(max_depth))):
+            hit = bdpt_intersect_forward(
+                raydn.require_handle(),
+                ray_inputs["ray_o"],
+                ray_inputs["ray_d"],
+                ray_inputs["ray_tmax"],
+                ray_inputs["active"],
+            )
+            prim = hit["global_prim_id"]
+            material_id = face_material_id.index_select(
+                0, prim.clamp_min(0).to(torch.int64)
+            )
+            hit_ok = (
+                state["valid"] & (prim >= 0) & (hit["t"] >= 0.0) & (material_id >= 0)
+            )
+            cos_theta = (
+                (state["direction"] * hit["n"]).sum(dim=-1).abs().clamp(1.0e-6, 1.0)
+            )
+            stack = em_layer_stack_eval(
+                cos_theta,
+                material_id.clamp_min(0),
+                layer_csr["layer_offset"],
+                layer_csr["layer_count"],
+                layer_csr["layer_thickness_m"],
+                layer_csr["layer_eps_r"],
+                layer_csr["layer_sigma_e"],
+                layer_csr["layer_mu_r"],
+                frequency_hz=frequency_hz,
+            )
+            r_eff, t_eff = unpolarized_power_budgets(stack)
+            p_transmit = transmission_event_probability(r_eff, t_eff)
+            uniforms = event_uniforms(
+                int(samples), seed=seed, tx_index=tx_index, depth=bounce, device=device
+            )
+            choose_transmit = hit_ok & (uniforms < p_transmit)
+            reflected = bdpt_reflected_light_subpath_state(
+                state,
+                hit,
+                material_gain=material_bundle["gain"],
+                material_valid=material_bundle["valid"],
+                material_eps_r=material_bundle["eps_r"],
+                material_sigma_e=material_bundle["sigma_e"],
+                material_mu_r=material_bundle["mu_r"],
+                material_thickness=material_bundle["thickness"],
+                frequency_hz=frequency_hz,
+            )
+            transmitted = bdpt_transmitted_light_subpath_state(
+                state,
+                hit,
+                face_material_id=face_material_id,
+                layer_offset=layer_csr["layer_offset"],
+                layer_count=layer_csr["layer_count"],
+                layer_thickness_m=layer_csr["layer_thickness_m"],
+                layer_eps_r=layer_csr["layer_eps_r"],
+                layer_sigma_e=layer_csr["layer_sigma_e"],
+                layer_mu_r=layer_csr["layer_mu_r"],
+                frequency_hz=frequency_hz,
+            )
+            merged = _merge_event_states(reflected, transmitted, choose_transmit)
+            # Unbiased event split: every contribution downstream has the form
+            # source_power * |field|^2 * (geometry terms), and branch e was
+            # selected with probability p_e, so the POWER must be divided by
+            # p_e. Dividing the FIELD (and the real amplitude proxy) by
+            # sqrt(p_e) achieves exactly that:
+            #   E[|field_e / sqrt(p_e)|^2] = sum_e p_e * |field_e|^2 / p_e
+            #                              = sum_e |field_e|^2.
+            # source_power is deliberately untouched; scaling it too would
+            # double count the correction.
+            p_event = torch.where(choose_transmit, p_transmit, 1.0 - p_transmit)
+            inv_amplitude = torch.where(
+                merged["valid"],
+                torch.rsqrt(p_event.clamp_min(1.0e-4)),
+                torch.ones_like(p_event),
+            )
+            for key in ("throughput_real", "throughput_imag"):
+                merged[key] = merged[key] * inv_amplitude
+            for key in ("field_real", "field_imag"):
+                merged[key] = merged[key] * inv_amplitude[:, None]
+            transmit_events += int((choose_transmit & merged["valid"]).sum())
+            reflect_events += int((~choose_transmit & merged["valid"]).sum())
+            mask = merged["component_mask"]
+            mixed = (
+                merged["valid"]
+                & ((mask & _MASK_REFLECTION) != 0)
+                & ((mask & _MASK_TRANSMISSION) != 0)
+            )
+            if bool(mixed.any()):
+                samples_out = bdpt_endpoint_connection_samples(
+                    merged,
+                    sensor,
+                    frequency_hz=frequency_hz,
+                    samples_per_tx=int(samples),
+                    max_paths=None,
+                    mis=mis,
+                    beta=beta,
+                    strategy_count=1,
+                )
+                visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
+                    merged,
+                    sensor,
+                    sample_count=int(samples_out["valid"].shape[0]),
+                )
+                visible = raydn_visibility_forward(
+                    raydn.require_handle(),
+                    visibility_inputs["start"],
+                    visibility_inputs["end"],
+                    visibility_inputs["active"],
+                )[0]
+                keep = visible & mixed.repeat_interleave(sensor_count)
+                sample_blocks.append(
+                    bdpt_filter_connection_samples(samples_out, keep)
+                )
+            if not bool(merged["valid"].any()):
+                break
+            state = merged
+            ray_inputs = bdpt_subpath_intersection_inputs(merged)
+    return sample_blocks, {"transmit": transmit_events, "reflect": reflect_events}
+
+
 def solve(scene: Scene, config: Config) -> Result:
     grid = first_receiver_grid(scene)
     if grid is not None and config.receiver_strategy != "grid_area":
@@ -690,6 +1000,7 @@ def solve(scene: Scene, config: Config) -> Result:
     raydn_available = bool(info["uses_raydn_native"]) and raydn.available
     reflection_available = raydn_available
     diffraction_available = raydn_available and config.max_diffraction_order > 0
+    transmission_available = raydn_available
     if (
         "reflection" in config.components
         and scene.structures
@@ -702,6 +1013,12 @@ def solve(scene: Scene, config: Config) -> Result:
         and not diffraction_available
     ):
         raise RuntimeError("diffraction requires RayDN native capability")
+    if (
+        "transmission" in config.components
+        and scene.structures
+        and not transmission_available
+    ):
+        raise RuntimeError("transmission requires RayDN native capability")
 
     tx_reference, tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_reference, grid=grid)
@@ -774,11 +1091,14 @@ def solve(scene: Scene, config: Config) -> Result:
         return bdpt_zero_matrix(tx_reference, rows=tx_count, cols=rx_count)
 
     estimate_samples: dict[str, torch.Tensor] | None = None
+    transmission_chain_count = 0
+    transmission_event_counts = {"transmit": 0, "reflect": 0}
     if endpoint_only:
         component_matrices = {
             "los": endpoint_accumulation["los"],
             "reflection": zero_component_matrix(),
             "diffraction": zero_component_matrix(),
+            "transmission": zero_component_matrix(),
         }
         estimate_samples = endpoint_connection_samples
     else:
@@ -787,6 +1107,7 @@ def solve(scene: Scene, config: Config) -> Result:
             "los": zero_component_matrix(),
             "reflection": zero_component_matrix(),
             "diffraction": zero_component_matrix(),
+            "transmission": zero_component_matrix(),
         }
         material_tensors = (
             _face_material_tensors(scene, device=tx_reference.device)
@@ -865,6 +1186,62 @@ def solve(scene: Scene, config: Config) -> Result:
             if coupled_samples is not None:
                 sample_blocks.append(coupled_samples)
                 launch_count += 1
+        transmission_requested = (
+            "transmission" in config.components
+            and scene.structures
+            and transmission_available
+            and native_max_depth >= 1
+        )
+        if transmission_requested:
+            material_bundle = face_material_field_bundle(
+                scene, device=tx_reference.device
+            )
+            scene_diagonal = scene_diagonal_m(scene)
+            transmission_light_state = _reduced_light_endpoint_state(
+                tx_reference,
+                tx_power,
+                tx_polarization,
+                rx_positions,
+                rx_polarization,
+            )
+            straight_samples, transmission_chain_count = (
+                _transmission_straight_connection_samples(
+                    raydn,
+                    transmission_light_state,
+                    endpoint_subpaths["sensor"],
+                    tx_reference,
+                    rx_positions,
+                    material_bundle,
+                    frequency_hz=float(scene.frequency),
+                    max_depth=native_max_depth,
+                    scene_diagonal=scene_diagonal,
+                    mis=config.mis,
+                    beta=config.power_heuristic_beta,
+                )
+            )
+            if straight_samples is not None:
+                sample_blocks.append(straight_samples)
+            launch_count += 2
+            mixed_blocks, transmission_event_counts = (
+                _transmission_sampled_connection_samples(
+                    raydn,
+                    tx_reference,
+                    tx_power,
+                    tx_polarization,
+                    rx_positions,
+                    rx_polarization,
+                    endpoint_subpaths["sensor"],
+                    material_bundle,
+                    frequency_hz=float(scene.frequency),
+                    samples=native_samples,
+                    max_depth=native_max_depth,
+                    seed=int(config.seed),
+                    mis=config.mis,
+                    beta=config.power_heuristic_beta,
+                )
+            )
+            sample_blocks.extend(mixed_blocks)
+            launch_count += 3
         if sample_blocks:
             estimate_samples = (
                 sample_blocks[0]
@@ -896,6 +1273,7 @@ def solve(scene: Scene, config: Config) -> Result:
             component_maps["los"],
             component_maps["reflection"],
             component_maps["diffraction"],
+            component_maps["transmission"],
         )
     else:
         point_component_matrices = component_matrices
@@ -903,6 +1281,7 @@ def solve(scene: Scene, config: Config) -> Result:
             point_component_matrices["los"],
             point_component_matrices["reflection"],
             point_component_matrices["diffraction"],
+            point_component_matrices["transmission"],
         )
     path_gain = finalized["path_gain"]
     component_power = {
@@ -910,13 +1289,18 @@ def solve(scene: Scene, config: Config) -> Result:
         "reflection": finalized["reflection_power"],
         "diffraction": finalized["diffraction_power"],
     }
-    # transmission and scattering are accepted plumbing in v1: emit structurally
-    # valid zero maps / power for them when requested until the physics lands.
-    for name in ("transmission", "scattering"):
-        if name in config.components:
-            component_power[name] = torch.zeros_like(component_power["los"])
-            if component_maps is not None:
-                component_maps[name] = torch.zeros_like(component_maps["los"])
+    if "transmission" in config.components:
+        component_power["transmission"] = finalized["transmission_power"]
+    elif component_maps is not None:
+        # The transmission map is always finalized (zeros when the component
+        # is off) but only exposed when requested.
+        component_maps.pop("transmission")
+    # scattering is accepted plumbing in v1: emit structurally valid zero
+    # maps / power when requested until the physics lands.
+    if "scattering" in config.components:
+        component_power["scattering"] = torch.zeros_like(component_power["los"])
+        if component_maps is not None:
+            component_maps["scattering"] = torch.zeros_like(component_maps["los"])
 
     variance = None
     if config.diagnostics:
@@ -984,6 +1368,13 @@ def solve(scene: Scene, config: Config) -> Result:
         launch_count=launch_count,
         effective_max_depth=native_max_depth,
     )
+    if "transmission" in config.components:
+        # component_mask bit 8 marks transmitted subpaths (contract section 1).
+        metadata["transmission"] = {
+            "straight_chain_paths": int(transmission_chain_count),
+            "event_counts": dict(transmission_event_counts),
+            "component_mask_bit": 8,
+        }
     edge_policy = resolve_scene_edge_policy(scene)
     metadata["edge_policy"] = {
         "edge_selection_mode": edge_policy.edge_selection_mode,

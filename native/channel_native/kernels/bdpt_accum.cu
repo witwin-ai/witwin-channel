@@ -263,10 +263,12 @@ __global__ void bdpt_finalize_point_components_kernel(
     const float* los,
     const float* reflection,
     const float* diffraction,
+    const float* transmission,
     float* path_gain,
     float* los_power,
     float* reflection_power,
-    float* diffraction_power) {
+    float* diffraction_power,
+    float* transmission_power) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count) {
         return;
@@ -274,10 +276,12 @@ __global__ void bdpt_finalize_point_components_kernel(
     float los_value = los[index];
     float reflection_value = reflection[index];
     float diffraction_value = diffraction[index];
-    path_gain[index] = los_value + reflection_value + diffraction_value;
+    float transmission_value = transmission[index];
+    path_gain[index] = los_value + reflection_value + diffraction_value + transmission_value;
     atomicAdd(los_power, los_value);
     atomicAdd(reflection_power, reflection_value);
     atomicAdd(diffraction_power, diffraction_value);
+    atomicAdd(transmission_power, transmission_value);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_bdpt_point_component_power_cuda(
@@ -332,25 +336,33 @@ at::Tensor cn_bdpt_store_point_component_column_cuda(
     return target;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_point_components_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_point_components_cuda(
     at::Tensor los,
     at::Tensor reflection,
-    at::Tensor diffraction) {
+    at::Tensor diffraction,
+    at::Tensor transmission) {
     check_path_gain(los);
     check_path_gain(reflection);
     check_path_gain(diffraction);
-    TORCH_CHECK(reflection.sizes() == los.sizes() && diffraction.sizes() == los.sizes(), "point component matrices must share shape");
+    check_path_gain(transmission);
+    TORCH_CHECK(
+        reflection.sizes() == los.sizes() && diffraction.sizes() == los.sizes() &&
+            transmission.sizes() == los.sizes(),
+        "point component matrices must share shape");
     TORCH_CHECK(reflection.get_device() == los.get_device(), "reflection must share los device");
     TORCH_CHECK(diffraction.get_device() == los.get_device(), "diffraction must share los device");
+    TORCH_CHECK(transmission.get_device() == los.get_device(), "transmission must share los device");
     auto float_options = los.options().dtype(at::kFloat);
     auto path_gain = at::empty_like(los);
     auto los_power = at::empty({}, float_options);
     auto reflection_power = at::empty({}, float_options);
     auto diffraction_power = at::empty({}, float_options);
+    auto transmission_power = at::empty({}, float_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
     C10_CUDA_CHECK(cudaMemsetAsync(los_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(reflection_power.data_ptr<float>(), 0, sizeof(float), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(diffraction_power.data_ptr<float>(), 0, sizeof(float), stream));
+    C10_CUDA_CHECK(cudaMemsetAsync(transmission_power.data_ptr<float>(), 0, sizeof(float), stream));
     int64_t count = los.numel();
     if (count > 0) {
         constexpr int threads = 256;
@@ -360,11 +372,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_poin
             los.data_ptr<float>(),
             reflection.data_ptr<float>(),
             diffraction.data_ptr<float>(),
+            transmission.data_ptr<float>(),
             path_gain.data_ptr<float>(),
             los_power.data_ptr<float>(),
             reflection_power.data_ptr<float>(),
-            diffraction_power.data_ptr<float>());
+            diffraction_power.data_ptr<float>(),
+            transmission_power.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    return {path_gain, los_power, reflection_power, diffraction_power};
+    return {path_gain, los_power, reflection_power, diffraction_power, transmission_power};
 }

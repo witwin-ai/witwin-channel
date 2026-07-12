@@ -651,7 +651,7 @@ def bdpt_accumulate_connection_samples(
         raise TypeError(
             "_channel_native.bdpt_accumulate_connection_samples must return a dict"
         )
-    if set(exported) != {"path_gain", "los", "reflection", "diffraction"}:
+    if set(exported) != {"path_gain", "los", "reflection", "diffraction", "transmission"}:
         raise ValueError(
             "_channel_native.bdpt_accumulate_connection_samples returned unexpected fields"
         )
@@ -1117,14 +1117,20 @@ def bdpt_finalize_point_components(
     los: torch.Tensor,
     reflection: torch.Tensor,
     diffraction: torch.Tensor,
+    transmission: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
     validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=2)
     validate_cuda_tensor("diffraction", diffraction, dtype=torch.float32, ndim=2)
-    if reflection.shape != los.shape or diffraction.shape != los.shape:
+    validate_cuda_tensor("transmission", transmission, dtype=torch.float32, ndim=2)
+    if (
+        reflection.shape != los.shape
+        or diffraction.shape != los.shape
+        or transmission.shape != los.shape
+    ):
         raise ValueError("point component matrices must have matching shapes")
     exported = _required_native_op("bdpt_finalize_point_components")(
-        los, reflection, diffraction
+        los, reflection, diffraction, transmission
     )
     if not isinstance(exported, dict):
         raise TypeError(
@@ -1137,7 +1143,12 @@ def bdpt_finalize_point_components(
         raise ValueError(
             "_channel_native.bdpt_finalize_point_components returned bad path_gain shape"
         )
-    for name in ("los_power", "reflection_power", "diffraction_power"):
+    for name in (
+        "los_power",
+        "reflection_power",
+        "diffraction_power",
+        "transmission_power",
+    ):
         validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
     return exported
 
@@ -1417,14 +1428,20 @@ def bdpt_finalize_component_maps(
     los: torch.Tensor,
     reflection: torch.Tensor,
     diffraction: torch.Tensor,
+    transmission: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("diffraction", diffraction, dtype=torch.float32, ndim=3)
-    if reflection.shape != los.shape or diffraction.shape != los.shape:
+    validate_cuda_tensor("transmission", transmission, dtype=torch.float32, ndim=3)
+    if (
+        reflection.shape != los.shape
+        or diffraction.shape != los.shape
+        or transmission.shape != los.shape
+    ):
         raise ValueError("component maps must share shape")
     exported = _required_native_op("bdpt_finalize_component_maps")(
-        los, reflection, diffraction
+        los, reflection, diffraction, transmission
     )
     if not isinstance(exported, dict):
         raise TypeError(
@@ -1437,7 +1454,12 @@ def bdpt_finalize_component_maps(
         raise ValueError(
             "_channel_native.bdpt_finalize_component_maps returned bad path_gain shape"
         )
-    for name in ("los_power", "reflection_power", "diffraction_power"):
+    for name in (
+        "los_power",
+        "reflection_power",
+        "diffraction_power",
+        "transmission_power",
+    ):
         validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
     return exported
 
@@ -4615,21 +4637,27 @@ def mc_finalize_component_maps(
     los: torch.Tensor,
     reflection: torch.Tensor,
     diffraction: torch.Tensor,
+    transmission: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("diffraction", diffraction, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("transmission", transmission, dtype=torch.float32, ndim=3)
     if reflection.shape != los.shape:
         raise ValueError("reflection must match los shape")
     if diffraction.shape != los.shape:
         raise ValueError("diffraction must match los shape")
+    if transmission.shape != los.shape:
+        raise ValueError("transmission must match los shape")
 
     native = native_extension()
     if native is None or not hasattr(native, "mc_finalize_component_maps"):
         raise RuntimeError(
             "_channel_native.mc_finalize_component_maps CUDA kernel is required"
         )
-    exported = native.mc_finalize_component_maps(los, reflection, diffraction)
+    exported = native.mc_finalize_component_maps(
+        los, reflection, diffraction, transmission
+    )
     if not isinstance(exported, dict):
         raise TypeError("_channel_native.mc_finalize_component_maps must return a dict")
     return exported

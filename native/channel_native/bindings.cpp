@@ -143,7 +143,8 @@ torch::Tensor cn_bdpt_store_point_component_column(
 pybind11::dict cn_bdpt_finalize_point_components(
     torch::Tensor los,
     torch::Tensor reflection,
-    torch::Tensor diffraction);
+    torch::Tensor diffraction,
+    torch::Tensor transmission);
 pybind11::dict cn_bdpt_los_export(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
@@ -152,7 +153,8 @@ pybind11::dict cn_bdpt_los_export(
 pybind11::dict cn_bdpt_finalize_component_maps(
     torch::Tensor los,
     torch::Tensor reflection,
-    torch::Tensor diffraction);
+    torch::Tensor diffraction,
+    torch::Tensor transmission);
 torch::Tensor cn_bdpt_component_map_buffer(
     torch::Tensor reference,
     int64_t tx_count,
@@ -630,7 +632,8 @@ pybind11::dict cn_path_finalize_blocks(
 pybind11::dict cn_mc_finalize_component_maps(
     torch::Tensor los,
     torch::Tensor reflection,
-    torch::Tensor diffraction);
+    torch::Tensor diffraction,
+    torch::Tensor transmission);
 torch::Tensor cn_mc_component_map_buffer(
     torch::Tensor reference,
     int64_t tx_count,

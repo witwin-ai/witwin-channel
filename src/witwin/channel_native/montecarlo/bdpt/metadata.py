@@ -14,9 +14,9 @@ _KERNEL_ACCUMULATION = {
     "compact": "compact_atomic_add",
 }
 
-# BDPT per-path component_mask bit scheme (see subpaths.component_mask). The
-# transmission and scattering bits are accepted plumbing in v1: no path sets
-# them until the physics lands in later waves.
+# BDPT per-path component_mask bit scheme (see subpaths.component_mask).
+# Transmitted subpaths set bit 8 (delta specular transmission events); the
+# scattering bit is accepted plumbing until its wave lands.
 COMPONENT_MASK_LOS = 1
 COMPONENT_MASK_REFLECTION = 2
 COMPONENT_MASK_DIFFRACTION = 4
@@ -63,12 +63,15 @@ def component_status(
         if not diffraction_available:
             raise RuntimeError("BDPT diffraction requires RayDN native capability")
         status["diffraction"] = "enabled"
-    # transmission and scattering are accepted plumbing in v1: reported as
-    # requested-but-empty until the physics lands in later waves.
-    for name in ("transmission", "scattering"):
-        status[name] = (
-            "enabled_no_paths" if name in config.components else "not_requested"
-        )
+    # transmission carries real physics (straight endpoint chains plus the
+    # event-selected shooting sampler); scattering is accepted plumbing until
+    # its wave lands.
+    status["transmission"] = (
+        "enabled" if "transmission" in config.components else "not_requested"
+    )
+    status["scattering"] = (
+        "enabled_no_paths" if "scattering" in config.components else "not_requested"
+    )
     return status
 
 
@@ -142,6 +145,7 @@ def make_solver_metadata(
         "event_classification": {
             "endpoint": 0,
             "delta_specular_reflection": 1,
+            "delta_specular_transmission": 2,
         },
         "component_mask_bits": dict(_COMPONENT_MASK_BITS),
         "delta_strategy": "canonical_enumeration_unit_bidirectional_mass",
@@ -163,7 +167,7 @@ def make_solver_metadata(
                 "reflection": int(effective_max_depth) if "reflection" in config.components else -1,
                 "diffraction": min(1, int(effective_max_depth)) if "diffraction" in config.components else -1,
                 # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1. Zero paths until the physics lands.
+                # single-bounce in v1 and carries zero paths until its wave.
                 "transmission": int(effective_max_depth) if "transmission" in config.components else -1,
                 "scattering": min(1, int(effective_max_depth)) if "scattering" in config.components else -1,
             },

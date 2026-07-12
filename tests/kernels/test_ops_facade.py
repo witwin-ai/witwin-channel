@@ -1344,14 +1344,16 @@ def test_mc_finalize_component_maps_fuses_total_and_power_reductions():
     los = torch.tensor([[[1.0, 2.0], [3.0, 4.0]]], device="cuda", dtype=torch.float32)
     reflection = torch.tensor([[[0.5, 0.0], [1.5, 2.0]]], device="cuda", dtype=torch.float32)
     diffraction = torch.tensor([[[0.25, 0.75], [0.0, 1.0]]], device="cuda", dtype=torch.float32)
+    transmission = torch.tensor([[[0.1, 0.2], [0.3, 0.4]]], device="cuda", dtype=torch.float32)
 
-    result = ops.mc_finalize_component_maps(los, reflection, diffraction)
+    result = ops.mc_finalize_component_maps(los, reflection, diffraction, transmission)
 
-    expected_total = (los + reflection + diffraction).reshape(1, -1)
+    expected_total = (los + reflection + diffraction + transmission).reshape(1, -1)
     torch.testing.assert_close(result["path_gain"], expected_total)
     torch.testing.assert_close(result["los_power"], los.sum())
     torch.testing.assert_close(result["reflection_power"], reflection.sum())
     torch.testing.assert_close(result["diffraction_power"], diffraction.sum())
+    torch.testing.assert_close(result["transmission_power"], transmission.sum())
 
 
 def test_mc_finalize_component_maps_requires_native_cuda_kernel(monkeypatch):
@@ -1361,10 +1363,11 @@ def test_mc_finalize_component_maps_requires_native_cuda_kernel(monkeypatch):
     los = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
     reflection = torch.zeros_like(los)
     diffraction = torch.zeros_like(los)
+    transmission = torch.zeros_like(los)
     monkeypatch.setattr(ops, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_finalize_component_maps CUDA kernel is required"):
-        ops.mc_finalize_component_maps(los, reflection, diffraction)
+        ops.mc_finalize_component_maps(los, reflection, diffraction, transmission)
 
 
 def test_mc_component_map_buffer_and_store_kernels_write_tx_slots():

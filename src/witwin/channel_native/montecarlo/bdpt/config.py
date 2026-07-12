@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-# Public component set. transmission and scattering are accepted plumbing in v1:
-# they validate and emit zero component maps until the physics lands in later
-# waves. Both are surface events that require at least one bounce
-# (max_depth >= 1); transmission chains count wall penetrations, scattering is
-# single-bounce in v1. component_mask bits: 1=los, 2=reflection, 4=diffraction,
-# 8=transmission, 16=scattering.
+# Public component set. transmission runs straight endpoint chains plus the
+# event-selected shooting sampler for mixed chains; scattering is accepted
+# plumbing that emits zero maps until its wave lands. Both are surface events
+# that require at least one bounce (max_depth >= 1); transmission chains count
+# wall penetrations, scattering is single-bounce in v1. component_mask bits:
+# 1=los, 2=reflection, 4=diffraction, 8=transmission, 16=scattering.
 _VALID_COMPONENTS = frozenset(
     {"los", "reflection", "diffraction", "transmission", "scattering"}
 )
