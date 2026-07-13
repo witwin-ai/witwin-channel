@@ -2226,6 +2226,954 @@ def raydn_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...
     return tuple(out)
 
 
+# ---------------------------------------------------------------------------
+# RayDN differentiable geometry (AD-A0).
+#
+# These entry points expose RayD's fixed-winner differentiable geometry
+# kernels across the source-linked C bridge (no rayd.torch import, no torch
+# dispatcher). Discrete winner records (prim ids, barycentrics, hit points,
+# normals) are detached tape constants; gradients flow only through the
+# continuous outputs (t, p, n, image sources, EPC field, path length) with
+# respect to mesh vertices, ray origin/direction, and EPC source/receiver.
+# They are opt-in AD entry points: no public solver calls them and the
+# ad_mode="none" forward paths are untouched.
+# ---------------------------------------------------------------------------
+
+_RAYDN_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
+
+
+def _ad_native_tensor(value: torch.Tensor | None) -> torch.Tensor | None:
+    if value is None:
+        return None
+    value = torch.autograd.forward_ad.unpack_dual(value).primal
+    if torch._C._functorch.is_functorch_wrapped_tensor(
+        value
+    ) or torch._C._functorch.is_gradtrackingtensor(value):
+        value = torch._C._functorch.get_unwrapped(value)
+    return value
+
+
+def _ad_native_tangent_or_none(value: torch.Tensor | None) -> torch.Tensor | None:
+    value = _ad_native_tensor(value)
+    if value is None:
+        return None
+    try:
+        value.data_ptr()
+    except RuntimeError:
+        return None
+    return value
+
+
+def _ad_active_ctx(active: torch.Tensor | None, like: torch.Tensor) -> torch.Tensor:
+    if active is not None:
+        return active
+    return torch.empty((0,), device=like.device, dtype=torch.bool)
+
+
+def raydn_intersect_backward(
+    handle: object,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    ray_tmax: torch.Tensor,
+    active: torch.Tensor | None,
+    tape_prim_id: torch.Tensor,
+    tape_barycentric: torch.Tensor,
+    *,
+    grad_t: torch.Tensor | None = None,
+    grad_p: torch.Tensor | None = None,
+    grad_n: torch.Tensor | None = None,
+    grad_geo_n: torch.Tensor | None = None,
+    grad_uv: torch.Tensor | None = None,
+    grad_barycentric: torch.Tensor | None = None,
+    need_grad_vertices: bool = False,
+    need_grad_ray_o: bool = False,
+    need_grad_ray_d: bool = False,
+    need_grad_ray_tmax: bool = False,
+) -> tuple[torch.Tensor | None, ...]:
+    validate_cuda_tensor(
+        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("ray_tmax", ray_tmax, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor(
+        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
+    )
+    out = _required_native_op("raydn_intersect_backward")(
+        _raydn_scene_handle_id(handle),
+        ray_o,
+        ray_d,
+        ray_tmax,
+        active,
+        tape_prim_id,
+        tape_barycentric,
+        grad_t,
+        grad_p,
+        grad_n,
+        grad_geo_n,
+        grad_uv,
+        grad_barycentric,
+        bool(need_grad_vertices),
+        bool(need_grad_ray_o),
+        bool(need_grad_ray_d),
+        bool(need_grad_ray_tmax),
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 4:
+        raise TypeError(
+            "_channel_native.raydn_intersect_backward must return 4 gradients"
+        )
+    return tuple(out)
+
+
+def raydn_intersect_jvp(
+    handle: object,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    active: torch.Tensor | None,
+    tape_prim_id: torch.Tensor,
+    tape_barycentric: torch.Tensor,
+    *,
+    tangent_vertices: torch.Tensor | None = None,
+    tangent_ray_o: torch.Tensor | None = None,
+    tangent_ray_d: torch.Tensor | None = None,
+    flags: int = _RAYDN_RAY_FLAGS_ALL,
+) -> tuple[torch.Tensor, ...]:
+    validate_cuda_tensor(
+        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor(
+        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
+    )
+    out = _required_native_op("raydn_intersect_jvp")(
+        _raydn_scene_handle_id(handle),
+        ray_o,
+        ray_d,
+        active,
+        tape_prim_id,
+        tape_barycentric,
+        tangent_vertices,
+        tangent_ray_o,
+        tangent_ray_d,
+        int(flags),
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 6:
+        raise TypeError("_channel_native.raydn_intersect_jvp must return 6 tangents")
+    return tuple(out)
+
+
+def raydn_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, ...]:
+    if not args:
+        raise TypeError(
+            "raydn_trace_reflections_forward_tape requires a RayDN scene handle"
+        )
+    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    out = _required_native_op("raydn_trace_reflections_forward_tape")(
+        *native_args,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 9:
+        raise TypeError(
+            "_channel_native.raydn_trace_reflections_forward_tape must return 9 tensors"
+        )
+    return tuple(out)
+
+
+def raydn_trace_reflections_backward(
+    handle: object,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    ray_tmax: torch.Tensor,
+    active: torch.Tensor | None,
+    tape_prim_id: torch.Tensor,
+    tape_barycentric: torch.Tensor,
+    tape_hit_points: torch.Tensor,
+    tape_normals: torch.Tensor,
+    image_sources: torch.Tensor,
+    *,
+    grad_t: torch.Tensor | None = None,
+    grad_image_sources: torch.Tensor | None = None,
+) -> tuple[torch.Tensor | None, ...]:
+    validate_cuda_tensor(
+        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor(
+        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=3
+    )
+    validate_cuda_tensor(
+        "tape_hit_points",
+        tape_hit_points,
+        dtype=torch.float32,
+        ndim=3,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor(
+        "tape_normals", tape_normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "image_sources",
+        image_sources,
+        dtype=torch.float32,
+        ndim=3,
+        trailing_shape=(3,),
+    )
+    out = _required_native_op("raydn_trace_reflections_backward")(
+        _raydn_scene_handle_id(handle),
+        ray_o,
+        ray_d,
+        ray_tmax,
+        active,
+        tape_prim_id,
+        tape_barycentric,
+        tape_hit_points,
+        tape_normals,
+        image_sources,
+        grad_t,
+        grad_image_sources,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 4:
+        raise TypeError(
+            "_channel_native.raydn_trace_reflections_backward must return 4 gradients"
+        )
+    return tuple(out)
+
+
+def raydn_trace_reflections_jvp(
+    handle: object,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    active: torch.Tensor | None,
+    tape_prim_id: torch.Tensor,
+    tape_barycentric: torch.Tensor,
+    tape_hit_points: torch.Tensor,
+    tape_normals: torch.Tensor,
+    image_sources: torch.Tensor,
+    *,
+    tangent_vertices: torch.Tensor | None = None,
+    tangent_ray_o: torch.Tensor | None = None,
+    tangent_ray_d: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, ...]:
+    validate_cuda_tensor(
+        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor(
+        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=3
+    )
+    out = _required_native_op("raydn_trace_reflections_jvp")(
+        _raydn_scene_handle_id(handle),
+        ray_o,
+        ray_d,
+        active,
+        tape_prim_id,
+        tape_barycentric,
+        tape_hit_points,
+        tape_normals,
+        tangent_vertices,
+        tangent_ray_o,
+        tangent_ray_d,
+        image_sources,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 2:
+        raise TypeError(
+            "_channel_native.raydn_trace_reflections_jvp must return 2 tangents"
+        )
+    return tuple(out)
+
+
+def raydn_refl_epc_field_forward(
+    handle: object,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    active: torch.Tensor | None,
+    max_bounces: int,
+) -> tuple[torch.Tensor, ...]:
+    validate_cuda_tensor(
+        "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "receiver", receiver, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    out = _required_native_op("raydn_refl_epc_field_forward")(
+        _raydn_scene_handle_id(handle),
+        source,
+        receiver,
+        active,
+        int(max_bounces),
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 8:
+        raise TypeError(
+            "_channel_native.raydn_refl_epc_field_forward must return 8 tensors"
+        )
+    return tuple(out)
+
+
+def raydn_refl_epc_backward(
+    handle: object,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    active: torch.Tensor | None,
+    tape_prim_id: torch.Tensor,
+    tape_barycentric: torch.Tensor,
+    tape_t: torch.Tensor,
+    *,
+    grad_field_real: torch.Tensor | None = None,
+    grad_field_imag: torch.Tensor | None = None,
+    grad_path_length: torch.Tensor | None = None,
+    need_grad_vertices: bool = False,
+    need_grad_source: bool = False,
+    need_grad_receiver: bool = False,
+) -> tuple[torch.Tensor | None, ...]:
+    validate_cuda_tensor(
+        "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "receiver", receiver, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor(
+        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
+    )
+    validate_cuda_tensor("tape_t", tape_t, dtype=torch.float32, ndim=1)
+    out = _required_native_op("raydn_refl_epc_backward")(
+        _raydn_scene_handle_id(handle),
+        source,
+        receiver,
+        active,
+        tape_prim_id,
+        tape_barycentric,
+        tape_t,
+        grad_field_real,
+        grad_field_imag,
+        grad_path_length,
+        bool(need_grad_vertices),
+        bool(need_grad_source),
+        bool(need_grad_receiver),
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 3:
+        raise TypeError(
+            "_channel_native.raydn_refl_epc_backward must return 3 gradients"
+        )
+    return tuple(out)
+
+
+def raydn_refl_epc_jvp(
+    handle: object,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    active: torch.Tensor | None,
+    tape_prim_id: torch.Tensor,
+    tape_barycentric: torch.Tensor,
+    tape_t: torch.Tensor,
+    *,
+    tangent_vertices: torch.Tensor | None = None,
+    tangent_source: torch.Tensor | None = None,
+    tangent_receiver: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, ...]:
+    validate_cuda_tensor(
+        "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "receiver", receiver, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor(
+        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
+    )
+    validate_cuda_tensor("tape_t", tape_t, dtype=torch.float32, ndim=1)
+    out = _required_native_op("raydn_refl_epc_jvp")(
+        _raydn_scene_handle_id(handle),
+        source,
+        receiver,
+        active,
+        tape_prim_id,
+        tape_barycentric,
+        tape_t,
+        tangent_vertices,
+        tangent_source,
+        tangent_receiver,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 3:
+        raise TypeError("_channel_native.raydn_refl_epc_jvp must return 3 tangents")
+    return tuple(out)
+
+
+class _RaydnIntersectAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayDN intersect over the C bridge.
+
+    Inputs: (scene_handle, vertices, ray_o, ray_d, ray_tmax, active).
+    ``vertices`` must be the scene's global vertex table (single-structure
+    scenes in AD-A0); the forward reads geometry from the native scene and
+    the tensor only routes vertex gradients/tangents.
+    """
+
+    @staticmethod
+    def forward(scene_handle, vertices, ray_o, ray_d, ray_tmax, active):
+        out = _required_native_op("bdpt_intersect_forward")(
+            int(scene_handle),
+            ray_o,
+            ray_d,
+            ray_tmax,
+            active,
+            _RAYDN_RAY_FLAGS_ALL,
+            _raydn_module_handle(),
+        )
+        return tuple(out)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        scene_handle, vertices, ray_o, ray_d, ray_tmax, active = inputs
+        barycentric = output[5]
+        shape_id, prim_id, local_prim_id, global_prim_id = output[6:10]
+        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
+        ray_o = torch.autograd.forward_ad.unpack_dual(ray_o).primal
+        ray_d = torch.autograd.forward_ad.unpack_dual(ray_d).primal
+        ray_tmax = torch.autograd.forward_ad.unpack_dual(ray_tmax).primal
+        active_ctx = _ad_active_ctx(active, ray_o)
+        ctx.scene = int(scene_handle)
+        ctx.vertices_shape = tuple(vertices.shape)
+        ctx.save_for_backward(
+            ray_o, ray_d, ray_tmax, active_ctx, global_prim_id, barycentric
+        )
+        ctx.save_for_forward(ray_o, ray_d, active_ctx, global_prim_id, barycentric)
+        ctx.mark_non_differentiable(shape_id, prim_id, local_prim_id, global_prim_id)
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        none_grads = (None, None, None, None, None, None)
+        if all(value is None for value in grad_outputs[:6]):
+            return none_grads
+        (
+            ray_o,
+            ray_d,
+            ray_tmax,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+        ) = ctx.saved_tensors
+        need_grad_vertices = bool(ctx.needs_input_grad[1])
+        need_grad_ray_o = bool(ctx.needs_input_grad[2])
+        need_grad_ray_d = bool(ctx.needs_input_grad[3])
+        need_grad_ray_tmax = bool(ctx.needs_input_grad[4])
+        if not (
+            need_grad_vertices
+            or need_grad_ray_o
+            or need_grad_ray_d
+            or need_grad_ray_tmax
+        ):
+            return none_grads
+        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = (
+            raydn_intersect_backward(
+                ctx.scene,
+                ray_o,
+                ray_d,
+                ray_tmax,
+                active_ctx,
+                tape_prim_id,
+                tape_barycentric,
+                grad_t=grad_outputs[0],
+                grad_p=grad_outputs[1],
+                grad_n=grad_outputs[2],
+                grad_geo_n=grad_outputs[3],
+                grad_uv=grad_outputs[4],
+                grad_barycentric=grad_outputs[5],
+                need_grad_vertices=need_grad_vertices,
+                need_grad_ray_o=need_grad_ray_o,
+                need_grad_ray_d=need_grad_ray_d,
+                need_grad_ray_tmax=need_grad_ray_tmax,
+            )
+        )
+        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
+            raise RuntimeError(
+                "raydn_intersect_ad vertices must be the scene global vertex table"
+            )
+        return (
+            None,
+            grad_vertices if need_grad_vertices else None,
+            grad_ray_o if need_grad_ray_o else None,
+            grad_ray_d if need_grad_ray_d else None,
+            grad_ray_tmax if need_grad_ray_tmax else None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active):
+        ray_o, ray_d, active_ctx, tape_prim_id, tape_barycentric = ctx.saved_tensors
+        with torch._C._DisableFuncTorch():
+            values = raydn_intersect_jvp(
+                ctx.scene,
+                _ad_native_tensor(ray_o),
+                _ad_native_tensor(ray_d),
+                _ad_native_tensor(active_ctx),
+                _ad_native_tensor(tape_prim_id),
+                _ad_native_tensor(tape_barycentric),
+                tangent_vertices=_ad_native_tangent_or_none(grad_vertices),
+                tangent_ray_o=_ad_native_tangent_or_none(grad_ray_o),
+                tangent_ray_d=_ad_native_tangent_or_none(grad_ray_d),
+                flags=_RAYDN_RAY_FLAGS_ALL,
+            )
+        return (*values, None, None, None, None)
+
+
+def raydn_intersect_ad(
+    handle: object,
+    vertices: torch.Tensor,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    ray_tmax: torch.Tensor,
+    active: torch.Tensor | None = None,
+) -> dict[str, torch.Tensor]:
+    """Differentiable RayDN intersect under the fixed-winner contract.
+
+    Returns the same fields as :func:`bdpt_intersect_forward`; ``t``/``p``/
+    ``n``/``geo_n``/``uv``/``barycentric`` participate in reverse- and
+    forward-mode torch AD with respect to ``vertices``, ``ray_o`` and
+    ``ray_d``. Winner ids stay detached.
+    """
+
+    values = _RaydnIntersectAdFunction.apply(
+        _raydn_scene_handle_id(handle), vertices, ray_o, ray_d, ray_tmax, active
+    )
+    return dict(zip(_BDPT_INTERSECTION_FIELDS, values, strict=True))
+
+
+class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayDN reflection chain over the C bridge."""
+
+    @staticmethod
+    def forward(scene_handle, vertices, ray_o, ray_d, ray_tmax, active, max_bounces):
+        out = _required_native_op("raydn_trace_reflections_forward_tape")(
+            int(scene_handle),
+            ray_o,
+            ray_d,
+            ray_tmax,
+            active,
+            int(max_bounces),
+            _raydn_module_handle(),
+        )
+        (
+            valid,
+            t,
+            image_sources,
+            prim_ids,
+            _tape_prim_id,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+            _active_ctx,
+        ) = out
+        return (
+            valid,
+            t,
+            image_sources,
+            prim_ids,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+        )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        scene_handle, vertices, ray_o, ray_d, ray_tmax, active, _max_bounces = inputs
+        (
+            valid,
+            _t,
+            image_sources,
+            prim_ids,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+        ) = output
+        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
+        ray_o = torch.autograd.forward_ad.unpack_dual(ray_o).primal
+        ray_d = torch.autograd.forward_ad.unpack_dual(ray_d).primal
+        ray_tmax = torch.autograd.forward_ad.unpack_dual(ray_tmax).primal
+        active_ctx = _ad_active_ctx(active, ray_o)
+        ctx.scene = int(scene_handle)
+        ctx.vertices_shape = tuple(vertices.shape)
+        ctx.save_for_backward(
+            ray_o,
+            ray_d,
+            ray_tmax,
+            active_ctx,
+            prim_ids,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+            image_sources,
+        )
+        ctx.save_for_forward(
+            ray_o,
+            ray_d,
+            active_ctx,
+            prim_ids,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+            image_sources,
+        )
+        ctx.mark_non_differentiable(
+            valid, prim_ids, tape_barycentric, tape_hit_points, tape_normals
+        )
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        none_grads = (None, None, None, None, None, None, None)
+        grad_t = grad_outputs[1]
+        grad_image_sources = grad_outputs[2]
+        if grad_t is None and grad_image_sources is None:
+            return none_grads
+        (
+            ray_o,
+            ray_d,
+            ray_tmax,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+            image_sources,
+        ) = ctx.saved_tensors
+        need_grad_vertices = bool(ctx.needs_input_grad[1])
+        need_grad_ray_o = bool(ctx.needs_input_grad[2])
+        need_grad_ray_d = bool(ctx.needs_input_grad[3])
+        need_grad_ray_tmax = bool(ctx.needs_input_grad[4])
+        if not (
+            need_grad_vertices
+            or need_grad_ray_o
+            or need_grad_ray_d
+            or need_grad_ray_tmax
+        ):
+            return none_grads
+        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = (
+            raydn_trace_reflections_backward(
+                ctx.scene,
+                ray_o,
+                ray_d,
+                ray_tmax,
+                active_ctx,
+                tape_prim_id,
+                tape_barycentric,
+                tape_hit_points,
+                tape_normals,
+                image_sources,
+                grad_t=grad_t,
+                grad_image_sources=grad_image_sources,
+            )
+        )
+        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
+            raise RuntimeError(
+                "raydn_trace_reflections_ad vertices must be the scene global"
+                " vertex table"
+            )
+        return (
+            None,
+            grad_vertices if need_grad_vertices else None,
+            grad_ray_o if need_grad_ray_o else None,
+            grad_ray_d if need_grad_ray_d else None,
+            grad_ray_tmax if need_grad_ray_tmax else None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        _grad_handle,
+        grad_vertices,
+        grad_ray_o,
+        grad_ray_d,
+        _grad_tmax,
+        _grad_active,
+        _grad_max_bounces,
+    ):
+        (
+            ray_o,
+            ray_d,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+            tape_hit_points,
+            tape_normals,
+            image_sources,
+        ) = ctx.saved_tensors
+        with torch._C._DisableFuncTorch():
+            tangent_t, tangent_image_sources = raydn_trace_reflections_jvp(
+                ctx.scene,
+                _ad_native_tensor(ray_o),
+                _ad_native_tensor(ray_d),
+                _ad_native_tensor(active_ctx),
+                _ad_native_tensor(tape_prim_id),
+                _ad_native_tensor(tape_barycentric),
+                _ad_native_tensor(tape_hit_points),
+                _ad_native_tensor(tape_normals),
+                _ad_native_tensor(image_sources),
+                tangent_vertices=_ad_native_tangent_or_none(grad_vertices),
+                tangent_ray_o=_ad_native_tangent_or_none(grad_ray_o),
+                tangent_ray_d=_ad_native_tangent_or_none(grad_ray_d),
+            )
+        return (None, tangent_t, tangent_image_sources, None, None, None, None)
+
+
+_RAYDN_TRACE_REFLECTIONS_AD_FIELDS = (
+    "valid",
+    "t",
+    "image_sources",
+    "prim_ids",
+    "tape_barycentric",
+    "tape_hit_points",
+    "tape_normals",
+)
+
+
+def raydn_trace_reflections_ad(
+    handle: object,
+    vertices: torch.Tensor,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    ray_tmax: torch.Tensor,
+    active: torch.Tensor | None,
+    max_bounces: int,
+) -> dict[str, torch.Tensor]:
+    """Differentiable RayDN reflection chain under the fixed-winner contract.
+
+    ``t`` and ``image_sources`` participate in reverse- and forward-mode
+    torch AD with respect to ``vertices``, ``ray_o`` and ``ray_d``; the
+    reflection chain (prim ids and tape tensors) stays detached.
+    """
+
+    values = _RaydnTraceReflectionsAdFunction.apply(
+        _raydn_scene_handle_id(handle),
+        vertices,
+        ray_o,
+        ray_d,
+        ray_tmax,
+        active,
+        int(max_bounces),
+    )
+    return dict(zip(_RAYDN_TRACE_REFLECTIONS_AD_FIELDS, values, strict=True))
+
+
+class _RaydnReflEpcFieldAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayDN reflection EPC field over the C bridge."""
+
+    @staticmethod
+    def forward(scene_handle, vertices, source, receiver, active, max_bounces):
+        out = _required_native_op("raydn_refl_epc_field_forward")(
+            int(scene_handle),
+            source,
+            receiver,
+            active,
+            int(max_bounces),
+            _raydn_module_handle(),
+        )
+        (
+            field_real,
+            field_imag,
+            path_length,
+            valid,
+            resolved_prim_id,
+            tape_prim_id,
+            tape_barycentric,
+            _active_ctx,
+        ) = out
+        return (
+            field_real,
+            field_imag,
+            path_length,
+            valid,
+            resolved_prim_id,
+            tape_prim_id,
+            tape_barycentric,
+        )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        scene_handle, vertices, source, receiver, active, _max_bounces = inputs
+        (
+            _field_real,
+            _field_imag,
+            path_length,
+            valid,
+            resolved_prim_id,
+            tape_prim_id,
+            tape_barycentric,
+        ) = output
+        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
+        source = torch.autograd.forward_ad.unpack_dual(source).primal
+        receiver = torch.autograd.forward_ad.unpack_dual(receiver).primal
+        active_ctx = _ad_active_ctx(active, source)
+        ctx.scene = int(scene_handle)
+        ctx.vertices_shape = tuple(vertices.shape)
+        # path_length doubles as tape_t: the EPC backward/jvp kernels
+        # recompute the winner reflection from it (RayD contract).
+        ctx.save_for_backward(
+            source, receiver, active_ctx, tape_prim_id, tape_barycentric, path_length
+        )
+        ctx.save_for_forward(
+            source, receiver, active_ctx, tape_prim_id, tape_barycentric, path_length
+        )
+        ctx.mark_non_differentiable(
+            valid, resolved_prim_id, tape_prim_id, tape_barycentric
+        )
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        none_grads = (None, None, None, None, None, None)
+        grad_field_real = grad_outputs[0]
+        grad_field_imag = grad_outputs[1]
+        grad_path_length = grad_outputs[2]
+        if (
+            grad_field_real is None
+            and grad_field_imag is None
+            and grad_path_length is None
+        ):
+            return none_grads
+        (
+            source,
+            receiver,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+            tape_t,
+        ) = ctx.saved_tensors
+        need_grad_vertices = bool(ctx.needs_input_grad[1])
+        need_grad_source = bool(ctx.needs_input_grad[2])
+        need_grad_receiver = bool(ctx.needs_input_grad[3])
+        if not (need_grad_vertices or need_grad_source or need_grad_receiver):
+            return none_grads
+        grad_vertices, grad_source, grad_receiver = raydn_refl_epc_backward(
+            ctx.scene,
+            source,
+            receiver,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+            tape_t,
+            grad_field_real=grad_field_real,
+            grad_field_imag=grad_field_imag,
+            grad_path_length=grad_path_length,
+            need_grad_vertices=need_grad_vertices,
+            need_grad_source=need_grad_source,
+            need_grad_receiver=need_grad_receiver,
+        )
+        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
+            raise RuntimeError(
+                "raydn_refl_epc_field_ad vertices must be the scene global"
+                " vertex table"
+            )
+        return (
+            None,
+            grad_vertices if need_grad_vertices else None,
+            grad_source if need_grad_source else None,
+            grad_receiver if need_grad_receiver else None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        _grad_handle,
+        grad_vertices,
+        grad_source,
+        grad_receiver,
+        _grad_active,
+        _grad_max_bounces,
+    ):
+        (
+            source,
+            receiver,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+            tape_t,
+        ) = ctx.saved_tensors
+        with torch._C._DisableFuncTorch():
+            tangents = raydn_refl_epc_jvp(
+                ctx.scene,
+                _ad_native_tensor(source),
+                _ad_native_tensor(receiver),
+                _ad_native_tensor(active_ctx),
+                _ad_native_tensor(tape_prim_id),
+                _ad_native_tensor(tape_barycentric),
+                _ad_native_tensor(tape_t),
+                tangent_vertices=_ad_native_tangent_or_none(grad_vertices),
+                tangent_source=_ad_native_tangent_or_none(grad_source),
+                tangent_receiver=_ad_native_tangent_or_none(grad_receiver),
+            )
+        tangent_field_real, tangent_field_imag, tangent_path_length = tangents
+        return (
+            tangent_field_real,
+            tangent_field_imag,
+            tangent_path_length,
+            None,
+            None,
+            None,
+            None,
+        )
+
+
+_RAYDN_REFL_EPC_FIELD_AD_FIELDS = (
+    "field_real",
+    "field_imag",
+    "path_length",
+    "valid",
+    "resolved_prim_id",
+    "tape_prim_id",
+    "tape_barycentric",
+)
+
+
+def raydn_refl_epc_field_ad(
+    handle: object,
+    vertices: torch.Tensor,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    active: torch.Tensor | None,
+    max_bounces: int,
+) -> dict[str, torch.Tensor]:
+    """Differentiable RayDN reflection EPC field under the fixed-winner contract.
+
+    ``field_real``/``field_imag``/``path_length`` participate in reverse- and
+    forward-mode torch AD with respect to ``vertices``, ``source`` and
+    ``receiver``; the winner primitive and barycentric tape stay detached.
+    The field uses RayD's unit-wavelength EPC convention.
+    """
+
+    values = _RaydnReflEpcFieldAdFunction.apply(
+        _raydn_scene_handle_id(handle),
+        vertices,
+        source,
+        receiver,
+        active,
+        int(max_bounces),
+    )
+    return dict(zip(_RAYDN_REFL_EPC_FIELD_AD_FIELDS, values, strict=True))
+
+
 def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
 

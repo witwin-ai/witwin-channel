@@ -256,6 +256,107 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     int64_t max_bounces,
     int64_t visibility_ignore_mode,
     std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_intersect_backward(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    pybind11::object grad_t,
+    pybind11::object grad_p,
+    pybind11::object grad_n,
+    pybind11::object grad_geo_n,
+    pybind11::object grad_uv,
+    pybind11::object grad_barycentric,
+    bool need_grad_vertices,
+    bool need_grad_ray_o,
+    bool need_grad_ray_d,
+    bool need_grad_ray_tmax,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_intersect_jvp(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_ray_o,
+    pybind11::object tangent_ray_d,
+    int64_t flags,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_trace_reflections_forward_tape(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    int64_t max_bounces,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_trace_reflections_backward(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_hit_points,
+    torch::Tensor tape_normals,
+    torch::Tensor image_sources,
+    pybind11::object grad_t,
+    pybind11::object grad_image_sources,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_trace_reflections_jvp(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_hit_points,
+    torch::Tensor tape_normals,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_ray_o,
+    pybind11::object tangent_ray_d,
+    torch::Tensor image_sources,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_refl_epc_field_forward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    pybind11::object active,
+    int64_t max_bounces,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_refl_epc_backward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_t,
+    pybind11::object grad_field_real,
+    pybind11::object grad_field_imag,
+    pybind11::object grad_path_length,
+    bool need_grad_vertices,
+    bool need_grad_source,
+    bool need_grad_receiver,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_refl_epc_jvp(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_t,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_source,
+    pybind11::object tangent_receiver,
+    std::uintptr_t raydn_module_handle);
 pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     int64_t scene_handle,
     torch::Tensor source,
@@ -1146,6 +1247,38 @@ PYBIND11_MODULE(_channel_native, module) {
         "raydn_reflection_epc_paths_forward",
         &cn_raydn_reflection_epc_paths_forward,
         "Call RayDN reflection EPC path export through the native C bridge.");
+    module.def(
+        "raydn_intersect_backward",
+        &cn_raydn_intersect_backward,
+        "Call the RayDN fixed-winner intersect VJP through the native C bridge.");
+    module.def(
+        "raydn_intersect_jvp",
+        &cn_raydn_intersect_jvp,
+        "Call the RayDN fixed-winner intersect JVP through the native C bridge.");
+    module.def(
+        "raydn_trace_reflections_forward_tape",
+        &cn_raydn_trace_reflections_forward_tape,
+        "Call RayDN tape-emitting reflection chain tracing through the native C bridge.");
+    module.def(
+        "raydn_trace_reflections_backward",
+        &cn_raydn_trace_reflections_backward,
+        "Call the RayDN fixed-winner reflection chain VJP through the native C bridge.");
+    module.def(
+        "raydn_trace_reflections_jvp",
+        &cn_raydn_trace_reflections_jvp,
+        "Call the RayDN fixed-winner reflection chain JVP through the native C bridge.");
+    module.def(
+        "raydn_refl_epc_field_forward",
+        &cn_raydn_refl_epc_field_forward,
+        "Call the RayDN tape-emitting reflection EPC field forward through the native C bridge.");
+    module.def(
+        "raydn_refl_epc_backward",
+        &cn_raydn_refl_epc_backward,
+        "Call the RayDN fixed-winner reflection EPC VJP through the native C bridge.");
+    module.def(
+        "raydn_refl_epc_jvp",
+        &cn_raydn_refl_epc_jvp,
+        "Call the RayDN fixed-winner reflection EPC JVP through the native C bridge.");
     module.def(
         "raydn_coupled_rd_geometry_forward",
         &cn_raydn_coupled_rd_geometry_forward,

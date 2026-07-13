@@ -88,6 +88,113 @@ using ReflectionEpcPathsForwardFn = int64_t (*)(
     at::Tensor *,
     int64_t);
 
+using IntersectBackwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    bool,
+    bool,
+    bool,
+    bool,
+    at::Tensor *,
+    int64_t);
+
+using IntersectJvpFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    int64_t,
+    at::Tensor *,
+    int64_t);
+
+using TraceReflectionsBackwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    at::Tensor *,
+    int64_t);
+
+using TraceReflectionsJvpFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    at::Tensor *,
+    int64_t);
+
+using ReflEpcFieldForwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    int64_t,
+    at::Tensor *,
+    int64_t);
+
+using ReflEpcBackwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    bool,
+    bool,
+    bool,
+    at::Tensor *,
+    int64_t);
+
+using ReflEpcJvpFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    at::Tensor *,
+    int64_t);
+
 using ReflectionAccumulationForwardFn = int64_t (*)(
     int64_t,
     const at::Tensor *,
@@ -286,6 +393,46 @@ ReflectionAccumulationForwardFn raydn_reflection_accumulation_forward_fn(std::ui
     return &rayd_torch_native_reflection_accumulation_forward;
 }
 
+IntersectBackwardFn raydn_intersect_backward_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_intersect_backward;
+}
+
+IntersectJvpFn raydn_intersect_jvp_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_intersect_jvp;
+}
+
+TraceReflectionsForwardFn raydn_trace_reflections_forward_tape_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_trace_reflections_forward_tape;
+}
+
+TraceReflectionsBackwardFn raydn_trace_reflections_backward_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_trace_reflections_backward;
+}
+
+TraceReflectionsJvpFn raydn_trace_reflections_jvp_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_trace_reflections_jvp;
+}
+
+ReflEpcFieldForwardFn raydn_refl_epc_field_forward_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_trace_refl_epc_field_forward;
+}
+
+ReflEpcBackwardFn raydn_refl_epc_backward_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_refl_epc_backward;
+}
+
+ReflEpcJvpFn raydn_refl_epc_jvp_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_refl_epc_jvp;
+}
+
 DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn(std::uintptr_t module_handle) {
     (void) module_handle;
     return &channel_native_diffraction_discover_edges;
@@ -313,6 +460,12 @@ const at::Tensor *optional_tensor(pybind11::object value, at::Tensor &storage) {
     if (!storage.defined())
         return nullptr;
     return &storage;
+}
+
+pybind11::object tensor_or_none(const at::Tensor &tensor) {
+    if (!tensor.defined())
+        return pybind11::none();
+    return pybind11::cast(tensor);
 }
 
 struct RaydnSceneOwner {
@@ -574,6 +727,366 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
         kOutputCount);
     if (output_count < 0 || output_count > kOutputCount)
         throw std::runtime_error("RayDN reflection EPC path export returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
+    return result;
+}
+
+pybind11::tuple cn_raydn_intersect_backward(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    pybind11::object grad_t,
+    pybind11::object grad_p,
+    pybind11::object grad_n,
+    pybind11::object grad_geo_n,
+    pybind11::object grad_uv,
+    pybind11::object grad_barycentric,
+    bool need_grad_vertices,
+    bool need_grad_ray_o,
+    bool need_grad_ray_d,
+    bool need_grad_ray_tmax,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    at::Tensor grad_t_storage;
+    at::Tensor grad_p_storage;
+    at::Tensor grad_n_storage;
+    at::Tensor grad_geo_n_storage;
+    at::Tensor grad_uv_storage;
+    at::Tensor grad_barycentric_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    const at::Tensor *grad_t_ptr = optional_tensor(std::move(grad_t), grad_t_storage);
+    const at::Tensor *grad_p_ptr = optional_tensor(std::move(grad_p), grad_p_storage);
+    const at::Tensor *grad_n_ptr = optional_tensor(std::move(grad_n), grad_n_storage);
+    const at::Tensor *grad_geo_n_ptr = optional_tensor(std::move(grad_geo_n), grad_geo_n_storage);
+    const at::Tensor *grad_uv_ptr = optional_tensor(std::move(grad_uv), grad_uv_storage);
+    const at::Tensor *grad_barycentric_ptr =
+        optional_tensor(std::move(grad_barycentric), grad_barycentric_storage);
+    constexpr int64_t kOutputCount = 4;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_intersect_backward_fn(raydn_module_handle)(
+        scene_handle,
+        &ray_o,
+        &ray_d,
+        &ray_tmax,
+        active_ptr,
+        &tape_prim_id,
+        &tape_barycentric,
+        grad_t_ptr,
+        grad_p_ptr,
+        grad_n_ptr,
+        grad_geo_n_ptr,
+        grad_uv_ptr,
+        grad_barycentric_ptr,
+        need_grad_vertices,
+        need_grad_ray_o,
+        need_grad_ray_d,
+        need_grad_ray_tmax,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN intersect backward returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
+    return result;
+}
+
+pybind11::tuple cn_raydn_intersect_jvp(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_ray_o,
+    pybind11::object tangent_ray_d,
+    int64_t flags,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    at::Tensor tangent_vertices_storage;
+    at::Tensor tangent_ray_o_storage;
+    at::Tensor tangent_ray_d_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    const at::Tensor *tangent_vertices_ptr =
+        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
+    const at::Tensor *tangent_ray_o_ptr =
+        optional_tensor(std::move(tangent_ray_o), tangent_ray_o_storage);
+    const at::Tensor *tangent_ray_d_ptr =
+        optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
+    constexpr int64_t kOutputCount = 6;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_intersect_jvp_fn(raydn_module_handle)(
+        scene_handle,
+        &ray_o,
+        &ray_d,
+        active_ptr,
+        &tape_prim_id,
+        &tape_barycentric,
+        tangent_vertices_ptr,
+        tangent_ray_o_ptr,
+        tangent_ray_d_ptr,
+        flags,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN intersect jvp returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
+    return result;
+}
+
+pybind11::tuple cn_raydn_trace_reflections_forward_tape(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    int64_t max_bounces,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    constexpr int64_t kOutputCount = 9;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_trace_reflections_forward_tape_fn(raydn_module_handle)(
+        scene_handle,
+        &ray_o,
+        &ray_d,
+        &ray_tmax,
+        active_ptr,
+        max_bounces,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN tape reflection trace returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
+    return result;
+}
+
+pybind11::tuple cn_raydn_trace_reflections_backward(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    torch::Tensor ray_tmax,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_hit_points,
+    torch::Tensor tape_normals,
+    torch::Tensor image_sources,
+    pybind11::object grad_t,
+    pybind11::object grad_image_sources,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    at::Tensor grad_t_storage;
+    at::Tensor grad_image_sources_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    const at::Tensor *grad_t_ptr = optional_tensor(std::move(grad_t), grad_t_storage);
+    const at::Tensor *grad_image_sources_ptr =
+        optional_tensor(std::move(grad_image_sources), grad_image_sources_storage);
+    constexpr int64_t kOutputCount = 4;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_trace_reflections_backward_fn(raydn_module_handle)(
+        scene_handle,
+        &ray_o,
+        &ray_d,
+        &ray_tmax,
+        active_ptr,
+        &tape_prim_id,
+        &tape_barycentric,
+        &tape_hit_points,
+        &tape_normals,
+        &image_sources,
+        grad_t_ptr,
+        grad_image_sources_ptr,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN reflection backward returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
+    return result;
+}
+
+pybind11::tuple cn_raydn_trace_reflections_jvp(
+    int64_t scene_handle,
+    torch::Tensor ray_o,
+    torch::Tensor ray_d,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_hit_points,
+    torch::Tensor tape_normals,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_ray_o,
+    pybind11::object tangent_ray_d,
+    torch::Tensor image_sources,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    at::Tensor tangent_vertices_storage;
+    at::Tensor tangent_ray_o_storage;
+    at::Tensor tangent_ray_d_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    const at::Tensor *tangent_vertices_ptr =
+        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
+    const at::Tensor *tangent_ray_o_ptr =
+        optional_tensor(std::move(tangent_ray_o), tangent_ray_o_storage);
+    const at::Tensor *tangent_ray_d_ptr =
+        optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
+    constexpr int64_t kOutputCount = 2;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_trace_reflections_jvp_fn(raydn_module_handle)(
+        scene_handle,
+        &ray_o,
+        &ray_d,
+        active_ptr,
+        &tape_prim_id,
+        &tape_barycentric,
+        &tape_hit_points,
+        &tape_normals,
+        tangent_vertices_ptr,
+        tangent_ray_o_ptr,
+        tangent_ray_d_ptr,
+        &image_sources,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN reflection jvp returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
+    return result;
+}
+
+pybind11::tuple cn_raydn_refl_epc_field_forward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    pybind11::object active,
+    int64_t max_bounces,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    constexpr int64_t kOutputCount = 8;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_refl_epc_field_forward_fn(raydn_module_handle)(
+        scene_handle,
+        &source,
+        &receiver,
+        active_ptr,
+        max_bounces,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN EPC field forward returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
+    return result;
+}
+
+pybind11::tuple cn_raydn_refl_epc_backward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_t,
+    pybind11::object grad_field_real,
+    pybind11::object grad_field_imag,
+    pybind11::object grad_path_length,
+    bool need_grad_vertices,
+    bool need_grad_source,
+    bool need_grad_receiver,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    at::Tensor grad_field_real_storage;
+    at::Tensor grad_field_imag_storage;
+    at::Tensor grad_path_length_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    const at::Tensor *grad_field_real_ptr =
+        optional_tensor(std::move(grad_field_real), grad_field_real_storage);
+    const at::Tensor *grad_field_imag_ptr =
+        optional_tensor(std::move(grad_field_imag), grad_field_imag_storage);
+    const at::Tensor *grad_path_length_ptr =
+        optional_tensor(std::move(grad_path_length), grad_path_length_storage);
+    constexpr int64_t kOutputCount = 3;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_refl_epc_backward_fn(raydn_module_handle)(
+        scene_handle,
+        &source,
+        &receiver,
+        active_ptr,
+        &tape_prim_id,
+        &tape_barycentric,
+        &tape_t,
+        grad_field_real_ptr,
+        grad_field_imag_ptr,
+        grad_path_length_ptr,
+        need_grad_vertices,
+        need_grad_source,
+        need_grad_receiver,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN EPC backward returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
+    return result;
+}
+
+pybind11::tuple cn_raydn_refl_epc_jvp(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    pybind11::object active,
+    torch::Tensor tape_prim_id,
+    torch::Tensor tape_barycentric,
+    torch::Tensor tape_t,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_source,
+    pybind11::object tangent_receiver,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor active_storage;
+    at::Tensor tangent_vertices_storage;
+    at::Tensor tangent_source_storage;
+    at::Tensor tangent_receiver_storage;
+    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
+    const at::Tensor *tangent_vertices_ptr =
+        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
+    const at::Tensor *tangent_source_ptr =
+        optional_tensor(std::move(tangent_source), tangent_source_storage);
+    const at::Tensor *tangent_receiver_ptr =
+        optional_tensor(std::move(tangent_receiver), tangent_receiver_storage);
+    constexpr int64_t kOutputCount = 3;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_refl_epc_jvp_fn(raydn_module_handle)(
+        scene_handle,
+        &source,
+        &receiver,
+        active_ptr,
+        &tape_prim_id,
+        &tape_barycentric,
+        &tape_t,
+        tangent_vertices_ptr,
+        tangent_source_ptr,
+        tangent_receiver_ptr,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN EPC jvp returned an invalid output count");
     pybind11::tuple result(static_cast<size_t>(output_count));
     for (int64_t i = 0; i < output_count; ++i)
         result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
