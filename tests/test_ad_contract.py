@@ -169,8 +169,10 @@ def test_ad_inventory_records_solver_ad_contract():
     # Plan 07 AD-1: the shared deterministic/path field seam calls the three
     # differentiable field entry points (LoS, reflection, transmission).
     # Plan 07 AD-3 adds the six montecarlo.basic power-map entry points.
-    assert audit["native_public_solver_ad_callers"] == 9
-    assert len(audit["native_public_solver_ad_call_sites"]) == 9
+    # Plan 07 AD-4 adds the wedge re-evaluation, receiver projection, coupled
+    # R-D transport and coupled stationary re-solve entry points.
+    assert audit["native_public_solver_ad_callers"] == 13
+    assert len(audit["native_public_solver_ad_call_sites"]) == 13
     assert audit["legacy_reference_files_with_explicit_ad"] == 19
     assert audit["decision"] == "fixed_topology_material_frequency_ad_t1"
     # The capability manifest flip happens at the plan 07 completion gate.

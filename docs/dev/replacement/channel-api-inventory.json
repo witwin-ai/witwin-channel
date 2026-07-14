@@ -51,11 +51,15 @@
       "channel/scripts"
     ],
     "legacy_reference_files_with_explicit_ad": 19,
-    "native_public_solver_ad_callers": 9,
+    "native_public_solver_ad_callers": 13,
     "native_public_solver_ad_call_sites": [
       "core/path_topology.py:_evaluate_shared_fields:field_free_space_ad",
       "core/path_topology.py:_evaluate_shared_fields:field_reflection_sequence_ad",
       "core/path_topology.py:_evaluate_shared_fields:field_transmission_sequence_ad",
+      "core/path_topology.py:_evaluate_shared_fields:field_diffraction_wedge_ad",
+      "core/path_topology.py:_evaluate_shared_fields:field_project_complex3_ad",
+      "core/path_topology.py:_evaluate_shared_fields:field_coupled_rd_ad",
+      "core/path_topology.py:_evaluate_shared_fields:coupled_rd_prepare_ad",
       "montecarlo/basic/backend.py:los_path_gain:mc_los_path_gain_ad",
       "montecarlo/basic/raydn_components.py:reflection_component_maps_with_wedges:mc_sionna_reflection_accumulate_ad",
       "montecarlo/basic/raydn_components.py:los_component_map:mc_los_grid_maps_ad",
@@ -69,7 +73,7 @@
     ],
     "decision": "fixed_topology_material_frequency_ad_t1",
     "supports_ad": false,
-    "notes": "Plan 07 AD-1: the shared field seam of the deterministic and path solvers routes LoS/reflection/transmission through native backward/jvp companion kernels when ad_mode is jvp/vjp (materials eps_r/sigma_e/gain/thickness and frequency; hit geometry detached). Plan 07 AD-3: montecarlo.basic routes its incoherent power map through the LoS, reflection-radiomap, layer-stack, grid-layout and finalize AD Functions (compiled material store leaves, frequency, LoS endpoints; diffraction and scattering maps fail loudly until AD-4). Capability manifests keep supports_ad=false until the plan 07 completion gate flips them. Repository production consumers still do not import Channel AD; legacy references remain offline evidence. The low-level LoS derivative primitives are consumed by the AD-3 LoS Function and keep their standalone facades."
+    "notes": "Plan 07 AD-1: the shared field seam of the deterministic and path solvers routes LoS/reflection/transmission through native backward/jvp companion kernels when ad_mode is jvp/vjp (materials eps_r/sigma_e/gain/thickness and frequency; hit geometry detached). Plan 07 AD-4: the same seam re-evaluates the UTD wedge field from the frozen topology and differentiates it together with the receiver projection, the coupled R-D transport and the fixed-winner coupled stationary geometry re-solve (wedge/wall materials, frequency, endpoints). Plan 07 AD-3: montecarlo.basic routes its incoherent power map through the LoS, reflection-radiomap, layer-stack, grid-layout and finalize AD Functions (compiled material store leaves, frequency, LoS endpoints; diffraction and scattering maps fail loudly until the diffraction radiomap adjoint lands). Capability manifests keep supports_ad=false until the plan 07 completion gate flips them. Repository production consumers still do not import Channel AD; legacy references remain offline evidence. The low-level LoS derivative primitives are consumed by the AD-3 LoS Function and keep their standalone facades."
   },
   "phase_status": {
     "complex_field_and_polarization": "supported_with_solver_specific_limits",

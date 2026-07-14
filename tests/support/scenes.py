@@ -170,7 +170,14 @@ def transmission_wall_structure(
     )
 
 
-def wedge_diffraction_scene() -> Scene:
+def wedge_diffraction_scene(
+    material: object | None = None,
+    *,
+    tx: torch.Tensor | None = None,
+    rx: torch.Tensor | None = None,
+    frequency: float | torch.Tensor = 3.0e9,
+) -> Scene:
+    wedge_material = PerfectConductor() if material is None else material
     face_a = Structure(
         vertices=torch.tensor(
             [
@@ -180,7 +187,7 @@ def wedge_diffraction_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 1, 2]]),
-        material=PerfectConductor(),
+        material=wedge_material,
         name="wedge-a",
         surface_id=2,
     )
@@ -193,19 +200,33 @@ def wedge_diffraction_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 2, 1]]),
-        material=PerfectConductor(),
+        material=wedge_material,
         name="wedge-b",
         surface_id=3,
     )
     return Scene(
         structures=[face_a, face_b],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
-        receivers=[ReceiverPoint(position=torch.tensor([3.0, 1.0, 0.5]))],
-        frequency=3.0e9,
+        transmitters=[
+            Transmitter(
+                position=torch.tensor([0.0, -1.0, 0.5]) if tx is None else tx
+            )
+        ],
+        receivers=[
+            ReceiverPoint(
+                position=torch.tensor([3.0, 1.0, 0.5]) if rx is None else rx
+            )
+        ],
+        frequency=frequency,
     )
 
 
-def coupled_wall_wedge_scene() -> Scene:
+def coupled_wall_wedge_scene(
+    material: object | None = None,
+    *,
+    tx: torch.Tensor | None = None,
+    rx: torch.Tensor | None = None,
+    frequency: float | torch.Tensor = 3.0e9,
+) -> Scene:
     """Analytic z=0 reflector plus the convex edge through (2, y, 2)."""
 
     vertices = torch.tensor(
@@ -232,11 +253,19 @@ def coupled_wall_wedge_scene() -> Scene:
             Structure(
                 vertices=vertices,
                 faces=faces,
-                material=PerfectConductor(),
+                material=PerfectConductor() if material is None else material,
                 surface_id=0,
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -2.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 2.0, 5.0]))],
-        frequency=3.0e9,
+        transmitters=[
+            Transmitter(
+                position=torch.tensor([0.0, -2.0, 1.0]) if tx is None else tx
+            )
+        ],
+        receivers=[
+            ReceiverPoint(
+                position=torch.tensor([0.0, 2.0, 5.0]) if rx is None else rx
+            )
+        ],
+        frequency=frequency,
     )

@@ -734,26 +734,6 @@ def _rough_reflection_factor(
     return factor
 
 
-_AD_UNSUPPORTED_COMPONENTS = (
-    (2, "diffraction"),
-    (3, "coupled reflection-diffraction"),
-    (4, "coupled diffraction-reflection"),
-)
-
-
-def _require_ad_supported_topology(topology: TopologyBatch, *, ad_mode: str) -> None:
-    """Fail before any field launch when the topology holds interactions whose
-    fields are not differentiable yet (plan 07 section 8; AD-4 lifts this)."""
-
-    for component_id, name in _AD_UNSUPPORTED_COMPONENTS:
-        if bool((topology.component_id == component_id).any()):
-            raise RuntimeError(
-                f"ad_mode='{ad_mode}' does not support {name} paths yet; "
-                "differentiable diffraction and coupled interactions arrive "
-                "with plan 07 AD-4"
-            )
-
-
 def _participates_in_ad(value: object) -> bool:
     """True when a leaf carries a reverse-mode graph or a forward-mode tangent."""
 
@@ -897,7 +877,6 @@ def _evaluate_shared_fields(
         return topology
     ad_enabled = ad_mode != "none"
     if ad_enabled:
-        _require_ad_supported_topology(topology, ad_mode=ad_mode)
         frequency = (
             scene.frequency
             if isinstance(scene.frequency, torch.Tensor)
@@ -1103,19 +1082,80 @@ def _evaluate_shared_fields(
         topology.component_id == 2, as_tuple=False
     ).reshape(-1)
     if int(diffraction_rows.shape[0]) > 0:
-        arrival = ops.deterministic_normalize_vec3(
-            (
-                target[diffraction_rows]
-                - topology.interaction_positions[diffraction_rows, 0]
-            ).contiguous(),
-            eps=1.0e-6,
-        )
-        powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
-        projected = ops.field_project_complex3(
-            powered_xyz,
-            arrival,
-            rx_pol[diffraction_rows].contiguous(),
-        )
+        if ad_enabled:
+            # Plan 07 AD-4: RayD's order-1 path export is detached, so the
+            # wedge field is re-evaluated from the frozen topology (edge id,
+            # edge tables, wedge-face materials) with the differentiable
+            # kernel, and the projection runs through its own Function so the
+            # arrival-direction chain stays on the graph. Forward parity with
+            # topology.field_xyz is pinned by tests/ad.
+            if material is None:
+                material = face_material_field_bundle(compiled, device=device)
+            preserve_imported_edges = bool(
+                isinstance(scene.metadata.get("mitsuba", {}), dict)
+                and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
+            )
+            edge_geometry = (
+                _diffraction_edge_geometry(compiled.raydn.edge_records())
+                if preserve_imported_edges
+                else _cached_diffraction_edge_geometry(compiled.raydn)
+            )
+            edge_id = topology.edge_id[diffraction_rows].to(dtype=torch.int64)
+            face0 = edge_geometry[8].to(dtype=torch.int64)[edge_id]
+            face1 = edge_geometry[9].to(dtype=torch.int64)[edge_id]
+            face_count = int(material["eps_r"].shape[0])
+            # RayD's export treats a face as absent when its id is out of
+            # range or its material entry is not exported (face_material
+            # validity is discrete winner state).
+            table_valid = face_material_tensors(compiled, device=device)[4]
+            face0_c = face0.clamp(min=0, max=max(face_count - 1, 0))
+            face1_c = face1.clamp(min=0, max=max(face_count - 1, 0))
+            valid0 = (face0 >= 0) & (face0 < face_count) & table_valid[face0_c]
+            valid1 = (face1 >= 0) & (face1 < face_count) & table_valid[face1_c]
+            evaluated = ops.field_diffraction_wedge_ad(
+                source[diffraction_rows].contiguous(),
+                target[diffraction_rows].contiguous(),
+                edge_geometry[1][edge_id].contiguous(),
+                edge_geometry[2][edge_id].contiguous(),
+                edge_geometry[4][edge_id].contiguous(),
+                edge_geometry[5][edge_id].contiguous(),
+                edge_geometry[6][edge_id].contiguous(),
+                edge_geometry[7][edge_id].contiguous(),
+                edge_geometry[10][edge_id].contiguous(),
+                valid0.contiguous(),
+                material["eps_r"][face0_c].contiguous(),
+                material["sigma_e"][face0_c].contiguous(),
+                material["mu_r"][face0_c].contiguous(),
+                material["gain"][face0_c].contiguous(),
+                valid1.contiguous(),
+                material["eps_r"][face1_c].contiguous(),
+                material["sigma_e"][face1_c].contiguous(),
+                material["mu_r"][face1_c].contiguous(),
+                material["gain"][face1_c].contiguous(),
+                source_power[diffraction_rows].contiguous(),
+                frequency=frequency,
+            )
+            powered_xyz = evaluated["field_vector"]
+            arrival = evaluated["direction"]
+            projected = ops.field_project_complex3_ad(
+                powered_xyz,
+                arrival,
+                rx_pol[diffraction_rows].contiguous(),
+            )
+        else:
+            arrival = ops.deterministic_normalize_vec3(
+                (
+                    target[diffraction_rows]
+                    - topology.interaction_positions[diffraction_rows, 0]
+                ).contiguous(),
+                eps=1.0e-6,
+            )
+            powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
+            projected = ops.field_project_complex3(
+                powered_xyz,
+                arrival,
+                rx_pol[diffraction_rows].contiguous(),
+            )
         amplitude = source_power[diffraction_rows].clamp_min(1.0e-30).sqrt()
         field_xyz.index_copy_(0, diffraction_rows, powered_xyz / amplitude[:, None])
         path_field.index_copy_(0, diffraction_rows, projected["coefficient"])
@@ -1149,6 +1189,14 @@ def _evaluate_shared_fields(
         edge_face0 = edge_geometry[8].to(dtype=torch.int64)
         edge_face1 = edge_geometry[9].to(dtype=torch.int64)
         edge_exterior = edge_geometry[10]
+        coupled_geometry_ad = ad_enabled and geometry_ad
+        if coupled_geometry_ad:
+            tri_a = ops.deterministic_face_anchor_points(
+                records.vertices.contiguous(), records.faces.contiguous()
+            )
+            normals_table = ops.deterministic_normalize_vec3(
+                records.face_normals.contiguous(), eps=1.0e-6
+            )
         for component_id, reverse_order in ((3, False), (4, True)):
             rows = torch.nonzero(
                 topology.component_id == component_id, as_tuple=False
@@ -1162,6 +1210,52 @@ def _evaluate_shared_fields(
             face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
             reflection_slot = 1 if reverse_order else 0
             edge_slot = 0 if reverse_order else 1
+            reflection_position = topology.interaction_positions[
+                rows, reflection_slot
+            ].contiguous()
+            edge_position = topology.interaction_positions[
+                rows, edge_slot
+            ].contiguous()
+            if coupled_geometry_ad:
+                # Plan 07 AD-4: the coupled interaction points move with the
+                # endpoints (Fresnel angles are not stationary), so re-solve
+                # the frozen winner's stationary geometry differentiably (the
+                # same image-source math as the discovery prepare kernel) and
+                # feed the live points into the field kernel. D->R is the
+                # reciprocal problem with the endpoints exchanged.
+                epc_source = target[rows] if reverse_order else source[rows]
+                epc_receiver = source[rows] if reverse_order else target[rows]
+                resolved = ops.coupled_rd_prepare_ad(
+                    epc_source.contiguous(),
+                    epc_receiver.contiguous(),
+                    tri_a[reflection_face].contiguous(),
+                    normals_table[reflection_face].contiguous(),
+                    edge_geometry[1][edge_id].contiguous(),
+                    edge_geometry[2][edge_id].contiguous(),
+                    edge_geometry[4][edge_id].contiguous(),
+                    edge_geometry[5][edge_id].contiguous(),
+                )
+                if not bool(resolved["active"].all()):
+                    raise RuntimeError(
+                        "fixed-winner coupled stationary re-solve no longer "
+                        "reproduces the discovered coupled paths; the winner "
+                        "topology moved under the current scene tensors"
+                    )
+                for name, reference in (
+                    ("edge_point", edge_position),
+                    ("reflection_point", reflection_position),
+                ):
+                    if not bool(
+                        torch.isclose(
+                            resolved[name].detach(), reference, atol=1.0e-3
+                        ).all()
+                    ):
+                        raise RuntimeError(
+                            "fixed-winner coupled stationary re-solve moved the "
+                            f"{name} away from the discovered topology"
+                        )
+                edge_position = resolved["edge_point"]
+                reflection_position = resolved["reflection_point"]
 
             def material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
                 return tuple(
@@ -1169,16 +1263,19 @@ def _evaluate_shared_fields(
                     for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
                 )
 
-            evaluated = ops.field_coupled_rd(
+            coupled_field_op = (
+                partial(ops.field_coupled_rd_ad, frequency=frequency)
+                if ad_enabled
+                else partial(ops.field_coupled_rd, frequency_hz=frequency)
+            )
+            evaluated = coupled_field_op(
                 source[rows].contiguous(),
                 target[rows].contiguous(),
-                topology.interaction_positions[
-                    rows, reflection_slot
-                ].contiguous(),
+                reflection_position,
                 topology.interaction_normals[
                     rows, reflection_slot
                 ].contiguous(),
-                topology.interaction_positions[rows, edge_slot].contiguous(),
+                edge_position,
                 edge_geometry[2][edge_id].contiguous(),
                 edge_n0[edge_id].contiguous(),
                 edge_n1[edge_id].contiguous(),
@@ -1189,7 +1286,6 @@ def _evaluate_shared_fields(
                 material_tuple(reflection_face),
                 material_tuple(face0),
                 material_tuple(face1),
-                frequency_hz=_frequency_scalar(scene),
                 reverse=reverse_order,
             )
             field_xyz.index_copy_(0, rows, evaluated["field_vector"])

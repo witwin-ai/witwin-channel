@@ -121,10 +121,24 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `field_transmission_sequence`, wrapped in thin `torch.autograd.Function`s
   and wired into the shared deterministic/path field seam. `ad_mode="none"`
   keeps the exact primal behavior (no graph, no extra launches, zero tape).
-- Explicit-failure policy: topologies containing diffraction or coupled
-  reflection-diffraction paths, and the scattering component, raise a
-  `RuntimeError` naming the interaction before any launch when
-  `ad_mode != "none"` (differentiable versions arrive with plan 07 AD-4).
+- UTD diffraction and coupled reflection-diffraction AD (plan 07 AD-4):
+  under `ad_mode != "none"` the shared field seam re-evaluates RayD's
+  order-1 wedge export from the frozen topology (edge id, edge geometry,
+  wedge-face materials, half-space Fresnel with the export's `+z` tx
+  polarization convention) with a native kernel whose forward is RayD's own
+  scalar-templated UTD implementation; instantiating the same code with
+  dual scalars yields the exact backward/jvp (no finite differences, no
+  duplicated physics). The receiver projection (`field_project_complex3`)
+  and the coupled R-D transport (`field_coupled_rd`, 12 material scalars +
+  frequency + endpoints) get native companions the same way, and under
+  geometry AD the coupled interaction points are re-solved differentiably
+  from the frozen winner (image source + stationary edge point + wall
+  crossing). The coupled pseudo-infinite edge truncation factor is a frozen
+  regularizer of the differentiation (its float32 endpoint ripple is
+  measurement noise amplified by the 1e5 lever arm; the true infinite-edge
+  derivative is zero).
+- Explicit-failure policy: the scattering component raises a `RuntimeError`
+  naming the interaction before any launch when `ad_mode != "none"`.
 - The reserved `psdr` solver stub has been removed; AD lives in the existing
   solvers' `ad_mode`.
 - Monte Carlo basic power map AD (plan 07 AD-3): the incoherent

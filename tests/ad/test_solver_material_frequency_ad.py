@@ -23,10 +23,8 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import (
-    coupled_wall_wedge_scene,
     empty_space_los_scene,
     transmission_wall_structure,
-    wedge_diffraction_scene,
 )
 from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
 from witwin.channel_native.core.materials import Dielectric, Layer, PhysicalSurface
@@ -288,25 +286,6 @@ def test_ad_mode_none_keeps_primal_contract(solver):
     assert kernel_vjp["tape_bytes"] == 0
     assert kernel_none["ad_status"] == "none"
     assert kernel_vjp["ad_status"] == "vjp"
-
-
-@pytest.mark.parametrize("solver", _SOLVERS)
-def test_diffraction_topology_fails_loudly_in_ad_mode(solver):
-    scene = wedge_diffraction_scene()
-    with pytest.raises(RuntimeError, match="diffraction"):
-        _solve(scene, solver, frozenset({"diffraction"}), "vjp")
-
-
-def test_coupled_topology_fails_loudly_in_ad_mode():
-    scene = coupled_wall_wedge_scene()
-    config = PathConfig(
-        max_depth=2,
-        components=frozenset({"reflection", "diffraction"}),
-        coupled_paths=True,
-        ad_mode="vjp",
-    )
-    with pytest.raises(RuntimeError, match="AD-4"):
-        path_solve(scene, config)
 
 
 @pytest.mark.parametrize("solver", _SOLVERS)

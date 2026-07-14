@@ -12,7 +12,7 @@
 | AD-1 材料/频率 JVP+VJP（T1） | 已交付 + 已加固 | `f6873d8`, `bc6dd5a` |
 | AD-2 TX/RX 位置 + mesh 顶点（T1） | 进行中 | — |
 | AD-3 MC basic 功率图 | 已交付（绕射/散射图显式拒绝，推迟到 AD-4） | — |
-| AD-4 多交互收口（绕射/耦合/多反射） | 未开始 | — |
+| AD-4a UTD 绕射 + 耦合 R↔D（T1） | 已交付（本次） | — |
 
 AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 次梯度门用 `>` 导致 `sigma_e = 0`（材料默认初值）梯度恒零；更隐蔽的是 `dc_layer_one_way_phase` 的衰减幅度门用 `exponent < 0`，而 passive 分支在 `sigma_e = 0` 或 `thickness = 0` 时把 `Im(kz)·d` 落在 **-0.0** 上，于是 `amplitude · d_exponent` 被整项吞掉——在 `sigma_e = 0` 处这一项就是层传播子对 sigma 的**全部**一阶效应（该处 dkz/dsigma 纯虚），透射 sigma 梯度因此小了约 20 倍且反号。同一提交还修好了 deterministic 累加在 AD 模式下截断计算图的问题，并让频率 AD 在遇到色散材料时显式失败。
 
@@ -193,10 +193,13 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 
 ### AD-4：多交互复场收口（三 solver）
 
+**AD-4a 执行更新（2026-07-14，已交付）**：路线改为**模板化对偶**而非修复上游手写伴随。核对结论：RayD 的 `pair_vector_output_vjp` 不做驻定点重选、丢弃 finite-wedge 因子梯度（`(void) gFiniteFactor`）、恒走 stored-Jones 入射分支、且完全没有 k 依赖——它微分的是与前向不同的函数（宿主 FD 证实每个分量差 2-4 个量级）；其子伴随（`adj_fresnel_reflection_face` / `adj_face_reflection_operator` / `adj_cplx_sqrt` / `adj_compute_edge_geometry_3d`）反而是对的。因此把 `utd_types.h`/`utd_math.h` 整体模板化到标量类型 `T`（float | `Dual`）：float 实例化与原前向**逐位一致**（6 组配置位级基线核对），`Dual` 实例化即精确 JVP；`pair_vector_output_jvp` 为单次对偶（含 k 与 omega 独立切向，频率由调用方按 dk=2πdf/c、dω=2πdf 链接），`pair_vector_output_vjp` 为按输入种子化的对偶探针（复线性输入每个复标量一次探针），有限差分版 `pair_vector_output_jvp_completion` 与死代码 add_scaled 族已删除。宿主 FD 全绿（两种通道约定：stationary+omega>0 与 fixed-point+stored-ops，覆盖 source/target/边几何/双面 eta_r/sigma/gain/频率/JVP-VJP 对偶）。**已知边界**：耦合核的 ±1e5 伪无限边界使截断因子成为 float32 端点纹波，其对输入的导数被 1e5 杠杆放大为噪声（宿主 FD 永不收敛；真无限边导数为零），故耦合对偶把该因子**冻结**为微分常量（策略注释在 `kernels/field_wedge_ad.cu`）。
+
 - [ ] 多反射链式导数（`field_reflection_sequence` 深度 > 1，Jones/complex3）；
 - [ ] multilayer/transmission 散射矩阵对 `eps_r/sigma/thickness/freq` 导数；
-- [ ] **UTD fixed-topology 导数（决定：channel_native 内重算）**：新增原生"楔形场重算 + 对偶"核，从固定拓扑（`edge_id`、边几何、楔面材料、驻定点）复现 RayD 的 order-1 UTD 前向（必须用 RayD 的半空间 Fresnel 约定 `material.omega > 0`，否则前向会变），再对材料/频率求导；随后 `field_project_complex3` 的 backward 才有意义（它本身只是常量基上的线性投影，伴随平凡）；含 shadow-boundary 排除区；
-- [ ] `field_coupled_rd` 的 backward/jvp（12 个材料标量 + 频率；其楔面算子走 `slab_face_operator` → 可直接复用已有的 `slab_fresnel_dual`）；解除 seam 中 component 3/4 的拦截；
+- [x] **UTD fixed-topology 导数（channel_native 内重算）**：`cn_field_diffraction_wedge`（前向 = RayD 模板化 UTD 的 float 实例 + 驻定点内部重解 + 出射方向；backward/jvp = Dual 实例种子化），复现 order-1 export 约定（半空间 Fresnel `omega>0`、bridge 硬编码 +z 极化、sqrt(tx_power) 幅度）；前向 parity 门禁（重算 vs `topology.field_xyz`）双 solver × 双材料（介质/PEC）全绿（rel ≤ 1e-3）；
+- [x] `field_project_complex3` backward/jvp（场向量与到达方向都在图上，方向链承载驻定点运动）；
+- [x] `field_coupled_rd` 的 backward/jvp（12 材料标量 + 频率 + 端点/交点几何；楔面算子复用 `slab_fresnel_dual`，反射腿复用 `dual_reflect_frame`，pair 走 RayD Dual 模板）；耦合驻定几何在 geometry AD 下经 `coupled_rd_prepare` 的 fixed-winner 可微重解（镜像源 + 驻定边点 + 墙面交点），一致性门禁比对拓扑存储交点；解除 seam 中 component 2/3/4 的拦截，耦合块频率改走活张量；
 - [ ] metadata 记录 `ad_status`、tape bytes、`jvp_launch_count`/`backward_launch_count`、forward/backward 时间与峰值显存（schema 已在 `metadata.py` 预留）；
 - [ ] 解析小场景通过后，进入 Munich/SF 场景。
 

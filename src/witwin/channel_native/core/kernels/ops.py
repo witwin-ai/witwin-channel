@@ -6110,6 +6110,926 @@ def field_transmission_sequence_ad(
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
 
+# ---------------------------------------------------------------------------
+# Plan 07 AD-4: differentiable UTD wedge diffraction (component 2 re-evaluated
+# from the frozen topology), receiver projection, coupled R-D transport
+# (components 3/4) and the coupled stationary-geometry re-solve. Each
+# torch.autograd.Function below is dispatch only; the math lives in
+# kernels/field_wedge_ad.cu (RayD's templated dual forward).
+# ---------------------------------------------------------------------------
+
+_WEDGE_OUTPUT_FIELDS = ("field_vector", "direction")
+_COUPLED_OUTPUT_FIELDS = (
+    "field_vector",
+    "coefficient",
+    "path_field",
+    "path_gain",
+    "direction",
+)
+
+
+def field_diffraction_wedge(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    edge_position: torch.Tensor,
+    edge_direction: torch.Tensor,
+    edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor,
+    edge_n0: torch.Tensor,
+    edge_n1: torch.Tensor,
+    exterior_angle: torch.Tensor,
+    face0_valid: torch.Tensor,
+    face0_eps_r: torch.Tensor,
+    face0_sigma_e: torch.Tensor,
+    face0_mu_r: torch.Tensor,
+    face0_gain: torch.Tensor,
+    face1_valid: torch.Tensor,
+    face1_eps_r: torch.Tensor,
+    face1_sigma_e: torch.Tensor,
+    face1_mu_r: torch.Tensor,
+    face1_gain: torch.Tensor,
+    tx_power: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    """Re-evaluate RayD's order-1 UTD wedge export from the frozen topology."""
+
+    out = _required_native_op("field_diffraction_wedge")(
+        source,
+        target,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+        edge_n0,
+        edge_n1,
+        exterior_angle,
+        face0_valid,
+        face0_eps_r,
+        face0_sigma_e,
+        face0_mu_r,
+        face0_gain,
+        face1_valid,
+        face1_eps_r,
+        face1_sigma_e,
+        face1_mu_r,
+        face1_gain,
+        tx_power,
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict) or set(out) != set(_WEDGE_OUTPUT_FIELDS):
+        raise TypeError(
+            "_channel_native.field_diffraction_wedge returned invalid fields"
+        )
+    return out
+
+
+class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
+    """Fixed-topology differentiable UTD wedge field (plan 07 AD-4).
+
+    Differentiable inputs: face eps_r / sigma_e / gain for both wedge faces,
+    frequency, and the endpoints. The edge geometry (anchor, direction,
+    bounds, face normals, exterior angle), the valid masks, mu_r and tx_power
+    stay fixed; requesting their gradient fails loudly. The stationary point
+    on the edge is re-solved inside the kernel, so endpoint gradients include
+    the diffraction-point motion.
+    """
+
+    @staticmethod
+    def forward(
+        source,
+        target,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+        edge_n0,
+        edge_n1,
+        exterior_angle,
+        face0_valid,
+        face0_eps_r,
+        face0_sigma_e,
+        face0_mu_r,
+        face0_gain,
+        face1_valid,
+        face1_eps_r,
+        face1_sigma_e,
+        face1_mu_r,
+        face1_gain,
+        tx_power,
+        frequency,
+    ):
+        out = _required_native_op("field_diffraction_wedge")(
+            source,
+            target,
+            edge_position,
+            edge_direction,
+            edge_t_min,
+            edge_t_max,
+            edge_n0,
+            edge_n1,
+            exterior_angle,
+            face0_valid,
+            face0_eps_r,
+            face0_sigma_e,
+            face0_mu_r,
+            face0_gain,
+            face1_valid,
+            face1_eps_r,
+            face1_sigma_e,
+            face1_mu_r,
+            face1_gain,
+            tx_power,
+            _ad_frequency_value(frequency),
+        )
+        return tuple(out[name] for name in _WEDGE_OUTPUT_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        frequency = inputs[20]
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:20]
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.geometry_live = _ad_geometry_live(inputs[0], inputs[1])
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_field_vector, grad_direction):
+        none_grads = (None,) * 21
+        _ad_reject_fixed_inputs(
+            "field_diffraction_wedge_ad",
+            ctx.needs_input_grad,
+            (
+                (2, "edge_position"),
+                (3, "edge_direction"),
+                (4, "edge_t_min"),
+                (5, "edge_t_max"),
+                (6, "edge_n0"),
+                (7, "edge_n1"),
+                (8, "exterior_angle"),
+                (9, "face0_valid"),
+                (12, "face0_mu_r"),
+                (14, "face1_valid"),
+                (17, "face1_mu_r"),
+                (19, "tx_power"),
+            ),
+        )
+        need_geometry = bool(ctx.needs_input_grad[0]) or bool(
+            ctx.needs_input_grad[1]
+        )
+        need_material = any(
+            bool(ctx.needs_input_grad[index]) for index in (10, 11, 13, 15, 16, 18)
+        )
+        need_frequency = bool(ctx.needs_input_grad[20])
+        if not (need_geometry or need_material or need_frequency) or (
+            grad_field_vector is None and grad_direction is None
+        ):
+            return none_grads
+        saved = ctx.saved_tensors
+        out = _required_native_op("field_diffraction_wedge_backward")(
+            *saved,
+            ctx.frequency_value,
+            grad_field_vector,
+            grad_direction,
+            need_material,
+            need_frequency,
+            need_geometry,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return (
+            out["grad_source"] if ctx.needs_input_grad[0] else None,
+            out["grad_target"] if ctx.needs_input_grad[1] else None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            out["grad_face0_eps_r"] if ctx.needs_input_grad[10] else None,
+            out["grad_face0_sigma_e"] if ctx.needs_input_grad[11] else None,
+            None,
+            out["grad_face0_gain"] if ctx.needs_input_grad[13] else None,
+            None,
+            out["grad_face1_eps_r"] if ctx.needs_input_grad[15] else None,
+            out["grad_face1_sigma_e"] if ctx.needs_input_grad[16] else None,
+            None,
+            out["grad_face1_gain"] if ctx.needs_input_grad[18] else None,
+            None,
+            grad_frequency,
+        )
+
+    @staticmethod
+    def jvp(ctx, *tangents):
+        _ad_reject_fixed_tangents(
+            "field_diffraction_wedge_ad",
+            (
+                (tangents[2], "edge_position"),
+                (tangents[3], "edge_direction"),
+                (tangents[4], "edge_t_min"),
+                (tangents[5], "edge_t_max"),
+                (tangents[6], "edge_n0"),
+                (tangents[7], "edge_n1"),
+                (tangents[8], "exterior_angle"),
+                (tangents[12], "face0_mu_r"),
+                (tangents[17], "face1_mu_r"),
+                (tangents[19], "tx_power"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        scalar_shape = tuple(saved[10].shape)
+        tangent_source = _ad_geometry_tangent(
+            "field_diffraction_wedge_ad tangent_source", tangents[0], saved[0]
+        )
+        tangent_target = _ad_geometry_tangent(
+            "field_diffraction_wedge_ad tangent_target", tangents[1], saved[1]
+        )
+        material_tangents = {}
+        for index, name in (
+            (10, "face0_eps_r"),
+            (11, "face0_sigma_e"),
+            (13, "face0_gain"),
+            (15, "face1_eps_r"),
+            (16, "face1_sigma_e"),
+            (18, "face1_gain"),
+        ):
+            material_tangents[name] = _ad_checked_tangent(
+                f"field_diffraction_wedge_ad tangent_{name}",
+                _ad_native_tangent_or_none(tangents[index]),
+                scalar_shape,
+            )
+        tangent_frequency = _ad_frequency_tangent(tangents[20])
+        if (
+            tangent_source is None
+            and tangent_target is None
+            and tangent_frequency == 0.0
+            and all(value is None for value in material_tangents.values())
+        ):
+            return (None, None)
+        with torch._C._DisableFuncTorch():
+            out = _required_native_op("field_diffraction_wedge_jvp")(
+                *(_ad_native_tensor(value) for value in saved),
+                ctx.frequency_value,
+                tangent_source,
+                tangent_target,
+                material_tangents["face0_eps_r"],
+                material_tangents["face0_sigma_e"],
+                material_tangents["face0_gain"],
+                material_tangents["face1_eps_r"],
+                material_tangents["face1_sigma_e"],
+                material_tangents["face1_gain"],
+                float(tangent_frequency),
+            )
+        return (out["tangent_field_vector"], out["tangent_direction"])
+
+
+def field_diffraction_wedge_ad(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    edge_position: torch.Tensor,
+    edge_direction: torch.Tensor,
+    edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor,
+    edge_n0: torch.Tensor,
+    edge_n1: torch.Tensor,
+    exterior_angle: torch.Tensor,
+    face0_valid: torch.Tensor,
+    face0_eps_r: torch.Tensor,
+    face0_sigma_e: torch.Tensor,
+    face0_mu_r: torch.Tensor,
+    face0_gain: torch.Tensor,
+    face1_valid: torch.Tensor,
+    face1_eps_r: torch.Tensor,
+    face1_sigma_e: torch.Tensor,
+    face1_mu_r: torch.Tensor,
+    face1_gain: torch.Tensor,
+    tx_power: torch.Tensor,
+    *,
+    frequency: torch.Tensor | float,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`field_diffraction_wedge` (materials, frequency, endpoints)."""
+
+    values = _FieldDiffractionWedgeAdFunction.apply(
+        source,
+        target,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+        edge_n0,
+        edge_n1,
+        exterior_angle,
+        face0_valid,
+        face0_eps_r,
+        face0_sigma_e,
+        face0_mu_r,
+        face0_gain,
+        face1_valid,
+        face1_eps_r,
+        face1_sigma_e,
+        face1_mu_r,
+        face1_gain,
+        tx_power,
+        frequency,
+    )
+    return dict(zip(_WEDGE_OUTPUT_FIELDS, values, strict=True))
+
+
+class _FieldProjectComplex3AdFunction(torch.autograd.Function):
+    """Differentiable receiver projection on a frozen polarization basis."""
+
+    @staticmethod
+    def forward(field_vector, direction, rx_polarization):
+        out = _required_native_op("field_project_complex3")(
+            field_vector, direction, rx_polarization
+        )
+        return (out["coefficient"], out["path_gain"])
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_coefficient, grad_path_gain):
+        _ad_reject_fixed_inputs(
+            "field_project_complex3_ad",
+            ctx.needs_input_grad,
+            ((2, "rx_polarization"),),
+        )
+        need_field = bool(ctx.needs_input_grad[0])
+        need_direction = bool(ctx.needs_input_grad[1])
+        if not (need_field or need_direction) or (
+            grad_coefficient is None and grad_path_gain is None
+        ):
+            return (None, None, None)
+        field_vector, direction, rx_polarization = ctx.saved_tensors
+        out = _required_native_op("field_project_complex3_backward")(
+            field_vector,
+            direction,
+            rx_polarization,
+            grad_coefficient,
+            grad_path_gain,
+            need_field,
+            need_direction,
+        )
+        return (
+            out["grad_field_vector"] if need_field else None,
+            out["grad_direction"] if need_direction else None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_field_vector, t_direction, t_rx_polarization):
+        _ad_reject_fixed_tangents(
+            "field_project_complex3_ad",
+            ((t_rx_polarization, "rx_polarization"),),
+        )
+        saved = ctx.saved_tensors
+        tangent_field = _ad_native_tangent_or_none(t_field_vector)
+        tangent_direction = _ad_geometry_tangent(
+            "field_project_complex3_ad tangent_direction", t_direction, saved[1]
+        )
+        if tangent_field is None and tangent_direction is None:
+            return (None, None)
+        with torch._C._DisableFuncTorch():
+            out = _required_native_op("field_project_complex3_jvp")(
+                *(_ad_native_tensor(value) for value in saved),
+                tangent_field,
+                tangent_direction,
+            )
+        return (out["tangent_coefficient"], out["tangent_path_gain"])
+
+
+def field_project_complex3_ad(
+    field_vector: torch.Tensor,
+    direction: torch.Tensor,
+    rx_polarization: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`field_project_complex3` (field vector + direction)."""
+
+    coefficient, path_gain = _FieldProjectComplex3AdFunction.apply(
+        field_vector, direction, rx_polarization
+    )
+    return {"coefficient": coefficient, "path_gain": path_gain}
+
+
+class _FieldCoupledRdAdFunction(torch.autograd.Function):
+    """Fixed-topology differentiable coupled R-D transport (plan 07 AD-4).
+
+    Differentiable inputs: eps_r / sigma_e / gain / thickness for the
+    reflection wall and both wedge faces (12 scalars per path), frequency,
+    and the continuous geometry (source, target, reflection_position,
+    edge_position). The wedge axis/normals/exterior angle, the reflection
+    normal (a frozen wall plane), mu_r, tx_power and the polarizations stay
+    fixed. The pseudo-infinite edge truncation factor is a frozen regularizer
+    of the differentiation (see kernels/field_wedge_ad.cu).
+    """
+
+    @staticmethod
+    def forward(
+        source,
+        target,
+        reflection_position,
+        reflection_normal,
+        edge_position,
+        edge_direction,
+        edge_n0,
+        edge_n1,
+        exterior_angle,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        refl_eps_r,
+        refl_sigma_e,
+        refl_mu_r,
+        refl_gain,
+        refl_thickness,
+        w0_eps_r,
+        w0_sigma_e,
+        w0_mu_r,
+        w0_gain,
+        w0_thickness,
+        w1_eps_r,
+        w1_sigma_e,
+        w1_mu_r,
+        w1_gain,
+        w1_thickness,
+        frequency,
+        reverse,
+    ):
+        out = _required_native_op("field_coupled_rd")(
+            source,
+            target,
+            reflection_position,
+            reflection_normal,
+            edge_position,
+            edge_direction,
+            edge_n0,
+            edge_n1,
+            exterior_angle,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            refl_eps_r,
+            refl_sigma_e,
+            refl_mu_r,
+            refl_gain,
+            refl_thickness,
+            w0_eps_r,
+            w0_sigma_e,
+            w0_mu_r,
+            w0_gain,
+            w0_thickness,
+            w1_eps_r,
+            w1_sigma_e,
+            w1_mu_r,
+            w1_gain,
+            w1_thickness,
+            _ad_frequency_value(frequency),
+            bool(reverse),
+        )
+        return tuple(out[name] for name in _COUPLED_OUTPUT_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        frequency = inputs[27]
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:27]
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.reverse = bool(inputs[28])
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+        ctx.mark_non_differentiable(output[4])
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(
+        ctx,
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        _grad_direction,
+    ):
+        none_grads = (None,) * 29
+        _ad_reject_fixed_inputs(
+            "field_coupled_rd_ad",
+            ctx.needs_input_grad,
+            (
+                (3, "reflection_normal"),
+                (5, "edge_direction"),
+                (6, "edge_n0"),
+                (7, "edge_n1"),
+                (8, "exterior_angle"),
+                (9, "tx_power"),
+                (10, "tx_polarization"),
+                (11, "rx_polarization"),
+                (14, "reflection_mu_r"),
+                (19, "wedge_mu_r0"),
+                (24, "wedge_mu_r1"),
+            ),
+        )
+        need_geometry = any(
+            bool(ctx.needs_input_grad[index]) for index in (0, 1, 2, 4)
+        )
+        need_eps = any(bool(ctx.needs_input_grad[index]) for index in (12, 17, 22))
+        need_sigma = any(bool(ctx.needs_input_grad[index]) for index in (13, 18, 23))
+        need_gain = any(bool(ctx.needs_input_grad[index]) for index in (15, 20, 25))
+        need_thickness = any(
+            bool(ctx.needs_input_grad[index]) for index in (16, 21, 26)
+        )
+        need_frequency = bool(ctx.needs_input_grad[27])
+        grads = (grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain)
+        if not (
+            need_geometry
+            or need_eps
+            or need_sigma
+            or need_gain
+            or need_thickness
+            or need_frequency
+        ) or all(value is None for value in grads):
+            return none_grads
+        saved = ctx.saved_tensors
+        out = _required_native_op("field_coupled_rd_backward")(
+            *saved,
+            ctx.frequency_value,
+            ctx.reverse,
+            grad_field_vector,
+            grad_coefficient,
+            grad_path_field,
+            grad_path_gain,
+            need_eps,
+            need_sigma,
+            need_gain,
+            need_thickness,
+            need_frequency,
+            need_geometry,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+
+        def material_column(name: str, column: int, index: int):
+            if not ctx.needs_input_grad[index]:
+                return None
+            return out[name][:, column]
+
+        return (
+            out["grad_source"] if ctx.needs_input_grad[0] else None,
+            out["grad_target"] if ctx.needs_input_grad[1] else None,
+            out["grad_reflection_position"] if ctx.needs_input_grad[2] else None,
+            None,
+            out["grad_edge_position"] if ctx.needs_input_grad[4] else None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            material_column("grad_eps_r", 0, 12),
+            material_column("grad_sigma_e", 0, 13),
+            None,
+            material_column("grad_gain", 0, 15),
+            material_column("grad_thickness", 0, 16),
+            material_column("grad_eps_r", 1, 17),
+            material_column("grad_sigma_e", 1, 18),
+            None,
+            material_column("grad_gain", 1, 20),
+            material_column("grad_thickness", 1, 21),
+            material_column("grad_eps_r", 2, 22),
+            material_column("grad_sigma_e", 2, 23),
+            None,
+            material_column("grad_gain", 2, 25),
+            material_column("grad_thickness", 2, 26),
+            grad_frequency,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, *tangents):
+        _ad_reject_fixed_tangents(
+            "field_coupled_rd_ad",
+            (
+                (tangents[3], "reflection_normal"),
+                (tangents[5], "edge_direction"),
+                (tangents[6], "edge_n0"),
+                (tangents[7], "edge_n1"),
+                (tangents[8], "exterior_angle"),
+                (tangents[9], "tx_power"),
+                (tangents[10], "tx_polarization"),
+                (tangents[11], "rx_polarization"),
+                (tangents[14], "reflection_mu_r"),
+                (tangents[19], "wedge_mu_r0"),
+                (tangents[24], "wedge_mu_r1"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        scalar_shape = tuple(saved[12].shape)
+        tangent_source = _ad_geometry_tangent(
+            "field_coupled_rd_ad tangent_source", tangents[0], saved[0]
+        )
+        tangent_target = _ad_geometry_tangent(
+            "field_coupled_rd_ad tangent_target", tangents[1], saved[1]
+        )
+        tangent_hit = _ad_geometry_tangent(
+            "field_coupled_rd_ad tangent_reflection_position",
+            tangents[2],
+            saved[2],
+        )
+        tangent_edge = _ad_geometry_tangent(
+            "field_coupled_rd_ad tangent_edge_position", tangents[4], saved[4]
+        )
+
+        def material_pack(indices: tuple[int, int, int], name: str):
+            columns = tuple(
+                _ad_checked_tangent(
+                    f"field_coupled_rd_ad tangent_{name}",
+                    _ad_native_tangent_or_none(tangents[index]),
+                    scalar_shape,
+                )
+                for index in indices
+            )
+            if all(column is None for column in columns):
+                return None
+            zero = torch.zeros(
+                scalar_shape, device=saved[12].device, dtype=torch.float32
+            )
+            return torch.stack(
+                [zero if column is None else column for column in columns], dim=1
+            )
+
+        tangent_eps = material_pack((12, 17, 22), "eps_r")
+        tangent_sigma = material_pack((13, 18, 23), "sigma_e")
+        tangent_gain = material_pack((15, 20, 25), "gain")
+        tangent_thickness = material_pack((16, 21, 26), "thickness")
+        tangent_frequency = _ad_frequency_tangent(tangents[27])
+        if (
+            tangent_source is None
+            and tangent_target is None
+            and tangent_hit is None
+            and tangent_edge is None
+            and tangent_eps is None
+            and tangent_sigma is None
+            and tangent_gain is None
+            and tangent_thickness is None
+            and tangent_frequency == 0.0
+        ):
+            return (None,) * 5
+        with torch._C._DisableFuncTorch():
+            out = _required_native_op("field_coupled_rd_jvp")(
+                *(_ad_native_tensor(value) for value in saved),
+                ctx.frequency_value,
+                ctx.reverse,
+                tangent_source,
+                tangent_target,
+                tangent_hit,
+                tangent_edge,
+                tangent_eps,
+                tangent_sigma,
+                tangent_gain,
+                tangent_thickness,
+                float(tangent_frequency),
+            )
+        return (
+            out["tangent_field_vector"],
+            out["tangent_coefficient"],
+            out["tangent_path_field"],
+            out["tangent_path_gain"],
+            None,
+        )
+
+
+def field_coupled_rd_ad(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    reflection_position: torch.Tensor,
+    reflection_normal: torch.Tensor,
+    edge_position: torch.Tensor,
+    edge_direction: torch.Tensor,
+    edge_n0: torch.Tensor,
+    edge_n1: torch.Tensor,
+    exterior_angle: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    reflection_material: tuple[torch.Tensor, ...],
+    wedge_material0: tuple[torch.Tensor, ...],
+    wedge_material1: tuple[torch.Tensor, ...],
+    *,
+    frequency: torch.Tensor | float,
+    reverse: bool,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`field_coupled_rd` (12 material scalars + frequency + geometry)."""
+
+    if any(
+        len(bundle) != 5
+        for bundle in (reflection_material, wedge_material0, wedge_material1)
+    ):
+        raise ValueError(
+            "coupled material bundles must contain eps/sigma/mu/gain/thickness"
+        )
+    values = _FieldCoupledRdAdFunction.apply(
+        source,
+        target,
+        reflection_position,
+        reflection_normal,
+        edge_position,
+        edge_direction,
+        edge_n0,
+        edge_n1,
+        exterior_angle,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        *reflection_material,
+        *wedge_material0,
+        *wedge_material1,
+        frequency,
+        bool(reverse),
+    )
+    return dict(zip(_COUPLED_OUTPUT_FIELDS, values, strict=True))
+
+
+class _CoupledRdPrepareAdFunction(torch.autograd.Function):
+    """Fixed-winner coupled stationary geometry (plan 07 AD-4).
+
+    Re-solves the image source, the stationary diffraction point on the edge
+    and the predicted wall crossing for the frozen winner (wall plane + edge
+    line), so the coupled interaction points move with the endpoints on the
+    autograd graph. Differentiable inputs: source and receiver.
+    """
+
+    @staticmethod
+    def forward(
+        source,
+        receiver,
+        plane_point,
+        plane_normal,
+        edge_pos,
+        edge_dir,
+        edge_t_min,
+        edge_t_max,
+    ):
+        out = _required_native_op("coupled_rd_prepare")(
+            source,
+            receiver,
+            plane_point,
+            plane_normal,
+            edge_pos,
+            edge_dir,
+            edge_t_min,
+            edge_t_max,
+        )
+        active, edge_point, _virtual_source, reflection_point = out
+        return (edge_point, reflection_point, active)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:7]
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+        ctx.mark_non_differentiable(output[2])
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_edge_point, grad_reflection_point, _grad_active):
+        none_grads = (None,) * 8
+        _ad_reject_fixed_inputs(
+            "coupled_rd_prepare_ad",
+            ctx.needs_input_grad,
+            (
+                (2, "plane_point"),
+                (3, "plane_normal"),
+                (4, "edge_pos"),
+                (5, "edge_dir"),
+                (6, "edge_t_min"),
+                (7, "edge_t_max"),
+            ),
+        )
+        need_source = bool(ctx.needs_input_grad[0])
+        need_receiver = bool(ctx.needs_input_grad[1])
+        if not (need_source or need_receiver) or (
+            grad_edge_point is None and grad_reflection_point is None
+        ):
+            return none_grads
+        out = _required_native_op("coupled_rd_prepare_backward")(
+            *ctx.saved_tensors,
+            grad_edge_point,
+            grad_reflection_point,
+            need_source,
+            need_receiver,
+        )
+        return (
+            out["grad_source"] if need_source else None,
+            out["grad_receiver"] if need_receiver else None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_source, t_receiver, *t_rest):
+        _ad_reject_fixed_tangents(
+            "coupled_rd_prepare_ad",
+            (
+                (t_rest[0], "plane_point"),
+                (t_rest[1], "plane_normal"),
+                (t_rest[2], "edge_pos"),
+                (t_rest[3], "edge_dir"),
+                (t_rest[4], "edge_t_min"),
+                (t_rest[5], "edge_t_max"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        tangent_source = _ad_geometry_tangent(
+            "coupled_rd_prepare_ad tangent_source", t_source, saved[0]
+        )
+        tangent_receiver = _ad_geometry_tangent(
+            "coupled_rd_prepare_ad tangent_receiver", t_receiver, saved[1]
+        )
+        if tangent_source is None and tangent_receiver is None:
+            return (None, None, None)
+        with torch._C._DisableFuncTorch():
+            out = _required_native_op("coupled_rd_prepare_jvp")(
+                *(_ad_native_tensor(value) for value in saved),
+                tangent_source,
+                tangent_receiver,
+            )
+        return (
+            out["tangent_edge_point"],
+            out["tangent_reflection_point"],
+            None,
+        )
+
+
+def coupled_rd_prepare_ad(
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    plane_point: torch.Tensor,
+    plane_normal: torch.Tensor,
+    edge_pos: torch.Tensor,
+    edge_dir: torch.Tensor,
+    edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Differentiable fixed-winner coupled stationary geometry re-solve."""
+
+    edge_point, reflection_point, active = _CoupledRdPrepareAdFunction.apply(
+        source,
+        receiver,
+        plane_point,
+        plane_normal,
+        edge_pos,
+        edge_dir,
+        edge_t_min,
+        edge_t_max,
+    )
+    return {
+        "edge_point": edge_point,
+        "reflection_point": reflection_point,
+        "active": active,
+    }
+
+
 def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
