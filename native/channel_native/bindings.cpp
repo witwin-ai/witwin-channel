@@ -357,6 +357,43 @@ pybind11::tuple cn_raydn_refl_epc_jvp(
     pybind11::object tangent_source,
     pybind11::object tangent_receiver,
     std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_reflection_epc_paths_backward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor sequence,
+    torch::Tensor plane_points,
+    torch::Tensor plane_normals,
+    torch::Tensor valid,
+    torch::Tensor bounce_count,
+    pybind11::object grad_points,
+    pybind11::object grad_normals,
+    pybind11::object grad_path_length,
+    bool need_grad_vertices,
+    bool need_grad_source,
+    bool need_grad_receiver,
+    std::uintptr_t raydn_module_handle);
+pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor sequence,
+    torch::Tensor plane_points,
+    torch::Tensor plane_normals,
+    torch::Tensor valid,
+    torch::Tensor bounce_count,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_source,
+    pybind11::object tangent_receiver,
+    std::uintptr_t raydn_module_handle);
+at::Tensor cn_raydn_scene_face_normals_backward(
+    int64_t scene_handle,
+    torch::Tensor grad_face_normals,
+    std::uintptr_t raydn_module_handle);
+at::Tensor cn_raydn_scene_face_normals_jvp(
+    int64_t scene_handle,
+    torch::Tensor tangent_vertices,
+    std::uintptr_t raydn_module_handle);
 pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     int64_t scene_handle,
     torch::Tensor source,
@@ -1413,6 +1450,22 @@ PYBIND11_MODULE(_channel_native, module) {
         "raydn_refl_epc_jvp",
         &cn_raydn_refl_epc_jvp,
         "Call the RayDN fixed-winner reflection EPC JVP through the native C bridge.");
+    module.def(
+        "raydn_reflection_epc_paths_backward",
+        &cn_raydn_reflection_epc_paths_backward,
+        "Call the RayDN fixed-winner reflection EPC paths geometry VJP through the native C bridge.");
+    module.def(
+        "raydn_reflection_epc_paths_jvp",
+        &cn_raydn_reflection_epc_paths_jvp,
+        "Call the RayDN fixed-winner reflection EPC paths geometry JVP through the native C bridge.");
+    module.def(
+        "raydn_scene_face_normals_backward",
+        &cn_raydn_scene_face_normals_backward,
+        "Call the RayDN face-normal table VJP through the native C bridge.");
+    module.def(
+        "raydn_scene_face_normals_jvp",
+        &cn_raydn_scene_face_normals_jvp,
+        "Call the RayDN face-normal table JVP through the native C bridge.");
     module.def(
         "raydn_coupled_rd_geometry_forward",
         &cn_raydn_coupled_rd_geometry_forward,

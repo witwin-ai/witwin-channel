@@ -195,6 +195,51 @@ using ReflEpcJvpFn = int64_t (*)(
     at::Tensor *,
     int64_t);
 
+using ReflectionEpcPathsBackwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    bool,
+    bool,
+    bool,
+    at::Tensor *,
+    int64_t);
+
+using ReflectionEpcPathsJvpFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    const at::Tensor *,
+    at::Tensor *,
+    int64_t);
+
+using SceneFaceNormalsBackwardFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    at::Tensor *,
+    int64_t);
+
+using SceneFaceNormalsJvpFn = int64_t (*)(
+    int64_t,
+    const at::Tensor *,
+    at::Tensor *,
+    int64_t);
+
 using ReflectionAccumulationForwardFn = int64_t (*)(
     int64_t,
     const at::Tensor *,
@@ -431,6 +476,26 @@ ReflEpcBackwardFn raydn_refl_epc_backward_fn(std::uintptr_t module_handle) {
 ReflEpcJvpFn raydn_refl_epc_jvp_fn(std::uintptr_t module_handle) {
     (void) module_handle;
     return &rayd_torch_native_refl_epc_jvp;
+}
+
+ReflectionEpcPathsBackwardFn raydn_reflection_epc_paths_backward_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_reflection_epc_paths_backward;
+}
+
+ReflectionEpcPathsJvpFn raydn_reflection_epc_paths_jvp_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_reflection_epc_paths_jvp;
+}
+
+SceneFaceNormalsBackwardFn raydn_scene_face_normals_backward_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_scene_face_normals_backward;
+}
+
+SceneFaceNormalsJvpFn raydn_scene_face_normals_jvp_fn(std::uintptr_t module_handle) {
+    (void) module_handle;
+    return &rayd_torch_native_scene_face_normals_jvp;
 }
 
 DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn(std::uintptr_t module_handle) {
@@ -1091,6 +1156,136 @@ pybind11::tuple cn_raydn_refl_epc_jvp(
     for (int64_t i = 0; i < output_count; ++i)
         result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
     return result;
+}
+
+pybind11::tuple cn_raydn_reflection_epc_paths_backward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor sequence,
+    torch::Tensor plane_points,
+    torch::Tensor plane_normals,
+    torch::Tensor valid,
+    torch::Tensor bounce_count,
+    pybind11::object grad_points,
+    pybind11::object grad_normals,
+    pybind11::object grad_path_length,
+    bool need_grad_vertices,
+    bool need_grad_source,
+    bool need_grad_receiver,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor grad_points_storage;
+    at::Tensor grad_normals_storage;
+    at::Tensor grad_path_length_storage;
+    const at::Tensor *grad_points_ptr =
+        optional_tensor(std::move(grad_points), grad_points_storage);
+    const at::Tensor *grad_normals_ptr =
+        optional_tensor(std::move(grad_normals), grad_normals_storage);
+    const at::Tensor *grad_path_length_ptr =
+        optional_tensor(std::move(grad_path_length), grad_path_length_storage);
+    constexpr int64_t kOutputCount = 3;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_reflection_epc_paths_backward_fn(raydn_module_handle)(
+        scene_handle,
+        &source,
+        &receiver,
+        &sequence,
+        &plane_points,
+        &plane_normals,
+        &valid,
+        &bounce_count,
+        grad_points_ptr,
+        grad_normals_ptr,
+        grad_path_length_ptr,
+        need_grad_vertices,
+        need_grad_source,
+        need_grad_receiver,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN reflection EPC paths backward returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
+    return result;
+}
+
+pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor sequence,
+    torch::Tensor plane_points,
+    torch::Tensor plane_normals,
+    torch::Tensor valid,
+    torch::Tensor bounce_count,
+    pybind11::object tangent_vertices,
+    pybind11::object tangent_source,
+    pybind11::object tangent_receiver,
+    std::uintptr_t raydn_module_handle) {
+    at::Tensor tangent_vertices_storage;
+    at::Tensor tangent_source_storage;
+    at::Tensor tangent_receiver_storage;
+    const at::Tensor *tangent_vertices_ptr =
+        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
+    const at::Tensor *tangent_source_ptr =
+        optional_tensor(std::move(tangent_source), tangent_source_storage);
+    const at::Tensor *tangent_receiver_ptr =
+        optional_tensor(std::move(tangent_receiver), tangent_receiver_storage);
+    constexpr int64_t kOutputCount = 3;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_reflection_epc_paths_jvp_fn(raydn_module_handle)(
+        scene_handle,
+        &source,
+        &receiver,
+        &sequence,
+        &plane_points,
+        &plane_normals,
+        &valid,
+        &bounce_count,
+        tangent_vertices_ptr,
+        tangent_source_ptr,
+        tangent_receiver_ptr,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN reflection EPC paths jvp returned an invalid output count");
+    pybind11::tuple result(static_cast<size_t>(output_count));
+    for (int64_t i = 0; i < output_count; ++i)
+        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
+    return result;
+}
+
+at::Tensor cn_raydn_scene_face_normals_backward(
+    int64_t scene_handle,
+    torch::Tensor grad_face_normals,
+    std::uintptr_t raydn_module_handle) {
+    constexpr int64_t kOutputCount = 1;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_scene_face_normals_backward_fn(raydn_module_handle)(
+        scene_handle,
+        &grad_face_normals,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN scene face normals backward returned an invalid output count");
+    return outputs[0];
+}
+
+at::Tensor cn_raydn_scene_face_normals_jvp(
+    int64_t scene_handle,
+    torch::Tensor tangent_vertices,
+    std::uintptr_t raydn_module_handle) {
+    constexpr int64_t kOutputCount = 1;
+    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
+    int64_t output_count = raydn_scene_face_normals_jvp_fn(raydn_module_handle)(
+        scene_handle,
+        &tangent_vertices,
+        outputs.data(),
+        kOutputCount);
+    if (output_count != kOutputCount)
+        throw std::runtime_error("RayDN scene face normals jvp returned an invalid output count");
+    return outputs[0];
 }
 
 pybind11::tuple cn_bdpt_reflection_accumulation_forward(

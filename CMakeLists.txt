@@ -102,6 +102,16 @@ Python_add_library(
 )
 
 target_compile_features(_channel_native PRIVATE cxx_std_17)
+if(MSVC)
+    # RayD's extern "C" integration entries raise std::runtime_error on
+    # invalid inputs by contract. MSVC's default /EHc (part of /EHsc) assumes
+    # extern "C" functions never raise, which turns those raises into
+    # std::terminate at the bridge call sites; /EHc- keeps them catchable so
+    # they surface as Python RuntimeError like every other validation error.
+    set_source_files_properties(
+        native/channel_native/raydn_bridge.cpp
+        PROPERTIES COMPILE_OPTIONS "/EHc-")
+endif()
 target_link_libraries(
     _channel_native
     PRIVATE

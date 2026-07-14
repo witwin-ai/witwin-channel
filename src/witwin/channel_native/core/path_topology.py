@@ -810,6 +810,64 @@ def _require_frequency_ad_constant_materials(
     )
 
 
+def _reflection_geometry_ad(
+    compiled: object,
+    vertices: torch.Tensor,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    face_id: torch.Tensor,
+    depth: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Differentiable reflection hit geometry from RayD under the frozen winner.
+
+    Re-launches the native EPC discovery (direct-plane mode) on the winner
+    face sequence, so the primal hit points and normals ARE the discovery
+    values, and RayD's fixed-winner chain companions provide
+    d(hits, normals)/d(vertices, source, target). The plane arrays handed to
+    RayD are pure gathers of the same anchor/normal tables the discovery
+    consumed; RayD chains the plane cotangents to the winner triangle's
+    vertices itself, so nothing geometric is re-derived here.
+    """
+
+    raydn = compiled.raydn
+    records = raydn.edge_records()
+    tri_a = ops.deterministic_face_anchor_points(
+        records.vertices.contiguous(), records.faces.contiguous()
+    )
+    normals_table = ops.deterministic_normalize_vec3(
+        records.face_normals.contiguous(), eps=1.0e-6
+    )
+    groups = _cached_coplanar_face_groups(
+        raydn,
+        tri_a,
+        normals_table,
+        compiled.geometry.face_surface_id.to(
+            device=face_id.device, dtype=torch.long
+        ).contiguous(),
+    )
+    epc = ops.raydn_reflection_epc_paths_ad(
+        raydn.require_handle(),
+        vertices,
+        source,
+        target,
+        face_id.to(dtype=torch.int32).contiguous(),
+        tri_a[face_id].contiguous(),
+        normals_table[face_id].contiguous(),
+        groups["surface_group_id"],
+        groups["surface_group_size"],
+        groups["surface_group_members"],
+        depth,
+        1,
+    )
+    if not bool(epc["valid"].all()):
+        raise RuntimeError(
+            "fixed-winner EPC re-solve no longer reproduces the discovered "
+            "reflection paths; the winner topology moved under the current "
+            "scene tensors"
+        )
+    return epc["hit_positions"], epc["normals"]
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -827,8 +885,10 @@ def _evaluate_shared_fields(
     float frequency, no autograd graph). ``jvp``/``vjp`` route LoS,
     reflection and transmission through the differentiable field Functions:
     material gathers stay on the torch graph and the frequency is forwarded
-    as a 0-d tensor when the scene stores one (hit geometry stays detached
-    under the fixed-topology contract). The rough-surface C_r attenuation is
+    as a 0-d tensor when the scene stores one. Hit geometry stays detached
+    under the fixed-topology contract unless a geometry leaf participates in
+    AD, in which case it comes from RayD's fixed-winner geometry companions
+    (see ``_reflection_geometry_ad``). The rough-surface C_r attenuation is
     pure torch and receives the same live frequency so dC_r/df is kept.
     """
 
@@ -860,14 +920,15 @@ def _evaluate_shared_fields(
             ops.field_transmission_sequence, frequency_hz=frequency
         )
     device = topology.valid.device
-    # AD-2: when a geometry leaf is on the graph, the endpoints and the hit
-    # points are re-derived from the live scene tensors under the frozen
-    # winner, so the field kernels see geometry with a gradient. Otherwise
-    # the detached native discovery output is used unchanged (AD-1 path).
+    # AD-2: when a geometry leaf is on the graph, the endpoints come from the
+    # live scene tensors and the hit geometry comes from RayD's fixed-winner
+    # chain companions (a native re-launch of the EPC discovery on the frozen
+    # winner sequence plus its backward/jvp CUDA kernels), so the field
+    # kernels see geometry with a gradient without any torch-side re-solve.
+    # Otherwise the detached native discovery output is used unchanged (AD-1).
     geometry_ad = ad_enabled and _geometry_participates_in_ad(scene)
     if geometry_ad:
         vertices = ad_geometry.scene_vertex_table(scene, compiled)
-        faces = compiled.geometry.faces
         tx_positions = ad_geometry.transmitter_positions_ad(
             scene, tx_positions, device=device
         )
@@ -921,16 +982,13 @@ def _evaluate_shared_fields(
             material = face_material_field_bundle(compiled, device=device)
         face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
         if geometry_ad:
-            positions, normals = ad_geometry.specular_chain_geometry(
-                vertices, faces, face_id, source[rows], target[rows]
-            )
-            ad_geometry.assert_geometry_parity(
-                "reflection hit points",
-                positions,
-                topology.interaction_positions[rows, :depth_value],
-            )
-            ad_geometry.assert_plane_parity(
-                normals, topology.interaction_normals[rows, :depth_value]
+            positions, normals = _reflection_geometry_ad(
+                compiled,
+                vertices,
+                source[rows].contiguous(),
+                target[rows].contiguous(),
+                face_id,
+                depth_value,
             )
         else:
             positions = topology.interaction_positions[
@@ -995,28 +1053,25 @@ def _evaluate_shared_fields(
         event_valid = (
             slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
         ).contiguous()
+        positions = topology.interaction_positions[rows].contiguous()
         if geometry_ad:
-            positions, normals = ad_geometry.straight_chain_geometry(
+            # The transmission kernel reads only the straight source-target
+            # ray and the wall normals, so the crossing points carry exactly
+            # zero gradient and stay the detached discovery values. The
+            # normals come from RayD's differentiable face-normal table
+            # gathered by the frozen winner prim; the kernel orients them
+            # against the incident ray internally, so the table's sign
+            # convention does not matter. Invalid slots gather face 0 but are
+            # skipped by the kernel, so they receive a zero cotangent.
+            records = compiled.raydn.edge_records()
+            face_normal_table = ops.raydn_face_normals_ad(
+                compiled.raydn.require_handle(),
                 vertices,
-                faces,
-                topology.primitive_sequence[rows].to(dtype=torch.int64),
-                event_valid,
-                source[rows],
-                target[rows],
+                records.face_normals.contiguous(),
             )
-            ad_geometry.assert_geometry_parity(
-                "transmission hit points",
-                positions,
-                topology.interaction_positions[rows],
-                mask=event_valid.unsqueeze(-1),
-            )
-            ad_geometry.assert_plane_parity(
-                normals,
-                topology.interaction_normals[rows],
-                mask=event_valid,
-            )
+            prim_sequence = topology.primitive_sequence[rows].to(dtype=torch.int64)
+            normals = face_normal_table[prim_sequence.clamp_min(0)]
         else:
-            positions = topology.interaction_positions[rows].contiguous()
             normals = topology.interaction_normals[rows].contiguous()
         evaluated = transmission_field_op(
             source[rows].contiguous(),

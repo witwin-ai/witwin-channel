@@ -3477,6 +3477,543 @@ def raydn_refl_epc_field_ad(
     return dict(zip(_RAYDN_REFL_EPC_FIELD_AD_FIELDS, values, strict=True))
 
 
+# ---------------------------------------------------------------------------
+# RayDN reflection EPC paths geometry AD (plan 07 AD-2 layer 1).
+#
+# The reflection EPC path export (direct-plane mode) is the discovery entry
+# the deterministic/path solvers use. Its geometry companions differentiate
+# the continuous specular chain (hit points, emitted unit normals, path
+# length) with respect to the scene vertex table and the per-row endpoints,
+# under a frozen winner: the face sequence, the validity mask, the
+# containment resolution and the visibility casts are detached discovery
+# records. RayD chains each bounce's plane cotangents to the winner
+# triangle's vertices itself, so no hit geometry is ever re-derived here.
+# ---------------------------------------------------------------------------
+
+
+def _epc_paths_frozen_winner_checks(
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    sequence: torch.Tensor,
+    plane_points: torch.Tensor,
+    plane_normals: torch.Tensor,
+    valid: torch.Tensor,
+    bounce_count: torch.Tensor,
+) -> tuple[int, int]:
+    validate_cuda_tensor(
+        "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "receiver", receiver, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("sequence", sequence, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor(
+        "plane_points", plane_points, dtype=torch.float32, ndim=3, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "plane_normals",
+        plane_normals,
+        dtype=torch.float32,
+        ndim=3,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    validate_cuda_tensor("bounce_count", bounce_count, dtype=torch.int32, ndim=1)
+    rows = int(source.shape[0])
+    bounces = int(sequence.shape[1])
+    _ad_check_rows("receiver", receiver, rows)
+    _ad_check_rows("sequence", sequence, rows)
+    _ad_check_rows("valid", valid, rows)
+    _ad_check_rows("bounce_count", bounce_count, rows)
+    if bounces < 1:
+        raise ValueError("sequence must cover at least one bounce")
+    if tuple(plane_points.shape) != (rows, bounces, 3):
+        raise ValueError("plane_points must have shape (rows, bounces, 3)")
+    if tuple(plane_normals.shape) != (rows, bounces, 3):
+        raise ValueError("plane_normals must have shape (rows, bounces, 3)")
+    return rows, bounces
+
+
+def raydn_reflection_epc_paths_backward(
+    handle: object,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    sequence: torch.Tensor,
+    plane_points: torch.Tensor,
+    plane_normals: torch.Tensor,
+    valid: torch.Tensor,
+    bounce_count: torch.Tensor,
+    *,
+    grad_points: torch.Tensor | None = None,
+    grad_normals: torch.Tensor | None = None,
+    grad_path_length: torch.Tensor | None = None,
+    need_grad_vertices: bool = False,
+    need_grad_source: bool = False,
+    need_grad_receiver: bool = False,
+) -> tuple[torch.Tensor | None, ...]:
+    rows, bounces = _epc_paths_frozen_winner_checks(
+        source, receiver, sequence, plane_points, plane_normals, valid, bounce_count
+    )
+    _ad_check_optional_grad("grad_points", grad_points, ((rows, bounces, 3),))
+    _ad_check_optional_grad("grad_normals", grad_normals, ((rows, bounces, 3),))
+    _ad_check_optional_grad("grad_path_length", grad_path_length, ((rows,),))
+    out = _required_native_op("raydn_reflection_epc_paths_backward")(
+        _raydn_scene_handle_id(handle),
+        source,
+        receiver,
+        sequence,
+        plane_points,
+        plane_normals,
+        valid,
+        bounce_count,
+        grad_points,
+        grad_normals,
+        grad_path_length,
+        bool(need_grad_vertices),
+        bool(need_grad_source),
+        bool(need_grad_receiver),
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 3:
+        raise TypeError(
+            "_channel_native.raydn_reflection_epc_paths_backward must return"
+            " 3 gradients"
+        )
+    return tuple(out)
+
+
+def raydn_reflection_epc_paths_jvp(
+    handle: object,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    sequence: torch.Tensor,
+    plane_points: torch.Tensor,
+    plane_normals: torch.Tensor,
+    valid: torch.Tensor,
+    bounce_count: torch.Tensor,
+    *,
+    tangent_vertices: torch.Tensor | None = None,
+    tangent_source: torch.Tensor | None = None,
+    tangent_receiver: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, ...]:
+    rows, _bounces = _epc_paths_frozen_winner_checks(
+        source, receiver, sequence, plane_points, plane_normals, valid, bounce_count
+    )
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    _ad_check_tangent_vec3("tangent_source", tangent_source, rows)
+    _ad_check_tangent_vec3("tangent_receiver", tangent_receiver, rows)
+    out = _required_native_op("raydn_reflection_epc_paths_jvp")(
+        _raydn_scene_handle_id(handle),
+        source,
+        receiver,
+        sequence,
+        plane_points,
+        plane_normals,
+        valid,
+        bounce_count,
+        tangent_vertices,
+        tangent_source,
+        tangent_receiver,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)) or len(out) != 3:
+        raise TypeError(
+            "_channel_native.raydn_reflection_epc_paths_jvp must return 3 tangents"
+        )
+    return tuple(out)
+
+
+def raydn_scene_face_normals_backward(
+    handle: object, grad_face_normals: torch.Tensor
+) -> torch.Tensor:
+    # Cotangents from autograd may be strided views; the native kernel
+    # consumes explicit strides, so contiguity is deliberately not required.
+    if not isinstance(grad_face_normals, torch.Tensor):
+        raise TypeError("grad_face_normals must be a torch.Tensor")
+    if grad_face_normals.dtype != torch.float32:
+        raise TypeError("grad_face_normals must have dtype torch.float32")
+    if not grad_face_normals.is_cuda:
+        raise ValueError("grad_face_normals must be a CUDA tensor")
+    if grad_face_normals.ndim != 2 or grad_face_normals.shape[1] != 3:
+        raise ValueError("grad_face_normals must have shape (F, 3)")
+    out = _required_native_op("raydn_scene_face_normals_backward")(
+        _raydn_scene_handle_id(handle),
+        grad_face_normals,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.raydn_scene_face_normals_backward must return a tensor"
+        )
+    return out
+
+
+def raydn_scene_face_normals_jvp(
+    handle: object, tangent_vertices: torch.Tensor
+) -> torch.Tensor:
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    if tangent_vertices is None:
+        raise ValueError("tangent_vertices is required")
+    out = _required_native_op("raydn_scene_face_normals_jvp")(
+        _raydn_scene_handle_id(handle),
+        tangent_vertices,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.raydn_scene_face_normals_jvp must return a tensor"
+        )
+    return out
+
+
+class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayDN reflection EPC paths over the C bridge.
+
+    Forward IS the discovery entry (direct-plane mode) re-launched on the
+    frozen winner sequence, so the primal hit points, normals and path length
+    are the native discovery values, not a reconstruction. Backward/jvp call
+    RayD's chain geometry companions; ``vertices`` must be the scene's global
+    vertex table and only routes vertex gradients/tangents.
+    """
+
+    @staticmethod
+    def forward(
+        scene_handle,
+        vertices,
+        source,
+        receiver,
+        sequence,
+        plane_points,
+        plane_normals,
+        surface_group_id,
+        surface_group_size,
+        surface_group_members,
+        max_bounces,
+        visibility_ignore_mode,
+    ):
+        out = _required_native_op("raydn_reflection_epc_paths_forward")(
+            int(scene_handle),
+            source,
+            receiver,
+            None,
+            sequence,
+            plane_points,
+            plane_normals,
+            surface_group_id,
+            surface_group_size,
+            surface_group_members,
+            int(max_bounces),
+            int(visibility_ignore_mode),
+            _raydn_module_handle(),
+        )
+        return tuple(out)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        (
+            scene_handle,
+            vertices,
+            source,
+            receiver,
+            sequence,
+            plane_points,
+            plane_normals,
+            _surface_group_id,
+            _surface_group_size,
+            _surface_group_members,
+            max_bounces,
+            _visibility_ignore_mode,
+        ) = inputs
+        valid, _path_length, resolved_prim_ids, surface_group_ids = output[:4]
+        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
+        source = torch.autograd.forward_ad.unpack_dual(source).primal
+        receiver = torch.autograd.forward_ad.unpack_dual(receiver).primal
+        # Direct-plane mode fills every bounce slot or invalidates the row, so
+        # the frozen per-row bounce count is the launch width; invalid rows
+        # are skipped by the companions regardless of this value.
+        bounce_count = torch.full(
+            (int(source.shape[0]),),
+            int(max_bounces),
+            device=source.device,
+            dtype=torch.int32,
+        )
+        ctx.scene = int(scene_handle)
+        ctx.vertices_shape = tuple(vertices.shape)
+        ctx.save_for_backward(
+            source, receiver, sequence, plane_points, plane_normals, valid,
+            bounce_count,
+        )
+        ctx.save_for_forward(
+            source, receiver, sequence, plane_points, plane_normals, valid,
+            bounce_count,
+        )
+        ctx.mark_non_differentiable(valid, resolved_prim_ids, surface_group_ids)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, *grad_outputs):
+        none_grads = (None,) * 12
+        grad_path_length = grad_outputs[1]
+        grad_hits = grad_outputs[4]
+        grad_unit_normals = grad_outputs[5]
+        if grad_path_length is None and grad_hits is None and grad_unit_normals is None:
+            return none_grads
+        (
+            source,
+            receiver,
+            sequence,
+            plane_points,
+            plane_normals,
+            valid,
+            bounce_count,
+        ) = ctx.saved_tensors
+        need_grad_vertices = bool(ctx.needs_input_grad[1])
+        need_grad_source = bool(ctx.needs_input_grad[2])
+        need_grad_receiver = bool(ctx.needs_input_grad[3])
+        if not (need_grad_vertices or need_grad_source or need_grad_receiver):
+            return none_grads
+        grad_vertices, grad_source, grad_receiver = raydn_reflection_epc_paths_backward(
+            ctx.scene,
+            source,
+            receiver,
+            sequence,
+            plane_points,
+            plane_normals,
+            valid,
+            bounce_count,
+            grad_points=grad_hits,
+            grad_normals=grad_unit_normals,
+            grad_path_length=grad_path_length,
+            need_grad_vertices=need_grad_vertices,
+            need_grad_source=need_grad_source,
+            need_grad_receiver=need_grad_receiver,
+        )
+        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
+            raise RuntimeError(
+                "raydn_reflection_epc_paths_ad vertices must be the scene"
+                " global vertex table"
+            )
+        return (
+            None,
+            grad_vertices if need_grad_vertices else None,
+            grad_source if need_grad_source else None,
+            grad_receiver if need_grad_receiver else None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        _grad_handle,
+        grad_vertices,
+        grad_source,
+        grad_receiver,
+        *_frozen_tangents,
+    ):
+        (
+            source,
+            receiver,
+            sequence,
+            plane_points,
+            plane_normals,
+            valid,
+            bounce_count,
+        ) = ctx.saved_tensors
+        with torch._C._DisableFuncTorch():
+            tangents = raydn_reflection_epc_paths_jvp(
+                ctx.scene,
+                _ad_native_tensor(source),
+                _ad_native_tensor(receiver),
+                _ad_native_tensor(sequence),
+                _ad_native_tensor(plane_points),
+                _ad_native_tensor(plane_normals),
+                _ad_native_tensor(valid),
+                _ad_native_tensor(bounce_count),
+                tangent_vertices=_ad_checked_tangent(
+                    "raydn_reflection_epc_paths_ad tangent_vertices",
+                    _ad_native_tangent_or_none(grad_vertices),
+                    ctx.vertices_shape,
+                ),
+                tangent_source=_ad_checked_tangent(
+                    "raydn_reflection_epc_paths_ad tangent_source",
+                    _ad_native_tangent_or_none(grad_source),
+                    tuple(source.shape),
+                ),
+                tangent_receiver=_ad_checked_tangent(
+                    "raydn_reflection_epc_paths_ad tangent_receiver",
+                    _ad_native_tangent_or_none(grad_receiver),
+                    tuple(receiver.shape),
+                ),
+            )
+        tangent_points, tangent_normals, tangent_path_length = tangents
+        return (
+            None,
+            tangent_path_length,
+            None,
+            None,
+            tangent_points,
+            tangent_normals,
+        )
+
+
+_RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS = (
+    "valid",
+    "path_length",
+    "resolved_prim_ids",
+    "surface_group_ids",
+    "hit_positions",
+    "normals",
+)
+
+
+def raydn_reflection_epc_paths_ad(
+    handle: object,
+    vertices: torch.Tensor,
+    source: torch.Tensor,
+    receiver: torch.Tensor,
+    sequence: torch.Tensor,
+    plane_points: torch.Tensor,
+    plane_normals: torch.Tensor,
+    surface_group_id: torch.Tensor,
+    surface_group_size: torch.Tensor,
+    surface_group_members: torch.Tensor,
+    max_bounces: int,
+    visibility_ignore_mode: int,
+) -> dict[str, torch.Tensor]:
+    """Differentiable RayDN reflection EPC paths under the fixed-winner contract.
+
+    ``hit_positions``, ``normals`` and ``path_length`` participate in
+    reverse- and forward-mode torch AD with respect to ``vertices``,
+    ``source`` and ``receiver``. ``sequence`` is the frozen winner face
+    sequence and ``plane_points`` / ``plane_normals`` are its detached plane
+    arrays (anchor + unit face normal, gathered per bounce); ``valid`` and
+    the resolved ids stay non-differentiable.
+    """
+
+    validate_cuda_tensor(
+        "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "receiver", receiver, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("sequence", sequence, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor(
+        "plane_points", plane_points, dtype=torch.float32, ndim=3, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "plane_normals",
+        plane_normals,
+        dtype=torch.float32,
+        ndim=3,
+        trailing_shape=(3,),
+    )
+    if int(sequence.shape[1]) != int(max_bounces):
+        raise ValueError("sequence width must equal max_bounces")
+    values = _RaydnReflectionEpcPathsAdFunction.apply(
+        _raydn_scene_handle_id(handle),
+        vertices,
+        source,
+        receiver,
+        sequence,
+        plane_points,
+        plane_normals,
+        surface_group_id,
+        surface_group_size,
+        surface_group_members,
+        int(max_bounces),
+        int(visibility_ignore_mode),
+    )
+    return dict(zip(_RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS, values, strict=True))
+
+
+class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
+    """Scene unit face-normal table with a graph to the vertex table.
+
+    Forward normalizes the native face-normal export with the same kernel the
+    reflection discovery uses; backward/jvp call RayD's face-normal table
+    companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))
+    over the scene's global vertex and face tables).
+    """
+
+    @staticmethod
+    def forward(scene_handle, vertices, raw_face_normals):
+        return deterministic_normalize_vec3(raw_face_normals, eps=1.0e-6)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        scene_handle, vertices, _raw_face_normals = inputs
+        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
+        ctx.scene = int(scene_handle)
+        ctx.vertices_shape = tuple(vertices.shape)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_face_normals):
+        if ctx.needs_input_grad[2]:
+            raise RuntimeError(
+                "raydn_face_normals_ad differentiates the vertex table only;"
+                " the raw face-normal export is a detached scene record"
+            )
+        if grad_face_normals is None or not ctx.needs_input_grad[1]:
+            return (None, None, None)
+        grad_vertices = raydn_scene_face_normals_backward(
+            ctx.scene, grad_face_normals
+        )
+        if tuple(grad_vertices.shape) != ctx.vertices_shape:
+            raise RuntimeError(
+                "raydn_face_normals_ad vertices must be the scene global"
+                " vertex table"
+            )
+        return (None, grad_vertices, None)
+
+    @staticmethod
+    def jvp(ctx, _grad_handle, grad_vertices, _grad_raw_face_normals):
+        tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
+        if tangent_vertices is None:
+            return None
+        with torch._C._DisableFuncTorch():
+            return raydn_scene_face_normals_jvp(
+                ctx.scene,
+                _ad_checked_tangent(
+                    "raydn_face_normals_ad tangent_vertices",
+                    tangent_vertices,
+                    ctx.vertices_shape,
+                ),
+            )
+
+
+def raydn_face_normals_ad(
+    handle: object, vertices: torch.Tensor, raw_face_normals: torch.Tensor
+) -> torch.Tensor:
+    """Scene unit face-normal table, differentiable in the vertex table.
+
+    ``raw_face_normals`` is the detached native export (scene edge records);
+    the returned table is its normalization with vertex gradients/tangents
+    routed through RayD's face-normal companions under the fixed-winner
+    contract (which face a row consumes stays a frozen integer gather).
+    """
+
+    validate_cuda_tensor(
+        "raw_face_normals",
+        raw_face_normals,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    return _RaydnFaceNormalsAdFunction.apply(
+        _raydn_scene_handle_id(handle), vertices, raw_face_normals
+    )
+
+
 def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
 
