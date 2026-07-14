@@ -1,7 +1,46 @@
 # Channel Native 可微分求解器计划
 
-**状态：** Proposed / 独立于前向仿真器发布
+**状态：** In progress（AD-A0 / AD-1 已交付并加固；AD-2 进行中）
 **基线日期：** 2026-07-12（v2：补齐 AD 架构与 RayD 集成边界）
+**执行更新：** 2026-07-14（v3：两条实现路线因上游能力缺口改道，见 §3.1）
+
+## 0. 执行进度（2026-07-14）
+
+| 阶段 | 状态 | 提交 |
+|---|---|---|
+| AD-A0 RayD 可微几何 C-ABI | 已交付 + 已加固 | `1396181`, `0fdfed2`（RayDi: `d13499d`, `bb9d457`） |
+| AD-1 材料/频率 JVP+VJP（T1） | 已交付 + 已加固 | `f6873d8`, `bc6dd5a` |
+| AD-2 TX/RX 位置 + mesh 顶点（T1） | 进行中 | — |
+| AD-3 MC basic 功率图 | 未开始 | — |
+| AD-4 多交互收口（绕射/耦合/多反射） | 未开始 | — |
+
+AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 次梯度门用 `>` 导致 `sigma_e = 0`（材料默认初值）梯度恒零；更隐蔽的是 `dc_layer_one_way_phase` 的衰减幅度门用 `exponent < 0`，而 passive 分支在 `sigma_e = 0` 或 `thickness = 0` 时把 `Im(kz)·d` 落在 **-0.0** 上，于是 `amplitude · d_exponent` 被整项吞掉——在 `sigma_e = 0` 处这一项就是层传播子对 sigma 的**全部**一阶效应（该处 dkz/dsigma 纯虚），透射 sigma 梯度因此小了约 20 倍且反号。同一提交还修好了 deterministic 累加在 AD 模式下截断计算图的问题，并让频率 AD 在遇到色散材料时显式失败。
+
+## 3.1 两处路线修正（基于上游能力核对，2026-07-14）
+
+**（一）层 1 几何 AD 联合修改 RayD，命中点导数由 RayD 自己给出。** §3 的原则不变，但上游能力不足，需要**在 RayD 内补齐**，而不是绕开它。
+
+现状核对：RayD 的 C-ABI 只暴露了 EPC **path_length** 的导数，**没有任何 interaction point 的导数**（其 EPC field backward 更是在微分一个与前向无关的 toy contract，已在 `0fdfed2` 中禁用）。而 Fresnel 幅度依赖入射角，入射角**不**满足驻定性（只有总路径长度按 Fermat 驻定），所以命中点导数无法回避。
+
+**硬约束（用户，2026-07-14）：几何导数必须走 RayD；不得在 channel_native 侧用 torch 重解一遍命中几何；一切热路径必须是 CUDA kernel，不允许 torch 逐算子编排或 CPU 计算。** 曾短暂存在过一版 `core/ad_geometry.py` 的 torch image-source 重建（提交 `bc6dd5a`），它重复了 RayD 前向已经算过的数学（`reflection_geometry.h` 的 `reflect_point_across_plane` + `intersect_segment_plane`），**已按此约束移除**。
+
+落地形态（不重复任何计算）：
+
+- **反射**：channel_native 走 EPC 的 `direct_plane_mode`——`deterministic_reflection_epc_input_batch` 先把 winner 面序列的 `(tri_a, face_normal)` 打成平面数组，RayD 的 `reflection_epc_paths_forward` 解镜像链（`reflect_point_across_plane`）并回溯出命中点（`intersect_line_plane`）与法线（`shared/include/rayd/shared/optix/reflection_epc_device.cuh:490-640`）。新增 `rayd_torch_native_reflection_epc_paths_backward/_jvp`：在**冻结 winner**（面序列、包含性检验、遮挡射线全部 detach）下，给出 `d(interaction_positions, interaction_normals, path_length) / d(vertices, source, receiver)`。**backward 不需要 OptiX**——winner 已冻结，只剩纯几何链。
+- **共享同一份数学**：把 raygen 里内联的链求解抽成 header-only device 函数，前向与伴随共用；按 RayD 自己的房规（`utd_math.h` 已有 `adj_fresnel_reflection_face` / `adj_face_reflection_operator`）在 `reflection_geometry.h` 旁补 `adj_reflect_point_across_plane` / `adj_intersect_line_plane` / `adj_face_normal`。
+- **透射**：墙面交点本来就来自 RayD 的 `intersect` 前向（`bdpt_intersect_forward`，flags=7 返回 t/p/geo_n/prim），而 AD-A0 已经桥好 `intersect_backward/_jvp`。只需把 `geo_n` 补成可微输出（法线是顶点的函数），并在 AD 模式下让透射行进循环调用可微入口。
+- **channel_native 侧只做调度**：bridge + 薄 `autograd.Function`（`save_for_backward` + 调原生 backward），零数学。射线方向 `normalize(target - source)` 的伴随另配一个平凡的 CUDA 核。
+
+推论：原定的 AD-1.5（修复 RayD 上游 EPC field backward）对本计划仍**不必要**——channel_native 用的是自己的 `field_*` 场核，从不消费 RayD 的 EPC 场；要修的是 EPC 的**几何**伴随。
+
+**（二）绕射 AD 只能由 channel_native 自己重算 UTD 楔形场。** RayD 的 C-ABI **零个**绕射 backward/jvp：其内部的 `diffraction_accumulation_*_backward_op` 是 radiomap 累加的伴随，不是 channel_native 使用的 order-1 path export 的伴随；`diffraction_paths_order1_forward` 没有任何伴随。因此 `field_project_complex3` 的 backward 只能拿到 d/d(field_vector)，链条到常量即断。
+
+可行路线（AD-4 采用）：channel_native 自己从固定拓扑（edge_id、边几何、楔面材料）重算 UTD 场并微分它。可行性已核实：
+
+- `field_transport.cuh` 已经 include 了 `<rayd/shared/utd/utd_math.h>`，`field_coupled_rd` 本来就在 channel_native 内重算楔形场（构造 `PairInputs` → `compute_pair_contribution`，见 `kernels/field_transport.cu:445-490`）。纯绕射（component 2）就是同一段代码去掉反射腿：入射场换成 `free_space_complex3(source, edge, k, tx_pol)`。
+- **驻定点由 `compute_pair_contribution` 内部求解**（`pair.selectStationaryPoint = 1.0f`，RayD 的约定），所以楔形场对几何的依赖整块落在这个函数里——它的伴随同时给出材料、频率与几何梯度，不需要在外面再解一次 Keller 锥。
+- **该 header 是 header-only device 代码，自带 pair 的伴随**（`compute_pair_vector_contribution` 的 VJP、`PairInputsGrad`、`adj_face_reflection_operator`）。因此绕射 AD **不需要动 RayDi 的 C-ABI**，直接在 channel_native 的核里调这些 device 函数即可。注意核对 `pair_vector_output_jvp_completion` 是**有限差分**实现（eps=1e-3）而非解析对偶——若走 jvp 需要评估其精度，或自己写解析切向。
+- **陷阱**：RayD 的绕射路径用**半空间** Fresnel（`face_reflection_operator`，无厚度，cos 由楔角给出），而 `field_coupled_rd` 用**有限厚板** Fresnel（`slab_face_operator`，有厚度，cos 由 |dot(n,dir)| 给出）；重算必须复现 RayD 的约定（`material.omega > 0`，让 `compute_pair_contribution` 自己算面算子）才能保持前向一致。另外 `raydn_bridge.cpp:1317` 把送进 RayD 的 tx 极化**硬编码成 +z**（场景的真实极化没进绕射核），重算要么复现这一约定，要么先单独修前向——**前向 parity 门禁（重算结果 vs `topology.field_xyz`）是这些细节的唯一保险**。
 
 ## 1. 目标
 
@@ -108,39 +147,56 @@
 
 ### AD-A0：打通 RayD 可微几何入口（前置，T1/T2 共用）
 
-- [ ] 在 `rayd/torch/integration.h` 增补 RayD 可微 EPC/trace/intersect 的 backward/jvp `extern "C"` 入口，直接 forward 到 RayD 现有的 `intersect_backward_optional_cuda` / `intersect_jvp_cuda` 及 reflection/EPC 对应实现；**不开 `RAYD_TORCH_BUILD_PYTHON_MODULE`、不 import `rayd.torch`**；
-- [ ] `raydn_bridge.cpp` 用与现有 `rayd_torch_native_*_forward` 相同的平凡方式 resolve 这些新符号；`ops.py` 在 channel_native 侧包 `torch.autograd.Function`，返回 requires_grad 的 `interaction_positions/normals/path_length`；
-- [ ] 单测：固定拓扑下，RayD 命中点对 tx 位置与顶点的 JVP/VJP 与中心有限差分一致（可拿 RayD 自带 `test_intersect_grad.py` 的精确顶点梯度做数值交叉验证，但运行时路径只走 C-ABI）。
+- [x] 在 `rayd/torch/integration.h` 增补 RayD 可微 EPC/trace/intersect 的 backward/jvp `extern "C"` 入口，直接 forward 到 RayD 现有的 `intersect_backward_optional_cuda` / `intersect_jvp_cuda` 及 reflection/EPC 对应实现；**不开 `RAYD_TORCH_BUILD_PYTHON_MODULE`、不 import `rayd.torch`**；
+- [x] `raydn_bridge.cpp` 用与现有 `rayd_torch_native_*_forward` 相同的平凡方式 resolve 这些新符号；`ops.py` 在 channel_native 侧包 `torch.autograd.Function`；
+- [x] 单测：固定拓扑下，RayD 命中点对 tx 位置与顶点的 JVP/VJP 与中心有限差分一致（`tests/ad/test_raydn_geometry_ad.py`，25 项）。
+- 交付偏差：RayD 的 EPC 入口只给出可微 `path_length`，**不给 interaction point 导数**，其 EPC field backward 微分的是 toy contract（已禁用）。故 AD-2 的几何层改走 §3.1（一）。
 
 ### AD-1：T1 材料/频率 JVP+VJP（Deterministic + Path，几何 detach）
 
-- [ ] 定义 fixed-topology field-evaluation 输入契约（positions/normals 作为可 detach 的固定几何）；
-- [ ] 为 `field_free_space` / `field_reflection_sequence` / `field_transmission_sequence` / `field_coupled_rd` / `field_project_complex3` 补原生 `*_jvp` 与 `*_backward` 核（LoS 复用并合并现有 `mc_los_path_gain_jvp/backward`，补 frequency 切向），薄 `autograd.Function` 封装；
-- [ ] 打通对 **材料 `eps_r/sigma_e/thickness` 与 frequency** 的 JVP+VJP（LoS + 单反射 + 单透射多层）；
-- [ ] 移除 `path/solver.py:179` 拦截，`deterministic`/`path` 的 `Config` 接受 `ad_mode="jvp"|"vjp"`；
-- [ ] `ad_mode="none"` 与当前前向性能、显存保持一致（不注册图，RayD 走 `*_noad`/`*_forward`）。
+- [x] 定义 fixed-topology field-evaluation 输入契约（positions/normals 作为可 detach 的固定几何）；
+- [x] 为 `field_free_space` / `field_reflection_sequence` / `field_transmission_sequence` 补原生 `*_jvp` 与 `*_backward` 核，薄 `autograd.Function` 封装；`field_coupled_rd` / `field_project_complex3` 移交 AD-4（前者的伴随与后者的 UTD 重算同属一块工作，见 §3.1（二））；
+- [x] 打通对 **材料 `eps_r/sigma_e/thickness` 与 frequency** 的 JVP+VJP（LoS + 单反射 + 单透射多层）；
+- [x] 移除 `path/solver.py` 拦截，`deterministic`/`path` 的 `Config` 接受 `ad_mode="jvp"|"vjp"`；
+- [x] `ad_mode="none"` 与当前前向性能、显存保持一致（不注册图）；
+- [x] 加固：钳位边界次梯度（`>=`）、`-0.0` 衰减门、可微累加、色散材料的频率 AD 显式失败。
 
 ### AD-2：T1 tx/rx position + mesh vertex（Deterministic + Path，几何移动）
 
-- [ ] LoS 对 **TX/RX position** 的 JVP+VJP（LoS 场核直接吃 tx/rx 张量，无需 RayD）；
-- [ ] 单反射对 **TX/RX position** 的 JVP+VJP（组合 AD-A0 的可微几何 + `field_reflection_sequence`）；
-- [ ] mesh vertex 的连续部分导数（复用 RayD 顶点梯度，固定 winner）；
-- [ ] `path` solver 端到端 torch autograd，`ctx.save_for_backward` 只存 backward 必需张量（positions/normals/materials/winner ids）；
-- [ ] 支持 batch、多 TX/RX 与 complex loss（复场 → 实标量 loss）。
+层 2（EM 侧，channel_native）：
+
+- [ ] `field_free_space` 对 **TX/RX position** 的 JVP+VJP（LoS 场核直接吃 tx/rx 张量）；
+- [ ] `field_reflection_sequence` / `field_transmission_sequence` 对 **source/target/interaction_positions/interaction_normals** 的伴随与切向（`slab_fresnel_dual` 需补 cos_theta 切向；伴随需穿过 frames、cos_theta 与 propagation）；
+- [ ] `path_length_m` / `delay_s` 在几何可微后转为可微输出（ToA 类损失）。
+
+层 1（几何侧，RayD，见 §3.1（一））：
+
+- [x] Scene 几何叶子接线：`Transmitter.position` / `ReceiverPoint.position` / `Structure.vertices` 绕开原生 host-float 构造 op，保持 autograd 图（纯张量传递，无数学）；
+- [ ] RayD 新增 `reflection_epc_paths_backward/_jvp`（CUDA，无 OptiX）：固定 winner 下 `d(hits, normals, path_length)/d(vertices, source, receiver)`；链求解抽成 header-only device 函数，前向/伴随共用；`reflection_geometry.h` 补 `adj_*` 原语；
+- [ ] RayD `intersect_backward/_jvp` 补 `geo_n` 可微输出（透射法线）；
+- [ ] channel_native：bridge 新符号 + 薄 `autograd.Function`；透射行进循环在 AD 模式下改调可微 intersect；`normalize(target-source)` 的伴随核；
+- [ ] 删除 `core/ad_geometry.py` 的 torch 链重建（`bc6dd5a` 引入，违反"不重复计算 + 热路径必须 CUDA"）；
+- [ ] mesh vertex 的连续部分导数（固定 winner）；支持 batch、多 TX/RX 与 complex loss。
 
 ### AD-3：T2 MC basic 可微（标量功率图）
 
-- [ ] LoS 功率增益：补 frequency 切向，把 `mc_los_path_gain_jvp/backward` 并入 `autograd.Function`（对 tx/rx 位置、材料、频率）；
-- [ ] 反射/绕射功率图：复用 AD-A0 打通的 RayD 可微 accumulation 入口拿 JVP/VJP；透射/散射功率图配原生 backward/jvp；
-- [ ] `montecarlo.basic` 的 `Config` 接受 `ad_mode`，移除 `basic/solver.py:41` 的 `_validate_ad_config` 拦截；seed 固定使 FD±h 与 AD 复用同一采样序列；
-- [ ] 标准连续采样重参数化（basic 无离散事件分支，直接可做）；跨 seed 梯度方差/CI（见 §9）。
+**路线修正**：§6 原假设"复用 RayD 可微 accumulation 入口"——**不成立**。RayD 既没有 reflection-accumulation jvp，也没有可用的绕射伴随；MC basic 真正做场求值的两个累加器是 channel_native **自己的**核（`cn_mc_sionna_reflection_accumulate_cuda` @ `kernels/reflection.cu:263`、`cn_mc_sionna_diffraction_tape_accumulate_cuda` @ `kernels/diffraction.cu:1298`），RayD 只负责求交与采样 tape（离散、冻结）。因此伴随核必须写在 channel_native 内。
+
+- [ ] 打通 basic 的材料/频率通路：`basic/solver.py::_host_material_tensors` 把材料 `float()` 成 host 标量（`bdpt_face_material_tensors_from_host` 契约就是 `tuple[float,...]`），AD 模式下改走张量路径（`face_material_field_bundle`）；`float(scene.frequency)` 同理换成活的 0-d 张量；
+- [ ] LoS 功率增益：`mc_los_path_gain_jvp/backward` 补 frequency 切向/余切，并入 `autograd.Function`（tx/rx 位置、tx_power、频率）；
+- [ ] 反射功率图：为 `mc_sionna_reflection_accumulate` 写原生 backward/jvp（`eta_r`/`sigma`/`gain`/`thickness`/`wavelength`，以及 ray origin = tx 位置）；
+- [ ] 绕射功率图：为 `mc_sionna_diffraction_tape_accumulate` 写原生 backward/jvp（同上 + `mu_r`）；
+- [ ] 透射功率图：`straight_transmission_chains` 的透射率对材料/频率可微；`mc_finalize_component_maps` 是纯线性求和，VJP 平凡；
+- [ ] `montecarlo.basic` 的 `Config` 接受 `ad_mode`（同时改 `basic/config.py` 与 `basic/solver.py:41` 两处拦截）；散射分量 + AD 显式拒绝（与 D/P 一致）；
+- [ ] seed 固定使 FD±h 与 AD 复用同一采样序列；跨 seed 梯度方差/CI（见 §9）；
+- [ ] `basic/metadata.py:36-53` 预留的"恰好一次 fused backward/jvp launch"计数契约需按实际的逐分量 launch 重新定义。
 
 ### AD-4：多交互复场收口（三 solver）
 
 - [ ] 多反射链式导数（`field_reflection_sequence` 深度 > 1，Jones/complex3）；
 - [ ] multilayer/transmission 散射矩阵对 `eps_r/sigma/thickness/freq` 导数；
-- [ ] UTD fixed-topology 导数：决定"RayD 内提供可微 UTD 场" vs "channel_native 从 `interaction_position/edge_id/材料` 重推 Keller 系数"，含 shadow-boundary 排除区；
-- [ ] coupled R-D / D-R 链式导数；
+- [ ] **UTD fixed-topology 导数（决定：channel_native 内重算）**：新增原生"楔形场重算 + 对偶"核，从固定拓扑（`edge_id`、边几何、楔面材料、驻定点）复现 RayD 的 order-1 UTD 前向（必须用 RayD 的半空间 Fresnel 约定 `material.omega > 0`，否则前向会变），再对材料/频率求导；随后 `field_project_complex3` 的 backward 才有意义（它本身只是常量基上的线性投影，伴随平凡）；含 shadow-boundary 排除区；
+- [ ] `field_coupled_rd` 的 backward/jvp（12 个材料标量 + 频率；其楔面算子走 `slab_face_operator` → 可直接复用已有的 `slab_fresnel_dual`）；解除 seam 中 component 3/4 的拦截；
 - [ ] metadata 记录 `ad_status`、tape bytes、`jvp_launch_count`/`backward_launch_count`、forward/backward 时间与峰值显存（schema 已在 `metadata.py` 预留）；
 - [ ] 解析小场景通过后，进入 Munich/SF 场景。
 
