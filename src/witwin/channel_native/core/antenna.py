@@ -157,6 +157,11 @@ def steering_vector(
 ) -> torch.Tensor:
     """Return ``exp(+j k r·u)`` under the package's ``exp(-j k d)`` convention."""
 
+    if isinstance(frequency_hz, torch.Tensor):
+        # Synthetic-array steering is evaluated at the primal frequency; its
+        # frequency derivative is exactly zero for single-element centre
+        # arrays and detached otherwise (plan 07 AD-1 fixed-array contract).
+        frequency_hz = float(frequency_hz.detach())
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
     if direction.shape[-1] != 3:

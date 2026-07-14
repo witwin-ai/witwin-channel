@@ -266,15 +266,13 @@ __global__ void transmission_sequence_kernel(
                 path_valid = false;
                 break;
             }
-            field::float3a normal = field::safe_normalize(
-                load_sequence3(interaction_normals, index, wall, depth),
-                field::make_f3(0.0f, 0.0f, 1.0f));
-            if (field::f3_dot(direction, normal) > 0.0f)
-                normal = field::f3_neg(normal);
-            const float cos_theta = fminf(
-                fmaxf(fabsf(field::f3_dot(direction, normal)),
-                      field::UTD_SMALL_EPS),
-                1.0f);
+            // s/p basis of the wall; outgoing direction equals incident
+            // direction, so the incident basis is also the exit basis. The
+            // alternate axis keeps the basis deterministic at normal
+            // incidence (same construction as reflect_complex3).
+            const transport::WallFrame frame = transport::wall_frame(
+                direction,
+                load_sequence3(interaction_normals, index, wall, depth));
             em::LayerView layers{
                 layer_offset,
                 layer_count,
@@ -285,30 +283,22 @@ __global__ void transmission_sequence_kernel(
                 material,
             };
             const em::StackRT te = em::stack_rt(
-                cos_theta, layers, frequency_hz, em::kPolTE);
+                frame.cos_theta, layers, frequency_hz, em::kPolTE);
             const em::StackRT tm = em::stack_rt(
-                cos_theta, layers, frequency_hz, em::kPolTM);
-            // s/p basis of the wall; outgoing direction equals incident
-            // direction, so the incident basis is also the exit basis. The
-            // alternate axis keeps the basis deterministic at normal
-            // incidence (same construction as reflect_complex3).
-            field::float3a s_axis = field::f3_cross(normal, direction);
-            s_axis = field::safe_normalize(
-                s_axis, field::stable_perp_basis(direction, normal));
-            const field::float3a p_axis = field::safe_normalize(
-                field::f3_cross(s_axis, direction),
-                field::stable_perp_basis(direction, s_axis));
-            const field::Complex e_s = transport::complex3_dot_real(value, s_axis);
-            const field::Complex e_p = transport::complex3_dot_real(value, p_axis);
+                frame.cos_theta, layers, frequency_hz, em::kPolTM);
+            const field::Complex e_s = transport::complex3_dot_real(
+                value, frame.s_axis);
+            const field::Complex e_p = transport::complex3_dot_real(
+                value, frame.p_axis);
             value = field::c3_add(
-                field::cplx_scale_real(s_axis, field::cplx_mul(te.t, e_s)),
-                field::cplx_scale_real(p_axis, field::cplx_mul(tm.t, e_p)));
+                field::cplx_scale_real(frame.s_axis, field::cplx_mul(te.t, e_s)),
+                field::cplx_scale_real(frame.p_axis, field::cplx_mul(tm.t, e_p)));
             float wall_thickness = 0.0f;
             const int first = layer_offset[material];
             const int layers_in_wall = layer_count[material];
             for (int layer = 0; layer < layers_in_wall; ++layer)
                 wall_thickness += fmaxf(layer_thickness_m[first + layer], 0.0f);
-            carrier_length -= wall_thickness * cos_theta;
+            carrier_length -= wall_thickness * frame.cos_theta;
         }
         const float wave_number =
             2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;

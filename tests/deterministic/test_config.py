@@ -36,7 +36,7 @@ def test_config_normalizes_component_iterables_to_frozenset():
         ({"max_paths": 0}, "max_paths must be positive"),
         ({"max_paths_scope": "receiver"}, "max_paths_scope must be"),
         ({"sort_key": "unstable"}, "sort_key must be one of"),
-        ({"ad_mode": "vjp"}, "deterministic fixed-topology AD is not enabled"),
+        ({"ad_mode": "forward"}, "deterministic ad_mode must be one of"),
     ],
 )
 def test_config_rejects_invalid_values(kwargs, message):

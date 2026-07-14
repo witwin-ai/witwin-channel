@@ -90,8 +90,44 @@ priority `scattering > diffraction > transmission > reflection > los`.
   (`thin_sheet_straight_path_approximation`, geometric group delay), and
   event/sample diagnostics.
 
+## Differentiable solving (fixed topology, plan 07 AD-1)
+
+- `deterministic` and `path` accept `ad_mode="jvp" | "vjp"` (default
+  `"none"`); `montecarlo.basic` and `montecarlo.bdpt` still reject any
+  non-`"none"` mode.
+- Differentiable parameters this phase: material `eps_r` / `sigma_e` /
+  `gain` / `thickness` (per bounce for reflection, per CSR layer for
+  transmission) and the carrier frequency. Hit geometry (endpoints,
+  interaction positions/normals, polarizations, tx_power) and `mu_r` are
+  detached under the fixed-winner contract; requesting their gradient fails
+  with `NotImplementedError` instead of returning silent zeros.
+- Reverse mode: set `requires_grad_(True)` on the compiled material store
+  tensors (`scene.compile().materials.eps_r` etc.) and call `.backward()` on
+  a loss built from the result's complex coefficients / `path_gain`.
+  Forward mode: `torch.func.jvp` through the field Functions, or
+  `torch.autograd.forward_ad.dual_level` through a full solve.
+- Frequency as a first-class differentiable input: `Scene(...,
+  frequency=torch.tensor(f0, device="cuda", requires_grad=True))` accepts a
+  0-d tensor; the scalar is read once per solve (one host sync), dispersive
+  material records stay frozen at the primal frequency.
+- Implementation: native CUDA backward/jvp companion kernels for
+  `field_free_space` / `field_reflection_sequence` /
+  `field_transmission_sequence`, wrapped in thin `torch.autograd.Function`s
+  and wired into the shared deterministic/path field seam. `ad_mode="none"`
+  keeps the exact primal behavior (no graph, no extra launches, zero tape).
+- Explicit-failure policy: topologies containing diffraction or coupled
+  reflection-diffraction paths, and the scattering component, raise a
+  `RuntimeError` naming the interaction before any launch when
+  `ad_mode != "none"` (differentiable versions arrive with plan 07 AD-4).
+- The reserved `psdr` solver stub has been removed; AD lives in the existing
+  solvers' `ad_mode`.
+
 ## Reference implementation
 
 - `witwin.channel_native.physics.oracle`: CPU complex128 electromagnetic
   oracle (Fresnel, multilayer transfer matrix, Kirchhoff lobes, phase-screen
   patch integrals) backing the golden test suite in `tests/physics/`.
+- `tests/ad/_reference_fields.py`: pure-torch complex128 mirrors of the
+  free-space carrier, finite-slab Fresnel reflection chain, and Rouard
+  transmission stack used as forward-parity and gradient oracles for the
+  native AD companion kernels.

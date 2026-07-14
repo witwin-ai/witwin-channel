@@ -260,6 +260,47 @@ __device__ __forceinline__ utd::Complex complex3_dot_real(
         utd::cplx_mul_real(value.z, axis.z));
 }
 
+// Fixed geometry of one specular reflection event. The frame is shared by the
+// forward transport kernel and its backward/jvp companions (plan 07 AD-1):
+// under the fixed-topology contract every field in this struct is a constant
+// of the differentiation, so extracting it keeps a single source of truth for
+// the s/p basis construction.
+struct ReflectFrame {
+    utd::float3a incident;
+    utd::float3a s_axis;
+    utd::float3a p_in;
+    utd::float3a p_out;
+    utd::float3a reflected_direction;
+    float cos_theta;
+};
+
+__device__ __forceinline__ ReflectFrame reflect_frame(
+    utd::float3a incident_direction,
+    utd::float3a normal) {
+    ReflectFrame frame;
+    frame.incident = utd::safe_normalize(
+        incident_direction, utd::make_f3(0.0f, 0.0f, 1.0f));
+    utd::float3a oriented_normal = utd::safe_normalize(
+        normal, utd::make_f3(0.0f, 0.0f, 1.0f));
+    if (utd::f3_dot(frame.incident, oriented_normal) > 0.0f)
+        oriented_normal = utd::f3_neg(oriented_normal);
+    const float dot_in = utd::f3_dot(frame.incident, oriented_normal);
+    frame.reflected_direction = utd::safe_normalize(
+        utd::f3_sub(frame.incident, utd::f3_mul(oriented_normal, 2.0f * dot_in)),
+        utd::f3_neg(frame.incident));
+    utd::float3a s_axis = utd::f3_cross(oriented_normal, frame.incident);
+    frame.s_axis = utd::safe_normalize(
+        s_axis, utd::stable_perp_basis(frame.incident, oriented_normal));
+    frame.p_in = utd::safe_normalize(
+        utd::f3_cross(frame.s_axis, frame.incident),
+        utd::stable_perp_basis(frame.incident, frame.s_axis));
+    frame.p_out = utd::safe_normalize(
+        utd::f3_cross(frame.s_axis, frame.reflected_direction),
+        utd::stable_perp_basis(frame.reflected_direction, frame.s_axis));
+    frame.cos_theta = fabsf(dot_in);
+    return frame;
+}
+
 __device__ __forceinline__ utd::Complex3 reflect_complex3(
     utd::Complex3 value,
     utd::float3a incident_direction,
@@ -271,29 +312,12 @@ __device__ __forceinline__ utd::Complex3 reflect_complex3(
     float thickness,
     float frequency_hz,
     utd::float3a& reflected_direction) {
-    const utd::float3a incident = utd::safe_normalize(
-        incident_direction, utd::make_f3(0.0f, 0.0f, 1.0f));
-    utd::float3a oriented_normal = utd::safe_normalize(
-        normal, utd::make_f3(0.0f, 0.0f, 1.0f));
-    if (utd::f3_dot(incident, oriented_normal) > 0.0f)
-        oriented_normal = utd::f3_neg(oriented_normal);
-    const float dot_in = utd::f3_dot(incident, oriented_normal);
-    reflected_direction = utd::safe_normalize(
-        utd::f3_sub(incident, utd::f3_mul(oriented_normal, 2.0f * dot_in)),
-        utd::f3_neg(incident));
-    utd::float3a s_axis = utd::f3_cross(oriented_normal, incident);
-    s_axis = utd::safe_normalize(
-        s_axis, utd::stable_perp_basis(incident, oriented_normal));
-    const utd::float3a p_in = utd::safe_normalize(
-        utd::f3_cross(s_axis, incident),
-        utd::stable_perp_basis(incident, s_axis));
-    const utd::float3a p_out = utd::safe_normalize(
-        utd::f3_cross(s_axis, reflected_direction),
-        utd::stable_perp_basis(reflected_direction, s_axis));
+    const ReflectFrame frame = reflect_frame(incident_direction, normal);
+    reflected_direction = frame.reflected_direction;
     utd::Complex r_te;
     utd::Complex r_tm;
     slab_fresnel(
-        fabsf(dot_in),
+        frame.cos_theta,
         eps_r,
         sigma_e,
         mu_r,
@@ -302,11 +326,40 @@ __device__ __forceinline__ utd::Complex3 reflect_complex3(
         frequency_hz,
         r_te,
         r_tm);
-    const utd::Complex e_s = complex3_dot_real(value, s_axis);
-    const utd::Complex e_p = complex3_dot_real(value, p_in);
+    const utd::Complex e_s = complex3_dot_real(value, frame.s_axis);
+    const utd::Complex e_p = complex3_dot_real(value, frame.p_in);
     return utd::c3_add(
-        utd::cplx_scale_real(s_axis, utd::cplx_mul(r_te, e_s)),
-        utd::cplx_scale_real(p_out, utd::cplx_mul(r_tm, e_p)));
+        utd::cplx_scale_real(frame.s_axis, utd::cplx_mul(r_te, e_s)),
+        utd::cplx_scale_real(frame.p_out, utd::cplx_mul(r_tm, e_p)));
+}
+
+// Fixed geometry of one thin-sheet wall crossing (transmission). Shared by
+// the forward transport kernel and its backward/jvp companions; the outgoing
+// direction equals the incident direction so one s/p pair serves both sides.
+struct WallFrame {
+    utd::float3a s_axis;
+    utd::float3a p_axis;
+    float cos_theta;
+};
+
+__device__ __forceinline__ WallFrame wall_frame(
+    utd::float3a direction,
+    utd::float3a raw_normal) {
+    utd::float3a normal = utd::safe_normalize(
+        raw_normal, utd::make_f3(0.0f, 0.0f, 1.0f));
+    if (utd::f3_dot(direction, normal) > 0.0f)
+        normal = utd::f3_neg(normal);
+    WallFrame frame;
+    frame.cos_theta = fminf(
+        fmaxf(fabsf(utd::f3_dot(direction, normal)), utd::UTD_SMALL_EPS),
+        1.0f);
+    utd::float3a s_axis = utd::f3_cross(normal, direction);
+    frame.s_axis = utd::safe_normalize(
+        s_axis, utd::stable_perp_basis(direction, normal));
+    frame.p_axis = utd::safe_normalize(
+        utd::f3_cross(frame.s_axis, direction),
+        utd::stable_perp_basis(direction, frame.s_axis));
+    return frame;
 }
 
 __device__ __forceinline__ utd::JonesOperator slab_face_operator(

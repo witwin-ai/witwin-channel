@@ -11,6 +11,9 @@ BOUNCE_COMPONENTS = frozenset(
     {"reflection", "diffraction", "transmission", "scattering"}
 )
 NO_AD_MODES = frozenset({"none"})
+# Fixed-topology material/frequency AD for the deterministic and path solvers
+# (plan 07 AD-1). Monte Carlo solvers keep NO_AD_MODES until their AD phases.
+AD_MODES = frozenset({"none", "jvp", "vjp"})
 
 
 def validated_components(

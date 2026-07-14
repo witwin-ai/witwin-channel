@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from witwin.channel_native.core.components import (
+    AD_MODES as _VALID_AD_MODES,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
-    NO_AD_MODES as _VALID_AD_MODES,
     validated_components,
 )
 
@@ -75,8 +75,7 @@ class Config:
             raise ValueError(f"sort_key must be one of {sorted(_VALID_SORT_KEYS)}")
         if self.ad_mode not in _VALID_AD_MODES:
             raise RuntimeError(
-                "deterministic fixed-topology AD is not enabled because "
-                "supports_ad=False in the first replacement release; ad_mode must be 'none'"
+                f"deterministic ad_mode must be one of {sorted(_VALID_AD_MODES)}"
             )
 
         object.__setattr__(self, "components", components)

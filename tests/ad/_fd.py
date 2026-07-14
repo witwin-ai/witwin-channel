@@ -14,7 +14,10 @@ import torch
 
 
 def _as_cpu_double(value: torch.Tensor) -> torch.Tensor:
-    return value.detach().double().cpu()
+    value = value.detach().cpu()
+    if value.is_complex():
+        return value.to(torch.complex128)
+    return value.double()
 
 
 def central_difference_gradient(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, replace
+from functools import partial
 from types import SimpleNamespace
 from typing import Protocol
 
@@ -720,6 +721,26 @@ def _rough_reflection_factor(
     return factor
 
 
+_AD_UNSUPPORTED_COMPONENTS = (
+    (2, "diffraction"),
+    (3, "coupled reflection-diffraction"),
+    (4, "coupled diffraction-reflection"),
+)
+
+
+def _require_ad_supported_topology(topology: TopologyBatch, *, ad_mode: str) -> None:
+    """Fail before any field launch when the topology holds interactions whose
+    fields are not differentiable yet (plan 07 section 8; AD-4 lifts this)."""
+
+    for component_id, name in _AD_UNSUPPORTED_COMPONENTS:
+        if bool((topology.component_id == component_id).any()):
+            raise RuntimeError(
+                f"ad_mode='{ad_mode}' does not support {name} paths yet; "
+                "differentiable diffraction and coupled interactions arrive "
+                "with plan 07 AD-4"
+            )
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -729,12 +750,45 @@ def _evaluate_shared_fields(
     rx_positions: torch.Tensor,
     *,
     components: frozenset[str] | set[str] = frozenset(),
+    ad_mode: str = "none",
 ) -> TopologyBatch:
-    """Evaluate selected canonical rows with the shared complex3 ABI."""
+    """Evaluate selected canonical rows with the shared complex3 ABI.
+
+    ``ad_mode == "none"`` keeps the exact primal behavior (plain facades,
+    float frequency, no autograd graph). ``jvp``/``vjp`` route LoS,
+    reflection and transmission through the differentiable field Functions:
+    material gathers stay on the torch graph and the frequency is forwarded
+    as a 0-d tensor when the scene stores one (hit geometry stays detached
+    under the fixed-topology contract).
+    """
 
     count = int(topology.valid.shape[0])
     if count == 0:
         return topology
+    ad_enabled = ad_mode != "none"
+    if ad_enabled:
+        _require_ad_supported_topology(topology, ad_mode=ad_mode)
+        frequency = (
+            scene.frequency
+            if isinstance(scene.frequency, torch.Tensor)
+            else float(scene.frequency)
+        )
+        los_field_op = partial(ops.field_free_space_ad, frequency=frequency)
+        reflection_field_op = partial(
+            ops.field_reflection_sequence_ad, frequency=frequency
+        )
+        transmission_field_op = partial(
+            ops.field_transmission_sequence_ad, frequency=frequency
+        )
+    else:
+        frequency_value = float(scene.frequency)
+        los_field_op = partial(ops.field_free_space, frequency_hz=frequency_value)
+        reflection_field_op = partial(
+            ops.field_reflection_sequence, frequency_hz=frequency_value
+        )
+        transmission_field_op = partial(
+            ops.field_transmission_sequence, frequency_hz=frequency_value
+        )
     device = topology.valid.device
     tx_id = topology.tx_id.to(dtype=torch.int64)
     rx_id = topology.rx_id.to(dtype=torch.int64)
@@ -755,13 +809,12 @@ def _evaluate_shared_fields(
 
     los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
     if int(los_rows.shape[0]) > 0:
-        evaluated = ops.field_free_space(
+        evaluated = los_field_op(
             source[los_rows].contiguous(),
             target[los_rows].contiguous(),
             source_power[los_rows].contiguous(),
             tx_pol[los_rows].contiguous(),
             rx_pol[los_rows].contiguous(),
-            frequency_hz=float(scene.frequency),
         )
         field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
         coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
@@ -783,7 +836,7 @@ def _evaluate_shared_fields(
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
-        evaluated = ops.field_reflection_sequence(
+        evaluated = reflection_field_op(
             source[rows].contiguous(),
             target[rows].contiguous(),
             topology.interaction_positions[rows, :depth_value].contiguous(),
@@ -796,7 +849,6 @@ def _evaluate_shared_fields(
             material["mu_r"][face_id].contiguous(),
             material["gain"][face_id].contiguous(),
             material["thickness"][face_id].contiguous(),
-            frequency_hz=float(scene.frequency),
         )
         # Rough-surface coherent attenuation / realization delta replacement
         # (see _rough_reflection_factor). Applied Python-side on the native
@@ -840,7 +892,7 @@ def _evaluate_shared_fields(
         event_valid = (
             slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
         ).contiguous()
-        evaluated = ops.field_transmission_sequence(
+        evaluated = transmission_field_op(
             source[rows].contiguous(),
             target[rows].contiguous(),
             topology.interaction_positions[rows].contiguous(),
@@ -856,7 +908,6 @@ def _evaluate_shared_fields(
             material["layer_eps_r"],
             material["layer_sigma_e"],
             material["layer_mu_r"],
-            frequency_hz=float(scene.frequency),
         )
         field_xyz.index_copy_(0, rows, evaluated["field_vector"])
         coefficient.index_copy_(0, rows, evaluated["coefficient"])
@@ -2183,6 +2234,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
     rx_positions, _ = receiver_positions_and_layout(scene, device=device)
     compiled = scene.compile()
+    ad_mode = str(getattr(config, "ad_mode", "none"))
     components = _path_components(config)
     coupled_paths = bool(getattr(config, "coupled_paths", False))
     sequence_width = max(int(config.max_depth), 2 if coupled_paths else 0)
@@ -2331,6 +2383,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             tx_power,
             rx_positions,
             components=components,
+            ad_mode=ad_mode,
         )
     padded_blocks = [
         block
@@ -2363,4 +2416,5 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
         tx_power,
         rx_positions,
         components=components,
+        ad_mode=ad_mode,
     )

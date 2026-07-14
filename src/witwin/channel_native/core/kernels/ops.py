@@ -4067,6 +4067,1022 @@ def field_coupled_rd(
     return out
 
 
+# ---------------------------------------------------------------------------
+# Fixed-topology EM-response AD for the field transport kernels (plan 07
+# AD-1). Differentiable inputs: per-bounce/per-layer eps_r, sigma_e, gain,
+# thickness and the carrier frequency. Hit geometry (endpoints, interaction
+# positions/normals, polarizations, tx_power) is detached by contract; the
+# native companion kernels reserve geometry cotangent flags for AD-2.
+# ---------------------------------------------------------------------------
+
+_FIELD_AD_OUTPUT_FIELDS = (
+    "field_vector",
+    "coefficient",
+    "path_field",
+    "path_gain",
+    "path_length_m",
+    "delay_s",
+    "direction",
+)
+_FIELD_AD_TANGENT_FIELDS = ("field_vector", "coefficient", "path_field", "path_gain")
+
+
+def _ad_frequency_value(frequency: torch.Tensor | float) -> float:
+    """Read the scalar carrier frequency once per solve.
+
+    A 0-d CUDA tensor frequency costs one device-to-host synchronization per
+    kernel invocation here (documented plan 07 AD-1 decision: one sync per
+    solve, never per path); the native entry points keep a double scalar.
+    """
+
+    if isinstance(frequency, torch.Tensor):
+        if frequency.ndim != 0:
+            raise ValueError("frequency must be a Python float or a 0-d tensor")
+        return float(_ad_native_tensor(frequency).detach())
+    return float(frequency)
+
+
+def _ad_frequency_tangent(tangent: torch.Tensor | None) -> float:
+    tangent = _ad_native_tangent_or_none(tangent)
+    if tangent is None:
+        return 0.0
+    if tangent.ndim != 0:
+        raise ValueError("frequency tangent must be a 0-d tensor")
+    return float(tangent.detach())
+
+
+def _ad_frequency_grad(
+    grad_frequency: torch.Tensor, meta: tuple[torch.dtype, torch.device]
+) -> torch.Tensor:
+    dtype, device = meta
+    return grad_frequency.to(dtype=dtype, device=device)[0]
+
+
+def _ad_reject_fixed_inputs(
+    op_name: str,
+    needs_input_grad: tuple[bool, ...],
+    fixed: tuple[tuple[int, str], ...],
+) -> None:
+    for index, name in fixed:
+        if needs_input_grad[index]:
+            raise NotImplementedError(
+                f"{op_name} does not differentiate {name} in plan 07 AD-1; "
+                "geometry gradients arrive with AD-2 and mu_r stays fixed"
+            )
+
+
+def _ad_reject_fixed_tangents(
+    op_name: str,
+    tangents: tuple[tuple[object, str], ...],
+) -> None:
+    for tangent, name in tangents:
+        if isinstance(tangent, torch.Tensor) and (
+            _ad_native_tangent_or_none(tangent) is not None
+        ):
+            raise NotImplementedError(
+                f"{op_name} does not differentiate {name} in plan 07 AD-1; "
+                "geometry tangents arrive with AD-2 and mu_r stays fixed"
+            )
+
+
+def field_free_space_backward(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    *,
+    frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None,
+    grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None,
+    grad_path_gain: torch.Tensor | None = None,
+    need_grad_frequency: bool = True,
+) -> dict[str, torch.Tensor | None]:
+    out = _required_native_op("field_free_space_backward")(
+        source,
+        target,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        float(frequency_hz),
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        bool(need_grad_frequency),
+        False,
+    )
+    if not isinstance(out, dict) or set(out) != {"grad_frequency"}:
+        raise TypeError("_channel_native.field_free_space_backward returned invalid fields")
+    return out
+
+
+def field_free_space_jvp(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    *,
+    frequency_hz: float,
+    tangent_frequency: float,
+) -> dict[str, torch.Tensor]:
+    out = _required_native_op("field_free_space_jvp")(
+        source,
+        target,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        float(frequency_hz),
+        float(tangent_frequency),
+    )
+    if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
+        raise TypeError("_channel_native.field_free_space_jvp returned invalid fields")
+    return out
+
+
+def field_reflection_sequence_backward(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    eps_r: torch.Tensor,
+    sigma_e: torch.Tensor,
+    mu_r: torch.Tensor,
+    gain: torch.Tensor,
+    thickness: torch.Tensor,
+    *,
+    frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None,
+    grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None,
+    grad_path_gain: torch.Tensor | None = None,
+    need_grad_eps_r: bool = True,
+    need_grad_sigma_e: bool = True,
+    need_grad_gain: bool = False,
+    need_grad_thickness: bool = True,
+    need_grad_frequency: bool = True,
+) -> dict[str, torch.Tensor | None]:
+    out = _required_native_op("field_reflection_sequence_backward")(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        thickness,
+        float(frequency_hz),
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        bool(need_grad_eps_r),
+        bool(need_grad_sigma_e),
+        bool(need_grad_gain),
+        bool(need_grad_thickness),
+        bool(need_grad_frequency),
+        False,
+    )
+    expected = {
+        "grad_eps_r",
+        "grad_sigma_e",
+        "grad_gain",
+        "grad_thickness",
+        "grad_frequency",
+    }
+    if not isinstance(out, dict) or set(out) != expected:
+        raise TypeError(
+            "_channel_native.field_reflection_sequence_backward returned invalid fields"
+        )
+    return out
+
+
+def field_reflection_sequence_jvp(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    eps_r: torch.Tensor,
+    sigma_e: torch.Tensor,
+    mu_r: torch.Tensor,
+    gain: torch.Tensor,
+    thickness: torch.Tensor,
+    *,
+    frequency_hz: float,
+    tangent_eps_r: torch.Tensor | None = None,
+    tangent_sigma_e: torch.Tensor | None = None,
+    tangent_gain: torch.Tensor | None = None,
+    tangent_thickness: torch.Tensor | None = None,
+    tangent_frequency: float = 0.0,
+) -> dict[str, torch.Tensor]:
+    out = _required_native_op("field_reflection_sequence_jvp")(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        thickness,
+        float(frequency_hz),
+        tangent_eps_r,
+        tangent_sigma_e,
+        tangent_gain,
+        tangent_thickness,
+        float(tangent_frequency),
+    )
+    if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
+        raise TypeError(
+            "_channel_native.field_reflection_sequence_jvp returned invalid fields"
+        )
+    return out
+
+
+def field_transmission_sequence_backward(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor,
+    interaction_valid: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None,
+    grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None,
+    grad_path_gain: torch.Tensor | None = None,
+    need_grad_layer_thickness: bool = True,
+    need_grad_layer_eps_r: bool = True,
+    need_grad_layer_sigma_e: bool = True,
+    need_grad_frequency: bool = True,
+) -> dict[str, torch.Tensor | None]:
+    out = _required_native_op("field_transmission_sequence_backward")(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        interaction_material_id,
+        interaction_valid,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        bool(need_grad_layer_thickness),
+        bool(need_grad_layer_eps_r),
+        bool(need_grad_layer_sigma_e),
+        bool(need_grad_frequency),
+        False,
+    )
+    expected = {
+        "grad_layer_thickness_m",
+        "grad_layer_eps_r",
+        "grad_layer_sigma_e",
+        "grad_frequency",
+    }
+    if not isinstance(out, dict) or set(out) != expected:
+        raise TypeError(
+            "_channel_native.field_transmission_sequence_backward returned invalid fields"
+        )
+    return out
+
+
+def field_transmission_sequence_jvp(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor,
+    interaction_valid: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency_hz: float,
+    tangent_layer_thickness_m: torch.Tensor | None = None,
+    tangent_layer_eps_r: torch.Tensor | None = None,
+    tangent_layer_sigma_e: torch.Tensor | None = None,
+    tangent_frequency: float = 0.0,
+) -> dict[str, torch.Tensor]:
+    out = _required_native_op("field_transmission_sequence_jvp")(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        interaction_material_id,
+        interaction_valid,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+        tangent_layer_thickness_m,
+        tangent_layer_eps_r,
+        tangent_layer_sigma_e,
+        float(tangent_frequency),
+    )
+    if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
+        raise TypeError(
+            "_channel_native.field_transmission_sequence_jvp returned invalid fields"
+        )
+    return out
+
+
+class _FieldFreeSpaceAdFunction(torch.autograd.Function):
+    """Fixed-topology differentiable free-space transport (plan 07 AD-1).
+
+    Differentiable input: frequency (0-d tensor). Geometry inputs are fixed;
+    requesting their gradient fails loudly. A float64 input batch routes
+    through the float64 companion forward so torch.autograd.gradcheck can run
+    in strict double precision.
+    """
+
+    @staticmethod
+    def forward(source, target, tx_power, tx_polarization, rx_polarization, frequency):
+        frequency_value = _ad_frequency_value(frequency)
+        op_name = (
+            "field_free_space_fwd64"
+            if source.dtype == torch.float64
+            else "field_free_space"
+        )
+        out = _required_native_op(op_name)(
+            source,
+            target,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            frequency_value,
+        )
+        return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        source, target, tx_power, tx_polarization, rx_polarization, frequency = inputs
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in (source, target, tx_power, tx_polarization, rx_polarization)
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+        ctx.mark_non_differentiable(output[4], output[5], output[6])
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(
+        ctx,
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        _grad_path_length,
+        _grad_delay,
+        _grad_direction,
+    ):
+        none_grads = (None,) * 6
+        _ad_reject_fixed_inputs(
+            "field_free_space_ad",
+            ctx.needs_input_grad,
+            (
+                (0, "source"),
+                (1, "target"),
+                (2, "tx_power"),
+                (3, "tx_polarization"),
+                (4, "rx_polarization"),
+            ),
+        )
+        grads = (grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain)
+        if not ctx.needs_input_grad[5] or all(value is None for value in grads):
+            return none_grads
+        source, target, tx_power, tx_polarization, rx_polarization = ctx.saved_tensors
+        out = field_free_space_backward(
+            source,
+            target,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            frequency_hz=ctx.frequency_value,
+            grad_field_vector=grad_field_vector,
+            grad_coefficient=grad_coefficient,
+            grad_path_field=grad_path_field,
+            grad_path_gain=grad_path_gain,
+        )
+        grad_frequency = _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+        return (None, None, None, None, None, grad_frequency)
+
+    @staticmethod
+    def jvp(ctx, t_source, t_target, t_tx_power, t_tx_pol, t_rx_pol, t_frequency):
+        _ad_reject_fixed_tangents(
+            "field_free_space_ad",
+            (
+                (t_source, "source"),
+                (t_target, "target"),
+                (t_tx_power, "tx_power"),
+                (t_tx_pol, "tx_polarization"),
+                (t_rx_pol, "rx_polarization"),
+            ),
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        if tangent_frequency == 0.0:
+            return (None,) * 7
+        source, target, tx_power, tx_polarization, rx_polarization = ctx.saved_tensors
+        with torch._C._DisableFuncTorch():
+            out = field_free_space_jvp(
+                _ad_native_tensor(source),
+                _ad_native_tensor(target),
+                _ad_native_tensor(tx_power),
+                _ad_native_tensor(tx_polarization),
+                _ad_native_tensor(rx_polarization),
+                frequency_hz=ctx.frequency_value,
+                tangent_frequency=tangent_frequency,
+            )
+        return (*(out[name] for name in _FIELD_AD_TANGENT_FIELDS), None, None, None)
+
+
+def field_free_space_ad(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    *,
+    frequency: torch.Tensor | float,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`field_free_space` (frequency only in AD-1)."""
+
+    values = _FieldFreeSpaceAdFunction.apply(
+        source, target, tx_power, tx_polarization, rx_polarization, frequency
+    )
+    return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
+
+
+class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
+    """Fixed-topology differentiable reflection transport (plan 07 AD-1).
+
+    Differentiable inputs: per-bounce eps_r / sigma_e / gain / thickness and
+    frequency. Geometry and mu_r are fixed; requesting their gradient fails
+    loudly instead of silently returning zeros.
+    """
+
+    @staticmethod
+    def forward(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        thickness,
+        frequency,
+    ):
+        out = _required_native_op("field_reflection_sequence")(
+            source,
+            target,
+            interaction_positions,
+            interaction_normals,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            eps_r,
+            sigma_e,
+            mu_r,
+            gain,
+            thickness,
+            _ad_frequency_value(frequency),
+        )
+        return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        frequency = inputs[12]
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:12]
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+        ctx.mark_non_differentiable(output[4], output[5], output[6])
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(
+        ctx,
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        _grad_path_length,
+        _grad_delay,
+        _grad_direction,
+    ):
+        none_grads = (None,) * 13
+        _ad_reject_fixed_inputs(
+            "field_reflection_sequence_ad",
+            ctx.needs_input_grad,
+            (
+                (0, "source"),
+                (1, "target"),
+                (2, "interaction_positions"),
+                (3, "interaction_normals"),
+                (4, "tx_power"),
+                (5, "tx_polarization"),
+                (6, "rx_polarization"),
+                (9, "mu_r"),
+            ),
+        )
+        need_eps = bool(ctx.needs_input_grad[7])
+        need_sigma = bool(ctx.needs_input_grad[8])
+        need_gain = bool(ctx.needs_input_grad[10])
+        need_thickness = bool(ctx.needs_input_grad[11])
+        need_frequency = bool(ctx.needs_input_grad[12])
+        grads = (grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain)
+        if not (
+            need_eps or need_sigma or need_gain or need_thickness or need_frequency
+        ) or all(value is None for value in grads):
+            return none_grads
+        (
+            source,
+            target,
+            interaction_positions,
+            interaction_normals,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            eps_r,
+            sigma_e,
+            mu_r,
+            gain,
+            thickness,
+        ) = ctx.saved_tensors
+        out = field_reflection_sequence_backward(
+            source,
+            target,
+            interaction_positions,
+            interaction_normals,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            eps_r,
+            sigma_e,
+            mu_r,
+            gain,
+            thickness,
+            frequency_hz=ctx.frequency_value,
+            grad_field_vector=grad_field_vector,
+            grad_coefficient=grad_coefficient,
+            grad_path_field=grad_path_field,
+            grad_path_gain=grad_path_gain,
+            need_grad_eps_r=need_eps,
+            need_grad_sigma_e=need_sigma,
+            need_grad_gain=need_gain,
+            need_grad_thickness=need_thickness,
+            need_grad_frequency=need_frequency,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            out["grad_eps_r"] if need_eps else None,
+            out["grad_sigma_e"] if need_sigma else None,
+            None,
+            out["grad_gain"] if need_gain else None,
+            out["grad_thickness"] if need_thickness else None,
+            grad_frequency,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        t_source,
+        t_target,
+        t_positions,
+        t_normals,
+        t_tx_power,
+        t_tx_pol,
+        t_rx_pol,
+        t_eps_r,
+        t_sigma_e,
+        t_mu_r,
+        t_gain,
+        t_thickness,
+        t_frequency,
+    ):
+        _ad_reject_fixed_tangents(
+            "field_reflection_sequence_ad",
+            (
+                (t_source, "source"),
+                (t_target, "target"),
+                (t_positions, "interaction_positions"),
+                (t_normals, "interaction_normals"),
+                (t_tx_power, "tx_power"),
+                (t_tx_pol, "tx_polarization"),
+                (t_rx_pol, "rx_polarization"),
+                (t_mu_r, "mu_r"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        eps_shape = tuple(saved[7].shape)
+        tangent_eps = _ad_checked_tangent(
+            "field_reflection_sequence_ad tangent_eps_r",
+            _ad_native_tangent_or_none(t_eps_r),
+            eps_shape,
+        )
+        tangent_sigma = _ad_checked_tangent(
+            "field_reflection_sequence_ad tangent_sigma_e",
+            _ad_native_tangent_or_none(t_sigma_e),
+            eps_shape,
+        )
+        tangent_gain = _ad_checked_tangent(
+            "field_reflection_sequence_ad tangent_gain",
+            _ad_native_tangent_or_none(t_gain),
+            eps_shape,
+        )
+        tangent_thickness = _ad_checked_tangent(
+            "field_reflection_sequence_ad tangent_thickness",
+            _ad_native_tangent_or_none(t_thickness),
+            eps_shape,
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        if (
+            tangent_eps is None
+            and tangent_sigma is None
+            and tangent_gain is None
+            and tangent_thickness is None
+            and tangent_frequency == 0.0
+        ):
+            return (None,) * 7
+        with torch._C._DisableFuncTorch():
+            out = field_reflection_sequence_jvp(
+                *(_ad_native_tensor(value) for value in saved),
+                frequency_hz=ctx.frequency_value,
+                tangent_eps_r=tangent_eps,
+                tangent_sigma_e=tangent_sigma,
+                tangent_gain=tangent_gain,
+                tangent_thickness=tangent_thickness,
+                tangent_frequency=tangent_frequency,
+            )
+        return (*(out[name] for name in _FIELD_AD_TANGENT_FIELDS), None, None, None)
+
+
+def field_reflection_sequence_ad(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    eps_r: torch.Tensor,
+    sigma_e: torch.Tensor,
+    mu_r: torch.Tensor,
+    gain: torch.Tensor,
+    thickness: torch.Tensor,
+    *,
+    frequency: torch.Tensor | float,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`field_reflection_sequence` (materials + frequency)."""
+
+    values = _FieldReflectionSequenceAdFunction.apply(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        thickness,
+        frequency,
+    )
+    return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
+
+
+class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
+    """Fixed-topology differentiable transmission transport (plan 07 AD-1).
+
+    Differentiable inputs: CSR layer thickness / eps_r / sigma_e and
+    frequency. Geometry and layer_mu_r are fixed; requesting their gradient
+    fails loudly. Layer gradients accumulate atomically across paths because
+    the CSR store is shared by every wall crossing.
+    """
+
+    @staticmethod
+    def forward(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        interaction_material_id,
+        interaction_valid,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        frequency,
+    ):
+        out = _required_native_op("field_transmission_sequence")(
+            source,
+            target,
+            interaction_positions,
+            interaction_normals,
+            interaction_material_id,
+            interaction_valid,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            layer_offset,
+            layer_count,
+            layer_thickness_m,
+            layer_eps_r,
+            layer_sigma_e,
+            layer_mu_r,
+            _ad_frequency_value(frequency),
+        )
+        return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        frequency = inputs[15]
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:15]
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+        ctx.mark_non_differentiable(output[4], output[5], output[6])
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(
+        ctx,
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        _grad_path_length,
+        _grad_delay,
+        _grad_direction,
+    ):
+        none_grads = (None,) * 16
+        _ad_reject_fixed_inputs(
+            "field_transmission_sequence_ad",
+            ctx.needs_input_grad,
+            (
+                (0, "source"),
+                (1, "target"),
+                (2, "interaction_positions"),
+                (3, "interaction_normals"),
+                (6, "tx_power"),
+                (7, "tx_polarization"),
+                (8, "rx_polarization"),
+                (14, "layer_mu_r"),
+            ),
+        )
+        need_thickness = bool(ctx.needs_input_grad[11])
+        need_eps = bool(ctx.needs_input_grad[12])
+        need_sigma = bool(ctx.needs_input_grad[13])
+        need_frequency = bool(ctx.needs_input_grad[15])
+        grads = (grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain)
+        if not (need_thickness or need_eps or need_sigma or need_frequency) or all(
+            value is None for value in grads
+        ):
+            return none_grads
+        saved = ctx.saved_tensors
+        out = field_transmission_sequence_backward(
+            *saved,
+            frequency_hz=ctx.frequency_value,
+            grad_field_vector=grad_field_vector,
+            grad_coefficient=grad_coefficient,
+            grad_path_field=grad_path_field,
+            grad_path_gain=grad_path_gain,
+            need_grad_layer_thickness=need_thickness,
+            need_grad_layer_eps_r=need_eps,
+            need_grad_layer_sigma_e=need_sigma,
+            need_grad_frequency=need_frequency,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            out["grad_layer_thickness_m"] if need_thickness else None,
+            out["grad_layer_eps_r"] if need_eps else None,
+            out["grad_layer_sigma_e"] if need_sigma else None,
+            None,
+            grad_frequency,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        t_source,
+        t_target,
+        t_positions,
+        t_normals,
+        _t_material_id,
+        _t_valid,
+        t_tx_power,
+        t_tx_pol,
+        t_rx_pol,
+        _t_layer_offset,
+        _t_layer_count,
+        t_layer_thickness,
+        t_layer_eps_r,
+        t_layer_sigma_e,
+        t_layer_mu_r,
+        t_frequency,
+    ):
+        _ad_reject_fixed_tangents(
+            "field_transmission_sequence_ad",
+            (
+                (t_source, "source"),
+                (t_target, "target"),
+                (t_positions, "interaction_positions"),
+                (t_normals, "interaction_normals"),
+                (t_tx_power, "tx_power"),
+                (t_tx_pol, "tx_polarization"),
+                (t_rx_pol, "rx_polarization"),
+                (t_layer_mu_r, "layer_mu_r"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        layer_shape = tuple(saved[11].shape)
+        tangent_thickness = _ad_checked_tangent(
+            "field_transmission_sequence_ad tangent_layer_thickness_m",
+            _ad_native_tangent_or_none(t_layer_thickness),
+            layer_shape,
+        )
+        tangent_eps = _ad_checked_tangent(
+            "field_transmission_sequence_ad tangent_layer_eps_r",
+            _ad_native_tangent_or_none(t_layer_eps_r),
+            layer_shape,
+        )
+        tangent_sigma = _ad_checked_tangent(
+            "field_transmission_sequence_ad tangent_layer_sigma_e",
+            _ad_native_tangent_or_none(t_layer_sigma_e),
+            layer_shape,
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        if (
+            tangent_thickness is None
+            and tangent_eps is None
+            and tangent_sigma is None
+            and tangent_frequency == 0.0
+        ):
+            return (None,) * 7
+        with torch._C._DisableFuncTorch():
+            out = field_transmission_sequence_jvp(
+                *(_ad_native_tensor(value) for value in saved),
+                frequency_hz=ctx.frequency_value,
+                tangent_layer_thickness_m=tangent_thickness,
+                tangent_layer_eps_r=tangent_eps,
+                tangent_layer_sigma_e=tangent_sigma,
+                tangent_frequency=tangent_frequency,
+            )
+        return (*(out[name] for name in _FIELD_AD_TANGENT_FIELDS), None, None, None)
+
+
+def field_transmission_sequence_ad(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor,
+    interaction_valid: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency: torch.Tensor | float,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`field_transmission_sequence` (layers + frequency)."""
+
+    values = _FieldTransmissionSequenceAdFunction.apply(
+        source,
+        target,
+        interaction_positions,
+        interaction_normals,
+        interaction_material_id,
+        interaction_valid,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        frequency,
+    )
+    return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
+
+
 def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(

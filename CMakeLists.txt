@@ -86,6 +86,7 @@ Python_add_library(
     native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/em_debug.cu
     native/channel_native/kernels/field_transport.cu
+    native/channel_native/kernels/field_transport_ad.cu
     native/channel_native/kernels/diffraction.cu
     native/channel_native/kernels/diffraction_discovery.cu
     native/channel_native/kernels/deterministic_accum.cu

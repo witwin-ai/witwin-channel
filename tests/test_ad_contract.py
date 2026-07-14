@@ -45,10 +45,23 @@ def test_public_ad_capability_is_primal_only_for_every_solver():
         assert solver["ad_modes"] == ["none"]
 
 
+@pytest.mark.parametrize("config_type", (PathConfig, DeterministicConfig))
+@pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
+def test_fixed_topology_solvers_accept_ad_modes(config_type, ad_mode):
+    assert config_type(ad_mode=ad_mode).ad_mode == ad_mode
+
+
 @pytest.mark.parametrize("config_type", _CONFIG_TYPES)
-@pytest.mark.parametrize("ad_mode", ["jvp", "vjp", "forward", "reverse"])
-def test_every_solver_rejects_ad_during_config_construction(config_type, ad_mode):
-    with pytest.raises((ValueError, RuntimeError), match="supports_ad=False"):
+@pytest.mark.parametrize("ad_mode", ["forward", "reverse", "grad"])
+def test_every_solver_rejects_unknown_ad_modes(config_type, ad_mode):
+    with pytest.raises((ValueError, RuntimeError), match="ad_mode"):
+        config_type(ad_mode=ad_mode)
+
+
+@pytest.mark.parametrize("config_type", (BasicConfig, BdptConfig))
+@pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
+def test_montecarlo_solvers_still_reject_ad_modes(config_type, ad_mode):
+    with pytest.raises((ValueError, RuntimeError), match="ad_mode"):
         config_type(ad_mode=ad_mode)
 
 
@@ -140,7 +153,7 @@ def test_free_space_derivative_oracle_matches_centered_finite_difference():
     torch.testing.assert_close(analytic, finite_difference, rtol=1.0e-8, atol=1.0e-12)
 
 
-def test_ad_inventory_records_no_production_dependency():
+def test_ad_inventory_records_solver_ad_contract():
     root = Path(__file__).resolve().parents[1]
     inventory = json.loads(
         (
@@ -150,7 +163,11 @@ def test_ad_inventory_records_no_production_dependency():
     audit = inventory["ad_audit"]
 
     assert audit["production_channel_ad_references"] == 0
-    assert audit["native_public_solver_ad_callers"] == 0
+    # Plan 07 AD-1: the shared deterministic/path field seam calls the three
+    # differentiable field entry points (LoS, reflection, transmission).
+    assert audit["native_public_solver_ad_callers"] == 3
+    assert len(audit["native_public_solver_ad_call_sites"]) == 3
     assert audit["legacy_reference_files_with_explicit_ad"] == 19
-    assert audit["decision"] == "primal_only_first_replacement"
+    assert audit["decision"] == "fixed_topology_material_frequency_ad_t1"
+    # The capability manifest flip happens at the plan 07 completion gate.
     assert audit["supports_ad"] is False

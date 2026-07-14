@@ -32,7 +32,10 @@ def test_path_config_validates_inputs():
         Config(coupled_candidate_limit=1_000_001)
 
     with pytest.raises(ValueError, match="ad_mode"):
-        Config(ad_mode="vjp")
+        Config(ad_mode="forward")
+    # Fixed-topology material/frequency AD (plan 07 AD-1).
+    assert Config(ad_mode="vjp").ad_mode == "vjp"
+    assert Config(ad_mode="jvp").ad_mode == "jvp"
 
 
 def test_path_config_rejects_invalid_coupled_requests_before_solve():

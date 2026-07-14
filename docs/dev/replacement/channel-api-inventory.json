@@ -11,26 +11,31 @@
     "notes": "Observed calls are token or qualified-call counts in repository-owned Python reference roots. The static contract scans production source only; offline oracle roots are intentionally outside that contract. External consumers are not visible to this repository."
   },
   "ad_audit": {
-    "audit_date": "2026-07-11",
+    "audit_date": "2026-07-14",
     "consumer_roots": ["core", "genesis", "maxwell", "radar", "studio"],
     "production_channel_ad_references": 0,
     "legacy_reference_roots": ["channel/examples", "channel/tests", "channel/tutorials", "channel/scripts"],
     "legacy_reference_files_with_explicit_ad": 19,
-    "native_public_solver_ad_callers": 0,
+    "native_public_solver_ad_callers": 3,
+    "native_public_solver_ad_call_sites": [
+      "core/path_topology.py:_evaluate_shared_fields:field_free_space_ad",
+      "core/path_topology.py:_evaluate_shared_fields:field_reflection_sequence_ad",
+      "core/path_topology.py:_evaluate_shared_fields:field_transmission_sequence_ad"
+    ],
     "native_experimental_low_level_primitives": [
       "mc_los_path_gain_backward",
       "mc_los_path_gain_jvp"
     ],
-    "decision": "primal_only_first_replacement",
+    "decision": "fixed_topology_material_frequency_ad_t1",
     "supports_ad": false,
-    "notes": "Repository production consumers do not import Channel AD. Legacy tests, examples, tutorials, and validation scripts remain offline reference evidence, not production dependencies. Low-level LoS derivative primitives are not connected to a public solver and do not advertise solver AD support. External consumers remain an explicit release gate."
+    "notes": "Plan 07 AD-1: the shared field seam of the deterministic and path solvers routes LoS/reflection/transmission through native backward/jvp companion kernels when ad_mode is jvp/vjp (materials eps_r/sigma_e/gain/thickness and frequency; hit geometry detached). Capability manifests keep supports_ad=false until the plan 07 completion gate flips them. Repository production consumers still do not import Channel AD; legacy references remain offline evidence. Low-level LoS derivative primitives stay standalone until AD-3."
   },
   "phase_status": {
     "complex_field_and_polarization": "supported_with_solver_specific_limits",
     "arrays": "supported_by_path",
     "materials_7a": "supported",
     "materials_7b_events": "unsupported_capability_false",
-    "ad": "unsupported_capability_false",
+    "ad": "t1_material_frequency_ad_capability_flip_pending",
     "performance_harness": "implemented",
     "pipeline_cache": "not_implemented",
     "sm_matrix": "declared_unverified",

@@ -416,6 +416,124 @@ pybind11::dict cn_field_transmission_sequence(
     torch::Tensor layer_sigma_e,
     torch::Tensor layer_mu_r,
     double frequency_hz);
+pybind11::dict cn_field_free_space_fwd64(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    double frequency_hz);
+pybind11::dict cn_field_free_space_backward(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    double frequency_hz,
+    pybind11::object grad_field_vector,
+    pybind11::object grad_coefficient,
+    pybind11::object grad_path_field,
+    pybind11::object grad_path_gain,
+    bool need_grad_frequency,
+    bool need_grad_geometry);
+pybind11::dict cn_field_free_space_jvp(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    double frequency_hz,
+    double tangent_frequency);
+pybind11::dict cn_field_reflection_sequence_backward(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    torch::Tensor thickness,
+    double frequency_hz,
+    pybind11::object grad_field_vector,
+    pybind11::object grad_coefficient,
+    pybind11::object grad_path_field,
+    pybind11::object grad_path_gain,
+    bool need_grad_eps_r,
+    bool need_grad_sigma_e,
+    bool need_grad_gain,
+    bool need_grad_thickness,
+    bool need_grad_frequency,
+    bool need_grad_geometry);
+pybind11::dict cn_field_reflection_sequence_jvp(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    torch::Tensor thickness,
+    double frequency_hz,
+    pybind11::object tangent_eps_r,
+    pybind11::object tangent_sigma_e,
+    pybind11::object tangent_gain,
+    pybind11::object tangent_thickness,
+    double tangent_frequency);
+pybind11::dict cn_field_transmission_sequence_backward(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor interaction_material_id,
+    torch::Tensor interaction_valid,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz,
+    pybind11::object grad_field_vector,
+    pybind11::object grad_coefficient,
+    pybind11::object grad_path_field,
+    pybind11::object grad_path_gain,
+    bool need_grad_layer_thickness,
+    bool need_grad_layer_eps_r,
+    bool need_grad_layer_sigma_e,
+    bool need_grad_frequency,
+    bool need_grad_geometry);
+pybind11::dict cn_field_transmission_sequence_jvp(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor interaction_material_id,
+    torch::Tensor interaction_valid,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz,
+    pybind11::object tangent_layer_thickness_m,
+    pybind11::object tangent_layer_eps_r,
+    pybind11::object tangent_layer_sigma_e,
+    double tangent_frequency);
 pybind11::dict cn_field_coupled_rd(
     torch::Tensor source,
     torch::Tensor target,
@@ -1303,6 +1421,34 @@ PYBIND11_MODULE(_channel_native, module) {
         "field_coupled_rd",
         &cn_field_coupled_rd,
         "Transport a canonical complex3 field through coupled R-D or D-R events.");
+    module.def(
+        "field_free_space_fwd64",
+        &cn_field_free_space_fwd64,
+        "Float64 free-space field forward for the strict gradcheck AD path.");
+    module.def(
+        "field_free_space_backward",
+        &cn_field_free_space_backward,
+        "Fixed-topology VJP of the free-space field (frequency in AD-1).");
+    module.def(
+        "field_free_space_jvp",
+        &cn_field_free_space_jvp,
+        "Fixed-topology JVP of the free-space field (frequency in AD-1).");
+    module.def(
+        "field_reflection_sequence_backward",
+        &cn_field_reflection_sequence_backward,
+        "Fixed-topology VJP of the reflection sequence (materials and frequency).");
+    module.def(
+        "field_reflection_sequence_jvp",
+        &cn_field_reflection_sequence_jvp,
+        "Fixed-topology JVP of the reflection sequence (materials and frequency).");
+    module.def(
+        "field_transmission_sequence_backward",
+        &cn_field_transmission_sequence_backward,
+        "Fixed-topology VJP of the transmission sequence (CSR layers and frequency).");
+    module.def(
+        "field_transmission_sequence_jvp",
+        &cn_field_transmission_sequence_jvp,
+        "Fixed-topology JVP of the transmission sequence (CSR layers and frequency).");
     module.def(
         "bdpt_reflection_accumulation_forward",
         &cn_bdpt_reflection_accumulation_forward,

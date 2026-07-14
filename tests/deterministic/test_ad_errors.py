@@ -6,10 +6,14 @@ from witwin.channel_native.deterministic import solve
 from tests.support.scenes import same_side_wall_reflection_scene
 
 
-@pytest.mark.parametrize("ad_mode", ["vjp", "jvp", "forward"])
-def test_deterministic_rejects_unsupported_ad_modes(ad_mode):
-    with pytest.raises(RuntimeError, match="deterministic fixed-topology AD is not enabled"):
-        Config(ad_mode=ad_mode)
+@pytest.mark.parametrize("ad_mode", ["vjp", "jvp"])
+def test_deterministic_accepts_fixed_topology_ad_modes(ad_mode):
+    assert Config(ad_mode=ad_mode).ad_mode == ad_mode
+
+
+def test_deterministic_rejects_unknown_ad_modes():
+    with pytest.raises(RuntimeError, match="ad_mode"):
+        Config(ad_mode="forward")
 
 
 def test_coherent_reflection_uses_complex_fields():

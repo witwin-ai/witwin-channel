@@ -34,7 +34,7 @@ class Scene:
     structures: tuple[Structure, ...]
     transmitters: tuple[Transmitter, ...]
     receivers: tuple[Receiver, ...]
-    frequency: float
+    frequency: float | torch.Tensor
     metadata: dict[str, object]
     _geometry_version: int = 0
     _material_version: int = 0
@@ -52,18 +52,29 @@ class Scene:
         structures: list[Structure] | tuple[Structure, ...],
         transmitters: list[Transmitter] | tuple[Transmitter, ...],
         receivers: list[Receiver] | tuple[Receiver, ...],
-        frequency: float,
+        frequency: float | torch.Tensor,
         metadata: dict[str, object] | None = None,
         _geometry_version: int = 0,
         _material_version: int = 0,
         _assignment_version: int = 0,
     ) -> None:
-        if frequency <= 0.0:
-            raise ValueError("frequency must be positive")
+        # The carrier frequency may be a 0-d torch tensor so it can carry
+        # requires_grad / forward-mode tangents into the differentiable field
+        # kernels (plan 07 AD-1). Every non-AD consumer reads it through
+        # float(scene.frequency), which detaches by contract.
+        if isinstance(frequency, torch.Tensor):
+            if frequency.ndim != 0:
+                raise ValueError("tensor frequency must be a 0-d tensor")
+            if float(frequency.detach()) <= 0.0:
+                raise ValueError("frequency must be positive")
+        else:
+            if frequency <= 0.0:
+                raise ValueError("frequency must be positive")
+            frequency = float(frequency)
         object.__setattr__(self, "structures", tuple(structures))
         object.__setattr__(self, "transmitters", tuple(transmitters))
         object.__setattr__(self, "receivers", tuple(receivers))
-        object.__setattr__(self, "frequency", float(frequency))
+        object.__setattr__(self, "frequency", frequency)
         object.__setattr__(self, "metadata", dict(metadata or {}))
         object.__setattr__(self, "_geometry_version", _geometry_version)
         object.__setattr__(self, "_material_version", _material_version)
@@ -139,12 +150,21 @@ class Scene:
 
     def compile(self) -> CompiledScene:
         cached = self._compiled_cache
+        # Material records are always evaluated at the primal frequency:
+        # dispersive material laws are frozen at compile time (fixed material
+        # records), so frequency gradients flow only through the explicit
+        # frequency dependence of the field kernels (plan 07 AD-1).
+        frequency_value = (
+            float(self.frequency.detach())
+            if isinstance(self.frequency, torch.Tensor)
+            else float(self.frequency)
+        )
         (
             material_records,
             material_keys,
             material_cache_token,
             phase_screens,
-        ) = _material_records(self.structures, self.frequency)
+        ) = _material_records(self.structures, frequency_value)
         if (
             cached is not None
             and cached.geometry_version == self._geometry_version
@@ -160,7 +180,7 @@ class Scene:
         materials = _compile_materials(
             material_records,
             material_keys,
-            self.frequency,
+            frequency_value,
             self._material_version,
             material_cache_token,
         )
