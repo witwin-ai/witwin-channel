@@ -275,17 +275,38 @@ def test_ad_mode_none_keeps_primal_contract(solver):
     assert not coefficient_none.requires_grad
     assert coefficient_none.grad_fn is None
     assert coefficient_vjp.requires_grad
-    # Same forward values and identical launch/tape accounting.
+    # Same forward values; primal mode keeps zero AD accounting while the
+    # AD mode reports its real registered companions and retained tape
+    # (plan 07 AD-4 metadata contract).
     torch.testing.assert_close(
         coefficient_none, coefficient_vjp.detach(), rtol=0.0, atol=0.0
     )
     kernel_none = result_none.metadata["kernel"]
     kernel_vjp = result_vjp.metadata["kernel"]
-    assert kernel_none["launch_count"] == kernel_vjp["launch_count"]
+    assert kernel_none["forward_launch_count"] == kernel_vjp["forward_launch_count"]
     assert kernel_none["tape_bytes"] == 0
-    assert kernel_vjp["tape_bytes"] == 0
+    assert kernel_none["backward_launch_count"] == 0
+    assert kernel_none["jvp_launch_count"] == 0
+    assert kernel_vjp["tape_bytes"] > 0
+    assert kernel_vjp["backward_launch_count"] > 0
+    assert kernel_vjp["jvp_launch_count"] == 0
     assert kernel_none["ad_status"] == "none"
     assert kernel_vjp["ad_status"] == "vjp"
+    assert kernel_none["forward_time_ms"] > 0.0
+    assert kernel_vjp["forward_time_ms"] > 0.0
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+def test_jvp_metadata_reports_dual_companions_without_tape(solver):
+    """Forward mode runs its dual companions in-solve and retains no tape."""
+
+    scene = _reflection_scene()
+    result = _solve(scene, solver, frozenset({"reflection"}), "jvp")
+    kernel = result.metadata["kernel"]
+    assert kernel["ad_status"] == "jvp"
+    assert kernel["jvp_launch_count"] > 0
+    assert kernel["backward_launch_count"] == 0
+    assert kernel["tape_bytes"] == 0
 
 
 @pytest.mark.parametrize("solver", _SOLVERS)

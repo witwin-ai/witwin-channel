@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 import torch
@@ -59,6 +60,10 @@ def _metadata(
     path_count: int,
     component_counts: dict[str, int],
     launch_count: int,
+    ad_companion_launches: int = 0,
+    ad_tape_bytes: int = 0,
+    forward_time_ms: float = 0.0,
+    peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     capability = {
@@ -119,15 +124,27 @@ def _metadata(
             "components": component_counts,
         },
         "capability": capability,
+        # Plan 07 AD-4: the real registered-companion accounting. vjp retains
+        # tape and schedules its companions on the user's later backward; jvp
+        # runs its dual companions inside this forward and retains no tape.
         "kernel": make_metadata(
             primitive="deterministic_solver",
             forward_launch_count=launch_count,
+            backward_launch_count=(
+                ad_companion_launches if config.ad_mode == "vjp" else 0
+            ),
+            jvp_launch_count=(
+                ad_companion_launches if config.ad_mode == "jvp" else 0
+            ),
+            tape_bytes=ad_tape_bytes if config.ad_mode == "vjp" else 0,
             accumulation_strategy="atomic_add",
             scheduling_strategy="native_fused"
             if raydn_component_enabled
             else "native_cuda",
             raydn_native=capability["raydn_native"],
             ad_status=config.ad_mode,
+            forward_time_ms=forward_time_ms,
+            peak_memory_bytes=peak_memory_bytes,
         ),
         "field_abi": "complex3_v1",
         "phase_convention": dict(PHASE_CONVENTION),
@@ -168,6 +185,12 @@ def solve(scene: Scene, config: Config) -> Result:
     )
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.deterministic requires CUDA")
+    # Solve-level wall time and CUDA high-water-mark delta for the kernel
+    # metadata (plan 07 AD-4). The synchronize pins the start; the solve body
+    # already carries host syncs, so the extra one is in their noise.
+    torch.cuda.synchronize()
+    solve_start = perf_counter()
+    peak_before = torch.cuda.max_memory_allocated()
 
     native_info = build_info()
     _validate_requested_components(config)
@@ -227,12 +250,19 @@ def solve(scene: Scene, config: Config) -> Result:
         component_power["diffraction"] = exact_diffraction
         if not config.coherent:
             path_gain = path_gain - previous_diffraction + exact_diffraction
+    torch.cuda.synchronize()
     metadata = _metadata(
         config=config,
         native_info=native_info,
         path_count=path_count,
         component_counts=component_counts,
         launch_count=path_result.launch_count,
+        ad_companion_launches=path_result.ad_companion_launches,
+        ad_tape_bytes=path_result.ad_tape_bytes,
+        forward_time_ms=(perf_counter() - solve_start) * 1.0e3,
+        peak_memory_bytes=max(
+            0, torch.cuda.max_memory_allocated() - peak_before
+        ),
         scattering_info=scattering_info,
     )
     diagnostics = None

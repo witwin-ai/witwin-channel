@@ -1,11 +1,12 @@
-"""AD-2 solver-level tests: TX/RX position and mesh-vertex gradients through solve().
+"""AD-2/AD-4 solver-level tests: TX/RX position and mesh-vertex gradients.
 
 Covers the plan 07 section 9.3 geometry cells for D=deterministic and P=path:
-TX/RX position x (LoS, single reflection, transmission-multilayer) and mesh
-vertex x single reflection, each against central finite differences of the
-primal solve. Geometry FD steps stay well inside the linear regime of the
-carrier phase (k*h << 1 at 3 GHz), which is what forces a tighter step here
-than the material tests use.
+TX/RX position x (LoS, single reflection, transmission-multilayer), mesh
+vertex x (LoS, single reflection, transmission-multilayer) and the coupled
+mesh-vertex gap, each against central finite differences of the primal
+solve. Geometry FD steps stay well inside the linear regime of the carrier
+phase (k*h << 1 at 3 GHz), which is what forces a tighter step here than the
+material tests use.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import torch
 from tests.ad._fd import central_difference_gradient, relative_error
 from tests.ad._tolerances import (
     ABS_TOL,
+    FD_STEP_POSITION,
     FD_STEP_POSITION_PHASE,
     FD_STEP_VERTEX,
     REL_TOL_GENERAL,
@@ -80,8 +82,18 @@ def _reflection_scene(
     )
 
 
+_TRANSMISSION_WALL_VERTICES = (
+    (3.0, -4.0, -4.0),
+    (3.0, 4.0, -4.0),
+    (3.0, -4.0, 4.2),
+    (3.0, 4.0, 4.2),
+)
+
+
 def _transmission_scene(
-    tx: torch.Tensor | None = None, rx: torch.Tensor | None = None
+    tx: torch.Tensor | None = None,
+    rx: torch.Tensor | None = None,
+    vertices: torch.Tensor | None = None,
 ) -> Scene:
     material = PhysicalSurface(
         layers=(
@@ -90,8 +102,18 @@ def _transmission_scene(
         ),
         name="ad-thin-sheet",
     )
+    if vertices is None:
+        wall = transmission_wall_structure(3.0, material)
+    else:
+        wall = Structure(
+            vertices=vertices,
+            faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
+            material=material,
+            name="wall",
+            surface_id=1,
+        )
     return Scene(
-        structures=[transmission_wall_structure(3.0, material)],
+        structures=[wall],
         transmitters=[
             Transmitter(position=_vec(_TRANSMISSION_TX) if tx is None else tx)
         ],
@@ -230,3 +252,151 @@ def test_geometry_ad_is_inert_without_geometry_leaves():
     primal = _solve(scene, "deterministic", frozenset({"reflection"}), "none")
     ad = _solve(scene, "deterministic", frozenset({"reflection"}), "vjp")
     assert torch.equal(primal.paths.coefficient, ad.paths.coefficient)
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+def test_mesh_vertex_transmission_grad_matches_fd(solver):
+    """Mesh vertex x transmission (plan 07 section 9.3).
+
+    A straight tx->rx penetration path never moves with the wall vertices
+    (the crossing point is not a path parameter) and its path length is
+    vertex-independent, but the incidence COSINE is not: the wall normal is
+    a function of the vertices, and the layer-stack response is evaluated
+    at that angle. Because no carrier phase rides on the vertices here, the
+    FD step is NOT bound by k*h << 1; it uses the coarser incoherent step,
+    which the tilt response needs to clear the float32 forward noise floor
+    (at 1e-3 the two-point difference of the ~1e-5-scale gradient is only
+    a few float32 ulps of the loss and reads reassociation noise).
+    """
+
+    components = frozenset({"transmission"})
+    base = torch.tensor(_TRANSMISSION_WALL_VERTICES, dtype=torch.float32)
+
+    leaf = base.clone().cuda().requires_grad_(True)
+    scene = _transmission_scene(vertices=leaf)
+    _loss(_solve(scene, solver, components, "vjp"), solver).backward()
+    assert leaf.grad is not None
+    assert float(leaf.grad.abs().max()) > 0.0
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        fd_scene = _transmission_scene(vertices=values.clone())
+        return _loss(_solve(fd_scene, solver, components, "none"), solver).detach()
+
+    expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION)
+    assert (
+        relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+    )
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+def test_mesh_vertex_los_grad_is_structurally_zero(solver):
+    """Mesh vertex x LoS: the exact zero, pinned.
+
+    A LoS path touches no face: its coefficient depends on the endpoints and
+    the frequency only, and the wall's sole influence (blocking the path) is
+    a discrete frozen visibility winner. The true fixed-topology derivative
+    is therefore identically zero. No graph edge can reach the vertex leaf,
+    so the loss itself carries no graph (the endpoints are not live) and
+    the leaf's gradient is the structural zero. Anything else (a live loss
+    with a nonzero vertex gradient) would be a regression.
+    """
+
+    wall_vertices = torch.tensor(_WALL_VERTICES, dtype=torch.float32)
+    leaf = wall_vertices.clone().cuda().requires_grad_(True)
+    # The wall sits at x = 2.5; the tx->rx segment runs along x = 0 and never
+    # touches it, so the LoS row exists and is unobstructed.
+    scene = _reflection_scene(vertices=leaf)
+    loss = _loss(_solve(scene, solver, frozenset({"los"}), "vjp"), solver)
+    if loss.requires_grad:
+        loss.backward()
+        assert leaf.grad is None or bool((leaf.grad == 0.0).all())
+    else:
+        # The graph never reached any live leaf: the vertex gradient is the
+        # exact structural zero.
+        assert leaf.grad is None
+
+
+def _coupled_scene_with_vertices(leaf: torch.Tensor) -> Scene:
+    from witwin.channel_native.core.materials import PerfectConductor
+
+    return Scene(
+        structures=[
+            Structure(
+                vertices=leaf,
+                faces=torch.tensor(
+                    [[0, 1, 2], [0, 2, 3], [4, 6, 7], [4, 7, 5], [4, 5, 9], [4, 9, 8]],
+                    dtype=torch.int32,
+                ),
+                material=PerfectConductor(),
+                surface_id=0,
+            )
+        ],
+        transmitters=[Transmitter(position=torch.tensor([0.4, -2.2, 1.15]))],
+        receivers=[ReceiverPoint(position=torch.tensor([0.55, 2.3, 4.8]))],
+        frequency=_FREQUENCY_HZ,
+    )
+
+
+_COUPLED_VERTICES = (
+    (-5.0, -5.0, 0.0),
+    (5.0, -5.0, 0.0),
+    (5.0, 5.0, 0.0),
+    (-5.0, 5.0, 0.0),
+    (2.0, -1.0, 2.0),
+    (2.0, 1.0, 2.0),
+    (4.0, -1.0, 2.0),
+    (4.0, 1.0, 2.0),
+    (2.0, -1.0, 4.0),
+    (2.0, 1.0, 4.0),
+)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "mesh vertex x coupled R-D is not wired (plan 07 section 9.3 known "
+        "gap): the coupled stationary re-solve and the coupled field "
+        "adjoints take the wall plane and the edge tables as frozen "
+        "winners, so the solver fails loudly instead of returning a "
+        "silently incomplete vertex gradient"
+    ),
+)
+def test_mesh_vertex_coupled_grad_exists():
+    leaf = (
+        torch.tensor(_COUPLED_VERTICES, dtype=torch.float32)
+        .cuda()
+        .requires_grad_(True)
+    )
+    result = path_solve(
+        _coupled_scene_with_vertices(leaf),
+        PathConfig(
+            max_depth=2,
+            components=frozenset({"reflection", "diffraction"}),
+            coupled_paths=True,
+            ad_mode="vjp",
+        ),
+    )
+    loss = result.a.real.sum() + 0.5 * result.a.imag.sum()
+    loss.backward()
+    assert leaf.grad is not None
+    assert float(leaf.grad.abs().max()) > 0.0
+
+
+def test_mesh_vertex_coupled_fails_loudly():
+    """The coupled + live-vertex combination must refuse, not silently zero."""
+
+    leaf = (
+        torch.tensor(_COUPLED_VERTICES, dtype=torch.float32)
+        .cuda()
+        .requires_grad_(True)
+    )
+    with pytest.raises(NotImplementedError, match="vertex"):
+        path_solve(
+            _coupled_scene_with_vertices(leaf),
+            PathConfig(
+                max_depth=2,
+                components=frozenset({"reflection", "diffraction"}),
+                coupled_paths=True,
+                ad_mode="vjp",
+            ),
+        )

@@ -320,10 +320,15 @@ __device__ __forceinline__ DualMedium make_medium_dual(
     return medium;
 }
 
-__device__ __forceinline__ DualC dc_kz_from_kpar(DualC k, DualF k_par) {
+// Takes the SQUARED conserved transverse wave number as the dual: the stack
+// response depends on k_par only through k_par^2, and the k_par
+// parameterization has an artificial derivative singularity at normal
+// incidence (d sin(theta)/d cos(theta) -> -inf at sin(theta) = 0 while the
+// k_par^2 tangent stays finite; routing the tangent through k_par produced
+// 0 * inf = NaN cos_theta gradients at exactly-normal rays).
+__device__ __forceinline__ DualC dc_kz_from_kpar2(DualC k, DualF k_par2) {
     return dc_sqrt_passive(dc_sub(
-        dc_mul(k, k),
-        dc_make(k_par.v * k_par.v, 0.0f, 2.0f * k_par.v * k_par.d, 0.0f)));
+        dc_mul(k, k), dc_make(k_par2.v, 0.0f, k_par2.d, 0.0f)));
 }
 
 __device__ __forceinline__ DualC dc_admittance(
@@ -408,18 +413,18 @@ __device__ __forceinline__ DualStackRT stack_rt_dual(
     const float sin2 = fmaxf(0.0f, sin2_raw);
     const float d_sin2 = sin2_raw >= 0.0f ? -2.0f * ct * d_ct : 0.0f;
 
-    // Entry medium is vacuum (v1); its wave number is omega / c.
+    // Entry medium is vacuum (v1); its wave number is omega / c. The
+    // conserved transverse wave number enters the stack only squared, and
+    // its square has a finite tangent everywhere (including exactly-normal
+    // incidence, where the k_par parameterization itself is singular); the
+    // value reproduces the primal's k_par * k_par operation order exactly.
     const float k_entry = omega.v / em::kSpeedOfLight;
     const float d_k_entry = omega.d / em::kSpeedOfLight;
     const float sin_theta = sqrtf(sin2);
-    // d sqrt at sin2 == 0 diverges like the oracle's; the d_sin2 == 0 gate
-    // only keeps the untouched-tangent case (materials/frequency seeds)
-    // exactly zero instead of 0 * inf.
-    const float d_sin_theta =
-        d_sin2 == 0.0f ? 0.0f : d_sin2 / (2.0f * sin_theta);
-    const DualF k_par = {
-        k_entry * sin_theta,
-        d_k_entry * sin_theta + k_entry * d_sin_theta};
+    const float k_par_value = k_entry * sin_theta;
+    const DualF k_par2 = {
+        k_par_value * k_par_value,
+        2.0f * k_entry * d_k_entry * sin2 + k_entry * k_entry * d_sin2};
     const DualC kz_entry = dc_make(
         k_entry * ct, 0.0f, d_k_entry * ct + k_entry * d_ct, 0.0f);
     DualMedium entry;
@@ -449,7 +454,7 @@ __device__ __forceinline__ DualStackRT stack_rt_dual(
         omega,
         last_seed.d_eps,
         last_seed.d_sigma);
-    DualC kz_below = dc_kz_from_kpar(below.k, k_par);
+    DualC kz_below = dc_kz_from_kpar2(below.k, k_par2);
     DualC y_below = dc_admittance(below, kz_below, omega, pol);
     const DualInterfaceRT exit_interface = dc_interface_rt(y_below, y_exit);
     DualC r_total = exit_interface.r;
@@ -477,7 +482,7 @@ __device__ __forceinline__ DualStackRT stack_rt_dual(
                 omega,
                 above_seed.d_eps,
                 above_seed.d_sigma);
-            kz_above = dc_kz_from_kpar(above.k, k_par);
+            kz_above = dc_kz_from_kpar2(above.k, k_par2);
             y_above = dc_admittance(above, kz_above, omega, pol);
         } else {
             kz_above = kz_entry;
@@ -1309,6 +1314,109 @@ __device__ __forceinline__ void legacy_sionna_slab_fresnel_dual(
         gain_dual);
     r_te = dc_make(result_te.v.re, result_te.v.im, result_te.d.re, result_te.d.im);
     r_tm = dc_make(result_tm.v.re, result_tm.v.im, result_tm.d.re, result_tm.d.im);
+}
+
+// ---------------------------------------------------------------------------
+// RayD-dual bridges (plan 07 AD-4). The templated UTD math in
+// rayd/shared/utd runs on utd::Dual scalars; these helpers feed the validated
+// AD-1 slab response into that machinery so the wedge and diffraction-map
+// dual rows share one finite-slab implementation. Shared by
+// kernels/field_wedge_ad.cu and kernels/diffraction.cu.
+// ---------------------------------------------------------------------------
+
+__device__ __forceinline__ utd::ComplexT<utd::Dual> dual_cplx_from(DualC value) {
+    return {{value.v.re, value.d.re}, {value.v.im, value.d.im}};
+}
+
+// Scalar/vector seeding that collapses to the plain value for the float
+// (forward) instantiation and carries the tangent for the Dual one.
+template <typename T>
+__device__ __forceinline__ T seeded(float value, float tangent);
+template <>
+__device__ __forceinline__ float seeded<float>(float value, float) {
+    return value;
+}
+template <>
+__device__ __forceinline__ utd::Dual seeded<utd::Dual>(float value, float tangent) {
+    return {value, tangent};
+}
+
+template <typename T>
+__device__ __forceinline__ utd::Vec3T<T> seeded3(
+    utd::float3a value, utd::float3a tangent) {
+    return {
+        seeded<T>(value.x, tangent.x),
+        seeded<T>(value.y, tangent.y),
+        seeded<T>(value.z, tangent.z)};
+}
+
+template <typename T>
+__device__ __forceinline__ utd::Vec3T<T> const3(utd::float3a value) {
+    return {T(value.x), T(value.y), T(value.z)};
+}
+
+// Slab Fresnel with RayD dual scalars: forwards to the validated AD-1
+// slab_fresnel_dual (single source of truth for the finite-slab response).
+__device__ __forceinline__ void slab_fresnel_dual_rd(
+    utd::Dual cos_theta,
+    utd::Dual eps_r,
+    utd::Dual sigma_e,
+    float mu_r,
+    utd::Dual gain,
+    utd::Dual thickness,
+    utd::Dual frequency,
+    utd::ComplexT<utd::Dual>& r_te,
+    utd::ComplexT<utd::Dual>& r_tm) {
+    DualC te;
+    DualC tm;
+    slab_fresnel_dual(
+        cos_theta.v, eps_r.v, sigma_e.v, mu_r, gain.v, thickness.v, frequency.v,
+        cos_theta.d, eps_r.d, sigma_e.d, gain.d, thickness.d, frequency.d,
+        te, tm);
+    r_te = dual_cplx_from(te);
+    r_tm = dual_cplx_from(tm);
+}
+
+// Mirror of transport::slab_face_operator on RayD duals (basis math from the
+// RayD templates, Fresnel from slab_fresnel_dual). Edit the primal operator
+// and this mirror TOGETHER.
+__device__ __forceinline__ utd::JonesOperatorT<utd::Dual> slab_face_operator_dual(
+    utd::Dual cos_theta,
+    utd::Dual eps_r,
+    utd::Dual sigma_e,
+    float mu_r,
+    utd::Dual gain,
+    utd::Dual thickness,
+    utd::Dual frequency,
+    utd::Vec3T<utd::Dual> normal,
+    utd::Vec3T<utd::Dual> in_direction,
+    utd::Vec3T<utd::Dual> out_direction,
+    utd::Basis3T<utd::Dual> in_edge,
+    utd::Basis3T<utd::Dual> out_edge) {
+    using Dual = utd::Dual;
+    utd::ComplexT<Dual> r_te;
+    utd::ComplexT<Dual> r_tm;
+    slab_fresnel_dual_rd(
+        cos_theta, eps_r, sigma_e, mu_r, gain, thickness, frequency, r_te, r_tm);
+    const utd::JonesOperatorT<Dual> diagonal = {
+        r_te,
+        utd::cplx_zero<Dual>(),
+        utd::cplx_zero<Dual>(),
+        r_tm,
+    };
+    const utd::Vec3T<Dual> face_in = utd::f3_cross(normal, in_direction);
+    const utd::Vec3T<Dual> raw_out = utd::f3_cross(normal, out_direction);
+    const utd::Vec3T<Dual> reference = utd::stable_perp_basis(out_direction, face_in);
+    const utd::Vec3T<Dual> face_out = utd::f3_dot(raw_out, reference) < 0.0f
+                                          ? utd::f3_neg(raw_out)
+                                          : raw_out;
+    const utd::Basis3T<Dual> input_basis = utd::basis_from_first_vector(
+        in_direction,
+        face_in,
+        utd::stable_perp_basis(in_direction, utd::v3_const<Dual>(0, 0, 1)));
+    const utd::Basis3T<Dual> output_basis = utd::basis_from_first_vector(
+        out_direction, face_out, reference);
+    return utd::jop_in_basis(diagonal, input_basis, output_basis, in_edge, out_edge);
 }
 
 }  // namespace channel_native::field_transport_ad

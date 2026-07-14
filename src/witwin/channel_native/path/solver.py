@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 import torch
@@ -100,15 +101,31 @@ def _metadata(
     path_native_available: bool,
     transmission_path_count: int = 0,
     scattering_path_count: int = 0,
+    ad_companion_launches: int = 0,
+    ad_tape_bytes: int = 0,
+    forward_time_ms: float = 0.0,
+    peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    # Plan 07 AD-4: the real registered-companion accounting. vjp retains
+    # tape and schedules its companions on the user's later backward; jvp
+    # runs its dual companions inside this forward and retains no tape.
     kernel = make_metadata(
         primitive="path_solver",
         forward_launch_count=1 if path_count else 0,
+        backward_launch_count=(
+            ad_companion_launches if config.ad_mode == "vjp" else 0
+        ),
+        jvp_launch_count=(
+            ad_companion_launches if config.ad_mode == "jvp" else 0
+        ),
+        tape_bytes=ad_tape_bytes if config.ad_mode == "vjp" else 0,
         accumulation_strategy="none",
         scheduling_strategy="native_cuda",
         raydn_native=reflection_available or diffraction_available,
         ad_status=config.ad_mode,
+        forward_time_ms=forward_time_ms,
+        peak_memory_bytes=peak_memory_bytes,
     )
     capability = {
         "path_native": path_native_available,
@@ -206,11 +223,17 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
     reflection_available, diffraction_available, path_native_available = (
         _validate_runtime(config)
     )
+    # Solve-level wall time and CUDA high-water-mark delta for the kernel
+    # metadata (plan 07 AD-4).
+    torch.cuda.synchronize()
+    solve_start = perf_counter()
+    peak_before = torch.cuda.max_memory_allocated()
     topology = export_topology(scene, config)
     scattering_info = None
     if "scattering" in config.components:
         topology, scattering_info = append_scattering_paths(scene, config, topology)
     path_count = int(topology.valid.numel())
+    torch.cuda.synchronize()
     metadata = _metadata(
         config=config,
         path_count=path_count,
@@ -223,6 +246,10 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
         scattering_path_count=int(
             (topology.component_id == _COMPONENT_ID["scattering"]).sum().item()
         ),
+        ad_companion_launches=topology.ad_companion_launches,
+        ad_tape_bytes=topology.ad_tape_bytes,
+        forward_time_ms=(perf_counter() - solve_start) * 1.0e3,
+        peak_memory_bytes=max(0, torch.cuda.max_memory_allocated() - peak_before),
         scattering_info=scattering_info,
     )
     tx_positions, _tx_power = _transmitter_tensors(scene)

@@ -36,14 +36,40 @@ _CAPABILITIES: dict[str, Any] = {
     "supports_complex_path_coefficients": True,
     "supports_polarization": True,
     "supports_arrays": True,
-    "supports_ad": False,
+    "supports_ad": True,
+    # Plan 07 completion gate (AD-4b). Honest scope: fixed-topology forward
+    # and reverse mode through the frozen discrete winner (path topology,
+    # sampling tapes, validity masks, polarization frames). No estimator for
+    # visibility / topology discontinuities: path birth/death and shadow
+    # transitions are out of contract, and the solvers refuse the excluded
+    # combinations below before any launch instead of returning silent zeros.
     "ad_contract": {
-        "decision": "primal_only_first_replacement",
-        "public_modes": ["none"],
-        "fixed_topology_jvp": False,
-        "fixed_topology_vjp": False,
+        "decision": "fixed_topology_jvp_vjp",
+        "public_modes": ["none", "jvp", "vjp"],
+        "fixed_topology_jvp": True,
+        "fixed_topology_vjp": True,
         "visibility_discontinuity_estimator": False,
-        "experimental_low_level_primitives": [
+        "differentiable_solvers": ["path", "deterministic", "montecarlo_basic"],
+        "differentiable_inputs": [
+            "material_eps_r",
+            "material_sigma_e",
+            "material_gain",
+            "material_thickness",
+            "frequency",
+            "tx_position",
+            "rx_position",
+            "mesh_vertices",
+        ],
+        # Per-solver refusals (fail loudly before any launch).
+        "ad_excluded": {
+            "path": ["scattering", "coupled_paths_mesh_vertex"],
+            "deterministic": ["scattering"],
+            "montecarlo_basic": ["scattering"],
+            "montecarlo_bdpt": ["all"],
+        },
+        # Wired into the montecarlo.basic LoS Function since AD-3; the
+        # standalone facades remain available.
+        "low_level_primitives": [
             "mc_los_path_gain_backward",
             "mc_los_path_gain_jvp",
         ],
@@ -90,8 +116,12 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
             "supports_arrays": True,
-            "supports_ad": False,
-            "ad_modes": ["none"],
+            "supports_ad": True,
+            "ad_modes": ["none", "jvp", "vjp"],
+            # Fail-loudly refusals: Kirchhoff scattering rows, and mesh
+            # vertex gradients through coupled R-D paths (the coupled
+            # adjoints take the wall plane / edge tables as frozen winners).
+            "ad_excluded": ["scattering", "coupled_paths_mesh_vertex"],
         },
         "deterministic": {
             "max_reflection_depth": 5,
@@ -100,8 +130,9 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
             "supports_arrays": False,
-            "supports_ad": False,
-            "ad_modes": ["none"],
+            "supports_ad": True,
+            "ad_modes": ["none", "jvp", "vjp"],
+            "ad_excluded": ["scattering"],
         },
         "montecarlo_basic": {
             "max_diffraction_order": 1,
@@ -109,8 +140,9 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_complex_path_coefficients": False,
             "supports_polarization": False,
             "supports_arrays": False,
-            "supports_ad": False,
-            "ad_modes": ["none"],
+            "supports_ad": True,
+            "ad_modes": ["none", "jvp", "vjp"],
+            "ad_excluded": ["scattering"],
         },
         "montecarlo_bdpt": {
             "max_diffraction_order": 1,

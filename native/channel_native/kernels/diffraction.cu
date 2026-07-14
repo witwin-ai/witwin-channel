@@ -6,6 +6,8 @@
 
 #include "../tensor_checks.h"
 #include "../field_transport.cuh"
+#include "../field_transport_ad.cuh"
+#include <algorithm>
 #include <vector>
 
 namespace {
@@ -13,6 +15,7 @@ namespace {
 constexpr int kDiffractionBlockSize = 256;
 namespace utd = witwin::channel::native_ext;
 namespace transport = channel_native::field_transport;
+namespace fad = channel_native::field_transport_ad;
 
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;
@@ -32,6 +35,35 @@ __device__ __forceinline__ utd::JonesOperator slab_face_operator(
         normal, in_hat, out_hat, in_edge, out_edge);
 }
 
+// Templated twin of the local slab_face_operator: the float instantiation IS
+// the primal operator; the Dual instantiation is the validated AD-1 slab
+// response on RayD duals (field_transport_ad.cuh).
+template <typename T>
+__device__ __forceinline__ utd::JonesOperatorT<T> slab_face_operator_t(
+    T ct, T er, T sg, T gain, T thickness, T wavelength,
+    utd::Vec3T<T> normal, utd::Vec3T<T> in_hat, utd::Vec3T<T> out_hat,
+    utd::Basis3T<T> in_edge, utd::Basis3T<T> out_edge);
+template <>
+__device__ __forceinline__ utd::JonesOperatorT<float> slab_face_operator_t<float>(
+    float ct, float er, float sg, float gain, float thickness, float wavelength,
+    utd::Vec3T<float> normal, utd::Vec3T<float> in_hat, utd::Vec3T<float> out_hat,
+    utd::Basis3T<float> in_edge, utd::Basis3T<float> out_edge) {
+    return slab_face_operator(
+        ct, er, sg, gain, thickness, wavelength, normal, in_hat, out_hat,
+        in_edge, out_edge);
+}
+template <>
+__device__ __forceinline__ utd::JonesOperatorT<utd::Dual> slab_face_operator_t<utd::Dual>(
+    utd::Dual ct, utd::Dual er, utd::Dual sg, utd::Dual gain, utd::Dual thickness,
+    utd::Dual wavelength, utd::Vec3T<utd::Dual> normal,
+    utd::Vec3T<utd::Dual> in_hat, utd::Vec3T<utd::Dual> out_hat,
+    utd::Basis3T<utd::Dual> in_edge, utd::Basis3T<utd::Dual> out_edge) {
+    const utd::Dual frequency = transport::kSpeedOfLight / wavelength;
+    return fad::slab_face_operator_dual(
+        ct, er, sg, 1.0f, gain, thickness, frequency, normal, in_hat, out_hat,
+        in_edge, out_edge);
+}
+
 __device__ __forceinline__ utd::float3a load_utd3(const float *p, int i) {
     return utd::make_f3(p[3*i], p[3*i+1], p[3*i+2]);
 }
@@ -39,6 +71,299 @@ __device__ __forceinline__ utd::float3a load_utd3(const float *p, int i) {
 __device__ __forceinline__ float component_utd(utd::float3a v, int axis) {
     return axis == 0 ? v.x : (axis == 1 ? v.y : v.z);
 }
+
+template <typename T>
+__device__ __forceinline__ T component_t(utd::Vec3T<T> v, int axis) {
+    return axis == 0 ? v.x : (axis == 1 ? v.y : v.z);
+}
+
+// Truncation-factor freeze (plan 07 AD-4a policy, same as the coupled row in
+// field_wedge_ad.cu): the tape rows evaluate the pair with +/-1e5
+// pseudo-infinite edge bounds, where the Boersma endpoint ripple makes the
+// factor's derivative float32 noise amplified by the 1e5 lever arm (the true
+// infinite-edge derivative is zero). No-op for the float instantiation.
+template <typename T>
+__device__ __forceinline__ void freeze_complex_tangent(utd::ComplexT<T>&) {}
+template <>
+__device__ __forceinline__ void freeze_complex_tangent<utd::Dual>(
+    utd::ComplexT<utd::Dual>& value) {
+    value.re.d = 0.f;
+    value.im.d = 0.f;
+}
+
+// ---------------------------------------------------------------------------
+// Templated per-lane row of the Sionna diffraction tape accumulator (plan 07
+// AD-4). The float instantiation is the primal deposit computed by
+// sionna_diffraction_tape_accumulate_kernel below; the Dual instantiation
+// carries an exact directional derivative through the recomputed Keller-cone
+// geometry, the incident spherical wave, the stored slab face operators and
+// the UTD pair (fixed-point + stored-ops convention: selectStationaryPoint =
+// 0, mat.omega = 0 at the pair call). Frozen winners: the RayD sampling tape
+// (active / state / cell / u), the per-lane cone azimuth, the edge tables
+// and the deposit binning. Differentiable: the per-face slab materials, the
+// state source (transmitter) and the wavelength (chained to frequency by the
+// host layer).
+// ---------------------------------------------------------------------------
+
+struct TapeRowContext {
+    utd::float3a edge_pos;
+    utd::float3a edge_dir_raw;
+    float t_min;
+    float t_max;
+    utd::float3a n0;
+    utd::float3a nn;
+    float exterior_angle;
+    int prim0;
+    int prim1;
+    bool valid0;
+    bool valid1;
+    float eps0, mu0, sigma0, gain0, thick0;
+    float eps1, mu1, sigma1, gain1, thick1;
+    utd::float3a src;
+    float src_power;
+    float u;
+    float azimuth_sa;
+    float azimuth_ca;
+    float wavelength;
+    int axis;
+    float plane;
+    float cell_area;
+    float edge_weight;
+};
+
+struct TapeRowSeeds {
+    utd::float3a src;
+    float eps0, sigma0, gain0, thick0;
+    float eps1, sigma1, gain1, thick1;
+    float wavelength;
+};
+
+__device__ __forceinline__ TapeRowSeeds tape_seeds_zero() {
+    TapeRowSeeds seeds;
+    seeds.src = utd::f3_zero();
+    seeds.eps0 = 0.f; seeds.sigma0 = 0.f; seeds.gain0 = 0.f; seeds.thick0 = 0.f;
+    seeds.eps1 = 0.f; seeds.sigma1 = 0.f; seeds.gain1 = 0.f; seeds.thick1 = 0.f;
+    seeds.wavelength = 0.f;
+    return seeds;
+}
+
+__device__ __forceinline__ TapeRowContext load_tape_row(
+    int64_t lane, int sidx,
+    const float *edge_pos, const float *edge_dir, const float *t_min,
+    const float *t_max, const float *n0, const float *nn, const int *prim0,
+    const int *prim1, const float *exterior_angle, const float *source,
+    const float *source_power, const float *tape_u,
+    const float *eta_r, const float *sigma, const float *mu_r,
+    const float *gain, const float *thickness, const bool *material_valid,
+    int64_t sample_count, int axis, float plane, float wavelength,
+    float cell_area, int seed, float total_edge_length) {
+    TapeRowContext c;
+    c.edge_pos = load_utd3(edge_pos, sidx);
+    c.edge_dir_raw = load_utd3(edge_dir, sidx);
+    c.t_min = t_min[sidx];
+    c.t_max = t_max[sidx];
+    c.n0 = load_utd3(n0, sidx);
+    c.nn = load_utd3(nn, sidx);
+    c.exterior_angle = exterior_angle[sidx];
+    c.prim0 = prim0[sidx];
+    c.prim1 = prim1[sidx];
+    c.valid0 = c.prim0 >= 0 && material_valid[c.prim0];
+    c.valid1 = c.prim1 >= 0 && material_valid[c.prim1];
+    c.eps0 = c.valid0 ? eta_r[c.prim0] : 1.f;
+    c.mu0 = c.valid0 ? mu_r[c.prim0] : 1.f;
+    c.sigma0 = c.valid0 ? sigma[c.prim0] : 0.f;
+    c.gain0 = c.valid0 ? gain[c.prim0] : 1.f;
+    c.thick0 = c.valid0 ? thickness[c.prim0] : 0.f;
+    c.eps1 = c.valid1 ? eta_r[c.prim1] : 1.f;
+    c.mu1 = c.valid1 ? mu_r[c.prim1] : 1.f;
+    c.sigma1 = c.valid1 ? sigma[c.prim1] : 0.f;
+    c.gain1 = c.valid1 ? gain[c.prim1] : 1.f;
+    c.thick1 = c.valid1 ? thickness[c.prim1] : 0.f;
+    c.src = load_utd3(source, sidx);
+    c.src_power = source_power[sidx];
+    c.u = tape_u[lane];
+    sincosf(
+        2.0f * utd::UTD_PI *
+            dfr_uniform(
+                static_cast<unsigned int>(lane), 1u,
+                static_cast<unsigned int>(seed)),
+        &c.azimuth_sa, &c.azimuth_ca);
+    c.wavelength = wavelength;
+    c.axis = axis;
+    c.plane = plane;
+    c.cell_area = cell_area;
+    c.edge_weight =
+        total_edge_length / fmaxf(static_cast<float>(sample_count), 1.0f);
+    return c;
+}
+
+template <typename T>
+__device__ bool tape_row_value(
+    const TapeRowContext& c, const TapeRowSeeds& seeds, T& value_out) {
+    const utd::float3a eh_f =
+        utd::safe_normalize(c.edge_dir_raw, utd::make_f3(0, 0, 1));
+    const float length = fmaxf(c.t_max - c.t_min, 0.0f);
+    const float ell = c.t_min + c.u * length;
+    const utd::float3a edge_point_f =
+        utd::f3_add(c.edge_pos, utd::f3_mul(eh_f, ell));
+    const utd::Vec3T<T> eh = fad::const3<T>(eh_f);
+    const utd::Vec3T<T> edge_point = fad::const3<T>(edge_point_f);
+    const utd::Vec3T<T> src = fad::seeded3<T>(c.src, seeds.src);
+    const utd::Vec3T<T> incident = utd::safe_normalize(
+        utd::f3_sub(edge_point, src), utd::v3_const<T>(0, 0, 1));
+    const T axial =
+        utd::fminf(utd::fmaxf(utd::f3_dot(incident, eh), T(-1.f)), T(1.f));
+    const T radial = utd::sqrtf(utd::fmaxf(1.0f - axial * axial, T(0.f)));
+    const utd::Vec3T<T> basis0 = utd::stable_perp_basis(eh, incident);
+    const utd::Vec3T<T> basis1 = utd::safe_normalize(
+        utd::f3_cross(eh, basis0), utd::v3_const<T>(0, 1, 0));
+    const utd::Vec3T<T> ko_exact = utd::safe_normalize(
+        utd::f3_add(
+            utd::f3_mul(eh, axial),
+            utd::f3_mul(
+                utd::f3_add(
+                    utd::f3_mul(basis0, c.azimuth_ca),
+                    utd::f3_mul(basis1, c.azimuth_sa)),
+                radial)),
+        basis0);
+    const T denom = component_t(ko_exact, c.axis);
+    if (fabsf(utd::scalar_value(denom)) < 1.0e-8f) return false;
+    const T distance = (c.plane - component_t(edge_point, c.axis)) / denom;
+    if (!(utd::scalar_value(distance) > 0.0f)) return false;
+    const utd::Vec3T<T> target =
+        utd::f3_add(edge_point, utd::f3_mul(ko_exact, distance));
+
+    utd::PairInputsT<T> p{};
+    p.edgePos = edge_point;
+    p.edgeDir = eh;
+    p.n0 = fad::const3<T>(c.n0);
+    p.nn = fad::const3<T>(c.nn);
+    p.wedgeN = T(c.exterior_angle / utd::UTD_PI);
+    p.edgeLineMin = T(-1.0e5f);
+    p.edgeLineMax = T(1.0e5f);
+    p.sourcePos = src;
+    p.selectStationaryPoint = 0.0f;
+    const T wavelength = fad::seeded<T>(c.wavelength, seeds.wavelength);
+    const T k = 2.0f * utd::UTD_PI / wavelength;
+    utd::MaterialParamsT<T> mat{};
+    mat.useFresnel = 1;
+    mat.etaR = T(1.f);
+    mat.muR = T(1.f);
+    mat.sigma = T(0.f);
+    mat.gain = T(1.f);
+    mat.omega = 2.0f * utd::UTD_PI * 299792458.0f / wavelength;
+    mat.txPolX = T(0.f);
+    mat.txPolY = T(0.f);
+    mat.txPolZ = T(1.0f);
+    const utd::Vec3T<T> pol =
+        utd::stable_perp_basis(incident, utd::v3_const<T>(0, 0, 1));
+    p.incidentBasis =
+        utd::basis_from_first_vector(incident, pol, utd::v3_const<T>(1, 0, 0));
+    p.incidentJones = utd::jones_from_vector(
+        utd::direct_source_vector(src, edge_point, k, mat), p.incidentBasis);
+    if (c.valid0) {
+        p.face0Material = {
+            fad::seeded<T>(c.eps0, seeds.eps0), T(c.mu0),
+            fad::seeded<T>(c.sigma0, seeds.sigma0),
+            fad::seeded<T>(c.gain0, seeds.gain0), 1, 1};
+    } else {
+        p.face0Material = {T(1.f), T(1.f), T(0.f), T(1.f), 1, 0};
+    }
+    if (c.valid1) {
+        p.face1Material = {
+            fad::seeded<T>(c.eps1, seeds.eps1), T(c.mu1),
+            fad::seeded<T>(c.sigma1, seeds.sigma1),
+            fad::seeded<T>(c.gain1, seeds.gain1), 1, 1};
+    } else {
+        p.face1Material = {T(1.f), T(1.f), T(0.f), T(1.f), 1, 0};
+    }
+    T gphi, gphi_p, gs, gs_p, gsb;
+    utd::compute_edge_geometry_3d(
+        src, edge_point, eh, p.n0, target, gphi, gphi_p, gs, gs_p, gsb);
+    const utd::Basis3T<T> in_edge = utd::diffraction_edge_basis(
+        utd::f3_sub(edge_point, src), eh, false);
+    const utd::Basis3T<T> out_edge = utd::diffraction_edge_basis(
+        utd::f3_sub(target, edge_point), eh, true);
+    if (c.valid0) {
+        p.face0Operator = slab_face_operator_t<T>(
+            utd::fabsf(utd::sinf(gphi_p)),
+            fad::seeded<T>(c.eps0, seeds.eps0),
+            fad::seeded<T>(c.sigma0, seeds.sigma0),
+            fad::seeded<T>(c.gain0, seeds.gain0),
+            fad::seeded<T>(c.thick0, seeds.thick0), wavelength, p.n0,
+            in_edge.k, out_edge.k, in_edge, out_edge);
+    }
+    if (c.valid1) {
+        p.face1Operator = slab_face_operator_t<T>(
+            utd::fabsf(utd::sinf(p.wedgeN * utd::UTD_PI - gphi)),
+            fad::seeded<T>(c.eps1, seeds.eps1),
+            fad::seeded<T>(c.sigma1, seeds.sigma1),
+            fad::seeded<T>(c.gain1, seeds.gain1),
+            fad::seeded<T>(c.thick1, seeds.thick1), wavelength, p.nn,
+            in_edge.k, out_edge.k, in_edge, out_edge);
+    }
+    mat.omega = T(0.0f);
+    // compute_pair_vector_contribution with selectStationaryPoint = 0,
+    // transcribed so the pseudo-infinite truncation factor can be frozen at
+    // its primal value (see freeze_complex_tangent above). The reused
+    // gphi/gs/basis values are the same calls the pair would make
+    // internally, so the float instantiation stays value-identical to
+    // utd::compute_pair_contribution.
+    const bool src_ext = utd::wedge_exterior_mask(
+        utd::f3_sub(p.sourcePos, p.edgePos), p.edgeDir, p.n0, p.nn);
+    if (!src_ext ||
+        !(utd::scalar_value(gs_p) > utd::UTD_MIN_DISTANCE) ||
+        !(utd::scalar_value(gs) > utd::UTD_MIN_DISTANCE))
+        return false;
+    utd::ComplexT<T> finite_factor =
+        utd::finite_wedge_truncation_factor(p, target, k);
+    freeze_complex_tangent<T>(finite_factor);
+    const utd::Complex3T<T> vector_field = utd::compute_pair_vector_at_angles(
+        p, target, k, mat, gphi, gphi_p, gs, gs_p, gsb, in_edge, out_edge,
+        finite_factor, false);
+    const T field_power = utd::cplx_abs_sqr(vector_field.x) +
+                          utd::cplx_abs_sqr(vector_field.y) +
+                          utd::cplx_abs_sqr(vector_field.z);
+    if (!(utd::scalar_value(field_power) > 0) ||
+        !::isfinite(utd::scalar_value(field_power)))
+        return false;
+
+    const utd::Vec3T<T> t0v = utd::safe_normalize(
+        utd::f3_cross(p.n0, eh), utd::v3_const<T>(1, 0, 0));
+    const utd::Vec3T<T> ko = ko_exact;
+    T phi = utd::atan2f(utd::f3_dot(ko, p.n0), utd::f3_dot(ko, t0v));
+    if (utd::scalar_value(phi) < 0.0f) phi += T(2.0f * utd::UTD_PI);
+    // RayD proposes the complete Keller cone. Sionna's lit-region
+    // estimator only accepts the exterior angular interval [0, 2pi-i].
+    // Rejection keeps the full-cone 1/(2pi) proposal density, hence the
+    // accepted sample weight below remains 2pi rather than the interval
+    // width.
+    if (utd::scalar_value(phi) > c.exterior_angle) return false;
+    const utd::Vec3T<T> dko = utd::f3_mul(
+        utd::f3_add(
+            utd::f3_mul(basis0, -c.azimuth_sa),
+            utd::f3_mul(basis1, c.azimuth_ca)),
+        radial);
+    const utd::Vec3T<T> je = utd::f3_sub(
+        eh, utd::f3_mul(ko, component_t(eh, c.axis) / denom));
+    const utd::Vec3T<T> jp = utd::f3_mul(
+        utd::f3_sub(dko, utd::f3_mul(ko, component_t(dko, c.axis) / denom)),
+        distance);
+    const T jacobian = utd::safe_length(utd::f3_cross(jp, je));
+    const T value = field_power * c.src_power * jacobian *
+                    (2.0f * utd::UTD_PI) * c.edge_weight /
+                    fmaxf(c.cell_area, 1.0e-8f);
+    if (!(utd::scalar_value(value) > 0 &&
+          ::isfinite(utd::scalar_value(value))))
+        return false;
+    value_out = value;
+    return true;
+}
+
+#define TAPE_ROW_TABLE_ARGS                                                   \
+    edge_pos, edge_dir, t_min, t_max, n0, nn, prim0, prim1, exterior_angle,   \
+        source, source_power, tape_u, eta_r, sigma, mu_r, gain, thickness,    \
+        material_valid
 
 __global__ void sionna_diffraction_tape_accumulate_kernel(
     const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
@@ -49,82 +374,147 @@ __global__ void sionna_diffraction_tape_accumulate_kernel(
     const bool *material_valid, float *output, int64_t sample_count, int state_count,
     int axis, float plane, float c0min, float c0max, float c1min, float c1max,
     int r0, int r1, float wavelength, float cell_area, int seed, float total_edge_length) {
+    (void)c0min; (void)c0max; (void)c1min; (void)c1max;
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
         if (!tape_active[lane]) continue;
         const int sidx=tape_state[lane], cell=tape_cell[lane];
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
-        const utd::float3a ep=load_utd3(edge_pos,sidx);
-        const utd::float3a eh=utd::safe_normalize(load_utd3(edge_dir,sidx),utd::make_f3(0,0,1));
-        const float length=fmaxf(t_max[sidx]-t_min[sidx],0.0f);
-        const float ell=t_min[sidx]+tape_u[lane]*length;
-        const utd::float3a edge_point=utd::f3_add(ep,utd::f3_mul(eh,ell));
-        const utd::float3a src=load_utd3(source,sidx);
-        const utd::float3a incident=utd::safe_normalize(utd::f3_sub(edge_point,src),utd::make_f3(0,0,1));
-        const float axial=fminf(fmaxf(utd::f3_dot(incident,eh),-1.0f),1.0f);
-        const float radial=sqrtf(fmaxf(1.0f-axial*axial,0.0f));
-        const utd::float3a basis0=utd::stable_perp_basis(eh,incident);
-        const utd::float3a basis1=utd::safe_normalize(utd::f3_cross(eh,basis0),utd::make_f3(0,1,0));
-        float sa,ca; sincosf(2.0f*utd::UTD_PI*dfr_uniform(static_cast<unsigned int>(lane),1u,static_cast<unsigned int>(seed)),&sa,&ca);
-        const utd::float3a ko_exact=utd::safe_normalize(
-            utd::f3_add(utd::f3_mul(eh,axial),utd::f3_mul(utd::f3_add(utd::f3_mul(basis0,ca),utd::f3_mul(basis1,sa)),radial)),basis0);
-        const float denom=component_utd(ko_exact,axis);
-        if(fabsf(denom)<1.0e-8f) continue;
-        const float distance=(plane-component_utd(edge_point,axis))/denom;
-        if(!(distance>0.0f)) continue;
-        const utd::float3a target=utd::f3_add(edge_point,utd::f3_mul(ko_exact,distance));
+        const TapeRowContext row = load_tape_row(
+            lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
+            wavelength, cell_area, seed, total_edge_length);
+        float value = 0.0f;
+        if (tape_row_value<float>(row, tape_seeds_zero(), value)) {
+            atomicAdd(output + cell, value);
+        }
+    }
+}
 
-        utd::PairInputs p={};
-        p.edgePos=edge_point; p.edgeDir=eh; p.n0=load_utd3(n0,sidx); p.nn=load_utd3(nn,sidx);
-        p.wedgeN=exterior_angle[sidx]/utd::UTD_PI; p.edgeLineMin=-1.0e5f; p.edgeLineMax=1.0e5f;
-        p.sourcePos=src; p.selectStationaryPoint=0.0f;
-        const float k=2.0f*utd::UTD_PI/wavelength;
-        utd::MaterialParams mat={}; mat.useFresnel=1; mat.etaR=1; mat.muR=1; mat.sigma=0; mat.gain=1;
-        mat.omega=2.0f*utd::UTD_PI*299792458.0f/wavelength; mat.txPolZ=1.0f;
-        const utd::float3a incident_dir=incident;
-        const utd::float3a pol=utd::stable_perp_basis(incident_dir,utd::make_f3(0,0,1));
-        p.incidentBasis=utd::basis_from_first_vector(incident_dir,pol,utd::make_f3(1,0,0));
-        p.incidentJones=utd::jones_from_vector(utd::direct_source_vector(src,edge_point,k,mat),p.incidentBasis);
-        auto load_mat=[&](int prim)->utd::FaceMaterialParams {
-            utd::FaceMaterialParams m={1,1,0,1,1,0};
-            if(prim>=0 && material_valid[prim]) { m={eta_r[prim],mu_r[prim],sigma[prim],gain[prim],1,1}; }
-            return m;
-        };
-        p.face0Material=load_mat(prim0[sidx]); p.face1Material=load_mat(prim1[sidx]);
-        float gphi,gphi_p,gs,gs_p,gsb;
-        utd::compute_edge_geometry_3d(src,edge_point,eh,p.n0,target,gphi,gphi_p,gs,gs_p,gsb);
-        const utd::Basis3 in_edge=utd::diffraction_edge_basis(utd::f3_sub(edge_point,src),eh,false);
-        const utd::Basis3 out_edge=utd::diffraction_edge_basis(utd::f3_sub(target,edge_point),eh,true);
-        const int f0=prim0[sidx], f1=prim1[sidx];
-        if(f0>=0 && material_valid[f0]) p.face0Operator=slab_face_operator(
-            fabsf(sinf(gphi_p)),eta_r[f0],sigma[f0],gain[f0],thickness[f0],wavelength,
-            p.n0,in_edge.k,out_edge.k,in_edge,out_edge);
-        if(f1>=0 && material_valid[f1]) p.face1Operator=slab_face_operator(
-            fabsf(sinf(p.wedgeN*utd::UTD_PI-gphi)),eta_r[f1],sigma[f1],gain[f1],thickness[f1],wavelength,
-            p.nn,in_edge.k,out_edge.k,in_edge,out_edge);
-        mat.omega=0.0f;
-        const utd::PairOutputs field=utd::compute_pair_contribution(p,target,k,mat);
-        const float field_power=utd::cplx_abs_sqr(field.vectorField.x)+utd::cplx_abs_sqr(field.vectorField.y)+utd::cplx_abs_sqr(field.vectorField.z);
-        if (!(field_power>0) || !isfinite(field_power)) continue;
+__global__ void sionna_diffraction_tape_accumulate_backward_kernel(
+    const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
+    const float *edge_pos, const float *edge_dir, const float *t_min, const float *t_max,
+    const float *n0, const float *nn, const int *prim0, const int *prim1,
+    const float *exterior_angle, const float *source, const float *source_power,
+    const float *eta_r, const float *sigma, const float *mu_r, const float *gain, const float *thickness,
+    const bool *material_valid, const float *grad_output,
+    float *grad_eta_r, float *grad_sigma, float *grad_gain, float *grad_thickness,
+    float *grad_source, float *grad_frequency,
+    int64_t sample_count, int state_count,
+    int axis, float plane, int r0, int r1, float wavelength, float cell_area,
+    int seed, float total_edge_length, float wavelength_dfreq,
+    int64_t grad_stride0, int64_t grad_stride1) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
+    for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
+         lane<sample_count; lane+=stride) {
+        if (!tape_active[lane]) continue;
+        const int sidx=tape_state[lane], cell=tape_cell[lane];
+        if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
+        const float cotangent = grad_output[
+            static_cast<int64_t>(cell / r0) * grad_stride0 +
+            static_cast<int64_t>(cell % r0) * grad_stride1];
+        if (cotangent == 0.0f) continue;
+        const TapeRowContext row = load_tape_row(
+            lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
+            wavelength, cell_area, seed, total_edge_length);
+        TapeRowSeeds seeds = tape_seeds_zero();
+        utd::Dual value;
+        if (grad_source != nullptr) {
+            float* slots[3] = {&seeds.src.x, &seeds.src.y, &seeds.src.z};
+            for (int axis_index = 0; axis_index < 3; ++axis_index) {
+                *slots[axis_index] = 1.f;
+                const bool accepted =
+                    tape_row_value<utd::Dual>(row, seeds, value);
+                *slots[axis_index] = 0.f;
+                if (accepted)
+                    atomicAdd(grad_source + axis_index, cotangent * value.d);
+            }
+        }
+        if (grad_eta_r != nullptr) {
+            struct MaterialSlot {
+                float* seed;
+                float* grad;
+                int prim;
+            };
+            MaterialSlot slots[8] = {
+                {&seeds.eps0, grad_eta_r, row.prim0},
+                {&seeds.sigma0, grad_sigma, row.prim0},
+                {&seeds.gain0, grad_gain, row.prim0},
+                {&seeds.thick0, grad_thickness, row.prim0},
+                {&seeds.eps1, grad_eta_r, row.prim1},
+                {&seeds.sigma1, grad_sigma, row.prim1},
+                {&seeds.gain1, grad_gain, row.prim1},
+                {&seeds.thick1, grad_thickness, row.prim1},
+            };
+            for (int slot = 0; slot < 8; ++slot) {
+                const bool face_valid = slot < 4 ? row.valid0 : row.valid1;
+                if (!face_valid) continue;
+                *slots[slot].seed = 1.f;
+                const bool accepted =
+                    tape_row_value<utd::Dual>(row, seeds, value);
+                *slots[slot].seed = 0.f;
+                if (accepted)
+                    atomicAdd(
+                        slots[slot].grad + slots[slot].prim,
+                        cotangent * value.d);
+            }
+        }
+        if (grad_frequency != nullptr) {
+            seeds.wavelength = wavelength_dfreq;
+            const bool accepted = tape_row_value<utd::Dual>(row, seeds, value);
+            seeds.wavelength = 0.f;
+            if (accepted) atomicAdd(grad_frequency, cotangent * value.d);
+        }
+    }
+}
 
-        const utd::float3a t0v=utd::safe_normalize(utd::f3_cross(p.n0,eh),utd::make_f3(1,0,0));
-        const utd::float3a ko=ko_exact;
-        float phi=atan2f(utd::f3_dot(ko,p.n0),utd::f3_dot(ko,t0v));
-        if (phi < 0.0f) phi += 2.0f*utd::UTD_PI;
-        // RayD proposes the complete Keller cone. Sionna's lit-region
-        // estimator only accepts the exterior angular interval [0, 2pi-i].
-        // Rejection keeps the full-cone 1/(2pi) proposal density, hence the
-        // accepted sample weight below remains 2pi rather than the interval
-        // width.
-        if (phi > exterior_angle[sidx]) continue;
-        const utd::float3a dko=utd::f3_mul(utd::f3_add(utd::f3_mul(basis0,-sa),utd::f3_mul(basis1,ca)),radial);
-        const utd::float3a je=utd::f3_sub(eh,utd::f3_mul(ko,component_utd(eh,axis)/denom));
-        const utd::float3a jp=utd::f3_mul(utd::f3_sub(dko,utd::f3_mul(ko,component_utd(dko,axis)/denom)),distance);
-        const float jacobian=utd::safe_length(utd::f3_cross(jp,je));
-        const float edge_weight=total_edge_length/fmaxf(static_cast<float>(sample_count),1.0f);
-        const float value=field_power*source_power[sidx]*jacobian*(2.0f*utd::UTD_PI)*edge_weight/fmaxf(cell_area,1.0e-8f);
-        if(value>0 && isfinite(value)) atomicAdd(output+cell,value);
+__global__ void sionna_diffraction_tape_accumulate_jvp_kernel(
+    const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
+    const float *edge_pos, const float *edge_dir, const float *t_min, const float *t_max,
+    const float *n0, const float *nn, const int *prim0, const int *prim1,
+    const float *exterior_angle, const float *source, const float *source_power,
+    const float *eta_r, const float *sigma, const float *mu_r, const float *gain, const float *thickness,
+    const bool *material_valid,
+    const float *tangent_eta_r, const float *tangent_sigma,
+    const float *tangent_gain, const float *tangent_thickness,
+    const float *tangent_source, float wavelength_tangent,
+    float *output_tangent,
+    int64_t sample_count, int state_count,
+    int axis, float plane, int r0, int r1, float wavelength, float cell_area,
+    int seed, float total_edge_length) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
+    for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
+         lane<sample_count; lane+=stride) {
+        if (!tape_active[lane]) continue;
+        const int sidx=tape_state[lane], cell=tape_cell[lane];
+        if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
+        const TapeRowContext row = load_tape_row(
+            lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
+            wavelength, cell_area, seed, total_edge_length);
+        TapeRowSeeds seeds = tape_seeds_zero();
+        if (tangent_source != nullptr) {
+            seeds.src = utd::make_f3(
+                tangent_source[0], tangent_source[1], tangent_source[2]);
+        }
+        if (row.valid0) {
+            if (tangent_eta_r != nullptr) seeds.eps0 = tangent_eta_r[row.prim0];
+            if (tangent_sigma != nullptr) seeds.sigma0 = tangent_sigma[row.prim0];
+            if (tangent_gain != nullptr) seeds.gain0 = tangent_gain[row.prim0];
+            if (tangent_thickness != nullptr)
+                seeds.thick0 = tangent_thickness[row.prim0];
+        }
+        if (row.valid1) {
+            if (tangent_eta_r != nullptr) seeds.eps1 = tangent_eta_r[row.prim1];
+            if (tangent_sigma != nullptr) seeds.sigma1 = tangent_sigma[row.prim1];
+            if (tangent_gain != nullptr) seeds.gain1 = tangent_gain[row.prim1];
+            if (tangent_thickness != nullptr)
+                seeds.thick1 = tangent_thickness[row.prim1];
+        }
+        seeds.wavelength = wavelength_tangent;
+        utd::Dual value;
+        if (tape_row_value<utd::Dual>(row, seeds, value)) {
+            atomicAdd(output_tangent + cell, value.d);
+        }
     }
 }
 
@@ -1323,4 +1713,136 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
         static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length));
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output;
+}
+
+namespace {
+
+// Zero-initialized gradient accumulator (memset on the current stream; same
+// pattern as reflection.cu / los.cu).
+at::Tensor diffraction_zero_filled(
+    at::IntArrayRef sizes, const at::TensorOptions& options) {
+    auto tensor = at::empty(sizes, options);
+    if (tensor.numel() > 0) {
+        cudaStream_t stream =
+            at::cuda::getCurrentCUDAStream(tensor.get_device()).stream();
+        C10_CUDA_CHECK(cudaMemsetAsync(
+            tensor.data_ptr(),
+            0,
+            static_cast<size_t>(tensor.numel()) * tensor.element_size(),
+            stream));
+    }
+    return tensor;
+}
+
+}  // namespace
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
+    at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
+    at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
+    at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
+    at::Tensor exterior_angle, at::Tensor source, at::Tensor source_power,
+    at::Tensor eta_r, at::Tensor sigma, at::Tensor mu_r, at::Tensor gain,
+    at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor grad_output,
+    bool need_materials, bool need_source, bool need_frequency,
+    int64_t axis, double plane,
+    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
+    double total_edge_length, double wavelength_dfreq) {
+    TORCH_CHECK(grad_output.is_cuda(), "grad_output must be a CUDA tensor");
+    TORCH_CHECK(grad_output.scalar_type() == at::kFloat, "grad_output must be float32");
+    TORCH_CHECK(grad_output.dim() == 2, "grad_output must have 2 dimensions");
+    TORCH_CHECK(
+        grad_output.size(0) == r1 && grad_output.size(1) == r0,
+        "grad_output must match the (resolution1, resolution0) map");
+    const auto face_options = eta_r.options();
+    auto grad_eta_r = diffraction_zero_filled({eta_r.size(0)}, face_options);
+    auto grad_sigma = diffraction_zero_filled({eta_r.size(0)}, face_options);
+    auto grad_gain = diffraction_zero_filled({eta_r.size(0)}, face_options);
+    auto grad_thickness = diffraction_zero_filled({eta_r.size(0)}, face_options);
+    auto grad_source = diffraction_zero_filled({3}, source.options());
+    auto grad_frequency = diffraction_zero_filled({1}, source.options());
+    const int64_t samples = tape_active.numel();
+    if (samples == 0 || !(need_materials || need_source || need_frequency)) {
+        return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_source,
+                grad_frequency};
+    }
+    const auto stream = at::cuda::getCurrentCUDAStream();
+    const int blocks = static_cast<int>(std::min<int64_t>(
+        (samples + kDiffractionBlockSize - 1) / kDiffractionBlockSize, 65535));
+    sionna_diffraction_tape_accumulate_backward_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
+        tape_active.data_ptr<bool>(), tape_state.data_ptr<int>(),
+        tape_cell.data_ptr<int>(), tape_u.data_ptr<float>(),
+        edge_pos.data_ptr<float>(), edge_dir.data_ptr<float>(),
+        t_min.data_ptr<float>(), t_max.data_ptr<float>(),
+        n0.data_ptr<float>(), nn.data_ptr<float>(), prim0.data_ptr<int>(),
+        prim1.data_ptr<int>(), exterior_angle.data_ptr<float>(),
+        source.data_ptr<float>(), source_power.data_ptr<float>(),
+        eta_r.data_ptr<float>(), sigma.data_ptr<float>(),
+        mu_r.data_ptr<float>(), gain.data_ptr<float>(),
+        thickness.data_ptr<float>(), material_valid.data_ptr<bool>(),
+        grad_output.data_ptr<float>(),
+        need_materials ? grad_eta_r.data_ptr<float>() : nullptr,
+        need_materials ? grad_sigma.data_ptr<float>() : nullptr,
+        need_materials ? grad_gain.data_ptr<float>() : nullptr,
+        need_materials ? grad_thickness.data_ptr<float>() : nullptr,
+        need_source ? grad_source.data_ptr<float>() : nullptr,
+        need_frequency ? grad_frequency.data_ptr<float>() : nullptr,
+        samples, static_cast<int>(edge_pos.size(0)),
+        static_cast<int>(axis), static_cast<float>(plane),
+        static_cast<int>(r0), static_cast<int>(r1),
+        static_cast<float>(wavelength), static_cast<float>(cell_area),
+        static_cast<int>(seed), static_cast<float>(total_edge_length),
+        static_cast<float>(wavelength_dfreq),
+        grad_output.stride(0), grad_output.stride(1));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_source,
+            grad_frequency};
+}
+
+at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
+    at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
+    at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
+    at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
+    at::Tensor exterior_angle, at::Tensor source, at::Tensor source_power,
+    at::Tensor eta_r, at::Tensor sigma, at::Tensor mu_r, at::Tensor gain,
+    at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor tangent_eta_r, at::Tensor tangent_sigma, at::Tensor tangent_gain,
+    at::Tensor tangent_thickness, at::Tensor tangent_source,
+    bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
+    bool has_tangent_thickness, bool has_tangent_source,
+    int64_t axis, double plane,
+    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
+    double total_edge_length, double wavelength_tangent) {
+    auto output_tangent = diffraction_zero_filled({r1, r0}, source.options());
+    const int64_t samples = tape_active.numel();
+    if (samples == 0) return output_tangent;
+    const auto stream = at::cuda::getCurrentCUDAStream();
+    const int blocks = static_cast<int>(std::min<int64_t>(
+        (samples + kDiffractionBlockSize - 1) / kDiffractionBlockSize, 65535));
+    sionna_diffraction_tape_accumulate_jvp_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
+        tape_active.data_ptr<bool>(), tape_state.data_ptr<int>(),
+        tape_cell.data_ptr<int>(), tape_u.data_ptr<float>(),
+        edge_pos.data_ptr<float>(), edge_dir.data_ptr<float>(),
+        t_min.data_ptr<float>(), t_max.data_ptr<float>(),
+        n0.data_ptr<float>(), nn.data_ptr<float>(), prim0.data_ptr<int>(),
+        prim1.data_ptr<int>(), exterior_angle.data_ptr<float>(),
+        source.data_ptr<float>(), source_power.data_ptr<float>(),
+        eta_r.data_ptr<float>(), sigma.data_ptr<float>(),
+        mu_r.data_ptr<float>(), gain.data_ptr<float>(),
+        thickness.data_ptr<float>(), material_valid.data_ptr<bool>(),
+        has_tangent_eta_r ? tangent_eta_r.data_ptr<float>() : nullptr,
+        has_tangent_sigma ? tangent_sigma.data_ptr<float>() : nullptr,
+        has_tangent_gain ? tangent_gain.data_ptr<float>() : nullptr,
+        has_tangent_thickness ? tangent_thickness.data_ptr<float>() : nullptr,
+        has_tangent_source ? tangent_source.data_ptr<float>() : nullptr,
+        static_cast<float>(wavelength_tangent),
+        output_tangent.data_ptr<float>(),
+        samples, static_cast<int>(edge_pos.size(0)),
+        static_cast<int>(axis), static_cast<float>(plane),
+        static_cast<int>(r0), static_cast<int>(r1),
+        static_cast<float>(wavelength), static_cast<float>(cell_area),
+        static_cast<int>(seed), static_cast<float>(total_edge_length));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return output_tangent;
 }

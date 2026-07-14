@@ -11,6 +11,7 @@ import torch
 from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core import ad_geometry
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -157,6 +158,12 @@ class TopologyBatch:
     candidate_count: int = 0
     guardrail_count: int = 0
     diffraction_vector_field: torch.Tensor | None = None
+    # Plan 07 AD-4 metadata: companion launches one reverse (vjp) or
+    # forward-dual (jvp) pass performs for the differentiable Functions this
+    # export registered, and the bytes their reverse passes retain via
+    # save_for_backward (zero under ad_mode="none").
+    ad_companion_launches: int = 0
+    ad_tape_bytes: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -766,6 +773,28 @@ def _geometry_participates_in_ad(scene: Scene) -> bool:
     return any(_participates_in_ad(leaf) for leaf in leaves)
 
 
+def _vertices_participate_in_ad(scene: Scene) -> bool:
+    """True when a mesh-vertex leaf carries a graph or a forward tangent."""
+
+    return any(
+        _participates_in_ad(structure.vertices) for structure in scene.structures
+    )
+
+
+def _opposite_vertex_ids(
+    faces: torch.Tensor, v0_ids: torch.Tensor, v1_ids: torch.Tensor
+) -> torch.Tensor:
+    """Per-row id of the triangle vertex opposite the (v0, v1) edge.
+
+    Frozen-winner integer extraction on detached tables (the same class of
+    winner bookkeeping as the validity masks around it).
+    """
+
+    shared = (faces == v0_ids[:, None]) | (faces == v1_ids[:, None])
+    opposite_slot = (~shared).to(dtype=torch.int64).argmax(dim=1)
+    return faces.gather(1, opposite_slot[:, None])[:, 0]
+
+
 def _require_frequency_ad_constant_materials(
     scene: Scene, compiled: object, *, ad_mode: str
 ) -> None:
@@ -876,6 +905,9 @@ def _evaluate_shared_fields(
     if count == 0:
         return topology
     ad_enabled = ad_mode != "none"
+    # Plan 07 AD-4 metadata: one ledger entry per registered differentiable
+    # Function, tape bytes mirroring each Function's save_for_backward set.
+    ledger = AdLaunchLedger() if ad_enabled else None
     if ad_enabled:
         frequency = (
             scene.frequency
@@ -933,13 +965,16 @@ def _evaluate_shared_fields(
 
     los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
     if int(los_rows.shape[0]) > 0:
-        evaluated = los_field_op(
+        los_args = (
             source[los_rows].contiguous(),
             target[los_rows].contiguous(),
             source_power[los_rows].contiguous(),
             tx_pol[los_rows].contiguous(),
             rx_pol[los_rows].contiguous(),
         )
+        if ledger is not None:
+            ledger.add(*los_args)
+        evaluated = los_field_op(*los_args)
         field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
         coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
         path_field.index_copy_(0, los_rows, evaluated["path_field"])
@@ -974,7 +1009,7 @@ def _evaluate_shared_fields(
                 rows, :depth_value
             ].contiguous()
             normals = topology.interaction_normals[rows, :depth_value].contiguous()
-        evaluated = reflection_field_op(
+        reflection_args = (
             source[rows].contiguous(),
             target[rows].contiguous(),
             positions,
@@ -988,6 +1023,12 @@ def _evaluate_shared_fields(
             material["gain"][face_id].contiguous(),
             material["thickness"][face_id].contiguous(),
         )
+        if ledger is not None:
+            if geometry_ad:
+                # The fixed-winner EPC re-solve registers its own companion.
+                ledger.add(vertices, source[rows], target[rows], face_id)
+            ledger.add(*reflection_args)
+        evaluated = reflection_field_op(*reflection_args)
         # Rough-surface coherent attenuation / realization delta replacement
         # (see _rough_reflection_factor). Applied Python-side on the native
         # smooth-stack result; C_r is real, so field magnitude scaling is
@@ -1052,7 +1093,7 @@ def _evaluate_shared_fields(
             normals = face_normal_table[prim_sequence.clamp_min(0)]
         else:
             normals = topology.interaction_normals[rows].contiguous()
-        evaluated = transmission_field_op(
+        transmission_args = (
             source[rows].contiguous(),
             target[rows].contiguous(),
             positions,
@@ -1069,6 +1110,12 @@ def _evaluate_shared_fields(
             material["layer_sigma_e"],
             material["layer_mu_r"],
         )
+        if ledger is not None:
+            if geometry_ad:
+                # The differentiable face-normal table registers a companion.
+                ledger.add(vertices)
+            ledger.add(*transmission_args)
+        evaluated = transmission_field_op(*transmission_args)
         field_xyz.index_copy_(0, rows, evaluated["field_vector"])
         coefficient.index_copy_(0, rows, evaluated["coefficient"])
         path_field.index_copy_(0, rows, evaluated["path_field"])
@@ -1112,7 +1159,30 @@ def _evaluate_shared_fields(
             face1_c = face1.clamp(min=0, max=max(face_count - 1, 0))
             valid0 = (face0 >= 0) & (face0 < face_count) & table_valid[face0_c]
             valid1 = (face1 >= 0) & (face1 < face_count) & table_valid[face1_c]
-            evaluated = ops.field_diffraction_wedge_ad(
+            wedge_vertices = None
+            if geometry_ad and _vertices_participate_in_ad(scene):
+                # Mesh-vertex x diffraction (plan 07 section 9.3): hand the
+                # winner edge vertices to the wedge kernel, which rebuilds
+                # the edge tables from them on the dual row. The integer
+                # winner extraction below runs on detached tables; only the
+                # vertex gathers touch the live table.
+                records = compiled.raydn.edge_records()
+                edge_v0_ids = records.edge_v0.to(dtype=torch.int64)[edge_id]
+                edge_v1_ids = records.edge_v1.to(dtype=torch.int64)[edge_id]
+                faces_table = records.faces.to(dtype=torch.int64)
+                tri0 = faces_table[face0.clamp(min=0)]
+                tri1 = faces_table[face1.clamp(min=0)]
+                opp0_ids = _opposite_vertex_ids(tri0, edge_v0_ids, edge_v1_ids)
+                opp1_ids = _opposite_vertex_ids(tri1, edge_v0_ids, edge_v1_ids)
+                edge_boundary = (face1 < 0).contiguous()
+                wedge_vertices = (
+                    vertices[edge_v0_ids].contiguous(),
+                    vertices[edge_v1_ids].contiguous(),
+                    vertices[opp0_ids].contiguous(),
+                    vertices[opp1_ids].contiguous(),
+                    edge_boundary,
+                )
+            wedge_args = (
                 source[diffraction_rows].contiguous(),
                 target[diffraction_rows].contiguous(),
                 edge_geometry[1][edge_id].contiguous(),
@@ -1133,10 +1203,21 @@ def _evaluate_shared_fields(
                 material["mu_r"][face1_c].contiguous(),
                 material["gain"][face1_c].contiguous(),
                 source_power[diffraction_rows].contiguous(),
+            )
+            if ledger is not None:
+                ledger.add(
+                    *wedge_args,
+                    *(wedge_vertices if wedge_vertices is not None else ()),
+                )
+            evaluated = ops.field_diffraction_wedge_ad(
+                *wedge_args,
                 frequency=frequency,
+                vertices=wedge_vertices,
             )
             powered_xyz = evaluated["field_vector"]
             arrival = evaluated["direction"]
+            if ledger is not None:
+                ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
             projected = ops.field_project_complex3_ad(
                 powered_xyz,
                 arrival,
@@ -1190,6 +1271,20 @@ def _evaluate_shared_fields(
         edge_face1 = edge_geometry[9].to(dtype=torch.int64)
         edge_exterior = edge_geometry[10]
         coupled_geometry_ad = ad_enabled and geometry_ad
+        if coupled_geometry_ad and _vertices_participate_in_ad(scene):
+            # The coupled chain consumes the wall plane and the edge tables
+            # through the stationary re-solve and the coupled field kernel,
+            # whose adjoints take them as frozen winners; a vertex gradient
+            # through the coupled rows would therefore be silently
+            # incomplete. Fail loudly instead (plan 07 section 9.4).
+            raise NotImplementedError(
+                "coupled reflection-diffraction paths do not support mesh "
+                "vertex gradients: the coupled stationary re-solve and the "
+                "coupled field adjoints treat the wall plane and the edge "
+                "tables as frozen winners, so d(coupled)/d(vertices) would "
+                "be silently missing. Drop the vertices requires_grad/"
+                "tangent or disable coupled_paths."
+            )
         if coupled_geometry_ad:
             tri_a = ops.deterministic_face_anchor_points(
                 records.vertices.contiguous(), records.faces.contiguous()
@@ -1268,7 +1363,10 @@ def _evaluate_shared_fields(
                 if ad_enabled
                 else partial(ops.field_coupled_rd, frequency_hz=frequency)
             )
-            evaluated = coupled_field_op(
+            reflection_materials = material_tuple(reflection_face)
+            wedge_materials0 = material_tuple(face0)
+            wedge_materials1 = material_tuple(face1)
+            coupled_args = (
                 source[rows].contiguous(),
                 target[rows].contiguous(),
                 reflection_position,
@@ -1283,9 +1381,22 @@ def _evaluate_shared_fields(
                 source_power[rows].contiguous(),
                 tx_pol[rows].contiguous(),
                 rx_pol[rows].contiguous(),
-                material_tuple(reflection_face),
-                material_tuple(face0),
-                material_tuple(face1),
+            )
+            if ledger is not None:
+                if coupled_geometry_ad:
+                    # Fixed-winner coupled stationary re-solve companion.
+                    ledger.add(source[rows], target[rows], reflection_position)
+                ledger.add(
+                    *coupled_args,
+                    *reflection_materials,
+                    *wedge_materials0,
+                    *wedge_materials1,
+                )
+            evaluated = coupled_field_op(
+                *coupled_args,
+                reflection_materials,
+                wedge_materials0,
+                wedge_materials1,
                 reverse=reverse_order,
             )
             field_xyz.index_copy_(0, rows, evaluated["field_vector"])
@@ -1305,6 +1416,16 @@ def _evaluate_shared_fields(
         coefficient=coefficient,
         field_direction=direction,
         launch_count=launch_count,
+        ad_companion_launches=(
+            topology.ad_companion_launches + ledger.launches
+            if ledger is not None
+            else topology.ad_companion_launches
+        ),
+        ad_tape_bytes=(
+            topology.ad_tape_bytes + ledger.tape_bytes
+            if ledger is not None
+            else topology.ad_tape_bytes
+        ),
     )
 
 

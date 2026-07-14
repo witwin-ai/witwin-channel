@@ -20,10 +20,11 @@ from tests.ad._tolerances import (
     FD_STEP_EPS_R,
     FD_STEP_POSITION_PHASE,
     FD_STEP_SIGMA_E,
+    FD_STEP_VERTEX,
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import coupled_wall_wedge_scene, wedge_diffraction_scene
-from witwin.channel_native import Scene
+from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config as DeterministicConfig
 from witwin.channel_native.deterministic import solve as deterministic_solve
@@ -259,6 +260,90 @@ def test_wedge_endpoint_position_grad_matches_fd(solver, endpoint):
 
     expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
     assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+# Single-structure wedge with a SHARED edge (vertices 0-1): the mesh-vertex
+# tests need welded topology so that one live vertex table drives both wedge
+# faces. The two-structure fixture above duplicates the edge vertices, and a
+# per-copy FD probe would split the wedge (a topology change outside the
+# fixed-winner contract).
+_WELDED_WEDGE_VERTICES = (
+    (2.0, 0.0, -1.0),
+    (2.0, 0.0, 2.0),
+    (2.0, 2.0, -1.0),
+    (4.0, 0.0, -1.0),
+)
+
+
+def _welded_wedge_scene(vertices: torch.Tensor | None = None) -> Scene:
+    wedge = Structure(
+        vertices=(
+            torch.tensor(_WELDED_WEDGE_VERTICES) if vertices is None else vertices
+        ),
+        faces=torch.tensor([[0, 1, 2], [0, 3, 1]]),
+        material=Dielectric(**_WEDGE_MATERIAL),
+        name="welded-wedge",
+        surface_id=2,
+    )
+    return Scene(
+        structures=[wedge],
+        transmitters=[Transmitter(position=torch.tensor(_WEDGE_TX))],
+        receivers=[ReceiverPoint(position=torch.tensor(_WEDGE_RX))],
+        frequency=_FREQUENCY_HZ,
+    )
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+def test_wedge_mesh_vertex_grad_matches_fd(solver):
+    """Mesh vertex x diffraction (plan 07 section 9.3).
+
+    The wedge kernel rebuilds the edge tables (edge anchor/direction/bounds,
+    face normals, exterior angle) from the winner vertices on the dual row,
+    so moving an edge vertex moves the stationary point, the wedge angle and
+    the incidence angles. FD parity of the primal is the gate for the
+    rebuilt-tables convention (sign/plane assignment against the frozen
+    discovery tables).
+    """
+
+    base = torch.tensor(_WELDED_WEDGE_VERTICES, dtype=torch.float32)
+    leaf = base.clone().cuda().requires_grad_(True)
+    scene = _welded_wedge_scene(vertices=leaf)
+    result = _solve_wedge(scene, solver, "vjp")
+    assert int(_coefficients(result, solver).shape[0]) > 0
+    _loss(result, solver).backward()
+    assert leaf.grad is not None
+    assert float(leaf.grad.abs().max()) > 0.0
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        fd_scene = _welded_wedge_scene(vertices=values.clone())
+        return _loss(_solve_wedge(fd_scene, solver, "none"), solver).detach()
+
+    expected = central_difference_gradient(evaluate, base, FD_STEP_VERTEX)
+    assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+def test_wedge_vertex_mode_forward_stays_on_parity():
+    """The vertex-rebuilt edge tables must reproduce the discovery tables.
+
+    With a live vertex leaf the AD forward evaluates the wedge from tables
+    rebuilt inside the kernel; any convention drift (normal winding, plane
+    assignment, exterior angle) would move the primal value away from the
+    frozen-table evaluation and fail this float32 parity gate.
+    """
+
+    scene_primal = _welded_wedge_scene()
+    primal = _solve_wedge(scene_primal, "deterministic", "none")
+    leaf = (
+        torch.tensor(_WELDED_WEDGE_VERTICES, dtype=torch.float32)
+        .cuda()
+        .requires_grad_(True)
+    )
+    ad = _solve_wedge(_welded_wedge_scene(vertices=leaf), "deterministic", "vjp")
+    a_primal = _coefficients(primal, "deterministic")
+    a_ad = _coefficients(ad, "deterministic").detach()
+    assert a_primal.shape == a_ad.shape
+    error = relative_error(a_ad, a_primal, abs_floor=ABS_TOL)
+    assert error <= 1.0e-3, f"vertex-mode wedge tables drifted: {error}"
 
 
 def test_wedge_forward_mode_matches_reverse():

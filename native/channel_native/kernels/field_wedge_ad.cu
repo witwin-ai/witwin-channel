@@ -59,10 +59,6 @@ __device__ __forceinline__ field::Complex from_c10(c10::complex<float> value) {
 // templated pair math directly.
 // ---------------------------------------------------------------------------
 
-__device__ __forceinline__ DualCx from_dualc(ad::DualC value) {
-    return {{value.v.re, value.d.re}, {value.v.im, value.d.im}};
-}
-
 __device__ __forceinline__ DualV3 from_dualf3(ad::DualF3 value) {
     return field::dual_seed(value.v, value.d);
 }
@@ -73,49 +69,15 @@ __device__ __forceinline__ ad::DualF3 to_dualf3(DualV3 value) {
         field::make_f3(value.x.d, value.y.d, value.z.d)};
 }
 
-// Scalar/vector seeding that collapses to the plain value for the float
-// (forward) instantiation and carries the tangent for the Dual one.
-template <typename T>
-__device__ __forceinline__ T seeded(float value, float tangent);
-template <>
-__device__ __forceinline__ float seeded<float>(float value, float) {
-    return value;
-}
-template <>
-__device__ __forceinline__ Dual seeded<Dual>(float value, float tangent) {
-    return {value, tangent};
-}
+// Scalar/vector seeding shims shared with the diffraction-map companions
+// (field_transport_ad.cuh).
+using ad::seeded;
+using ad::seeded3;
 
-template <typename T>
-__device__ __forceinline__ field::Vec3T<T> seeded3(
-    field::float3a value, field::float3a tangent) {
-    return {
-        seeded<T>(value.x, tangent.x),
-        seeded<T>(value.y, tangent.y),
-        seeded<T>(value.z, tangent.z)};
-}
-
-// Slab Fresnel with RayD dual scalars: forwards to the validated AD-1
-// slab_fresnel_dual (single source of truth for the finite-slab response).
-__device__ __forceinline__ void slab_fresnel_dual_rd(
-    Dual cos_theta,
-    Dual eps_r,
-    Dual sigma_e,
-    float mu_r,
-    Dual gain,
-    Dual thickness,
-    Dual frequency,
-    DualCx& r_te,
-    DualCx& r_tm) {
-    ad::DualC te;
-    ad::DualC tm;
-    ad::slab_fresnel_dual(
-        cos_theta.v, eps_r.v, sigma_e.v, mu_r, gain.v, thickness.v, frequency.v,
-        cos_theta.d, eps_r.d, sigma_e.d, gain.d, thickness.d, frequency.d,
-        te, tm);
-    r_te = from_dualc(te);
-    r_tm = from_dualc(tm);
-}
+// Slab Fresnel / slab face operator on RayD duals: shared with the
+// diffraction-map companions in field_transport_ad.cuh (single copy).
+using ad::slab_face_operator_dual;
+using ad::slab_fresnel_dual_rd;
 
 // Dual of transport::precise_neg_kd (fmod has unit slope).
 __device__ __forceinline__ Dual precise_neg_kd_dual(Dual k, Dual d) {
@@ -153,46 +115,6 @@ __device__ DualC3 reflect_complex3_dual(
         field::cplx_scale_real(p_out, field::cplx_mul(r_tm, e_p)));
 }
 
-// Mirror of transport::slab_face_operator on RayD duals (basis math from the
-// RayD templates, Fresnel from slab_fresnel_dual).
-__device__ field::JonesOperatorT<Dual> slab_face_operator_dual(
-    Dual cos_theta,
-    Dual eps_r,
-    Dual sigma_e,
-    float mu_r,
-    Dual gain,
-    Dual thickness,
-    Dual frequency,
-    DualV3 normal,
-    DualV3 in_direction,
-    DualV3 out_direction,
-    field::Basis3T<Dual> in_edge,
-    field::Basis3T<Dual> out_edge) {
-    DualCx r_te;
-    DualCx r_tm;
-    slab_fresnel_dual_rd(
-        cos_theta, eps_r, sigma_e, mu_r, gain, thickness, frequency, r_te, r_tm);
-    const field::JonesOperatorT<Dual> diagonal = {
-        r_te,
-        field::cplx_zero<Dual>(),
-        field::cplx_zero<Dual>(),
-        r_tm,
-    };
-    const DualV3 face_in = field::f3_cross(normal, in_direction);
-    const DualV3 raw_out = field::f3_cross(normal, out_direction);
-    const DualV3 reference = field::stable_perp_basis(out_direction, face_in);
-    const DualV3 face_out = field::f3_dot(raw_out, reference) < 0.0f
-                                ? field::f3_neg(raw_out)
-                                : raw_out;
-    const field::Basis3T<Dual> input_basis = field::basis_from_first_vector(
-        in_direction,
-        face_in,
-        field::stable_perp_basis(in_direction, field::v3_const<Dual>(0, 0, 1)));
-    const field::Basis3T<Dual> output_basis = field::basis_from_first_vector(
-        out_direction, face_out, reference);
-    return field::jop_in_basis(diagonal, input_basis, output_basis, in_edge, out_edge);
-}
-
 // ---------------------------------------------------------------------------
 // Pure diffraction (component 2): re-evaluate RayD's order-1 wedge export
 // from the frozen topology. One templated row serves the forward (float) and
@@ -220,6 +142,13 @@ struct WedgeRowInputs {
     bool valid1;
     float tx_power;
     float frequency;
+    // Optional winner vertices (plan 07 section 9.3 mesh-vertex x
+    // diffraction). When present, the row rebuilds the edge tables from them
+    // so vertex seeds reach the edge geometry; the frozen tables above stay
+    // the winner reference for sign/plane assignment.
+    bool has_vertices;
+    bool edge_boundary;
+    field::float3a v0, v1, opp0, opp1;
 };
 
 struct WedgeRowSeeds {
@@ -228,6 +157,7 @@ struct WedgeRowSeeds {
     float eps0, sigma0, gain0;
     float eps1, sigma1, gain1;
     float frequency;
+    field::float3a v0, v1, opp0, opp1;
 };
 
 __device__ __forceinline__ WedgeRowSeeds wedge_seeds_zero() {
@@ -237,7 +167,95 @@ __device__ __forceinline__ WedgeRowSeeds wedge_seeds_zero() {
     seeds.eps0 = 0.f; seeds.sigma0 = 0.f; seeds.gain0 = 0.f;
     seeds.eps1 = 0.f; seeds.sigma1 = 0.f; seeds.gain1 = 0.f;
     seeds.frequency = 0.f;
+    seeds.v0 = field::f3_zero();
+    seeds.v1 = field::f3_zero();
+    seeds.opp0 = field::f3_zero();
+    seeds.opp1 = field::f3_zero();
     return seeds;
+}
+
+// acos on the templated scalar via atan2 (utd has no acos shim); equals
+// ::acosf to float rounding on [-1, 1].
+template <typename T>
+__device__ __forceinline__ T wedge_acos(T x) {
+    return field::atan2f(field::sqrtf(field::fmaxf(1.0f - x * x, T(0.f))), x);
+}
+
+// Primal part of a templated vector (identity for float).
+template <typename T>
+__device__ __forceinline__ field::float3a primal3(field::Vec3T<T> v) {
+    return field::make_f3(
+        field::scalar_value(v.x), field::scalar_value(v.y),
+        field::scalar_value(v.z));
+}
+
+// Differentiable edge tables rebuilt from the winner vertices. The frozen
+// discovery tables (in.n0 / in.n1) pick the plane assignment and the normal
+// signs, so RayD's winding/ordering conventions cannot drift the primal
+// values; the derivative flows through the aligned smooth normal. Mirrors
+// diffraction_edge_geometry_kernel (kernels/diffraction.cu) row math; edit
+// the discovery kernel and this rebuild TOGETHER.
+template <typename T>
+struct WedgeEdgeTables {
+    field::Vec3T<T> edge_pos;
+    field::Vec3T<T> edge_dir;
+    T t_min;
+    T t_max;
+    field::Vec3T<T> n0;
+    field::Vec3T<T> n1;
+    T wedge_n;  // exterior_angle / pi
+};
+
+template <typename T>
+__device__ WedgeEdgeTables<T> wedge_edge_tables_from_vertices(
+    const WedgeRowInputs& in, const WedgeRowSeeds& seeds) {
+    WedgeEdgeTables<T> tables;
+    const field::Vec3T<T> v0 = seeded3<T>(in.v0, seeds.v0);
+    const field::Vec3T<T> v1 = seeded3<T>(in.v1, seeds.v1);
+    const field::Vec3T<T> vector = field::f3_sub(v1, v0);
+    const T length = field::fmaxf(field::safe_length(vector), T(1.0e-12f));
+    tables.edge_dir = field::f3_mul(vector, 1.0f / length);
+    tables.edge_pos = field::f3_mul(field::f3_add(v0, v1), 0.5f);
+    tables.t_min = -0.5f * length;
+    tables.t_max = 0.5f * length;
+
+    const field::Vec3T<T> opp0 = seeded3<T>(in.opp0, seeds.opp0);
+    const field::Vec3T<T> candidate_a = field::safe_normalize(
+        field::f3_cross(vector, field::f3_sub(opp0, v0)),
+        field::v3_const<T>(0.f, 0.f, 1.f));
+    field::Vec3T<T> pick0 = candidate_a;
+    field::Vec3T<T> pick1 = candidate_a;
+    if (!in.edge_boundary) {
+        const field::Vec3T<T> opp1 = seeded3<T>(in.opp1, seeds.opp1);
+        const field::Vec3T<T> candidate_b = field::safe_normalize(
+            field::f3_cross(vector, field::f3_sub(opp1, v0)),
+            field::v3_const<T>(0.f, 0.f, 1.f));
+        // Frozen plane assignment: match each candidate to the discovery
+        // table slot it is (anti)parallel to (primal values only).
+        const field::float3a a_val = primal3<T>(candidate_a);
+        const bool a_is_n0 =
+            ::fabsf(field::f3_dot(a_val, in.n0)) >=
+            ::fabsf(field::f3_dot(a_val, in.n1));
+        pick0 = a_is_n0 ? candidate_a : candidate_b;
+        pick1 = a_is_n0 ? candidate_b : candidate_a;
+    }
+    // Frozen sign alignment against the discovery normals.
+    const float sign0 =
+        field::f3_dot(primal3<T>(pick0), in.n0) < 0.f ? -1.f : 1.f;
+    tables.n0 = field::f3_mul(pick0, sign0);
+    if (in.edge_boundary) {
+        tables.n1 = field::f3_neg(tables.n0);
+        tables.wedge_n = T(2.f);
+    } else {
+        const float sign1 =
+            field::f3_dot(primal3<T>(pick1), in.n1) < 0.f ? -1.f : 1.f;
+        tables.n1 = field::f3_mul(pick1, sign1);
+        const T neg_dot = field::fminf(
+            field::fmaxf(-field::f3_dot(tables.n0, tables.n1), T(-1.f)), T(1.f));
+        const T exterior = 2.0f * field::UTD_PI - wedge_acos(neg_dot);
+        tables.wedge_n = exterior * (1.0f / field::UTD_PI);
+    }
+    return tables;
 }
 
 template <typename T>
@@ -268,13 +286,29 @@ __device__ WedgeRowOutputs<T> wedge_row_eval(
 
     const field::float3a zero3 = field::f3_zero();
     field::PairInputsT<T> pair{};
-    pair.edgePos = seeded3<T>(in.edge_pos, zero3);
-    pair.edgeDir = seeded3<T>(in.edge_dir, zero3);
-    pair.n0 = seeded3<T>(in.n0, zero3);
-    pair.nn = seeded3<T>(in.n1, zero3);
-    pair.wedgeN = T(in.exterior_angle / field::UTD_PI);
-    pair.edgeLineMin = T(in.t_min);
-    pair.edgeLineMax = T(in.t_max);
+    T edge_t_min;
+    T edge_t_max;
+    if (in.has_vertices) {
+        const WedgeEdgeTables<T> tables =
+            wedge_edge_tables_from_vertices<T>(in, seeds);
+        pair.edgePos = tables.edge_pos;
+        pair.edgeDir = tables.edge_dir;
+        pair.n0 = tables.n0;
+        pair.nn = tables.n1;
+        pair.wedgeN = tables.wedge_n;
+        edge_t_min = tables.t_min;
+        edge_t_max = tables.t_max;
+    } else {
+        pair.edgePos = seeded3<T>(in.edge_pos, zero3);
+        pair.edgeDir = seeded3<T>(in.edge_dir, zero3);
+        pair.n0 = seeded3<T>(in.n0, zero3);
+        pair.nn = seeded3<T>(in.n1, zero3);
+        pair.wedgeN = T(in.exterior_angle / field::UTD_PI);
+        edge_t_min = T(in.t_min);
+        edge_t_max = T(in.t_max);
+    }
+    pair.edgeLineMin = edge_t_min;
+    pair.edgeLineMax = edge_t_max;
     pair.sourcePos = source;
     pair.selectStationaryPoint = 1.f;
     pair.face0Material = wedge_face_material(
@@ -308,9 +342,9 @@ __device__ WedgeRowOutputs<T> wedge_row_eval(
     // Arrival direction from the clamped stationary point (the export's p0).
     const field::Vec3T<T> edge_hat = field::safe_normalize(
         pair.edgeDir, field::v3_const<T>(0.f, 0.f, 1.f));
-    const T edge_length = T(in.t_max - in.t_min);
+    const T edge_length = edge_t_max - edge_t_min;
     const field::Vec3T<T> edge_origin = field::f3_add(
-        pair.edgePos, field::f3_mul(edge_hat, T(in.t_min)));
+        pair.edgePos, field::f3_mul(edge_hat, edge_t_min));
     const T parameter = field::first_order_diffraction_parameter(
         source, target, edge_origin, edge_hat);
     const T clamped = field::fminf(field::fmaxf(parameter, T(0.f)), edge_length);
@@ -343,7 +377,12 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
     const float* face1_mu_r,
     const float* face1_gain,
     const float* tx_power,
-    float frequency_hz) {
+    float frequency_hz,
+    const float* vertex_v0,
+    const float* vertex_v1,
+    const float* vertex_opp0,
+    const float* vertex_opp1,
+    const bool* edge_boundary) {
     WedgeRowInputs in;
     in.source = load3f(source, index);
     in.target = load3f(target, index);
@@ -366,6 +405,20 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
     in.gain1 = face1_gain[index];
     in.tx_power = tx_power[index];
     in.frequency = frequency_hz;
+    in.has_vertices = vertex_v0 != nullptr;
+    if (in.has_vertices) {
+        in.edge_boundary = edge_boundary[index];
+        in.v0 = load3f(vertex_v0, index);
+        in.v1 = load3f(vertex_v1, index);
+        in.opp0 = load3f(vertex_opp0, index);
+        in.opp1 = load3f(vertex_opp1, index);
+    } else {
+        in.edge_boundary = false;
+        in.v0 = field::f3_zero();
+        in.v1 = field::f3_zero();
+        in.opp0 = field::f3_zero();
+        in.opp1 = field::f3_zero();
+    }
     return in;
 }
 
@@ -378,14 +431,18 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
         const float* face0_mu_r, const float* face0_gain,                     \
         const bool* face1_valid, const float* face1_eps_r,                    \
         const float* face1_sigma_e, const float* face1_mu_r,                  \
-        const float* face1_gain, const float* tx_power, float frequency_hz
+        const float* face1_gain, const float* tx_power, float frequency_hz,   \
+        const float* vertex_v0, const float* vertex_v1,                       \
+        const float* vertex_opp0, const float* vertex_opp1,                   \
+        const bool* edge_boundary
 
 #define WEDGE_ROW_ARGS(index)                                                 \
     index, source, target, edge_position, edge_direction, edge_t_min,         \
         edge_t_max, edge_n0, edge_n1, exterior_angle, face0_valid,            \
         face0_eps_r, face0_sigma_e, face0_mu_r, face0_gain, face1_valid,      \
         face1_eps_r, face1_sigma_e, face1_mu_r, face1_gain, tx_power,         \
-        frequency_hz
+        frequency_hz, vertex_v0, vertex_v1, vertex_opp0, vertex_opp1,         \
+        edge_boundary
 
 __global__ void diffraction_wedge_forward_kernel(
     int64_t count,
@@ -442,7 +499,11 @@ __global__ void diffraction_wedge_backward_kernel(
     float* grad_face1_eps_r,
     float* grad_face1_sigma_e,
     float* grad_face1_gain,
-    float* grad_frequency) {
+    float* grad_frequency,
+    float* grad_vertex_v0,
+    float* grad_vertex_v1,
+    float* grad_vertex_opp0,
+    float* grad_vertex_opp1) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -467,6 +528,33 @@ __global__ void diffraction_wedge_backward_kernel(
                 *slots[axis] = 0.f;
                 grad_target[base + axis] = wedge_contract(
                     index, grad_field_vector, grad_direction, out);
+            }
+        }
+        if (grad_vertex_v0 != nullptr) {
+            struct VertexSlot {
+                field::float3a* seed;
+                float* grad;
+            };
+            VertexSlot vertex_slots[4] = {
+                {&seeds.v0, grad_vertex_v0},
+                {&seeds.v1, grad_vertex_v1},
+                {&seeds.opp0, grad_vertex_opp0},
+                {&seeds.opp1, grad_vertex_opp1},
+            };
+            for (int slot = 0; slot < 4; ++slot) {
+                float* components[3] = {
+                    &vertex_slots[slot].seed->x,
+                    &vertex_slots[slot].seed->y,
+                    &vertex_slots[slot].seed->z,
+                };
+                for (int axis = 0; axis < 3; ++axis) {
+                    *components[axis] = 1.f;
+                    const WedgeRowOutputs<Dual> out =
+                        wedge_row_eval<Dual>(in, seeds);
+                    *components[axis] = 0.f;
+                    vertex_slots[slot].grad[base + axis] = wedge_contract(
+                        index, grad_field_vector, grad_direction, out);
+                }
             }
         }
         struct MaterialSlot {
@@ -512,6 +600,10 @@ __global__ void diffraction_wedge_jvp_kernel(
     const float* tangent_face1_sigma_e,
     const float* tangent_face1_gain,
     float tangent_frequency,
+    const float* tangent_vertex_v0,
+    const float* tangent_vertex_v1,
+    const float* tangent_vertex_opp0,
+    const float* tangent_vertex_opp1,
     c10::complex<float>* tangent_field_vector,
     float* tangent_direction) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -535,6 +627,14 @@ __global__ void diffraction_wedge_jvp_kernel(
             seeds.sigma1 = tangent_face1_sigma_e[index];
         if (tangent_face1_gain != nullptr)
             seeds.gain1 = tangent_face1_gain[index];
+        if (tangent_vertex_v0 != nullptr)
+            seeds.v0 = load3f(tangent_vertex_v0, index);
+        if (tangent_vertex_v1 != nullptr)
+            seeds.v1 = load3f(tangent_vertex_v1, index);
+        if (tangent_vertex_opp0 != nullptr)
+            seeds.opp0 = load3f(tangent_vertex_opp0, index);
+        if (tangent_vertex_opp1 != nullptr)
+            seeds.opp1 = load3f(tangent_vertex_opp1, index);
         seeds.frequency = tangent_frequency;
         const WedgeRowOutputs<Dual> out = wedge_row_eval<Dual>(in, seeds);
         const field::Complex3 tangent = field::dual_tangent(out.field_vector);
@@ -1429,6 +1529,54 @@ void check_wedge_primal(
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
 }
 
+// Optional winner-vertex group (mesh-vertex x diffraction). Supplied
+// together or not at all; resolved into `out` so the tensor storage outlives
+// the kernel launch.
+struct WedgeVertexArgs {
+    at::Tensor storage[5];
+    const at::Tensor* v0 = nullptr;
+    const at::Tensor* v1 = nullptr;
+    const at::Tensor* opp0 = nullptr;
+    const at::Tensor* opp1 = nullptr;
+    const at::Tensor* boundary = nullptr;
+};
+
+void resolve_wedge_vertices(
+    WedgeVertexArgs& out,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary,
+    int64_t count,
+    const at::Tensor& reference) {
+    const bool any = !vertex_v0.is_none() || !vertex_v1.is_none() ||
+                     !vertex_opp0.is_none() || !vertex_opp1.is_none() ||
+                     !edge_boundary.is_none();
+    if (!any)
+        return;
+    TORCH_CHECK(
+        !vertex_v0.is_none() && !vertex_v1.is_none() &&
+            !vertex_opp0.is_none() && !vertex_opp1.is_none() &&
+            !edge_boundary.is_none(),
+        "wedge vertex inputs must be supplied together");
+    out.v0 = optional_tensor_arg(
+        std::move(vertex_v0), out.storage[0], "vertex_v0", at::kFloat,
+        {count, 3}, reference);
+    out.v1 = optional_tensor_arg(
+        std::move(vertex_v1), out.storage[1], "vertex_v1", at::kFloat,
+        {count, 3}, reference);
+    out.opp0 = optional_tensor_arg(
+        std::move(vertex_opp0), out.storage[2], "vertex_opp0", at::kFloat,
+        {count, 3}, reference);
+    out.opp1 = optional_tensor_arg(
+        std::move(vertex_opp1), out.storage[3], "vertex_opp1", at::kFloat,
+        {count, 3}, reference);
+    out.boundary = optional_tensor_arg(
+        std::move(edge_boundary), out.storage[4], "edge_boundary", at::kBool,
+        {count}, reference);
+}
+
 }  // namespace
 
 #define WEDGE_HOST_ARGS                                                       \
@@ -1442,7 +1590,9 @@ void check_wedge_primal(
         face1_valid.data_ptr<bool>(), face1_eps_r.data_ptr<float>(),          \
         face1_sigma_e.data_ptr<float>(), face1_mu_r.data_ptr<float>(),        \
         face1_gain.data_ptr<float>(), tx_power.data_ptr<float>(),             \
-        static_cast<float>(frequency_hz)
+        static_cast<float>(frequency_hz), opt_ptr<float>(vertex_args.v0),     \
+        opt_ptr<float>(vertex_args.v1), opt_ptr<float>(vertex_args.opp0),     \
+        opt_ptr<float>(vertex_args.opp1), opt_ptr<bool>(vertex_args.boundary)
 
 pybind11::dict cn_field_diffraction_wedge(
     at::Tensor source,
@@ -1465,13 +1615,23 @@ pybind11::dict cn_field_diffraction_wedge(
     at::Tensor face1_mu_r,
     at::Tensor face1_gain,
     at::Tensor tx_power,
-    double frequency_hz) {
+    double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary) {
     check_wedge_primal(
         source, target, edge_position, edge_direction, edge_t_min, edge_t_max,
         edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r,
         face0_sigma_e, face0_mu_r, face0_gain, face1_valid, face1_eps_r,
         face1_sigma_e, face1_mu_r, face1_gain, tx_power, frequency_hz);
     const int64_t count = source.size(0);
+    WedgeVertexArgs vertex_args;
+    resolve_wedge_vertices(
+        vertex_args, std::move(vertex_v0), std::move(vertex_v1),
+        std::move(vertex_opp0), std::move(vertex_opp1),
+        std::move(edge_boundary), count, source);
     auto field_vector = at::empty({count, 3}, source.options().dtype(at::kComplexFloat));
     auto direction = at::empty({count, 3}, source.options());
     if (count > 0) {
@@ -1511,17 +1671,31 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     at::Tensor face1_gain,
     at::Tensor tx_power,
     double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary,
     pybind11::object grad_field_vector,
     pybind11::object grad_direction,
     bool need_grad_material,
     bool need_grad_frequency,
-    bool need_grad_geometry) {
+    bool need_grad_geometry,
+    bool need_grad_vertices) {
     check_wedge_primal(
         source, target, edge_position, edge_direction, edge_t_min, edge_t_max,
         edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r,
         face0_sigma_e, face0_mu_r, face0_gain, face1_valid, face1_eps_r,
         face1_sigma_e, face1_mu_r, face1_gain, tx_power, frequency_hz);
     const int64_t count = source.size(0);
+    WedgeVertexArgs vertex_args;
+    resolve_wedge_vertices(
+        vertex_args, std::move(vertex_v0), std::move(vertex_v1),
+        std::move(vertex_opp0), std::move(vertex_opp1),
+        std::move(edge_boundary), count, source);
+    TORCH_CHECK(
+        !need_grad_vertices || vertex_args.v0 != nullptr,
+        "vertex gradients require the wedge vertex inputs");
     at::Tensor grad_field_storage;
     at::Tensor grad_direction_storage;
     const at::Tensor* g_field = optional_tensor_arg(
@@ -1536,10 +1710,12 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     at::Tensor grad_face0_eps, grad_face0_sigma, grad_face0_gain;
     at::Tensor grad_face1_eps, grad_face1_sigma, grad_face1_gain;
     at::Tensor grad_frequency;
+    at::Tensor grad_vertices[4];
     at::Tensor* grad_source_ptr = nullptr;
     at::Tensor* grad_target_ptr = nullptr;
     at::Tensor* material_ptrs[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
     at::Tensor* grad_frequency_ptr = nullptr;
+    at::Tensor* grad_vertex_ptrs[4] = {nullptr, nullptr, nullptr, nullptr};
     if (need_grad_geometry) {
         grad_source = at::empty({count, 3}, options);
         grad_target = at::empty({count, 3}, options);
@@ -1564,6 +1740,12 @@ pybind11::dict cn_field_diffraction_wedge_backward(
         grad_frequency = zero_scalar(options);
         grad_frequency_ptr = &grad_frequency;
     }
+    if (need_grad_vertices) {
+        for (int slot = 0; slot < 4; ++slot) {
+            grad_vertices[slot] = at::empty({count, 3}, options);
+            grad_vertex_ptrs[slot] = &grad_vertices[slot];
+        }
+    }
     if (count > 0 && (g_field != nullptr || g_direction != nullptr)) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
         diffraction_wedge_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
@@ -1579,7 +1761,11 @@ pybind11::dict cn_field_diffraction_wedge_backward(
             opt_mut_ptr<float>(material_ptrs[3]),
             opt_mut_ptr<float>(material_ptrs[4]),
             opt_mut_ptr<float>(material_ptrs[5]),
-            opt_mut_ptr<float>(grad_frequency_ptr));
+            opt_mut_ptr<float>(grad_frequency_ptr),
+            opt_mut_ptr<float>(grad_vertex_ptrs[0]),
+            opt_mut_ptr<float>(grad_vertex_ptrs[1]),
+            opt_mut_ptr<float>(grad_vertex_ptrs[2]),
+            opt_mut_ptr<float>(grad_vertex_ptrs[3]));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     } else if (count == 0 || (g_field == nullptr && g_direction == nullptr)) {
         // No cotangents: every requested gradient is exactly zero.
@@ -1588,6 +1774,10 @@ pybind11::dict cn_field_diffraction_wedge_backward(
                 tensor->zero_();
         }
         for (at::Tensor* tensor : material_ptrs) {
+            if (tensor != nullptr)
+                tensor->zero_();
+        }
+        for (at::Tensor* tensor : grad_vertex_ptrs) {
             if (tensor != nullptr)
                 tensor->zero_();
         }
@@ -1620,6 +1810,15 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     out["grad_frequency"] = grad_frequency_ptr != nullptr
                                 ? pybind11::cast(grad_frequency)
                                 : pybind11::object(pybind11::none());
+    const char* vertex_grad_names[4] = {
+        "grad_vertex_v0", "grad_vertex_v1", "grad_vertex_opp0",
+        "grad_vertex_opp1"};
+    for (int slot = 0; slot < 4; ++slot) {
+        out[vertex_grad_names[slot]] =
+            grad_vertex_ptrs[slot] != nullptr
+                ? pybind11::cast(grad_vertices[slot])
+                : pybind11::object(pybind11::none());
+    }
     return out;
 }
 
@@ -1645,6 +1844,11 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     at::Tensor face1_gain,
     at::Tensor tx_power,
     double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary,
     pybind11::object tangent_source,
     pybind11::object tangent_target,
     pybind11::object tangent_face0_eps_r,
@@ -1653,14 +1857,23 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     pybind11::object tangent_face1_eps_r,
     pybind11::object tangent_face1_sigma_e,
     pybind11::object tangent_face1_gain,
-    double tangent_frequency) {
+    double tangent_frequency,
+    pybind11::object tangent_vertex_v0,
+    pybind11::object tangent_vertex_v1,
+    pybind11::object tangent_vertex_opp0,
+    pybind11::object tangent_vertex_opp1) {
     check_wedge_primal(
         source, target, edge_position, edge_direction, edge_t_min, edge_t_max,
         edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r,
         face0_sigma_e, face0_mu_r, face0_gain, face1_valid, face1_eps_r,
         face1_sigma_e, face1_mu_r, face1_gain, tx_power, frequency_hz);
     const int64_t count = source.size(0);
-    at::Tensor storage[8];
+    WedgeVertexArgs vertex_args;
+    resolve_wedge_vertices(
+        vertex_args, std::move(vertex_v0), std::move(vertex_v1),
+        std::move(vertex_opp0), std::move(vertex_opp1),
+        std::move(edge_boundary), count, source);
+    at::Tensor storage[12];
     const at::Tensor* t_source = optional_tensor_arg(
         std::move(tangent_source), storage[0], "tangent_source", at::kFloat,
         {count, 3}, source);
@@ -1685,6 +1898,23 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     const at::Tensor* t_f1_gain = optional_tensor_arg(
         std::move(tangent_face1_gain), storage[7], "tangent_face1_gain",
         at::kFloat, {count}, source);
+    const at::Tensor* t_v0 = optional_tensor_arg(
+        std::move(tangent_vertex_v0), storage[8], "tangent_vertex_v0",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* t_v1 = optional_tensor_arg(
+        std::move(tangent_vertex_v1), storage[9], "tangent_vertex_v1",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* t_opp0 = optional_tensor_arg(
+        std::move(tangent_vertex_opp0), storage[10], "tangent_vertex_opp0",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* t_opp1 = optional_tensor_arg(
+        std::move(tangent_vertex_opp1), storage[11], "tangent_vertex_opp1",
+        at::kFloat, {count, 3}, source);
+    TORCH_CHECK(
+        (t_v0 == nullptr && t_v1 == nullptr && t_opp0 == nullptr &&
+         t_opp1 == nullptr) ||
+            vertex_args.v0 != nullptr,
+        "vertex tangents require the wedge vertex inputs");
     auto tangent_field_vector = at::empty({count, 3}, source.options().dtype(at::kComplexFloat));
     auto tangent_direction = at::empty({count, 3}, source.options());
     if (count > 0) {
@@ -1701,6 +1931,10 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
             opt_ptr<float>(t_f1_sigma),
             opt_ptr<float>(t_f1_gain),
             static_cast<float>(tangent_frequency),
+            opt_ptr<float>(t_v0),
+            opt_ptr<float>(t_v1),
+            opt_ptr<float>(t_opp0),
+            opt_ptr<float>(t_opp1),
             tangent_field_vector.data_ptr<c10::complex<float>>(),
             tangent_direction.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();

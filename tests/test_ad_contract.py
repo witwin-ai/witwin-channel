@@ -25,24 +25,50 @@ from witwin.channel_native.path.solver import _metadata as path_metadata
 _CONFIG_TYPES = (PathConfig, DeterministicConfig, BasicConfig, BdptConfig)
 
 
-def test_public_ad_capability_is_primal_only_for_every_solver():
+def test_public_ad_capability_advertises_fixed_topology_jvp_vjp():
     manifest = capabilities()
 
-    assert manifest["supports_ad"] is False
+    assert manifest["supports_ad"] is True
     assert manifest["ad_contract"] == {
-        "decision": "primal_only_first_replacement",
-        "public_modes": ["none"],
-        "fixed_topology_jvp": False,
-        "fixed_topology_vjp": False,
+        "decision": "fixed_topology_jvp_vjp",
+        "public_modes": ["none", "jvp", "vjp"],
+        "fixed_topology_jvp": True,
+        "fixed_topology_vjp": True,
+        # No estimator for visibility/topology discontinuities: path
+        # birth/death and shadow transitions stay out of contract.
         "visibility_discontinuity_estimator": False,
-        "experimental_low_level_primitives": [
+        "differentiable_solvers": ["path", "deterministic", "montecarlo_basic"],
+        "differentiable_inputs": [
+            "material_eps_r",
+            "material_sigma_e",
+            "material_gain",
+            "material_thickness",
+            "frequency",
+            "tx_position",
+            "rx_position",
+            "mesh_vertices",
+        ],
+        "ad_excluded": {
+            "path": ["scattering", "coupled_paths_mesh_vertex"],
+            "deterministic": ["scattering"],
+            "montecarlo_basic": ["scattering"],
+            "montecarlo_bdpt": ["all"],
+        },
+        # Wired into the montecarlo.basic LoS Function since AD-3; no longer
+        # experimental.
+        "low_level_primitives": [
             "mc_los_path_gain_backward",
             "mc_los_path_gain_jvp",
         ],
     }
-    for solver in manifest["solvers"].values():
-        assert solver["supports_ad"] is False
-        assert solver["ad_modes"] == ["none"]
+    for name in ("path", "deterministic", "montecarlo_basic"):
+        solver = manifest["solvers"][name]
+        assert solver["supports_ad"] is True
+        assert solver["ad_modes"] == ["none", "jvp", "vjp"]
+        assert "scattering" in solver["ad_excluded"]
+    bdpt = manifest["solvers"]["montecarlo_bdpt"]
+    assert bdpt["supports_ad"] is False
+    assert bdpt["ad_modes"] == ["none"]
 
 
 @pytest.mark.parametrize(
@@ -170,10 +196,11 @@ def test_ad_inventory_records_solver_ad_contract():
     # differentiable field entry points (LoS, reflection, transmission).
     # Plan 07 AD-3 adds the six montecarlo.basic power-map entry points.
     # Plan 07 AD-4 adds the wedge re-evaluation, receiver projection, coupled
-    # R-D transport and coupled stationary re-solve entry points.
-    assert audit["native_public_solver_ad_callers"] == 13
-    assert len(audit["native_public_solver_ad_call_sites"]) == 13
+    # R-D transport and coupled stationary re-solve entry points; AD-4b adds
+    # the montecarlo.basic diffraction radiomap entry point.
+    assert audit["native_public_solver_ad_callers"] == 14
+    assert len(audit["native_public_solver_ad_call_sites"]) == 14
     assert audit["legacy_reference_files_with_explicit_ad"] == 19
     assert audit["decision"] == "fixed_topology_material_frequency_ad_t1"
-    # The capability manifest flip happens at the plan 07 completion gate.
-    assert audit["supports_ad"] is False
+    # The plan 07 completion gate flipped the capability manifest (AD-4b).
+    assert audit["supports_ad"] is True

@@ -492,7 +492,12 @@ pybind11::dict cn_field_diffraction_wedge(
     at::Tensor face1_mu_r,
     at::Tensor face1_gain,
     at::Tensor tx_power,
-    double frequency_hz);
+    double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary);
 pybind11::dict cn_field_diffraction_wedge_backward(
     at::Tensor source,
     at::Tensor target,
@@ -515,11 +520,17 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     at::Tensor face1_gain,
     at::Tensor tx_power,
     double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary,
     pybind11::object grad_field_vector,
     pybind11::object grad_direction,
     bool need_grad_material,
     bool need_grad_frequency,
-    bool need_grad_geometry);
+    bool need_grad_geometry,
+    bool need_grad_vertices);
 pybind11::dict cn_field_diffraction_wedge_jvp(
     at::Tensor source,
     at::Tensor target,
@@ -542,6 +553,11 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     at::Tensor face1_gain,
     at::Tensor tx_power,
     double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary,
     pybind11::object tangent_source,
     pybind11::object tangent_target,
     pybind11::object tangent_face0_eps_r,
@@ -550,7 +566,11 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     pybind11::object tangent_face1_eps_r,
     pybind11::object tangent_face1_sigma_e,
     pybind11::object tangent_face1_gain,
-    double tangent_frequency);
+    double tangent_frequency,
+    pybind11::object tangent_vertex_v0,
+    pybind11::object tangent_vertex_v1,
+    pybind11::object tangent_vertex_opp0,
+    pybind11::object tangent_vertex_opp1);
 pybind11::dict cn_field_coupled_rd_backward(
     at::Tensor source,
     at::Tensor target,
@@ -1273,6 +1293,35 @@ torch::Tensor cn_mc_sionna_diffraction_tape_accumulate(
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,int64_t,double,double,double,double,double,
     int64_t,int64_t,double,double,int64_t,double);
+pybind11::tuple cn_mc_sionna_diffraction_tape_accumulate_backward(
+    torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
+    torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor prim0, torch::Tensor prim1, torch::Tensor exterior_angle,
+    torch::Tensor source, torch::Tensor source_power, torch::Tensor eta_r,
+    torch::Tensor sigma, torch::Tensor mu_r, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor grad_output,
+    bool need_materials, bool need_source, bool need_frequency,
+    int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
+    double cell_area, int64_t seed, double total_edge_length,
+    double wavelength_dfreq);
+torch::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp(
+    torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
+    torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor prim0, torch::Tensor prim1, torch::Tensor exterior_angle,
+    torch::Tensor source, torch::Tensor source_power, torch::Tensor eta_r,
+    torch::Tensor sigma, torch::Tensor mu_r, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor tangent_eta_r, torch::Tensor tangent_sigma,
+    torch::Tensor tangent_gain, torch::Tensor tangent_thickness,
+    torch::Tensor tangent_source,
+    bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
+    bool has_tangent_thickness, bool has_tangent_source,
+    int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
+    double cell_area, int64_t seed, double total_edge_length,
+    double wavelength_tangent);
 torch::Tensor cn_mc_selected_edge_indices(torch::Tensor selected);
 pybind11::tuple cn_mc_diffraction_state_pack(
     torch::Tensor edge_indices,
@@ -2031,6 +2080,14 @@ PYBIND11_MODULE(_channel_native, module) {
         "mc_sionna_diffraction_tape_accumulate",
         &cn_mc_sionna_diffraction_tape_accumulate,
         "Evaluate full UTD power for valid Keller-cone diffraction samples.");
+    module.def(
+        "mc_sionna_diffraction_tape_accumulate_backward",
+        &cn_mc_sionna_diffraction_tape_accumulate_backward,
+        "Diffraction radiomap VJP over materials, source and frequency under the frozen sampling tape.");
+    module.def(
+        "mc_sionna_diffraction_tape_accumulate_jvp",
+        &cn_mc_sionna_diffraction_tape_accumulate_jvp,
+        "Diffraction radiomap JVP over materials, source and frequency under the frozen sampling tape.");
     module.def(
         "mc_selected_edge_indices",
         &cn_mc_selected_edge_indices,

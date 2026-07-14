@@ -1,39 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
-import torch
-
-from witwin.channel_native.core.kernels.metadata import make_metadata
+# One AdLaunchLedger shape for every solver (plan 07 AD-4): montecarlo.basic
+# counts one companion per LoS matrix, per grid-map layout Function, per
+# transmitter for the reflection/diffraction accumulators and per layer-stack
+# evaluation inside the transmission chain march; the finalize sum registers
+# no native companion (its cotangent is a view).
+from witwin.channel_native.core.kernels.metadata import AdLaunchLedger, make_metadata
 from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
 from witwin.channel_native.core.components import component_availability_status
 
 from .config import Config
-
-
-@dataclass
-class AdLaunchLedger:
-    """Per-solve accounting of the plan 07 AD-3 companion kernels.
-
-    ``launches`` counts the native backward/jvp companion launches one full
-    reverse pass (vjp) or forward-dual pass (jvp) performs for this solve:
-    one per LoS matrix, one per grid-map layout Function, one per transmitter
-    for the reflection accumulator and one per layer-stack evaluation inside
-    the transmission chain march. The finalize sum registers no native
-    companion (its cotangent is a view). ``tape_bytes`` sums the tensors the
-    reverse pass retains via save_for_backward; forward mode retains nothing
-    past the solve, so jvp reports zero tape.
-    """
-
-    launches: int = 0
-    tape_bytes: int = 0
-
-    def add(self, *saved: object) -> None:
-        self.launches += 1
-        for tensor in saved:
-            if isinstance(tensor, torch.Tensor):
-                self.tape_bytes += tensor.numel() * tensor.element_size()
 
 
 def component_status(

@@ -42,7 +42,7 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     )
     assert path["max_reflections_in_coupled_path"] == 1
     assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
-    assert manifest["supports_ad"] is False
+    assert manifest["supports_ad"] is True
     materials = manifest["materials"]
     assert materials["abi_version"] == 3
     assert materials["perfect_conductor_model"] == "explicit"

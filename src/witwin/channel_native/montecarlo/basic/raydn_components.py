@@ -26,6 +26,7 @@ from witwin.channel_native.core.kernels.ops import (
     mc_sionna_reflection_accumulate_ad,
     mc_sample_directions,
     mc_sionna_diffraction_tape_accumulate,
+    mc_sionna_diffraction_tape_accumulate_ad,
     mc_store_component_map,
     mc_store_scaled_component_map,
     mc_surface_group_edge_candidates,
@@ -212,6 +213,13 @@ def transmission_component_map(
         scene, grid, device=device, los=los, ad=ad, ledger=ledger
     )
     tx_pos, _ = transmitter_positions(scene, device=device)
+    # Live transmitter origins in AD mode: the straight-line incidence cosine
+    # (and with it every per-wall transmittance) moves with the transmitter,
+    # so the chain march must see the graph, not the detached native table
+    # (plan 07 section 9.3 TX x transmission for M).
+    tx_march = (
+        transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
+    )
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     if ad:
         bundle = face_material_field_bundle(scene, device=device)
@@ -223,7 +231,7 @@ def transmission_component_map(
     rx_count = int(rx_pos.shape[0])
     gains = []
     for tx_index in range(int(tx_pos.shape[0])):
-        origins = tx_pos[tx_index].unsqueeze(0).repeat(rx_count, 1)
+        origins = tx_march[tx_index].unsqueeze(0).repeat(rx_count, 1)
         chain = straight_transmission_chains(
             raydn,
             origins,
@@ -315,11 +323,6 @@ def reflection_component_maps_with_wedges(
     ad: bool = False,
     ledger: object | None = None,
 ) -> ReflectionComponentResult:
-    if ad and collect_wedges:
-        raise RuntimeError(
-            "diffraction wedge collection is a primal-only path; the solver "
-            "rejects diffraction under ad_mode before reaching this launch"
-        )
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
@@ -413,40 +416,42 @@ def reflection_component_maps_with_wedges(
                 grid_cell_area=float(spec.cell_area),
             )
             ad_maps.append(reflection_map * tx_power[tx_index])
-            continue
-        reflection_map = mc_sionna_reflection_accumulate(
-            ray_o,
-            ray_d,
-            trace[0],
-            trace[1],
-            trace[2],
-            face_normals,
-            material_eta_r,
-            material_sigma,
-            material_gain,
-            material_valid,
-            material_thickness,
-            contribution_depth=int(max_depth),
-            grid_axis=int(spec.axis),
-            grid_position=float(spec.position),
-            grid_coord0_min=float(spec.coord0_min),
-            grid_coord0_max=float(spec.coord0_max),
-            grid_coord1_min=float(spec.coord1_min),
-            grid_coord1_max=float(spec.coord1_max),
-            grid_resolution0=int(spec.resolution0),
-            grid_resolution1=int(spec.resolution1),
-            wavelength=float(wavelength),
-            solid_angle_per_ray=solid_angle_per_ray,
-            grid_cell_area=float(spec.cell_area),
-        )
-        mc_store_scaled_component_map(
-            maps,
-            reflection_map,
-            tx_power,
-            tx_index=tx_index,
-            scale_index=tx_index,
-        )
+        else:
+            reflection_map = mc_sionna_reflection_accumulate(
+                ray_o,
+                ray_d,
+                trace[0],
+                trace[1],
+                trace[2],
+                face_normals,
+                material_eta_r,
+                material_sigma,
+                material_gain,
+                material_valid,
+                material_thickness,
+                contribution_depth=int(max_depth),
+                grid_axis=int(spec.axis),
+                grid_position=float(spec.position),
+                grid_coord0_min=float(spec.coord0_min),
+                grid_coord0_max=float(spec.coord0_max),
+                grid_coord1_min=float(spec.coord1_min),
+                grid_coord1_max=float(spec.coord1_max),
+                grid_resolution0=int(spec.resolution0),
+                grid_resolution1=int(spec.resolution1),
+                wavelength=float(wavelength),
+                solid_angle_per_ray=solid_angle_per_ray,
+                grid_cell_area=float(spec.cell_area),
+            )
+            mc_store_scaled_component_map(
+                maps,
+                reflection_map,
+                tx_power,
+                tx_index=tx_index,
+                scale_index=tx_index,
+            )
         if collect_wedges:
+            # Winner-event extraction on detached trace outputs (frozen
+            # discovery bookkeeping in both primal and AD modes).
             valid_indices = torch.nonzero(trace[0][:, 0], as_tuple=False).flatten()
             prim_id = trace[2][:, 0].index_select(0, valid_indices)
             ray_dir = ray_d.index_select(0, valid_indices)
@@ -454,7 +459,9 @@ def reflection_component_maps_with_wedges(
                 ray_o.index_select(0, valid_indices)
                 + trace[1][:, 0].index_select(0, valid_indices)[:, None] * ray_dir
             )
-            hit_n = face_normals.index_select(0, prim_id.to(dtype=torch.int64))
+            hit_n = face_normals.detach().index_select(
+                0, prim_id.to(dtype=torch.int64)
+            )
             wedge_batches.append(
                 WedgeEventBatch(
                     tx_pos=tx,
@@ -650,6 +657,8 @@ def diffraction_component_map(
     device: torch.device,
     material_tensors: MaterialTensors,
     wedge_events: tuple[WedgeEventBatch, ...] | None = None,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> torch.Tensor:
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
@@ -660,6 +669,9 @@ def diffraction_component_map(
     spec = grid_spec(grid)
     handle = raydn.require_handle()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
+    tx_live = (
+        transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
+    )
     (
         material_eta_r,
         material_sigma,
@@ -670,7 +682,10 @@ def diffraction_component_map(
     ) = material_tensors
     wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
     dim0, dim1 = component_grid_shape(grid)
-    maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
+    ad_maps: list[torch.Tensor] = []
+    maps = None
+    if not ad:
+        maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
     edge_geometry: tuple[torch.Tensor, ...] | None = None
     edge_candidates: tuple[torch.Tensor, torch.Tensor] | None = None
     mitsuba_metadata = scene.metadata.get("mitsuba", {})
@@ -694,9 +709,14 @@ def diffraction_component_map(
             edge_candidates = _cached_primitive_edge_candidates(raydn, geometry[0])
         return edge_candidates
 
+    def zero_map() -> torch.Tensor:
+        return mc_component_map_buffer(tx_pos, tx_count=1, dim0=dim0, dim1=dim1)[0]
+
     for tx_index, tx in enumerate(tx_pos):
         if wedge_events is not None:
             if int(wedge_events[tx_index].prim_id.numel()) == 0:
+                if ad:
+                    ad_maps.append(zero_map())
                 continue
             geometry = get_edge_geometry()
             edge_indices = _discover_diffraction_edges_from_wedges(
@@ -706,6 +726,8 @@ def diffraction_component_map(
                 edge_candidates=get_edge_candidates(geometry),
             )
             if int(edge_indices.numel()) == 0:
+                if ad:
+                    ad_maps.append(zero_map())
                 continue
             states = _diffraction_states_from_edge_indices(
                 raydn,
@@ -726,10 +748,14 @@ def diffraction_component_map(
             )
         state_count = int(states[0].shape[0])
         if state_count <= 0:
+            if ad:
+                ad_maps.append(zero_map())
             continue
         edge_lengths = (states[4] - states[3]).clamp_min(0.0)
         total_edge_length = float(edge_lengths.sum().item())
         if not total_edge_length > 0.0:
+            if ad:
+                ad_maps.append(zero_map())
             continue
         generator = torch.Generator(device=device)
         generator.manual_seed(int(seed))
@@ -756,6 +782,51 @@ def diffraction_component_map(
             None, None, None, None, None, None, None, None, None, None, None,
             1, sample_state_index, sample_edge_weight,
         )
+        if ad:
+            # Same tape-accumulate kernel behind the autograd Function
+            # (plan 07 AD-4): the RayD sampling tape and the packed edge
+            # states are frozen winners; the anchor keeps the transmitter
+            # graph, the store leaves keep the material graph and the live
+            # frequency carries the carrier graph.
+            tape_tensors = (sampled[14], sampled[15], sampled[16], sampled[18])
+            state_tensors = tuple(states[1:12])
+            if ledger is not None:
+                ledger.add(
+                    *tape_tensors,
+                    *state_tensors,
+                    material_eta_r,
+                    material_sigma,
+                    material_mu_r,
+                    material_gain,
+                    material_valid,
+                    material_thickness,
+                )
+            diffraction_map = mc_sionna_diffraction_tape_accumulate_ad(
+                tx_live[tx_index],
+                material_eta_r,
+                material_sigma,
+                material_gain,
+                material_thickness,
+                scene.frequency,
+                tape_tensors,
+                state_tensors,
+                material_mu_r,
+                material_valid,
+                grid_axis=int(spec.axis),
+                grid_position=float(spec.position),
+                grid_coord0_min=float(spec.coord0_min),
+                grid_coord0_max=float(spec.coord0_max),
+                grid_coord1_min=float(spec.coord1_min),
+                grid_coord1_max=float(spec.coord1_max),
+                grid_resolution0=int(spec.resolution0),
+                grid_resolution1=int(spec.resolution1),
+                wavelength=float(wavelength),
+                grid_cell_area=float(spec.cell_area),
+                seed=int(seed),
+                total_edge_length=total_edge_length,
+            )
+            ad_maps.append(diffraction_map)
+            continue
         diffraction_map = mc_sionna_diffraction_tape_accumulate(
             sampled[14], sampled[15], sampled[16], sampled[18],
             states[1], states[2], states[3], states[4], states[5], states[6],
@@ -766,4 +837,6 @@ def diffraction_component_map(
             int(spec.resolution1), float(wavelength), float(spec.cell_area), int(seed), total_edge_length,
         )
         mc_store_component_map(maps, diffraction_map, tx_index=tx_index)
+    if ad:
+        maps = torch.stack(ad_maps, dim=0)
     return maps

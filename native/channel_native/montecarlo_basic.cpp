@@ -120,6 +120,33 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,int64_t,double,double,double,double,double,
     int64_t,int64_t,double,double,int64_t,double);
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
+    at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
+    at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
+    at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
+    at::Tensor exterior_angle, at::Tensor source, at::Tensor source_power,
+    at::Tensor eta_r, at::Tensor sigma, at::Tensor mu_r, at::Tensor gain,
+    at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor grad_output,
+    bool need_materials, bool need_source, bool need_frequency,
+    int64_t axis, double plane,
+    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
+    double total_edge_length, double wavelength_dfreq);
+at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
+    at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
+    at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
+    at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
+    at::Tensor exterior_angle, at::Tensor source, at::Tensor source_power,
+    at::Tensor eta_r, at::Tensor sigma, at::Tensor mu_r, at::Tensor gain,
+    at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor tangent_eta_r, at::Tensor tangent_sigma, at::Tensor tangent_gain,
+    at::Tensor tangent_thickness, at::Tensor tangent_source,
+    bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
+    bool has_tangent_thickness, bool has_tangent_source,
+    int64_t axis, double plane,
+    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
+    double total_edge_length, double wavelength_tangent);
 at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected);
 std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
@@ -447,6 +474,56 @@ torch::Tensor cn_mc_sionna_diffraction_tape_accumulate(
         tape_active,tape_state,tape_cell,tape_u,edge_pos,edge_dir,t_min,t_max,n0,nn,prim0,prim1,
         exterior_angle,source,source_power,eta_r,sigma,mu_r,gain,material_valid,thickness,axis,plane,
         c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length);
+}
+
+pybind11::tuple cn_mc_sionna_diffraction_tape_accumulate_backward(
+    torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
+    torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor prim0, torch::Tensor prim1, torch::Tensor exterior_angle,
+    torch::Tensor source, torch::Tensor source_power, torch::Tensor eta_r,
+    torch::Tensor sigma, torch::Tensor mu_r, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor grad_output,
+    bool need_materials, bool need_source, bool need_frequency,
+    int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
+    double cell_area, int64_t seed, double total_edge_length,
+    double wavelength_dfreq) {
+    auto gradients = cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
+        tape_active, tape_state, tape_cell, tape_u, edge_pos, edge_dir, t_min,
+        t_max, n0, nn, prim0, prim1, exterior_angle, source, source_power,
+        eta_r, sigma, mu_r, gain, material_valid, thickness, grad_output,
+        need_materials, need_source, need_frequency, axis, plane, r0, r1,
+        wavelength, cell_area, seed, total_edge_length, wavelength_dfreq);
+    return pybind11::make_tuple(
+        std::get<0>(gradients), std::get<1>(gradients), std::get<2>(gradients),
+        std::get<3>(gradients), std::get<4>(gradients), std::get<5>(gradients));
+}
+
+torch::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp(
+    torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
+    torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor prim0, torch::Tensor prim1, torch::Tensor exterior_angle,
+    torch::Tensor source, torch::Tensor source_power, torch::Tensor eta_r,
+    torch::Tensor sigma, torch::Tensor mu_r, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor tangent_eta_r, torch::Tensor tangent_sigma,
+    torch::Tensor tangent_gain, torch::Tensor tangent_thickness,
+    torch::Tensor tangent_source,
+    bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
+    bool has_tangent_thickness, bool has_tangent_source,
+    int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
+    double cell_area, int64_t seed, double total_edge_length,
+    double wavelength_tangent) {
+    return cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
+        tape_active, tape_state, tape_cell, tape_u, edge_pos, edge_dir, t_min,
+        t_max, n0, nn, prim0, prim1, exterior_angle, source, source_power,
+        eta_r, sigma, mu_r, gain, material_valid, thickness, tangent_eta_r,
+        tangent_sigma, tangent_gain, tangent_thickness, tangent_source,
+        has_tangent_eta_r, has_tangent_sigma, has_tangent_gain,
+        has_tangent_thickness, has_tangent_source, axis, plane, r0, r1,
+        wavelength, cell_area, seed, total_edge_length, wavelength_tangent);
 }
 
 torch::Tensor cn_mc_selected_edge_indices(torch::Tensor selected) {

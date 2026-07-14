@@ -1,8 +1,8 @@
 # Channel Native 可微分求解器计划
 
-**状态：** In progress（AD-A0 / AD-1 已交付并加固；AD-2 进行中）
+**状态：** Complete（AD-4b 收口：矩阵补齐、metadata、CI 预算、Munich 烟测、capability 翻转；bdpt 与几何不连续性按 §7 明确推迟）
 **基线日期：** 2026-07-12（v2：补齐 AD 架构与 RayD 集成边界）
-**执行更新：** 2026-07-14（v3：两条实现路线因上游能力缺口改道，见 §3.1）
+**执行更新：** 2026-07-14（v4：AD-4b 收口，见 §10）
 
 ## 0. 执行进度（2026-07-14）
 
@@ -10,9 +10,23 @@
 |---|---|---|
 | AD-A0 RayD 可微几何 C-ABI | 已交付 + 已加固 | `1396181`, `0fdfed2`（RayDi: `d13499d`, `bb9d457`） |
 | AD-1 材料/频率 JVP+VJP（T1） | 已交付 + 已加固 | `f6873d8`, `bc6dd5a` |
-| AD-2 TX/RX 位置 + mesh 顶点（T1） | 进行中 | — |
-| AD-3 MC basic 功率图 | 已交付（绕射/散射图显式拒绝，推迟到 AD-4） | — |
-| AD-4a UTD 绕射 + 耦合 R↔D（T1） | 已交付（本次） | — |
+| AD-2 TX/RX 位置 + mesh 顶点（T1） | 已交付 | `b0d5823` |
+| AD-3 MC basic 功率图 | 已交付（散射图显式拒绝；绕射图由 AD-4b 交付） | `760e2f4` |
+| AD-4a UTD 绕射 + 耦合 R↔D（T1） | 已交付 | `9ae109b` |
+| AD-4b 收口（矩阵补齐 + basic 绕射图 + metadata + CI 预算 + Munich/优化烟测 + capability 翻转） | 已交付（本次） | — |
+
+**AD-4b 交付摘要（2026-07-14）**：
+
+- **basic 绕射功率图 AD**：`sionna_diffraction_tape_accumulate` 的逐 lane 行模板化到标量 `T`（float 实例即 primal、Dual 实例即精确导数），backward 为逐输入种子化对偶探针（12 个/lane 上限）、jvp 为单次对偶；可微输入 = 楔面板材 4 参数 + 频率 + tx 位置（源经 state_src 广播，源梯度原生归并到 (3,)）。伪无限 ±1e5 截断因子按 AD-4a 政策冻结（否则 1e5 杠杆把端点纹波放大成梯度垃圾——实测修复前后源梯度差 ~50 倍）。**tx 单元的 FD 判据**：全解 FD 在 h=3e-4..3e-2 全程不收敛（楔事件发现、采样带与逐 lane Keller 锥接受判据 `phi<=exterior` 都随 tx 离散翻转），有效判据是固定带 + 接受稳定 lane 聚合 + 两步长一致性过滤（剔除 UTD 过渡区 1/h 尖峰 lane），聚合 FD 与对偶 ≤5e-2。
+- **mesh 顶点 × {透射, 绕射}**：透射经 `raydn_face_normals_ad` 的活法线表（已验证与 torch 参考逐值一致；FD 用非相干步长——直线穿透路径长度与顶点无关，1e-3 步长下 2 点差分落在 float32 前向噪声底）；绕射经楔核内从 winner 顶点重建边表（边锚点/方向/界、符号对齐法线、外角；冻结发现表钉住平面指派，防 RayD 绕序约定漂移），新增 12 顶点分量探针。LoS × 顶点结构性为零（图不触及叶子，测试钉死）。**耦合 × 顶点不支持**：耦合伴随把墙平面/边表当冻结 winner，实现即静默缺失梯度，故 seam 在顶点叶子参与时显式 `NotImplementedError`，测试registered `xfail(strict=True)`。
+- **多反射（深度 2）solver 级**：新 `tests/ad/test_solver_multibounce_ad.py`，双平行墙（z 不对称）夹 TX/RX，损失只取 depth==2 行，eps_r/sigma_e/频率/TX/RX/顶点全部过中心 FD + JVP-VJP 对偶。
+- **metadata**：`AdLaunchLedger` 上移到 `core/kernels/metadata.py`（三 solver 一个形状）；deterministic/path 经 `TopologyBatch.ad_companion_launches/ad_tape_bytes` 上报真实注册伴随数与 save_for_backward 字节；`make_metadata` 增加 `forward_time_ms`（CUDA 同步壁钟；jvp 的对偶趟在其中）与 `peak_memory_bytes`（本次 solve 抬高的进程 CUDA 高水位）。vjp 的反向趟发生在 solve 之后、solve 无法观测，反向时间/显存预算由 CI 门禁承担（见下），不伪造 metadata 字段。
+- **CI 预算门禁**：`tests/ad/test_ad_budgets.py` 冻结 §9.2 全部容差/步长常量（放松即红），并对 AD 前向时间、反向趟壁钟、tape 字节与 CUDA 峰值显存设上限（中位数测量 + 量级余量，抓回归不抓调度噪声）。
+- **Munich 烟测**：`tests/ad/test_munich_ad_smoke.py`，缩减 Munich（16×16、depth1、los+reflection）vjp 求解后对 eps_r 与活 TX 位置各一次 backward，断言有限、非零、无 NaN。
+- **优化烟测**：`tests/ad/test_optimization_smoke.py`，Adam 经 deterministic 可微 delay（ToA 多点定位，无 λ/2 相位缠绕局部极小）从 0.5 m 级扰动恢复 TX 至 <1e-2 m。
+- **矩阵自查补漏（M×透射×TX）**：任务清单之外审计发现 basic 透射图的行进起点用的是 detach 的原生 tx 表——入射余弦（进而每面墙透射率）对 TX 的连续依赖会被静默丢失。已改走活 TX 起点，并顺带修掉层栈对偶在**严格法向入射**处的 NaN：k_par=k·sinθ 参数化在 sinθ=0 处 d sinθ/d cosθ=-∞，而物理量只依赖 k_par²（切向处处有限），对偶改携带 k_par²（primal 值按原运算次序逐位保持）。新增 FD 测试覆盖该单元。
+- **capability 翻转**：`path`/`deterministic`/`montecarlo_basic` `supports_ad=True`、`ad_modes=["none","jvp","vjp"]` + 逐 solver `ad_excluded`；全局 `ad_contract` 诚实声明（fixed-topology JVP/VJP：是；visibility/几何不连续估计器：否；bdpt：否；LoS 低层原语自 AD-3 起已接线，不再"experimental"）。
+- 测试规模：`tests/ad` 197 通过 + 1 strict xfail；全套（除 Munich parity 与 performance）903 通过、1 跳过、1 xfail。
 
 AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 次梯度门用 `>` 导致 `sigma_e = 0`（材料默认初值）梯度恒零；更隐蔽的是 `dc_layer_one_way_phase` 的衰减幅度门用 `exponent < 0`，而 passive 分支在 `sigma_e = 0` 或 `thickness = 0` 时把 `Im(kz)·d` 落在 **-0.0** 上，于是 `amplitude · d_exponent` 被整项吞掉——在 `sigma_e = 0` 处这一项就是层传播子对 sigma 的**全部**一阶效应（该处 dkz/dsigma 纯虚），透射 sigma 梯度因此小了约 20 倍且反号。同一提交还修好了 deterministic 累加在 AD 模式下截断计算图的问题，并让频率 AD 在遇到色散材料时显式失败。
 
@@ -169,14 +183,13 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 - [x] `field_reflection_sequence` / `field_transmission_sequence` 对 **source/target/interaction_positions/interaction_normals** 的伴随与切向（`slab_fresnel_dual` / `stack_rt_dual` 补了 cos_theta 切向；反射伴随为真反向模式，穿过 frames、cos_theta 与 propagation，法线翻转按冻结分支只取符号；透射的 interaction_positions 梯度恒为零——直线路径不依赖穿墙点）；
 - [x] `path_length_m` / `delay_s` 在几何可微后转为可微输出（ToA 类损失；对材料/频率余切恒零；`direction` 输出保持不可微）。
 
-层 1（几何侧，RayD，见 §3.1（一））：
+层 1（几何侧，RayD，见 §3.1（一））：（`b0d5823` 交付）
 
 - [x] Scene 几何叶子接线：`Transmitter.position` / `ReceiverPoint.position` / `Structure.vertices` 绕开原生 host-float 构造 op，保持 autograd 图（纯张量传递，无数学）；
-- [ ] RayD 新增 `reflection_epc_paths_backward/_jvp`（CUDA，无 OptiX）：固定 winner 下 `d(hits, normals, path_length)/d(vertices, source, receiver)`；链求解抽成 header-only device 函数，前向/伴随共用；`reflection_geometry.h` 补 `adj_*` 原语；
-- [ ] RayD `intersect_backward/_jvp` 补 `geo_n` 可微输出（透射法线）；
-- [ ] channel_native：bridge 新符号 + 薄 `autograd.Function`；透射行进循环在 AD 模式下改调可微 intersect；`normalize(target-source)` 的伴随核；
-- [ ] 删除 `core/ad_geometry.py` 的 torch 链重建（`bc6dd5a` 引入，违反"不重复计算 + 热路径必须 CUDA"）；
-- [ ] mesh vertex 的连续部分导数（固定 winner）；支持 batch、多 TX/RX 与 complex loss。
+- [x] RayD 新增 `reflection_epc_paths_backward/_jvp`（CUDA，无 OptiX）：固定 winner 下 `d(hits, normals, path_length)/d(vertices, source, receiver)`（RayDi `fc52233`）；
+- [x] 透射法线走 `raydn_face_normals_ad` 的可微面法线表（顶点函数），channel_native bridge + 薄 `autograd.Function`；
+- [x] 删除 `core/ad_geometry.py` 的 torch 链重建（现存文件只做纯张量传递，无数学）；
+- [x] mesh vertex 的连续部分导数（固定 winner）：反射（任意深度，AD-4b 补 solver 级 depth-2 测试）、透射与楔形绕射（AD-4b，楔核内从 winner 顶点重建边表）；LoS 结构性为零（钉死）；耦合 R↔D 顶点梯度显式拒绝（xfail(strict) 登记）。
 
 ### AD-3：T2 MC basic 可微（标量功率图）
 
@@ -185,7 +198,7 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 - [x] 打通 basic 的材料/频率通路：`_host_material_tensors` 已删除，反射/绕射材料与厚度统一走编译材料仓（`face_material_field_bundle`，`ad_mode="none"` 与 AD 模式同一来源、同一数值；primal 在 no_grad 下读取）；`float(scene.frequency)` 在 AD 模式换成活的 0-d 张量；
 - [x] LoS 功率增益：`mc_los_path_gain_jvp/backward` 补了 frequency 切向/余切（`d gain_scale/df = -2*gain_scale/f`），并入 `_McLosPathGainAdFunction`（tx/rx 位置、频率；tx_power 按固定拓扑契约显式拒绝）；
 - [x] 反射功率图：`mc_sionna_reflection_accumulate_backward/_jvp`（`eta_r`/`sigma`/`gain`/`thickness`/`wavelength`->frequency；逐 bounce 反向场链 + `legacy_sionna_slab_fresnel_dual` 参数对偶）。**交付偏差：ray origin（tx 位置）的解析梯度恒等于零**——沉积权重 `|Gamma|^2*Omega*(lambda/4pi)^2/(A*|cos|)` 的每个因子只依赖冻结的采样方向、法线与材料，1/d^2 扩散由冻结的射线密度/分箱承载（离散 winner）；已实测验证（对 tx 的中心差分在 h=1e-2 只读到单射线换箱跳变 ~7e-7，h<=1e-3 只剩 float32 重排序噪声），梯度经活图返回精确零；
-- [ ] 绕射功率图：**推迟到 AD-4**——`mc_sionna_diffraction_tape_accumulate` 消费 RayD `compute_pair_contribution`（存储面算子路径），其材料伴随需要 `slab_face_operator` 的对偶且 k/频率切向只有 RayD 的有限差分 `pair_vector_output_jvp_completion`（§3.1（二）已把 UTD 重算/微分归入 AD-4）；`ad_mode != "none"` + diffraction 显式失败；
+- [x] 绕射功率图：AD-4b 交付——逐 lane 行模板化（float=primal、Dual=导数），backward 逐输入种子化探针、jvp 单次对偶；材料/频率/tx 位置可微；伪无限截断因子冻结（AD-4a 政策）；
 - [x] 透射功率图：`em_layer_stack_backward/_jvp`（`stack_rt_dual` 补 cap_r/cap_t 对偶；cos_theta/CSR 层参数/频率），`straight_transmission_chains` 在 AD 模式走 `em_layer_stack_ad`；`mc_finalize_component_maps` 的 VJP 是余切 view + 广播、JVP 复用前向核；LoS/透射图布局与可见性掩码经 `mc_los_grid_maps_ad`（伴随为一只掩码 gather 核）；
 - [x] `montecarlo.basic` 的 `Config` 接受 `ad_mode`；散射与绕射分量 + AD 在 launch 前显式拒绝；
 - [x] seed 固定使 FD±h 与 AD 复用同一采样序列（反射方向为确定性 Fibonacci 球，天然 seed 无关）；跨 seed 梯度稳定性测试就位；
@@ -195,13 +208,13 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 
 **AD-4a 执行更新（2026-07-14，已交付）**：路线改为**模板化对偶**而非修复上游手写伴随。核对结论：RayD 的 `pair_vector_output_vjp` 不做驻定点重选、丢弃 finite-wedge 因子梯度（`(void) gFiniteFactor`）、恒走 stored-Jones 入射分支、且完全没有 k 依赖——它微分的是与前向不同的函数（宿主 FD 证实每个分量差 2-4 个量级）；其子伴随（`adj_fresnel_reflection_face` / `adj_face_reflection_operator` / `adj_cplx_sqrt` / `adj_compute_edge_geometry_3d`）反而是对的。因此把 `utd_types.h`/`utd_math.h` 整体模板化到标量类型 `T`（float | `Dual`）：float 实例化与原前向**逐位一致**（6 组配置位级基线核对），`Dual` 实例化即精确 JVP；`pair_vector_output_jvp` 为单次对偶（含 k 与 omega 独立切向，频率由调用方按 dk=2πdf/c、dω=2πdf 链接），`pair_vector_output_vjp` 为按输入种子化的对偶探针（复线性输入每个复标量一次探针），有限差分版 `pair_vector_output_jvp_completion` 与死代码 add_scaled 族已删除。宿主 FD 全绿（两种通道约定：stationary+omega>0 与 fixed-point+stored-ops，覆盖 source/target/边几何/双面 eta_r/sigma/gain/频率/JVP-VJP 对偶）。**已知边界**：耦合核的 ±1e5 伪无限边界使截断因子成为 float32 端点纹波，其对输入的导数被 1e5 杠杆放大为噪声（宿主 FD 永不收敛；真无限边导数为零），故耦合对偶把该因子**冻结**为微分常量（策略注释在 `kernels/field_wedge_ad.cu`）。
 
-- [ ] 多反射链式导数（`field_reflection_sequence` 深度 > 1，Jones/complex3）；
-- [ ] multilayer/transmission 散射矩阵对 `eps_r/sigma/thickness/freq` 导数；
+- [x] 多反射链式导数（`field_reflection_sequence` 深度 > 1，Jones/complex3；核级 depth-2 测试自 AD-1，solver 级 depth-2 矩阵单元由 AD-4b 的 `test_solver_multibounce_ad.py` 收口）；
+- [x] multilayer/transmission 散射矩阵对 `eps_r/sigma/thickness/freq` 导数（AD-1/AD-3 交付，`stack_rt_dual`）；
 - [x] **UTD fixed-topology 导数（channel_native 内重算）**：`cn_field_diffraction_wedge`（前向 = RayD 模板化 UTD 的 float 实例 + 驻定点内部重解 + 出射方向；backward/jvp = Dual 实例种子化），复现 order-1 export 约定（半空间 Fresnel `omega>0`、bridge 硬编码 +z 极化、sqrt(tx_power) 幅度）；前向 parity 门禁（重算 vs `topology.field_xyz`）双 solver × 双材料（介质/PEC）全绿（rel ≤ 1e-3）；
 - [x] `field_project_complex3` backward/jvp（场向量与到达方向都在图上，方向链承载驻定点运动）；
 - [x] `field_coupled_rd` 的 backward/jvp（12 材料标量 + 频率 + 端点/交点几何；楔面算子复用 `slab_fresnel_dual`，反射腿复用 `dual_reflect_frame`，pair 走 RayD Dual 模板）；耦合驻定几何在 geometry AD 下经 `coupled_rd_prepare` 的 fixed-winner 可微重解（镜像源 + 驻定边点 + 墙面交点），一致性门禁比对拓扑存储交点；解除 seam 中 component 2/3/4 的拦截，耦合块频率改走活张量；
-- [ ] metadata 记录 `ad_status`、tape bytes、`jvp_launch_count`/`backward_launch_count`、forward/backward 时间与峰值显存（schema 已在 `metadata.py` 预留）；
-- [ ] 解析小场景通过后，进入 Munich/SF 场景。
+- [x] metadata 记录 `ad_status`、tape bytes、`jvp_launch_count`/`backward_launch_count`、forward 时间与峰值显存（AD-4b：`AdLaunchLedger` 三 solver 共用；vjp 的反向趟发生在 solve 之后、无法在 metadata 里如实测量，反向时间/显存改由 `tests/ad/test_ad_budgets.py` 的 CI 门禁承担）；
+- [x] 解析小场景通过后，进入 Munich 场景（`tests/ad/test_munich_ad_smoke.py`：材料与 TX 位置各一次 backward，有限/非零/无 NaN）。
 
 ### 本轮非目标（明确推迟）
 
@@ -257,15 +270,15 @@ D=deterministic, P=path, M=montecarlo.basic。**D/P 验证复系数（含相位/
 - `pytestmark = pytest.mark.gpu`；已知缺口用 `@pytest.mark.xfail(strict=True)` 记录（如绕射运动 FD parity），不静默省略；
 - `ad_mode="none"` 零额外 tape 与性能回归测试（含 RayD `*_noad` 快路径），断言 `tape_bytes==0`、launch 计数不变。
 
-## 10. 完成定义
+## 10. 完成定义（AD-4b 全部满足，2026-07-14）
 
-- [ ] AD-A0 打通，RayD 可微几何在 channel_native 内经 C-ABI 可用（不走 `rayd.torch` Python 层）；
-- [ ] **`deterministic` / `path` / `montecarlo.basic` 三个 solver** 均支持材料、frequency、TX/RX position 的 JVP/VJP（D/P 复系数，M 实数功率），端到端 torch autograd 可用；
-- [ ] §9 覆盖矩阵每个可行单元有测试；中心 FD、JVP-vs-VJP 自洽、内积对偶、T1 `gradcheck`、前向 parity 门禁全部通过；MC basic 有 seed 固定 + 跨 seed 方差/CI 测试；
-- [ ] 已知缺口（绕射运动 FD parity 等）以 `xfail(strict=True)` 显式登记；
-- [ ] 时间、显存与梯度误差预算固定（数字进 CI 门禁）；
-- [ ] 前向模式（`ad_mode="none"`）不承担 AD 的额外常驻成本，RayD 走 detached 快路径；
-- [ ] `psdr` 桩已删除；
-- [ ] **`montecarlo.bdpt` 梯度与几何不连续性**明确标注为后续计划；`bdpt.Config` 仍拒绝 `ad_mode != "none"`；落到不支持区域时显式失败或诊断；
-- [ ] 通过以上条件后，才把对应 solver 的 `supports_ad` 改为 `True`（本轮不含 bdpt）。
+- [x] AD-A0 打通，RayD 可微几何在 channel_native 内经 C-ABI 可用（不走 `rayd.torch` Python 层）；
+- [x] **`deterministic` / `path` / `montecarlo.basic` 三个 solver** 均支持材料、frequency、TX/RX position 的 JVP/VJP（D/P 复系数，M 实数功率），端到端 torch autograd 可用；
+- [x] §9 覆盖矩阵每个可行单元有测试；中心 FD、JVP-vs-VJP 自洽、内积对偶、T1 `gradcheck`、前向 parity 门禁全部通过；MC basic 有 seed 固定 + 跨 seed 方差测试（含真正 seed 依赖的绕射图）。矩阵备注：LoS×顶点为结构性零（钉死）；M×绕射×TX 的 FD 判据是固定带 + 接受稳定 lane 聚合（全解 FD 因离散 winner 翻转在任何步长都不收敛，实测登记在测试 docstring）；M×绕射×RX 不适用（radiomap 的网格是输出不是参数）；
+- [x] 已知缺口以 `xfail(strict=True)` 显式登记（mesh vertex × 耦合 R↔D：耦合伴随把墙平面/边表当冻结 winner，solver 先显式 `NotImplementedError`）；
+- [x] 时间、显存与梯度误差预算固定（`tests/ad/test_ad_budgets.py`：§9.2 常量冻结 + AD 前向/反向时间、tape 字节、CUDA 峰值显存上限进 CI）；
+- [x] 前向模式（`ad_mode="none"`）不承担 AD 的额外常驻成本，RayD 走 detached 快路径（零 tape、伴随计数为零、前向 launch 数与 AD 模式一致，metadata 测试钉死）；
+- [x] `psdr` 桩已删除（`f6873d8`）；
+- [x] **`montecarlo.bdpt` 梯度与几何不连续性**明确标注为后续计划；`bdpt.Config` 仍拒绝 `ad_mode != "none"`；落到不支持区域时显式失败（basic 散射、D/P 散射、耦合×顶点均 launch 前拒绝）；
+- [x] 以上条件全部满足后，`path`/`deterministic`/`montecarlo_basic` 的 `supports_ad` 已改为 `True`（`ad_modes=["none","jvp","vjp"]` + 逐 solver `ad_excluded`）；bdpt 保持 `False`/`["none"]`。
 ```

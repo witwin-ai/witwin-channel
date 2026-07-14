@@ -1,6 +1,31 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
+
+import torch
+
+
+@dataclass
+class AdLaunchLedger:
+    """Per-solve accounting of the plan 07 AD companion kernels.
+
+    ``launches`` counts the native backward/jvp companion launches one full
+    reverse pass (vjp) or forward-dual pass (jvp) performs for this solve:
+    one per registered differentiable Function. ``tape_bytes`` sums the
+    tensors the reverse pass retains via ``save_for_backward``; forward mode
+    retains nothing past the solve, so jvp reports zero tape. One ledger
+    shape for every solver (montecarlo.basic, deterministic, path).
+    """
+
+    launches: int = 0
+    tape_bytes: int = 0
+
+    def add(self, *saved: object) -> None:
+        self.launches += 1
+        for tensor in saved:
+            if isinstance(tensor, torch.Tensor):
+                self.tape_bytes += tensor.numel() * tensor.element_size()
 
 
 ACCUMULATION_STRATEGIES = frozenset(
@@ -54,6 +79,8 @@ def make_metadata(
     spill_bytes: int = 0,
     raydn_native: bool = False,
     ad_status: str = "none",
+    forward_time_ms: float = 0.0,
+    peak_memory_bytes: int = 0,
 ) -> dict[str, bool | float | int | str]:
     metadata: dict[str, bool | float | int | str] = {
         "primitive": primitive,
@@ -72,6 +99,13 @@ def make_metadata(
         "spill_bytes": spill_bytes,
         "raydn_native": raydn_native,
         "ad_status": ad_status,
+        # Wall-clock (CUDA-synchronized) solve duration and the amount the
+        # solve raised the process CUDA high-water mark. A jvp solve carries
+        # its dual pass inside this forward time; a vjp solve cannot observe
+        # its future backward, so reverse-pass time/memory budgets are pinned
+        # by the tests/ad overhead gates instead of a metadata field.
+        "forward_time_ms": float(forward_time_ms),
+        "peak_memory_bytes": int(peak_memory_bytes),
     }
     validate_metadata(metadata)
     return metadata
@@ -124,3 +158,8 @@ def validate_metadata(metadata: Mapping[str, object]) -> None:
 
     if not isinstance(metadata["raydn_native"], bool):
         raise ValueError("metadata raydn_native must be a boolean")
+
+    for field in ("forward_time_ms", "peak_memory_bytes"):
+        value = metadata.get(field, 0)
+        if not isinstance(value, int | float) or value < 0:
+            raise ValueError(f"metadata {field} must be non-negative")

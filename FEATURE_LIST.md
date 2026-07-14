@@ -90,11 +90,15 @@ priority `scattering > diffraction > transmission > reflection > los`.
   (`thin_sheet_straight_path_approximation`, geometric group delay), and
   event/sample diagnostics.
 
-## Differentiable solving (fixed topology, plan 07 AD-1 / AD-2 / AD-3)
+## Differentiable solving (fixed topology, plan 07 AD-1 through AD-4)
 
 - `deterministic`, `path` and `montecarlo.basic` accept
   `ad_mode="jvp" | "vjp"` (default `"none"`); `montecarlo.bdpt` still
-  rejects any non-`"none"` mode.
+  rejects any non-`"none"` mode. The capability manifest advertises this:
+  `supports_ad=True` with `ad_modes=["none", "jvp", "vjp"]` for the three
+  fixed-topology solvers, and the global `ad_contract` states what is and
+  is not delivered (fixed-topology JVP/VJP yes; visibility/topology
+  discontinuity estimator no; bdpt no; per-solver exclusions listed).
 - Differentiable parameters: material `eps_r` / `sigma_e` / `gain` /
   `thickness` (per bounce for reflection, per CSR layer for transmission),
   the carrier frequency, and since AD-2 the continuous hit geometry:
@@ -137,8 +141,32 @@ priority `scattering > diffraction > transmission > reflection > los`.
   regularizer of the differentiation (its float32 endpoint ripple is
   measurement noise amplified by the 1e5 lever arm; the true infinite-edge
   derivative is zero).
+- Mesh-vertex gradients cover every wired interaction (plan 07 AD-4b):
+  reflection (any depth) through RayD's fixed-winner EPC chain,
+  transmission through the differentiable face-normal table, and wedge
+  diffraction through edge tables rebuilt from the winner vertices inside
+  the wedge kernel (edge anchor/direction/bounds, sign-aligned face
+  normals, exterior angle; the frozen discovery tables pin the plane
+  assignment so RayD's ordering conventions cannot drift the primal).
+  A LoS path touches no face, so its vertex gradient is structurally zero
+  (pinned by test). Coupled R-D paths do not support vertex gradients: the
+  coupled adjoints take the wall plane and edge tables as frozen winners,
+  and the solver fails loudly (`NotImplementedError`) instead of returning
+  a silently incomplete gradient (registered as `xfail(strict=True)`).
 - Explicit-failure policy: the scattering component raises a `RuntimeError`
   naming the interaction before any launch when `ad_mode != "none"`.
+- AD metadata (plan 07 AD-4): `result.metadata["kernel"]` reports the real
+  `ad_status`, `tape_bytes` (bytes retained via `save_for_backward`; zero
+  for `none`/`jvp`), `backward_launch_count` / `jvp_launch_count`
+  (registered companion launches, one `AdLaunchLedger` shape across
+  montecarlo.basic / deterministic / path), plus `forward_time_ms`
+  (CUDA-synchronized solve wall time; a jvp solve carries its dual pass
+  here) and `peak_memory_bytes` (how far the solve raised the process CUDA
+  high-water mark). A vjp solve cannot observe its future backward, so
+  reverse-pass time/memory budgets are pinned by the CI gates in
+  `tests/ad/test_ad_budgets.py` (tolerance freeze + forward/backward
+  time, tape and peak-memory overhead budgets) rather than a metadata
+  field.
 - The reserved `psdr` solver stub has been removed; AD lives in the existing
   solvers' `ad_mode`.
 - Monte Carlo basic power map AD (plan 07 AD-3): the incoherent
@@ -153,9 +181,27 @@ priority `scattering > diffraction > transmission > reflection > los`.
   directions, deposit binning and visibility masks are frozen winners; the
   reflection deposit weight is analytically independent of the ray origin,
   so the transmitter-position gradient of the reflection map is an exact
-  zero (delivered through a live graph, not a missing gradient). Grid
-  receivers expose no per-receiver position leaf (the grid is the output).
-  Diffraction and scattering maps reject AD until plan 07 AD-4.
+  zero (delivered through a live graph, not a missing gradient). The
+  transmission map's transmitter gradient is genuinely nonzero (the
+  straight-line incidence cosine, and with it every per-wall transmittance,
+  moves with the live march origin) and the layer-stack dual carries the
+  squared transverse wave number so exactly-normal rays keep a finite
+  cos_theta derivative. Grid receivers expose no per-receiver position leaf
+  (the grid is the output).
+- Monte Carlo basic diffraction map AD (plan 07 AD-4b): the Sionna-style
+  Keller-cone diffraction radiomap differentiates with respect to the
+  wedge-face slab materials (`eps_r` / `sigma_e` / `gain` / `thickness`),
+  the carrier frequency and the transmitter position. The per-lane row of
+  the tape accumulator is templated over the scalar type: the float
+  instantiation IS the primal deposit and the dual instantiation carries
+  the exact derivative through the recomputed cone geometry, the incident
+  spherical wave, the stored slab face operators and the UTD pair
+  (fixed-point + stored-ops convention). The RayD sampling tape (active /
+  state / cell / u), the per-lane azimuth and the deposit binning stay
+  frozen winners. Unlike the reflection map, the transmitter gradient is
+  genuinely nonzero here (the deposit carries the incident 1/s wave and
+  the source-dependent cone orientation). The scattering map keeps
+  rejecting AD loudly.
 
 ## Reference implementation
 

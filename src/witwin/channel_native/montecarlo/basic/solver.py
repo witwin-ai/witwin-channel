@@ -41,11 +41,9 @@ from .sampling import make_cuda_generator
 
 
 # Components whose Monte Carlo power maps have no AD companions yet: the
-# diffraction accumulator consumes RayD's UTD pair contribution whose material
-# and frequency adjoints arrive with the plan 07 AD-4 wedge-field recompute,
-# and the Kirchhoff scattering map is deferred with it. Fail before any launch
-# instead of returning silently detached maps.
-_AD_PENDING_COMPONENTS = ("diffraction", "scattering")
+# Kirchhoff scattering map (deferred past plan 07 AD-4). Fail before any
+# launch instead of returning silently detached maps.
+_AD_PENDING_COMPONENTS = ("scattering",)
 
 
 def _validate_ad_config(config: Config) -> None:
@@ -202,6 +200,10 @@ def solve(scene: Scene, config: Config) -> Result:
         if needs_reflection_launch:
             if material_tensors is None:
                 raise RuntimeError("material tensors are required for native reflection")
+            # A diffraction-only AD solve still needs the reflection launch
+            # for wedge discovery, but its (discarded) reflection map stays
+            # primal so no spurious companions are registered.
+            reflection_ad = ad and "reflection" in config.components
             reflection_result = reflection_component_maps_with_wedges(
                 scene,
                 raydn,
@@ -211,8 +213,8 @@ def solve(scene: Scene, config: Config) -> Result:
                 device=device,
                 material_tensors=material_tensors,
                 collect_wedges=collect_diffraction_wedges,
-                ad=ad,
-                ledger=ledger if ad else None,
+                ad=reflection_ad,
+                ledger=ledger if reflection_ad else None,
             )
         if "reflection" in config.components and reflection_available and reflection_result is not None:
             component_maps["reflection"] = reflection_result.maps
@@ -236,6 +238,8 @@ def solve(scene: Scene, config: Config) -> Result:
                     if reflection_result is not None and collect_diffraction_wedges
                     else None
                 ),
+                ad=ad,
+                ledger=ledger if ad else None,
             )
             path_count += config.samples
             valid_contribution_count += int(component_maps["diffraction"].numel())
