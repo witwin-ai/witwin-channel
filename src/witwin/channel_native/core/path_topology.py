@@ -8,7 +8,8 @@ from typing import Protocol
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
+from witwin.channel_native.core import ad_geometry
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
@@ -41,6 +42,22 @@ _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 65_536
 _MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
 _ORDER1_EXHAUSTIVE_GROUP_LIMIT = 4096
 _PLANE_GROUP_QUANTIZATION = 1.0e-4
+
+
+def _frequency_scalar(scene: Scene) -> float:
+    """Detached scalar carrier for non-differentiable consumers.
+
+    Topology discovery and metadata never differentiate with respect to
+    frequency (fixed-topology contract), so detach before float() to keep AD
+    solves with a requires_grad tensor frequency warning-free. The field
+    evaluation seam must NOT use this helper: it forwards the live tensor so
+    the frequency stays on the autograd graph.
+    """
+
+    frequency = scene.frequency
+    if isinstance(frequency, torch.Tensor):
+        return float(frequency.detach())
+    return float(frequency)
 
 
 def _empty_path_block(device: torch.device) -> dict[str, torch.Tensor]:
@@ -643,8 +660,10 @@ def _rough_reflection_factor(
     depth_value: int,
     source: torch.Tensor,
     material: dict[str, torch.Tensor],
+    positions: torch.Tensor,
+    normals: torch.Tensor,
     *,
-    frequency_hz: float,
+    frequency_hz: float | torch.Tensor,
     scattering_active: bool,
 ) -> torch.Tensor | None:
     """Per-row field scale for rough-surface specular reflection rows.
@@ -653,7 +672,9 @@ def _rough_reflection_factor(
     specular Jones by C_r = exp(-2*(k0*cos_theta_i*sigma_h)^2) per bounce
     (plan 05 section 6.2, contract section 6). C_r is a real positive scalar,
     so this first-order Python-side attenuation of the native smooth-stack
-    field is exact for the field magnitude and phase-neutral.
+    field is exact for the field magnitude and phase-neutral. Under AD the
+    seam passes the 0-d tensor frequency so k0 (and hence dC_r/df) stays on
+    the autograd graph; a float frequency keeps the primal path.
 
     When the scattering component is active, single-bounce specular rows on a
     surface carrying a realization_coherent phase screen are zeroed: the
@@ -695,7 +716,6 @@ def _rough_reflection_factor(
         sigma_face = material["rough_sigma_h_m"][face_material]
         sigma_b = sigma_face[face_id]
         rough_b = rough_face[face_material][face_id]
-        positions = topology.interaction_positions[rows, :depth_value]
         prev = torch.cat(
             (source[rows].unsqueeze(1), positions[:, : depth_value - 1]), dim=1
         )
@@ -703,17 +723,10 @@ def _rough_reflection_factor(
         seg_dir = seg / torch.linalg.vector_norm(seg, dim=-1, keepdim=True).clamp_min(
             1.0e-9
         )
-        cos_b = (
-            (seg_dir * topology.interaction_normals[rows, :depth_value])
-            .sum(-1)
-            .abs()
-        )
-        k0 = 2.0 * math.pi * float(frequency_hz) / _LIGHT_SPEED_M_PER_S
-        c_r = torch.where(
-            rough_b,
-            torch.exp(-2.0 * (k0 * cos_b * sigma_b).square()),
-            torch.ones_like(cos_b),
-        )
+        cos_b = (seg_dir * normals).sum(-1).abs()
+        k0 = 2.0 * math.pi * frequency_hz / _LIGHT_SPEED_M_PER_S
+        attenuation = torch.exp(-2.0 * (k0 * cos_b * sigma_b).square())
+        c_r = torch.where(rough_b, attenuation, torch.ones_like(attenuation))
         factor = c_r.prod(dim=1)
     if realization_face is not None and depth_value == 1:
         replaced = realization_face[face_id[:, 0]]
@@ -741,6 +754,62 @@ def _require_ad_supported_topology(topology: TopologyBatch, *, ad_mode: str) -> 
             )
 
 
+def _participates_in_ad(value: object) -> bool:
+    """True when a leaf carries a reverse-mode graph or a forward-mode tangent."""
+
+    if not isinstance(value, torch.Tensor):
+        return False
+    if value.requires_grad:
+        return True
+    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
+
+
+def _frequency_participates_in_ad(frequency: float | torch.Tensor) -> bool:
+    return _participates_in_ad(frequency)
+
+
+def _geometry_participates_in_ad(scene: Scene) -> bool:
+    """True when a geometry leaf (mesh vertices, TX/RX position) is on the graph.
+
+    Materials-only AD (plan 07 AD-1) keeps the detached native hit geometry
+    and skips the fixed-winner reconstruction entirely, so AD-2 adds no work
+    to a solve that does not ask for geometry gradients.
+    """
+
+    leaves: list[object] = [tx.position for tx in scene.transmitters]
+    leaves += [
+        receiver.position
+        for receiver in scene.receivers
+        if isinstance(receiver, ReceiverPoint)
+    ]
+    leaves += [structure.vertices for structure in scene.structures]
+    return any(_participates_in_ad(leaf) for leaf in leaves)
+
+
+def _require_frequency_ad_constant_materials(
+    scene: Scene, compiled: object, *, ad_mode: str
+) -> None:
+    """Explicit-failure contract for frequency AD over dispersive materials.
+
+    ``Scene.compile()`` freezes material records at the primal frequency, so
+    a frequency gradient through a scene with frequency-dependent material
+    laws would silently miss d(material)/d(frequency) (plan 07 section 7:
+    never return misleading gradients). Fail before any launch instead.
+    """
+
+    dependent = tuple(compiled.materials.frequency_dependent)
+    if not dependent or not _frequency_participates_in_ad(scene.frequency):
+        return
+    raise NotImplementedError(
+        f"ad_mode='{ad_mode}' cannot differentiate with respect to frequency "
+        "in this scene: material records are frozen at the primal frequency "
+        "at compile time, so the gradient would silently miss "
+        "d(material)/d(frequency) for the frequency-dependent materials "
+        f"{list(dependent)}. Use a constant-material scene for frequency AD, "
+        "or drop the frequency requires_grad/tangent for materials-only AD."
+    )
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -759,7 +828,8 @@ def _evaluate_shared_fields(
     reflection and transmission through the differentiable field Functions:
     material gathers stay on the torch graph and the frequency is forwarded
     as a 0-d tensor when the scene stores one (hit geometry stays detached
-    under the fixed-topology contract).
+    under the fixed-topology contract). The rough-surface C_r attenuation is
+    pure torch and receives the same live frequency so dC_r/df is kept.
     """
 
     count = int(topology.valid.shape[0])
@@ -781,15 +851,29 @@ def _evaluate_shared_fields(
             ops.field_transmission_sequence_ad, frequency=frequency
         )
     else:
-        frequency_value = float(scene.frequency)
-        los_field_op = partial(ops.field_free_space, frequency_hz=frequency_value)
+        frequency = _frequency_scalar(scene)
+        los_field_op = partial(ops.field_free_space, frequency_hz=frequency)
         reflection_field_op = partial(
-            ops.field_reflection_sequence, frequency_hz=frequency_value
+            ops.field_reflection_sequence, frequency_hz=frequency
         )
         transmission_field_op = partial(
-            ops.field_transmission_sequence, frequency_hz=frequency_value
+            ops.field_transmission_sequence, frequency_hz=frequency
         )
     device = topology.valid.device
+    # AD-2: when a geometry leaf is on the graph, the endpoints and the hit
+    # points are re-derived from the live scene tensors under the frozen
+    # winner, so the field kernels see geometry with a gradient. Otherwise
+    # the detached native discovery output is used unchanged (AD-1 path).
+    geometry_ad = ad_enabled and _geometry_participates_in_ad(scene)
+    if geometry_ad:
+        vertices = ad_geometry.scene_vertex_table(scene, compiled)
+        faces = compiled.geometry.faces
+        tx_positions = ad_geometry.transmitter_positions_ad(
+            scene, tx_positions, device=device
+        )
+        rx_positions = ad_geometry.receiver_positions_ad(
+            scene, rx_positions, device=device
+        )
     tx_id = topology.tx_id.to(dtype=torch.int64)
     rx_id = topology.rx_id.to(dtype=torch.int64)
     source = tx_positions[tx_id].contiguous()
@@ -836,11 +920,28 @@ def _evaluate_shared_fields(
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
+        if geometry_ad:
+            positions, normals = ad_geometry.specular_chain_geometry(
+                vertices, faces, face_id, source[rows], target[rows]
+            )
+            ad_geometry.assert_geometry_parity(
+                "reflection hit points",
+                positions,
+                topology.interaction_positions[rows, :depth_value],
+            )
+            ad_geometry.assert_plane_parity(
+                normals, topology.interaction_normals[rows, :depth_value]
+            )
+        else:
+            positions = topology.interaction_positions[
+                rows, :depth_value
+            ].contiguous()
+            normals = topology.interaction_normals[rows, :depth_value].contiguous()
         evaluated = reflection_field_op(
             source[rows].contiguous(),
             target[rows].contiguous(),
-            topology.interaction_positions[rows, :depth_value].contiguous(),
-            topology.interaction_normals[rows, :depth_value].contiguous(),
+            positions,
+            normals,
             source_power[rows].contiguous(),
             tx_pol[rows].contiguous(),
             rx_pol[rows].contiguous(),
@@ -861,7 +962,9 @@ def _evaluate_shared_fields(
             depth_value,
             source,
             material,
-            frequency_hz=float(scene.frequency),
+            positions,
+            normals,
+            frequency_hz=frequency,
             scattering_active="scattering" in components,
         )
         if rough_factor is not None:
@@ -892,11 +995,34 @@ def _evaluate_shared_fields(
         event_valid = (
             slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
         ).contiguous()
+        if geometry_ad:
+            positions, normals = ad_geometry.straight_chain_geometry(
+                vertices,
+                faces,
+                topology.primitive_sequence[rows].to(dtype=torch.int64),
+                event_valid,
+                source[rows],
+                target[rows],
+            )
+            ad_geometry.assert_geometry_parity(
+                "transmission hit points",
+                positions,
+                topology.interaction_positions[rows],
+                mask=event_valid.unsqueeze(-1),
+            )
+            ad_geometry.assert_plane_parity(
+                normals,
+                topology.interaction_normals[rows],
+                mask=event_valid,
+            )
+        else:
+            positions = topology.interaction_positions[rows].contiguous()
+            normals = topology.interaction_normals[rows].contiguous()
         evaluated = transmission_field_op(
             source[rows].contiguous(),
             target[rows].contiguous(),
-            topology.interaction_positions[rows].contiguous(),
-            topology.interaction_normals[rows].contiguous(),
+            positions,
+            normals,
             topology.material_sequence[rows].contiguous(),
             event_valid,
             source_power[rows].contiguous(),
@@ -1008,7 +1134,7 @@ def _evaluate_shared_fields(
                 material_tuple(reflection_face),
                 material_tuple(face0),
                 material_tuple(face1),
-                frequency_hz=float(scene.frequency),
+                frequency_hz=_frequency_scalar(scene),
                 reverse=reverse_order,
             )
             field_xyz.index_copy_(0, rows, evaluated["field_vector"])
@@ -2235,6 +2361,8 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
     rx_positions, _ = receiver_positions_and_layout(scene, device=device)
     compiled = scene.compile()
     ad_mode = str(getattr(config, "ad_mode", "none"))
+    if ad_mode != "none":
+        _require_frequency_ad_constant_materials(scene, compiled, ad_mode=ad_mode)
     components = _path_components(config)
     coupled_paths = bool(getattr(config, "coupled_paths", False))
     sequence_width = max(int(config.max_depth), 2 if coupled_paths else 0)
@@ -2250,7 +2378,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             tx_positions,
             tx_power,
             rx_positions,
-            frequency_hz=float(scene.frequency),
+            frequency_hz=_frequency_scalar(scene),
         )
         launch_count += 1
         tx_id = exported["tx_id"]
@@ -2279,7 +2407,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 exported["delay_s"].to(dtype=torch.float32).contiguous(),
                 exported["path_gain"].to(dtype=torch.float32).contiguous(),
                 visible,
-                frequency_hz=float(scene.frequency),
+                frequency_hz=_frequency_scalar(scene),
                 sequence_width=sequence_width,
             )
         )
@@ -2295,7 +2423,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             tx_positions,
             tx_power,
             rx_positions,
-            frequency_hz=float(scene.frequency),
+            frequency_hz=_frequency_scalar(scene),
         )
         launch_count += reflection_launches
         candidate_count += int(block["valid"].numel())
@@ -2308,7 +2436,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 tx_positions,
                 tx_power,
                 rx_positions,
-                frequency_hz=float(scene.frequency),
+                frequency_hz=_frequency_scalar(scene),
                 min_depth=2,
                 max_depth=int(config.max_depth),
                 max_paths=config.max_paths,
@@ -2325,7 +2453,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 tx_positions,
                 tx_power,
                 rx_positions,
-                frequency_hz=float(scene.frequency),
+                frequency_hz=_frequency_scalar(scene),
             )
         )
         launch_count += diffraction_launches

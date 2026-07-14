@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from tests.ad._fd import relative_error
+from tests.ad._fd import central_difference_directional, relative_error
 from tests.ad._reference_fields import (
     free_space_reference,
     reflection_sequence_reference,
@@ -390,6 +390,123 @@ def test_transmission_frequency_vjp_matches_reference_oracle():
 
 
 # ---------------------------------------------------------------------------
+# Clamp-boundary regressions: the forward fmaxf(x, 0) passes x through at
+# x == 0, so the dual/adjoint gates must pass the gradient there too
+# (>=, matching the oracle's clamp_min autograd). sigma_e = 0 is the default
+# material initialization; a dead gradient would stall conductivity
+# optimization at 0 forever.
+# ---------------------------------------------------------------------------
+
+
+def test_reflection_sigma_zero_boundary_grad_matches_oracle():
+    batch = _reflection_batch(depth=1)
+    batch["sigma_e"] = torch.zeros_like(batch["sigma_e"])
+    weights = _loss_weights(3, seed=53)
+    sigma = batch["sigma_e"].clone().requires_grad_(True)
+    ad_batch = dict(batch)
+    ad_batch["sigma_e"] = sigma
+    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
+    loss.backward()
+    assert sigma.grad is not None
+    assert float(sigma.grad.abs().max()) > 0.0
+
+    reference_batch = _reference_inputs(batch)
+    reference_sigma = reference_batch["sigma_e"].clone().requires_grad_(True)
+    reference_batch["sigma_e"] = reference_sigma
+    reference = reflection_sequence_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    reference_loss = _real_pair_loss(reference["coefficient"], weights)
+    reference_loss = reference_loss + reference["path_gain"].sum()
+    (expected,) = torch.autograd.grad(reference_loss, reference_sigma)
+    assert relative_error(sigma.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_transmission_sigma_zero_boundary_grad_matches_oracle():
+    batch = _transmission_batch()
+    batch["layer_sigma_e"] = torch.zeros_like(batch["layer_sigma_e"])
+    weights = _loss_weights(2, seed=59)
+    sigma = batch["layer_sigma_e"].clone().requires_grad_(True)
+    ad_batch = dict(batch)
+    ad_batch["layer_sigma_e"] = sigma
+    out = ops.field_transmission_sequence_ad(
+        *ad_batch.values(), frequency=_FREQUENCY_HZ
+    )
+    loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
+    loss.backward()
+    assert sigma.grad is not None
+    assert float(sigma.grad.abs().max()) > 0.0
+
+    reference_batch = _reference_inputs(batch)
+    del reference_batch["interaction_positions"]
+    reference_sigma = reference_batch["layer_sigma_e"].clone().requires_grad_(True)
+    reference_batch["layer_sigma_e"] = reference_sigma
+    reference = transmission_sequence_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    reference_loss = _real_pair_loss(reference["coefficient"], weights)
+    reference_loss = reference_loss + reference["path_gain"].sum()
+    (expected,) = torch.autograd.grad(reference_loss, reference_sigma)
+    assert relative_error(sigma.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_transmission_thickness_zero_boundary_grads():
+    batch = _transmission_batch()
+    batch["layer_thickness_m"] = batch["layer_thickness_m"].clone()
+    batch["layer_thickness_m"][1] = 0.0
+    weights = _loss_weights(2, seed=61)
+    thickness = batch["layer_thickness_m"].clone().requires_grad_(True)
+    ad_batch = dict(batch)
+    ad_batch["layer_thickness_m"] = thickness
+    out = ops.field_transmission_sequence_ad(
+        *ad_batch.values(), frequency=_FREQUENCY_HZ
+    )
+    loss = _real_pair_loss(out["coefficient"], weights)
+    loss.backward()
+    assert thickness.grad is not None
+    assert float(thickness.grad[1].abs()) > 0.0
+
+    reference_batch = _reference_inputs(batch)
+    del reference_batch["interaction_positions"]
+    reference_thickness = (
+        reference_batch["layer_thickness_m"].clone().requires_grad_(True)
+    )
+    reference_batch["layer_thickness_m"] = reference_thickness
+    reference = transmission_sequence_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    (expected,) = torch.autograd.grad(
+        _real_pair_loss(reference["coefficient"], weights), reference_thickness
+    )
+    assert relative_error(thickness.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+    # jvp side of the same boundary: the forward tangent must agree with the
+    # backward through the inner-product duality on a thickness-only seed.
+    generator = torch.Generator(device="cpu").manual_seed(67)
+    v_thickness = torch.randn(3, generator=generator).to("cuda") * 0.01
+    tangents = ops.field_transmission_sequence_jvp(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        tangent_layer_thickness_m=v_thickness,
+    )
+    lhs = _real_pair_loss(tangents["coefficient"], weights).double()
+    grads = ops.field_transmission_sequence_backward(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        grad_coefficient=weights,
+        need_grad_layer_eps_r=False,
+        need_grad_layer_sigma_e=False,
+        need_grad_frequency=False,
+    )
+    rhs = (grads["grad_layer_thickness_m"].double() * v_thickness.double()).sum()
+    assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+# ---------------------------------------------------------------------------
 # JVP-vs-VJP self consistency (inner-product duality and vjp == sum of jvp).
 # ---------------------------------------------------------------------------
 
@@ -402,6 +519,7 @@ def test_jvp_vjp_inner_product_duality_reflection():
     v_eps = torch.randn(3, 2, generator=generator).to("cuda")
     v_sigma = torch.randn(3, 2, generator=generator).to("cuda") * 0.01
     v_thickness = torch.randn(3, 2, generator=generator).to("cuda") * 0.01
+    v_gain = torch.randn(3, 2, generator=generator).to("cuda") * 0.01
     v_frequency = 1.0e6
 
     tangents = ops.field_reflection_sequence_jvp(
@@ -409,6 +527,7 @@ def test_jvp_vjp_inner_product_duality_reflection():
         frequency_hz=_FREQUENCY_HZ,
         tangent_eps_r=v_eps,
         tangent_sigma_e=v_sigma,
+        tangent_gain=v_gain,
         tangent_thickness=v_thickness,
         tangent_frequency=v_frequency,
     )
@@ -422,12 +541,13 @@ def test_jvp_vjp_inner_product_duality_reflection():
         grad_path_gain=u_gain,
         need_grad_eps_r=True,
         need_grad_sigma_e=True,
-        need_grad_gain=False,
+        need_grad_gain=True,
         need_grad_thickness=True,
         need_grad_frequency=True,
     )
     rhs = (grads["grad_eps_r"].double() * v_eps.double()).sum()
     rhs = rhs + (grads["grad_sigma_e"].double() * v_sigma.double()).sum()
+    rhs = rhs + (grads["grad_gain"].double() * v_gain.double()).sum()
     rhs = rhs + (grads["grad_thickness"].double() * v_thickness.double()).sum()
     rhs = rhs + grads["grad_frequency"].double().sum() * v_frequency
     assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
@@ -465,6 +585,33 @@ def test_jvp_vjp_inner_product_duality_transmission():
     rhs = rhs + (grads["grad_layer_sigma_e"].double() * v_sigma.double()).sum()
     rhs = rhs + grads["grad_frequency"].double().sum() * v_frequency
     assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_reflection_gain_jvp_matches_fd():
+    """Gain-tangent seeding through the reflection jvp (forward mode)."""
+
+    batch = _reflection_batch(depth=2)
+    generator = torch.Generator(device="cpu").manual_seed(47)
+    v_gain = torch.randn(3, 2, generator=generator).to("cuda") * 0.1
+    tangents = ops.field_reflection_sequence_jvp(
+        *batch.values(), frequency_hz=_FREQUENCY_HZ, tangent_gain=v_gain
+    )
+    assert float(tangents["coefficient"].abs().max()) > 0.0
+
+    def evaluate(gain: torch.Tensor) -> torch.Tensor:
+        fd_batch = dict(batch)
+        fd_batch["gain"] = gain
+        return ops.field_reflection_sequence(
+            *fd_batch.values(), frequency_hz=_FREQUENCY_HZ
+        )["coefficient"]
+
+    expected = central_difference_directional(
+        evaluate, batch["gain"], v_gain, 1.0e-2
+    )
+    assert (
+        relative_error(tangents["coefficient"], expected, abs_floor=ABS_TOL)
+        <= REL_TOL_PATH
+    )
 
 
 def test_free_space_vjp_matches_sum_of_jvp():

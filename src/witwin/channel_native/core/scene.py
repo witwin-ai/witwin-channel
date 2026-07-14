@@ -153,7 +153,9 @@ class Scene:
         # Material records are always evaluated at the primal frequency:
         # dispersive material laws are frozen at compile time (fixed material
         # records), so frequency gradients flow only through the explicit
-        # frequency dependence of the field kernels (plan 07 AD-1).
+        # frequency dependence of the field kernels (plan 07 AD-1). The AD
+        # seam therefore refuses frequency AD when any record is frequency
+        # dependent (see materials.frequency_dependent).
         frequency_value = (
             float(self.frequency.detach())
             if isinstance(self.frequency, torch.Tensor)
@@ -183,6 +185,9 @@ class Scene:
             frequency_value,
             self._material_version,
             material_cache_token,
+            frequency_dependent=_frequency_dependent_material_keys(
+                self.structures, material_records, material_keys, frequency_value
+            ),
         )
         assignments = _compile_assignments(
             self.structures,
@@ -381,12 +386,47 @@ def _material_records(
     return params, keys, cache_token, phase_screens
 
 
+def _frequency_dependent_material_keys(
+    structures: tuple[Structure, ...],
+    records: list[dict[str, object]],
+    keys: tuple[str, ...],
+    frequency_hz: float,
+) -> tuple[str, ...]:
+    """Keys of material records whose law changes with the carrier frequency.
+
+    Probe each material law at a nearby frequency and compare the compiled
+    record payload; a record that cannot even be evaluated at the probe
+    (e.g. a tabulated permittivity at its range edge) is conservatively
+    frequency-dependent. Backs the plan 07 AD-1 explicit-failure check:
+    frequency AD refuses scenes with frequency-dependent records because
+    compile() freezes records at the primal frequency.
+    """
+
+    probe_hz = float(frequency_hz) * (1.0 + 1.0e-3)
+    dependent: list[str] = []
+    for index, structure in enumerate(structures):
+        material = structure.material
+        if isinstance(material, SurfaceAssignment):
+            material = material.material
+        try:
+            probe = dict(material.parameters(probe_hz))
+            probe.update(_abi_v3_layer_view(probe))
+        except Exception:
+            dependent.append(keys[index])
+            continue
+        if probe != records[index]:
+            dependent.append(keys[index])
+    return tuple(dependent)
+
+
 def _compile_materials(
     params: list[dict[str, object]],
     material_keys: tuple[str, ...],
     frequency_hz: float,
     version: int,
     cache_token: str,
+    *,
+    frequency_dependent: tuple[str, ...] = (),
 ) -> MaterialStore:
     layer_offset: list[int] = []
     layer_count: list[int] = []
@@ -446,6 +486,7 @@ def _compile_materials(
         abi_version=MATERIAL_ABI_VERSION,
         cache_token=cache_token,
         version=version,
+        frequency_dependent=frequency_dependent,
     )
 
 

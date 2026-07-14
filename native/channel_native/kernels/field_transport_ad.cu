@@ -868,7 +868,7 @@ __global__ void transmission_sequence_backward_kernel(
                         frame.cos_theta, layers, frequency_hz, 0.0f,
                         em::kPolTM, seed);
                     float grad = adj_dot(g_t_te, te.t.d) + adj_dot(g_t_tm, tm.t.d);
-                    if (param == 0 && layer_thickness_m[slot] > 0.0f) {
+                    if (param == 0 && layer_thickness_m[slot] >= 0.0f) {
                         // Carrier phase runs over L - sum_w d_w * cos(theta_w).
                         grad += g_carrier * (-frame.cos_theta);
                     }
@@ -983,7 +983,7 @@ __global__ void transmission_sequence_jvp_kernel(
                 const int layers_in_wall = layer_count[material];
                 for (int layer = 0; layer < layers_in_wall; ++layer) {
                     const int slot = first + layer;
-                    if (layer_thickness_m[slot] > 0.0f)
+                    if (layer_thickness_m[slot] >= 0.0f)
                         d_carrier -=
                             tangent_layer_thickness[slot] * frame.cos_theta;
                 }

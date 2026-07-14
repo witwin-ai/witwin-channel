@@ -26,6 +26,7 @@ from .config import Config
 from .result import Result
 from .scattering import append_scattering_paths
 from witwin.channel_native.core.path_topology import (
+    _frequency_scalar,
     apply_receiver_layout,
     export_topology,
     receiver_positions_and_layout,
@@ -201,13 +202,17 @@ def solve(scene: Scene, config: Config) -> Result:
     )
     path_gain, field, component_power, component_fields = accumulate_path_result(
         path_result,
-        frequency_hz=float(scene.frequency),
+        frequency_hz=_frequency_scalar(scene),
         num_tx=len(scene.transmitters),
         num_rx=layout.receiver_count,
         layout=layout,
         coherent=config.coherent,
         return_field=config.return_field,
         extra_components=extra_components,
+        # AD modes route every component through the differentiable Python
+        # accumulation so Result.path_gain/field/component_power carry the
+        # complete graph; none-mode keeps the native zero-overhead kernel.
+        differentiable=config.ad_mode != "none",
     )
     exact_diffraction = None
     if (
@@ -265,7 +270,7 @@ def solve(scene: Scene, config: Config) -> Result:
         paths=(
             build_path_table(
                 path_result,
-                frequency_hz=float(scene.frequency),
+                frequency_hz=_frequency_scalar(scene),
                 include_fields=config.return_field,
             )
             if config.export_paths

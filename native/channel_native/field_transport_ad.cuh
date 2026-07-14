@@ -19,8 +19,12 @@
 //
 // including every clamp and epsilon of the primal (a clamped branch carries a
 // zero derivative, which matches what a central finite difference measures
-// away from the kink). The mirroring is pinned by the tests/ad forward-parity
-// and gradient-oracle suites; edit the primal helper and its dual TOGETHER.
+// away from the kink). At the clamp boundary itself the subgradient follows
+// the pass-through side of the forward fmaxf (gate with >=, not >), matching
+// torch's clamp_min autograd in the tests/ad complex128 oracle so parameters
+// initialized exactly at the boundary (e.g. sigma_e = 0) still receive a
+// gradient. The mirroring is pinned by the tests/ad forward-parity and
+// gradient-oracle suites; edit the primal helper and its dual TOGETHER.
 //
 // Real-pair convention: a complex cotangent g packs (dL/d out.re, dL/d out.im)
 // exactly like torch's grad for complex tensors, so the adjoint of any
@@ -198,7 +202,7 @@ __device__ __forceinline__ void slab_fresnel_dual(
     const float eps_clamped = fmaxf(eps_r, utd::UTD_SMALL_EPS);
     const float d_eps_clamped = eps_r > utd::UTD_SMALL_EPS ? d_eps : 0.0f;
     const float sigma_clamped = fmaxf(sigma_e, 0.0f);
-    const float d_sigma_clamped = sigma_e > 0.0f ? d_sigma : 0.0f;
+    const float d_sigma_clamped = sigma_e >= 0.0f ? d_sigma : 0.0f;
     const float eta_im = -sigma_clamped / (omega * utd::UTD_EPSILON_0);
     const float d_eta_im =
         (-d_sigma_clamped / omega + sigma_clamped * d_omega / (omega * omega)) /
@@ -214,7 +218,7 @@ __device__ __forceinline__ void slab_fresnel_dual(
     const DualC interface_tm = dc_div_utd(
         dc_sub(eta_ct, root), dc_add(eta_ct, root));
     const float thickness_clamped = fmaxf(thickness, 0.0f);
-    const float d_thickness_clamped = thickness > 0.0f ? d_thickness : 0.0f;
+    const float d_thickness_clamped = thickness >= 0.0f ? d_thickness : 0.0f;
     const float wavelength_clamped = fmaxf(wavelength, utd::UTD_SMALL_EPS);
     const float d_wavelength_clamped =
         wavelength > utd::UTD_SMALL_EPS ? d_wavelength : 0.0f;
@@ -274,7 +278,7 @@ __device__ __forceinline__ DualMedium make_medium_dual(
     const float eps_clamped = fmaxf(eps_r, utd::UTD_SMALL_EPS);
     const float d_eps_clamped = eps_r > utd::UTD_SMALL_EPS ? d_eps : 0.0f;
     const float sigma_clamped = fmaxf(sigma_e, 0.0f);
-    const float d_sigma_clamped = sigma_e > 0.0f ? d_sigma : 0.0f;
+    const float d_sigma_clamped = sigma_e >= 0.0f ? d_sigma : 0.0f;
     medium.eps_abs = dc_make(
         em::kVacuumPermittivity * eps_clamped,
         -sigma_clamped / safe_omega,
@@ -319,13 +323,18 @@ __device__ __forceinline__ DualInterfaceRT dc_interface_rt(DualC y1, DualC y2) {
 }
 
 // Dual of em::layer_one_way_phase (decay clamp at exponent 0; primal phasor
-// keeps its double-precision argument reduction).
+// keeps its double-precision argument reduction). The passive branch keeps
+// exponent = Im(k_z)*d <= 0, so the fminf clamp only guards float noise; at
+// the boundary itself (sigma_e = 0 or thickness = 0 both give
+// exponent == -0.0) the subgradient follows the pass-through side of the
+// fminf (gate with <=, mirroring the fmaxf >= convention above) so the decay
+// derivative survives exactly where the tests/ad oracle differentiates it.
 __device__ __forceinline__ DualC dc_layer_one_way_phase(
     DualC k_z, DualF thickness_m) {
     const float exponent = k_z.v.im * thickness_m.v;
     const float amplitude = expf(fminf(exponent, 0.0f));
     const float d_exponent = k_z.d.im * thickness_m.v + k_z.v.im * thickness_m.d;
-    const float d_amplitude = exponent < 0.0f ? amplitude * d_exponent : 0.0f;
+    const float d_amplitude = exponent <= 0.0f ? amplitude * d_exponent : 0.0f;
     const utd::Complex phasor = em::c_exp_neg_j(
         static_cast<double>(k_z.v.re) * static_cast<double>(thickness_m.v));
     const float d_theta = k_z.d.re * thickness_m.v + k_z.v.re * thickness_m.d;
@@ -403,7 +412,7 @@ __device__ __forceinline__ DualStackRT stack_rt_dual(
         const float thickness_raw = layers.layer_thickness_m[slot];
         const DualF thickness = {
             fmaxf(thickness_raw, 0.0f),
-            thickness_raw > 0.0f ? slot_seed.d_thickness : 0.0f};
+            thickness_raw >= 0.0f ? slot_seed.d_thickness : 0.0f};
         const DualC phase = dc_layer_one_way_phase(kz_below, thickness);
         const DualC phase2 = dc_mul(phase, phase);
 

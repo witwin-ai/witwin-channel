@@ -38,6 +38,10 @@ class MaterialStore:
     abi_version: int
     cache_token: str
     version: int
+    # Keys of records whose material law changes with the carrier frequency
+    # (records are frozen at the primal frequency at compile time). Consumed
+    # by the plan 07 AD-1 explicit-failure check for frequency AD.
+    frequency_dependent: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_tensor("material_id", self.material_id, dtype=torch.int32, ndim=1)
