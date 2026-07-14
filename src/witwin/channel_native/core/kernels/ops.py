@@ -2242,14 +2242,44 @@ def raydn_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...
 _RAYDN_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
 
 
+def _ad_still_wrapped(value: torch.Tensor) -> bool:
+    return torch._C._functorch.is_functorch_wrapped_tensor(
+        value
+    ) or torch._C._functorch.is_gradtrackingtensor(value)
+
+
+def _ad_raise_composed_transforms() -> None:
+    # Plan 07 section 7 contract: fail loudly instead of feeding the native
+    # kernels an unwrapped tensor that has silently lost its transform
+    # tracking (which would produce exact-zero tangents/gradients).
+    raise NotImplementedError(
+        "raydn_*_ad entry points support a single forward-mode transform"
+        " level; composed functorch transforms (e.g. torch.func.grad over"
+        " forward-mode jvp) are not supported by the native geometry kernels"
+        " (first-order only)"
+    )
+
+
 def _ad_native_tensor(value: torch.Tensor | None) -> torch.Tensor | None:
     if value is None:
         return None
+    if torch._C._functorch.maybe_get_level(value) >= 0:
+        # The tensor is functorch-wrapped. Unwrapping is only sound for a
+        # single Jvp transform (torch.func.jvp); under nested transforms or
+        # a Grad transform (e.g. torch.func.grad over forward-mode jvp, the
+        # standard HVP recipe) unwrapping would silently sever the outer
+        # transform and return exact zeros.
+        stack = torch._C._functorch.get_interpreter_stack() or []
+        if len(stack) > 1 or any(
+            entry.key() != torch._C._functorch.TransformType.Jvp
+            for entry in stack
+        ):
+            _ad_raise_composed_transforms()
     value = torch.autograd.forward_ad.unpack_dual(value).primal
-    if torch._C._functorch.is_functorch_wrapped_tensor(
-        value
-    ) or torch._C._functorch.is_gradtrackingtensor(value):
+    if _ad_still_wrapped(value):
         value = torch._C._functorch.get_unwrapped(value)
+    if _ad_still_wrapped(value):
+        _ad_raise_composed_transforms()
     return value
 
 
@@ -2258,10 +2288,97 @@ def _ad_native_tangent_or_none(value: torch.Tensor | None) -> torch.Tensor | Non
     if value is None:
         return None
     try:
+        # Efficient zero tangents (ZeroTensor) have no storage; treat them as
+        # absent so the kernels take their tangent-free fast path.
         value.data_ptr()
     except RuntimeError:
         return None
     return value
+
+
+def _ad_checked_tangent(
+    name: str,
+    tangent: torch.Tensor | None,
+    primal_shape: tuple[int, ...],
+) -> torch.Tensor | None:
+    """Validate an unwrapped jvp tangent against its primal contract.
+
+    Strided tangents are passed through unchanged: the native kernels consume
+    explicit strides, so no Python-side layout copy or staging is needed.
+    """
+
+    if tangent is None:
+        return None
+    if tuple(tangent.shape) != tuple(primal_shape):
+        raise ValueError(
+            f"{name} must match its primal shape {tuple(primal_shape)};"
+            f" got {tuple(tangent.shape)}"
+        )
+    if tangent.dtype != torch.float32:
+        raise TypeError(f"{name} must have dtype torch.float32")
+    if not tangent.is_cuda:
+        raise ValueError(f"{name} must be a CUDA tensor")
+    return tangent
+
+
+def _ad_check_rows(name: str, tensor: torch.Tensor, rows: int) -> None:
+    if tensor.shape[0] != rows:
+        raise ValueError(f"{name} must have {rows} rows to match the ray batch")
+
+
+def _ad_check_active(active: torch.Tensor | None, rows: int) -> None:
+    if active is None:
+        return
+    validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
+    if active.shape[0] not in (0, rows):
+        raise ValueError("active must be empty or match the ray batch size")
+
+
+def _ad_check_optional_grad(
+    name: str,
+    grad: torch.Tensor | None,
+    allowed_shapes: tuple[tuple[int, ...], ...],
+) -> None:
+    # Cotangents from autograd may be strided views; the native kernels
+    # consume explicit strides, so contiguity is deliberately not required.
+    if grad is None:
+        return
+    if not isinstance(grad, torch.Tensor):
+        raise TypeError(f"{name} must be a torch.Tensor")
+    if grad.dtype != torch.float32:
+        raise TypeError(f"{name} must have dtype torch.float32")
+    if not grad.is_cuda:
+        raise ValueError(f"{name} must be a CUDA tensor")
+    if tuple(grad.shape) not in allowed_shapes:
+        raise ValueError(
+            f"{name} must have shape in {allowed_shapes}; got {tuple(grad.shape)}"
+        )
+
+
+def _ad_check_tangent_vec3(
+    name: str,
+    tangent: torch.Tensor | None,
+    rows: int | None,
+) -> None:
+    """Validate a facade-level jvp tangent.
+
+    ``rows=None`` checks only the ``(V, 3)`` layout; the native entry point
+    enforces that a vertex tangent matches the scene's global vertex table.
+    Strided tangents are allowed: the native kernels consume explicit strides.
+    """
+
+    if tangent is None:
+        return
+    if not isinstance(tangent, torch.Tensor):
+        raise TypeError(f"{name} must be a torch.Tensor")
+    if tangent.dtype != torch.float32:
+        raise TypeError(f"{name} must have dtype torch.float32")
+    if not tangent.is_cuda:
+        raise ValueError(f"{name} must be a CUDA tensor")
+    if tangent.ndim != 2 or tangent.shape[1] != 3:
+        raise ValueError(f"{name} must have shape (N, 3)")
+    if rows is not None and tangent.shape[0] != rows:
+        raise ValueError(f"{name} must have {rows} rows to match the ray batch")
 
 
 def _ad_active_ctx(active: torch.Tensor | None, like: torch.Tensor) -> torch.Tensor:
@@ -2301,6 +2418,23 @@ def raydn_intersect_backward(
     validate_cuda_tensor(
         "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
     )
+    rows = int(ray_o.shape[0])
+    _ad_check_rows("ray_d", ray_d, rows)
+    if ray_tmax.shape[0] not in (0, rows):
+        raise ValueError("ray_tmax must be empty or match the ray batch size")
+    _ad_check_active(active, rows)
+    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
+    # An empty barycentric tape selects the native width-0 recompute path.
+    if tape_barycentric.shape[0] not in (0, rows):
+        raise ValueError("tape_barycentric must be empty or match the ray batch size")
+    if tape_barycentric.shape[0] and tape_barycentric.shape[1] not in (2, 3):
+        raise ValueError("tape_barycentric last dimension must be 2 or 3")
+    _ad_check_optional_grad("grad_t", grad_t, ((rows,),))
+    _ad_check_optional_grad("grad_p", grad_p, ((rows, 3),))
+    _ad_check_optional_grad("grad_n", grad_n, ((rows, 3),))
+    _ad_check_optional_grad("grad_geo_n", grad_geo_n, ((rows, 3),))
+    _ad_check_optional_grad("grad_uv", grad_uv, ((rows, 2),))
+    _ad_check_optional_grad("grad_barycentric", grad_barycentric, ((rows, 3),))
     out = _required_native_op("raydn_intersect_backward")(
         _raydn_scene_handle_id(handle),
         ray_o,
@@ -2351,6 +2485,19 @@ def raydn_intersect_jvp(
     validate_cuda_tensor(
         "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
     )
+    rows = int(ray_o.shape[0])
+    _ad_check_rows("ray_d", ray_d, rows)
+    _ad_check_active(active, rows)
+    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
+    # The native jvp kernel has no width-0 recompute path: the barycentric
+    # tape must cover the full ray batch (unlike backward, which accepts an
+    # empty tape).
+    _ad_check_rows("tape_barycentric", tape_barycentric, rows)
+    if rows and tape_barycentric.shape[1] not in (2, 3):
+        raise ValueError("tape_barycentric last dimension must be 2 or 3")
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    _ad_check_tangent_vec3("tangent_ray_o", tangent_ray_o, rows)
+    _ad_check_tangent_vec3("tangent_ray_d", tangent_ray_d, rows)
     out = _required_native_op("raydn_intersect_jvp")(
         _raydn_scene_handle_id(handle),
         ray_o,
@@ -2428,6 +2575,31 @@ def raydn_trace_reflections_backward(
         ndim=3,
         trailing_shape=(3,),
     )
+    validate_cuda_tensor("ray_tmax", ray_tmax, dtype=torch.float32, ndim=1)
+    rows = int(ray_o.shape[0])
+    _ad_check_rows("ray_d", ray_d, rows)
+    if ray_tmax.shape[0] not in (0, rows):
+        raise ValueError("ray_tmax must be empty or match the ray batch size")
+    _ad_check_active(active, rows)
+    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
+    bounces = int(tape_prim_id.shape[1])
+    if tuple(tape_barycentric.shape[:2]) != (rows, bounces) or tape_barycentric.shape[
+        2
+    ] not in (2, 3):
+        raise ValueError(
+            f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)"
+        )
+    for name, value in (
+        ("tape_hit_points", tape_hit_points),
+        ("tape_normals", tape_normals),
+        ("image_sources", image_sources),
+    ):
+        if tuple(value.shape) != (rows, bounces, 3):
+            raise ValueError(f"{name} must have shape ({rows}, {bounces}, 3)")
+    _ad_check_optional_grad("grad_t", grad_t, ((rows,), (rows, bounces)))
+    _ad_check_optional_grad(
+        "grad_image_sources", grad_image_sources, ((rows, bounces, 3),)
+    )
     out = _required_native_op("raydn_trace_reflections_backward")(
         _raydn_scene_handle_id(handle),
         ray_o,
@@ -2475,6 +2647,44 @@ def raydn_trace_reflections_jvp(
     validate_cuda_tensor(
         "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=3
     )
+    validate_cuda_tensor(
+        "tape_hit_points",
+        tape_hit_points,
+        dtype=torch.float32,
+        ndim=3,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor(
+        "tape_normals", tape_normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "image_sources",
+        image_sources,
+        dtype=torch.float32,
+        ndim=3,
+        trailing_shape=(3,),
+    )
+    rows = int(ray_o.shape[0])
+    _ad_check_rows("ray_d", ray_d, rows)
+    _ad_check_active(active, rows)
+    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
+    bounces = int(tape_prim_id.shape[1])
+    if tuple(tape_barycentric.shape[:2]) != (rows, bounces) or tape_barycentric.shape[
+        2
+    ] not in (2, 3):
+        raise ValueError(
+            f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)"
+        )
+    for name, value in (
+        ("tape_hit_points", tape_hit_points),
+        ("tape_normals", tape_normals),
+        ("image_sources", image_sources),
+    ):
+        if tuple(value.shape) != (rows, bounces, 3):
+            raise ValueError(f"{name} must have shape ({rows}, {bounces}, 3)")
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    _ad_check_tangent_vec3("tangent_ray_o", tangent_ray_o, rows)
+    _ad_check_tangent_vec3("tangent_ray_d", tangent_ray_d, rows)
     out = _required_native_op("raydn_trace_reflections_jvp")(
         _raydn_scene_handle_id(handle),
         ray_o,
@@ -2541,6 +2751,16 @@ def raydn_refl_epc_backward(
     need_grad_source: bool = False,
     need_grad_receiver: bool = False,
 ) -> tuple[torch.Tensor | None, ...]:
+    """Raw RayD EPC backward kernel entry (kernel contract, not EM physics).
+
+    The field cotangents (``grad_field_real``/``grad_field_imag``) are
+    consumed by RayD's toy analytic field contract ``cos(t)/(1+t)`` /
+    ``sin(t)/(1+t)``, which does not match the EM field computed by
+    ``raydn_refl_epc_field_forward``; only ``grad_path_length`` maps to real
+    geometry. Production AD goes through :func:`raydn_refl_epc_field_ad`,
+    which withholds field gradients.
+    """
+
     validate_cuda_tensor(
         "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -2552,6 +2772,17 @@ def raydn_refl_epc_backward(
         "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
     )
     validate_cuda_tensor("tape_t", tape_t, dtype=torch.float32, ndim=1)
+    rows = int(source.shape[0])
+    _ad_check_rows("receiver", receiver, rows)
+    _ad_check_active(active, rows)
+    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
+    _ad_check_rows("tape_barycentric", tape_barycentric, rows)
+    if rows and tape_barycentric.shape[1] not in (2, 3):
+        raise ValueError("tape_barycentric last dimension must be 2 or 3")
+    _ad_check_rows("tape_t", tape_t, rows)
+    _ad_check_optional_grad("grad_field_real", grad_field_real, ((rows,),))
+    _ad_check_optional_grad("grad_field_imag", grad_field_imag, ((rows,),))
+    _ad_check_optional_grad("grad_path_length", grad_path_length, ((rows,),))
     out = _required_native_op("raydn_refl_epc_backward")(
         _raydn_scene_handle_id(handle),
         source,
@@ -2588,6 +2819,14 @@ def raydn_refl_epc_jvp(
     tangent_source: torch.Tensor | None = None,
     tangent_receiver: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, ...]:
+    """Raw RayD EPC jvp kernel entry (kernel contract, not EM physics).
+
+    The returned field tangents follow RayD's toy analytic field contract
+    (see :func:`raydn_refl_epc_backward`); only the path-length tangent maps
+    to real geometry. Production AD goes through
+    :func:`raydn_refl_epc_field_ad`, which withholds field tangents.
+    """
+
     validate_cuda_tensor(
         "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -2599,6 +2838,17 @@ def raydn_refl_epc_jvp(
         "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
     )
     validate_cuda_tensor("tape_t", tape_t, dtype=torch.float32, ndim=1)
+    rows = int(source.shape[0])
+    _ad_check_rows("receiver", receiver, rows)
+    _ad_check_active(active, rows)
+    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
+    _ad_check_rows("tape_barycentric", tape_barycentric, rows)
+    if rows and tape_barycentric.shape[1] not in (2, 3):
+        raise ValueError("tape_barycentric last dimension must be 2 or 3")
+    _ad_check_rows("tape_t", tape_t, rows)
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    _ad_check_tangent_vec3("tangent_source", tangent_source, rows)
+    _ad_check_tangent_vec3("tangent_receiver", tangent_receiver, rows)
     out = _required_native_op("raydn_refl_epc_jvp")(
         _raydn_scene_handle_id(handle),
         source,
@@ -2659,6 +2909,7 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(shape_id, prim_id, local_prim_id, global_prim_id)
 
     @staticmethod
+    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None, None, None, None, None, None)
         if all(value is None for value in grad_outputs[:6]):
@@ -2727,9 +2978,21 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
                 _ad_native_tensor(active_ctx),
                 _ad_native_tensor(tape_prim_id),
                 _ad_native_tensor(tape_barycentric),
-                tangent_vertices=_ad_native_tangent_or_none(grad_vertices),
-                tangent_ray_o=_ad_native_tangent_or_none(grad_ray_o),
-                tangent_ray_d=_ad_native_tangent_or_none(grad_ray_d),
+                tangent_vertices=_ad_checked_tangent(
+                    "raydn_intersect_ad tangent_vertices",
+                    _ad_native_tangent_or_none(grad_vertices),
+                    ctx.vertices_shape,
+                ),
+                tangent_ray_o=_ad_checked_tangent(
+                    "raydn_intersect_ad tangent_ray_o",
+                    _ad_native_tangent_or_none(grad_ray_o),
+                    tuple(ray_o.shape),
+                ),
+                tangent_ray_d=_ad_checked_tangent(
+                    "raydn_intersect_ad tangent_ray_d",
+                    _ad_native_tangent_or_none(grad_ray_d),
+                    tuple(ray_d.shape),
+                ),
                 flags=_RAYDN_RAY_FLAGS_ALL,
             )
         return (*values, None, None, None, None)
@@ -2838,6 +3101,7 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
+    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None, None, None, None, None, None, None)
         grad_t = grad_outputs[1]
@@ -2929,9 +3193,21 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
                 _ad_native_tensor(tape_hit_points),
                 _ad_native_tensor(tape_normals),
                 _ad_native_tensor(image_sources),
-                tangent_vertices=_ad_native_tangent_or_none(grad_vertices),
-                tangent_ray_o=_ad_native_tangent_or_none(grad_ray_o),
-                tangent_ray_d=_ad_native_tangent_or_none(grad_ray_d),
+                tangent_vertices=_ad_checked_tangent(
+                    "raydn_trace_reflections_ad tangent_vertices",
+                    _ad_native_tangent_or_none(grad_vertices),
+                    ctx.vertices_shape,
+                ),
+                tangent_ray_o=_ad_checked_tangent(
+                    "raydn_trace_reflections_ad tangent_ray_o",
+                    _ad_native_tangent_or_none(grad_ray_o),
+                    tuple(ray_o.shape),
+                ),
+                tangent_ray_d=_ad_checked_tangent(
+                    "raydn_trace_reflections_ad tangent_ray_d",
+                    _ad_native_tangent_or_none(grad_ray_d),
+                    tuple(ray_d.shape),
+                ),
             )
         return (None, tangent_t, tangent_image_sources, None, None, None, None)
 
@@ -2976,7 +3252,16 @@ def raydn_trace_reflections_ad(
 
 
 class _RaydnReflEpcFieldAdFunction(torch.autograd.Function):
-    """Fixed-winner differentiable RayDN reflection EPC field over the C bridge."""
+    """Fixed-winner differentiable RayDN reflection EPC path length over the C bridge.
+
+    ``field_real``/``field_imag`` are marked non-differentiable: upstream
+    RayD pairs a real EM forward (Fresnel reflection chain at unit
+    wavelength) with backward/jvp kernels that differentiate a toy analytic
+    contract ``cos(t)/(1+t)`` / ``sin(t)/(1+t)`` unrelated to that forward,
+    so field AD is withheld until upstream reconciles the two. The
+    ``path_length`` derivatives are real geometry math (FD-validated) and
+    stay differentiable.
+    """
 
     @staticmethod
     def forward(scene_handle, vertices, source, receiver, active, max_bounces):
@@ -3013,8 +3298,8 @@ class _RaydnReflEpcFieldAdFunction(torch.autograd.Function):
         ctx.set_materialize_grads(False)
         scene_handle, vertices, source, receiver, active, _max_bounces = inputs
         (
-            _field_real,
-            _field_imag,
+            field_real,
+            field_imag,
             path_length,
             valid,
             resolved_prim_id,
@@ -3035,21 +3320,20 @@ class _RaydnReflEpcFieldAdFunction(torch.autograd.Function):
         ctx.save_for_forward(
             source, receiver, active_ctx, tape_prim_id, tape_barycentric, path_length
         )
+        # field_real/field_imag are non-differentiable outputs (see class
+        # docstring): upstream RayD's EPC field backward implements a toy
+        # analytic contract that does not match its EM forward.
         ctx.mark_non_differentiable(
-            valid, resolved_prim_id, tape_prim_id, tape_barycentric
+            field_real, field_imag, valid, resolved_prim_id, tape_prim_id,
+            tape_barycentric,
         )
 
     @staticmethod
+    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None, None, None, None, None, None)
-        grad_field_real = grad_outputs[0]
-        grad_field_imag = grad_outputs[1]
         grad_path_length = grad_outputs[2]
-        if (
-            grad_field_real is None
-            and grad_field_imag is None
-            and grad_path_length is None
-        ):
+        if grad_path_length is None:
             return none_grads
         (
             source,
@@ -3072,8 +3356,8 @@ class _RaydnReflEpcFieldAdFunction(torch.autograd.Function):
             tape_prim_id,
             tape_barycentric,
             tape_t,
-            grad_field_real=grad_field_real,
-            grad_field_imag=grad_field_imag,
+            grad_field_real=None,
+            grad_field_imag=None,
             grad_path_length=grad_path_length,
             need_grad_vertices=need_grad_vertices,
             need_grad_source=need_grad_source,
@@ -3120,14 +3404,28 @@ class _RaydnReflEpcFieldAdFunction(torch.autograd.Function):
                 _ad_native_tensor(tape_prim_id),
                 _ad_native_tensor(tape_barycentric),
                 _ad_native_tensor(tape_t),
-                tangent_vertices=_ad_native_tangent_or_none(grad_vertices),
-                tangent_source=_ad_native_tangent_or_none(grad_source),
-                tangent_receiver=_ad_native_tangent_or_none(grad_receiver),
+                tangent_vertices=_ad_checked_tangent(
+                    "raydn_refl_epc_field_ad tangent_vertices",
+                    _ad_native_tangent_or_none(grad_vertices),
+                    ctx.vertices_shape,
+                ),
+                tangent_source=_ad_checked_tangent(
+                    "raydn_refl_epc_field_ad tangent_source",
+                    _ad_native_tangent_or_none(grad_source),
+                    tuple(source.shape),
+                ),
+                tangent_receiver=_ad_checked_tangent(
+                    "raydn_refl_epc_field_ad tangent_receiver",
+                    _ad_native_tangent_or_none(grad_receiver),
+                    tuple(receiver.shape),
+                ),
             )
-        tangent_field_real, tangent_field_imag, tangent_path_length = tangents
+        _tangent_field_real, _tangent_field_imag, tangent_path_length = tangents
+        # field tangents are withheld: field_real/field_imag are
+        # non-differentiable outputs (see class docstring).
         return (
-            tangent_field_real,
-            tangent_field_imag,
+            None,
+            None,
             tangent_path_length,
             None,
             None,
@@ -3155,12 +3453,17 @@ def raydn_refl_epc_field_ad(
     active: torch.Tensor | None,
     max_bounces: int,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable RayDN reflection EPC field under the fixed-winner contract.
+    """Differentiable RayDN reflection EPC path length under the fixed-winner contract.
 
-    ``field_real``/``field_imag``/``path_length`` participate in reverse- and
-    forward-mode torch AD with respect to ``vertices``, ``source`` and
-    ``receiver``; the winner primitive and barycentric tape stay detached.
-    The field uses RayD's unit-wavelength EPC convention.
+    ``path_length`` participates in reverse- and forward-mode torch AD with
+    respect to ``vertices``, ``source`` and ``receiver``; the winner
+    primitive and barycentric tape stay detached. ``field_real`` and
+    ``field_imag`` are returned as non-differentiable values (RayD's
+    unit-wavelength EPC convention): upstream RayD's EPC field backward/jvp
+    kernels differentiate a toy analytic contract that does not match the
+    EM field its forward computes, so field AD is withheld until upstream
+    reconciles the two. A loss built only from the field outputs therefore
+    fails loudly instead of receiving wrong gradients.
     """
 
     values = _RaydnReflEpcFieldAdFunction.apply(
