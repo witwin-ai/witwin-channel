@@ -1546,6 +1546,47 @@ pybind11::dict cn_deterministic_accumulate_flat(
     int64_t num_tx,
     int64_t num_rx,
     bool coherent);
+pybind11::dict cn_deterministic_accumulate_flat_fwd64(
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor component_id,
+    torch::Tensor path_gain,
+    torch::Tensor field_real,
+    torch::Tensor field_imag,
+    int64_t num_tx,
+    int64_t num_rx,
+    bool coherent);
+pybind11::dict cn_deterministic_accumulate_flat_backward(
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor component_id,
+    torch::Tensor component_field_real,
+    torch::Tensor component_field_imag,
+    torch::Tensor field_total_real,
+    torch::Tensor field_total_imag,
+    torch::Tensor power_total,
+    pybind11::object grad_power_total,
+    pybind11::object grad_field_total_real,
+    pybind11::object grad_field_total_imag,
+    pybind11::object grad_component_power,
+    pybind11::object grad_component_field_real,
+    pybind11::object grad_component_field_imag,
+    int64_t num_tx,
+    int64_t num_rx,
+    bool coherent);
+pybind11::dict cn_deterministic_accumulate_flat_jvp(
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor component_id,
+    torch::Tensor component_field_real,
+    torch::Tensor component_field_imag,
+    torch::Tensor power_total,
+    pybind11::object tangent_path_gain,
+    pybind11::object tangent_field_real,
+    pybind11::object tangent_field_imag,
+    int64_t num_tx,
+    int64_t num_rx,
+    bool coherent);
 pybind11::dict cn_deterministic_component_counts(torch::Tensor component_id);
 int64_t cn_deterministic_selected_edge_count(torch::Tensor edge_id);
 
@@ -2232,4 +2273,16 @@ PYBIND11_MODULE(_channel_native, module) {
         "deterministic_accumulate_flat",
         &cn_deterministic_accumulate_flat,
         "Accumulate deterministic flat path fields into per-component maps with a CUDA kernel.");
+    module.def(
+        "deterministic_accumulate_flat_fwd64",
+        &cn_deterministic_accumulate_flat_fwd64,
+        "Float64 flat accumulation forward for the strict gradcheck AD path.");
+    module.def(
+        "deterministic_accumulate_flat_backward",
+        &cn_deterministic_accumulate_flat_backward,
+        "Fixed-gate VJP of the flat accumulation (per-path field and power cotangents).");
+    module.def(
+        "deterministic_accumulate_flat_jvp",
+        &cn_deterministic_accumulate_flat_jvp,
+        "Fixed-gate JVP of the flat accumulation (per-path field and power tangents).");
 }
