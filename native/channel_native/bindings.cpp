@@ -434,6 +434,8 @@ pybind11::dict cn_field_free_space_backward(
     pybind11::object grad_coefficient,
     pybind11::object grad_path_field,
     pybind11::object grad_path_gain,
+    pybind11::object grad_path_length,
+    pybind11::object grad_delay,
     bool need_grad_frequency,
     bool need_grad_geometry);
 pybind11::dict cn_field_free_space_jvp(
@@ -443,7 +445,9 @@ pybind11::dict cn_field_free_space_jvp(
     torch::Tensor tx_polarization,
     torch::Tensor rx_polarization,
     double frequency_hz,
-    double tangent_frequency);
+    double tangent_frequency,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target);
 pybind11::dict cn_field_reflection_sequence_backward(
     torch::Tensor source,
     torch::Tensor target,
@@ -462,6 +466,8 @@ pybind11::dict cn_field_reflection_sequence_backward(
     pybind11::object grad_coefficient,
     pybind11::object grad_path_field,
     pybind11::object grad_path_gain,
+    pybind11::object grad_path_length,
+    pybind11::object grad_delay,
     bool need_grad_eps_r,
     bool need_grad_sigma_e,
     bool need_grad_gain,
@@ -486,7 +492,11 @@ pybind11::dict cn_field_reflection_sequence_jvp(
     pybind11::object tangent_sigma_e,
     pybind11::object tangent_gain,
     pybind11::object tangent_thickness,
-    double tangent_frequency);
+    double tangent_frequency,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target,
+    pybind11::object tangent_interaction_positions,
+    pybind11::object tangent_interaction_normals);
 pybind11::dict cn_field_transmission_sequence_backward(
     torch::Tensor source,
     torch::Tensor target,
@@ -508,6 +518,8 @@ pybind11::dict cn_field_transmission_sequence_backward(
     pybind11::object grad_coefficient,
     pybind11::object grad_path_field,
     pybind11::object grad_path_gain,
+    pybind11::object grad_path_length,
+    pybind11::object grad_delay,
     bool need_grad_layer_thickness,
     bool need_grad_layer_eps_r,
     bool need_grad_layer_sigma_e,
@@ -533,7 +545,11 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     pybind11::object tangent_layer_thickness_m,
     pybind11::object tangent_layer_eps_r,
     pybind11::object tangent_layer_sigma_e,
-    double tangent_frequency);
+    double tangent_frequency,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target,
+    pybind11::object tangent_interaction_positions,
+    pybind11::object tangent_interaction_normals);
 pybind11::dict cn_field_coupled_rd(
     torch::Tensor source,
     torch::Tensor target,
@@ -1428,27 +1444,27 @@ PYBIND11_MODULE(_channel_native, module) {
     module.def(
         "field_free_space_backward",
         &cn_field_free_space_backward,
-        "Fixed-topology VJP of the free-space field (frequency in AD-1).");
+        "Fixed-topology VJP of the free-space field (frequency and endpoints).");
     module.def(
         "field_free_space_jvp",
         &cn_field_free_space_jvp,
-        "Fixed-topology JVP of the free-space field (frequency in AD-1).");
+        "Fixed-topology JVP of the free-space field (frequency and endpoints).");
     module.def(
         "field_reflection_sequence_backward",
         &cn_field_reflection_sequence_backward,
-        "Fixed-topology VJP of the reflection sequence (materials and frequency).");
+        "Fixed-topology VJP of the reflection sequence (materials, frequency, geometry).");
     module.def(
         "field_reflection_sequence_jvp",
         &cn_field_reflection_sequence_jvp,
-        "Fixed-topology JVP of the reflection sequence (materials and frequency).");
+        "Fixed-topology JVP of the reflection sequence (materials, frequency, geometry).");
     module.def(
         "field_transmission_sequence_backward",
         &cn_field_transmission_sequence_backward,
-        "Fixed-topology VJP of the transmission sequence (CSR layers and frequency).");
+        "Fixed-topology VJP of the transmission sequence (CSR layers, frequency, geometry).");
     module.def(
         "field_transmission_sequence_jvp",
         &cn_field_transmission_sequence_jvp,
-        "Fixed-topology JVP of the transmission sequence (CSR layers and frequency).");
+        "Fixed-topology JVP of the transmission sequence (CSR layers, frequency, geometry).");
     module.def(
         "bdpt_reflection_accumulation_forward",
         &cn_bdpt_reflection_accumulation_forward,

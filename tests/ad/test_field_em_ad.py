@@ -746,26 +746,38 @@ def test_forward_dual_free_space_matches_native_jvp():
 # ---------------------------------------------------------------------------
 
 
-def test_geometry_gradients_fail_loudly():
+def test_fixed_inputs_fail_loudly():
+    """tx_power and the polarizations stay fixed under AD-2 (plan 07)."""
+
     batch = _free_space_batch()
-    source = batch["source"].clone().requires_grad_(True)
+    tx_power = batch["tx_power"].clone().requires_grad_(True)
     out = ops.field_free_space_ad(
-        source,
+        batch["source"],
         batch["target"],
-        batch["tx_power"],
+        tx_power,
         batch["tx_polarization"],
         batch["rx_polarization"],
         frequency=_FREQUENCY_HZ,
     )
-    with pytest.raises(NotImplementedError, match="source"):
+    with pytest.raises(NotImplementedError, match="tx_power"):
         out["coefficient"].real.sum().backward()
 
     reflection = _reflection_batch(depth=1)
-    positions = reflection["interaction_positions"].clone().requires_grad_(True)
+    tx_pol = reflection["tx_polarization"].clone().requires_grad_(True)
     ad_batch = dict(reflection)
-    ad_batch["interaction_positions"] = positions
+    ad_batch["tx_polarization"] = tx_pol
     out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
-    with pytest.raises(NotImplementedError, match="interaction_positions"):
+    with pytest.raises(NotImplementedError, match="tx_polarization"):
+        out["coefficient"].real.sum().backward()
+
+    transmission = _transmission_batch()
+    rx_pol = transmission["rx_polarization"].clone().requires_grad_(True)
+    ad_batch = dict(transmission)
+    ad_batch["rx_polarization"] = rx_pol
+    out = ops.field_transmission_sequence_ad(
+        *ad_batch.values(), frequency=_FREQUENCY_HZ
+    )
+    with pytest.raises(NotImplementedError, match="rx_polarization"):
         out["coefficient"].real.sum().backward()
 
 
@@ -833,3 +845,503 @@ def test_composed_functorch_transforms_raise():
 
     with pytest.raises(NotImplementedError):
         torch.func.grad(jvp_scalar)(batch["eps_r"])
+
+
+# ---------------------------------------------------------------------------
+# Geometry gradients (plan 07 AD-2): source / target / interaction_positions /
+# interaction_normals against the complex128 reference oracle, forward-mode
+# tangents against the oracle jvp, inner-product duality on geometry seeds,
+# and the differentiable path_length_m / delay_s outputs.
+# ---------------------------------------------------------------------------
+
+_FREE_SPACE_GEOMETRY = ("source", "target")
+_REFLECTION_GEOMETRY = (
+    "source",
+    "target",
+    "interaction_positions",
+    "interaction_normals",
+)
+_TRANSMISSION_GEOMETRY = ("source", "target", "interaction_normals")
+
+
+def _reference_reflection_length(batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    previous = batch["source"]
+    depth = batch["interaction_positions"].shape[1]
+    total = torch.zeros(
+        batch["source"].shape[0], dtype=torch.float64, device="cuda"
+    )
+    for bounce in range(depth):
+        hit = batch["interaction_positions"][:, bounce]
+        total = total + torch.linalg.vector_norm(hit - previous, dim=-1)
+        previous = hit
+    return total + torch.linalg.vector_norm(batch["target"] - previous, dim=-1)
+
+
+def test_free_space_geometry_vjp_matches_reference_oracle():
+    batch = _free_space_batch()
+    weights = _loss_weights(4, seed=71)
+    leaves = {}
+    ad_batch = dict(batch)
+    for name in _FREE_SPACE_GEOMETRY:
+        leaves[name] = batch[name].clone().requires_grad_(True)
+        ad_batch[name] = leaves[name]
+    out = ops.field_free_space_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
+    loss.backward()
+
+    reference_batch = _reference_inputs(batch)
+    reference_leaves = {}
+    for name in _FREE_SPACE_GEOMETRY:
+        reference_leaves[name] = reference_batch[name].clone().requires_grad_(True)
+        reference_batch[name] = reference_leaves[name]
+    reference = free_space_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    reference_loss = _real_pair_loss(reference["coefficient"], weights)
+    reference_loss = reference_loss + reference["path_gain"].sum()
+    expected = torch.autograd.grad(reference_loss, tuple(reference_leaves.values()))
+    for (name, leaf), expected_grad in zip(leaves.items(), expected, strict=True):
+        assert leaf.grad is not None, name
+        assert (
+            relative_error(leaf.grad, expected_grad, abs_floor=ABS_TOL) <= REL_TOL_PATH
+        ), name
+
+
+@pytest.mark.parametrize("depth", [1, 2])
+def test_reflection_geometry_vjp_matches_reference_oracle(depth):
+    batch = _reflection_batch(depth=depth)
+    weights = _loss_weights(3, seed=73)
+    leaves = {}
+    ad_batch = dict(batch)
+    for name in _REFLECTION_GEOMETRY:
+        leaves[name] = batch[name].clone().requires_grad_(True)
+        ad_batch[name] = leaves[name]
+    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
+    loss.backward()
+
+    reference_batch = _reference_inputs(batch)
+    reference_leaves = {}
+    for name in _REFLECTION_GEOMETRY:
+        reference_leaves[name] = reference_batch[name].clone().requires_grad_(True)
+        reference_batch[name] = reference_leaves[name]
+    reference = reflection_sequence_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    reference_loss = _real_pair_loss(reference["coefficient"], weights)
+    reference_loss = reference_loss + reference["path_gain"].sum()
+    expected = torch.autograd.grad(reference_loss, tuple(reference_leaves.values()))
+    for (name, leaf), expected_grad in zip(leaves.items(), expected, strict=True):
+        assert leaf.grad is not None, name
+        assert (
+            relative_error(leaf.grad, expected_grad, abs_floor=ABS_TOL) <= REL_TOL_PATH
+        ), name
+
+
+def test_transmission_geometry_vjp_matches_reference_oracle():
+    batch = _transmission_batch()
+    weights = _loss_weights(2, seed=79)
+    leaves = {}
+    ad_batch = dict(batch)
+    for name in _TRANSMISSION_GEOMETRY:
+        leaves[name] = batch[name].clone().requires_grad_(True)
+        ad_batch[name] = leaves[name]
+    # The crossing points do not enter the straight-path field; their
+    # gradient is exactly zero (delivered as None by the Function).
+    positions = batch["interaction_positions"].clone().requires_grad_(True)
+    ad_batch["interaction_positions"] = positions
+    out = ops.field_transmission_sequence_ad(
+        *ad_batch.values(), frequency=_FREQUENCY_HZ
+    )
+    loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
+    loss.backward()
+    assert positions.grad is None or float(positions.grad.abs().max()) == 0.0
+
+    reference_batch = _reference_inputs(batch)
+    del reference_batch["interaction_positions"]
+    reference_leaves = {}
+    for name in _TRANSMISSION_GEOMETRY:
+        reference_leaves[name] = reference_batch[name].clone().requires_grad_(True)
+        reference_batch[name] = reference_leaves[name]
+    reference = transmission_sequence_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    reference_loss = _real_pair_loss(reference["coefficient"], weights)
+    reference_loss = reference_loss + reference["path_gain"].sum()
+    expected = torch.autograd.grad(reference_loss, tuple(reference_leaves.values()))
+    for (name, leaf), expected_grad in zip(leaves.items(), expected, strict=True):
+        assert leaf.grad is not None, name
+        assert (
+            relative_error(leaf.grad, expected_grad, abs_floor=ABS_TOL) <= REL_TOL_PATH
+        ), name
+
+
+def test_free_space_geometry_jvp_matches_reference_oracle():
+    batch = _free_space_batch()
+    generator = torch.Generator(device="cpu").manual_seed(83)
+    v_source = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
+    v_target = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
+    tangents = ops.field_free_space_jvp(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        tangent_frequency=0.0,
+        tangent_source=v_source,
+        tangent_target=v_target,
+    )
+    reference_batch = _reference_inputs(batch)
+
+    def f(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        local = dict(reference_batch)
+        local["source"] = source
+        local["target"] = target
+        return free_space_reference(
+            **local,
+            frequency=torch.tensor(
+                _FREQUENCY_HZ, dtype=torch.float64, device="cuda"
+            ),
+        )["coefficient"]
+
+    _, expected = torch.func.jvp(
+        f,
+        (reference_batch["source"], reference_batch["target"]),
+        (v_source.double(), v_target.double()),
+    )
+    assert (
+        relative_error(tangents["coefficient"], expected, abs_floor=ABS_TOL)
+        <= REL_TOL_PATH
+    )
+
+
+@pytest.mark.parametrize("depth", [1, 2])
+def test_reflection_geometry_jvp_matches_reference_oracle(depth):
+    batch = _reflection_batch(depth=depth)
+    generator = torch.Generator(device="cpu").manual_seed(89)
+    seeds = {
+        "tangent_source": (torch.randn(3, 3, generator=generator) * 0.01).cuda(),
+        "tangent_target": (torch.randn(3, 3, generator=generator) * 0.01).cuda(),
+        "tangent_interaction_positions": (
+            torch.randn(3, depth, 3, generator=generator) * 0.01
+        ).cuda(),
+        "tangent_interaction_normals": (
+            torch.randn(3, depth, 3, generator=generator) * 0.01
+        ).cuda(),
+    }
+    tangents = ops.field_reflection_sequence_jvp(
+        *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
+    )
+    assert float(tangents["coefficient"].abs().max()) > 0.0
+    reference_batch = _reference_inputs(batch)
+
+    def f(source, target, positions, normals) -> torch.Tensor:
+        local = dict(reference_batch)
+        local["source"] = source
+        local["target"] = target
+        local["interaction_positions"] = positions
+        local["interaction_normals"] = normals
+        return reflection_sequence_reference(
+            **local,
+            frequency=torch.tensor(
+                _FREQUENCY_HZ, dtype=torch.float64, device="cuda"
+            ),
+        )["coefficient"]
+
+    _, expected = torch.func.jvp(
+        f,
+        (
+            reference_batch["source"],
+            reference_batch["target"],
+            reference_batch["interaction_positions"],
+            reference_batch["interaction_normals"],
+        ),
+        (
+            seeds["tangent_source"].double(),
+            seeds["tangent_target"].double(),
+            seeds["tangent_interaction_positions"].double(),
+            seeds["tangent_interaction_normals"].double(),
+        ),
+    )
+    assert (
+        relative_error(tangents["coefficient"], expected, abs_floor=ABS_TOL)
+        <= REL_TOL_PATH
+    )
+
+
+def test_transmission_geometry_jvp_matches_reference_oracle():
+    """Native geometry jvp against the oracle through random projections.
+
+    The transmission reference reads discrete winner data with Python scalar
+    conversions, so instead of torch.func.jvp the oracle directional
+    derivative is evaluated as <grad(loss_u), v> for a random output
+    projection u; the native side is the same projection of the jvp output.
+    """
+
+    batch = _transmission_batch()
+    generator = torch.Generator(device="cpu").manual_seed(97)
+    weights = _loss_weights(2, seed=101)
+    seeds = {
+        "tangent_source": (torch.randn(2, 3, generator=generator) * 0.01).cuda(),
+        "tangent_target": (torch.randn(2, 3, generator=generator) * 0.01).cuda(),
+        "tangent_interaction_normals": (
+            torch.randn(2, 2, 3, generator=generator) * 0.01
+        ).cuda(),
+    }
+    tangents = ops.field_transmission_sequence_jvp(
+        *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
+    )
+    lhs = _real_pair_loss(tangents["coefficient"], weights).double()
+
+    reference_batch = _reference_inputs(batch)
+    del reference_batch["interaction_positions"]
+    reference_leaves = {}
+    for name in _TRANSMISSION_GEOMETRY:
+        reference_leaves[name] = reference_batch[name].clone().requires_grad_(True)
+        reference_batch[name] = reference_leaves[name]
+    reference = transmission_sequence_reference(
+        **reference_batch,
+        frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
+    )
+    expected_grads = torch.autograd.grad(
+        _real_pair_loss(reference["coefficient"], weights),
+        tuple(reference_leaves.values()),
+    )
+    rhs = torch.zeros((), dtype=torch.float64)
+    seed_values = (
+        seeds["tangent_source"],
+        seeds["tangent_target"],
+        seeds["tangent_interaction_normals"],
+    )
+    for expected_grad, seed in zip(expected_grads, seed_values, strict=True):
+        rhs = rhs + (expected_grad.double().cpu() * seed.double().cpu()).sum()
+    assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_jvp_vjp_inner_product_duality_geometry_free_space():
+    batch = _free_space_batch()
+    generator = torch.Generator(device="cpu").manual_seed(103)
+    u_coefficient = _loss_weights(4, seed=107)
+    u_gain = torch.randn(4, generator=generator).to("cuda")
+    u_length = torch.randn(4, generator=generator).to("cuda")
+    v_source = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
+    v_target = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
+
+    tangents = ops.field_free_space_jvp(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        tangent_frequency=0.0,
+        tangent_source=v_source,
+        tangent_target=v_target,
+    )
+    lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
+    lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
+    lhs = lhs + (tangents["path_length_m"].double() * u_length.double()).sum()
+
+    grads = ops.field_free_space_backward(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        grad_coefficient=u_coefficient,
+        grad_path_gain=u_gain,
+        grad_path_length=u_length,
+        need_grad_frequency=False,
+        need_grad_geometry=True,
+    )
+    rhs = (grads["grad_source"].double() * v_source.double()).sum()
+    rhs = rhs + (grads["grad_target"].double() * v_target.double()).sum()
+    assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_jvp_vjp_inner_product_duality_geometry_reflection():
+    batch = _reflection_batch(depth=2)
+    generator = torch.Generator(device="cpu").manual_seed(109)
+    u_coefficient = _loss_weights(3, seed=113)
+    u_gain = torch.randn(3, generator=generator).to("cuda")
+    u_length = torch.randn(3, generator=generator).to("cuda")
+    seeds = {
+        "tangent_source": (torch.randn(3, 3, generator=generator) * 0.01).cuda(),
+        "tangent_target": (torch.randn(3, 3, generator=generator) * 0.01).cuda(),
+        "tangent_interaction_positions": (
+            torch.randn(3, 2, 3, generator=generator) * 0.01
+        ).cuda(),
+        "tangent_interaction_normals": (
+            torch.randn(3, 2, 3, generator=generator) * 0.01
+        ).cuda(),
+    }
+
+    tangents = ops.field_reflection_sequence_jvp(
+        *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
+    )
+    lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
+    lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
+    lhs = lhs + (tangents["path_length_m"].double() * u_length.double()).sum()
+
+    grads = ops.field_reflection_sequence_backward(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        grad_coefficient=u_coefficient,
+        grad_path_gain=u_gain,
+        grad_path_length=u_length,
+        need_grad_eps_r=False,
+        need_grad_sigma_e=False,
+        need_grad_gain=False,
+        need_grad_thickness=False,
+        need_grad_frequency=False,
+        need_grad_geometry=True,
+    )
+    rhs = (grads["grad_source"].double() * seeds["tangent_source"].double()).sum()
+    rhs = rhs + (grads["grad_target"].double() * seeds["tangent_target"].double()).sum()
+    rhs = rhs + (
+        grads["grad_interaction_positions"].double()
+        * seeds["tangent_interaction_positions"].double()
+    ).sum()
+    rhs = rhs + (
+        grads["grad_interaction_normals"].double()
+        * seeds["tangent_interaction_normals"].double()
+    ).sum()
+    assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_jvp_vjp_inner_product_duality_geometry_transmission():
+    batch = _transmission_batch()
+    generator = torch.Generator(device="cpu").manual_seed(127)
+    u_coefficient = _loss_weights(2, seed=131)
+    u_gain = torch.randn(2, generator=generator).to("cuda")
+    u_length = torch.randn(2, generator=generator).to("cuda")
+    seeds = {
+        "tangent_source": (torch.randn(2, 3, generator=generator) * 0.01).cuda(),
+        "tangent_target": (torch.randn(2, 3, generator=generator) * 0.01).cuda(),
+        "tangent_interaction_normals": (
+            torch.randn(2, 2, 3, generator=generator) * 0.01
+        ).cuda(),
+    }
+
+    tangents = ops.field_transmission_sequence_jvp(
+        *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
+    )
+    lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
+    lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
+    lhs = lhs + (tangents["path_length_m"].double() * u_length.double()).sum()
+
+    grads = ops.field_transmission_sequence_backward(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        grad_coefficient=u_coefficient,
+        grad_path_gain=u_gain,
+        grad_path_length=u_length,
+        need_grad_layer_thickness=False,
+        need_grad_layer_eps_r=False,
+        need_grad_layer_sigma_e=False,
+        need_grad_frequency=False,
+        need_grad_geometry=True,
+    )
+    rhs = (grads["grad_source"].double() * seeds["tangent_source"].double()).sum()
+    rhs = rhs + (grads["grad_target"].double() * seeds["tangent_target"].double()).sum()
+    rhs = rhs + (
+        grads["grad_interaction_normals"].double()
+        * seeds["tangent_interaction_normals"].double()
+    ).sum()
+    assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= REL_TOL_PATH
+
+
+def test_free_space_path_length_grads_match_reference():
+    batch = _free_space_batch()
+    leaves = {}
+    ad_batch = dict(batch)
+    for name in _FREE_SPACE_GEOMETRY:
+        leaves[name] = batch[name].clone().requires_grad_(True)
+        ad_batch[name] = leaves[name]
+    out = ops.field_free_space_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    assert out["path_length_m"].requires_grad
+    assert out["delay_s"].requires_grad
+    loss = out["path_length_m"].sum() + out["delay_s"].sum() * 2.99792458e8
+    loss.backward()
+
+    reference_batch = _reference_inputs(batch)
+    source = reference_batch["source"].clone().requires_grad_(True)
+    target = reference_batch["target"].clone().requires_grad_(True)
+    length = torch.linalg.vector_norm(target - source, dim=-1)
+    reference_loss = length.sum() + (length / 299792458.0).sum() * 2.99792458e8
+    expected = torch.autograd.grad(reference_loss, (source, target))
+    for (name, leaf), expected_grad in zip(leaves.items(), expected, strict=True):
+        assert (
+            relative_error(leaf.grad, expected_grad, abs_floor=ABS_TOL) <= REL_TOL_PATH
+        ), name
+
+
+def test_reflection_path_length_grads_match_reference():
+    batch = _reflection_batch(depth=2)
+    leaves = {}
+    ad_batch = dict(batch)
+    for name in ("source", "target", "interaction_positions"):
+        leaves[name] = batch[name].clone().requires_grad_(True)
+        ad_batch[name] = leaves[name]
+    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    assert out["path_length_m"].requires_grad
+    out["path_length_m"].sum().backward()
+
+    reference_batch = _reference_inputs(batch)
+    reference_leaves = {}
+    for name in ("source", "target", "interaction_positions"):
+        reference_leaves[name] = reference_batch[name].clone().requires_grad_(True)
+        reference_batch[name] = reference_leaves[name]
+    expected = torch.autograd.grad(
+        _reference_reflection_length(reference_batch).sum(),
+        tuple(reference_leaves.values()),
+    )
+    for (name, leaf), expected_grad in zip(leaves.items(), expected, strict=True):
+        assert (
+            relative_error(leaf.grad, expected_grad, abs_floor=ABS_TOL) <= REL_TOL_PATH
+        ), name
+
+    # Materials receive an exactly zero cotangent from the length outputs.
+    eps_r = batch["eps_r"].clone().requires_grad_(True)
+    material_batch = dict(batch)
+    material_batch["eps_r"] = eps_r
+    material_batch["source"] = batch["source"].clone().requires_grad_(True)
+    out = ops.field_reflection_sequence_ad(
+        *material_batch.values(), frequency=_FREQUENCY_HZ
+    )
+    (grad_eps,) = torch.autograd.grad(
+        out["path_length_m"].sum(), eps_r, allow_unused=True
+    )
+    assert grad_eps is None or float(grad_eps.abs().max()) == 0.0
+
+
+def test_transmission_path_length_grads_match_reference():
+    batch = _transmission_batch()
+    leaves = {}
+    ad_batch = dict(batch)
+    for name in ("source", "target"):
+        leaves[name] = batch[name].clone().requires_grad_(True)
+        ad_batch[name] = leaves[name]
+    out = ops.field_transmission_sequence_ad(
+        *ad_batch.values(), frequency=_FREQUENCY_HZ
+    )
+    assert out["path_length_m"].requires_grad
+    out["path_length_m"].sum().backward()
+
+    reference_batch = _reference_inputs(batch)
+    source = reference_batch["source"].clone().requires_grad_(True)
+    target = reference_batch["target"].clone().requires_grad_(True)
+    expected = torch.autograd.grad(
+        torch.linalg.vector_norm(target - source, dim=-1).sum(), (source, target)
+    )
+    for (name, leaf), expected_grad in zip(leaves.items(), expected, strict=True):
+        assert (
+            relative_error(leaf.grad, expected_grad, abs_floor=ABS_TOL) <= REL_TOL_PATH
+        ), name
+
+
+def test_path_outputs_differentiable_only_with_geometry():
+    """path_length_m / delay_s join the graph exactly when geometry does."""
+
+    batch = _reflection_batch(depth=1)
+    source = batch["source"].clone().requires_grad_(True)
+    ad_batch = dict(batch)
+    ad_batch["source"] = source
+    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    assert out["path_length_m"].requires_grad
+    assert out["delay_s"].requires_grad
+    assert not out["direction"].requires_grad
+    assert out["direction"].grad_fn is None

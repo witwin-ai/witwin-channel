@@ -163,11 +163,11 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 
 ### AD-2：T1 tx/rx position + mesh vertex（Deterministic + Path，几何移动）
 
-层 2（EM 侧，channel_native）：
+层 2（EM 侧，channel_native）：（2026-07-14 交付）
 
-- [ ] `field_free_space` 对 **TX/RX position** 的 JVP+VJP（LoS 场核直接吃 tx/rx 张量）；
-- [ ] `field_reflection_sequence` / `field_transmission_sequence` 对 **source/target/interaction_positions/interaction_normals** 的伴随与切向（`slab_fresnel_dual` 需补 cos_theta 切向；伴随需穿过 frames、cos_theta 与 propagation）；
-- [ ] `path_length_m` / `delay_s` 在几何可微后转为可微输出（ToA 类损失）。
+- [x] `field_free_space` 对 **TX/RX position** 的 JVP+VJP（LoS 场核直接吃 tx/rx 张量）；
+- [x] `field_reflection_sequence` / `field_transmission_sequence` 对 **source/target/interaction_positions/interaction_normals** 的伴随与切向（`slab_fresnel_dual` / `stack_rt_dual` 补了 cos_theta 切向；反射伴随为真反向模式，穿过 frames、cos_theta 与 propagation，法线翻转按冻结分支只取符号；透射的 interaction_positions 梯度恒为零——直线路径不依赖穿墙点）；
+- [x] `path_length_m` / `delay_s` 在几何可微后转为可微输出（ToA 类损失；对材料/频率余切恒零；`direction` 输出保持不可微）。
 
 层 1（几何侧，RayD，见 §3.1（一））：
 

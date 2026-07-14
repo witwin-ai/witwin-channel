@@ -8,9 +8,10 @@ gradient oracle: torch autograd through these functions defines the exact
 Wirtinger-convention derivatives the native backward/jvp companions must
 reproduce (plan 07 section 9.1).
 
-Every function is differentiable with respect to the material tensors and the
-0-d ``frequency`` tensor; geometry arguments are treated as constants (the
-fixed-topology contract).
+Every function is differentiable with respect to the material tensors, the
+0-d ``frequency`` tensor and (since plan 07 AD-2) the continuous geometry
+arguments (source, target, interaction positions/normals); only the discrete
+winner (validity masks, material ids, normal-flip branches) is fixed.
 """
 
 from __future__ import annotations

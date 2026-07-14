@@ -8,12 +8,14 @@
 #include "../tensor_checks.h"
 
 // Backward / JVP companion kernels for the field transport forwards
-// (plan 07 AD-1). Fixed-topology contract: geometry (endpoints, interaction
-// positions/normals, polarizations, tx_power) is constant; the differentiable
-// inputs are eps_r / sigma_e / gain / thickness (per bounce or CSR layer) and
-// the carrier frequency. Geometry cotangents are reserved behind the
-// need_grad_geometry flag (rejected until plan 07 AD-2) so the ABI does not
-// churn when they land.
+// (plan 07 AD-1 materials/frequency, AD-2 geometry). Fixed-topology contract:
+// the discrete winner (face sequence, validity, normal flips, polarizations,
+// tx_power, material ids) is constant; the differentiable inputs are
+// eps_r / sigma_e / gain / thickness (per bounce or CSR layer), the carrier
+// frequency, and the continuous hit geometry (source, target,
+// interaction_positions, interaction_normals) behind need_grad_geometry.
+// path_length_m / delay_s are differentiable outputs of the geometry alone
+// (their material/frequency cotangent is exactly zero).
 
 namespace {
 
@@ -51,6 +53,8 @@ __device__ __forceinline__ c10::complex<float> to_c10(field::Complex value) {
 // chain is coefficient = <value, rx_axis>, path_field = coefficient * a,
 // path_gain = |path_field|^2 with a = sqrt(max(tx_power, 0)); all real-linear
 // maps except path_gain, whose real-pair adjoint at pf is 2*g*(pf.re, pf.im).
+// The folded scalar cotangent is also emitted: it is the coefficient-level
+// cotangent the geometry adjoint needs for the rx_axis (plan 07 AD-2).
 __device__ __forceinline__ field::Complex3 fold_output_cotangents(
     const c10::complex<float>* grad_field_vector,
     const c10::complex<float>* grad_coefficient,
@@ -59,7 +63,8 @@ __device__ __forceinline__ field::Complex3 fold_output_cotangents(
     int64_t index,
     field::float3a rx_axis,
     field::Complex path_field_value,
-    float amplitude_scale) {
+    float amplitude_scale,
+    field::Complex& g_scalar_out) {
     field::Complex g_scalar = field::cplx_zero();
     if (grad_coefficient != nullptr)
         g_scalar = field::cplx_add(g_scalar, complex_of(grad_coefficient[index]));
@@ -75,6 +80,7 @@ __device__ __forceinline__ field::Complex3 fold_output_cotangents(
             field::cplx_mul_real(
                 path_field_value, 2.0f * g_gain * amplitude_scale));
     }
+    g_scalar_out = g_scalar;
     field::Complex3 g_value = field::c3_zero();
     g_value.x = field::cplx_mul_real(g_scalar, rx_axis.x);
     g_value.y = field::cplx_mul_real(g_scalar, rx_axis.y);
@@ -88,30 +94,39 @@ __device__ __forceinline__ field::Complex3 fold_output_cotangents(
     return g_value;
 }
 
-// Forward-mode dual of the shared scalar output chain. Writes the four
-// differentiable output tangents.
+// Forward-mode dual of the shared scalar output chain. Writes the six
+// differentiable output tangents; d_rx_axis and d_length carry the geometry
+// tangents (zero under material/frequency-only seeds).
 __device__ __forceinline__ void write_output_tangents(
     int64_t index,
     field::Complex3 value,
     field::Complex3 d_value,
     field::float3a rx_axis,
+    field::float3a d_rx_axis,
     float amplitude_scale,
+    float d_length,
     c10::complex<float>* t_field_vector,
     c10::complex<float>* t_coefficient,
     c10::complex<float>* t_path_field,
-    float* t_path_gain) {
+    float* t_path_gain,
+    float* t_path_length,
+    float* t_delay) {
     const int64_t base = index * 3;
     t_field_vector[base] = to_c10(d_value.x);
     t_field_vector[base + 1] = to_c10(d_value.y);
     t_field_vector[base + 2] = to_c10(d_value.z);
     const field::Complex scalar = transport::complex3_dot_real(value, rx_axis);
-    const field::Complex d_scalar = transport::complex3_dot_real(d_value, rx_axis);
+    const field::Complex d_scalar = field::cplx_add(
+        transport::complex3_dot_real(d_value, rx_axis),
+        transport::complex3_dot_real(value, d_rx_axis));
     t_coefficient[index] = to_c10(d_scalar);
     const field::Complex path_field = field::cplx_mul_real(scalar, amplitude_scale);
     const field::Complex d_path_field = field::cplx_mul_real(d_scalar, amplitude_scale);
     t_path_field[index] = to_c10(d_path_field);
     t_path_gain[index] =
         2.0f * (path_field.re * d_path_field.re + path_field.im * d_path_field.im);
+    t_path_length[index] = d_length;
+    t_delay[index] = d_length / transport::kSpeedOfLight;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +190,11 @@ __global__ void free_space_backward_kernel(
     const c10::complex<T>* grad_coefficient,
     const c10::complex<T>* grad_path_field,
     const T* grad_path_gain,
-    T* grad_frequency) {
+    const T* grad_path_length,
+    const T* grad_delay,
+    T* grad_frequency,
+    T* grad_source,
+    T* grad_target) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -186,8 +205,10 @@ __global__ void free_space_backward_kernel(
             ad::v3_load(rx_polarization, index),
             tx_power[index],
             frequency_hz);
-        // Fold the output cotangents onto the carrier P (every differentiable
-        // output is P scaled by real geometry constants).
+        const int64_t base = index * 3;
+        // Fold the field-output cotangents onto the carrier P; the geometry
+        // enters through the carrier distance, the tx/rx bases and the raw
+        // straight length (path_length_m / delay_s).
         const c10::complex<T> path_field_value =
             eval.carrier * eval.projection * eval.amplitude_scale;
         c10::complex<T> g_scalar(T(0), T(0));
@@ -200,14 +221,66 @@ __global__ void free_space_backward_kernel(
                         (T(2) * grad_path_gain[index] * eval.amplitude_scale);
         c10::complex<T> g_carrier = g_scalar * eval.projection;
         if (grad_field_vector != nullptr) {
-            const int64_t base = index * 3;
             g_carrier += grad_field_vector[base] * eval.tx_axis.x;
             g_carrier += grad_field_vector[base + 1] * eval.tx_axis.y;
             g_carrier += grad_field_vector[base + 2] * eval.tx_axis.z;
         }
-        const T g_freq = g_carrier.real() * eval.carrier_dfreq.real() +
-                         g_carrier.imag() * eval.carrier_dfreq.imag();
-        atomicAdd(grad_frequency, g_freq);
+        if (grad_frequency != nullptr) {
+            const T g_freq = g_carrier.real() * eval.carrier_dfreq.real() +
+                             g_carrier.imag() * eval.carrier_dfreq.imag();
+            atomicAdd(grad_frequency, g_freq);
+        }
+        if (grad_source == nullptr && grad_target == nullptr)
+            continue;
+        // Real-pair cotangents of the tx/rx bases: coefficient = P *
+        // <tx_axis, rx_axis> and field_vector = P * tx_axis.
+        const T g_projection = g_scalar.real() * eval.carrier.real() +
+                               g_scalar.imag() * eval.carrier.imag();
+        ad::Vec3<T> g_tx_axis = {T(0), T(0), T(0)};
+        ad::Vec3<T> g_rx_axis = {T(0), T(0), T(0)};
+        g_tx_axis = ad::v3_add(g_tx_axis, ad::v3_scale(eval.rx_axis, g_projection));
+        g_rx_axis = ad::v3_add(g_rx_axis, ad::v3_scale(eval.tx_axis, g_projection));
+        if (grad_field_vector != nullptr) {
+            g_tx_axis.x += grad_field_vector[base].real() * eval.carrier.real() +
+                           grad_field_vector[base].imag() * eval.carrier.imag();
+            g_tx_axis.y +=
+                grad_field_vector[base + 1].real() * eval.carrier.real() +
+                grad_field_vector[base + 1].imag() * eval.carrier.imag();
+            g_tx_axis.z +=
+                grad_field_vector[base + 2].real() * eval.carrier.real() +
+                grad_field_vector[base + 2].imag() * eval.carrier.imag();
+        }
+        T g_distance = g_carrier.real() * eval.carrier_ddist.real() +
+                       g_carrier.imag() * eval.carrier_ddist.imag();
+        if (grad_path_length != nullptr)
+            g_distance += grad_path_length[index];
+        if (grad_delay != nullptr)
+            g_distance += grad_delay[index] / T(ad::kSpeedOfLight);
+        const ad::Vec3<T> offset =
+            ad::v3_sub(ad::v3_load(target, index), ad::v3_load(source, index));
+        ad::Vec3<T> g_direction = {T(0), T(0), T(0)};
+        ad::adj_v3_stable_perp_basis(
+            eval.direction, ad::v3_load(tx_polarization, index), g_tx_axis,
+            g_direction);
+        ad::adj_v3_stable_perp_basis(
+            eval.direction, ad::v3_load(rx_polarization, index), g_rx_axis,
+            g_direction);
+        ad::Vec3<T> g_offset = {T(0), T(0), T(0)};
+        ad::Vec3<T> g_alternate = {T(0), T(0), T(0)};
+        ad::adj_v3_safe_normalize(
+            offset, ad::Vec3<T>{T(0), T(0), T(1)}, g_direction, g_offset,
+            g_alternate);
+        ad::adj_v3_length(offset, g_distance, g_offset);
+        if (grad_target != nullptr) {
+            grad_target[base] = g_offset.x;
+            grad_target[base + 1] = g_offset.y;
+            grad_target[base + 2] = g_offset.z;
+        }
+        if (grad_source != nullptr) {
+            grad_source[base] = -g_offset.x;
+            grad_source[base + 1] = -g_offset.y;
+            grad_source[base + 2] = -g_offset.z;
+        }
     }
 }
 
@@ -221,10 +294,14 @@ __global__ void free_space_jvp_kernel(
     const T* rx_polarization,
     T frequency_hz,
     T tangent_frequency,
+    const T* tangent_source,
+    const T* tangent_target,
     c10::complex<T>* t_field_vector,
     c10::complex<T>* t_coefficient,
     c10::complex<T>* t_path_field,
-    T* t_path_gain) {
+    T* t_path_gain,
+    T* t_path_length,
+    T* t_delay) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -235,12 +312,36 @@ __global__ void free_space_jvp_kernel(
             ad::v3_load(rx_polarization, index),
             tx_power[index],
             frequency_hz);
-        const c10::complex<T> d_carrier = eval.carrier_dfreq * tangent_frequency;
+        const ad::Vec3<T> zero3 = {T(0), T(0), T(0)};
+        const ad::Vec3<T> d_source =
+            tangent_source != nullptr ? ad::v3_load(tangent_source, index) : zero3;
+        const ad::Vec3<T> d_target =
+            tangent_target != nullptr ? ad::v3_load(tangent_target, index) : zero3;
+        const ad::DualV3<T> offset = {
+            ad::v3_sub(ad::v3_load(target, index), ad::v3_load(source, index)),
+            ad::v3_sub(d_target, d_source)};
+        T d_distance = T(0);
+        (void)ad::dual_v3_length(offset, d_distance);
+        const ad::DualV3<T> direction = ad::dual_v3_safe_normalize(
+            offset, ad::dv3_const(ad::Vec3<T>{T(0), T(0), T(1)}));
+        const ad::DualV3<T> tx_axis = ad::dual_v3_stable_perp_basis(
+            direction, ad::v3_load(tx_polarization, index));
+        const ad::DualV3<T> rx_axis = ad::dual_v3_stable_perp_basis(
+            direction, ad::v3_load(rx_polarization, index));
+        const c10::complex<T> d_carrier =
+            eval.carrier_dfreq * tangent_frequency +
+            eval.carrier_ddist * d_distance;
         const int64_t base = index * 3;
-        t_field_vector[base] = d_carrier * eval.tx_axis.x;
-        t_field_vector[base + 1] = d_carrier * eval.tx_axis.y;
-        t_field_vector[base + 2] = d_carrier * eval.tx_axis.z;
-        const c10::complex<T> d_scalar = d_carrier * eval.projection;
+        t_field_vector[base] =
+            d_carrier * eval.tx_axis.x + eval.carrier * tx_axis.d.x;
+        t_field_vector[base + 1] =
+            d_carrier * eval.tx_axis.y + eval.carrier * tx_axis.d.y;
+        t_field_vector[base + 2] =
+            d_carrier * eval.tx_axis.z + eval.carrier * tx_axis.d.z;
+        const T d_projection = ad::v3_dot(tx_axis.d, eval.rx_axis) +
+                               ad::v3_dot(eval.tx_axis, rx_axis.d);
+        const c10::complex<T> d_scalar =
+            d_carrier * eval.projection + eval.carrier * d_projection;
         t_coefficient[index] = d_scalar;
         const c10::complex<T> d_path_field = d_scalar * eval.amplitude_scale;
         t_path_field[index] = d_path_field;
@@ -249,6 +350,8 @@ __global__ void free_space_jvp_kernel(
         t_path_gain[index] =
             T(2) * (path_field_value.real() * d_path_field.real() +
                     path_field_value.imag() * d_path_field.imag());
+        t_path_length[index] = d_distance;
+        t_delay[index] = d_distance / T(ad::kSpeedOfLight);
     }
 }
 
@@ -261,6 +364,7 @@ __global__ void free_space_jvp_kernel(
 // backward and jvp kernels so both differentiate the identical forward chain.
 struct ReflectionChain {
     transport::ReflectFrame frames[kMaxAdDepth];
+    field::Complex3 value_in[kMaxAdDepth];  // field entering each bounce
     field::Complex e_s[kMaxAdDepth];
     field::Complex e_p[kMaxAdDepth];
     field::Complex r_te[kMaxAdDepth];
@@ -269,6 +373,7 @@ struct ReflectionChain {
     field::float3a rx_axis;
     field::Complex propagation;
     field::Complex propagation_dfreq;
+    field::Complex propagation_dlength;
     float total_length;
     float amplitude_scale;
 };
@@ -323,6 +428,7 @@ __device__ void reflection_chain_eval(
         const field::Complex e_s = transport::complex3_dot_real(value, frame.s_axis);
         const field::Complex e_p = transport::complex3_dot_real(value, frame.p_in);
         chain.frames[bounce] = frame;
+        chain.value_in[bounce] = value;
         chain.e_s[bounce] = e_s;
         chain.e_p[bounce] = e_p;
         chain.r_te[bounce] = r_te;
@@ -357,6 +463,13 @@ __device__ void reflection_chain_eval(
     chain.propagation_dfreq = field::cplx_mul_real(
         field::cplx_mul(propagation, dlog),
         2.0f * field::UTD_PI / transport::kSpeedOfLight);
+    // dP/dL = P * (-[L >= EPS]/L_clamped - j*k): phase over the raw length,
+    // amplitude over the clamped length (clamp_min subgradient convention).
+    const float length_gate = total_length >= field::UTD_EPS
+                                  ? 1.0f / fmaxf(total_length, field::UTD_EPS)
+                                  : 0.0f;
+    chain.propagation_dlength = field::cplx_mul(
+        propagation, field::cplx(-length_gate, -wave_number));
     chain.total_length = total_length;
     chain.amplitude_scale = sqrtf(fmaxf(tx_power[index], 0.0f));
 }
@@ -381,11 +494,18 @@ __global__ void reflection_sequence_backward_kernel(
     const c10::complex<float>* grad_coefficient,
     const c10::complex<float>* grad_path_field,
     const float* grad_path_gain,
+    const float* grad_path_length,
+    const float* grad_delay,
     float* grad_eps_r,
     float* grad_sigma_e,
     float* grad_gain,
     float* grad_thickness,
-    float* grad_frequency) {
+    float* grad_frequency,
+    float* grad_source,
+    float* grad_target,
+    float* grad_positions,
+    float* grad_normals) {
+    const bool need_geometry = grad_source != nullptr;
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -401,9 +521,11 @@ __global__ void reflection_sequence_backward_kernel(
             value_final, chain.rx_axis);
         const field::Complex path_field_value = field::cplx_mul_real(
             scalar, chain.amplitude_scale);
+        field::Complex g_scalar = field::cplx_zero();
         field::Complex3 g_value = fold_output_cotangents(
             grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain,
-            index, chain.rx_axis, path_field_value, chain.amplitude_scale);
+            index, chain.rx_axis, path_field_value, chain.amplitude_scale,
+            g_scalar);
 
         // Split value_final = P * value_chain.
         field::Complex g_propagation = field::cplx_zero();
@@ -419,18 +541,70 @@ __global__ void reflection_sequence_backward_kernel(
             g_chain.z, g_propagation);
         float g_freq = adj_dot(g_propagation, chain.propagation_dfreq);
 
+        // Geometry adjoint state (plan 07 AD-2): the total path length
+        // cotangent, the cotangent flowing onto the `previous` endpoint of
+        // the segment being processed, the alternate-branch cotangent on the
+        // bounce's outgoing direction, and the final receive-segment terms.
+        const field::float3a e_z = field::make_f3(0.0f, 0.0f, 1.0f);
+        float g_length = 0.0f;
+        field::float3a g_carry = field::f3_zero();
+        field::float3a g_outgoing = field::f3_zero();
+        field::float3a g_hit_first = field::f3_zero();
+        if (need_geometry) {
+            g_length = adj_dot(g_propagation, chain.propagation_dlength);
+            if (grad_path_length != nullptr)
+                g_length += grad_path_length[index];
+            if (grad_delay != nullptr)
+                g_length += grad_delay[index] / transport::kSpeedOfLight;
+            // rx_axis cotangent from the folded scalar (coefficient =
+            // <value_final, rx_axis> with a real axis).
+            field::float3a g_rx_axis = field::make_f3(
+                field::cplx_adj_dot(g_scalar, value_final.x),
+                field::cplx_adj_dot(g_scalar, value_final.y),
+                field::cplx_adj_dot(g_scalar, value_final.z));
+            const field::float3a previous_last = load_sequence3f(
+                interaction_positions, index, depth - 1, depth);
+            const field::float3a final_offset = field::f3_sub(
+                load3f(target, index), previous_last);
+            const field::float3a outgoing_last =
+                chain.frames[depth - 1].reflected_direction;
+            const field::float3a final_direction = field::safe_normalize(
+                final_offset, outgoing_last);
+            field::float3a g_final_direction = field::f3_zero();
+            field::float3a g_pol_dump = field::f3_zero();
+            field::adj_stable_perp_basis(
+                final_direction, load3f(rx_polarization, index), g_rx_axis,
+                g_final_direction, g_pol_dump);
+            field::float3a g_final_offset = field::f3_zero();
+            field::adj_safe_normalize(
+                final_offset, outgoing_last, g_final_direction,
+                g_final_offset, g_outgoing);
+            ad::adj_safe_length(final_offset, g_length, g_final_offset);
+            const int64_t base = index * 3;
+            grad_target[base] = g_final_offset.x;
+            grad_target[base + 1] = g_final_offset.y;
+            grad_target[base + 2] = g_final_offset.z;
+            g_carry = field::f3_neg(g_final_offset);
+        }
+
         for (int64_t bounce = depth - 1; bounce >= 0; --bounce) {
             const transport::ReflectFrame& frame = chain.frames[bounce];
-            const field::Complex gs = field::cplx_add(
-                field::cplx_add(
-                    field::cplx_mul_real(g_chain.x, frame.s_axis.x),
-                    field::cplx_mul_real(g_chain.y, frame.s_axis.y)),
-                field::cplx_mul_real(g_chain.z, frame.s_axis.z));
-            const field::Complex gp = field::cplx_add(
-                field::cplx_add(
-                    field::cplx_mul_real(g_chain.x, frame.p_out.x),
-                    field::cplx_mul_real(g_chain.y, frame.p_out.y)),
-                field::cplx_mul_real(g_chain.z, frame.p_out.z));
+            // value_out = s_axis*(r_te*e_s) + p_out*(r_tm*e_p): recover the
+            // complex coefficient cotangents and (for geometry) the real
+            // basis cotangents in one adjoint step each.
+            field::float3a g_s_axis = field::f3_zero();
+            field::float3a g_p_in = field::f3_zero();
+            field::float3a g_p_out = field::f3_zero();
+            field::Complex gs = field::cplx_zero();
+            field::Complex gp = field::cplx_zero();
+            field::adj_cplx_scale_real(
+                frame.s_axis,
+                field::cplx_mul(chain.r_te[bounce], chain.e_s[bounce]),
+                g_chain, g_s_axis, gs);
+            field::adj_cplx_scale_real(
+                frame.p_out,
+                field::cplx_mul(chain.r_tm[bounce], chain.e_p[bounce]),
+                g_chain, g_p_out, gp);
             field::Complex g_r_te = field::cplx_zero();
             field::Complex g_r_tm = field::cplx_zero();
             field::Complex g_e_s = field::cplx_zero();
@@ -439,15 +613,14 @@ __global__ void reflection_sequence_backward_kernel(
                 chain.r_te[bounce], chain.e_s[bounce], gs, g_r_te, g_e_s);
             field::adj_cplx_mul(
                 chain.r_tm[bounce], chain.e_p[bounce], gp, g_r_tm, g_e_p);
-            g_chain.x = field::cplx_add(
-                field::cplx_mul_real(g_e_s, frame.s_axis.x),
-                field::cplx_mul_real(g_e_p, frame.p_in.x));
-            g_chain.y = field::cplx_add(
-                field::cplx_mul_real(g_e_s, frame.s_axis.y),
-                field::cplx_mul_real(g_e_p, frame.p_in.y));
-            g_chain.z = field::cplx_add(
-                field::cplx_mul_real(g_e_s, frame.s_axis.z),
-                field::cplx_mul_real(g_e_p, frame.p_in.z));
+            // e_s = <value_in, s_axis>, e_p = <value_in, p_in>.
+            field::Complex3 g_value_in = field::c3_zero();
+            field::adj_cplx_dot_real(
+                chain.value_in[bounce], frame.s_axis, g_e_s, g_value_in,
+                g_s_axis);
+            field::adj_cplx_dot_real(
+                chain.value_in[bounce], frame.p_in, g_e_p, g_value_in, g_p_in);
+            g_chain = g_value_in;
 
             // Convert (g_r_te, g_r_tm) to input gradients with one dual
             // slab_fresnel evaluation per requested basis direction.
@@ -462,7 +635,7 @@ __global__ void reflection_sequence_backward_kernel(
             if (grad_eps_r != nullptr) {
                 ad::slab_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                    frequency_hz, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_eps_r[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
@@ -470,7 +643,7 @@ __global__ void reflection_sequence_backward_kernel(
             if (grad_sigma_e != nullptr) {
                 ad::slab_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                    frequency_hz, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_sigma_e[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
@@ -478,7 +651,7 @@ __global__ void reflection_sequence_backward_kernel(
             if (grad_gain != nullptr) {
                 ad::slab_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+                    frequency_hz, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_gain[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
@@ -486,7 +659,7 @@ __global__ void reflection_sequence_backward_kernel(
             if (grad_thickness != nullptr) {
                 ad::slab_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+                    frequency_hz, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_thickness[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
@@ -494,15 +667,132 @@ __global__ void reflection_sequence_backward_kernel(
             if (grad_frequency != nullptr) {
                 ad::slab_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                    frequency_hz, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                     r_te_dual, r_tm_dual);
                 g_freq +=
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
             }
+            if (!need_geometry)
+                continue;
+
+            // Geometry enters the Fresnel only through cos_theta.
+            ad::slab_fresnel_dual(
+                frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
+                frequency_hz, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                r_te_dual, r_tm_dual);
+            const float g_cos_theta =
+                adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
+
+            // Replay the segment geometry of this bounce.
+            const field::float3a previous =
+                bounce > 0 ? load_sequence3f(
+                                 interaction_positions, index, bounce - 1, depth)
+                           : load3f(source, index);
+            const field::float3a hit = load_sequence3f(
+                interaction_positions, index, bounce, depth);
+            const field::float3a segment = field::f3_sub(hit, previous);
+            const field::float3a outgoing_previous =
+                bounce > 0 ? chain.frames[bounce - 1].reflected_direction
+                           : field::safe_normalize(
+                                 field::f3_sub(
+                                     load_sequence3f(
+                                         interaction_positions, index, 0, depth),
+                                     load3f(source, index)),
+                                 e_z);
+            const field::float3a incident_argument = field::safe_normalize(
+                segment, outgoing_previous);
+            const field::float3a raw_normal = load_sequence3f(
+                interaction_normals, index, bounce, depth);
+
+            // Frame outputs -> incident direction + raw normal. The frozen
+            // normal flip contributes only its sign; g_outgoing carries the
+            // downstream alternate-branch cotangent of frame.reflected_direction.
+            field::float3a g_incident = field::f3_zero();
+            field::float3a g_normal_raw = field::f3_zero();
+            ad::adj_reflect_frame(
+                incident_argument, raw_normal, g_s_axis, g_p_in, g_p_out,
+                g_outgoing, g_cos_theta, g_incident, g_normal_raw);
+            const int64_t normal_base = scalar_index * 3;
+            grad_normals[normal_base] = g_normal_raw.x;
+            grad_normals[normal_base + 1] = g_normal_raw.y;
+            grad_normals[normal_base + 2] = g_normal_raw.z;
+
+            // incident = safe_normalize(segment, outgoing_previous); the
+            // segment also carries the path-length cotangent.
+            field::float3a g_segment = field::f3_zero();
+            field::float3a g_outgoing_previous = field::f3_zero();
+            field::adj_safe_normalize(
+                segment, outgoing_previous, g_incident, g_segment,
+                g_outgoing_previous);
+            ad::adj_safe_length(segment, g_length, g_segment);
+            field::float3a g_hit = field::f3_add(g_carry, g_segment);
+            g_carry = field::f3_neg(g_segment);
+            g_outgoing = g_outgoing_previous;
+            if (bounce > 0) {
+                const int64_t hit_base = scalar_index * 3;
+                grad_positions[hit_base] = g_hit.x;
+                grad_positions[hit_base + 1] = g_hit.y;
+                grad_positions[hit_base + 2] = g_hit.z;
+            } else {
+                g_hit_first = g_hit;
+            }
         }
         if (grad_frequency != nullptr)
             atomicAdd(grad_frequency, g_freq);
+        if (!need_geometry)
+            continue;
+
+        // Launch segment: value_0 = tx_axis * (1 + 0j) with tx_axis built on
+        // the pre-loop incident direction (alternate e_z); the bounce-0
+        // normalize falls back onto this same direction, so g_outgoing now
+        // holds that branch's cotangent.
+        const field::float3a source_value = load3f(source, index);
+        const field::float3a first_hit = load_sequence3f(
+            interaction_positions, index, 0, depth);
+        const field::float3a segment_pre = field::f3_sub(first_hit, source_value);
+        const field::float3a incident_pre = field::safe_normalize(segment_pre, e_z);
+        field::float3a g_tx_axis = field::make_f3(
+            g_chain.x.re, g_chain.y.re, g_chain.z.re);
+        field::float3a g_incident_pre = g_outgoing;
+        field::float3a g_pol_dump = field::f3_zero();
+        field::adj_stable_perp_basis(
+            incident_pre, load3f(tx_polarization, index), g_tx_axis,
+            g_incident_pre, g_pol_dump);
+        field::float3a g_segment_pre = field::f3_zero();
+        field::float3a g_ez_dump = field::f3_zero();
+        field::adj_safe_normalize(
+            segment_pre, e_z, g_incident_pre, g_segment_pre, g_ez_dump);
+        g_hit_first = field::f3_add(g_hit_first, g_segment_pre);
+        const field::float3a g_source_total = field::f3_sub(
+            g_carry, g_segment_pre);
+        const int64_t base = index * 3;
+        const int64_t first_base = index * depth * 3;
+        grad_positions[first_base] = g_hit_first.x;
+        grad_positions[first_base + 1] = g_hit_first.y;
+        grad_positions[first_base + 2] = g_hit_first.z;
+        grad_source[base] = g_source_total.x;
+        grad_source[base + 1] = g_source_total.y;
+        grad_source[base + 2] = g_source_total.z;
     }
+}
+
+__device__ __forceinline__ ad::DualF3 load_dual3f(
+    const float* values, const float* tangents, int64_t index) {
+    return {
+        load3f(values, index),
+        tangents != nullptr ? load3f(tangents, index) : field::f3_zero()};
+}
+
+__device__ __forceinline__ ad::DualF3 load_dual_sequence3f(
+    const float* values,
+    const float* tangents,
+    int64_t index,
+    int64_t bounce,
+    int64_t depth) {
+    return {
+        load_sequence3f(values, index, bounce, depth),
+        tangents != nullptr ? load_sequence3f(tangents, index, bounce, depth)
+                            : field::f3_zero()};
 }
 
 __global__ void reflection_sequence_jvp_kernel(
@@ -526,37 +816,63 @@ __global__ void reflection_sequence_jvp_kernel(
     const float* tangent_gain,
     const float* tangent_thickness,
     float tangent_frequency,
+    const float* tangent_source,
+    const float* tangent_target,
+    const float* tangent_positions,
+    const float* tangent_normals,
     c10::complex<float>* t_field_vector,
     c10::complex<float>* t_coefficient,
     c10::complex<float>* t_path_field,
-    float* t_path_gain) {
+    float* t_path_gain,
+    float* t_path_length,
+    float* t_delay) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        ReflectionChain chain;
-        reflection_chain_eval(
-            index, depth, source, target, interaction_positions,
-            interaction_normals, tx_power, tx_polarization, rx_polarization,
-            eps_r, sigma_e, mu_r, gain, thickness, frequency_hz, chain);
-
-        // Forward-mode chain: d(value_out) accumulates dr terms plus the
-        // propagated d(value_in) through each fixed s/p frame. The primal
-        // per-bounce state comes from the shared chain evaluation, so only
-        // the tangent needs to be propagated here.
-        field::Complex3 d_value = field::c3_zero();
+        // Full forward-mode dual sweep mirroring reflection_sequence_kernel
+        // (and reflection_chain_eval) step by step: the dual vector helpers
+        // replay the same utd formulas, so material/frequency-only seeds
+        // reduce exactly to the AD-1 tangent chain while geometry seeds move
+        // the frames, the incidence cosines and the path length.
+        const ad::DualF3 e_z = ad::df3_const(field::make_f3(0.0f, 0.0f, 1.0f));
+        ad::DualF3 previous = load_dual3f(source, tangent_source, index);
+        const ad::DualF3 first_hit = load_dual_sequence3f(
+            interaction_positions, tangent_positions, index, 0, depth);
+        const ad::DualF3 incident_pre = ad::dual_safe_normalize(
+            ad::df3_sub(first_hit, previous), e_z);
+        const ad::DualF3 tx_axis = ad::dual_stable_perp_basis(
+            incident_pre, ad::df3_const(load3f(tx_polarization, index)));
+        field::Complex3 value = field::cplx_scale_real(
+            tx_axis.v, field::cplx(1.0f, 0.0f));
+        field::Complex3 d_value = field::cplx_scale_real(
+            tx_axis.d, field::cplx(1.0f, 0.0f));
+        ad::DualF total_length = {0.0f, 0.0f};
+        ad::DualF3 outgoing = incident_pre;
         for (int64_t bounce = 0; bounce < depth; ++bounce) {
-            const transport::ReflectFrame& frame = chain.frames[bounce];
+            const ad::DualF3 hit = load_dual_sequence3f(
+                interaction_positions, tangent_positions, index, bounce, depth);
+            const ad::DualF3 segment = ad::df3_sub(hit, previous);
+            const ad::DualF3 incident = ad::dual_safe_normalize(
+                segment, outgoing);
+            const ad::DualF segment_length = ad::dual_safe_length(segment);
+            total_length.v += segment_length.v;
+            total_length.d += segment_length.d;
+            const ad::DualF3 raw_normal = load_dual_sequence3f(
+                interaction_normals, tangent_normals, index, bounce, depth);
+            const ad::DualReflectFrame frame = ad::dual_reflect_frame(
+                incident, raw_normal);
             const int64_t scalar_index = index * depth + bounce;
             DualC r_te_dual;
             DualC r_tm_dual;
             ad::slab_fresnel_dual(
-                frame.cos_theta,
+                frame.cos_theta.v,
                 eps_r[scalar_index],
                 sigma_e[scalar_index],
                 mu_r[scalar_index],
                 gain[scalar_index],
                 thickness[scalar_index],
                 frequency_hz,
+                frame.cos_theta.d,
                 tangent_eps_r != nullptr ? tangent_eps_r[scalar_index] : 0.0f,
                 tangent_sigma_e != nullptr ? tangent_sigma_e[scalar_index] : 0.0f,
                 tangent_gain != nullptr ? tangent_gain[scalar_index] : 0.0f,
@@ -565,32 +881,78 @@ __global__ void reflection_sequence_jvp_kernel(
                 tangent_frequency,
                 r_te_dual,
                 r_tm_dual);
-            const field::Complex e_s = chain.e_s[bounce];
-            const field::Complex e_p = chain.e_p[bounce];
-            const field::Complex d_e_s = transport::complex3_dot_real(
-                d_value, frame.s_axis);
-            const field::Complex d_e_p = transport::complex3_dot_real(
-                d_value, frame.p_in);
-            const field::Complex d_te = field::cplx_add(
+            const field::Complex e_s = transport::complex3_dot_real(
+                value, frame.s_axis.v);
+            const field::Complex e_p = transport::complex3_dot_real(
+                value, frame.p_in.v);
+            const field::Complex d_e_s = field::cplx_add(
+                transport::complex3_dot_real(d_value, frame.s_axis.v),
+                transport::complex3_dot_real(value, frame.s_axis.d));
+            const field::Complex d_e_p = field::cplx_add(
+                transport::complex3_dot_real(d_value, frame.p_in.v),
+                transport::complex3_dot_real(value, frame.p_in.d));
+            const field::Complex w_te = field::cplx_mul(r_te_dual.v, e_s);
+            const field::Complex w_tm = field::cplx_mul(r_tm_dual.v, e_p);
+            const field::Complex d_w_te = field::cplx_add(
                 field::cplx_mul(r_te_dual.d, e_s),
                 field::cplx_mul(r_te_dual.v, d_e_s));
-            const field::Complex d_tm = field::cplx_add(
+            const field::Complex d_w_tm = field::cplx_add(
                 field::cplx_mul(r_tm_dual.d, e_p),
                 field::cplx_mul(r_tm_dual.v, d_e_p));
+            value = field::c3_add(
+                field::cplx_scale_real(frame.s_axis.v, w_te),
+                field::cplx_scale_real(frame.p_out.v, w_tm));
             d_value = field::c3_add(
-                field::cplx_scale_real(frame.s_axis, d_te),
-                field::cplx_scale_real(frame.p_out, d_tm));
+                field::c3_add(
+                    field::cplx_scale_real(frame.s_axis.d, w_te),
+                    field::cplx_scale_real(frame.s_axis.v, d_w_te)),
+                field::c3_add(
+                    field::cplx_scale_real(frame.p_out.d, w_tm),
+                    field::cplx_scale_real(frame.p_out.v, d_w_tm)));
+            outgoing = frame.reflected_direction;
+            previous = hit;
         }
-        const field::Complex d_propagation = field::cplx_mul_real(
-            chain.propagation_dfreq, tangent_frequency);
-        const field::Complex3 value_final = field::c3_scale(
-            chain.value_chain, chain.propagation);
+        const ad::DualF3 target_dual = load_dual3f(target, tangent_target, index);
+        const ad::DualF3 final_offset = ad::df3_sub(target_dual, previous);
+        const ad::DualF3 final_direction = ad::dual_safe_normalize(
+            final_offset, outgoing);
+        const ad::DualF final_length = ad::dual_safe_length(final_offset);
+        total_length.v += final_length.v;
+        total_length.d += final_length.d;
+        const float wave_number =
+            2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
+        const float amplitude = 1.0f /
+                                (2.0f * wave_number *
+                                 fmaxf(total_length.v, field::UTD_EPS));
+        const field::Complex propagation = field::cplx_mul_real(
+            field::cplx_exp_phase(
+                transport::precise_neg_kd(wave_number, total_length.v)),
+            amplitude);
+        const field::Complex dlog_freq = field::cplx(
+            -1.0f / wave_number, -total_length.v);
+        const field::Complex propagation_dfreq = field::cplx_mul_real(
+            field::cplx_mul(propagation, dlog_freq),
+            2.0f * field::UTD_PI / transport::kSpeedOfLight);
+        const float length_gate =
+            total_length.v >= field::UTD_EPS
+                ? 1.0f / fmaxf(total_length.v, field::UTD_EPS)
+                : 0.0f;
+        const field::Complex propagation_dlength = field::cplx_mul(
+            propagation, field::cplx(-length_gate, -wave_number));
+        const field::Complex d_propagation = field::cplx_add(
+            field::cplx_mul_real(propagation_dfreq, tangent_frequency),
+            field::cplx_mul_real(propagation_dlength, total_length.d));
+        const ad::DualF3 rx_axis = ad::dual_stable_perp_basis(
+            final_direction, ad::df3_const(load3f(rx_polarization, index)));
+        const field::Complex3 value_final = field::c3_scale(value, propagation);
         const field::Complex3 d_final = field::c3_add(
-            field::c3_scale(d_value, chain.propagation),
-            field::c3_scale(chain.value_chain, d_propagation));
+            field::c3_scale(d_value, propagation),
+            field::c3_scale(value, d_propagation));
         write_output_tangents(
-            index, value_final, d_final, chain.rx_axis, chain.amplitude_scale,
-            t_field_vector, t_coefficient, t_path_field, t_path_gain);
+            index, value_final, d_final, rx_axis.v, rx_axis.d,
+            sqrtf(fmaxf(tx_power[index], 0.0f)), total_length.d,
+            t_field_vector, t_coefficient, t_path_field, t_path_gain,
+            t_path_length, t_delay);
     }
 }
 
@@ -602,10 +964,12 @@ __global__ void reflection_sequence_jvp_kernel(
 
 struct TransmissionChain {
     transport::WallFrame frames[kMaxAdDepth];
+    field::Complex3 value_in[kMaxAdDepth];  // field entering each wall
     field::Complex e_s[kMaxAdDepth];
     field::Complex e_p[kMaxAdDepth];
     field::Complex t_te[kMaxAdDepth];
     field::Complex t_tm[kMaxAdDepth];
+    float wall_thickness[kMaxAdDepth];
     int wall_material[kMaxAdDepth];  // -1 for skipped slots
     field::float3a direction;
     field::float3a rx_axis;
@@ -613,6 +977,7 @@ struct TransmissionChain {
     field::Complex propagation;
     field::Complex propagation_dfreq;
     field::Complex propagation_dcarrier;
+    field::Complex propagation_dtotal;  // amplitude spread over the raw length
     float total_length;
     float carrier_length;
     float amplitude_scale;
@@ -667,6 +1032,7 @@ __device__ void transmission_chain_eval(
         const field::Complex e_s = transport::complex3_dot_real(value, frame.s_axis);
         const field::Complex e_p = transport::complex3_dot_real(value, frame.p_axis);
         chain.frames[wall] = frame;
+        chain.value_in[wall] = value;
         chain.e_s[wall] = e_s;
         chain.e_p[wall] = e_p;
         chain.t_te[wall] = te.t;
@@ -681,6 +1047,7 @@ __device__ void transmission_chain_eval(
         for (int layer = 0; layer < layers_in_wall; ++layer)
             wall_thickness += fmaxf(
                 layers_base.layer_thickness_m[first + layer], 0.0f);
+        chain.wall_thickness[wall] = wall_thickness;
         carrier_length -= wall_thickness * frame.cos_theta;
     }
     const float wave_number =
@@ -698,14 +1065,20 @@ __device__ void transmission_chain_eval(
     chain.propagation = propagation;
     chain.carrier_length = carrier_length;
     // dP/df = P * (-1/k - j*carrier) * (2*pi/c); the amplitude spreads over
-    // the full straight length (constant), the phase runs over the carrier
-    // length (thickness dependent, handled via dP/dcarrier = -j*k*P).
+    // the full straight length (geometry, handled via dP/dtotal), the phase
+    // runs over the carrier length (thickness and cos_theta dependent,
+    // handled via dP/dcarrier = -j*k*P).
     const field::Complex dlog = field::cplx(-1.0f / wave_number, -carrier_length);
     chain.propagation_dfreq = field::cplx_mul_real(
         field::cplx_mul(propagation, dlog),
         2.0f * field::UTD_PI / transport::kSpeedOfLight);
     chain.propagation_dcarrier = field::cplx(
         propagation.im * wave_number, -propagation.re * wave_number);
+    const float length_gate =
+        chain.total_length >= field::UTD_EPS
+            ? 1.0f / fmaxf(chain.total_length, field::UTD_EPS)
+            : 0.0f;
+    chain.propagation_dtotal = field::cplx_mul_real(propagation, -length_gate);
     chain.amplitude_scale = sqrtf(fmaxf(tx_power[index], 0.0f));
 }
 
@@ -765,10 +1138,15 @@ __global__ void transmission_sequence_backward_kernel(
     const c10::complex<float>* grad_coefficient,
     const c10::complex<float>* grad_path_field,
     const float* grad_path_gain,
+    const float* grad_path_length,
+    const float* grad_delay,
     float* grad_layer_thickness,
     float* grad_layer_eps_r,
     float* grad_layer_sigma_e,
-    float* grad_frequency) {
+    float* grad_frequency,
+    float* grad_source,
+    float* grad_target,
+    float* grad_normals) {
     const em::LayerView layers_base{
         layer_offset,
         layer_count,
@@ -778,6 +1156,7 @@ __global__ void transmission_sequence_backward_kernel(
         layer_mu_r,
         0,
     };
+    const bool need_geometry = grad_source != nullptr;
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -796,9 +1175,11 @@ __global__ void transmission_sequence_backward_kernel(
             value_final, chain.rx_axis);
         const field::Complex path_field_value = field::cplx_mul_real(
             scalar, chain.amplitude_scale);
+        field::Complex g_scalar = field::cplx_zero();
         field::Complex3 g_value = fold_output_cotangents(
             grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain,
-            index, chain.rx_axis, path_field_value, chain.amplitude_scale);
+            index, chain.rx_axis, path_field_value, chain.amplitude_scale,
+            g_scalar);
 
         field::Complex g_propagation = field::cplx_zero();
         field::Complex3 g_chain = field::c3_zero();
@@ -815,21 +1196,46 @@ __global__ void transmission_sequence_backward_kernel(
         const float g_carrier = adj_dot(
             g_propagation, chain.propagation_dcarrier);
 
+        // Geometry cotangents (plan 07 AD-2). The straight length L feeds the
+        // amplitude spread, the carrier start (carrier = L - sum_w d_w*cos_w)
+        // and the path_length_m / delay_s outputs; the shared ray direction
+        // feeds the tx/rx bases and every wall frame.
+        field::float3a g_direction = field::f3_zero();
+        float g_total_length = 0.0f;
+        if (need_geometry) {
+            g_total_length = adj_dot(g_propagation, chain.propagation_dtotal) +
+                             g_carrier;
+            if (grad_path_length != nullptr)
+                g_total_length += grad_path_length[index];
+            if (grad_delay != nullptr)
+                g_total_length += grad_delay[index] / transport::kSpeedOfLight;
+            const field::float3a g_rx_axis = field::make_f3(
+                field::cplx_adj_dot(g_scalar, value_final.x),
+                field::cplx_adj_dot(g_scalar, value_final.y),
+                field::cplx_adj_dot(g_scalar, value_final.z));
+            field::float3a g_pol_dump = field::f3_zero();
+            field::adj_stable_perp_basis(
+                chain.direction, load3f(rx_polarization, index), g_rx_axis,
+                g_direction, g_pol_dump);
+        }
+
         for (int64_t wall = depth - 1; wall >= 0; --wall) {
             const int material = chain.wall_material[wall];
             if (material < 0)
                 continue;
             const transport::WallFrame& frame = chain.frames[wall];
-            const field::Complex gs = field::cplx_add(
-                field::cplx_add(
-                    field::cplx_mul_real(g_chain.x, frame.s_axis.x),
-                    field::cplx_mul_real(g_chain.y, frame.s_axis.y)),
-                field::cplx_mul_real(g_chain.z, frame.s_axis.z));
-            const field::Complex gp = field::cplx_add(
-                field::cplx_add(
-                    field::cplx_mul_real(g_chain.x, frame.p_axis.x),
-                    field::cplx_mul_real(g_chain.y, frame.p_axis.y)),
-                field::cplx_mul_real(g_chain.z, frame.p_axis.z));
+            field::float3a g_s_axis = field::f3_zero();
+            field::float3a g_p_axis = field::f3_zero();
+            field::Complex gs = field::cplx_zero();
+            field::Complex gp = field::cplx_zero();
+            field::adj_cplx_scale_real(
+                frame.s_axis,
+                field::cplx_mul(chain.t_te[wall], chain.e_s[wall]),
+                g_chain, g_s_axis, gs);
+            field::adj_cplx_scale_real(
+                frame.p_axis,
+                field::cplx_mul(chain.t_tm[wall], chain.e_p[wall]),
+                g_chain, g_p_axis, gp);
             field::Complex g_t_te = field::cplx_zero();
             field::Complex g_t_tm = field::cplx_zero();
             field::Complex g_e_s = field::cplx_zero();
@@ -838,15 +1244,12 @@ __global__ void transmission_sequence_backward_kernel(
                 chain.t_te[wall], chain.e_s[wall], gs, g_t_te, g_e_s);
             field::adj_cplx_mul(
                 chain.t_tm[wall], chain.e_p[wall], gp, g_t_tm, g_e_p);
-            g_chain.x = field::cplx_add(
-                field::cplx_mul_real(g_e_s, frame.s_axis.x),
-                field::cplx_mul_real(g_e_p, frame.p_axis.x));
-            g_chain.y = field::cplx_add(
-                field::cplx_mul_real(g_e_s, frame.s_axis.y),
-                field::cplx_mul_real(g_e_p, frame.p_axis.y));
-            g_chain.z = field::cplx_add(
-                field::cplx_mul_real(g_e_s, frame.s_axis.z),
-                field::cplx_mul_real(g_e_p, frame.p_axis.z));
+            field::Complex3 g_value_in = field::c3_zero();
+            field::adj_cplx_dot_real(
+                chain.value_in[wall], frame.s_axis, g_e_s, g_value_in, g_s_axis);
+            field::adj_cplx_dot_real(
+                chain.value_in[wall], frame.p_axis, g_e_p, g_value_in, g_p_axis);
+            g_chain = g_value_in;
 
             em::LayerView layers = layers_base;
             layers.material = material;
@@ -862,10 +1265,10 @@ __global__ void transmission_sequence_backward_kernel(
                         continue;
                     const BasisSeed seed{slot, param};
                     const ad::DualStackRT te = ad::stack_rt_dual(
-                        frame.cos_theta, layers, frequency_hz, 0.0f,
+                        frame.cos_theta, layers, frequency_hz, 0.0f, 0.0f,
                         em::kPolTE, seed);
                     const ad::DualStackRT tm = ad::stack_rt_dual(
-                        frame.cos_theta, layers, frequency_hz, 0.0f,
+                        frame.cos_theta, layers, frequency_hz, 0.0f, 0.0f,
                         em::kPolTM, seed);
                     float grad = adj_dot(g_t_te, te.t.d) + adj_dot(g_t_tm, tm.t.d);
                     if (param == 0 && layer_thickness_m[slot] >= 0.0f) {
@@ -878,16 +1281,67 @@ __global__ void transmission_sequence_backward_kernel(
             if (grad_frequency != nullptr) {
                 const ZeroSeed zero_seed;
                 const ad::DualStackRT te = ad::stack_rt_dual(
-                    frame.cos_theta, layers, frequency_hz, 1.0f,
+                    frame.cos_theta, layers, frequency_hz, 0.0f, 1.0f,
                     em::kPolTE, zero_seed);
                 const ad::DualStackRT tm = ad::stack_rt_dual(
-                    frame.cos_theta, layers, frequency_hz, 1.0f,
+                    frame.cos_theta, layers, frequency_hz, 0.0f, 1.0f,
                     em::kPolTM, zero_seed);
                 g_freq += adj_dot(g_t_te, te.t.d) + adj_dot(g_t_tm, tm.t.d);
             }
+            if (!need_geometry)
+                continue;
+
+            // Geometry enters this wall through cos_theta (Fresnel stack and
+            // carrier chord) and through the s/p frame.
+            const ZeroSeed zero_seed;
+            const ad::DualStackRT te_cos = ad::stack_rt_dual(
+                frame.cos_theta, layers, frequency_hz, 1.0f, 0.0f,
+                em::kPolTE, zero_seed);
+            const ad::DualStackRT tm_cos = ad::stack_rt_dual(
+                frame.cos_theta, layers, frequency_hz, 1.0f, 0.0f,
+                em::kPolTM, zero_seed);
+            float g_cos_theta = adj_dot(g_t_te, te_cos.t.d) +
+                                adj_dot(g_t_tm, tm_cos.t.d);
+            g_cos_theta += g_carrier * (-chain.wall_thickness[wall]);
+            field::float3a g_normal_raw = field::f3_zero();
+            ad::adj_wall_frame(
+                chain.direction,
+                load_sequence3f(interaction_normals, index, wall, depth),
+                g_s_axis, g_p_axis, g_cos_theta, g_direction, g_normal_raw);
+            const int64_t normal_base = (index * depth + wall) * 3;
+            grad_normals[normal_base] = g_normal_raw.x;
+            grad_normals[normal_base + 1] = g_normal_raw.y;
+            grad_normals[normal_base + 2] = g_normal_raw.z;
         }
         if (grad_frequency != nullptr)
             atomicAdd(grad_frequency, g_freq);
+        if (!need_geometry)
+            continue;
+
+        // tx_axis cotangent (value_0 = tx_axis * (1 + 0j)), then the shared
+        // straight offset: direction = safe_normalize(target - source, e_z)
+        // and L = safe_length(target - source).
+        const field::float3a g_tx_axis = field::make_f3(
+            g_chain.x.re, g_chain.y.re, g_chain.z.re);
+        field::float3a g_pol_dump = field::f3_zero();
+        field::adj_stable_perp_basis(
+            chain.direction, load3f(tx_polarization, index), g_tx_axis,
+            g_direction, g_pol_dump);
+        const field::float3a offset = field::f3_sub(
+            load3f(target, index), load3f(source, index));
+        field::float3a g_offset = field::f3_zero();
+        field::float3a g_ez_dump = field::f3_zero();
+        field::adj_safe_normalize(
+            offset, field::make_f3(0.0f, 0.0f, 1.0f), g_direction, g_offset,
+            g_ez_dump);
+        ad::adj_safe_length(offset, g_total_length, g_offset);
+        const int64_t base = index * 3;
+        grad_target[base] = g_offset.x;
+        grad_target[base + 1] = g_offset.y;
+        grad_target[base + 2] = g_offset.z;
+        grad_source[base] = -g_offset.x;
+        grad_source[base + 1] = -g_offset.y;
+        grad_source[base + 2] = -g_offset.z;
     }
 }
 
@@ -914,10 +1368,15 @@ __global__ void transmission_sequence_jvp_kernel(
     const float* tangent_layer_eps_r,
     const float* tangent_layer_sigma_e,
     float tangent_frequency,
+    const float* tangent_source,
+    const float* tangent_target,
+    const float* tangent_normals,
     c10::complex<float>* t_field_vector,
     c10::complex<float>* t_coefficient,
     c10::complex<float>* t_path_field,
-    float* t_path_gain) {
+    float* t_path_gain,
+    float* t_path_length,
+    float* t_delay) {
     const em::LayerView layers_base{
         layer_offset,
         layer_count,
@@ -947,59 +1406,95 @@ __global__ void transmission_sequence_jvp_kernel(
             t_coefficient[index] = zero;
             t_path_field[index] = zero;
             t_path_gain[index] = 0.0f;
+            t_path_length[index] = 0.0f;
+            t_delay[index] = 0.0f;
             continue;
         }
 
-        field::Complex3 d_value = field::c3_zero();
-        float d_carrier = 0.0f;
+        // Straight-ray geometry duals shared by every wall: the offset feeds
+        // the direction (tx/rx bases and wall frames) and the raw length
+        // (amplitude spread, carrier start, path_length_m / delay_s).
+        const ad::DualF3 e_z = ad::df3_const(field::make_f3(0.0f, 0.0f, 1.0f));
+        const ad::DualF3 offset = ad::df3_sub(
+            load_dual3f(target, tangent_target, index),
+            load_dual3f(source, tangent_source, index));
+        const ad::DualF total_length = ad::dual_safe_length(offset);
+        const ad::DualF3 direction = ad::dual_safe_normalize(offset, e_z);
+        const ad::DualF3 tx_axis = ad::dual_stable_perp_basis(
+            direction, ad::df3_const(load3f(tx_polarization, index)));
+        const ad::DualF3 rx_axis = ad::dual_stable_perp_basis(
+            direction, ad::df3_const(load3f(rx_polarization, index)));
+        field::Complex3 d_value = field::cplx_scale_real(
+            tx_axis.d, field::cplx(1.0f, 0.0f));
+        float d_carrier = total_length.d;
         for (int64_t wall = 0; wall < depth; ++wall) {
             const int material = chain.wall_material[wall];
             if (material < 0)
                 continue;
-            const transport::WallFrame& frame = chain.frames[wall];
+            const ad::DualWallFrame frame = ad::dual_wall_frame(
+                direction,
+                load_dual_sequence3f(
+                    interaction_normals, tangent_normals, index, wall, depth));
             em::LayerView layers = layers_base;
             layers.material = material;
             const ad::DualStackRT te = ad::stack_rt_dual(
-                frame.cos_theta, layers, frequency_hz, tangent_frequency,
-                em::kPolTE, tangent_seed);
+                frame.cos_theta.v, layers, frequency_hz, frame.cos_theta.d,
+                tangent_frequency, em::kPolTE, tangent_seed);
             const ad::DualStackRT tm = ad::stack_rt_dual(
-                frame.cos_theta, layers, frequency_hz, tangent_frequency,
-                em::kPolTM, tangent_seed);
+                frame.cos_theta.v, layers, frequency_hz, frame.cos_theta.d,
+                tangent_frequency, em::kPolTM, tangent_seed);
             const field::Complex e_s = chain.e_s[wall];
             const field::Complex e_p = chain.e_p[wall];
-            const field::Complex d_e_s = transport::complex3_dot_real(
-                d_value, frame.s_axis);
-            const field::Complex d_e_p = transport::complex3_dot_real(
-                d_value, frame.p_axis);
-            const field::Complex d_te = field::cplx_add(
+            const field::Complex3 value_in = chain.value_in[wall];
+            const field::Complex d_e_s = field::cplx_add(
+                transport::complex3_dot_real(d_value, frame.s_axis.v),
+                transport::complex3_dot_real(value_in, frame.s_axis.d));
+            const field::Complex d_e_p = field::cplx_add(
+                transport::complex3_dot_real(d_value, frame.p_axis.v),
+                transport::complex3_dot_real(value_in, frame.p_axis.d));
+            const field::Complex w_te = field::cplx_mul(te.t.v, e_s);
+            const field::Complex w_tm = field::cplx_mul(tm.t.v, e_p);
+            const field::Complex d_w_te = field::cplx_add(
                 field::cplx_mul(te.t.d, e_s), field::cplx_mul(te.t.v, d_e_s));
-            const field::Complex d_tm = field::cplx_add(
+            const field::Complex d_w_tm = field::cplx_add(
                 field::cplx_mul(tm.t.d, e_p), field::cplx_mul(tm.t.v, d_e_p));
             d_value = field::c3_add(
-                field::cplx_scale_real(frame.s_axis, d_te),
-                field::cplx_scale_real(frame.p_axis, d_tm));
+                field::c3_add(
+                    field::cplx_scale_real(frame.s_axis.d, w_te),
+                    field::cplx_scale_real(frame.s_axis.v, d_w_te)),
+                field::c3_add(
+                    field::cplx_scale_real(frame.p_axis.d, w_tm),
+                    field::cplx_scale_real(frame.p_axis.v, d_w_tm)));
+            // Carrier chord: d(wall_thickness * cos_theta) with the clamped
+            // per-layer thickness gates of the primal accumulation.
+            float d_wall_thickness = 0.0f;
             if (tangent_layer_thickness != nullptr) {
                 const int first = layer_offset[material];
                 const int layers_in_wall = layer_count[material];
                 for (int layer = 0; layer < layers_in_wall; ++layer) {
                     const int slot = first + layer;
                     if (layer_thickness_m[slot] >= 0.0f)
-                        d_carrier -=
-                            tangent_layer_thickness[slot] * frame.cos_theta;
+                        d_wall_thickness += tangent_layer_thickness[slot];
                 }
             }
+            d_carrier -= d_wall_thickness * frame.cos_theta.v +
+                         chain.wall_thickness[wall] * frame.cos_theta.d;
         }
         const field::Complex d_propagation = field::cplx_add(
-            field::cplx_mul_real(chain.propagation_dfreq, tangent_frequency),
-            field::cplx_mul_real(chain.propagation_dcarrier, d_carrier));
+            field::cplx_add(
+                field::cplx_mul_real(chain.propagation_dfreq, tangent_frequency),
+                field::cplx_mul_real(chain.propagation_dcarrier, d_carrier)),
+            field::cplx_mul_real(chain.propagation_dtotal, total_length.d));
         const field::Complex3 value_final = field::c3_scale(
             chain.value_chain, chain.propagation);
         const field::Complex3 d_final = field::c3_add(
             field::c3_scale(d_value, chain.propagation),
             field::c3_scale(chain.value_chain, d_propagation));
         write_output_tangents(
-            index, value_final, d_final, chain.rx_axis, chain.amplitude_scale,
-            t_field_vector, t_coefficient, t_path_field, t_path_gain);
+            index, value_final, d_final, chain.rx_axis, rx_axis.d,
+            chain.amplitude_scale, total_length.d,
+            t_field_vector, t_coefficient, t_path_field, t_path_gain,
+            t_path_length, t_delay);
     }
 }
 
@@ -1141,11 +1636,10 @@ pybind11::dict cn_field_free_space_backward(
     pybind11::object grad_coefficient,
     pybind11::object grad_path_field,
     pybind11::object grad_path_gain,
+    pybind11::object grad_path_length,
+    pybind11::object grad_delay,
     bool need_grad_frequency,
     bool need_grad_geometry) {
-    TORCH_CHECK(
-        !need_grad_geometry,
-        "field_free_space geometry gradients arrive with plan 07 AD-2");
     const c10::ScalarType real_dtype = source.scalar_type();
     TORCH_CHECK(
         real_dtype == at::kFloat || real_dtype == at::kDouble,
@@ -1160,6 +1654,8 @@ pybind11::dict cn_field_free_space_backward(
     at::Tensor gc_storage;
     at::Tensor gpf_storage;
     at::Tensor gpg_storage;
+    at::Tensor gpl_storage;
+    at::Tensor gd_storage;
     const at::Tensor* gfv = optional_grad(
         std::move(grad_field_vector), gfv_storage, "grad_field_vector",
         complex_dtype, {count, 3}, source);
@@ -1172,15 +1668,31 @@ pybind11::dict cn_field_free_space_backward(
     const at::Tensor* gpg = optional_grad(
         std::move(grad_path_gain), gpg_storage, "grad_path_gain",
         real_dtype, {count}, source);
+    const at::Tensor* gpl = optional_grad(
+        std::move(grad_path_length), gpl_storage, "grad_path_length",
+        real_dtype, {count}, source);
+    const at::Tensor* gd = optional_grad(
+        std::move(grad_delay), gd_storage, "grad_delay",
+        real_dtype, {count}, source);
 
     pybind11::dict out;
-    if (!need_grad_frequency) {
+    if (!need_grad_frequency && !need_grad_geometry) {
         out["grad_frequency"] = pybind11::none();
+        out["grad_source"] = pybind11::none();
+        out["grad_target"] = pybind11::none();
         return out;
     }
-    auto grad_frequency = zero_filled({1}, source.options());
-    const bool any_grad =
-        gfv != nullptr || gc != nullptr || gpf != nullptr || gpg != nullptr;
+    at::Tensor grad_frequency = need_grad_frequency
+                                    ? zero_filled({1}, source.options())
+                                    : at::Tensor();
+    at::Tensor grad_source = need_grad_geometry
+                                 ? zero_filled({count, 3}, source.options())
+                                 : at::Tensor();
+    at::Tensor grad_target = need_grad_geometry
+                                 ? zero_filled({count, 3}, source.options())
+                                 : at::Tensor();
+    const bool any_grad = gfv != nullptr || gc != nullptr || gpf != nullptr ||
+                          gpg != nullptr || gpl != nullptr || gd != nullptr;
     if (count > 0 && any_grad) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -1198,7 +1710,12 @@ pybind11::dict cn_field_free_space_backward(
                     gc ? gc->data_ptr<c10::complex<float>>() : nullptr,
                     gpf ? gpf->data_ptr<c10::complex<float>>() : nullptr,
                     grad_ptr<float>(gpg),
-                    grad_frequency.data_ptr<float>());
+                    grad_ptr<float>(gpl),
+                    grad_ptr<float>(gd),
+                    need_grad_frequency ? grad_frequency.data_ptr<float>()
+                                        : nullptr,
+                    need_grad_geometry ? grad_source.data_ptr<float>() : nullptr,
+                    need_grad_geometry ? grad_target.data_ptr<float>() : nullptr);
         } else {
             free_space_backward_kernel<double>
                 <<<launch_blocks(count), kBlockSize, 0, stream>>>(
@@ -1213,11 +1730,25 @@ pybind11::dict cn_field_free_space_backward(
                     gc ? gc->data_ptr<c10::complex<double>>() : nullptr,
                     gpf ? gpf->data_ptr<c10::complex<double>>() : nullptr,
                     grad_ptr<double>(gpg),
-                    grad_frequency.data_ptr<double>());
+                    grad_ptr<double>(gpl),
+                    grad_ptr<double>(gd),
+                    need_grad_frequency ? grad_frequency.data_ptr<double>()
+                                        : nullptr,
+                    need_grad_geometry ? grad_source.data_ptr<double>() : nullptr,
+                    need_grad_geometry ? grad_target.data_ptr<double>()
+                                       : nullptr);
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    out["grad_frequency"] = grad_frequency;
+    out["grad_frequency"] = need_grad_frequency
+                                ? pybind11::cast(grad_frequency)
+                                : pybind11::object(pybind11::none());
+    out["grad_source"] = need_grad_geometry
+                             ? pybind11::cast(grad_source)
+                             : pybind11::object(pybind11::none());
+    out["grad_target"] = need_grad_geometry
+                             ? pybind11::cast(grad_target)
+                             : pybind11::object(pybind11::none());
     return out;
 }
 
@@ -1228,7 +1759,9 @@ pybind11::dict cn_field_free_space_jvp(
     at::Tensor tx_polarization,
     at::Tensor rx_polarization,
     double frequency_hz,
-    double tangent_frequency) {
+    double tangent_frequency,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target) {
     const c10::ScalarType real_dtype = source.scalar_type();
     TORCH_CHECK(
         real_dtype == at::kFloat || real_dtype == at::kDouble,
@@ -1239,11 +1772,21 @@ pybind11::dict cn_field_free_space_jvp(
         source, target, tx_power, tx_polarization, rx_polarization,
         frequency_hz, real_dtype);
     const int64_t count = source.size(0);
+    at::Tensor ts_storage;
+    at::Tensor tt_storage;
+    const at::Tensor* t_source = optional_grad(
+        std::move(tangent_source), ts_storage, "tangent_source",
+        real_dtype, {count, 3}, source);
+    const at::Tensor* t_target = optional_grad(
+        std::move(tangent_target), tt_storage, "tangent_target",
+        real_dtype, {count, 3}, source);
     auto complex_options = source.options().dtype(complex_dtype);
     auto t_field_vector = at::empty({count, 3}, complex_options);
     auto t_coefficient = at::empty({count}, complex_options);
     auto t_path_field = at::empty({count}, complex_options);
     auto t_path_gain = at::empty({count}, source.options());
+    auto t_path_length = at::empty({count}, source.options());
+    auto t_delay = at::empty({count}, source.options());
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -1258,10 +1801,14 @@ pybind11::dict cn_field_free_space_jvp(
                     rx_polarization.data_ptr<float>(),
                     static_cast<float>(frequency_hz),
                     static_cast<float>(tangent_frequency),
+                    grad_ptr<float>(t_source),
+                    grad_ptr<float>(t_target),
                     t_field_vector.data_ptr<c10::complex<float>>(),
                     t_coefficient.data_ptr<c10::complex<float>>(),
                     t_path_field.data_ptr<c10::complex<float>>(),
-                    t_path_gain.data_ptr<float>());
+                    t_path_gain.data_ptr<float>(),
+                    t_path_length.data_ptr<float>(),
+                    t_delay.data_ptr<float>());
         } else {
             free_space_jvp_kernel<double>
                 <<<launch_blocks(count), kBlockSize, 0, stream>>>(
@@ -1273,10 +1820,14 @@ pybind11::dict cn_field_free_space_jvp(
                     rx_polarization.data_ptr<double>(),
                     frequency_hz,
                     tangent_frequency,
+                    grad_ptr<double>(t_source),
+                    grad_ptr<double>(t_target),
                     t_field_vector.data_ptr<c10::complex<double>>(),
                     t_coefficient.data_ptr<c10::complex<double>>(),
                     t_path_field.data_ptr<c10::complex<double>>(),
-                    t_path_gain.data_ptr<double>());
+                    t_path_gain.data_ptr<double>(),
+                    t_path_length.data_ptr<double>(),
+                    t_delay.data_ptr<double>());
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -1285,6 +1836,8 @@ pybind11::dict cn_field_free_space_jvp(
     out["coefficient"] = t_coefficient;
     out["path_field"] = t_path_field;
     out["path_gain"] = t_path_gain;
+    out["path_length_m"] = t_path_length;
+    out["delay_s"] = t_delay;
     return out;
 }
 
@@ -1358,15 +1911,14 @@ pybind11::dict cn_field_reflection_sequence_backward(
     pybind11::object grad_coefficient,
     pybind11::object grad_path_field,
     pybind11::object grad_path_gain,
+    pybind11::object grad_path_length,
+    pybind11::object grad_delay,
     bool need_grad_eps_r,
     bool need_grad_sigma_e,
     bool need_grad_gain,
     bool need_grad_thickness,
     bool need_grad_frequency,
     bool need_grad_geometry) {
-    TORCH_CHECK(
-        !need_grad_geometry,
-        "field_reflection_sequence geometry gradients arrive with plan 07 AD-2");
     const int64_t depth = check_reflection_primal(
         source, target, interaction_positions, interaction_normals, tx_power,
         tx_polarization, rx_polarization, eps_r, sigma_e, mu_r, gain, thickness,
@@ -1376,6 +1928,8 @@ pybind11::dict cn_field_reflection_sequence_backward(
     at::Tensor gc_storage;
     at::Tensor gpf_storage;
     at::Tensor gpg_storage;
+    at::Tensor gpl_storage;
+    at::Tensor gd_storage;
     const at::Tensor* gfv = optional_grad(
         std::move(grad_field_vector), gfv_storage, "grad_field_vector",
         at::kComplexFloat, {count, 3}, source);
@@ -1388,6 +1942,12 @@ pybind11::dict cn_field_reflection_sequence_backward(
     const at::Tensor* gpg = optional_grad(
         std::move(grad_path_gain), gpg_storage, "grad_path_gain",
         at::kFloat, {count}, source);
+    const at::Tensor* gpl = optional_grad(
+        std::move(grad_path_length), gpl_storage, "grad_path_length",
+        at::kFloat, {count}, source);
+    const at::Tensor* gd = optional_grad(
+        std::move(grad_delay), gd_storage, "grad_delay",
+        at::kFloat, {count}, source);
 
     auto material_grad = [&](bool needed) {
         return needed ? zero_filled({count, depth}, source.options()) : at::Tensor();
@@ -1399,11 +1959,21 @@ pybind11::dict cn_field_reflection_sequence_backward(
     at::Tensor grad_frequency = need_grad_frequency
                                     ? zero_filled({1}, source.options())
                                     : at::Tensor();
-    const bool any_grad_in =
-        gfv != nullptr || gc != nullptr || gpf != nullptr || gpg != nullptr;
+    at::Tensor grad_source;
+    at::Tensor grad_target;
+    at::Tensor grad_positions;
+    at::Tensor grad_normals;
+    if (need_grad_geometry) {
+        grad_source = zero_filled({count, 3}, source.options());
+        grad_target = zero_filled({count, 3}, source.options());
+        grad_positions = zero_filled({count, depth, 3}, source.options());
+        grad_normals = zero_filled({count, depth, 3}, source.options());
+    }
+    const bool any_grad_in = gfv != nullptr || gc != nullptr || gpf != nullptr ||
+                             gpg != nullptr || gpl != nullptr || gd != nullptr;
     const bool any_grad_out = need_grad_eps_r || need_grad_sigma_e ||
                               need_grad_gain || need_grad_thickness ||
-                              need_grad_frequency;
+                              need_grad_frequency || need_grad_geometry;
     if (count > 0 && any_grad_in && any_grad_out) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -1428,12 +1998,18 @@ pybind11::dict cn_field_reflection_sequence_backward(
                 gc ? gc->data_ptr<c10::complex<float>>() : nullptr,
                 gpf ? gpf->data_ptr<c10::complex<float>>() : nullptr,
                 grad_ptr<float>(gpg),
+                grad_ptr<float>(gpl),
+                grad_ptr<float>(gd),
                 need_grad_eps_r ? grad_eps.data_ptr<float>() : nullptr,
                 need_grad_sigma_e ? grad_sigma.data_ptr<float>() : nullptr,
                 need_grad_gain ? grad_gain_out.data_ptr<float>() : nullptr,
                 need_grad_thickness ? grad_thickness_out.data_ptr<float>()
                                     : nullptr,
-                need_grad_frequency ? grad_frequency.data_ptr<float>() : nullptr);
+                need_grad_frequency ? grad_frequency.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_source.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_target.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_positions.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_normals.data_ptr<float>() : nullptr);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     pybind11::dict out;
@@ -1449,6 +2025,18 @@ pybind11::dict cn_field_reflection_sequence_backward(
     out["grad_frequency"] = need_grad_frequency
                                 ? pybind11::cast(grad_frequency)
                                 : pybind11::object(pybind11::none());
+    out["grad_source"] = need_grad_geometry
+                             ? pybind11::cast(grad_source)
+                             : pybind11::object(pybind11::none());
+    out["grad_target"] = need_grad_geometry
+                             ? pybind11::cast(grad_target)
+                             : pybind11::object(pybind11::none());
+    out["grad_interaction_positions"] =
+        need_grad_geometry ? pybind11::cast(grad_positions)
+                           : pybind11::object(pybind11::none());
+    out["grad_interaction_normals"] =
+        need_grad_geometry ? pybind11::cast(grad_normals)
+                           : pybind11::object(pybind11::none());
     return out;
 }
 
@@ -1470,7 +2058,11 @@ pybind11::dict cn_field_reflection_sequence_jvp(
     pybind11::object tangent_sigma_e,
     pybind11::object tangent_gain,
     pybind11::object tangent_thickness,
-    double tangent_frequency) {
+    double tangent_frequency,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target,
+    pybind11::object tangent_interaction_positions,
+    pybind11::object tangent_interaction_normals) {
     const int64_t depth = check_reflection_primal(
         source, target, interaction_positions, interaction_normals, tx_power,
         tx_polarization, rx_polarization, eps_r, sigma_e, mu_r, gain, thickness,
@@ -1480,6 +2072,10 @@ pybind11::dict cn_field_reflection_sequence_jvp(
     at::Tensor ts_storage;
     at::Tensor tg_storage;
     at::Tensor tt_storage;
+    at::Tensor tsrc_storage;
+    at::Tensor ttgt_storage;
+    at::Tensor tpos_storage;
+    at::Tensor tnrm_storage;
     const at::Tensor* t_eps = optional_grad(
         std::move(tangent_eps_r), te_storage, "tangent_eps_r",
         at::kFloat, {count, depth}, source);
@@ -1492,12 +2088,26 @@ pybind11::dict cn_field_reflection_sequence_jvp(
     const at::Tensor* t_thickness = optional_grad(
         std::move(tangent_thickness), tt_storage, "tangent_thickness",
         at::kFloat, {count, depth}, source);
+    const at::Tensor* t_source = optional_grad(
+        std::move(tangent_source), tsrc_storage, "tangent_source",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* t_target = optional_grad(
+        std::move(tangent_target), ttgt_storage, "tangent_target",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* t_positions = optional_grad(
+        std::move(tangent_interaction_positions), tpos_storage,
+        "tangent_interaction_positions", at::kFloat, {count, depth, 3}, source);
+    const at::Tensor* t_normals = optional_grad(
+        std::move(tangent_interaction_normals), tnrm_storage,
+        "tangent_interaction_normals", at::kFloat, {count, depth, 3}, source);
 
     auto complex_options = source.options().dtype(at::kComplexFloat);
     auto t_field_vector = at::empty({count, 3}, complex_options);
     auto t_coefficient = at::empty({count}, complex_options);
     auto t_path_field = at::empty({count}, complex_options);
     auto t_path_gain = at::empty({count}, source.options());
+    auto t_path_length = at::empty({count}, source.options());
+    auto t_delay = at::empty({count}, source.options());
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -1523,10 +2133,16 @@ pybind11::dict cn_field_reflection_sequence_jvp(
                 grad_ptr<float>(t_gain),
                 grad_ptr<float>(t_thickness),
                 static_cast<float>(tangent_frequency),
+                grad_ptr<float>(t_source),
+                grad_ptr<float>(t_target),
+                grad_ptr<float>(t_positions),
+                grad_ptr<float>(t_normals),
                 t_field_vector.data_ptr<c10::complex<float>>(),
                 t_coefficient.data_ptr<c10::complex<float>>(),
                 t_path_field.data_ptr<c10::complex<float>>(),
-                t_path_gain.data_ptr<float>());
+                t_path_gain.data_ptr<float>(),
+                t_path_length.data_ptr<float>(),
+                t_delay.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     pybind11::dict out;
@@ -1534,6 +2150,8 @@ pybind11::dict cn_field_reflection_sequence_jvp(
     out["coefficient"] = t_coefficient;
     out["path_field"] = t_path_field;
     out["path_gain"] = t_path_gain;
+    out["path_length_m"] = t_path_length;
+    out["delay_s"] = t_delay;
     return out;
 }
 
@@ -1630,14 +2248,13 @@ pybind11::dict cn_field_transmission_sequence_backward(
     pybind11::object grad_coefficient,
     pybind11::object grad_path_field,
     pybind11::object grad_path_gain,
+    pybind11::object grad_path_length,
+    pybind11::object grad_delay,
     bool need_grad_layer_thickness,
     bool need_grad_layer_eps_r,
     bool need_grad_layer_sigma_e,
     bool need_grad_frequency,
     bool need_grad_geometry) {
-    TORCH_CHECK(
-        !need_grad_geometry,
-        "field_transmission_sequence geometry gradients arrive with plan 07 AD-2");
     const auto [depth, material_count] = check_transmission_primal(
         source, target, interaction_positions, interaction_normals,
         interaction_material_id, interaction_valid, tx_power, tx_polarization,
@@ -1649,6 +2266,8 @@ pybind11::dict cn_field_transmission_sequence_backward(
     at::Tensor gc_storage;
     at::Tensor gpf_storage;
     at::Tensor gpg_storage;
+    at::Tensor gpl_storage;
+    at::Tensor gd_storage;
     const at::Tensor* gfv = optional_grad(
         std::move(grad_field_vector), gfv_storage, "grad_field_vector",
         at::kComplexFloat, {count, 3}, source);
@@ -1661,6 +2280,12 @@ pybind11::dict cn_field_transmission_sequence_backward(
     const at::Tensor* gpg = optional_grad(
         std::move(grad_path_gain), gpg_storage, "grad_path_gain",
         at::kFloat, {count}, source);
+    const at::Tensor* gpl = optional_grad(
+        std::move(grad_path_length), gpl_storage, "grad_path_length",
+        at::kFloat, {count}, source);
+    const at::Tensor* gd = optional_grad(
+        std::move(grad_delay), gd_storage, "grad_delay",
+        at::kFloat, {count}, source);
 
     auto layer_grad = [&](bool needed) {
         return needed ? zero_filled({layer_total}, source.options()) : at::Tensor();
@@ -1671,11 +2296,19 @@ pybind11::dict cn_field_transmission_sequence_backward(
     at::Tensor grad_frequency = need_grad_frequency
                                     ? zero_filled({1}, source.options())
                                     : at::Tensor();
-    const bool any_grad_in =
-        gfv != nullptr || gc != nullptr || gpf != nullptr || gpg != nullptr;
+    at::Tensor grad_source;
+    at::Tensor grad_target;
+    at::Tensor grad_normals;
+    if (need_grad_geometry) {
+        grad_source = zero_filled({count, 3}, source.options());
+        grad_target = zero_filled({count, 3}, source.options());
+        grad_normals = zero_filled({count, depth, 3}, source.options());
+    }
+    const bool any_grad_in = gfv != nullptr || gc != nullptr || gpf != nullptr ||
+                             gpg != nullptr || gpl != nullptr || gd != nullptr;
     const bool any_grad_out = need_grad_layer_thickness ||
                               need_grad_layer_eps_r || need_grad_layer_sigma_e ||
-                              need_grad_frequency;
+                              need_grad_frequency || need_grad_geometry;
     if (count > 0 && any_grad_in && any_grad_out) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -1703,11 +2336,16 @@ pybind11::dict cn_field_transmission_sequence_backward(
                 gc ? gc->data_ptr<c10::complex<float>>() : nullptr,
                 gpf ? gpf->data_ptr<c10::complex<float>>() : nullptr,
                 grad_ptr<float>(gpg),
+                grad_ptr<float>(gpl),
+                grad_ptr<float>(gd),
                 need_grad_layer_thickness ? grad_thickness.data_ptr<float>()
                                           : nullptr,
                 need_grad_layer_eps_r ? grad_eps.data_ptr<float>() : nullptr,
                 need_grad_layer_sigma_e ? grad_sigma.data_ptr<float>() : nullptr,
-                need_grad_frequency ? grad_frequency.data_ptr<float>() : nullptr);
+                need_grad_frequency ? grad_frequency.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_source.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_target.data_ptr<float>() : nullptr,
+                need_grad_geometry ? grad_normals.data_ptr<float>() : nullptr);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     pybind11::dict out;
@@ -1723,6 +2361,19 @@ pybind11::dict cn_field_transmission_sequence_backward(
     out["grad_frequency"] = need_grad_frequency
                                 ? pybind11::cast(grad_frequency)
                                 : pybind11::object(pybind11::none());
+    out["grad_source"] = need_grad_geometry
+                             ? pybind11::cast(grad_source)
+                             : pybind11::object(pybind11::none());
+    out["grad_target"] = need_grad_geometry
+                             ? pybind11::cast(grad_target)
+                             : pybind11::object(pybind11::none());
+    // The straight-path transmission field is independent of the crossing
+    // points themselves (the ray is source->target); their gradient is
+    // exactly zero, reported as None so autograd materializes nothing.
+    out["grad_interaction_positions"] = pybind11::none();
+    out["grad_interaction_normals"] =
+        need_grad_geometry ? pybind11::cast(grad_normals)
+                           : pybind11::object(pybind11::none());
     return out;
 }
 
@@ -1746,7 +2397,11 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     pybind11::object tangent_layer_thickness_m,
     pybind11::object tangent_layer_eps_r,
     pybind11::object tangent_layer_sigma_e,
-    double tangent_frequency) {
+    double tangent_frequency,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target,
+    pybind11::object tangent_interaction_positions,
+    pybind11::object tangent_interaction_normals) {
     const auto [depth, material_count] = check_transmission_primal(
         source, target, interaction_positions, interaction_normals,
         interaction_material_id, interaction_valid, tx_power, tx_polarization,
@@ -1757,6 +2412,10 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     at::Tensor tt_storage;
     at::Tensor te_storage;
     at::Tensor ts_storage;
+    at::Tensor tsrc_storage;
+    at::Tensor ttgt_storage;
+    at::Tensor tpos_storage;
+    at::Tensor tnrm_storage;
     const at::Tensor* t_thickness = optional_grad(
         std::move(tangent_layer_thickness_m), tt_storage,
         "tangent_layer_thickness_m", at::kFloat, {layer_total}, source);
@@ -1766,12 +2425,28 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     const at::Tensor* t_sigma = optional_grad(
         std::move(tangent_layer_sigma_e), ts_storage, "tangent_layer_sigma_e",
         at::kFloat, {layer_total}, source);
+    const at::Tensor* t_source = optional_grad(
+        std::move(tangent_source), tsrc_storage, "tangent_source",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* t_target = optional_grad(
+        std::move(tangent_target), ttgt_storage, "tangent_target",
+        at::kFloat, {count, 3}, source);
+    // The crossing points do not enter the straight-path transmission field;
+    // their tangent is validated for ABI symmetry and contributes zero.
+    (void)optional_grad(
+        std::move(tangent_interaction_positions), tpos_storage,
+        "tangent_interaction_positions", at::kFloat, {count, depth, 3}, source);
+    const at::Tensor* t_normals = optional_grad(
+        std::move(tangent_interaction_normals), tnrm_storage,
+        "tangent_interaction_normals", at::kFloat, {count, depth, 3}, source);
 
     auto complex_options = source.options().dtype(at::kComplexFloat);
     auto t_field_vector = at::empty({count, 3}, complex_options);
     auto t_coefficient = at::empty({count}, complex_options);
     auto t_path_field = at::empty({count}, complex_options);
     auto t_path_gain = at::empty({count}, source.options());
+    auto t_path_length = at::empty({count}, source.options());
+    auto t_delay = at::empty({count}, source.options());
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -1799,10 +2474,15 @@ pybind11::dict cn_field_transmission_sequence_jvp(
                 grad_ptr<float>(t_eps),
                 grad_ptr<float>(t_sigma),
                 static_cast<float>(tangent_frequency),
+                grad_ptr<float>(t_source),
+                grad_ptr<float>(t_target),
+                grad_ptr<float>(t_normals),
                 t_field_vector.data_ptr<c10::complex<float>>(),
                 t_coefficient.data_ptr<c10::complex<float>>(),
                 t_path_field.data_ptr<c10::complex<float>>(),
-                t_path_gain.data_ptr<float>());
+                t_path_gain.data_ptr<float>(),
+                t_path_length.data_ptr<float>(),
+                t_delay.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     pybind11::dict out;
@@ -1810,5 +2490,7 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     out["coefficient"] = t_coefficient;
     out["path_field"] = t_path_field;
     out["path_gain"] = t_path_gain;
+    out["path_length_m"] = t_path_length;
+    out["delay_s"] = t_delay;
     return out;
 }

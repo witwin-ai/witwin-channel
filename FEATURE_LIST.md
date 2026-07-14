@@ -90,17 +90,23 @@ priority `scattering > diffraction > transmission > reflection > los`.
   (`thin_sheet_straight_path_approximation`, geometric group delay), and
   event/sample diagnostics.
 
-## Differentiable solving (fixed topology, plan 07 AD-1)
+## Differentiable solving (fixed topology, plan 07 AD-1 / AD-2)
 
 - `deterministic` and `path` accept `ad_mode="jvp" | "vjp"` (default
   `"none"`); `montecarlo.basic` and `montecarlo.bdpt` still reject any
   non-`"none"` mode.
-- Differentiable parameters this phase: material `eps_r` / `sigma_e` /
-  `gain` / `thickness` (per bounce for reflection, per CSR layer for
-  transmission) and the carrier frequency. Hit geometry (endpoints,
-  interaction positions/normals, polarizations, tx_power) and `mu_r` are
-  detached under the fixed-winner contract; requesting their gradient fails
-  with `NotImplementedError` instead of returning silent zeros.
+- Differentiable parameters: material `eps_r` / `sigma_e` / `gain` /
+  `thickness` (per bounce for reflection, per CSR layer for transmission),
+  the carrier frequency, and since AD-2 the continuous hit geometry:
+  TX/RX positions and mesh vertices flow through the native field kernels'
+  geometry adjoints (`source`, `target`, `interaction_positions`,
+  `interaction_normals`). `path_length_m` / `delay_s` are differentiable
+  outputs of the geometry (time-of-arrival losses), with an exactly zero
+  cotangent into materials and frequency. The discrete winner
+  (polarizations, tx_power, `mu_r`, material ids, valid masks) stays fixed;
+  requesting its gradient fails with `NotImplementedError` instead of
+  returning silent zeros, and path birth/death discontinuities remain out
+  of contract (fixed-winner gradients only).
 - Reverse mode: set `requires_grad_(True)` on the compiled material store
   tensors (`scene.compile().materials.eps_r` etc.) and call `.backward()` on
   a loss built from the result's complex coefficients / `path_gain`.
