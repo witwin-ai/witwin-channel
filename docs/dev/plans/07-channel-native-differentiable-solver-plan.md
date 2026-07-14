@@ -11,7 +11,7 @@
 | AD-A0 RayD 可微几何 C-ABI | 已交付 + 已加固 | `1396181`, `0fdfed2`（RayDi: `d13499d`, `bb9d457`） |
 | AD-1 材料/频率 JVP+VJP（T1） | 已交付 + 已加固 | `f6873d8`, `bc6dd5a` |
 | AD-2 TX/RX 位置 + mesh 顶点（T1） | 进行中 | — |
-| AD-3 MC basic 功率图 | 未开始 | — |
+| AD-3 MC basic 功率图 | 已交付（绕射/散射图显式拒绝，推迟到 AD-4） | — |
 | AD-4 多交互收口（绕射/耦合/多反射） | 未开始 | — |
 
 AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 次梯度门用 `>` 导致 `sigma_e = 0`（材料默认初值）梯度恒零；更隐蔽的是 `dc_layer_one_way_phase` 的衰减幅度门用 `exponent < 0`，而 passive 分支在 `sigma_e = 0` 或 `thickness = 0` 时把 `Im(kz)·d` 落在 **-0.0** 上，于是 `amplitude · d_exponent` 被整项吞掉——在 `sigma_e = 0` 处这一项就是层传播子对 sigma 的**全部**一阶效应（该处 dkz/dsigma 纯虚），透射 sigma 梯度因此小了约 20 倍且反号。同一提交还修好了 deterministic 累加在 AD 模式下截断计算图的问题，并让频率 AD 在遇到色散材料时显式失败。
@@ -182,14 +182,14 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 
 **路线修正**：§6 原假设"复用 RayD 可微 accumulation 入口"——**不成立**。RayD 既没有 reflection-accumulation jvp，也没有可用的绕射伴随；MC basic 真正做场求值的两个累加器是 channel_native **自己的**核（`cn_mc_sionna_reflection_accumulate_cuda` @ `kernels/reflection.cu:263`、`cn_mc_sionna_diffraction_tape_accumulate_cuda` @ `kernels/diffraction.cu:1298`），RayD 只负责求交与采样 tape（离散、冻结）。因此伴随核必须写在 channel_native 内。
 
-- [ ] 打通 basic 的材料/频率通路：`basic/solver.py::_host_material_tensors` 把材料 `float()` 成 host 标量（`bdpt_face_material_tensors_from_host` 契约就是 `tuple[float,...]`），AD 模式下改走张量路径（`face_material_field_bundle`）；`float(scene.frequency)` 同理换成活的 0-d 张量；
-- [ ] LoS 功率增益：`mc_los_path_gain_jvp/backward` 补 frequency 切向/余切，并入 `autograd.Function`（tx/rx 位置、tx_power、频率）；
-- [ ] 反射功率图：为 `mc_sionna_reflection_accumulate` 写原生 backward/jvp（`eta_r`/`sigma`/`gain`/`thickness`/`wavelength`，以及 ray origin = tx 位置）；
-- [ ] 绕射功率图：为 `mc_sionna_diffraction_tape_accumulate` 写原生 backward/jvp（同上 + `mu_r`）；
-- [ ] 透射功率图：`straight_transmission_chains` 的透射率对材料/频率可微；`mc_finalize_component_maps` 是纯线性求和，VJP 平凡；
-- [ ] `montecarlo.basic` 的 `Config` 接受 `ad_mode`（同时改 `basic/config.py` 与 `basic/solver.py:41` 两处拦截）；散射分量 + AD 显式拒绝（与 D/P 一致）；
-- [ ] seed 固定使 FD±h 与 AD 复用同一采样序列；跨 seed 梯度方差/CI（见 §9）；
-- [ ] `basic/metadata.py:36-53` 预留的"恰好一次 fused backward/jvp launch"计数契约需按实际的逐分量 launch 重新定义。
+- [x] 打通 basic 的材料/频率通路：`_host_material_tensors` 已删除，反射/绕射材料与厚度统一走编译材料仓（`face_material_field_bundle`，`ad_mode="none"` 与 AD 模式同一来源、同一数值；primal 在 no_grad 下读取）；`float(scene.frequency)` 在 AD 模式换成活的 0-d 张量；
+- [x] LoS 功率增益：`mc_los_path_gain_jvp/backward` 补了 frequency 切向/余切（`d gain_scale/df = -2*gain_scale/f`），并入 `_McLosPathGainAdFunction`（tx/rx 位置、频率；tx_power 按固定拓扑契约显式拒绝）；
+- [x] 反射功率图：`mc_sionna_reflection_accumulate_backward/_jvp`（`eta_r`/`sigma`/`gain`/`thickness`/`wavelength`->frequency；逐 bounce 反向场链 + `legacy_sionna_slab_fresnel_dual` 参数对偶）。**交付偏差：ray origin（tx 位置）的解析梯度恒等于零**——沉积权重 `|Gamma|^2*Omega*(lambda/4pi)^2/(A*|cos|)` 的每个因子只依赖冻结的采样方向、法线与材料，1/d^2 扩散由冻结的射线密度/分箱承载（离散 winner）；已实测验证（对 tx 的中心差分在 h=1e-2 只读到单射线换箱跳变 ~7e-7，h<=1e-3 只剩 float32 重排序噪声），梯度经活图返回精确零；
+- [ ] 绕射功率图：**推迟到 AD-4**——`mc_sionna_diffraction_tape_accumulate` 消费 RayD `compute_pair_contribution`（存储面算子路径），其材料伴随需要 `slab_face_operator` 的对偶且 k/频率切向只有 RayD 的有限差分 `pair_vector_output_jvp_completion`（§3.1（二）已把 UTD 重算/微分归入 AD-4）；`ad_mode != "none"` + diffraction 显式失败；
+- [x] 透射功率图：`em_layer_stack_backward/_jvp`（`stack_rt_dual` 补 cap_r/cap_t 对偶；cos_theta/CSR 层参数/频率），`straight_transmission_chains` 在 AD 模式走 `em_layer_stack_ad`；`mc_finalize_component_maps` 的 VJP 是余切 view + 广播、JVP 复用前向核；LoS/透射图布局与可见性掩码经 `mc_los_grid_maps_ad`（伴随为一只掩码 gather 核）；
+- [x] `montecarlo.basic` 的 `Config` 接受 `ad_mode`；散射与绕射分量 + AD 在 launch 前显式拒绝；
+- [x] seed 固定使 FD±h 与 AD 复用同一采样序列（反射方向为确定性 Fibonacci 球，天然 seed 无关）；跨 seed 梯度稳定性测试就位；
+- [x] `basic/metadata.py` 计数契约重定义为实际注册的伴随 launch（`AdLaunchLedger`：LoS 1 次、布局 Function 各 1 次、反射逐 tx 各 1 次、层栈逐次评估各 1 次；finalize 0 次），`tape_bytes` 为 vjp 实际 save_for_backward 字节，jvp 为 0。
 
 ### AD-4：多交互复场收口（三 solver）
 

@@ -52,6 +52,35 @@ pybind11::dict cn_em_layer_stack_eval(
     torch::Tensor layer_sigma_e,
     torch::Tensor layer_mu_r,
     double frequency_hz);
+pybind11::dict cn_em_layer_stack_backward(
+    torch::Tensor cos_theta,
+    torch::Tensor material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz,
+    pybind11::sequence grad_outputs,
+    bool need_cos_theta,
+    bool need_layers,
+    bool need_frequency);
+pybind11::dict cn_em_layer_stack_jvp(
+    torch::Tensor cos_theta,
+    torch::Tensor material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz,
+    pybind11::object tangent_cos_theta,
+    pybind11::object tangent_layer_thickness,
+    pybind11::object tangent_layer_eps_r,
+    pybind11::object tangent_layer_sigma_e,
+    double tangent_frequency);
 pybind11::dict cn_scattering_table_eval(
     torch::Tensor wi, torch::Tensor wo, torch::Tensor f_te, torch::Tensor f_tm);
 torch::Tensor cn_scattering_table_pdf(
@@ -968,7 +997,11 @@ torch::Tensor cn_mc_los_path_gain_jvp(
     bool has_tx_tangent,
     bool has_power_tangent,
     bool has_rx_tangent,
-    double frequency_hz);
+    double frequency_hz,
+    double frequency_tangent);
+torch::Tensor cn_mc_los_component_maps_adjoint(
+    torch::Tensor grad_maps,
+    torch::Tensor visible);
 torch::Tensor cn_mc_apply_los_visibility(
     torch::Tensor maps,
     torch::Tensor los,
@@ -1006,6 +1039,30 @@ torch::Tensor cn_mc_sionna_reflection_accumulate(
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
     double solid_angle_per_ray, double cell_area);
+pybind11::tuple cn_mc_sionna_reflection_accumulate_backward(
+    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
+    torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
+    torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor grad_output,
+    bool need_materials, bool need_frequency,
+    int64_t contribution_depth, int64_t axis, double plane_position,
+    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
+    int64_t resolution0, int64_t resolution1, double wavelength,
+    double solid_angle_per_ray, double cell_area, double wavelength_dfreq);
+torch::Tensor cn_mc_sionna_reflection_accumulate_jvp(
+    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
+    torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
+    torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor tangent_eta_r, torch::Tensor tangent_sigma,
+    torch::Tensor tangent_gain, torch::Tensor tangent_thickness,
+    bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
+    bool has_tangent_thickness,
+    int64_t contribution_depth, int64_t axis, double plane_position,
+    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
+    int64_t resolution0, int64_t resolution1, double wavelength,
+    double solid_angle_per_ray, double cell_area, double wavelength_tangent);
 torch::Tensor cn_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src);
 torch::Tensor cn_mc_sionna_diffraction_tape_accumulate(
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
@@ -1270,6 +1327,14 @@ PYBIND11_MODULE(_channel_native, module) {
         "em_layer_stack_eval",
         &cn_em_layer_stack_eval,
         "Evaluate shared em/ layer-stack reflection/transmission coefficients for parity tests.");
+    module.def(
+        "em_layer_stack_backward",
+        &cn_em_layer_stack_backward,
+        "Layer-stack VJP over cos_theta, CSR layer parameters and frequency (CUDA duals).");
+    module.def(
+        "em_layer_stack_jvp",
+        &cn_em_layer_stack_jvp,
+        "Layer-stack JVP over cos_theta, CSR layer parameters and frequency (CUDA duals).");
     module.def("scattering_table_eval", &cn_scattering_table_eval,
                "Evaluate a resident Kirchhoff BSDF table with native CUDA.");
     module.def("scattering_table_pdf", &cn_scattering_table_pdf,
@@ -1683,6 +1748,10 @@ PYBIND11_MODULE(_channel_native, module) {
         &cn_mc_los_path_gain_jvp,
         "Compute LoS path-gain JVP with a native CUDA kernel.");
     module.def(
+        "mc_los_component_maps_adjoint",
+        &cn_mc_los_component_maps_adjoint,
+        "Gather LoS component-map cotangents back to matrix layout with a CUDA kernel.");
+    module.def(
         "mc_apply_los_visibility",
         &cn_mc_apply_los_visibility,
         "Apply RayDN LoS visibility to one transmitter component map with a CUDA kernel.");
@@ -1702,6 +1771,14 @@ PYBIND11_MODULE(_channel_native, module) {
         "mc_sionna_reflection_accumulate",
         &cn_mc_sionna_reflection_accumulate,
         "Accumulate finite-thickness Sionna/ITU specular reflections from RayDN traces.");
+    module.def(
+        "mc_sionna_reflection_accumulate_backward",
+        &cn_mc_sionna_reflection_accumulate_backward,
+        "Reflection radiomap VJP over materials and frequency under the frozen trace tape.");
+    module.def(
+        "mc_sionna_reflection_accumulate_jvp",
+        &cn_mc_sionna_reflection_accumulate_jvp,
+        "Reflection radiomap JVP over materials and frequency under the frozen trace tape.");
     module.def(
         "mc_diffraction_state_wi",
         &cn_mc_diffraction_state_wi,

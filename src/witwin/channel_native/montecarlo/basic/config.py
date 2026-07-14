@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from witwin.channel_native.core.components import (
+    AD_MODES as _VALID_AD_MODES,
     BOUNCE_COMPONENTS as _BOUNCE_COMPONENTS,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
-    NO_AD_MODES as _VALID_AD_MODES,
     validated_components,
 )
 
@@ -40,8 +40,8 @@ class Config:
             raise RuntimeError("MC basic scattering requires max_depth >= 1")
         if self.ad_mode not in _VALID_AD_MODES:
             raise ValueError(
-                "montecarlo_basic supports_ad=False in the first replacement release; "
-                "ad_mode must be 'none'"
+                "montecarlo_basic ad_mode must be one of "
+                f"{sorted(_VALID_AD_MODES)}"
             )
         if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
             raise ValueError("workspace_limit_bytes must be non-negative")

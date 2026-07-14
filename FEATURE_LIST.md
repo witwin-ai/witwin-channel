@@ -90,11 +90,11 @@ priority `scattering > diffraction > transmission > reflection > los`.
   (`thin_sheet_straight_path_approximation`, geometric group delay), and
   event/sample diagnostics.
 
-## Differentiable solving (fixed topology, plan 07 AD-1 / AD-2)
+## Differentiable solving (fixed topology, plan 07 AD-1 / AD-2 / AD-3)
 
-- `deterministic` and `path` accept `ad_mode="jvp" | "vjp"` (default
-  `"none"`); `montecarlo.basic` and `montecarlo.bdpt` still reject any
-  non-`"none"` mode.
+- `deterministic`, `path` and `montecarlo.basic` accept
+  `ad_mode="jvp" | "vjp"` (default `"none"`); `montecarlo.bdpt` still
+  rejects any non-`"none"` mode.
 - Differentiable parameters: material `eps_r` / `sigma_e` / `gain` /
   `thickness` (per bounce for reflection, per CSR layer for transmission),
   the carrier frequency, and since AD-2 the continuous hit geometry:
@@ -127,6 +127,21 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `ad_mode != "none"` (differentiable versions arrive with plan 07 AD-4).
 - The reserved `psdr` solver stub has been removed; AD lives in the existing
   solvers' `ad_mode`.
+- Monte Carlo basic power map AD (plan 07 AD-3): the incoherent
+  `Result.path_gain` radiomap/matrix differentiates with respect to the
+  compiled material store leaves (per-face `eps_r` / `sigma_e` / `gain` /
+  `thickness` for the reflection map, per-CSR-layer parameters for the
+  transmission map), the carrier frequency (including the LoS
+  `(lambda/4pi)^2` aperture and the radiomap deposit weight), and the LoS
+  TX/RX point positions. Materials come from the compiled store in BOTH
+  `ad_mode="none"` and the AD modes (one source, same values; the old
+  host-float flattening is gone). The RayD trace/sampling tapes, sampled
+  directions, deposit binning and visibility masks are frozen winners; the
+  reflection deposit weight is analytically independent of the ray origin,
+  so the transmitter-position gradient of the reflection map is an exact
+  zero (delivered through a live graph, not a missing gradient). Grid
+  receivers expose no per-receiver position leaf (the grid is the output).
+  Diffraction and scattering maps reject AD until plan 07 AD-4.
 
 ## Reference implementation
 

@@ -40,6 +40,15 @@ float los_gain_scale(double frequency_hz) {
     return static_cast<float>(scale * scale);
 }
 
+// d(gain_scale)/d(frequency): gain_scale = (c / (4 pi f))^2, so the frequency
+// derivative is -2 * gain_scale / f (computed in double before narrowing).
+float los_gain_scale_dfreq(double frequency_hz) {
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+    const double wavelength = kLightSpeedMetersPerSecond / frequency_hz;
+    const double scale = wavelength / 12.566370614359172;
+    return static_cast<float>(-2.0 * scale * scale / frequency_hz);
+}
+
 __global__ void path_los_export_kernel(
     const float *__restrict__ tx_positions,
     const float *__restrict__ tx_power,
@@ -86,11 +95,13 @@ __global__ void los_path_gain_backward_kernel(
     float *__restrict__ grad_tx,
     float *__restrict__ grad_power,
     float *__restrict__ grad_rx,
+    float *__restrict__ grad_frequency,
     int64_t tx_count,
     int64_t rx_count,
     int64_t grad_stride0,
     int64_t grad_stride1,
-    float gain_scale) {
+    float gain_scale,
+    float gain_scale_dfreq) {
     const int64_t pair_count = tx_count * rx_count;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -109,7 +120,13 @@ __global__ void los_path_gain_backward_kernel(
         const float safe_distance = fmaxf(distance, 1.0e-6f);
         const float inv_d2 = 1.0f / (safe_distance * safe_distance);
         atomicAdd(grad_power + tx, go * gain_scale * inv_d2);
-        if (distance <= 1.0e-6f) {
+        if (grad_frequency != nullptr) {
+            // gain = P * gain_scale(f) / d^2; only gain_scale carries f.
+            atomicAdd(grad_frequency, go * tx_power[tx] * gain_scale_dfreq * inv_d2);
+        }
+        // Position gradients follow the clamp_min pass-through convention
+        // (>= keeps the boundary subgradient, matching the tests/ad oracle).
+        if (distance < 1.0e-6f) {
             continue;
         }
         const float coeff = go * 2.0f * tx_power[tx] * gain_scale * inv_d2 * inv_d2;
@@ -138,7 +155,8 @@ __global__ void los_path_gain_jvp_kernel(
     bool has_tx_tangent,
     bool has_power_tangent,
     bool has_rx_tangent,
-    float gain_scale) {
+    float gain_scale,
+    float gain_scale_dfreq_tangent) {
     const int64_t pair_count = tx_count * rx_count;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -159,7 +177,10 @@ __global__ void los_path_gain_jvp_kernel(
         if (has_power_tangent) {
             tangent += power_tangent[tx] * gain_scale * inv_d2;
         }
-        if (distance > 1.0e-6f) {
+        // Frequency tangent, pre-folded on the host into
+        // d(gain_scale)/df * t_f so a zero tangent costs one fma.
+        tangent += tx_power[tx] * gain_scale_dfreq_tangent * inv_d2;
+        if (distance >= 1.0e-6f) {
             const float coeff = 2.0f * tx_power[tx] * gain_scale * inv_d2 * inv_d2;
             if (has_rx_tangent) {
                 const float *rx_t = rx_tangent + rx * 3;
@@ -240,6 +261,38 @@ __global__ void apply_los_visibility_public_layout_kernel(
         const int64_t col = cell - row * cols;
         const float gain = visible[cell] ? los[(tx_index * rows + row) * cols + col] : 0.0f;
         maps[(tx_index * rows + row) * cols + col] = gain;
+    }
+}
+
+// Adjoint of the (visibility-masked) LoS component-map layout: the forward is
+// maps[tx, col, row] = visible[tx, cell] * los[tx, cell] with
+// cell = row * cols + col (identity mask when visible == nullptr), a pure
+// permutation times a frozen 0/1 mask, so the adjoint gathers the map
+// cotangent back into matrix layout under the same mask.
+__global__ void los_component_maps_adjoint_kernel(
+    const float *__restrict__ grad_maps,
+    const bool *__restrict__ visible,
+    float *__restrict__ grad_matrix,
+    int64_t tx_count,
+    int64_t rows,
+    int64_t cols,
+    int64_t grad_stride0,
+    int64_t grad_stride1,
+    int64_t grad_stride2) {
+    const int64_t element_count = tx_count * rows * cols;
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         idx < element_count;
+         idx += stride) {
+        const int64_t cell = idx % (rows * cols);
+        const int64_t tx = idx / (rows * cols);
+        const int64_t row = cell / cols;
+        const int64_t col = cell - row * cols;
+        const bool pass =
+            visible == nullptr || visible[tx * rows * cols + cell];
+        grad_matrix[idx] =
+            pass ? grad_maps[tx * grad_stride0 + col * grad_stride1 + row * grad_stride2]
+                 : 0.0f;
     }
 }
 
@@ -362,7 +415,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     return {tx_id, rx_id, path_length, delay, path_gain, path_gain_matrix};
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
     at::Tensor rx_positions,
@@ -384,6 +437,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda
     auto grad_tx = at::empty_like(tx_positions);
     auto grad_power = at::empty_like(tx_power);
     auto grad_rx = at::empty_like(rx_positions);
+    auto grad_frequency = at::empty({1}, tx_positions.options());
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
     if (grad_tx.numel() > 0) {
         C10_CUDA_CHECK(cudaMemsetAsync(grad_tx.data_ptr<float>(), 0, grad_tx.numel() * sizeof(float), stream));
@@ -394,6 +448,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda
     if (grad_rx.numel() > 0) {
         C10_CUDA_CHECK(cudaMemsetAsync(grad_rx.data_ptr<float>(), 0, grad_rx.numel() * sizeof(float), stream));
     }
+    C10_CUDA_CHECK(cudaMemsetAsync(grad_frequency.data_ptr<float>(), 0, sizeof(float), stream));
 
     const int64_t tx_count = tx_positions.size(0);
     const int64_t rx_count = rx_positions.size(0);
@@ -408,14 +463,16 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda
             grad_tx.data_ptr<float>(),
             grad_power.data_ptr<float>(),
             grad_rx.data_ptr<float>(),
+            grad_frequency.data_ptr<float>(),
             tx_count,
             rx_count,
             grad_output.stride(0),
             grad_output.stride(1),
-            los_gain_scale(frequency_hz));
+            los_gain_scale(frequency_hz),
+            los_gain_scale_dfreq(frequency_hz));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    return {grad_tx, grad_power, grad_rx};
+    return {grad_tx, grad_power, grad_rx, grad_frequency};
 }
 
 at::Tensor cn_mc_los_path_gain_jvp_cuda(
@@ -428,7 +485,8 @@ at::Tensor cn_mc_los_path_gain_jvp_cuda(
     bool has_tx_tangent,
     bool has_power_tangent,
     bool has_rx_tangent,
-    double frequency_hz) {
+    double frequency_hz,
+    double frequency_tangent) {
     check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
     check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
     check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
@@ -473,7 +531,10 @@ at::Tensor cn_mc_los_path_gain_jvp_cuda(
             has_tx_tangent,
             has_power_tangent,
             has_rx_tangent,
-            los_gain_scale(frequency_hz));
+            los_gain_scale(frequency_hz),
+            static_cast<float>(
+                static_cast<double>(los_gain_scale_dfreq(frequency_hz)) *
+                frequency_tangent));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return out;
@@ -519,6 +580,45 @@ at::Tensor cn_mc_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t row
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return maps;
+}
+
+at::Tensor cn_mc_los_component_maps_adjoint_cuda(
+    at::Tensor grad_maps,
+    at::Tensor visible) {
+    check_cuda_tensor_rank(grad_maps, "grad_maps", at::kFloat, 3);
+    const int64_t tx_count = grad_maps.size(0);
+    const int64_t cols = grad_maps.size(1);
+    const int64_t rows = grad_maps.size(2);
+    const bool has_visible = visible.numel() > 0;
+    if (has_visible) {
+        check_cuda_tensor(visible, "visible", at::kBool, 2);
+        TORCH_CHECK(
+            visible.size(0) == tx_count && visible.size(1) == rows * cols,
+            "visible must have shape (tx, rows * cols)");
+        TORCH_CHECK(
+            visible.get_device() == grad_maps.get_device(),
+            "visible must share grad_maps device");
+    }
+    auto grad_matrix = at::empty({tx_count, rows * cols}, grad_maps.options());
+    const int64_t element_count = grad_matrix.numel();
+    if (element_count > 0) {
+        cudaStream_t stream =
+            at::cuda::getCurrentCUDAStream(grad_maps.get_device()).stream();
+        const int block_count = static_cast<int>(
+            (element_count + kLosBlockSize - 1) / kLosBlockSize);
+        los_component_maps_adjoint_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+            grad_maps.data_ptr<float>(),
+            has_visible ? visible.data_ptr<bool>() : nullptr,
+            grad_matrix.data_ptr<float>(),
+            tx_count,
+            rows,
+            cols,
+            grad_maps.stride(0),
+            grad_maps.stride(1),
+            grad_maps.stride(2));
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return grad_matrix;
 }
 
 at::Tensor cn_mc_apply_los_visibility_cuda(

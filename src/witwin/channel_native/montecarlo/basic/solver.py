@@ -8,23 +8,26 @@ from witwin.channel_native import ReceiverGrid, Scene
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import effective_sigma_e
+from witwin.channel_native.core.material_runtime import face_material_field_bundle
 from witwin.channel_native.core.memory_budget import (
     enforce_memory_budget,
     estimate_monte_carlo_memory,
 )
+from witwin.channel_native.core.path_topology import (
+    _require_frequency_ad_constant_materials,
+)
 from witwin.channel_native.core.receiver_geometry import first_receiver_grid
 from witwin.channel_native.core.kernels.ops import (
-    bdpt_face_material_tensors_from_host,
     mc_component_map_buffer,
     mc_finalize_component_maps,
+    mc_finalize_component_maps_ad,
     mc_point_component_power,
     mc_zero_matrix,
 )
 
 from .backend import apply_point_los_visibility, los_path_gain
 from .config import Config
-from .metadata import make_solver_metadata
+from .metadata import AdLaunchLedger, make_solver_metadata
 from .raydn_components import (
     component_grid_shape,
     diffraction_component_map,
@@ -37,9 +40,23 @@ from .result import Result
 from .sampling import make_cuda_generator
 
 
+# Components whose Monte Carlo power maps have no AD companions yet: the
+# diffraction accumulator consumes RayD's UTD pair contribution whose material
+# and frequency adjoints arrive with the plan 07 AD-4 wedge-field recompute,
+# and the Kirchhoff scattering map is deferred with it. Fail before any launch
+# instead of returning silently detached maps.
+_AD_PENDING_COMPONENTS = ("diffraction", "scattering")
+
+
 def _validate_ad_config(config: Config) -> None:
-    if config.ad_mode != "none":
-        raise RuntimeError("MC basic ad_mode must be 'none'")
+    if config.ad_mode == "none":
+        return
+    for name in _AD_PENDING_COMPONENTS:
+        if name in config.components:
+            raise RuntimeError(
+                f"MC basic ad_mode='{config.ad_mode}' does not support the "
+                f"{name} component yet (plan 07 AD-4)"
+            )
 
 
 def _receiver_count(scene: Scene) -> int:
@@ -67,34 +84,33 @@ def _enforce_workspace_budget(scene: Scene, config: Config) -> None:
     )
 
 
-def _host_material_tensors(scene: Scene) -> tuple[torch.Tensor, ...]:
-    material_eps_r: list[float] = []
-    material_sigma_e: list[float] = []
-    material_mu_r: list[float] = []
-    face_material_id: list[int] = []
-    for material_id, structure in enumerate(scene.structures):
-        params = structure.material.parameters(scene.frequency)
-        material_eps_r.append(float(params["eps_r"]))
-        material_sigma_e.append(effective_sigma_e(params))
-        material_mu_r.append(float(params["mu_r"]))
-        face_material_id.extend([material_id] * int(structure.faces.shape[0]))
-    if not material_eps_r:
-        material_eps_r = [1.0]
-        material_sigma_e = [0.0]
-        material_mu_r = [1.0]
-    exported = bdpt_face_material_tensors_from_host(
-        tuple(material_eps_r),
-        tuple(material_sigma_e),
-        tuple(material_mu_r),
-        tuple(face_material_id),
-    )
-    return (
-        exported["eps_r"],
-        exported["sigma_e"],
-        exported["mu_r"],
-        exported["gain"],
-        exported["valid"],
-    )
+def _face_material_tensors(
+    scene: Scene, *, device: torch.device, ad: bool
+) -> tuple[torch.Tensor, ...]:
+    """Per-face material tensors from the compiled material store.
+
+    One material source for both ad_mode="none" and the AD modes (plan 07
+    AD-3): the store leaves (``scene.compile().materials``) are the values the
+    kernels see, so a finite difference taken on the store measures the same
+    function the AD modes differentiate. The primal path reads under no_grad
+    so it never builds a graph.
+    """
+
+    def build() -> tuple[torch.Tensor, ...]:
+        bundle = face_material_field_bundle(scene, device=device)
+        return (
+            bundle["eps_r"],
+            bundle["sigma_e"],
+            bundle["mu_r"],
+            bundle["gain"],
+            bundle["valid"],
+            bundle["thickness"],
+        )
+
+    if ad:
+        return build()
+    with torch.no_grad():
+        return build()
 
 
 def solve(scene: Scene, config: Config) -> Result:
@@ -105,6 +121,11 @@ def solve(scene: Scene, config: Config) -> Result:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.montecarlo.basic requires CUDA")
     _validate_ad_config(config)
+    ad = config.ad_mode != "none"
+    if ad:
+        _require_frequency_ad_constant_materials(
+            scene, scene.compile(), ad_mode=config.ad_mode
+        )
 
     info = build_info()
     reflection_available = bool(info["uses_raydn_native"])
@@ -124,8 +145,11 @@ def solve(scene: Scene, config: Config) -> Result:
     make_cuda_generator(config.seed)
     raydn = scene.raydn_scene()
     grid = first_receiver_grid(scene)
+    ledger = AdLaunchLedger()
     if "los" in config.components:
-        los = los_path_gain(scene, device=device)
+        los = los_path_gain(
+            scene, device=device, ad=ad, ledger=ledger if ad else None
+        )
         if grid is None:
             los = apply_point_los_visibility(scene, raydn, los, device=device)
         path_count = config.samples
@@ -155,7 +179,15 @@ def solve(scene: Scene, config: Config) -> Result:
         )
 
         if "los" in config.components:
-            component_maps["los"] = los_component_map(scene, raydn, grid, device=device, los=los)
+            component_maps["los"] = los_component_map(
+                scene,
+                raydn,
+                grid,
+                device=device,
+                los=los,
+                ad=ad,
+                ledger=ledger if ad else None,
+            )
         else:
             component_maps["los"] = zero_component_map()
         needs_reflection_launch = (
@@ -164,7 +196,7 @@ def solve(scene: Scene, config: Config) -> Result:
         )
         material_tensors = None
         if needs_reflection_launch or ("diffraction" in config.components and diffraction_available):
-            material_tensors = _host_material_tensors(scene)
+            material_tensors = _face_material_tensors(scene, device=device, ad=ad)
         reflection_result = None
         collect_diffraction_wedges = "diffraction" in config.components and diffraction_available
         if needs_reflection_launch:
@@ -179,6 +211,8 @@ def solve(scene: Scene, config: Config) -> Result:
                 device=device,
                 material_tensors=material_tensors,
                 collect_wedges=collect_diffraction_wedges,
+                ad=ad,
+                ledger=ledger if ad else None,
             )
         if "reflection" in config.components and reflection_available and reflection_result is not None:
             component_maps["reflection"] = reflection_result.maps
@@ -215,6 +249,8 @@ def solve(scene: Scene, config: Config) -> Result:
                 max_depth=config.max_depth,
                 device=device,
                 los=los if "los" in config.components else None,
+                ad=ad,
+                ledger=ledger if ad else None,
             )
             path_count += len(scene.transmitters) * grid_dim0 * grid_dim1
             valid_contribution_count += int(
@@ -240,7 +276,8 @@ def solve(scene: Scene, config: Config) -> Result:
 
     path_gain = los
     if component_maps is not None:
-        finalized = mc_finalize_component_maps(
+        finalize = mc_finalize_component_maps_ad if ad else mc_finalize_component_maps
+        finalized = finalize(
             component_maps["los"],
             component_maps["reflection"],
             component_maps["diffraction"],
@@ -258,7 +295,9 @@ def solve(scene: Scene, config: Config) -> Result:
         if "scattering" in config.components:
             component_power["scattering"] = finalized["scattering_power"]
     else:
-        component_power = mc_point_component_power(los, include_los=("los" in config.components))
+        component_power = mc_point_component_power(
+            los.detach() if ad else los, include_los=("los" in config.components)
+        )
         # Point receivers carry no transmission or scattering map in MC
         # basic; report zero (grid receivers carry the real physics).
         if "transmission" in config.components:
@@ -271,6 +310,7 @@ def solve(scene: Scene, config: Config) -> Result:
         valid_contribution_count=valid_contribution_count,
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
+        ad_ledger=ledger,
     )
     if "scattering" in config.components:
         metadata["scattering"] = {

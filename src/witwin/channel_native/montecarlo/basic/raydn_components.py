@@ -6,6 +6,7 @@ import math
 import torch
 
 from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
 from witwin.channel_native.core.kernels.ops import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
@@ -18,9 +19,11 @@ from witwin.channel_native.core.kernels.ops import (
     deterministic_diffraction_state_pack_selected,
     mc_diffraction_state_wi,
     mc_los_component_maps_from_matrix,
+    mc_los_grid_maps_ad,
     mc_los_visibility_inputs,
     mc_reflection_launch_inputs,
     mc_sionna_reflection_accumulate,
+    mc_sionna_reflection_accumulate_ad,
     mc_sample_directions,
     mc_sionna_diffraction_tape_accumulate,
     mc_store_component_map,
@@ -35,10 +38,7 @@ from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
 )
-from witwin.channel_native.core.material_runtime import (
-    face_material_field_bundle,
-    face_material_thickness,
-)
+from witwin.channel_native.core.material_runtime import face_material_field_bundle
 from witwin.channel_native.core.runtime.raydn import RayDNScene
 from witwin.channel_native.montecarlo.scattering_events import scattering_map_matrix
 from witwin.channel_native.montecarlo.transmission import (
@@ -50,6 +50,15 @@ from witwin.channel_native.montecarlo.transmission import (
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
 
 __all__ = ["_diffraction_edge_geometry"]
+
+
+def _frequency_scalar(scene: Scene) -> float:
+    """Detached scalar carrier read (one host sync per solve at most)."""
+
+    frequency = scene.frequency
+    if isinstance(frequency, torch.Tensor):
+        return float(frequency.detach())
+    return float(frequency)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +79,17 @@ class ReflectionComponentResult:
     wedge_events: tuple[WedgeEventBatch, ...]
 
 
-MaterialTensors = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+# Per-face material tensors from the compiled store (one source for both
+# ad_mode="none" and the AD modes): eps_r, sigma_e, mu_r, gain, valid,
+# thickness.
+MaterialTensors = tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]
 
 
 def _grid_los_matrix(
@@ -79,6 +98,8 @@ def _grid_los_matrix(
     *,
     device: torch.device,
     los: torch.Tensor | None = None,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> torch.Tensor:
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los
@@ -89,7 +110,26 @@ def _grid_los_matrix(
         frequency=scene.frequency,
         metadata=scene.metadata,
     )
-    return los_path_gain(grid_scene, device=device)
+    return los_path_gain(grid_scene, device=device, ad=ad, ledger=ledger)
+
+
+def _grid_visibility_masks(
+    scene: Scene,
+    raydn: RayDNScene,
+    grid: ReceiverGrid,
+    *,
+    device: torch.device,
+) -> torch.Tensor:
+    handle = raydn.require_handle()
+    tx_pos, _ = transmitter_positions(scene, device=device)
+    rx_pos = receiver_grid_points(grid, reference=tx_pos)
+    masks: list[torch.Tensor] = []
+    for tx_index in range(tx_pos.shape[0]):
+        inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
+        masks.append(
+            raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0]
+        )
+    return torch.stack(masks, dim=0)
 
 
 def los_component_map(
@@ -99,8 +139,23 @@ def los_component_map(
     *,
     device: torch.device,
     los: torch.Tensor | None = None,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> torch.Tensor:
-    los = _grid_los_matrix(scene, grid, device=device, los=los)
+    los = _grid_los_matrix(scene, grid, device=device, los=los, ad=ad, ledger=ledger)
+    if ad:
+        # Same layout and visibility kernels behind one autograd Function:
+        # the visibility mask is a frozen winner, the matrix keeps its graph.
+        visible = None
+        if scene.structures:
+            if not raydn.available:
+                raise RuntimeError("LoS visibility requires RayDN native scene capability")
+            visible = _grid_visibility_masks(scene, raydn, grid, device=device)
+        if ledger is not None:
+            ledger.add(visible)
+        return mc_los_grid_maps_ad(
+            los, visible, rows=grid.shape[0], cols=grid.shape[1]
+        )
     maps = mc_los_component_maps_from_matrix(los, rows=grid.shape[0], cols=grid.shape[1])
     if not scene.structures:
         return maps
@@ -128,6 +183,8 @@ def transmission_component_map(
     max_depth: int,
     device: torch.device,
     los: torch.Tensor | None = None,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> torch.Tensor:
     """Straight-penetration transmission radiomap (contract section 4,
     endpoint-connection context).
@@ -151,10 +208,16 @@ def transmission_component_map(
         )
     if not raydn.available:
         raise RuntimeError("transmission requires RayDN native scene capability")
-    los_matrix = _grid_los_matrix(scene, grid, device=device, los=los)
+    los_matrix = _grid_los_matrix(
+        scene, grid, device=device, los=los, ad=ad, ledger=ledger
+    )
     tx_pos, _ = transmitter_positions(scene, device=device)
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
-    bundle = face_material_field_bundle(scene, device=device)
+    if ad:
+        bundle = face_material_field_bundle(scene, device=device)
+    else:
+        with torch.no_grad():
+            bundle = face_material_field_bundle(scene, device=device)
     layer_csr = layer_csr_view(bundle)
     diagonal = scene_diagonal_m(scene)
     rx_count = int(rx_pos.shape[0])
@@ -167,9 +230,11 @@ def transmission_component_map(
             rx_pos,
             face_material_id=bundle["material_id"],
             layer_csr=layer_csr,
-            frequency_hz=float(scene.frequency),
+            frequency_hz=scene.frequency if ad else float(scene.frequency),
             max_depth=int(max_depth),
             scene_diagonal=diagonal,
+            ad=ad,
+            ledger=ledger,
         )
         gains.append(
             torch.where(
@@ -179,6 +244,12 @@ def transmission_component_map(
             )
         )
     matrix = los_matrix * torch.stack(gains, dim=0)
+    if ad:
+        if ledger is not None:
+            ledger.add()
+        return mc_los_grid_maps_ad(
+            matrix, None, rows=grid.shape[0], cols=grid.shape[1]
+        )
     return mc_los_component_maps_from_matrix(
         matrix, rows=grid.shape[0], cols=grid.shape[1]
     )
@@ -241,7 +312,14 @@ def reflection_component_maps_with_wedges(
     device: torch.device,
     material_tensors: MaterialTensors,
     collect_wedges: bool = False,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> ReflectionComponentResult:
+    if ad and collect_wedges:
+        raise RuntimeError(
+            "diffraction wedge collection is a primal-only path; the solver "
+            "rejects diffraction under ad_mode before reaching this launch"
+        )
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
@@ -255,13 +333,25 @@ def reflection_component_maps_with_wedges(
     spec = grid_spec(grid)
     handle = raydn.require_handle()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
-    wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    material_eta_r, material_sigma, _material_mu_r, material_gain, material_valid = material_tensors
-    material_thickness = face_material_thickness(scene, device=device)
+    tx_live = (
+        transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
+    )
+    wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
+    (
+        material_eta_r,
+        material_sigma,
+        _material_mu_r,
+        material_gain,
+        material_valid,
+        material_thickness,
+    ) = material_tensors
     face_normals = raydn.edge_records().face_normals
     solid_angle_per_ray = float(4.0 * math.pi / max(1, int(samples)))
     dim0, dim1 = component_grid_shape(grid)
-    maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
+    ad_maps: list[torch.Tensor] = []
+    maps = None
+    if not ad:
+        maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
         ray_d = _sample_directions(samples, reference=tx_pos)
@@ -277,6 +367,53 @@ def reflection_component_maps_with_wedges(
             active,
             max(1, int(max_depth) + 1),
         )
+        if ad:
+            # Same accumulate kernel behind the autograd Function; the
+            # tx_power scale and the per-tx stack below replicate the
+            # mc_store_scaled_component_map arithmetic value for value.
+            if ledger is not None:
+                ledger.add(
+                    ray_o,
+                    ray_d,
+                    trace[0],
+                    trace[1],
+                    trace[2],
+                    face_normals,
+                    material_eta_r,
+                    material_sigma,
+                    material_gain,
+                    material_valid,
+                    material_thickness,
+                )
+            reflection_map = mc_sionna_reflection_accumulate_ad(
+                tx_live,
+                material_eta_r,
+                material_sigma,
+                material_gain,
+                material_thickness,
+                scene.frequency,
+                ray_o,
+                ray_d,
+                trace[0],
+                trace[1],
+                trace[2],
+                face_normals,
+                material_valid,
+                contribution_depth=int(max_depth),
+                grid_axis=int(spec.axis),
+                grid_position=float(spec.position),
+                grid_coord0_min=float(spec.coord0_min),
+                grid_coord0_max=float(spec.coord0_max),
+                grid_coord1_min=float(spec.coord1_min),
+                grid_coord1_max=float(spec.coord1_max),
+                grid_resolution0=int(spec.resolution0),
+                grid_resolution1=int(spec.resolution1),
+                wavelength=float(wavelength),
+                solid_angle_per_ray=solid_angle_per_ray,
+                grid_cell_area=float(spec.cell_area),
+            )
+            ad_maps.append(reflection_map * tx_power[tx_index])
+            continue
         reflection_map = mc_sionna_reflection_accumulate(
             ray_o,
             ray_d,
@@ -330,31 +467,9 @@ def reflection_component_maps_with_wedges(
                     bounce_depth=torch.zeros_like(prim_id),
                 )
             )
+    if ad:
+        maps = torch.stack(ad_maps, dim=0)
     return ReflectionComponentResult(maps=maps, wedge_events=tuple(wedge_batches))
-
-
-def reflection_component_map(
-    scene: Scene,
-    raydn: RayDNScene,
-    grid: ReceiverGrid,
-    *,
-    samples: int,
-    max_depth: int,
-    seed: int,
-    device: torch.device,
-    material_tensors: MaterialTensors,
-) -> torch.Tensor:
-    return reflection_component_maps_with_wedges(
-        scene,
-        raydn,
-        grid,
-        samples=samples,
-        max_depth=max_depth,
-        seed=seed,
-        device=device,
-        material_tensors=material_tensors,
-        collect_wedges=False,
-    ).maps
 
 
 def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -545,9 +660,15 @@ def diffraction_component_map(
     spec = grid_spec(grid)
     handle = raydn.require_handle()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
-    material_eta_r, material_sigma, material_mu_r, material_gain, material_valid = material_tensors
-    material_thickness = face_material_thickness(scene, device=device)
-    wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
+    (
+        material_eta_r,
+        material_sigma,
+        material_mu_r,
+        material_gain,
+        material_valid,
+        material_thickness,
+    ) = material_tensors
+    wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
     dim0, dim1 = component_grid_shape(grid)
     maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
     edge_geometry: tuple[torch.Tensor, ...] | None = None

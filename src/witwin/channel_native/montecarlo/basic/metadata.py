@@ -1,12 +1,39 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
+
+import torch
 
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.capabilities import capabilities, config_metadata, serialize_config
 from witwin.channel_native.core.components import component_availability_status
 
 from .config import Config
+
+
+@dataclass
+class AdLaunchLedger:
+    """Per-solve accounting of the plan 07 AD-3 companion kernels.
+
+    ``launches`` counts the native backward/jvp companion launches one full
+    reverse pass (vjp) or forward-dual pass (jvp) performs for this solve:
+    one per LoS matrix, one per grid-map layout Function, one per transmitter
+    for the reflection accumulator and one per layer-stack evaluation inside
+    the transmission chain march. The finalize sum registers no native
+    companion (its cotangent is a view). ``tape_bytes`` sums the tensors the
+    reverse pass retains via save_for_backward; forward mode retains nothing
+    past the solve, so jvp reports zero tape.
+    """
+
+    launches: int = 0
+    tape_bytes: int = 0
+
+    def add(self, *saved: object) -> None:
+        self.launches += 1
+        for tensor in saved:
+            if isinstance(tensor, torch.Tensor):
+                self.tape_bytes += tensor.numel() * tensor.element_size()
 
 
 def component_status(
@@ -31,11 +58,16 @@ def make_solver_metadata(
     valid_contribution_count: int,
     reflection_available: bool,
     diffraction_available: bool,
+    ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     forward_launch_count = 1 if valid_contribution_count else 0
-    backward_launch_count = 1 if config.ad_mode == "vjp" and valid_contribution_count else 0
-    jvp_launch_count = 1 if config.ad_mode == "jvp" and valid_contribution_count else 0
-    tape_bytes = valid_contribution_count * 16 if config.ad_mode in {"vjp", "jvp"} else 0
+    # Plan 07 AD-3: report the companion launches this solve actually
+    # registered (see AdLaunchLedger), not the pre-design fused-launch
+    # placeholder. ad_mode="none" wires no companions and retains no tape.
+    ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
+    backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
+    jvp_launch_count = ledger.launches if config.ad_mode == "jvp" else 0
+    tape_bytes = ledger.tape_bytes if config.ad_mode == "vjp" else 0
     raydn_component_enabled = (
         ("reflection" in config.components and reflection_available)
         or ("diffraction" in config.components and diffraction_available)

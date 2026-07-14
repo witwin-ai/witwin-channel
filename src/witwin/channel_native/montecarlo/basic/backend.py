@@ -3,7 +3,12 @@ from __future__ import annotations
 import torch
 
 from witwin.channel_native import Scene
+from witwin.channel_native.core.ad_geometry import (
+    receiver_positions_ad,
+    transmitter_positions_ad,
+)
 from witwin.channel_native.core.kernels.ops import (
+    mc_los_path_gain_ad,
     mc_los_visibility_inputs,
     mc_zero_matrix,
     path_los_export,
@@ -24,12 +29,30 @@ __all__ = [
 ]
 
 
-def los_path_gain(scene: Scene, *, device: torch.device) -> torch.Tensor:
+def los_path_gain(
+    scene: Scene,
+    *,
+    device: torch.device,
+    ad: bool = False,
+    ledger: object | None = None,
+) -> torch.Tensor:
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
     if tx_pos.shape[0] == 0 or rx_pos.shape[0] == 0:
         return mc_zero_matrix(tx_pos, rows=tx_pos.shape[0], cols=rx_pos.shape[0])
 
+    if ad:
+        # Plan 07 AD-3: swap the host-float endpoint tensors for the live
+        # scene leaves (same float32 values) and route through the LoS AD
+        # Function so tx/rx position and frequency gradients survive. Grid
+        # receiver points stay native: a grid exposes no position leaf.
+        tx_live = transmitter_positions_ad(scene, tx_pos, device=device)
+        rx_live = receiver_positions_ad(scene, rx_pos, device=device)
+        if ledger is not None:
+            ledger.add(tx_live, tx_power, rx_live)
+        return mc_los_path_gain_ad(
+            tx_live, tx_power, rx_live, frequency=scene.frequency
+        )
     exported = path_los_export(
         tx_pos,
         tx_power,

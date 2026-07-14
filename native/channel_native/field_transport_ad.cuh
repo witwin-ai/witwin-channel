@@ -379,6 +379,11 @@ __device__ __forceinline__ DualC dc_layer_one_way_phase(
 struct DualStackRT {
     DualC r;
     DualC t;
+    // Power budgets of em::stack_rt (cap_r = |r|^2, cap_t = flux * |t|^2 with
+    // the Re(Y_exit)/Re(Y_entry) flux factor), carried as duals for the
+    // MC transmission radiomap companions (plan 07 AD-3).
+    DualF cap_r;
+    DualF cap_t;
 };
 
 template <typename SeedFn>
@@ -430,6 +435,8 @@ __device__ __forceinline__ DualStackRT stack_rt_dual(
     if (count <= 0) {
         out.r = dc_const(utd::cplx_zero());
         out.t = dc_const(utd::cplx(1.0f, 0.0f));
+        out.cap_r = {0.0f, 0.0f};
+        out.cap_t = {1.0f, 0.0f};
         return out;
     }
 
@@ -489,6 +496,24 @@ __device__ __forceinline__ DualStackRT stack_rt_dual(
 
     out.r = r_total;
     out.t = t_total;
+    // Power budgets, mirroring em::stack_rt (the Re(Y) floor keeps the
+    // pass-through subgradient on the >= side; the flux is a ratio of the
+    // same admittance for the v1 vacuum surround, so its derivative cancels
+    // exactly on the unclamped branch).
+    out.cap_r = {
+        r_total.v.re * r_total.v.re + r_total.v.im * r_total.v.im,
+        2.0f * (r_total.v.re * r_total.d.re + r_total.v.im * r_total.d.im)};
+    const float y_floor = utd::UTD_SMALL_EPS * 1.0e-6f;
+    const float y_entry_re = fmaxf(y_entry.v.re, y_floor);
+    const float d_y_entry_re = y_entry.v.re >= y_floor ? y_entry.d.re : 0.0f;
+    const float flux = y_exit.v.re / y_entry_re;
+    const float d_flux =
+        (y_exit.d.re * y_entry_re - y_exit.v.re * d_y_entry_re) /
+        (y_entry_re * y_entry_re);
+    const float t_abs2 = t_total.v.re * t_total.v.re + t_total.v.im * t_total.v.im;
+    const float d_t_abs2 =
+        2.0f * (t_total.v.re * t_total.d.re + t_total.v.im * t_total.d.im);
+    out.cap_t = {flux * t_abs2, d_flux * t_abs2 + flux * d_t_abs2};
     return out;
 }
 
@@ -1113,6 +1138,177 @@ __device__ __forceinline__ void adj_wall_frame(
     const utd::float3a g_n_unit = flip ? utd::f3_neg(g_normal) : g_normal;
     utd::float3a g_dump = utd::f3_zero();
     adj_safe_normalize(raw_normal, e_z, g_n_unit, g_raw_normal, g_dump);
+}
+
+// ---------------------------------------------------------------------------
+// Dual of the frozen legacy Sionna radiomap slab arithmetic
+// (transport::legacy_sionna_slab_fresnel, plan 07 AD-3). The .v computations
+// replicate the Legacy* helpers verbatim (hypotf sqrt, 1e-30 denominator
+// floor, exp clamp at 80) so a dual replay reproduces the seeded FP32
+// radiomap fingerprints bit for bit; the .d computations follow the same
+// clamp-gate conventions as slab_fresnel_dual above. cos_theta carries no
+// tangent here: the MC radiomap estimator freezes the sampled directions and
+// the winner trace, so the incidence cosine is a constant of the
+// differentiation (plan 07 section 4). Edit the legacy primal helpers and
+// these duals TOGETHER.
+// ---------------------------------------------------------------------------
+
+struct DualLC {
+    transport::LegacySlabComplex v;
+    transport::LegacySlabComplex d;
+};
+
+__device__ __forceinline__ DualLC dlc_const(float re, float im) {
+    return {{re, im}, {0.0f, 0.0f}};
+}
+
+__device__ __forceinline__ DualLC dlc_make(float re, float im, float dre, float dim) {
+    return {{re, im}, {dre, dim}};
+}
+
+__device__ __forceinline__ DualLC dlc_add(DualLC a, DualLC b) {
+    return {transport::legacy_add(a.v, b.v), transport::legacy_add(a.d, b.d)};
+}
+
+__device__ __forceinline__ DualLC dlc_sub(DualLC a, DualLC b) {
+    return {transport::legacy_sub(a.v, b.v), transport::legacy_sub(a.d, b.d)};
+}
+
+__device__ __forceinline__ DualLC dlc_mul(DualLC a, DualLC b) {
+    return {
+        transport::legacy_mul(a.v, b.v),
+        transport::legacy_add(
+            transport::legacy_mul(a.d, b.v), transport::legacy_mul(a.v, b.d))};
+}
+
+__device__ __forceinline__ DualLC dlc_scale_dual(DualLC a, DualF s) {
+    return {
+        transport::legacy_scale(a.v, s.v),
+        transport::legacy_add(
+            transport::legacy_scale(a.d, s.v), transport::legacy_scale(a.v, s.d))};
+}
+
+// Dual of legacy_div (denominator floored at 1e-30; the floored branch keeps
+// the denominator constant, exactly like dc_div_em).
+__device__ __forceinline__ DualLC dlc_div(DualLC a, DualLC b) {
+    const float mag2 = b.v.re * b.v.re + b.v.im * b.v.im;
+    const float denom = fmaxf(mag2, 1.0e-30f);
+    DualLC out;
+    out.v = transport::legacy_div(a.v, b.v);
+    const float d_denom =
+        mag2 > 1.0e-30f ? 2.0f * (b.v.re * b.d.re + b.v.im * b.d.im) : 0.0f;
+    const transport::LegacySlabComplex d_num = transport::legacy_add(
+        transport::legacy_mul(a.d, {b.v.re, -b.v.im}),
+        transport::legacy_mul(a.v, {b.d.re, -b.d.im}));
+    out.d = {
+        (d_num.re - out.v.re * d_denom) / denom,
+        (d_num.im - out.v.im * d_denom) / denom};
+    return out;
+}
+
+// Dual of legacy_sqrt: the value keeps the hypotf/copysignf evaluation of the
+// primal; the derivative uses dw = dz / (2 w) (exact complex division; the
+// derivative is withheld at the branch point, matching dc_sqrt_passive).
+__device__ __forceinline__ DualLC dlc_sqrt(DualLC a) {
+    DualLC out;
+    out.v = transport::legacy_sqrt(a.v);
+    const float w_mag2 = out.v.re * out.v.re + out.v.im * out.v.im;
+    if (w_mag2 <= 1.0e-30f) {
+        out.d = {0.0f, 0.0f};
+        return out;
+    }
+    const float two_w_mag2 = 4.0f * w_mag2;
+    // dz / (2 w) = dz * conj(2 w) / |2 w|^2, written on real pairs.
+    out.d = {
+        (a.d.re * 2.0f * out.v.re + a.d.im * 2.0f * out.v.im) / two_w_mag2,
+        (a.d.im * 2.0f * out.v.re - a.d.re * 2.0f * out.v.im) / two_w_mag2};
+    return out;
+}
+
+// Dual of legacy_exp_neg_2i (growth clamp at exp(80); the clamped branch
+// freezes the amplitude derivative, mirroring dc_exp_neg_2i).
+__device__ __forceinline__ DualLC dlc_exp_neg_2i(DualLC q) {
+    const float exponent = 2.0f * q.v.im;
+    const float amplitude = expf(fminf(exponent, 80.0f));
+    float sine;
+    float cosine;
+    sincosf(2.0f * q.v.re, &sine, &cosine);
+    DualLC out;
+    out.v = {amplitude * cosine, -amplitude * sine};
+    const float d_amplitude =
+        exponent < 80.0f ? amplitude * 2.0f * q.d.im : 0.0f;
+    const float d_theta = 2.0f * q.d.re;
+    out.d = {
+        d_amplitude * cosine - amplitude * sine * d_theta,
+        -(d_amplitude * sine + amplitude * cosine * d_theta)};
+    return out;
+}
+
+// Tangent seeds: d_eps / d_sigma / d_gain / d_thickness / d_wavelength.
+// Outputs are utd-complex duals so the callers can reuse adj_dot.
+__device__ __forceinline__ void legacy_sionna_slab_fresnel_dual(
+    float cos_theta,
+    float eps_r,
+    float sigma_e,
+    float gain,
+    float thickness,
+    float wavelength,
+    float d_eps,
+    float d_sigma,
+    float d_gain,
+    float d_thickness,
+    float d_wavelength,
+    DualC& r_te,
+    DualC& r_tm) {
+    const float wavelength_clamped = fmaxf(wavelength, utd::UTD_SMALL_EPS);
+    const float d_wavelength_clamped =
+        wavelength > utd::UTD_SMALL_EPS ? d_wavelength : 0.0f;
+    const float omega = 2.0f * utd::UTD_PI * transport::kSpeedOfLight /
+                        wavelength_clamped;
+    const float d_omega = -omega * d_wavelength_clamped / wavelength_clamped;
+    const float eps_clamped = fmaxf(eps_r, utd::UTD_SMALL_EPS);
+    const float d_eps_clamped = eps_r > utd::UTD_SMALL_EPS ? d_eps : 0.0f;
+    const float sigma_clamped = fmaxf(sigma_e, 0.0f);
+    const float d_sigma_clamped = sigma_e >= 0.0f ? d_sigma : 0.0f;
+    const float eta_im = -sigma_clamped / (omega * utd::UTD_EPSILON_0);
+    const float d_eta_im =
+        (-d_sigma_clamped / omega + sigma_clamped * d_omega / (omega * omega)) /
+        utd::UTD_EPSILON_0;
+    const DualLC eta = dlc_make(eps_clamped, eta_im, d_eps_clamped, d_eta_im);
+    const float ct = fminf(fmaxf(fabsf(cos_theta), utd::UTD_SMALL_EPS), 1.0f);
+    const float sin2 = fmaxf(0.0f, 1.0f - ct * ct);
+    const DualLC root = dlc_sqrt(dlc_sub(eta, dlc_const(sin2, 0.0f)));
+    const DualLC ct_complex = dlc_const(ct, 0.0f);
+    const DualLC eta_ct = dlc_scale_dual(eta, {ct, 0.0f});
+    const DualLC interface_te = dlc_div(
+        dlc_sub(ct_complex, root), dlc_add(ct_complex, root));
+    const DualLC interface_tm = dlc_div(
+        dlc_sub(eta_ct, root), dlc_add(eta_ct, root));
+    const float thickness_clamped = fmaxf(thickness, 0.0f);
+    const float d_thickness_clamped = thickness >= 0.0f ? d_thickness : 0.0f;
+    const float q_scale = 2.0f * utd::UTD_PI * thickness_clamped /
+                          wavelength_clamped;
+    const float d_q_scale = 2.0f * utd::UTD_PI *
+                            (d_thickness_clamped * wavelength_clamped -
+                             thickness_clamped * d_wavelength_clamped) /
+                            (wavelength_clamped * wavelength_clamped);
+    const DualLC q = dlc_scale_dual(root, {q_scale, d_q_scale});
+    const DualLC phase = dlc_exp_neg_2i(q);
+    const DualLC one = dlc_const(1.0f, 0.0f);
+    const DualLC numerator = dlc_sub(one, phase);
+    const DualF gain_dual = {gain, d_gain};
+    const DualLC result_te = dlc_scale_dual(
+        dlc_div(
+            dlc_mul(interface_te, numerator),
+            dlc_sub(one, dlc_mul(dlc_mul(interface_te, interface_te), phase))),
+        gain_dual);
+    const DualLC result_tm = dlc_scale_dual(
+        dlc_div(
+            dlc_mul(interface_tm, numerator),
+            dlc_sub(one, dlc_mul(dlc_mul(interface_tm, interface_tm), phase))),
+        gain_dual);
+    r_te = dc_make(result_te.v.re, result_te.v.im, result_te.d.re, result_te.d.im);
+    r_tm = dc_make(result_tm.v.re, result_tm.v.im, result_tm.d.re, result_tm.d.im);
 }
 
 }  // namespace channel_native::field_transport_ad

@@ -242,12 +242,17 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
     assert offenders == []
 
 
-def test_mc_basic_solver_uses_native_scene_and_host_material_paths():
-    source = inspect.getsource(mc_basic_solver.solve)
+def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
+    solve_source = inspect.getsource(mc_basic_solver.solve)
+    module_source = inspect.getsource(mc_basic_solver)
 
-    assert ".compile(" not in source
-    assert "face_material_tensors(" not in source
-    assert "scene.raydn_scene()" in source
+    # Plan 07 AD-3: materials come from the compiled store in BOTH
+    # ad_mode="none" and the AD modes (one source, same values); the old
+    # host-float flattening cannot carry a gradient and is gone.
+    assert "scene.raydn_scene()" in solve_source
+    assert "_host_material_tensors" not in module_source
+    assert "bdpt_face_material_tensors_from_host" not in module_source
+    assert "face_material_field_bundle" in module_source
 
 
 def test_bdpt_solver_does_not_use_derived_variance_or_component_map_path_export():

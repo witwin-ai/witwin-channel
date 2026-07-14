@@ -23,6 +23,7 @@ import torch
 
 from witwin.channel_native.core.kernels.ops import (
     bdpt_intersect_forward,
+    em_layer_stack_ad,
     em_layer_stack_eval,
 )
 
@@ -142,9 +143,11 @@ def straight_transmission_chains(
     *,
     face_material_id: torch.Tensor,
     layer_csr: dict[str, torch.Tensor],
-    frequency_hz: float,
+    frequency_hz: float | torch.Tensor,
     max_depth: int,
     scene_diagonal: float,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
     """March straight origin->target segments through up to ``max_depth``
     thin_sheet walls and accumulate the per-wall power transmittance product.
@@ -203,17 +206,44 @@ def straight_transmission_chains(
             .abs()
             .clamp(_MIN_EPSILON_M, 1.0)
         )
-        stack = em_layer_stack_eval(
-            cos_theta.contiguous(),
-            row_material.clamp_min(0).contiguous(),
-            layer_csr["layer_offset"],
-            layer_csr["layer_count"],
-            layer_csr["layer_thickness_m"],
-            layer_csr["layer_eps_r"],
-            layer_csr["layer_sigma_e"],
-            layer_csr["layer_mu_r"],
-            frequency_hz=float(frequency_hz),
-        )
+        if ad:
+            # Plan 07 AD-3: same native stack kernel behind an autograd
+            # Function, so the CSR layer leaves and the frequency keep their
+            # gradients through the per-wall transmittance.
+            if ledger is not None:
+                ledger.add(
+                    cos_theta,
+                    row_material,
+                    layer_csr["layer_offset"],
+                    layer_csr["layer_count"],
+                    layer_csr["layer_thickness_m"],
+                    layer_csr["layer_eps_r"],
+                    layer_csr["layer_sigma_e"],
+                    layer_csr["layer_mu_r"],
+                )
+            stack = em_layer_stack_ad(
+                cos_theta.contiguous(),
+                row_material.clamp_min(0).contiguous(),
+                layer_csr["layer_offset"],
+                layer_csr["layer_count"],
+                layer_csr["layer_thickness_m"],
+                layer_csr["layer_eps_r"],
+                layer_csr["layer_sigma_e"],
+                layer_csr["layer_mu_r"],
+                frequency=frequency_hz,
+            )
+        else:
+            stack = em_layer_stack_eval(
+                cos_theta.contiguous(),
+                row_material.clamp_min(0).contiguous(),
+                layer_csr["layer_offset"],
+                layer_csr["layer_count"],
+                layer_csr["layer_thickness_m"],
+                layer_csr["layer_eps_r"],
+                layer_csr["layer_sigma_e"],
+                layer_csr["layer_mu_r"],
+                frequency_hz=float(frequency_hz),
+            )
         _r_eff, t_eff = unpolarized_power_budgets(stack)
         t_eff = torch.where(material_ok, t_eff, torch.zeros_like(t_eff))
         transmittance[rows] = transmittance.index_select(0, rows) * t_eff

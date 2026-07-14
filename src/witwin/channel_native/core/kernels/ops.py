@@ -4425,6 +4425,266 @@ def em_layer_stack_eval(
     return out
 
 
+def em_layer_stack_backward(
+    cos_theta: torch.Tensor,
+    material_id: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    grad_outputs: tuple[torch.Tensor | None, ...],
+    *,
+    frequency_hz: float,
+    need_cos_theta: bool,
+    need_layers: bool,
+    need_frequency: bool,
+) -> dict[str, torch.Tensor]:
+    if len(grad_outputs) != len(_EM_LAYER_STACK_FIELDS):
+        raise ValueError(
+            "grad_outputs must carry one cotangent slot per stack output"
+        )
+    out = _required_native_op("em_layer_stack_backward")(
+        cos_theta,
+        material_id,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+        list(grad_outputs),
+        bool(need_cos_theta),
+        bool(need_layers),
+        bool(need_frequency),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.em_layer_stack_backward must return a dict")
+    return out
+
+
+def em_layer_stack_jvp(
+    cos_theta: torch.Tensor,
+    material_id: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency_hz: float,
+    tangent_cos_theta: torch.Tensor | None,
+    tangent_layer_thickness: torch.Tensor | None,
+    tangent_layer_eps_r: torch.Tensor | None,
+    tangent_layer_sigma_e: torch.Tensor | None,
+    tangent_frequency: float,
+) -> dict[str, torch.Tensor]:
+    out = _required_native_op("em_layer_stack_jvp")(
+        cos_theta,
+        material_id,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        float(frequency_hz),
+        tangent_cos_theta,
+        tangent_layer_thickness,
+        tangent_layer_eps_r,
+        tangent_layer_sigma_e,
+        float(tangent_frequency),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.em_layer_stack_jvp must return a dict")
+    return out
+
+
+class _EmLayerStackAdFunction(torch.autograd.Function):
+    """Differentiable layer-stack r/t coefficients and power budgets.
+
+    Differentiable inputs: cos_theta (per row), the CSR layer thickness /
+    eps_r / sigma_e and the carrier frequency. layer_mu_r and the CSR
+    topology stay fixed under the plan 07 contract; requesting the mu_r
+    gradient fails loudly. Layer gradients accumulate atomically because the
+    CSR store is shared by every row.
+    """
+
+    @staticmethod
+    def forward(
+        cos_theta,
+        material_id,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        frequency,
+    ):
+        out = em_layer_stack_eval(
+            cos_theta,
+            material_id,
+            layer_offset,
+            layer_count,
+            layer_thickness_m,
+            layer_eps_r,
+            layer_sigma_e,
+            layer_mu_r,
+            frequency_hz=_ad_frequency_value(frequency),
+        )
+        return tuple(out[name] for name in _EM_LAYER_STACK_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        frequency = inputs[8]
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:8]
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, *grad_outputs):
+        none_grads = (None,) * 9
+        _ad_reject_fixed_inputs(
+            "em_layer_stack_ad",
+            ctx.needs_input_grad,
+            ((7, "layer_mu_r"),),
+        )
+        need_cos = bool(ctx.needs_input_grad[0])
+        need_layers = any(bool(ctx.needs_input_grad[i]) for i in (4, 5, 6))
+        need_frequency = bool(ctx.needs_input_grad[8])
+        if not (need_cos or need_layers or need_frequency) or all(
+            value is None for value in grad_outputs
+        ):
+            return none_grads
+        saved = ctx.saved_tensors
+        out = em_layer_stack_backward(
+            *saved,
+            grad_outputs,
+            frequency_hz=ctx.frequency_value,
+            need_cos_theta=need_cos,
+            need_layers=need_layers,
+            need_frequency=need_frequency,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return (
+            out["grad_cos_theta"] if need_cos else None,
+            None,
+            None,
+            None,
+            out["grad_layer_thickness_m"] if ctx.needs_input_grad[4] else None,
+            out["grad_layer_eps_r"] if ctx.needs_input_grad[5] else None,
+            out["grad_layer_sigma_e"] if ctx.needs_input_grad[6] else None,
+            None,
+            grad_frequency,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        t_cos_theta,
+        _t_material_id,
+        _t_layer_offset,
+        _t_layer_count,
+        t_layer_thickness,
+        t_layer_eps_r,
+        t_layer_sigma_e,
+        t_layer_mu_r,
+        t_frequency,
+    ):
+        _ad_reject_fixed_tangents(
+            "em_layer_stack_ad", ((t_layer_mu_r, "layer_mu_r"),)
+        )
+        saved = ctx.saved_tensors
+        tangent_cos = _ad_checked_tangent(
+            "em_layer_stack_ad tangent_cos_theta",
+            _ad_native_tangent_or_none(t_cos_theta),
+            tuple(saved[0].shape),
+        )
+        layer_shape = tuple(saved[4].shape)
+        tangent_thickness = _ad_checked_tangent(
+            "em_layer_stack_ad tangent_layer_thickness_m",
+            _ad_native_tangent_or_none(t_layer_thickness),
+            layer_shape,
+        )
+        tangent_eps = _ad_checked_tangent(
+            "em_layer_stack_ad tangent_layer_eps_r",
+            _ad_native_tangent_or_none(t_layer_eps_r),
+            layer_shape,
+        )
+        tangent_sigma = _ad_checked_tangent(
+            "em_layer_stack_ad tangent_layer_sigma_e",
+            _ad_native_tangent_or_none(t_layer_sigma_e),
+            layer_shape,
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        if (
+            tangent_cos is None
+            and tangent_thickness is None
+            and tangent_eps is None
+            and tangent_sigma is None
+            and tangent_frequency == 0.0
+        ):
+            return (None,) * len(_EM_LAYER_STACK_FIELDS)
+        with torch._C._DisableFuncTorch():
+            out = em_layer_stack_jvp(
+                *(_ad_native_tensor(value) for value in saved),
+                frequency_hz=ctx.frequency_value,
+                tangent_cos_theta=tangent_cos,
+                tangent_layer_thickness=tangent_thickness,
+                tangent_layer_eps_r=tangent_eps,
+                tangent_layer_sigma_e=tangent_sigma,
+                tangent_frequency=tangent_frequency,
+            )
+        return tuple(out[name] for name in _EM_LAYER_STACK_FIELDS)
+
+
+def em_layer_stack_ad(
+    cos_theta: torch.Tensor,
+    material_id: torch.Tensor,
+    layer_offset: torch.Tensor,
+    layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor,
+    *,
+    frequency: torch.Tensor | float,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`em_layer_stack_eval` (plan 07 AD-3)."""
+
+    values = _EmLayerStackAdFunction.apply(
+        cos_theta,
+        material_id,
+        layer_offset,
+        layer_count,
+        layer_thickness_m,
+        layer_eps_r,
+        layer_sigma_e,
+        layer_mu_r,
+        frequency,
+    )
+    return dict(zip(_EM_LAYER_STACK_FIELDS, values, strict=True))
+
+
 def scattering_table_eval(
     wi: torch.Tensor,
     wo: torch.Tensor,
@@ -7656,7 +7916,7 @@ def mc_los_path_gain_backward(
     grad_output: torch.Tensor,
     *,
     frequency_hz: float,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -7691,9 +7951,9 @@ def mc_los_path_gain_backward(
         grad_output,
         float(frequency_hz),
     )
-    if not isinstance(gradients, tuple) or len(gradients) != 3:
+    if not isinstance(gradients, tuple) or len(gradients) != 4:
         raise TypeError(
-            "_channel_native.mc_los_path_gain_backward must return 3 tensors"
+            "_channel_native.mc_los_path_gain_backward must return 4 tensors"
         )
     validate_cuda_tensor(
         "grad_tx", gradients[0], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -7701,6 +7961,9 @@ def mc_los_path_gain_backward(
     validate_cuda_tensor("grad_power", gradients[1], dtype=torch.float32, ndim=1)
     validate_cuda_tensor(
         "grad_rx", gradients[2], dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "grad_frequency", gradients[3], dtype=torch.float32, ndim=1
     )
     if gradients[0].shape != tx_positions.shape:
         raise ValueError(
@@ -7713,6 +7976,10 @@ def mc_los_path_gain_backward(
     if gradients[2].shape != rx_positions.shape:
         raise ValueError(
             "_channel_native.mc_los_path_gain_backward returned bad grad_rx shape"
+        )
+    if gradients[3].shape != (1,):
+        raise ValueError(
+            "_channel_native.mc_los_path_gain_backward returned bad grad_frequency shape"
         )
     return gradients
 
@@ -7729,6 +7996,7 @@ def mc_los_path_gain_jvp(
     has_rx_tangent: bool,
     *,
     frequency_hz: float,
+    frequency_tangent: float = 0.0,
 ) -> torch.Tensor:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -7776,6 +8044,7 @@ def mc_los_path_gain_jvp(
         bool(has_power_tangent),
         bool(has_rx_tangent),
         float(frequency_hz),
+        float(frequency_tangent),
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError("_channel_native.mc_los_path_gain_jvp must return a tensor")
@@ -7819,6 +8088,198 @@ def mc_finalize_component_maps(
     if not isinstance(exported, dict):
         raise TypeError("_channel_native.mc_finalize_component_maps must return a dict")
     return exported
+
+
+_MC_FINALIZE_FIELDS = (
+    "path_gain",
+    "los_power",
+    "reflection_power",
+    "diffraction_power",
+    "transmission_power",
+    "scattering_power",
+)
+
+
+class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
+    """Differentiable component-map finalization (plan 07 AD-3).
+
+    The finalize kernel is a purely linear elementwise sum plus per-component
+    power reductions, so the map cotangent is the path_gain cotangent viewed
+    back to map layout plus the broadcast power cotangent, and the
+    pushforward is the finalize kernel itself applied to the tangents.
+    """
+
+    @staticmethod
+    def forward(los, reflection, diffraction, transmission, scattering):
+        out = mc_finalize_component_maps(
+            los, reflection, diffraction, transmission, scattering
+        )
+        return tuple(out[name] for name in _MC_FINALIZE_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        ctx.map_shape = tuple(inputs[0].shape)
+        primal = torch.autograd.forward_ad.unpack_dual(inputs[0]).primal
+        ctx.save_for_forward(primal)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_path_gain, *grad_powers):
+        tx_count, dim0, dim1 = ctx.map_shape
+        base = (
+            grad_path_gain.unflatten(1, (dim0, dim1))
+            if grad_path_gain is not None
+            else None
+        )
+        grads = []
+        for index in range(5):
+            if not ctx.needs_input_grad[index]:
+                grads.append(None)
+                continue
+            grad_power = grad_powers[index]
+            if grad_power is None:
+                grads.append(base)
+            elif base is None:
+                grads.append(grad_power.expand(ctx.map_shape))
+            else:
+                grads.append(base + grad_power)
+        return tuple(grads)
+
+    @staticmethod
+    def jvp(ctx, t_los, t_reflection, t_diffraction, t_transmission, t_scattering):
+        tangents = [
+            _ad_native_tangent_or_none(value) for value in
+            (t_los, t_reflection, t_diffraction, t_transmission, t_scattering)
+        ]
+        if all(value is None for value in tangents):
+            return (None,) * len(_MC_FINALIZE_FIELDS)
+        (reference,) = ctx.saved_tensors
+        zero = None
+        filled = []
+        for value in tangents:
+            if value is None:
+                if zero is None:
+                    zero = torch.zeros_like(_ad_native_tensor(reference))
+                value = zero
+            filled.append(value)
+        with torch._C._DisableFuncTorch():
+            out = mc_finalize_component_maps(*filled)
+        return tuple(out[name] for name in _MC_FINALIZE_FIELDS)
+
+
+def mc_finalize_component_maps_ad(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`mc_finalize_component_maps`."""
+
+    values = _McFinalizeComponentMapsAdFunction.apply(
+        los, reflection, diffraction, transmission, scattering
+    )
+    return dict(zip(_MC_FINALIZE_FIELDS, values, strict=True))
+
+
+def mc_los_component_maps_adjoint(
+    grad_maps: torch.Tensor,
+    visible: torch.Tensor | None,
+) -> torch.Tensor:
+    """Adjoint of the (visibility-masked) LoS component-map layout."""
+
+    if not isinstance(grad_maps, torch.Tensor):
+        raise TypeError("grad_maps must be a torch.Tensor")
+    if grad_maps.dtype != torch.float32 or not grad_maps.is_cuda:
+        raise TypeError("grad_maps must be a float32 CUDA tensor")
+    if grad_maps.ndim != 3:
+        raise ValueError("grad_maps must have 3 dimensions")
+    if visible is None:
+        visible = grad_maps.new_empty((0, 0), dtype=torch.bool)
+    out = _required_native_op("mc_los_component_maps_adjoint")(grad_maps, visible)
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_los_component_maps_adjoint must return a tensor"
+        )
+    return out
+
+
+class _McLosGridMapsAdFunction(torch.autograd.Function):
+    """Differentiable LoS/transmission component-map layout (plan 07 AD-3).
+
+    The forward is the primal layout kernel plus the per-tx visibility mask
+    application, a permutation times a frozen 0/1 mask of the (tx, cells)
+    matrix; its adjoint is one masked gather kernel and its pushforward is
+    the forward itself on the tangent matrix.
+    """
+
+    @staticmethod
+    def forward(matrix, visible, rows, cols):
+        maps = mc_los_component_maps_from_matrix(matrix, rows=rows, cols=cols)
+        if visible is not None:
+            for tx_index in range(int(matrix.shape[0])):
+                mc_apply_los_visibility(
+                    maps, matrix, visible[tx_index], tx_index=tx_index
+                )
+        return maps
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        matrix, visible, rows, cols = inputs
+        ctx.rows = int(rows)
+        ctx.cols = int(cols)
+        ctx.has_visible = visible is not None
+        if visible is not None:
+            ctx.save_for_backward(visible)
+            ctx.save_for_forward(visible)
+        else:
+            ctx.save_for_backward()
+            ctx.save_for_forward()
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_maps):
+        if grad_maps is None or not ctx.needs_input_grad[0]:
+            return None, None, None, None
+        visible = ctx.saved_tensors[0] if ctx.has_visible else None
+        return (
+            mc_los_component_maps_adjoint(grad_maps, visible),
+            None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_matrix, _t_visible, _t_rows, _t_cols):
+        tangent = _ad_native_tangent_or_none(t_matrix)
+        if tangent is None:
+            return None
+        visible = ctx.saved_tensors[0] if ctx.has_visible else None
+        with torch._C._DisableFuncTorch():
+            maps = mc_los_component_maps_from_matrix(
+                tangent, rows=ctx.rows, cols=ctx.cols
+            )
+            if visible is not None:
+                visible = _ad_native_tensor(visible)
+                for tx_index in range(int(tangent.shape[0])):
+                    mc_apply_los_visibility(
+                        maps, tangent, visible[tx_index], tx_index=tx_index
+                    )
+        return maps
+
+
+def mc_los_grid_maps_ad(
+    matrix: torch.Tensor,
+    visible: torch.Tensor | None,
+    *,
+    rows: int,
+    cols: int,
+) -> torch.Tensor:
+    """Differentiable grid component maps from a (tx, cells) matrix."""
+
+    return _McLosGridMapsAdFunction.apply(matrix, visible, int(rows), int(cols))
 
 
 def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
@@ -8266,6 +8727,631 @@ def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
             "_channel_native.mc_sionna_diffraction_tape_accumulate must return a tensor"
         )
     return output
+
+
+# ---------------------------------------------------------------------------
+# MC basic incoherent power-map AD (plan 07 AD-3). The solver emits a REAL
+# power map assembled from per-component maps; the differentiable inputs are
+# the compiled material store leaves (per-face eta_r / sigma_e / gain /
+# thickness, per-layer CSR parameters), the carrier frequency and the LoS
+# endpoint positions. The RayD trace and sampling tapes, the sampled ray
+# directions, the deposit binning and the visibility masks are all frozen
+# winners (plan 07 section 4): gradients cover the continuous part only. The
+# reflection deposit weight is analytically independent of the ray origin
+# (the weight is |Gamma|^2 * solid_angle * (lambda/4pi)^2 / (A_cell * |cos|),
+# with the 1/d^2 spreading carried by the frozen ray density), so the
+# transmitter-position gradient of the reflection map is exactly zero and is
+# returned without a kernel launch.
+# ---------------------------------------------------------------------------
+
+_LIGHT_SPEED_M_PER_S_AD = 299_792_458.0
+
+
+class _McLosPathGainAdFunction(torch.autograd.Function):
+    """Differentiable LoS power-gain matrix (plan 07 AD-3).
+
+    Differentiable inputs: tx_positions, rx_positions and the carrier
+    frequency. tx_power stays fixed under the plan 07 contract; requesting
+    its gradient fails loudly. The forward is the primal path_los_export
+    kernel; only the path_gain_matrix output is exposed.
+    """
+
+    @staticmethod
+    def forward(tx_positions, tx_power, rx_positions, frequency):
+        exported = path_los_export(
+            tx_positions,
+            tx_power,
+            rx_positions,
+            frequency_hz=_ad_frequency_value(frequency),
+        )
+        return exported["path_gain_matrix"]
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        tx_positions, tx_power, rx_positions, frequency = inputs
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in (tx_positions, tx_power, rx_positions)
+        )
+        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_output):
+        _ad_reject_fixed_inputs(
+            "mc_los_path_gain_ad",
+            ctx.needs_input_grad,
+            ((1, "tx_power"),),
+        )
+        need_tx = bool(ctx.needs_input_grad[0])
+        need_rx = bool(ctx.needs_input_grad[2])
+        need_frequency = bool(ctx.needs_input_grad[3])
+        if grad_output is None or not (need_tx or need_rx or need_frequency):
+            return None, None, None, None
+        tx_positions, tx_power, rx_positions = ctx.saved_tensors
+        grad_tx, _grad_power, grad_rx, grad_frequency = mc_los_path_gain_backward(
+            tx_positions,
+            tx_power,
+            rx_positions,
+            grad_output,
+            frequency_hz=ctx.frequency_value,
+        )
+        return (
+            grad_tx if need_tx else None,
+            None,
+            grad_rx if need_rx else None,
+            _ad_frequency_grad(grad_frequency, ctx.frequency_meta)
+            if need_frequency
+            else None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_tx, t_power, t_rx, t_frequency):
+        _ad_reject_fixed_tangents(
+            "mc_los_path_gain_ad", ((t_power, "tx_power"),)
+        )
+        saved = ctx.saved_tensors
+        tangent_tx = _ad_geometry_tangent(
+            "mc_los_path_gain_ad tangent_tx", t_tx, saved[0]
+        )
+        tangent_rx = _ad_geometry_tangent(
+            "mc_los_path_gain_ad tangent_rx", t_rx, saved[2]
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        if tangent_tx is None and tangent_rx is None and tangent_frequency == 0.0:
+            return None
+        tx_positions, tx_power, rx_positions = saved
+        with torch._C._DisableFuncTorch():
+            return mc_los_path_gain_jvp(
+                _ad_native_tensor(tx_positions),
+                _ad_native_tensor(tx_power),
+                _ad_native_tensor(rx_positions),
+                tangent_tx if tangent_tx is not None else _ad_native_tensor(tx_positions),
+                _ad_native_tensor(tx_power),
+                tangent_rx if tangent_rx is not None else _ad_native_tensor(rx_positions),
+                tangent_tx is not None,
+                False,
+                tangent_rx is not None,
+                frequency_hz=ctx.frequency_value,
+                frequency_tangent=tangent_frequency,
+            )
+
+
+def mc_los_path_gain_ad(
+    tx_positions: torch.Tensor,
+    tx_power: torch.Tensor,
+    rx_positions: torch.Tensor,
+    *,
+    frequency: torch.Tensor | float,
+) -> torch.Tensor:
+    """Differentiable LoS path-gain matrix (endpoints and frequency)."""
+
+    return _McLosPathGainAdFunction.apply(
+        tx_positions, tx_power, rx_positions, frequency
+    )
+
+
+def mc_sionna_reflection_accumulate_backward(
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    trace_valid: torch.Tensor,
+    trace_t: torch.Tensor,
+    trace_prim: torch.Tensor,
+    face_normals: torch.Tensor,
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_valid: torch.Tensor,
+    material_thickness: torch.Tensor,
+    grad_output: torch.Tensor,
+    *,
+    need_materials: bool,
+    need_frequency: bool,
+    contribution_depth: int,
+    grid_axis: int,
+    grid_position: float,
+    grid_coord0_min: float,
+    grid_coord0_max: float,
+    grid_coord1_min: float,
+    grid_coord1_max: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    solid_angle_per_ray: float,
+    grid_cell_area: float,
+    wavelength_dfreq: float,
+) -> tuple[torch.Tensor, ...]:
+    gradients = _required_native_op("mc_sionna_reflection_accumulate_backward")(
+        ray_o,
+        ray_d,
+        trace_valid,
+        trace_t,
+        trace_prim,
+        face_normals,
+        material_eta_r,
+        material_sigma,
+        material_gain,
+        material_valid,
+        material_thickness,
+        grad_output,
+        bool(need_materials),
+        bool(need_frequency),
+        int(contribution_depth),
+        int(grid_axis),
+        float(grid_position),
+        float(grid_coord0_min),
+        float(grid_coord0_max),
+        float(grid_coord1_min),
+        float(grid_coord1_max),
+        int(grid_resolution0),
+        int(grid_resolution1),
+        float(wavelength),
+        float(solid_angle_per_ray),
+        float(grid_cell_area),
+        float(wavelength_dfreq),
+    )
+    if not isinstance(gradients, tuple) or len(gradients) != 5:
+        raise TypeError(
+            "_channel_native.mc_sionna_reflection_accumulate_backward must "
+            "return 5 tensors"
+        )
+    return gradients
+
+
+def mc_sionna_reflection_accumulate_jvp(
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    trace_valid: torch.Tensor,
+    trace_t: torch.Tensor,
+    trace_prim: torch.Tensor,
+    face_normals: torch.Tensor,
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_valid: torch.Tensor,
+    material_thickness: torch.Tensor,
+    tangent_eta_r: torch.Tensor | None,
+    tangent_sigma: torch.Tensor | None,
+    tangent_gain: torch.Tensor | None,
+    tangent_thickness: torch.Tensor | None,
+    *,
+    contribution_depth: int,
+    grid_axis: int,
+    grid_position: float,
+    grid_coord0_min: float,
+    grid_coord0_max: float,
+    grid_coord1_min: float,
+    grid_coord1_max: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    solid_angle_per_ray: float,
+    grid_cell_area: float,
+    wavelength_tangent: float,
+) -> torch.Tensor:
+    output = _required_native_op("mc_sionna_reflection_accumulate_jvp")(
+        ray_o,
+        ray_d,
+        trace_valid,
+        trace_t,
+        trace_prim,
+        face_normals,
+        material_eta_r,
+        material_sigma,
+        material_gain,
+        material_valid,
+        material_thickness,
+        tangent_eta_r if tangent_eta_r is not None else material_eta_r,
+        tangent_sigma if tangent_sigma is not None else material_sigma,
+        tangent_gain if tangent_gain is not None else material_gain,
+        tangent_thickness if tangent_thickness is not None else material_thickness,
+        tangent_eta_r is not None,
+        tangent_sigma is not None,
+        tangent_gain is not None,
+        tangent_thickness is not None,
+        int(contribution_depth),
+        int(grid_axis),
+        float(grid_position),
+        float(grid_coord0_min),
+        float(grid_coord0_max),
+        float(grid_coord1_min),
+        float(grid_coord1_max),
+        int(grid_resolution0),
+        int(grid_resolution1),
+        float(wavelength),
+        float(solid_angle_per_ray),
+        float(grid_cell_area),
+        float(wavelength_tangent),
+    )
+    if not isinstance(output, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_sionna_reflection_accumulate_jvp must return a tensor"
+        )
+    return output
+
+
+class _McReflectionMapAdFunction(torch.autograd.Function):
+    """Differentiable Sionna reflection radiomap for one transmitter.
+
+    Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
+    carrier frequency and the transmitter anchor. The trace tape, sampled
+    directions, face normals and validity masks are frozen winners and fail
+    loudly when a gradient is requested. The deposit weight is independent of
+    the ray origin, so the transmitter anchor receives an exact zero gradient
+    without a kernel launch (its binning influence is discrete and frozen).
+    """
+
+    @staticmethod
+    def forward(
+        tx_anchor,
+        eta_r,
+        sigma_e,
+        gain,
+        thickness,
+        frequency,
+        ray_o,
+        ray_d,
+        trace_valid,
+        trace_t,
+        trace_prim,
+        face_normals,
+        material_valid,
+        params,
+    ):
+        return mc_sionna_reflection_accumulate(
+            ray_o,
+            ray_d,
+            trace_valid,
+            trace_t,
+            trace_prim,
+            face_normals,
+            eta_r,
+            sigma_e,
+            gain,
+            material_valid,
+            thickness,
+            contribution_depth=params["contribution_depth"],
+            grid_axis=params["grid_axis"],
+            grid_position=params["grid_position"],
+            grid_coord0_min=params["grid_coord0_min"],
+            grid_coord0_max=params["grid_coord0_max"],
+            grid_coord1_min=params["grid_coord1_min"],
+            grid_coord1_max=params["grid_coord1_max"],
+            grid_resolution0=params["grid_resolution0"],
+            grid_resolution1=params["grid_resolution1"],
+            wavelength=params["wavelength"],
+            solid_angle_per_ray=params["solid_angle_per_ray"],
+            grid_cell_area=params["grid_cell_area"],
+        )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:5]
+        )
+        frequency = inputs[5]
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.params = inputs[13]
+        ctx.anchor_shape = tuple(inputs[0].shape)
+        saved = (*primals[1:], *inputs[6:13])
+        ctx.save_for_backward(*saved)
+        ctx.save_for_forward(*saved)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_output):
+        none_grads = (None,) * 14
+        _ad_reject_fixed_inputs(
+            "mc_sionna_reflection_accumulate_ad",
+            ctx.needs_input_grad,
+            (
+                (6, "ray_o"),
+                (7, "ray_d"),
+                (8, "trace_valid"),
+                (9, "trace_t"),
+                (10, "trace_prim"),
+                (11, "face_normals"),
+                (12, "material_valid"),
+            ),
+        )
+        if grad_output is None:
+            return none_grads
+        (
+            eta_r,
+            sigma_e,
+            gain,
+            thickness,
+            ray_o,
+            ray_d,
+            trace_valid,
+            trace_t,
+            trace_prim,
+            face_normals,
+            material_valid,
+        ) = ctx.saved_tensors
+        need_anchor = bool(ctx.needs_input_grad[0])
+        need_eta = bool(ctx.needs_input_grad[1])
+        need_sigma = bool(ctx.needs_input_grad[2])
+        need_gain = bool(ctx.needs_input_grad[3])
+        need_thickness = bool(ctx.needs_input_grad[4])
+        need_materials = need_eta or need_sigma or need_gain or need_thickness
+        need_frequency = bool(ctx.needs_input_grad[5])
+        grad_anchor = None
+        if need_anchor:
+            # The deposit weight carries no ray-origin dependence; the frozen
+            # binning is the only door and it is discrete. Exact zero.
+            grad_anchor = mc_zero_matrix(
+                ray_o, rows=ctx.anchor_shape[0], cols=ctx.anchor_shape[1]
+            )
+        if not (need_materials or need_frequency):
+            return (grad_anchor,) + (None,) * 13
+        params = ctx.params
+        wavelength = float(params["wavelength"])
+        gradients = mc_sionna_reflection_accumulate_backward(
+            ray_o,
+            ray_d,
+            trace_valid,
+            trace_t,
+            trace_prim,
+            face_normals,
+            eta_r,
+            sigma_e,
+            gain,
+            material_valid,
+            thickness,
+            grad_output,
+            need_materials=need_materials,
+            need_frequency=need_frequency,
+            contribution_depth=params["contribution_depth"],
+            grid_axis=params["grid_axis"],
+            grid_position=params["grid_position"],
+            grid_coord0_min=params["grid_coord0_min"],
+            grid_coord0_max=params["grid_coord0_max"],
+            grid_coord1_min=params["grid_coord1_min"],
+            grid_coord1_max=params["grid_coord1_max"],
+            grid_resolution0=params["grid_resolution0"],
+            grid_resolution1=params["grid_resolution1"],
+            wavelength=wavelength,
+            solid_angle_per_ray=params["solid_angle_per_ray"],
+            grid_cell_area=params["grid_cell_area"],
+            wavelength_dfreq=-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(gradients[4], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return (
+            grad_anchor,
+            gradients[0] if need_eta else None,
+            gradients[1] if need_sigma else None,
+            gradients[2] if need_gain else None,
+            gradients[3] if need_thickness else None,
+            grad_frequency,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(
+        ctx,
+        t_anchor,
+        t_eta,
+        t_sigma,
+        t_gain,
+        t_thickness,
+        t_frequency,
+        t_ray_o,
+        t_ray_d,
+        t_trace_valid,
+        t_trace_t,
+        t_trace_prim,
+        t_face_normals,
+        t_material_valid,
+        _t_params,
+    ):
+        _ad_reject_fixed_tangents(
+            "mc_sionna_reflection_accumulate_ad",
+            (
+                (t_ray_o, "ray_o"),
+                (t_ray_d, "ray_d"),
+                (t_face_normals, "face_normals"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        face_shape = tuple(saved[0].shape)
+        tangent_eta = _ad_checked_tangent(
+            "mc_sionna_reflection_accumulate_ad tangent_eta_r",
+            _ad_native_tangent_or_none(t_eta),
+            face_shape,
+        )
+        tangent_sigma = _ad_checked_tangent(
+            "mc_sionna_reflection_accumulate_ad tangent_sigma_e",
+            _ad_native_tangent_or_none(t_sigma),
+            face_shape,
+        )
+        tangent_gain = _ad_checked_tangent(
+            "mc_sionna_reflection_accumulate_ad tangent_gain",
+            _ad_native_tangent_or_none(t_gain),
+            face_shape,
+        )
+        tangent_thickness = _ad_checked_tangent(
+            "mc_sionna_reflection_accumulate_ad tangent_thickness",
+            _ad_native_tangent_or_none(t_thickness),
+            face_shape,
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        params = ctx.params
+        if (
+            tangent_eta is None
+            and tangent_sigma is None
+            and tangent_gain is None
+            and tangent_thickness is None
+            and tangent_frequency == 0.0
+        ):
+            if _ad_native_tangent_or_none(
+                t_anchor if isinstance(t_anchor, torch.Tensor) else None
+            ) is None:
+                return None
+            # Transmitter-anchor-only tangent: the deposit weight carries no
+            # ray-origin dependence (frozen binning), so the map tangent is
+            # exactly zero. A concrete zero tensor is required: this torch
+            # build rejects a None jvp when an input tangent is live.
+            return mc_zero_matrix(
+                _ad_native_tensor(saved[4]),
+                rows=params["grid_resolution1"],
+                cols=params["grid_resolution0"],
+            )
+        (
+            eta_r,
+            sigma_e,
+            gain,
+            thickness,
+            ray_o,
+            ray_d,
+            trace_valid,
+            trace_t,
+            trace_prim,
+            face_normals,
+            material_valid,
+        ) = saved
+        wavelength = float(params["wavelength"])
+        with torch._C._DisableFuncTorch():
+            return mc_sionna_reflection_accumulate_jvp(
+                _ad_native_tensor(ray_o),
+                _ad_native_tensor(ray_d),
+                _ad_native_tensor(trace_valid),
+                _ad_native_tensor(trace_t),
+                _ad_native_tensor(trace_prim),
+                _ad_native_tensor(face_normals),
+                _ad_native_tensor(eta_r),
+                _ad_native_tensor(sigma_e),
+                _ad_native_tensor(gain),
+                _ad_native_tensor(material_valid),
+                _ad_native_tensor(thickness),
+                tangent_eta,
+                tangent_sigma,
+                tangent_gain,
+                tangent_thickness,
+                contribution_depth=params["contribution_depth"],
+                grid_axis=params["grid_axis"],
+                grid_position=params["grid_position"],
+                grid_coord0_min=params["grid_coord0_min"],
+                grid_coord0_max=params["grid_coord0_max"],
+                grid_coord1_min=params["grid_coord1_min"],
+                grid_coord1_max=params["grid_coord1_max"],
+                grid_resolution0=params["grid_resolution0"],
+                grid_resolution1=params["grid_resolution1"],
+                wavelength=wavelength,
+                solid_angle_per_ray=params["solid_angle_per_ray"],
+                grid_cell_area=params["grid_cell_area"],
+                wavelength_tangent=(
+                    -wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD
+                )
+                * tangent_frequency,
+            )
+
+
+def mc_sionna_reflection_accumulate_ad(
+    tx_anchor: torch.Tensor,
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_thickness: torch.Tensor,
+    frequency: torch.Tensor | float,
+    ray_o: torch.Tensor,
+    ray_d: torch.Tensor,
+    trace_valid: torch.Tensor,
+    trace_t: torch.Tensor,
+    trace_prim: torch.Tensor,
+    face_normals: torch.Tensor,
+    material_valid: torch.Tensor,
+    *,
+    contribution_depth: int,
+    grid_axis: int,
+    grid_position: float,
+    grid_coord0_min: float,
+    grid_coord0_max: float,
+    grid_coord1_min: float,
+    grid_coord1_max: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    solid_angle_per_ray: float,
+    grid_cell_area: float,
+) -> torch.Tensor:
+    """Differentiable :func:`mc_sionna_reflection_accumulate` (one tx)."""
+
+    params = {
+        "contribution_depth": int(contribution_depth),
+        "grid_axis": int(grid_axis),
+        "grid_position": float(grid_position),
+        "grid_coord0_min": float(grid_coord0_min),
+        "grid_coord0_max": float(grid_coord0_max),
+        "grid_coord1_min": float(grid_coord1_min),
+        "grid_coord1_max": float(grid_coord1_max),
+        "grid_resolution0": int(grid_resolution0),
+        "grid_resolution1": int(grid_resolution1),
+        "wavelength": float(wavelength),
+        "solid_angle_per_ray": float(solid_angle_per_ray),
+        "grid_cell_area": float(grid_cell_area),
+    }
+    return _McReflectionMapAdFunction.apply(
+        tx_anchor,
+        material_eta_r,
+        material_sigma,
+        material_gain,
+        material_thickness,
+        frequency,
+        ray_o,
+        ray_d,
+        trace_valid,
+        trace_t,
+        trace_prim,
+        face_normals,
+        material_valid,
+        params,
+    )
 
 
 def mc_selected_edge_indices(selected: torch.Tensor) -> torch.Tensor:

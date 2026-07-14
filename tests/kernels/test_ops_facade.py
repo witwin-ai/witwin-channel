@@ -1265,12 +1265,14 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     power_tangent = torch.tensor([0.25, -0.5], device="cuda", dtype=torch.float32)
     tx_tangent = torch.zeros_like(tx_positions)
 
-    grad_tx, grad_power, grad_rx = ops.mc_los_path_gain_backward(
+    frequency_hz = 3.0e9
+    frequency_tangent = 2.5e5
+    grad_tx, grad_power, grad_rx, grad_frequency = ops.mc_los_path_gain_backward(
         tx_positions,
         tx_power,
         rx_positions,
         grad_output,
-        frequency_hz=3.0e9,
+        frequency_hz=frequency_hz,
     )
     jvp = ops.mc_los_path_gain_jvp(
         tx_positions,
@@ -1282,14 +1284,19 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
         False,
         True,
         True,
-        frequency_hz=3.0e9,
+        frequency_hz=frequency_hz,
+        frequency_tangent=frequency_tangent,
     )
 
-    scale = (299_792_458.0 / 3.0e9 / (4.0 * torch.pi)) ** 2
+    scale = (299_792_458.0 / frequency_hz / (4.0 * torch.pi)) ** 2
+    scale_dfreq = -2.0 * scale / frequency_hz
     diff = tx_positions[:, None, :] - rx_positions[None, :, :]
     distance_sq = (diff * diff).sum(dim=-1)
     inv_d2 = 1.0 / distance_sq
     expected_grad_power = (grad_output * scale * inv_d2).sum(dim=1)
+    expected_grad_frequency = (
+        grad_output * tx_power[:, None] * scale_dfreq * inv_d2
+    ).sum()
     coeff = grad_output * 2.0 * tx_power[:, None] * scale * inv_d2 * inv_d2
     expected_grad_rx = (coeff[:, :, None] * diff).sum(dim=0)
     expected_grad_tx = -(coeff[:, :, None] * diff).sum(dim=1)
@@ -1297,10 +1304,16 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     expected_jvp = expected_jvp + 2.0 * tx_power[:, None] * scale * inv_d2 * inv_d2 * (
         diff * rx_tangent[None, :, :]
     ).sum(dim=-1)
+    expected_jvp = expected_jvp + (
+        tx_power[:, None] * scale_dfreq * frequency_tangent * inv_d2
+    )
 
     torch.testing.assert_close(grad_tx, expected_grad_tx, rtol=1e-6, atol=1e-9)
     torch.testing.assert_close(grad_power, expected_grad_power, rtol=1e-6, atol=1e-9)
     torch.testing.assert_close(grad_rx, expected_grad_rx, rtol=1e-6, atol=1e-9)
+    torch.testing.assert_close(
+        grad_frequency[0], expected_grad_frequency, rtol=1e-5, atol=1e-12
+    )
     torch.testing.assert_close(jvp, expected_jvp, rtol=1e-6, atol=1e-9)
 
 

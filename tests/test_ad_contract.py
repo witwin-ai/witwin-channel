@@ -45,7 +45,9 @@ def test_public_ad_capability_is_primal_only_for_every_solver():
         assert solver["ad_modes"] == ["none"]
 
 
-@pytest.mark.parametrize("config_type", (PathConfig, DeterministicConfig))
+@pytest.mark.parametrize(
+    "config_type", (PathConfig, DeterministicConfig, BasicConfig)
+)
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
 def test_fixed_topology_solvers_accept_ad_modes(config_type, ad_mode):
     assert config_type(ad_mode=ad_mode).ad_mode == ad_mode
@@ -58,11 +60,12 @@ def test_every_solver_rejects_unknown_ad_modes(config_type, ad_mode):
         config_type(ad_mode=ad_mode)
 
 
-@pytest.mark.parametrize("config_type", (BasicConfig, BdptConfig))
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
-def test_montecarlo_solvers_still_reject_ad_modes(config_type, ad_mode):
+def test_bdpt_still_rejects_ad_modes(ad_mode):
+    # Plan 07 defers the BDPT gradient (coherent contributions plus
+    # material-dependent discrete event sampling) to its own later plan.
     with pytest.raises((ValueError, RuntimeError), match="ad_mode"):
-        config_type(ad_mode=ad_mode)
+        BdptConfig(ad_mode=ad_mode)
 
 
 def test_primal_metadata_reports_no_ad_for_every_solver():
@@ -165,8 +168,9 @@ def test_ad_inventory_records_solver_ad_contract():
     assert audit["production_channel_ad_references"] == 0
     # Plan 07 AD-1: the shared deterministic/path field seam calls the three
     # differentiable field entry points (LoS, reflection, transmission).
-    assert audit["native_public_solver_ad_callers"] == 3
-    assert len(audit["native_public_solver_ad_call_sites"]) == 3
+    # Plan 07 AD-3 adds the six montecarlo.basic power-map entry points.
+    assert audit["native_public_solver_ad_callers"] == 9
+    assert len(audit["native_public_solver_ad_call_sites"]) == 9
     assert audit["legacy_reference_files_with_explicit_ad"] == 19
     assert audit["decision"] == "fixed_topology_material_frequency_ad_t1"
     # The capability manifest flip happens at the plan 07 completion gate.
