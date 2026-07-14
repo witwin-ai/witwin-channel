@@ -186,11 +186,18 @@ def solve(scene: Scene, config: Config) -> Result:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.deterministic requires CUDA")
     # Solve-level wall time and CUDA high-water-mark delta for the kernel
-    # metadata (plan 07 AD-4). The synchronize pins the start; the solve body
-    # already carries host syncs, so the extra one is in their noise.
-    torch.cuda.synchronize()
-    solve_start = perf_counter()
-    peak_before = torch.cuda.max_memory_allocated()
+    # metadata (plan 07 AD-4). This is AD instrumentation only: the leading
+    # synchronize would stall the host on the caller's queued work and the
+    # trailing one drains the solve before returning, which an optimization
+    # loop over ad_mode="none" must not pay. none-mode reports zeros and takes
+    # no sync, preserving the byte-identical zero-overhead primal contract.
+    ad_instrumented = config.ad_mode != "none"
+    solve_start = 0.0
+    peak_before = 0
+    if ad_instrumented:
+        torch.cuda.synchronize()
+        solve_start = perf_counter()
+        peak_before = torch.cuda.max_memory_allocated()
 
     native_info = build_info()
     _validate_requested_components(config)
@@ -250,7 +257,13 @@ def solve(scene: Scene, config: Config) -> Result:
         component_power["diffraction"] = exact_diffraction
         if not config.coherent:
             path_gain = path_gain - previous_diffraction + exact_diffraction
-    torch.cuda.synchronize()
+    if ad_instrumented:
+        torch.cuda.synchronize()
+        forward_time_ms = (perf_counter() - solve_start) * 1.0e3
+        peak_memory_bytes = max(0, torch.cuda.max_memory_allocated() - peak_before)
+    else:
+        forward_time_ms = 0.0
+        peak_memory_bytes = 0
     metadata = _metadata(
         config=config,
         native_info=native_info,
@@ -259,10 +272,8 @@ def solve(scene: Scene, config: Config) -> Result:
         launch_count=path_result.launch_count,
         ad_companion_launches=path_result.ad_companion_launches,
         ad_tape_bytes=path_result.ad_tape_bytes,
-        forward_time_ms=(perf_counter() - solve_start) * 1.0e3,
-        peak_memory_bytes=max(
-            0, torch.cuda.max_memory_allocated() - peak_before
-        ),
+        forward_time_ms=forward_time_ms,
+        peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
     )
     diagnostics = None

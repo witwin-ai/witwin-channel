@@ -224,16 +224,28 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
         _validate_runtime(config)
     )
     # Solve-level wall time and CUDA high-water-mark delta for the kernel
-    # metadata (plan 07 AD-4).
-    torch.cuda.synchronize()
-    solve_start = perf_counter()
-    peak_before = torch.cuda.max_memory_allocated()
+    # metadata (plan 07 AD-4). AD instrumentation only: the syncs would break
+    # host/device overlap for a caller looping over ad_mode="none" solves, so
+    # none-mode reports zeros and takes no sync (zero-overhead primal contract).
+    ad_instrumented = config.ad_mode != "none"
+    solve_start = 0.0
+    peak_before = 0
+    if ad_instrumented:
+        torch.cuda.synchronize()
+        solve_start = perf_counter()
+        peak_before = torch.cuda.max_memory_allocated()
     topology = export_topology(scene, config)
     scattering_info = None
     if "scattering" in config.components:
         topology, scattering_info = append_scattering_paths(scene, config, topology)
     path_count = int(topology.valid.numel())
-    torch.cuda.synchronize()
+    if ad_instrumented:
+        torch.cuda.synchronize()
+        forward_time_ms = (perf_counter() - solve_start) * 1.0e3
+        peak_memory_bytes = max(0, torch.cuda.max_memory_allocated() - peak_before)
+    else:
+        forward_time_ms = 0.0
+        peak_memory_bytes = 0
     metadata = _metadata(
         config=config,
         path_count=path_count,
@@ -248,8 +260,8 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
         ),
         ad_companion_launches=topology.ad_companion_launches,
         ad_tape_bytes=topology.ad_tape_bytes,
-        forward_time_ms=(perf_counter() - solve_start) * 1.0e3,
-        peak_memory_bytes=max(0, torch.cuda.max_memory_allocated() - peak_before),
+        forward_time_ms=forward_time_ms,
+        peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
     )
     tx_positions, _tx_power = _transmitter_tensors(scene)

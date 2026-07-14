@@ -143,7 +143,18 @@ def test_ad_time_memory_and_tape_budgets():
 
 def test_metadata_reports_solve_timing():
     scene = same_side_wall_reflection_scene()
-    result = deterministic_solve(scene, _config("none"))
-    kernel = result.metadata["kernel"]
-    assert kernel["forward_time_ms"] > 0.0
-    assert kernel["peak_memory_bytes"] >= 0
+    # none-mode is not AD-instrumented: no timing synchronize, reported as
+    # exactly zero (part of the zero-overhead primal contract).
+    none_kernel = deterministic_solve(scene, _config("none")).metadata["kernel"]
+    assert none_kernel["forward_time_ms"] == 0.0
+    assert none_kernel["peak_memory_bytes"] == 0
+
+    # An AD solve is instrumented and reports a positive wall time.
+    leaf = scene.compile().materials.eps_r
+    leaf.requires_grad_(True)
+    try:
+        ad_kernel = deterministic_solve(scene, _config("vjp")).metadata["kernel"]
+    finally:
+        leaf.requires_grad_(False)
+    assert ad_kernel["forward_time_ms"] > 0.0
+    assert ad_kernel["peak_memory_bytes"] >= 0

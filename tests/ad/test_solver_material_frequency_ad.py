@@ -292,7 +292,11 @@ def test_ad_mode_none_keeps_primal_contract(solver):
     assert kernel_vjp["jvp_launch_count"] == 0
     assert kernel_none["ad_status"] == "none"
     assert kernel_vjp["ad_status"] == "vjp"
-    assert kernel_none["forward_time_ms"] > 0.0
+    # none-mode is not AD-instrumented: it takes no timing synchronize and
+    # reports exactly zero, which is part of the zero-overhead primal contract
+    # (the leading sync would otherwise stall the caller's queued work). The AD
+    # solve is instrumented and reports a positive wall time.
+    assert kernel_none["forward_time_ms"] == 0.0
     assert kernel_vjp["forward_time_ms"] > 0.0
 
 
