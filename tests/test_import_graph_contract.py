@@ -111,6 +111,28 @@ import witwin.channel_native.materials.kernels.private
     }
 
 
+def test_topology_cannot_import_canonical_or_legacy_compiled_scene(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "scene/compiled.py": "",
+            "core/runtime/compiled_scene.py": "",
+            "propagation/topology/canonical.py": (
+                "from witwin.channel_native.scene.compiled import CompiledScene\n"
+            ),
+            "propagation/topology/legacy.py": (
+                "from witwin.channel_native.core.runtime.compiled_scene "
+                "import CompiledScene\n"
+            ),
+        },
+    )
+
+    rules = Counter(violation.rule for violation in graph.scan_package(package_root))
+
+    assert rules == {"topology_forbidden_dependency": 2}
+
+
 def test_propagation_legacy_path_topology_dependencies_are_hard_failures(
     tmp_path: Path,
 ):

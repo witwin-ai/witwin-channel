@@ -8,7 +8,7 @@ from witwin.channel_native.materials.kernels.functional import mc_face_material_
 
 if TYPE_CHECKING:
     from .scene import Scene
-    from .runtime.compiled_scene import CompiledScene
+    from witwin.channel_native.scene.compiled import CompiledScene
 
 
 def face_material_tensors(

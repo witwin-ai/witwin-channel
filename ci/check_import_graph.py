@@ -42,6 +42,12 @@ _RAW_EXTENSION_MODULES = frozenset(
         f"{PACKAGE}.runtime.extension",
     }
 )
+_COMPILED_SCENE_MODULES = frozenset(
+    {
+        f"{PACKAGE}.scene.compiled",
+        f"{PACKAGE}.core.runtime.compiled_scene",
+    }
+)
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -291,7 +297,7 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
         or target_solver is not None
         or _matches(target, f"{PACKAGE}.scene")
         or _matches(target, f"{PACKAGE}.core.scene")
-        or _matches(target, f"{PACKAGE}.core.runtime.compiled_scene")
+        or target in _COMPILED_SCENE_MODULES
     ):
         violations.append(_violation(edge, "topology_forbidden_dependency"))
 

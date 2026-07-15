@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import gc
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass, replace
+from dataclasses import MISSING, fields, is_dataclass, replace
+import os
+from pathlib import Path
 import pickle
+import subprocess
+import sys
 from typing import get_args, get_origin, get_type_hints
 import weakref
 
@@ -30,6 +34,10 @@ from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.scene import compiled as canonical_compiled
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 _LEGACY_CLASS_CASES = (
@@ -165,7 +173,14 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
         is legacy_scene.ReceiverPoint
     )
     assert legacy_objects.ReceiverGrid is public.ReceiverGrid is legacy_scene.ReceiverGrid
-    assert legacy_scene.CompiledScene is legacy_compiled.CompiledScene
+    assert (
+        canonical_compiled.CompiledScene
+        is legacy_scene.CompiledScene
+        is legacy_compiled.CompiledScene
+    )
+    assert canonical_compiled.CompiledScene.__module__ == (
+        "witwin.channel_native.core.runtime.compiled_scene"
+    )
     assert legacy_scene.GeometryStore is legacy_geometry.GeometryStore
     assert legacy_scene.MaterialStore is legacy_material_store.MaterialStore
     assert legacy_scene.AssignmentStore is legacy_assignments.AssignmentStore
@@ -173,6 +188,90 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
     for module, name, owner in _LEGACY_CLASS_CASES:
         assert pickle.loads(_pickle_global(module, name)) is owner
         assert pickle.loads(pickle.dumps(owner)) is owner
+
+
+def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
+    owner = canonical_compiled.CompiledScene
+    schema = fields(owner)
+
+    assert tuple(item.name for item in schema) == (
+        "geometry",
+        "materials",
+        "assignments",
+        "raydn",
+        "workspace",
+        "geometry_version",
+        "material_version",
+        "assignment_version",
+        "_kirchhoff_tables_cache",
+        "_phase_screen_runtimes_cache",
+    )
+    assert all(item.default is MISSING for item in schema[:8])
+    assert all(item.default_factory is MISSING for item in schema)
+    assert tuple(item.default for item in schema[8:]) == (None, None)
+    assert all(not item.repr and not item.compare for item in schema[8:])
+    assert get_type_hints(owner) == {
+        "geometry": legacy_geometry.GeometryStore,
+        "materials": legacy_material_store.MaterialStore,
+        "assignments": legacy_assignments.AssignmentStore,
+        "raydn": legacy_raydn.RayDNScene,
+        "workspace": object | None,
+        "geometry_version": int,
+        "material_version": int,
+        "assignment_version": int,
+        "_kirchhoff_tables_cache": dict[int, object] | None,
+        "_phase_screen_runtimes_cache": dict[int, object] | None,
+    }
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
+            "from witwin.channel_native.scene import compiled as canonical; "
+            "from witwin.channel_native.core.runtime import compiled_scene as legacy; "
+            "from witwin.channel_native.core import scene as core_scene"
+        ),
+        (
+            "from witwin.channel_native.core.runtime import compiled_scene as legacy; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene import compiled as canonical"
+        ),
+        (
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene import compiled as canonical; "
+            "from witwin.channel_native.core.runtime import compiled_scene as legacy"
+        ),
+    ),
+)
+def test_compiled_scene_fresh_import_order_and_legacy_pickle_replay(imports: str):
+    source = (
+        f"{imports}; import pickle; "
+        "owner = canonical.CompiledScene; "
+        "assert owner is legacy.CompiledScene is core_scene.CompiledScene; "
+        "assert owner.__module__ == "
+        "'witwin.channel_native.core.runtime.compiled_scene'; "
+        "assert pickle.loads("
+        "b'cwitwin.channel_native.core.runtime.compiled_scene\\nCompiledScene\\n.'"
+        ") is owner; "
+        "assert pickle.loads(pickle.dumps(owner)) is owner"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (
+            str(REPOSITORY_ROOT / "src"),
+            environment.get("PYTHONPATH"),
+        )
+        if value
+    )
+
+    subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        check=True,
+    )
 
 
 def test_public_material_identity_and_legacy_pickle_replay():

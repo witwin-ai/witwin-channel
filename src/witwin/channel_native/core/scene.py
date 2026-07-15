@@ -8,7 +8,7 @@ import torch
 
 from .objects import ReceiverGrid, ReceiverPoint, Structure, Transmitter
 from .runtime.assignments import AssignmentStore
-from .runtime.compiled_scene import CompiledScene
+from witwin.channel_native.scene.compiled import CompiledScene
 from .runtime.geometry import GeometryStore
 from .runtime.material_store import MaterialStore
 from .runtime.raydn import RayDNScene, build_scene_from_structures
