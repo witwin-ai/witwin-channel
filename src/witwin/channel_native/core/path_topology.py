@@ -6,11 +6,6 @@ from typing import TYPE_CHECKING, Protocol
 
 import torch
 
-# Receiver endpoint ownership is imported below the frozen ops-003 line pin.
-# ops-003 is frozen to the physical import below.
-# Keep it on line 13 until topology discovery stops calling
-# ops.mc_sample_directions through the legacy facade.
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.propagation.geometry.endpoints import (
     ReceiverLayout,  # noqa: F401 - compatibility re-export
     apply_receiver_layout,  # noqa: F401 - compatibility re-export
@@ -44,6 +39,9 @@ from witwin.channel_native.propagation.topology.kernels import (
 )
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
+)
+from witwin.channel_native.propagation.topology.kernels.sampling import (
+    mc_sample_directions,
 )
 from witwin.channel_native.propagation.topology.concatenate import (
     _block_sequence_width,  # noqa: F401 - compatibility re-export
@@ -578,7 +576,7 @@ def _discovered_group_chains(
 
     device = face_group_id.device
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
-    ray_d = ops.mc_sample_directions(ray_count, tx.reshape(1, 3))
+    ray_d = mc_sample_directions(ray_count, tx.reshape(1, 3))
     ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
     out = geometry_bridge.raydn_trace_reflections_forward(
         raydn.require_handle(),

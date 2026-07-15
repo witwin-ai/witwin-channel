@@ -51,6 +51,7 @@ from witwin.channel_native.propagation.topology.kernels.primitives import (  # n
     mc_selected_edge_indices,
     path_concat_vec3,
 )
+from witwin.channel_native.propagation.topology.kernels.sampling import mc_sample_directions  # noqa: F401
 from witwin.channel_native.scattering.kernels.functional import (  # noqa: F401
     scattering_event_probabilities,
     scattering_table_eval,
@@ -238,7 +239,6 @@ from witwin.channel_native.montecarlo.basic.kernels.sampling import (  # noqa: E
     mc_diffraction_state_pack,
     mc_diffraction_state_wi,
     mc_reflection_launch_inputs,
-    mc_sample_directions,
 )
 from witwin.channel_native.montecarlo.basic.kernels.maps import (  # noqa: E402,F401
     _LIGHT_SPEED_M_PER_S_AD,

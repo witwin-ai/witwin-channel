@@ -2223,7 +2223,7 @@
     "mc_receiver_grid_points": "witwin.channel_native.runtime.native_buffers.mc_receiver_grid_points",
     "mc_reflection_ad_max_depth": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_reflection_ad_max_depth",
     "mc_reflection_launch_inputs": "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_reflection_launch_inputs",
-    "mc_sample_directions": "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_sample_directions",
+    "mc_sample_directions": "witwin.channel_native.propagation.topology.kernels.sampling.mc_sample_directions",
     "mc_selected_edge_indices": "witwin.channel_native.propagation.topology.kernels.primitives.mc_selected_edge_indices",
     "mc_sionna_diffraction_tape_accumulate": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate",
     "mc_sionna_diffraction_tape_accumulate_ad": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_ad",

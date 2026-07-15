@@ -30,7 +30,6 @@ _SAMPLING_OWNER_NAMES = (
     "mc_diffraction_state_pack",
     "mc_diffraction_state_wi",
     "mc_reflection_launch_inputs",
-    "mc_sample_directions",
 )
 
 _NATIVE_BUFFER_OWNER_NAMES = (

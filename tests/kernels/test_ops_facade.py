@@ -16,6 +16,9 @@ from witwin.channel_native.runtime import symbols as runtime_symbols
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
+from witwin.channel_native.propagation.topology.kernels import (
+    sampling as topology_sampling,
+)
 
 
 def test_validate_cuda_tensor_accepts_matching_cuda_tensor_when_available():
@@ -1456,7 +1459,7 @@ def test_mc_sample_directions_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC sample directions")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
+    monkeypatch.setattr(topology_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_sample_directions CUDA kernel is required"):
         ops.mc_sample_directions(1, reference)
