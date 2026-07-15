@@ -370,6 +370,154 @@ def _evaluate_transmission_fields(
     return material, launch_count
 
 
+def _evaluate_diffraction_fields(
+    scene: Scene,
+    compiled: object,
+    topology: TopologyBatch,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    source_power: torch.Tensor,
+    rx_pol: torch.Tensor,
+    device: torch.device,
+    frequency: float | torch.Tensor,
+    frequency_value: float | None,
+    ad_enabled: bool,
+    geometry_ad: bool,
+    vertices: torch.Tensor | None,
+    ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None,
+    field_xyz: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    direction: torch.Tensor,
+    launch_count: int,
+) -> tuple[dict[str, torch.Tensor] | None, int]:
+    diffraction_rows = torch.nonzero(
+        topology.component_id == 2, as_tuple=False
+    ).reshape(-1)
+    if int(diffraction_rows.shape[0]) > 0:
+        if ad_enabled:
+            # Plan 07 AD-4: RayD's order-1 path export is detached, so the
+            # wedge field is re-evaluated from the frozen topology (edge id,
+            # edge tables, wedge-face materials) with the differentiable
+            # kernel, and the projection runs through its own Function so the
+            # arrival-direction chain stays on the graph. Forward parity with
+            # topology.field_xyz is pinned by tests/ad.
+            if material is None:
+                material = face_material_field_bundle(compiled, device=device)
+            preserve_imported_edges = bool(
+                isinstance(scene.metadata.get("mitsuba", {}), dict)
+                and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
+            )
+            edge_geometry = (
+                _diffraction_edge_geometry(compiled.raydn.edge_records())
+                if preserve_imported_edges
+                else _cached_diffraction_edge_geometry(compiled.raydn)
+            )
+            edge_id = topology.edge_id[diffraction_rows].to(dtype=torch.int64)
+            face0 = edge_geometry[8].to(dtype=torch.int64)[edge_id]
+            face1 = edge_geometry[9].to(dtype=torch.int64)[edge_id]
+            face_count = int(material["eps_r"].shape[0])
+            # RayD's export treats a face as absent when its id is out of
+            # range or its material entry is not exported (face_material
+            # validity is discrete winner state).
+            table_valid = face_material_tensors(compiled, device=device)[4]
+            face0_c = face0.clamp(min=0, max=max(face_count - 1, 0))
+            face1_c = face1.clamp(min=0, max=max(face_count - 1, 0))
+            valid0 = (face0 >= 0) & (face0 < face_count) & table_valid[face0_c]
+            valid1 = (face1 >= 0) & (face1 < face_count) & table_valid[face1_c]
+            wedge_vertices = None
+            if geometry_ad and _vertices_participate_in_ad(scene):
+                # Mesh-vertex x diffraction (plan 07 section 9.3): hand the
+                # winner edge vertices to the wedge kernel, which rebuilds
+                # the edge tables from them on the dual row. The integer
+                # winner extraction below runs on detached tables; only the
+                # vertex gathers touch the live table.
+                records = compiled.raydn.edge_records()
+                edge_v0_ids = records.edge_v0.to(dtype=torch.int64)[edge_id]
+                edge_v1_ids = records.edge_v1.to(dtype=torch.int64)[edge_id]
+                faces_table = records.faces.to(dtype=torch.int64)
+                tri0 = faces_table[face0.clamp(min=0)]
+                tri1 = faces_table[face1.clamp(min=0)]
+                opp0_ids = _opposite_vertex_ids(tri0, edge_v0_ids, edge_v1_ids)
+                opp1_ids = _opposite_vertex_ids(tri1, edge_v0_ids, edge_v1_ids)
+                edge_boundary = (face1 < 0).contiguous()
+                wedge_vertices = (
+                    vertices[edge_v0_ids].contiguous(),
+                    vertices[edge_v1_ids].contiguous(),
+                    vertices[opp0_ids].contiguous(),
+                    vertices[opp1_ids].contiguous(),
+                    edge_boundary,
+                )
+            wedge_args = (
+                source[diffraction_rows].contiguous(),
+                target[diffraction_rows].contiguous(),
+                edge_geometry[1][edge_id].contiguous(),
+                edge_geometry[2][edge_id].contiguous(),
+                edge_geometry[4][edge_id].contiguous(),
+                edge_geometry[5][edge_id].contiguous(),
+                edge_geometry[6][edge_id].contiguous(),
+                edge_geometry[7][edge_id].contiguous(),
+                edge_geometry[10][edge_id].contiguous(),
+                valid0.contiguous(),
+                material["eps_r"][face0_c].contiguous(),
+                material["sigma_e"][face0_c].contiguous(),
+                material["mu_r"][face0_c].contiguous(),
+                material["gain"][face0_c].contiguous(),
+                valid1.contiguous(),
+                material["eps_r"][face1_c].contiguous(),
+                material["sigma_e"][face1_c].contiguous(),
+                material["mu_r"][face1_c].contiguous(),
+                material["gain"][face1_c].contiguous(),
+                source_power[diffraction_rows].contiguous(),
+            )
+            if ledger is not None:
+                ledger.add(
+                    *wedge_args,
+                    *(wedge_vertices if wedge_vertices is not None else ()),
+                )
+            evaluated = field_autograd.field_diffraction_wedge_ad(
+                *wedge_args,
+                frequency=frequency,
+                frequency_value=frequency_value,
+                vertices=wedge_vertices,
+            )
+            powered_xyz = evaluated["field_vector"]
+            arrival = evaluated["direction"]
+            if ledger is not None:
+                ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
+            projected = field_autograd.field_project_complex3_ad(
+                powered_xyz,
+                arrival,
+                rx_pol[diffraction_rows].contiguous(),
+            )
+        else:
+            arrival = geometry_primitives.deterministic_normalize_vec3(
+                (
+                    target[diffraction_rows]
+                    - topology.interaction_positions[diffraction_rows, 0]
+                ).contiguous(),
+                eps=1.0e-6,
+            )
+            powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
+            projected = field_functional.field_project_complex3(
+                powered_xyz,
+                arrival,
+                rx_pol[diffraction_rows].contiguous(),
+            )
+        amplitude = source_power[diffraction_rows].clamp_min(1.0e-30).sqrt()
+        field_xyz.index_copy_(0, diffraction_rows, powered_xyz / amplitude[:, None])
+        path_field.index_copy_(0, diffraction_rows, projected["coefficient"])
+        coefficient.index_copy_(
+            0, diffraction_rows, projected["coefficient"] / amplitude
+        )
+        path_gain.index_copy_(0, diffraction_rows, projected["path_gain"])
+        direction.index_copy_(0, diffraction_rows, arrival)
+        launch_count += 1
+    return material, launch_count
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -545,128 +693,29 @@ def _evaluate_shared_fields(
         launch_count,
     )
 
-    diffraction_rows = torch.nonzero(
-        topology.component_id == 2, as_tuple=False
-    ).reshape(-1)
-    if int(diffraction_rows.shape[0]) > 0:
-        if ad_enabled:
-            # Plan 07 AD-4: RayD's order-1 path export is detached, so the
-            # wedge field is re-evaluated from the frozen topology (edge id,
-            # edge tables, wedge-face materials) with the differentiable
-            # kernel, and the projection runs through its own Function so the
-            # arrival-direction chain stays on the graph. Forward parity with
-            # topology.field_xyz is pinned by tests/ad.
-            if material is None:
-                material = face_material_field_bundle(compiled, device=device)
-            preserve_imported_edges = bool(
-                isinstance(scene.metadata.get("mitsuba", {}), dict)
-                and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
-            )
-            edge_geometry = (
-                _diffraction_edge_geometry(compiled.raydn.edge_records())
-                if preserve_imported_edges
-                else _cached_diffraction_edge_geometry(compiled.raydn)
-            )
-            edge_id = topology.edge_id[diffraction_rows].to(dtype=torch.int64)
-            face0 = edge_geometry[8].to(dtype=torch.int64)[edge_id]
-            face1 = edge_geometry[9].to(dtype=torch.int64)[edge_id]
-            face_count = int(material["eps_r"].shape[0])
-            # RayD's export treats a face as absent when its id is out of
-            # range or its material entry is not exported (face_material
-            # validity is discrete winner state).
-            table_valid = face_material_tensors(compiled, device=device)[4]
-            face0_c = face0.clamp(min=0, max=max(face_count - 1, 0))
-            face1_c = face1.clamp(min=0, max=max(face_count - 1, 0))
-            valid0 = (face0 >= 0) & (face0 < face_count) & table_valid[face0_c]
-            valid1 = (face1 >= 0) & (face1 < face_count) & table_valid[face1_c]
-            wedge_vertices = None
-            if geometry_ad and _vertices_participate_in_ad(scene):
-                # Mesh-vertex x diffraction (plan 07 section 9.3): hand the
-                # winner edge vertices to the wedge kernel, which rebuilds
-                # the edge tables from them on the dual row. The integer
-                # winner extraction below runs on detached tables; only the
-                # vertex gathers touch the live table.
-                records = compiled.raydn.edge_records()
-                edge_v0_ids = records.edge_v0.to(dtype=torch.int64)[edge_id]
-                edge_v1_ids = records.edge_v1.to(dtype=torch.int64)[edge_id]
-                faces_table = records.faces.to(dtype=torch.int64)
-                tri0 = faces_table[face0.clamp(min=0)]
-                tri1 = faces_table[face1.clamp(min=0)]
-                opp0_ids = _opposite_vertex_ids(tri0, edge_v0_ids, edge_v1_ids)
-                opp1_ids = _opposite_vertex_ids(tri1, edge_v0_ids, edge_v1_ids)
-                edge_boundary = (face1 < 0).contiguous()
-                wedge_vertices = (
-                    vertices[edge_v0_ids].contiguous(),
-                    vertices[edge_v1_ids].contiguous(),
-                    vertices[opp0_ids].contiguous(),
-                    vertices[opp1_ids].contiguous(),
-                    edge_boundary,
-                )
-            wedge_args = (
-                source[diffraction_rows].contiguous(),
-                target[diffraction_rows].contiguous(),
-                edge_geometry[1][edge_id].contiguous(),
-                edge_geometry[2][edge_id].contiguous(),
-                edge_geometry[4][edge_id].contiguous(),
-                edge_geometry[5][edge_id].contiguous(),
-                edge_geometry[6][edge_id].contiguous(),
-                edge_geometry[7][edge_id].contiguous(),
-                edge_geometry[10][edge_id].contiguous(),
-                valid0.contiguous(),
-                material["eps_r"][face0_c].contiguous(),
-                material["sigma_e"][face0_c].contiguous(),
-                material["mu_r"][face0_c].contiguous(),
-                material["gain"][face0_c].contiguous(),
-                valid1.contiguous(),
-                material["eps_r"][face1_c].contiguous(),
-                material["sigma_e"][face1_c].contiguous(),
-                material["mu_r"][face1_c].contiguous(),
-                material["gain"][face1_c].contiguous(),
-                source_power[diffraction_rows].contiguous(),
-            )
-            if ledger is not None:
-                ledger.add(
-                    *wedge_args,
-                    *(wedge_vertices if wedge_vertices is not None else ()),
-                )
-            evaluated = field_autograd.field_diffraction_wedge_ad(
-                *wedge_args,
-                frequency=frequency,
-                frequency_value=frequency_value,
-                vertices=wedge_vertices,
-            )
-            powered_xyz = evaluated["field_vector"]
-            arrival = evaluated["direction"]
-            if ledger is not None:
-                ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
-            projected = field_autograd.field_project_complex3_ad(
-                powered_xyz,
-                arrival,
-                rx_pol[diffraction_rows].contiguous(),
-            )
-        else:
-            arrival = geometry_primitives.deterministic_normalize_vec3(
-                (
-                    target[diffraction_rows]
-                    - topology.interaction_positions[diffraction_rows, 0]
-                ).contiguous(),
-                eps=1.0e-6,
-            )
-            powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
-            projected = field_functional.field_project_complex3(
-                powered_xyz,
-                arrival,
-                rx_pol[diffraction_rows].contiguous(),
-            )
-        amplitude = source_power[diffraction_rows].clamp_min(1.0e-30).sqrt()
-        field_xyz.index_copy_(0, diffraction_rows, powered_xyz / amplitude[:, None])
-        path_field.index_copy_(0, diffraction_rows, projected["coefficient"])
-        coefficient.index_copy_(
-            0, diffraction_rows, projected["coefficient"] / amplitude
-        )
-        path_gain.index_copy_(0, diffraction_rows, projected["path_gain"])
-        direction.index_copy_(0, diffraction_rows, arrival)
-        launch_count += 1
+    material, launch_count = _evaluate_diffraction_fields(
+        scene,
+        compiled,
+        topology,
+        source,
+        target,
+        source_power,
+        rx_pol,
+        device,
+        frequency,
+        frequency_value,
+        ad_enabled,
+        geometry_ad,
+        vertices if geometry_ad else None,
+        ledger,
+        material,
+        field_xyz,
+        coefficient,
+        path_field,
+        path_gain,
+        direction,
+        launch_count,
+    )
 
     coupled_rows = torch.nonzero(
         (topology.component_id == 3) | (topology.component_id == 4),
