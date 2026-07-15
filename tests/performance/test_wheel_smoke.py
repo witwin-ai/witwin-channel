@@ -16,25 +16,31 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
     metadata["Version"] = version
     payload = metadata.as_bytes()
     with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("witwin_channel_native-0.1.0.dist-info/METADATA", payload)
         archive.writestr(
-            "witwin_channel_native-0.1.0.dist-info/METADATA", payload
+            "witwin/channel_native/_channel_native.cp311-win_amd64.pyd", b"native"
+        )
+        archive.writestr(
+            "witwin/channel_native/runtime/_channel_native.build-fingerprint",
+            b"a" * 64 + b"\n",
+        )
+        archive.writestr(
+            "witwin/channel_native/runtime/rayd.lock.json", b'{"schema_version": 1}'
         )
     return path.read_bytes()
 
 
 def test_wheel_identity_and_sha256_are_read_from_wheel(tmp_path: Path):
     wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
-    payload = _write_wheel(
-        wheel, name="witwin-channel-native", version="0.1.0"
-    )
+    payload = _write_wheel(wheel, name="witwin-channel-native", version="0.1.0")
 
     assert wheel_smoke._wheel_identity(wheel) == (
         "witwin-channel-native",
         "0.1.0",
     )
-    assert wheel_smoke._sha256(wheel) == __import__("hashlib").sha256(
-        payload
-    ).hexdigest()
+    assert (
+        wheel_smoke._sha256(wheel) == __import__("hashlib").sha256(payload).hexdigest()
+    )
 
 
 def test_wheel_identity_rejects_unexpected_distribution(tmp_path: Path):
@@ -43,6 +49,33 @@ def test_wheel_identity_rejects_unexpected_distribution(tmp_path: Path):
 
     with pytest.raises(ValueError, match="wheel identity"):
         wheel_smoke._wheel_identity(wheel)
+
+
+def test_wheel_content_audit_accepts_owned_runtime_files(tmp_path: Path):
+    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel-native", version="0.1.0")
+
+    wheel_smoke._audit_wheel_contents(wheel)
+
+
+@pytest.mark.parametrize(
+    ("member", "payload"),
+    [
+        ("rayd/torch/_stable_ops.dll", b"leaked dependency"),
+        ("witwin/channel_native/CMakeFiles/kernel.obj", b"build output"),
+        ("witwin/channel_native/config.txt", b"E:\\private\\checkout"),
+    ],
+)
+def test_wheel_content_audit_rejects_build_leaks(
+    tmp_path: Path, member: str, payload: bytes
+):
+    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel-native", version="0.1.0")
+    with zipfile.ZipFile(wheel, "a") as archive:
+        archive.writestr(member, payload)
+
+    with pytest.raises(ValueError, match="forbidden build content"):
+        wheel_smoke._audit_wheel_contents(wheel)
 
 
 def test_smoke_program_contains_strict_isolation_and_native_checks(tmp_path: Path):

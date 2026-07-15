@@ -1,13 +1,17 @@
 [build-system]
-requires = ["scikit-build-core"]
+requires = [
+    "cmake>=4.3,<4.4",
+    "ninja>=1.13,<1.14",
+    "scikit-build-core>=0.12,<0.13",
+]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "witwin-channel-native"
 version = "0.1.0"
 description = "DrJit-free Torch/CUDA RF channel runtime."
-requires-python = ">=3.10"
-dependencies = ["torch"]
+requires-python = ">=3.11,<3.12"
+dependencies = ["torch==2.10.0"]
 
 [tool.scikit-build]
 wheel.packages = ["src/witwin"]

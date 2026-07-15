@@ -4,6 +4,7 @@ import argparse
 import hashlib
 from email.parser import BytesParser
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,22 @@ import zipfile
 
 
 _DISTRIBUTION = "witwin-channel-native"
+_REQUIRED_RUNTIME_MEMBERS = {
+    "witwin/channel_native/runtime/_channel_native.build-fingerprint",
+    "witwin/channel_native/runtime/rayd.lock.json",
+}
+_FORBIDDEN_BUILD_SUFFIXES = {
+    ".exp",
+    ".ilk",
+    ".lib",
+    ".lock",
+    ".o",
+    ".obj",
+    ".pdb",
+}
+_ABSOLUTE_PATH_PATTERN = re.compile(
+    rb"(?:[A-Za-z]:[\\/]|/(?:home|Users|private/tmp|tmp|workspace)/)"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -24,9 +41,7 @@ def _sha256(path: Path) -> str:
 def _wheel_identity(path: Path) -> tuple[str, str]:
     with zipfile.ZipFile(path) as archive:
         metadata_files = [
-            name
-            for name in archive.namelist()
-            if name.endswith(".dist-info/METADATA")
+            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
         ]
         if len(metadata_files) != 1:
             raise ValueError(
@@ -42,6 +57,46 @@ def _wheel_identity(path: Path) -> tuple[str, str]:
             f"found name={name!r}, version={version!r}"
         )
     return name, version
+
+
+def _audit_wheel_contents(path: Path) -> None:
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        native_extensions = [
+            name
+            for name in names
+            if name.startswith("witwin/channel_native/_channel_native")
+            and name.endswith((".pyd", ".so"))
+        ]
+        if len(native_extensions) != 1:
+            raise ValueError(
+                "wheel must contain exactly one packaged _channel_native extension; "
+                f"found {native_extensions}"
+            )
+        missing = sorted(_REQUIRED_RUNTIME_MEMBERS.difference(names))
+        if missing:
+            raise ValueError(f"wheel is missing runtime identity files: {missing}")
+
+        forbidden: list[str] = []
+        for name in names:
+            normalized = name.replace("\\", "/")
+            parts = tuple(part.lower() for part in normalized.split("/") if part)
+            suffix = Path(normalized).suffix.lower()
+            if (
+                normalized.startswith("/")
+                or re.match(r"^[A-Za-z]:/", normalized)
+                or (parts and parts[0] == "rayd")
+                or any(part in {"cmakefiles", "_skbuild", "build"} for part in parts)
+                or suffix in _FORBIDDEN_BUILD_SUFFIXES
+                or normalized.endswith(".pyd.pyd")
+            ):
+                forbidden.append(name)
+                continue
+            if suffix in {".json", ".md", ".py", ".toml", ".txt"}:
+                if _ABSOLUTE_PATH_PATTERN.search(archive.read(name)):
+                    forbidden.append(f"{name} (contains an absolute local path)")
+        if forbidden:
+            raise ValueError(f"wheel contains forbidden build content: {forbidden}")
 
 
 def _smoke_code(
@@ -130,6 +185,7 @@ def main() -> int:
         parser.error(f"wheel does not exist: {wheel}")
     try:
         expected_name, expected_version = _wheel_identity(wheel)
+        _audit_wheel_contents(wheel)
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         parser.error(str(exc))
     wheel_sha256 = _sha256(wheel)
