@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
+from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint
 from witwin.channel_native.core.kernels.ops import (
     bdpt_host_vec3_tensor,
     bdpt_receiver_grid_points,
     bdpt_transmitter_tensors,
 )
+from witwin.channel_native.core.scene import Scene
 from witwin.channel_native.core.receiver_geometry import (
     vector3_tuple as _vector3_tuple,
 )

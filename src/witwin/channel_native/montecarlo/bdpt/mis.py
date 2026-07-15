@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.core.kernels.ops import bdpt_mis_weights
+from witwin.channel_native.montecarlo.bdpt.kernels.paths import bdpt_mis_weights
 
 
 def compute_mis_weights(

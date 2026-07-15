@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 import torch
 
-from witwin.channel_native import Scene
-from witwin.channel_native import ReceiverGrid
+from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.field_state import (
@@ -24,33 +24,36 @@ from witwin.channel_native.core.receiver_geometry import (
     first_receiver_grid,
 )
 from witwin.channel_native.core.path_topology import export_topology
-from witwin.channel_native.path import Config as PathConfig
+
 from witwin.channel_native.core.kernels.ops import (
-    bdpt_accumulate_connection_samples,
-    bdpt_compact_connection_samples,
-    bdpt_concat_connection_samples,
-    bdpt_count_valid_connection_samples,
-    bdpt_diffraction_connection_samples_from_tape,
-    bdpt_diffraction_point_connection_samples,
     bdpt_diffraction_state_pack,
     bdpt_diffraction_state_wi,
-    bdpt_endpoint_subpath_state,
-    bdpt_endpoint_connection_samples,
-    bdpt_endpoint_connection_visibility_inputs,
     bdpt_finalize_component_maps,
     bdpt_finalize_point_components,
-    bdpt_filter_connection_samples,
-    bdpt_connection_variance,
     bdpt_los_component_maps_from_matrix,
-    bdpt_reflected_light_subpath_state,
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,
     bdpt_selected_edge_indices,
-    bdpt_subpath_intersection_inputs,
-    bdpt_transmitted_light_subpath_state,
     bdpt_zero_matrix,
     mc_component_map_buffer,
     mc_store_component_map,
+)
+from witwin.channel_native.core.scene import Scene
+from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
+    bdpt_accumulate_connection_samples,
+    bdpt_compact_connection_samples,
+    bdpt_concat_connection_samples,
+    bdpt_connection_variance,
+    bdpt_count_valid_connection_samples,
+    bdpt_diffraction_connection_samples_from_tape,
+    bdpt_diffraction_point_connection_samples,
+    bdpt_endpoint_connection_samples,
+    bdpt_endpoint_connection_visibility_inputs,
+    bdpt_endpoint_subpath_state,
+    bdpt_filter_connection_samples,
+    bdpt_reflected_light_subpath_state,
+    bdpt_subpath_intersection_inputs,
+    bdpt_transmitted_light_subpath_state,
 )
 from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
 from witwin.channel_native.core.diffraction_geometry import (
@@ -90,6 +93,24 @@ _EXPORT_BYTES_PER_PATH = 96
 _CONNECTION_BYTES_PER_ROW = 57
 _VISIBILITY_BYTES_PER_ROW = 25
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
+
+
+@dataclass(frozen=True, slots=True)
+class _BDPTTopologyOptions:
+    max_depth: int
+    components: frozenset[str]
+    max_paths: int | None = None
+    max_paths_scope: str = "per_pair"
+    ad_mode: str = "none"
+    coupled_paths: bool = False
+    coupled_candidate_limit: int = 1_000_000
+
+    def __post_init__(self) -> None:
+        if self.max_depth > 5 and self.components & {
+            "reflection",
+            "transmission",
+        }:
+            raise RuntimeError("path reflection/transmission support max_depth <= 5")
 
 
 def _estimate_workspace_bytes(
@@ -601,9 +622,9 @@ def _reflection_discrete_connection_samples(
 
     topology = export_topology(
         scene,
-        PathConfig(
+        _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
-            components={"reflection"},
+            components=frozenset({"reflection"}),
         ),
     )
     selected = torch.nonzero(topology.component_id == 1, as_tuple=False).flatten()
@@ -617,9 +638,9 @@ def _coupled_discrete_connection_samples(
 
     topology = export_topology(
         scene,
-        PathConfig(
+        _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
-            components={"reflection", "diffraction"},
+            components=frozenset({"reflection", "diffraction"}),
             coupled_paths=True,
             coupled_candidate_limit=int(config.coupled_candidate_limit),
         ),

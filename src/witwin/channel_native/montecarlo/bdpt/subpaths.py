@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel_native.core.kernels.ops import bdpt_empty_subpath_state
+from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
+    bdpt_empty_subpath_state,
+)
 
 
 @dataclass(frozen=True, slots=True)

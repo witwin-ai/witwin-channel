@@ -29,9 +29,8 @@ def test_current_import_debt_is_exact_and_allowlisted():
     assert Counter(
         graph._DEBT_GROUP_BY_RULE[violation.rule] for violation in violations
     ) == {
-        "direct_core_kernels_ops": 7,
+        "direct_core_kernels_ops": 4,
         "existing_boundary": 6,
-        "solver_to_solver": 1,
     }
 
 
@@ -148,12 +147,14 @@ def test_allowlist_must_remove_stale_entries_with_resolved_debt():
     violations = graph.scan_package(PACKAGE_ROOT)
     allowlist = graph.load_allowlist(ALLOWLIST)
     resolved = [
-        violation for violation in violations if violation.rule != "solver_to_solver"
+        violation
+        for violation in violations
+        if violation.rule != "direct_core_kernels_ops"
     ]
 
     issues = graph.check_allowlist(resolved, allowlist)
 
-    assert any("stale solver_to_solver allowance" in issue for issue in issues)
+    assert any("stale direct_core_kernels_ops allowance" in issue for issue in issues)
 
 
 def test_frozen_baseline_universe_cannot_change():

@@ -3,6 +3,7 @@ import torch
 import math
 
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.montecarlo.bdpt.kernels import paths
 from witwin.channel_native.runtime import symbols
 
 
@@ -91,7 +92,7 @@ def test_bdpt_launch_state_has_no_python_fallback(monkeypatch):
         pytest.skip("CUDA is required for BDPT launch state")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(paths, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_launch_state CUDA kernel is required"):
         ops.bdpt_launch_state(reference, tx_count=1, samples=1, sample_streams=1, seed=0)
@@ -648,7 +649,7 @@ def test_bdpt_endpoint_connection_samples_has_no_python_fallback(monkeypatch):
         torch.zeros((1,), device="cuda", dtype=torch.int32),
         torch.ones((1,), device="cuda", dtype=torch.int64),
     )
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_endpoint_connection_samples CUDA kernel is required"):
         ops.bdpt_endpoint_connection_samples(
@@ -961,7 +962,7 @@ def test_bdpt_accumulate_connection_samples_has_no_python_fallback(monkeypatch):
         "sensor_depth": torch.zeros((1,), device="cuda", dtype=torch.int32),
         "path_length_m": torch.ones((1,), device="cuda", dtype=torch.float32),
     }
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_accumulate_connection_samples CUDA kernel is required"):
         ops.bdpt_accumulate_connection_samples(samples, tx_count=1, rx_count=1)
@@ -999,7 +1000,7 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
         "sensor_depth": torch.zeros((1,), device="cuda", dtype=torch.int32),
         "path_length_m": torch.ones((1,), device="cuda", dtype=torch.float32),
     }
-    monkeypatch.setattr(ops, "native_extension", lambda: FakeNative())
+    monkeypatch.setattr(symbols, "native_extension", lambda: FakeNative())
 
     for strategy in ("atomic", "staged", "compact"):
         ops.bdpt_accumulate_connection_samples(

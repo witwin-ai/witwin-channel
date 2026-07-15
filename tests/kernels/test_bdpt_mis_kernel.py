@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.montecarlo.bdpt.kernels import paths
 
 
 def test_bdpt_mis_kernel_matches_expected_constants():
@@ -30,7 +31,7 @@ def test_bdpt_mis_kernel_has_no_python_fallback(monkeypatch):
 
     pdf = torch.ones(1, device="cuda", dtype=torch.float32)
     strategy_sum = torch.ones((), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(paths, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_mis_weights CUDA kernel is required"):
         ops.bdpt_mis_weights(pdf, strategy_sum, mis="balance")
