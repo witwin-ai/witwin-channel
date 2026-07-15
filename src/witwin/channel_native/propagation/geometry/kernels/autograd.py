@@ -21,6 +21,7 @@ from witwin.channel_native.scene.native_handles import (
 )
 
 from .bridge import _BDPT_INTERSECTION_FIELDS
+from .primitives import deterministic_normalize_vec3
 
 
 _RAYDN_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
@@ -1115,3 +1116,126 @@ def raydn_reflection_epc_paths_ad(
         int(visibility_ignore_mode),
     )
     return dict(zip(_RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS, values, strict=True))
+
+
+def raydn_scene_face_normals_backward(
+    handle: object, grad_face_normals: torch.Tensor
+) -> torch.Tensor:
+    # Cotangents from autograd may be strided views; the native kernel
+    # consumes explicit strides, so contiguity is deliberately not required.
+    if not isinstance(grad_face_normals, torch.Tensor):
+        raise TypeError("grad_face_normals must be a torch.Tensor")
+    if grad_face_normals.dtype != torch.float32:
+        raise TypeError("grad_face_normals must have dtype torch.float32")
+    if not grad_face_normals.is_cuda:
+        raise ValueError("grad_face_normals must be a CUDA tensor")
+    if grad_face_normals.ndim != 2 or grad_face_normals.shape[1] != 3:
+        raise ValueError("grad_face_normals must have shape (F, 3)")
+    out = _required_native_op("raydn_scene_face_normals_backward")(
+        _raydn_scene_handle_id(handle),
+        grad_face_normals,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.raydn_scene_face_normals_backward must return a tensor"
+        )
+    return out
+
+
+def raydn_scene_face_normals_jvp(
+    handle: object, tangent_vertices: torch.Tensor
+) -> torch.Tensor:
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    if tangent_vertices is None:
+        raise ValueError("tangent_vertices is required")
+    out = _required_native_op("raydn_scene_face_normals_jvp")(
+        _raydn_scene_handle_id(handle),
+        tangent_vertices,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.raydn_scene_face_normals_jvp must return a tensor"
+        )
+    return out
+
+
+class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
+    """Scene unit face-normal table with a graph to the vertex table.
+
+    Forward normalizes the native face-normal export with the same kernel the
+    reflection discovery uses; backward/jvp call RayD's face-normal table
+    companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))
+    over the scene's global vertex and face tables).
+    """
+
+    @staticmethod
+    def forward(scene_handle, vertices, raw_face_normals):
+        return deterministic_normalize_vec3(raw_face_normals, eps=1.0e-6)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        scene_handle, vertices, _raw_face_normals = inputs
+        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
+        ctx.scene = int(scene_handle)
+        ctx.vertices_shape = tuple(vertices.shape)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_face_normals):
+        if ctx.needs_input_grad[2]:
+            raise RuntimeError(
+                "raydn_face_normals_ad differentiates the vertex table only;"
+                " the raw face-normal export is a detached scene record"
+            )
+        if grad_face_normals is None or not ctx.needs_input_grad[1]:
+            return (None, None, None)
+        grad_vertices = raydn_scene_face_normals_backward(
+            ctx.scene, grad_face_normals
+        )
+        if tuple(grad_vertices.shape) != ctx.vertices_shape:
+            raise RuntimeError(
+                "raydn_face_normals_ad vertices must be the scene global"
+                " vertex table"
+            )
+        return (None, grad_vertices, None)
+
+    @staticmethod
+    def jvp(ctx, _grad_handle, grad_vertices, _grad_raw_face_normals):
+        tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
+        if tangent_vertices is None:
+            return None
+        with torch_compat.disable_functorch():
+            return raydn_scene_face_normals_jvp(
+                ctx.scene,
+                _ad_checked_tangent(
+                    "raydn_face_normals_ad tangent_vertices",
+                    tangent_vertices,
+                    ctx.vertices_shape,
+                ),
+            )
+
+
+def raydn_face_normals_ad(
+    handle: object, vertices: torch.Tensor, raw_face_normals: torch.Tensor
+) -> torch.Tensor:
+    """Scene unit face-normal table, differentiable in the vertex table.
+
+    ``raw_face_normals`` is the detached native export (scene edge records);
+    the returned table is its normalization with vertex gradients/tangents
+    routed through RayD's face-normal companions under the fixed-winner
+    contract (which face a row consumes stays a frozen integer gather).
+    """
+
+    validate_cuda_tensor(
+        "raw_face_normals",
+        raw_face_normals,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    return _RaydnFaceNormalsAdFunction.apply(
+        _raydn_scene_handle_id(handle), vertices, raw_face_normals
+    )

@@ -10,25 +10,31 @@ from witwin.channel_native.propagation.geometry.kernels.bridge import (  # noqa:
     bdpt_intersect_forward,
     bdpt_reflection_accumulation_forward,
     bdpt_visibility_forward,
+    raydn_coupled_rd_geometry_forward,
     raydn_diffraction_accumulation_forward,
     raydn_diffraction_discover_edges,
     raydn_diffraction_discover_edges_counted,
+    raydn_diffraction_paths_order1_forward,
     raydn_reflection_accumulation_forward,
     raydn_reflection_epc_paths_forward,
     raydn_trace_reflections_forward,
     raydn_visibility_forward,
 )
 from witwin.channel_native.propagation.geometry.kernels.autograd import (  # noqa: F401
+    _RaydnFaceNormalsAdFunction,
     _RaydnIntersectAdFunction,
     _RaydnReflectionEpcPathsAdFunction,
     _RaydnTraceReflectionsAdFunction,
     _epc_paths_frozen_winner_checks,
+    raydn_face_normals_ad,
     raydn_intersect_ad,
     raydn_intersect_backward,
     raydn_intersect_jvp,
     raydn_reflection_epc_paths_ad,
     raydn_reflection_epc_paths_backward,
     raydn_reflection_epc_paths_jvp,
+    raydn_scene_face_normals_backward,
+    raydn_scene_face_normals_jvp,
     raydn_trace_reflections_ad,
     raydn_trace_reflections_backward,
     raydn_trace_reflections_forward_tape,
@@ -822,8 +828,6 @@ def core_pack_int2(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     if out.shape != (x.shape[0], 2):
         raise ValueError("_channel_native.core_pack_int2 returned an unexpected shape")
     return out
-
-
 
 
 def bdpt_mis_weights(
@@ -1773,10 +1777,6 @@ def deterministic_diffraction_state_pack_selected(
     return states
 
 
-
-
-
-
 def bdpt_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("x", x, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("y", y, dtype=torch.float32, ndim=1)
@@ -1866,27 +1866,6 @@ def bdpt_face_material_tensors_from_host(
 # ---------------------------------------------------------------------------
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------------------
 # RayDN reflection EPC paths geometry AD (plan 07 AD-2 layer 1).
 #
@@ -1899,204 +1878,6 @@ def bdpt_face_material_tensors_from_host(
 # records. RayD chains each bounce's plane cotangents to the winner
 # triangle's vertices itself, so no hit geometry is ever re-derived here.
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-def raydn_scene_face_normals_backward(
-    handle: object, grad_face_normals: torch.Tensor
-) -> torch.Tensor:
-    # Cotangents from autograd may be strided views; the native kernel
-    # consumes explicit strides, so contiguity is deliberately not required.
-    if not isinstance(grad_face_normals, torch.Tensor):
-        raise TypeError("grad_face_normals must be a torch.Tensor")
-    if grad_face_normals.dtype != torch.float32:
-        raise TypeError("grad_face_normals must have dtype torch.float32")
-    if not grad_face_normals.is_cuda:
-        raise ValueError("grad_face_normals must be a CUDA tensor")
-    if grad_face_normals.ndim != 2 or grad_face_normals.shape[1] != 3:
-        raise ValueError("grad_face_normals must have shape (F, 3)")
-    out = _required_native_op("raydn_scene_face_normals_backward")(
-        _raydn_scene_handle_id(handle),
-        grad_face_normals,
-        _raydn_module_handle(),
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel_native.raydn_scene_face_normals_backward must return a tensor"
-        )
-    return out
-
-
-def raydn_scene_face_normals_jvp(
-    handle: object, tangent_vertices: torch.Tensor
-) -> torch.Tensor:
-    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
-    if tangent_vertices is None:
-        raise ValueError("tangent_vertices is required")
-    out = _required_native_op("raydn_scene_face_normals_jvp")(
-        _raydn_scene_handle_id(handle),
-        tangent_vertices,
-        _raydn_module_handle(),
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel_native.raydn_scene_face_normals_jvp must return a tensor"
-        )
-    return out
-
-
-
-
-
-
-
-
-class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
-    """Scene unit face-normal table with a graph to the vertex table.
-
-    Forward normalizes the native face-normal export with the same kernel the
-    reflection discovery uses; backward/jvp call RayD's face-normal table
-    companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))
-    over the scene's global vertex and face tables).
-    """
-
-    @staticmethod
-    def forward(scene_handle, vertices, raw_face_normals):
-        return deterministic_normalize_vec3(raw_face_normals, eps=1.0e-6)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        scene_handle, vertices, _raw_face_normals = inputs
-        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
-        ctx.scene = int(scene_handle)
-        ctx.vertices_shape = tuple(vertices.shape)
-
-    @staticmethod
-    @torch.autograd.function.once_differentiable
-    def backward(ctx, grad_face_normals):
-        if ctx.needs_input_grad[2]:
-            raise RuntimeError(
-                "raydn_face_normals_ad differentiates the vertex table only;"
-                " the raw face-normal export is a detached scene record"
-            )
-        if grad_face_normals is None or not ctx.needs_input_grad[1]:
-            return (None, None, None)
-        grad_vertices = raydn_scene_face_normals_backward(
-            ctx.scene, grad_face_normals
-        )
-        if tuple(grad_vertices.shape) != ctx.vertices_shape:
-            raise RuntimeError(
-                "raydn_face_normals_ad vertices must be the scene global"
-                " vertex table"
-            )
-        return (None, grad_vertices, None)
-
-    @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, _grad_raw_face_normals):
-        tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
-        if tangent_vertices is None:
-            return None
-        with torch_compat.disable_functorch():
-            return raydn_scene_face_normals_jvp(
-                ctx.scene,
-                _ad_checked_tangent(
-                    "raydn_face_normals_ad tangent_vertices",
-                    tangent_vertices,
-                    ctx.vertices_shape,
-                ),
-            )
-
-
-def raydn_face_normals_ad(
-    handle: object, vertices: torch.Tensor, raw_face_normals: torch.Tensor
-) -> torch.Tensor:
-    """Scene unit face-normal table, differentiable in the vertex table.
-
-    ``raw_face_normals`` is the detached native export (scene edge records);
-    the returned table is its normalization with vertex gradients/tangents
-    routed through RayD's face-normal companions under the fixed-winner
-    contract (which face a row consumes stays a frozen integer gather).
-    """
-
-    validate_cuda_tensor(
-        "raw_face_normals",
-        raw_face_normals,
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    return _RaydnFaceNormalsAdFunction.apply(
-        _raydn_scene_handle_id(handle), vertices, raw_face_normals
-    )
-
-
-def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
-    """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
-
-    The native operation uses image-source edge stationarity, RayDN reflection
-    EPC, and RayDN segment visibility. ``reverse=True`` constructs D->R by
-    exchanging endpoints and reversing the interaction sequence. The returned
-    dictionary intentionally has no ``path_gain`` or ``field`` entry; coupled
-    complex/Jones transport belongs to the unified field phase.
-    """
-
-    if not args:
-        raise TypeError(
-            "raydn_coupled_rd_geometry_forward requires a RayDN scene handle"
-        )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_coupled_rd_geometry_forward")(
-        *native_args,
-        _raydn_module_handle(),
-    )
-    if not isinstance(out, dict):
-        raise TypeError(
-            "_channel_native.raydn_coupled_rd_geometry_forward must return a dict"
-        )
-    required = {
-        "valid": (torch.bool, 1),
-        "interaction_type_sequence": (torch.int32, 2),
-        "primitive_sequence": (torch.int32, 2),
-        "edge_sequence": (torch.int32, 2),
-        "face_id": (torch.int32, 1),
-        "edge_id": (torch.int32, 1),
-        "interaction_positions": (torch.float32, 3),
-        "interaction_normals": (torch.float32, 3),
-        "reflection_position": (torch.float32, 2),
-        "reflection_normal": (torch.float32, 2),
-        "edge_position": (torch.float32, 2),
-        "edge_direction": (torch.float32, 2),
-        "path_length_m": (torch.float32, 1),
-        "delay_s": (torch.float32, 1),
-    }
-    for name, (dtype, ndim) in required.items():
-        value = out.get(name)
-        if not isinstance(value, torch.Tensor):
-            raise TypeError(f"coupled geometry output {name!r} must be a tensor")
-        validate_cuda_tensor(name, value, dtype=dtype, ndim=ndim)
-    if "path_gain" in out or "field" in out or "path_field" in out:
-        raise ValueError(
-            "coupled geometry must not expose placeholder physical coefficients"
-        )
-    count = int(out["valid"].shape[0])
-    if out["interaction_type_sequence"].shape != (count, 2):
-        raise ValueError("interaction_type_sequence must have shape (N, 2)")
-    if out["primitive_sequence"].shape != (count, 2) or out["edge_sequence"].shape != (
-        count,
-        2,
-    ):
-        raise ValueError("coupled primitive/edge sequences must have shape (N, 2)")
-    if out["interaction_positions"].shape != (count, 2, 3):
-        raise ValueError("interaction_positions must have shape (N, 2, 3)")
-    if out["interaction_normals"].shape != (count, 2, 3):
-        raise ValueError("interaction_normals must have shape (N, 2, 3)")
-    return out
 
 
 def field_free_space(
@@ -5126,23 +4907,6 @@ def coupled_rd_prepare_ad(
     }
 
 
-def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
-    if not args:
-        raise TypeError(
-            "raydn_diffraction_paths_order1_forward requires a RayDN scene handle"
-        )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_diffraction_paths_order1_forward")(
-        *native_args,
-        _raydn_module_handle(),
-    )
-    if not isinstance(out, (tuple, list)):
-        raise TypeError(
-            "_channel_native.raydn_diffraction_paths_order1_forward must return a tensor sequence"
-        )
-    return tuple(out)
-
-
 def path_los_export(
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
@@ -6415,14 +6179,6 @@ def deterministic_diffraction_order1_compact(
             "_channel_native.deterministic_diffraction_order1_compact returned bad interaction_position shape"
         )
     return exported
-
-
-
-
-
-
-
-
 
 
 def deterministic_sort_order(
@@ -8732,10 +8488,6 @@ def mc_diffraction_state_pack(
     )
     validate_cuda_tensor("state_src_power", states[11], dtype=torch.float32, ndim=1)
     return states
-
-
-
-
 
 
 def mc_face_material_tensors(

@@ -17,6 +17,8 @@ _CANONICAL_FUNCTION_NAMES = (
     "bdpt_intersect_forward",
     "bdpt_reflection_accumulation_forward",
     "bdpt_visibility_forward",
+    "raydn_coupled_rd_geometry_forward",
+    "raydn_diffraction_paths_order1_forward",
     "raydn_reflection_epc_paths_forward",
     "raydn_trace_reflections_forward",
 )

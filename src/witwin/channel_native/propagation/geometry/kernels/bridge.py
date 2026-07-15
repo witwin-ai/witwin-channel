@@ -207,6 +207,86 @@ def raydn_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...
     return tuple(out)
 
 
+def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+    """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
+
+    The native operation uses image-source edge stationarity, RayDN reflection
+    EPC, and RayDN segment visibility. ``reverse=True`` constructs D->R by
+    exchanging endpoints and reversing the interaction sequence. The returned
+    dictionary intentionally has no ``path_gain`` or ``field`` entry; coupled
+    complex/Jones transport belongs to the unified field phase.
+    """
+
+    if not args:
+        raise TypeError(
+            "raydn_coupled_rd_geometry_forward requires a RayDN scene handle"
+        )
+    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    out = _required_native_op("raydn_coupled_rd_geometry_forward")(
+        *native_args,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, dict):
+        raise TypeError(
+            "_channel_native.raydn_coupled_rd_geometry_forward must return a dict"
+        )
+    required = {
+        "valid": (torch.bool, 1),
+        "interaction_type_sequence": (torch.int32, 2),
+        "primitive_sequence": (torch.int32, 2),
+        "edge_sequence": (torch.int32, 2),
+        "face_id": (torch.int32, 1),
+        "edge_id": (torch.int32, 1),
+        "interaction_positions": (torch.float32, 3),
+        "interaction_normals": (torch.float32, 3),
+        "reflection_position": (torch.float32, 2),
+        "reflection_normal": (torch.float32, 2),
+        "edge_position": (torch.float32, 2),
+        "edge_direction": (torch.float32, 2),
+        "path_length_m": (torch.float32, 1),
+        "delay_s": (torch.float32, 1),
+    }
+    for name, (dtype, ndim) in required.items():
+        value = out.get(name)
+        if not isinstance(value, torch.Tensor):
+            raise TypeError(f"coupled geometry output {name!r} must be a tensor")
+        validate_cuda_tensor(name, value, dtype=dtype, ndim=ndim)
+    if "path_gain" in out or "field" in out or "path_field" in out:
+        raise ValueError(
+            "coupled geometry must not expose placeholder physical coefficients"
+        )
+    count = int(out["valid"].shape[0])
+    if out["interaction_type_sequence"].shape != (count, 2):
+        raise ValueError("interaction_type_sequence must have shape (N, 2)")
+    if out["primitive_sequence"].shape != (count, 2) or out["edge_sequence"].shape != (
+        count,
+        2,
+    ):
+        raise ValueError("coupled primitive/edge sequences must have shape (N, 2)")
+    if out["interaction_positions"].shape != (count, 2, 3):
+        raise ValueError("interaction_positions must have shape (N, 2, 3)")
+    if out["interaction_normals"].shape != (count, 2, 3):
+        raise ValueError("interaction_normals must have shape (N, 2, 3)")
+    return out
+
+
+def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
+    if not args:
+        raise TypeError(
+            "raydn_diffraction_paths_order1_forward requires a RayDN scene handle"
+        )
+    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    out = _required_native_op("raydn_diffraction_paths_order1_forward")(
+        *native_args,
+        _raydn_module_handle(),
+    )
+    if not isinstance(out, (tuple, list)):
+        raise TypeError(
+            "_channel_native.raydn_diffraction_paths_order1_forward must return a tensor sequence"
+        )
+    return tuple(out)
+
+
 __all__ = [
     "bdpt_diffraction_accumulation_forward",
     "bdpt_diffraction_discover_edges",
@@ -214,9 +294,11 @@ __all__ = [
     "bdpt_intersect_forward",
     "bdpt_reflection_accumulation_forward",
     "bdpt_visibility_forward",
+    "raydn_coupled_rd_geometry_forward",
     "raydn_diffraction_accumulation_forward",
     "raydn_diffraction_discover_edges",
     "raydn_diffraction_discover_edges_counted",
+    "raydn_diffraction_paths_order1_forward",
     "raydn_reflection_accumulation_forward",
     "raydn_reflection_epc_paths_forward",
     "raydn_trace_reflections_forward",

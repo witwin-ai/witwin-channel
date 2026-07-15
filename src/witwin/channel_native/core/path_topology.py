@@ -1110,7 +1110,7 @@ def _evaluate_shared_fields(
             # convention does not matter. Invalid slots gather face 0 but are
             # skipped by the kernel, so they receive a zero cotangent.
             records = compiled.raydn.edge_records()
-            face_normal_table = ops.raydn_face_normals_ad(
+            face_normal_table = geometry_autograd.raydn_face_normals_ad(
                 compiled.raydn.require_handle(),
                 vertices,
                 records.face_normals.contiguous(),
@@ -2186,7 +2186,7 @@ def _diffraction_topology_order1(
             rx_end = min(rx_start + rx_chunk_size, rx_count)
             rx_chunk = rx_positions[rx_start:rx_end].contiguous()
             capacity = int(rx_chunk.shape[0]) * state_count
-            out = ops.raydn_diffraction_paths_order1_forward(
+            out = geometry_bridge.raydn_diffraction_paths_order1_forward(
                 handle,
                 tx.reshape(1, 3).contiguous(),
                 rx_chunk,
@@ -2411,7 +2411,9 @@ def _coupled_reflection_diffraction_topology_order2(
             surface_group_members,
         )
         for reverse, component_id in ((False, 3), (True, 4)):
-            exported = ops.raydn_coupled_rd_geometry_forward(*common_args, reverse)
+            exported = geometry_bridge.raydn_coupled_rd_geometry_forward(
+                *common_args, reverse
+            )
             launch_count += 1
             candidate_count += count
             kept = torch.nonzero(exported["valid"], as_tuple=False).reshape(-1)
