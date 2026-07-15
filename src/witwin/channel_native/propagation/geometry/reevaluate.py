@@ -22,6 +22,14 @@ if TYPE_CHECKING:
 _PLANE_GROUP_QUANTIZATION = 1.0e-4
 
 
+def _reflect_points(
+    points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor
+) -> torch.Tensor:
+    return geometry_primitives.deterministic_reflect_points(
+        points.contiguous(), plane_points.contiguous(), normals.contiguous()
+    )
+
+
 def _coplanar_face_groups(
     tri_a: torch.Tensor,
     normals: torch.Tensor,

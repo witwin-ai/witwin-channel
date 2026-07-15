@@ -39,9 +39,6 @@ from witwin.channel_native.propagation.fields.evaluation import (
     _evaluate_shared_fields,
     _rough_reflection_factor,  # noqa: F401 - compatibility re-export
 )
-from witwin.channel_native.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
 from witwin.channel_native.propagation.geometry.reevaluate import (
     _PLANE_GROUP_QUANTIZATION,  # noqa: F401 - compatibility re-export
     _cached_coplanar_face_groups,  # noqa: F401 - compatibility re-export
@@ -50,6 +47,7 @@ from witwin.channel_native.propagation.geometry.reevaluate import (
     _opposite_vertex_ids,  # noqa: F401 - compatibility re-export
     _participates_in_ad,  # noqa: F401 - compatibility re-export
     _reflection_geometry_ad,  # noqa: F401 - compatibility re-export
+    _reflect_points,  # noqa: F401 - compatibility re-export
     _vertices_participate_in_ad,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.geometry.visibility import (
@@ -297,14 +295,6 @@ def _from_path_block(
             ),
             guardrail_count=guardrail_count,
         )
-    )
-
-
-def _reflect_points(
-    points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor
-) -> torch.Tensor:
-    return geometry_primitives.deterministic_reflect_points(
-        points.contiguous(), plane_points.contiguous(), normals.contiguous()
     )
 
 

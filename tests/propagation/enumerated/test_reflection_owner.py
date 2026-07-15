@@ -15,6 +15,7 @@ from witwin.channel_native.propagation.enumerated import reflection
 from witwin.channel_native.propagation.geometry import (
     reflection as geometry_reflection,
 )
+from witwin.channel_native.propagation.geometry import reevaluate
 from witwin.channel_native.propagation.topology.discovery import (
     reflection as discovery,
 )
@@ -98,6 +99,8 @@ def test_reflection_owners_and_discovery_constants_preserve_identity():
     )
     assert reflection.ReflectionEpcQuery is geometry_reflection.ReflectionEpcQuery
     assert reflection.query_reflection_epc is geometry_reflection.query_reflection_epc
+    assert legacy._reflect_points is reevaluate._reflect_points
+    assert reevaluate._reflect_points.__module__ == reevaluate.__name__
 
 
 def test_unmodified_reflection_helpers_keep_frozen_ast():
@@ -111,7 +114,7 @@ def test_unmodified_reflection_helpers_keep_frozen_ast():
     assert (
         _digest(discovery, "_face_sequence_chunks") == _DIGESTS["_face_sequence_chunks"]
     )
-    assert _digest(legacy, "_reflect_points") == _DIGESTS["_reflect_points"]
+    assert _digest(reevaluate, "_reflect_points") == _DIGESTS["_reflect_points"]
 
 
 def test_reflection_consumers_use_only_named_epc_geometry():
@@ -173,6 +176,7 @@ def test_fresh_process_import_order_preserves_owner_identity(imports: str):
         "import reflection as discovery; "
         "from witwin.channel_native.propagation.geometry import "
         "reflection as geometry_reflection; "
+        "from witwin.channel_native.propagation.geometry import reevaluate; "
         "assert legacy._reflection_topology_order1 is "
         "reflection._reflection_topology_order1; "
         "assert legacy._discovered_group_chains is reflection._discovered_group_chains; "
@@ -185,7 +189,8 @@ def test_fresh_process_import_order_preserves_owner_identity(imports: str):
         "assert reflection.ReflectionEpcQuery is "
         "geometry_reflection.ReflectionEpcQuery; "
         "assert reflection.query_reflection_epc is "
-        "geometry_reflection.query_reflection_epc"
+        "geometry_reflection.query_reflection_epc; "
+        "assert legacy._reflect_points is reevaluate._reflect_points"
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")

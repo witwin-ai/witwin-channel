@@ -14,6 +14,7 @@ from witwin.channel_native.propagation.geometry import reevaluate
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 _REEVALUATE_NAMES = (
+    "_reflect_points",
     "_coplanar_face_groups",
     "_cached_coplanar_face_groups",
     "_participates_in_ad",
