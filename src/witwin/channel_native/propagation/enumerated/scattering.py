@@ -64,12 +64,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from witwin.channel_native.core.tensor_math import normalize_vec3
 
-from witwin.channel_native import Scene
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -88,6 +87,9 @@ from witwin.channel_native.core.materials import PhaseScreen
 from witwin.channel_native.physics.oracle import C0
 from witwin.channel_native.scattering import eval_bsdf, patch_phase_integral
 from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE
+
+if TYPE_CHECKING:
+    from witwin.channel_native.core.scene import Scene
 
 __all__ = ["append_scattering_paths"]
 
