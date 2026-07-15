@@ -7,6 +7,9 @@ import torch
 
 from witwin.channel_native.propagation.enumerated import reflection
 from witwin.channel_native.propagation.fields.kernels import deterministic as fields
+from witwin.channel_native.propagation.geometry import (
+    reflection as geometry_reflection,
+)
 from witwin.channel_native.propagation.topology.discovery.reflection import (
     ReflectionMultibounceEpcRequest,
     ReflectionOrder1EpcRequest,
@@ -176,6 +179,73 @@ def _request(tx_index: int, tx: torch.Tensor):
         "rx_indices": object(),
     }
     return ReflectionOrder1EpcRequest(tx_index, tx, epc_inputs), epc_inputs
+
+
+def test_order1_maps_lazy_request_to_typed_query_without_copies(monkeypatch):
+    events: list[str] = []
+    args = _fixture(monkeypatch, events)
+    surface_group_id = torch.tensor([0], dtype=torch.int32)
+    surface_group_size = torch.tensor([1], dtype=torch.int32)
+    surface_group_members = torch.arange(6, dtype=torch.int32).reshape(3, 2).t()
+    monkeypatch.setattr(
+        reflection,
+        "_cached_coplanar_face_groups",
+        lambda *a, **k: {
+            "group_count": 1,
+            "representative_faces": torch.tensor([0]),
+            "face_group_id": torch.tensor([0]),
+            "surface_group_id": surface_group_id,
+            "surface_group_size": surface_group_size,
+            "surface_group_members": surface_group_members,
+        },
+    )
+    monkeypatch.setattr(
+        reflection,
+        "prepare_reflection_order1_plan",
+        lambda **k: object(),
+    )
+    request, epc_inputs = _request(0, args[2][0])
+    monkeypatch.setattr(
+        reflection,
+        "iter_reflection_order1_epc_requests",
+        lambda *a, **k: iter([request]),
+    )
+    queries = []
+
+    def fake_query(query):
+        events.append("epc")
+        queries.append(query)
+        return geometry_reflection.ReflectionEpcGeometry(
+            visible=torch.ones(1, dtype=torch.bool),
+            path_length_m=torch.ones(1),
+            resolved_prim_ids=torch.zeros(1, dtype=torch.int32),
+            surface_group_ids=torch.zeros(1, dtype=torch.int32),
+            hit_positions=torch.zeros((1, 3)),
+            normals=torch.ones((1, 3)),
+        )
+
+    monkeypatch.setattr(reflection, "query_reflection_epc", fake_query)
+
+    _, launches = reflection._reflection_topology_order1(
+        *args,
+        frequency_hz=3.0e9,
+    )
+
+    assert launches == 1
+    assert len(queries) == 1
+    query = queries[0]
+    assert isinstance(query, geometry_reflection.ReflectionEpcQuery)
+    assert query.source is epc_inputs["tx_batch"]
+    assert query.receiver is epc_inputs["rx_batch"]
+    assert query.expected_prim_ids is epc_inputs["sequence_batch"]
+    assert query.direct_plane_points is epc_inputs["direct_plane_points"]
+    assert query.direct_plane_normals is epc_inputs["direct_plane_normals"]
+    assert query.surface_group_id is surface_group_id
+    assert query.surface_group_size is surface_group_size
+    assert query.surface_group_members is surface_group_members
+    assert query.surface_group_members.stride() == surface_group_members.stride()
+    assert query.max_bounces == 1
+    assert query.visibility_ignore_mode == 1
 
 
 def test_two_lazy_requests_resume_only_after_each_export(monkeypatch):

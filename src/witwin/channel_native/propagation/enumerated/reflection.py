@@ -14,6 +14,10 @@ from witwin.channel_native.propagation.geometry.kernels import (
 from witwin.channel_native.propagation.geometry.reevaluate import (
     _cached_coplanar_face_groups,
 )
+from witwin.channel_native.propagation.geometry.reflection import (
+    ReflectionEpcQuery,
+    query_reflection_epc,
+)
 from witwin.channel_native.propagation.topology.concatenate import (
     concatenate_path_blocks,
 )
@@ -159,26 +163,28 @@ def _reflection_topology_order1(
         tx_index = request.tx_index
         tx = request.tx
         epc_inputs = request.epc_inputs
-        epc = geometry_bridge.raydn_reflection_epc_paths_forward(
-            raydn.require_handle(),
-            epc_inputs["tx_batch"],
-            epc_inputs["rx_batch"],
-            None,
-            epc_inputs["sequence_batch"],
-            epc_inputs["direct_plane_points"],
-            epc_inputs["direct_plane_normals"],
-            groups["surface_group_id"],
-            groups["surface_group_size"],
-            groups["surface_group_members"],
-            1,
-            1,
+        epc = query_reflection_epc(
+            ReflectionEpcQuery(
+                raydn=raydn,
+                source=epc_inputs["tx_batch"],
+                receiver=epc_inputs["rx_batch"],
+                active=None,
+                expected_prim_ids=epc_inputs["sequence_batch"],
+                direct_plane_points=epc_inputs["direct_plane_points"],
+                direct_plane_normals=epc_inputs["direct_plane_normals"],
+                surface_group_id=groups["surface_group_id"],
+                surface_group_size=groups["surface_group_size"],
+                surface_group_members=groups["surface_group_members"],
+                max_bounces=1,
+                visibility_ignore_mode=1,
+            )
         )
         launch_count += 1
         selected = topology_compaction.deterministic_reflection_order1_compact(
-            visible=epc[0],
-            epc_faces=epc[2],
-            epc_hits=epc[4],
-            epc_normals=epc[5],
+            visible=epc.visible,
+            epc_faces=epc.resolved_prim_ids,
+            epc_hits=epc.hit_positions,
+            epc_normals=epc.normals,
             sequence_batch=epc_inputs["sequence_batch"],
             rx_indices=epc_inputs["rx_indices"],
             tx=tx,
@@ -411,26 +417,28 @@ def _reflection_topology_multibounce(
         tx_index = request.tx_index
         tx = request.tx
         epc_inputs = request.epc_inputs
-        epc = geometry_bridge.raydn_reflection_epc_paths_forward(
-            raydn.require_handle(),
-            epc_inputs["tx_batch"],
-            epc_inputs["rx_batch"],
-            None,
-            epc_inputs["sequence_batch"],
-            epc_inputs["direct_plane_points"],
-            epc_inputs["direct_plane_normals"],
-            surface_group_id,
-            surface_group_size,
-            surface_group_members,
-            int(depth),
-            1,
+        epc = query_reflection_epc(
+            ReflectionEpcQuery(
+                raydn=raydn,
+                source=epc_inputs["tx_batch"],
+                receiver=epc_inputs["rx_batch"],
+                active=None,
+                expected_prim_ids=epc_inputs["sequence_batch"],
+                direct_plane_points=epc_inputs["direct_plane_points"],
+                direct_plane_normals=epc_inputs["direct_plane_normals"],
+                surface_group_id=surface_group_id,
+                surface_group_size=surface_group_size,
+                surface_group_members=surface_group_members,
+                max_bounces=int(depth),
+                visibility_ignore_mode=1,
+            )
         )
         launch_count += 1
         selected = topology_compaction.deterministic_reflection_sequence_compact(
-            visible=epc[0],
-            epc_sequences=epc[2],
-            epc_hits=epc[4],
-            epc_normals=epc[5],
+            visible=epc.visible,
+            epc_sequences=epc.resolved_prim_ids,
+            epc_hits=epc.hit_positions,
+            epc_normals=epc.normals,
             rx_indices=epc_inputs["rx_indices"],
             tx=tx,
             rx_positions=rx_positions,
