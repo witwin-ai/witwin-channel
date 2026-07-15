@@ -9,6 +9,7 @@ from witwin.channel_native.runtime.autograd_contracts import (
     _ad_frequency_tangent,
     _ad_frequency_value,
     _ad_geometry_tangent,
+    _ad_native_tangent_or_none,
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
@@ -21,6 +22,231 @@ from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 
 _LIGHT_SPEED_M_PER_S_AD = 299_792_458.0
+
+_MC_FINALIZE_FIELDS = (
+    "path_gain",
+    "los_power",
+    "reflection_power",
+    "diffraction_power",
+    "transmission_power",
+    "scattering_power",
+)
+
+
+def mc_finalize_component_maps(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("diffraction", diffraction, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("transmission", transmission, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("scattering", scattering, dtype=torch.float32, ndim=3)
+    if reflection.shape != los.shape:
+        raise ValueError("reflection must match los shape")
+    if diffraction.shape != los.shape:
+        raise ValueError("diffraction must match los shape")
+    if transmission.shape != los.shape:
+        raise ValueError("transmission must match los shape")
+    if scattering.shape != los.shape:
+        raise ValueError("scattering must match los shape")
+
+    native = native_extension()
+    if native is None or not hasattr(native, "mc_finalize_component_maps"):
+        raise RuntimeError(
+            "_channel_native.mc_finalize_component_maps CUDA kernel is required"
+        )
+    exported = native.mc_finalize_component_maps(
+        los, reflection, diffraction, transmission, scattering
+    )
+    if not isinstance(exported, dict):
+        raise TypeError("_channel_native.mc_finalize_component_maps must return a dict")
+    return exported
+
+
+class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
+    """Differentiable component-map finalization (plan 07 AD-3).
+
+    The finalize kernel is a purely linear elementwise sum plus per-component
+    power reductions, so the map cotangent is the path_gain cotangent viewed
+    back to map layout plus the broadcast power cotangent, and the
+    pushforward is the finalize kernel itself applied to the tangents.
+    """
+
+    @staticmethod
+    def forward(los, reflection, diffraction, transmission, scattering):
+        out = mc_finalize_component_maps(
+            los, reflection, diffraction, transmission, scattering
+        )
+        return tuple(out[name] for name in _MC_FINALIZE_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        ctx.map_shape = tuple(inputs[0].shape)
+        primal = torch.autograd.forward_ad.unpack_dual(inputs[0]).primal
+        ctx.save_for_forward(primal)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_path_gain, *grad_powers):
+        tx_count, dim0, dim1 = ctx.map_shape
+        base = (
+            grad_path_gain.unflatten(1, (dim0, dim1))
+            if grad_path_gain is not None
+            else None
+        )
+        grads = []
+        for index in range(5):
+            if not ctx.needs_input_grad[index]:
+                grads.append(None)
+                continue
+            grad_power = grad_powers[index]
+            if grad_power is None:
+                grads.append(base)
+            elif base is None:
+                grads.append(grad_power.expand(ctx.map_shape))
+            else:
+                grads.append(base + grad_power)
+        return tuple(grads)
+
+    @staticmethod
+    def jvp(ctx, t_los, t_reflection, t_diffraction, t_transmission, t_scattering):
+        tangents = [
+            _ad_native_tangent_or_none(value) for value in
+            (t_los, t_reflection, t_diffraction, t_transmission, t_scattering)
+        ]
+        if all(value is None for value in tangents):
+            return (None,) * len(_MC_FINALIZE_FIELDS)
+        (reference,) = ctx.saved_tensors
+        zero = None
+        filled = []
+        for value in tangents:
+            if value is None:
+                if zero is None:
+                    zero = torch.zeros_like(_ad_native_tensor(reference))
+                value = zero
+            filled.append(value)
+        with torch_compat.disable_functorch():
+            out = mc_finalize_component_maps(*filled)
+        return tuple(out[name] for name in _MC_FINALIZE_FIELDS)
+
+
+def mc_finalize_component_maps_ad(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Differentiable :func:`mc_finalize_component_maps`."""
+
+    values = _McFinalizeComponentMapsAdFunction.apply(
+        los, reflection, diffraction, transmission, scattering
+    )
+    return dict(zip(_MC_FINALIZE_FIELDS, values, strict=True))
+
+
+def mc_los_component_maps_adjoint(
+    grad_maps: torch.Tensor,
+    visible: torch.Tensor | None,
+) -> torch.Tensor:
+    """Adjoint of the (visibility-masked) LoS component-map layout."""
+
+    if not isinstance(grad_maps, torch.Tensor):
+        raise TypeError("grad_maps must be a torch.Tensor")
+    if grad_maps.dtype != torch.float32 or not grad_maps.is_cuda:
+        raise TypeError("grad_maps must be a float32 CUDA tensor")
+    if grad_maps.ndim != 3:
+        raise ValueError("grad_maps must have 3 dimensions")
+    if visible is None:
+        visible = grad_maps.new_empty((0, 0), dtype=torch.bool)
+    out = _required_native_op("mc_los_component_maps_adjoint")(grad_maps, visible)
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_los_component_maps_adjoint must return a tensor"
+        )
+    return out
+
+
+class _McLosGridMapsAdFunction(torch.autograd.Function):
+    """Differentiable LoS/transmission component-map layout (plan 07 AD-3).
+
+    The forward is the primal layout kernel plus the per-tx visibility mask
+    application, a permutation times a frozen 0/1 mask of the (tx, cells)
+    matrix; its adjoint is one masked gather kernel and its pushforward is
+    the forward itself on the tangent matrix.
+    """
+
+    @staticmethod
+    def forward(matrix, visible, rows, cols):
+        maps = mc_los_component_maps_from_matrix(matrix, rows=rows, cols=cols)
+        if visible is not None:
+            for tx_index in range(int(matrix.shape[0])):
+                mc_apply_los_visibility(
+                    maps, matrix, visible[tx_index], tx_index=tx_index
+                )
+        return maps
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        matrix, visible, rows, cols = inputs
+        ctx.rows = int(rows)
+        ctx.cols = int(cols)
+        ctx.has_visible = visible is not None
+        if visible is not None:
+            ctx.save_for_backward(visible)
+            ctx.save_for_forward(visible)
+        else:
+            ctx.save_for_backward()
+            ctx.save_for_forward()
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_maps):
+        if grad_maps is None or not ctx.needs_input_grad[0]:
+            return None, None, None, None
+        visible = ctx.saved_tensors[0] if ctx.has_visible else None
+        return (
+            mc_los_component_maps_adjoint(grad_maps, visible),
+            None,
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_matrix, _t_visible, _t_rows, _t_cols):
+        tangent = _ad_native_tangent_or_none(t_matrix)
+        if tangent is None:
+            return None
+        visible = ctx.saved_tensors[0] if ctx.has_visible else None
+        with torch_compat.disable_functorch():
+            maps = mc_los_component_maps_from_matrix(
+                tangent, rows=ctx.rows, cols=ctx.cols
+            )
+            if visible is not None:
+                visible = _ad_native_tensor(visible)
+                for tx_index in range(int(tangent.shape[0])):
+                    mc_apply_los_visibility(
+                        maps, tangent, visible[tx_index], tx_index=tx_index
+                    )
+        return maps
+
+
+def mc_los_grid_maps_ad(
+    matrix: torch.Tensor,
+    visible: torch.Tensor | None,
+    *,
+    rows: int,
+    cols: int,
+) -> torch.Tensor:
+    """Differentiable grid component maps from a (tx, cells) matrix."""
+
+    return _McLosGridMapsAdFunction.apply(matrix, visible, int(rows), int(cols))
 
 
 def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:

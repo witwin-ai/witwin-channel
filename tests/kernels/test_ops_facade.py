@@ -1392,7 +1392,7 @@ def test_mc_finalize_component_maps_requires_native_cuda_kernel(monkeypatch):
     diffraction = torch.zeros_like(los)
     transmission = torch.zeros_like(los)
     scattering = torch.zeros_like(los)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_finalize_component_maps CUDA kernel is required"):
         ops.mc_finalize_component_maps(

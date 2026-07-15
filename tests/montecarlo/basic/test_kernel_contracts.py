@@ -36,11 +36,17 @@ _OWNER_NAMES = (
 )
 
 _MAP_OWNER_NAMES = (
+    "_McFinalizeComponentMapsAdFunction",
+    "_McLosGridMapsAdFunction",
     "_McLosPathGainAdFunction",
     "mc_apply_los_visibility",
     "mc_component_map_buffer",
+    "mc_finalize_component_maps",
+    "mc_finalize_component_maps_ad",
     "mc_los_component_maps",
+    "mc_los_component_maps_adjoint",
     "mc_los_component_maps_from_matrix",
+    "mc_los_grid_maps_ad",
     "mc_los_path_gain_ad",
     "mc_los_path_gain_backward",
     "mc_los_path_gain_jvp",
@@ -52,14 +58,26 @@ _MAP_OWNER_NAMES = (
 )
 
 _MAP_CONTRACT_IDS = (
+    "_McFinalizeComponentMapsAdFunction.backward",
+    "_McFinalizeComponentMapsAdFunction.forward",
+    "_McFinalizeComponentMapsAdFunction.jvp",
+    "_McFinalizeComponentMapsAdFunction.setup_context",
+    "_McLosGridMapsAdFunction.backward",
+    "_McLosGridMapsAdFunction.forward",
+    "_McLosGridMapsAdFunction.jvp",
+    "_McLosGridMapsAdFunction.setup_context",
     "_McLosPathGainAdFunction.backward",
     "_McLosPathGainAdFunction.forward",
     "_McLosPathGainAdFunction.jvp",
     "_McLosPathGainAdFunction.setup_context",
     "mc_apply_los_visibility",
     "mc_component_map_buffer",
+    "mc_finalize_component_maps",
+    "mc_finalize_component_maps_ad",
     "mc_los_component_maps",
+    "mc_los_component_maps_adjoint",
     "mc_los_component_maps_from_matrix",
+    "mc_los_grid_maps_ad",
     "mc_los_path_gain_ad",
     "mc_los_path_gain_backward",
     "mc_los_path_gain_jvp",
@@ -141,6 +159,10 @@ def test_mc_basic_maps_uses_canonical_runtime_dependencies():
     assert maps._ad_frequency_tangent is autograd_contracts._ad_frequency_tangent
     assert maps._ad_frequency_value is autograd_contracts._ad_frequency_value
     assert maps._ad_geometry_tangent is autograd_contracts._ad_geometry_tangent
+    assert (
+        maps._ad_native_tangent_or_none
+        is autograd_contracts._ad_native_tangent_or_none
+    )
     assert maps._ad_native_tensor is autograd_contracts._ad_native_tensor
     assert maps._ad_reject_fixed_inputs is autograd_contracts._ad_reject_fixed_inputs
     assert (
@@ -148,6 +170,7 @@ def test_mc_basic_maps_uses_canonical_runtime_dependencies():
         is autograd_contracts._ad_reject_fixed_tangents
     )
     assert ops._LIGHT_SPEED_M_PER_S_AD is maps._LIGHT_SPEED_M_PER_S_AD
+    assert ops._MC_FINALIZE_FIELDS is maps._MC_FINALIZE_FIELDS
 
 
 def test_mc_basic_maps_los_ad_methods_resolve_canonical_siblings():
@@ -168,6 +191,63 @@ def test_mc_basic_maps_los_ad_methods_resolve_canonical_siblings():
     )
     assert (
         maps.mc_los_path_gain_ad.__globals__["_McLosPathGainAdFunction"] is function
+    )
+
+
+def test_mc_basic_maps_finalize_ad_methods_resolve_canonical_siblings():
+    function = maps._McFinalizeComponentMapsAdFunction
+
+    assert function.forward.__globals__ is maps.__dict__
+    assert function.setup_context.__globals__ is maps.__dict__
+    assert inspect.unwrap(function.backward).__globals__ is maps.__dict__
+    assert function.jvp.__globals__ is maps.__dict__
+    assert (
+        function.forward.__globals__["mc_finalize_component_maps"]
+        is maps.mc_finalize_component_maps
+    )
+    assert (
+        function.jvp.__globals__["mc_finalize_component_maps"]
+        is maps.mc_finalize_component_maps
+    )
+    assert (
+        maps.mc_finalize_component_maps_ad.__globals__[
+            "_McFinalizeComponentMapsAdFunction"
+        ]
+        is function
+    )
+
+
+def test_mc_basic_maps_grid_ad_methods_resolve_canonical_siblings():
+    function = maps._McLosGridMapsAdFunction
+
+    assert function.forward.__globals__ is maps.__dict__
+    assert function.setup_context.__globals__ is maps.__dict__
+    assert inspect.unwrap(function.backward).__globals__ is maps.__dict__
+    assert function.jvp.__globals__ is maps.__dict__
+    assert (
+        function.forward.__globals__["mc_los_component_maps_from_matrix"]
+        is maps.mc_los_component_maps_from_matrix
+    )
+    assert (
+        function.forward.__globals__["mc_apply_los_visibility"]
+        is maps.mc_apply_los_visibility
+    )
+    assert (
+        inspect.unwrap(function.backward).__globals__[
+            "mc_los_component_maps_adjoint"
+        ]
+        is maps.mc_los_component_maps_adjoint
+    )
+    assert (
+        function.jvp.__globals__["mc_los_component_maps_from_matrix"]
+        is maps.mc_los_component_maps_from_matrix
+    )
+    assert (
+        function.jvp.__globals__["mc_apply_los_visibility"]
+        is maps.mc_apply_los_visibility
+    )
+    assert (
+        maps.mc_los_grid_maps_ad.__globals__["_McLosGridMapsAdFunction"] is function
     )
 
 

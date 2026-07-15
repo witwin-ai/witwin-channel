@@ -8,7 +8,6 @@ import torch
 from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
 from witwin.channel_native.core.kernels.ops import (
-    mc_los_grid_maps_ad,
     mc_sionna_reflection_accumulate,
     mc_sionna_reflection_accumulate_ad,
     mc_sionna_diffraction_tape_accumulate,
@@ -19,6 +18,7 @@ from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
     mc_los_component_maps_from_matrix,
+    mc_los_grid_maps_ad,
     mc_los_visibility_inputs,
     mc_store_component_map,
     mc_store_scaled_component_map,

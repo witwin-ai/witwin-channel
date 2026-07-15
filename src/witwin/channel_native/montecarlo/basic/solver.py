@@ -18,12 +18,12 @@ from witwin.channel_native.core.path_topology import (
 )
 from witwin.channel_native.core.receiver_geometry import first_receiver_grid
 from witwin.channel_native.core.kernels.ops import (
-    mc_finalize_component_maps,
-    mc_finalize_component_maps_ad,
     mc_reflection_ad_max_depth,
 )
 from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_component_map_buffer,
+    mc_finalize_component_maps,
+    mc_finalize_component_maps_ad,
     mc_point_component_power,
     mc_zero_matrix,
 )
