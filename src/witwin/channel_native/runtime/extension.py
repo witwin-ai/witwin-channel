@@ -154,7 +154,9 @@ def _runtime_identity() -> tuple[str, str, str]:
     if os.name == "nt":
         cxx_abi = "msvc"
     else:
-        uses_cxx11 = bool(getattr(torch._C, "_GLIBCXX_USE_CXX11_ABI", False))
+        from .torch_compat import uses_cxx11_abi
+
+        uses_cxx11 = uses_cxx11_abi()
         cxx_abi = "cxx11" if uses_cxx11 else "pre-cxx11"
     return torch_version, cuda_version, cxx_abi
 

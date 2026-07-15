@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 
 from witwin.channel_native.runtime import symbols as _native_symbols
+from witwin.channel_native.runtime import torch_compat
 
 from .metadata import make_metadata, validate_metadata  # noqa: F401
 
@@ -2244,9 +2245,7 @@ _RAYDN_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
 
 
 def _ad_still_wrapped(value: torch.Tensor) -> bool:
-    return torch._C._functorch.is_functorch_wrapped_tensor(
-        value
-    ) or torch._C._functorch.is_gradtrackingtensor(value)
+    return torch_compat.is_transform_wrapped_tensor(value)
 
 
 def _ad_raise_composed_transforms() -> None:
@@ -2264,21 +2263,20 @@ def _ad_raise_composed_transforms() -> None:
 def _ad_native_tensor(value: torch.Tensor | None) -> torch.Tensor | None:
     if value is None:
         return None
-    if torch._C._functorch.maybe_get_level(value) >= 0:
+    if torch_compat.transform_level(value) >= 0:
         # The tensor is functorch-wrapped. Unwrapping is only sound for a
         # single Jvp transform (torch.func.jvp); under nested transforms or
         # a Grad transform (e.g. torch.func.grad over forward-mode jvp, the
         # standard HVP recipe) unwrapping would silently sever the outer
         # transform and return exact zeros.
-        stack = torch._C._functorch.get_interpreter_stack() or []
+        stack = torch_compat.interpreter_stack()
         if len(stack) > 1 or any(
-            entry.key() != torch._C._functorch.TransformType.Jvp
-            for entry in stack
+            not torch_compat.is_jvp_transform(entry) for entry in stack
         ):
             _ad_raise_composed_transforms()
     value = torch.autograd.forward_ad.unpack_dual(value).primal
     if _ad_still_wrapped(value):
-        value = torch._C._functorch.get_unwrapped(value)
+        value = torch_compat.unwrap_transform_tensor(value)
     if _ad_still_wrapped(value):
         _ad_raise_composed_transforms()
     return value
@@ -2811,7 +2809,7 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active):
         ray_o, ray_d, active_ctx, tape_prim_id, tape_barycentric = ctx.saved_tensors
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             values = raydn_intersect_jvp(
                 ctx.scene,
                 _ad_native_tensor(ray_o),
@@ -3023,7 +3021,7 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
             tape_normals,
             image_sources,
         ) = ctx.saved_tensors
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             tangent_t, tangent_image_sources = raydn_trace_reflections_jvp(
                 ctx.scene,
                 _ad_native_tensor(ray_o),
@@ -3442,7 +3440,7 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
             valid,
             bounce_count,
         ) = ctx.saved_tensors
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             tangents = raydn_reflection_epc_paths_jvp(
                 ctx.scene,
                 _ad_native_tensor(source),
@@ -3595,7 +3593,7 @@ class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
         tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
         if tangent_vertices is None:
             return None
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             return raydn_scene_face_normals_jvp(
                 ctx.scene,
                 _ad_checked_tangent(
@@ -4262,7 +4260,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * len(_EM_LAYER_STACK_FIELDS)
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = em_layer_stack_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 frequency_hz=ctx.frequency_value,
@@ -5128,7 +5126,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         ):
             return (None,) * 7
         source, target, tx_power, tx_polarization, rx_polarization = saved
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = field_free_space_jvp(
                 _ad_native_tensor(source),
                 _ad_native_tensor(target),
@@ -5431,7 +5429,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * 7
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = field_reflection_sequence_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 frequency_hz=ctx.frequency_value,
@@ -5734,7 +5732,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * 7
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = field_transmission_sequence_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 frequency_hz=ctx.frequency_value,
@@ -6137,7 +6135,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             and all(value is None for value in vertex_tangents)
         ):
             return (None, None)
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = _required_native_op("field_diffraction_wedge_jvp")(
                 *(_ad_native_tensor(value) for value in primals),
                 ctx.frequency_value,
@@ -6294,7 +6292,7 @@ class _FieldProjectComplex3AdFunction(torch.autograd.Function):
         )
         if tangent_field is None and tangent_direction is None:
             return (None, None)
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = _required_native_op("field_project_complex3_jvp")(
                 *(_ad_native_tensor(value) for value in saved),
                 tangent_field,
@@ -6591,7 +6589,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * 5
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = _required_native_op("field_coupled_rd_jvp")(
                 *(_ad_native_tensor(value) for value in saved),
                 ctx.frequency_value,
@@ -6781,7 +6779,7 @@ class _CoupledRdPrepareAdFunction(torch.autograd.Function):
         )
         if tangent_source is None and tangent_receiver is None:
             return (None, None, None)
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = _required_native_op("coupled_rd_prepare_jvp")(
                 *(_ad_native_tensor(value) for value in saved),
                 tangent_source,
@@ -8876,7 +8874,7 @@ class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
                     zero = torch.zeros_like(_ad_native_tensor(reference))
                 value = zero
             filled.append(value)
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = mc_finalize_component_maps(*filled)
         return tuple(out[name] for name in _MC_FINALIZE_FIELDS)
 
@@ -8970,7 +8968,7 @@ class _McLosGridMapsAdFunction(torch.autograd.Function):
         if tangent is None:
             return None
         visible = ctx.saved_tensors[0] if ctx.has_visible else None
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             maps = mc_los_component_maps_from_matrix(
                 tangent, rows=ctx.rows, cols=ctx.cols
             )
@@ -9543,7 +9541,7 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
         if tangent_tx is None and tangent_rx is None and tangent_frequency == 0.0:
             return None
         tx_positions, tx_power, rx_positions = saved
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             return mc_los_path_gain_jvp(
                 _ad_native_tensor(tx_positions),
                 _ad_native_tensor(tx_power),
@@ -9989,7 +9987,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             material_valid,
         ) = saved
         wavelength = float(params["wavelength"])
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             return mc_sionna_reflection_accumulate_jvp(
                 _ad_native_tensor(ray_o),
                 _ad_native_tensor(ray_d),
@@ -10436,7 +10434,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
         tape_tensors = tuple(_ad_native_tensor(value) for value in saved[4:8])
         state_tensors = tuple(_ad_native_tensor(value) for value in saved[8:19])
         wavelength = float(params["wavelength"])
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             return mc_sionna_diffraction_tape_accumulate_jvp(
                 tape_tensors,
                 state_tensors,
@@ -11551,7 +11549,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             _field_total_imag,
             power_total,
         ) = (_ad_native_tensor(value) for value in ctx.saved_tensors)
-        with torch._C._DisableFuncTorch():
+        with torch_compat.disable_functorch():
             out = deterministic_accumulate_flat_jvp(
                 tx_id,
                 rx_id,

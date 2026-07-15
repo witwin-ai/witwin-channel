@@ -1,9 +1,13 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import torch
 
 from witwin.channel_native.runtime import torch_compat
+
+
+PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "src" / "witwin" / "channel_native"
 
 
 def test_plain_tensor_and_cxx_abi_contract_on_supported_torch():
@@ -114,3 +118,16 @@ def test_missing_private_api_fails_loudly(monkeypatch: pytest.MonkeyPatch):
         torch_compat.disable_functorch()
     with pytest.raises(AttributeError):
         torch_compat.uses_cxx11_abi()
+
+
+def test_private_torch_api_has_a_single_production_owner():
+    owner = PACKAGE_ROOT / "runtime" / "torch_compat.py"
+    violations = []
+    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+        if path == owner:
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "torch._C" in source or "_DisableFuncTorch" in source or "._functorch" in source:
+            violations.append(path.relative_to(PACKAGE_ROOT).as_posix())
+
+    assert violations == []
