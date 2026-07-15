@@ -113,6 +113,24 @@ _CONTRACTS = {
             "d8dfe6e4652bd058dc8ee34e9ba01aa4c1375356254f0e74ecb9b66eb8ce1c24"
         ),
     },
+    "_evaluate_coupled_fields": {
+        "signature": (
+            "(scene: Scene, compiled: object, topology: TopologyBatch, source: "
+            "torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, "
+            "tx_pol: torch.Tensor, rx_pol: torch.Tensor, device: torch.device, "
+            "frequency: float | torch.Tensor, frequency_value: float | None, "
+            "ad_enabled: bool, geometry_ad: bool, ledger: AdLaunchLedger | None, "
+            "material: dict[str, torch.Tensor] | None, field_xyz: torch.Tensor, "
+            "coefficient: torch.Tensor, path_field: torch.Tensor, path_gain: "
+            "torch.Tensor, direction: torch.Tensor, launch_count: int)"
+        ),
+        "body_sha256": (
+            "e31f88623a982968a2e72b692e2012518167feb6d28cdde6e103783ae08a3c1a"
+        ),
+        "normalized_ast_sha256": (
+            "87d8c609ab9afb6af9efab47d2d91bda20295c084e1dd11546795ea1c2bca4a5"
+        ),
+    },
     "_evaluate_shared_fields": {
         "signature": (
             "(scene: Scene, compiled: object, topology: TopologyBatch, "
@@ -121,10 +139,10 @@ _CONTRACTS = {
             "ad_mode: str='none', frequency_value: float | None=None)"
         ),
         "body_sha256": (
-            "832f56e96e3c3f80e8671f33fd6a217ea8a0e03d376ba2df09b743a8217933db"
+            "92deeab268cbc08229f8d0767d821be8bad17c05fa50ad4ccedb11da3fdd61ff"
         ),
         "normalized_ast_sha256": (
-            "0de866892f43bc83b1d8fa64044285f88eaa12e07c00598c1022240066f965fb"
+            "010cfc47ae2b566265abb6a777a4564576a09e18360190b01abe68d4a46c543f"
         ),
     },
 }
@@ -219,12 +237,25 @@ def test_diffraction_field_extraction_preserves_frozen_prefix_segment():
     )
 
 
+def test_coupled_field_extraction_preserves_frozen_prefix_segment():
+    helper = _function_node("_evaluate_coupled_fields")
+
+    assert _body_sha256(helper.body[:-1]) == (
+        "3b1263b76cba3023a31885a6a83d254e278689a53492472e6e35dd25701bc8e8"
+    )
+    assert ast.dump(helper.body[-1], include_attributes=False) == (
+        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
+        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
+    )
+
+
 def test_component_field_helpers_do_not_clone_output_buffers():
     for name in (
         "_evaluate_los_fields",
         "_evaluate_reflection_fields",
         "_evaluate_transmission_fields",
         "_evaluate_diffraction_fields",
+        "_evaluate_coupled_fields",
     ):
         helper = _function_node(name)
 
@@ -280,6 +311,8 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
                     component_markers.append("transmission")
                 elif statement.value.func.id == "_evaluate_diffraction_fields":
                     component_markers.append("diffraction")
+                elif statement.value.func.id == "_evaluate_coupled_fields":
+                    component_markers.append("coupled")
             elif target_names == {"material"}:
                 component_markers.append("material")
             elif target_names & {"transmission_rows", "diffraction_rows", "coupled_rows"}:
@@ -305,13 +338,13 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
         "reflection",
         "transmission",
         "diffraction",
-        "coupled_rows",
+        "coupled",
         "epilogue",
     ]
 
 
 def test_evaluation_preserves_nested_material_tuple_body():
-    qualified_name = f"{evaluation.__name__}._evaluate_shared_fields.material_tuple"
+    qualified_name = f"{evaluation.__name__}._evaluate_coupled_fields.material_tuple"
     definitions = {
         item["qualified_name"]: item for item in python_body_hashes(REPOSITORY_ROOT)
     }

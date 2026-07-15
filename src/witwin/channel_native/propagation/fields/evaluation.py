@@ -518,6 +518,194 @@ def _evaluate_diffraction_fields(
     return material, launch_count
 
 
+def _evaluate_coupled_fields(
+    scene: Scene,
+    compiled: object,
+    topology: TopologyBatch,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    source_power: torch.Tensor,
+    tx_pol: torch.Tensor,
+    rx_pol: torch.Tensor,
+    device: torch.device,
+    frequency: float | torch.Tensor,
+    frequency_value: float | None,
+    ad_enabled: bool,
+    geometry_ad: bool,
+    ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None,
+    field_xyz: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    direction: torch.Tensor,
+    launch_count: int,
+) -> tuple[dict[str, torch.Tensor] | None, int]:
+    coupled_rows = torch.nonzero(
+        (topology.component_id == 3) | (topology.component_id == 4),
+        as_tuple=False,
+    ).reshape(-1)
+    if int(coupled_rows.shape[0]) > 0:
+        if material is None:
+            material = face_material_field_bundle(compiled, device=device)
+        raydn = compiled.raydn
+        records = raydn.edge_records()
+        preserve_imported_edges = bool(
+            isinstance(scene.metadata.get("mitsuba", {}), dict)
+            and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
+        )
+        edge_geometry = (
+            _diffraction_edge_geometry(records)
+            if preserve_imported_edges
+            else _cached_diffraction_edge_geometry(raydn)
+        )
+        edge_n0 = edge_geometry[6]
+        edge_n1 = edge_geometry[7]
+        edge_face0 = edge_geometry[8].to(dtype=torch.int64)
+        edge_face1 = edge_geometry[9].to(dtype=torch.int64)
+        edge_exterior = edge_geometry[10]
+        coupled_geometry_ad = ad_enabled and geometry_ad
+        if coupled_geometry_ad and _vertices_participate_in_ad(scene):
+            # The coupled chain consumes the wall plane and the edge tables
+            # through the stationary re-solve and the coupled field kernel,
+            # whose adjoints take them as frozen winners; a vertex gradient
+            # through the coupled rows would therefore be silently
+            # incomplete. Fail loudly instead (plan 07 section 9.4).
+            raise NotImplementedError(
+                "coupled reflection-diffraction paths do not support mesh "
+                "vertex gradients: the coupled stationary re-solve and the "
+                "coupled field adjoints treat the wall plane and the edge "
+                "tables as frozen winners, so d(coupled)/d(vertices) would "
+                "be silently missing. Drop the vertices requires_grad/"
+                "tangent or disable coupled_paths."
+            )
+        if coupled_geometry_ad:
+            tri_a = topology_construction.deterministic_face_anchor_points(
+                records.vertices.contiguous(), records.faces.contiguous()
+            )
+            normals_table = geometry_primitives.deterministic_normalize_vec3(
+                records.face_normals.contiguous(), eps=1.0e-6
+            )
+        for component_id, reverse_order in ((3, False), (4, True)):
+            rows = torch.nonzero(
+                topology.component_id == component_id, as_tuple=False
+            ).reshape(-1)
+            if int(rows.shape[0]) == 0:
+                continue
+            edge_id = topology.edge_id[rows].to(dtype=torch.int64)
+            reflection_face = topology.primitive_id[rows].to(dtype=torch.int64)
+            face0 = edge_face0[edge_id]
+            raw_face1 = edge_face1[edge_id]
+            face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
+            reflection_slot = 1 if reverse_order else 0
+            edge_slot = 0 if reverse_order else 1
+            reflection_position = topology.interaction_positions[
+                rows, reflection_slot
+            ].contiguous()
+            edge_position = topology.interaction_positions[
+                rows, edge_slot
+            ].contiguous()
+            if coupled_geometry_ad:
+                # Plan 07 AD-4: the coupled interaction points move with the
+                # endpoints (Fresnel angles are not stationary), so re-solve
+                # the frozen winner's stationary geometry differentiably (the
+                # same image-source math as the discovery prepare kernel) and
+                # feed the live points into the field kernel. D->R is the
+                # reciprocal problem with the endpoints exchanged.
+                epc_source = target[rows] if reverse_order else source[rows]
+                epc_receiver = source[rows] if reverse_order else target[rows]
+                resolved = field_autograd.coupled_rd_prepare_ad(
+                    epc_source.contiguous(),
+                    epc_receiver.contiguous(),
+                    tri_a[reflection_face].contiguous(),
+                    normals_table[reflection_face].contiguous(),
+                    edge_geometry[1][edge_id].contiguous(),
+                    edge_geometry[2][edge_id].contiguous(),
+                    edge_geometry[4][edge_id].contiguous(),
+                    edge_geometry[5][edge_id].contiguous(),
+                )
+                if not bool(resolved["active"].all()):
+                    raise RuntimeError(
+                        "fixed-winner coupled stationary re-solve no longer "
+                        "reproduces the discovered coupled paths; the winner "
+                        "topology moved under the current scene tensors"
+                    )
+                for name, reference in (
+                    ("edge_point", edge_position),
+                    ("reflection_point", reflection_position),
+                ):
+                    if not bool(
+                        torch.isclose(
+                            resolved[name].detach(), reference, atol=1.0e-3
+                        ).all()
+                    ):
+                        raise RuntimeError(
+                            "fixed-winner coupled stationary re-solve moved the "
+                            f"{name} away from the discovered topology"
+                        )
+                edge_position = resolved["edge_point"]
+                reflection_position = resolved["reflection_point"]
+
+            def material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
+                return tuple(
+                    material[name][face].contiguous()
+                    for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
+                )
+
+            coupled_field_op = (
+                partial(
+                    field_autograd.field_coupled_rd_ad,
+                    frequency=frequency,
+                    frequency_value=frequency_value,
+                )
+                if ad_enabled
+                else partial(field_functional.field_coupled_rd, frequency_hz=frequency)
+            )
+            reflection_materials = material_tuple(reflection_face)
+            wedge_materials0 = material_tuple(face0)
+            wedge_materials1 = material_tuple(face1)
+            coupled_args = (
+                source[rows].contiguous(),
+                target[rows].contiguous(),
+                reflection_position,
+                topology.interaction_normals[
+                    rows, reflection_slot
+                ].contiguous(),
+                edge_position,
+                edge_geometry[2][edge_id].contiguous(),
+                edge_n0[edge_id].contiguous(),
+                edge_n1[edge_id].contiguous(),
+                edge_exterior[edge_id].contiguous(),
+                source_power[rows].contiguous(),
+                tx_pol[rows].contiguous(),
+                rx_pol[rows].contiguous(),
+            )
+            if ledger is not None:
+                if coupled_geometry_ad:
+                    # Fixed-winner coupled stationary re-solve companion.
+                    ledger.add(source[rows], target[rows], reflection_position)
+                ledger.add(
+                    *coupled_args,
+                    *reflection_materials,
+                    *wedge_materials0,
+                    *wedge_materials1,
+                )
+            evaluated = coupled_field_op(
+                *coupled_args,
+                reflection_materials,
+                wedge_materials0,
+                wedge_materials1,
+                reverse=reverse_order,
+            )
+            field_xyz.index_copy_(0, rows, evaluated["field_vector"])
+            coefficient.index_copy_(0, rows, evaluated["coefficient"])
+            path_field.index_copy_(0, rows, evaluated["path_field"])
+            path_gain.index_copy_(0, rows, evaluated["path_gain"])
+            direction.index_copy_(0, rows, evaluated["direction"])
+            launch_count += 1
+    return material, launch_count
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -717,168 +905,29 @@ def _evaluate_shared_fields(
         launch_count,
     )
 
-    coupled_rows = torch.nonzero(
-        (topology.component_id == 3) | (topology.component_id == 4),
-        as_tuple=False,
-    ).reshape(-1)
-    if int(coupled_rows.shape[0]) > 0:
-        if material is None:
-            material = face_material_field_bundle(compiled, device=device)
-        raydn = compiled.raydn
-        records = raydn.edge_records()
-        preserve_imported_edges = bool(
-            isinstance(scene.metadata.get("mitsuba", {}), dict)
-            and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
-        )
-        edge_geometry = (
-            _diffraction_edge_geometry(records)
-            if preserve_imported_edges
-            else _cached_diffraction_edge_geometry(raydn)
-        )
-        edge_n0 = edge_geometry[6]
-        edge_n1 = edge_geometry[7]
-        edge_face0 = edge_geometry[8].to(dtype=torch.int64)
-        edge_face1 = edge_geometry[9].to(dtype=torch.int64)
-        edge_exterior = edge_geometry[10]
-        coupled_geometry_ad = ad_enabled and geometry_ad
-        if coupled_geometry_ad and _vertices_participate_in_ad(scene):
-            # The coupled chain consumes the wall plane and the edge tables
-            # through the stationary re-solve and the coupled field kernel,
-            # whose adjoints take them as frozen winners; a vertex gradient
-            # through the coupled rows would therefore be silently
-            # incomplete. Fail loudly instead (plan 07 section 9.4).
-            raise NotImplementedError(
-                "coupled reflection-diffraction paths do not support mesh "
-                "vertex gradients: the coupled stationary re-solve and the "
-                "coupled field adjoints treat the wall plane and the edge "
-                "tables as frozen winners, so d(coupled)/d(vertices) would "
-                "be silently missing. Drop the vertices requires_grad/"
-                "tangent or disable coupled_paths."
-            )
-        if coupled_geometry_ad:
-            tri_a = topology_construction.deterministic_face_anchor_points(
-                records.vertices.contiguous(), records.faces.contiguous()
-            )
-            normals_table = geometry_primitives.deterministic_normalize_vec3(
-                records.face_normals.contiguous(), eps=1.0e-6
-            )
-        for component_id, reverse_order in ((3, False), (4, True)):
-            rows = torch.nonzero(
-                topology.component_id == component_id, as_tuple=False
-            ).reshape(-1)
-            if int(rows.shape[0]) == 0:
-                continue
-            edge_id = topology.edge_id[rows].to(dtype=torch.int64)
-            reflection_face = topology.primitive_id[rows].to(dtype=torch.int64)
-            face0 = edge_face0[edge_id]
-            raw_face1 = edge_face1[edge_id]
-            face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
-            reflection_slot = 1 if reverse_order else 0
-            edge_slot = 0 if reverse_order else 1
-            reflection_position = topology.interaction_positions[
-                rows, reflection_slot
-            ].contiguous()
-            edge_position = topology.interaction_positions[
-                rows, edge_slot
-            ].contiguous()
-            if coupled_geometry_ad:
-                # Plan 07 AD-4: the coupled interaction points move with the
-                # endpoints (Fresnel angles are not stationary), so re-solve
-                # the frozen winner's stationary geometry differentiably (the
-                # same image-source math as the discovery prepare kernel) and
-                # feed the live points into the field kernel. D->R is the
-                # reciprocal problem with the endpoints exchanged.
-                epc_source = target[rows] if reverse_order else source[rows]
-                epc_receiver = source[rows] if reverse_order else target[rows]
-                resolved = field_autograd.coupled_rd_prepare_ad(
-                    epc_source.contiguous(),
-                    epc_receiver.contiguous(),
-                    tri_a[reflection_face].contiguous(),
-                    normals_table[reflection_face].contiguous(),
-                    edge_geometry[1][edge_id].contiguous(),
-                    edge_geometry[2][edge_id].contiguous(),
-                    edge_geometry[4][edge_id].contiguous(),
-                    edge_geometry[5][edge_id].contiguous(),
-                )
-                if not bool(resolved["active"].all()):
-                    raise RuntimeError(
-                        "fixed-winner coupled stationary re-solve no longer "
-                        "reproduces the discovered coupled paths; the winner "
-                        "topology moved under the current scene tensors"
-                    )
-                for name, reference in (
-                    ("edge_point", edge_position),
-                    ("reflection_point", reflection_position),
-                ):
-                    if not bool(
-                        torch.isclose(
-                            resolved[name].detach(), reference, atol=1.0e-3
-                        ).all()
-                    ):
-                        raise RuntimeError(
-                            "fixed-winner coupled stationary re-solve moved the "
-                            f"{name} away from the discovered topology"
-                        )
-                edge_position = resolved["edge_point"]
-                reflection_position = resolved["reflection_point"]
-
-            def material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
-                return tuple(
-                    material[name][face].contiguous()
-                    for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
-                )
-
-            coupled_field_op = (
-                partial(
-                    field_autograd.field_coupled_rd_ad,
-                    frequency=frequency,
-                    frequency_value=frequency_value,
-                )
-                if ad_enabled
-                else partial(field_functional.field_coupled_rd, frequency_hz=frequency)
-            )
-            reflection_materials = material_tuple(reflection_face)
-            wedge_materials0 = material_tuple(face0)
-            wedge_materials1 = material_tuple(face1)
-            coupled_args = (
-                source[rows].contiguous(),
-                target[rows].contiguous(),
-                reflection_position,
-                topology.interaction_normals[
-                    rows, reflection_slot
-                ].contiguous(),
-                edge_position,
-                edge_geometry[2][edge_id].contiguous(),
-                edge_n0[edge_id].contiguous(),
-                edge_n1[edge_id].contiguous(),
-                edge_exterior[edge_id].contiguous(),
-                source_power[rows].contiguous(),
-                tx_pol[rows].contiguous(),
-                rx_pol[rows].contiguous(),
-            )
-            if ledger is not None:
-                if coupled_geometry_ad:
-                    # Fixed-winner coupled stationary re-solve companion.
-                    ledger.add(source[rows], target[rows], reflection_position)
-                ledger.add(
-                    *coupled_args,
-                    *reflection_materials,
-                    *wedge_materials0,
-                    *wedge_materials1,
-                )
-            evaluated = coupled_field_op(
-                *coupled_args,
-                reflection_materials,
-                wedge_materials0,
-                wedge_materials1,
-                reverse=reverse_order,
-            )
-            field_xyz.index_copy_(0, rows, evaluated["field_vector"])
-            coefficient.index_copy_(0, rows, evaluated["coefficient"])
-            path_field.index_copy_(0, rows, evaluated["path_field"])
-            path_gain.index_copy_(0, rows, evaluated["path_gain"])
-            direction.index_copy_(0, rows, evaluated["direction"])
-            launch_count += 1
+    material, launch_count = _evaluate_coupled_fields(
+        scene,
+        compiled,
+        topology,
+        source,
+        target,
+        source_power,
+        tx_pol,
+        rx_pol,
+        device,
+        frequency,
+        frequency_value,
+        ad_enabled,
+        geometry_ad,
+        ledger,
+        material,
+        field_xyz,
+        coefficient,
+        path_field,
+        path_gain,
+        direction,
+        launch_count,
+    )
 
     return replace(
         topology,
