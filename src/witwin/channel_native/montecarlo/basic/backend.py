@@ -11,7 +11,6 @@ from witwin.channel_native.core.kernels.ops import (
     mc_los_path_gain_ad,
     mc_los_visibility_inputs,
     mc_zero_matrix,
-    path_los_export,
 )
 from witwin.channel_native.core.scene_tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
@@ -20,6 +19,7 @@ from witwin.channel_native.core.scene_tensors import (
     transmitter_positions,
 )
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.topology.kernels.blocks import path_los_export
 
 __all__ = [
     "_LIGHT_SPEED_M_PER_S",

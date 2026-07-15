@@ -6,6 +6,7 @@ from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
+from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 import witwin.channel_native.path as path_package
 
 
@@ -14,13 +15,13 @@ def test_los_hot_path_uses_channel_native_kernel_facade(monkeypatch):
         pytest.skip("CUDA is required for deterministic hot-path contract")
 
     calls = []
-    original = ops.path_los_export
+    original = topology_blocks.path_los_export
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(ops, "path_los_export", wrapped)
+    monkeypatch.setattr(topology_blocks, "path_los_export", wrapped)
 
     solve(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
 

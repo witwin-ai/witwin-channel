@@ -6,6 +6,7 @@ import torch
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels import raydn_backend
 from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel_native.runtime import symbols as runtime_symbols
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
@@ -89,7 +90,7 @@ def test_path_los_export_requires_native_cuda_kernel(monkeypatch):
     tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime_symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="path_los_export CUDA kernel is required"):
         ops.path_los_export(tx_positions, tx_power, rx_positions, frequency_hz=3.0e9)

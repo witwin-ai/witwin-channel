@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+from .blocks import (
+    _DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA,
+    _PATH_BLOCK_SCHEMA,
+    _validate_deterministic_topology_block,
+    _validate_path_block,
+    _validate_path_reflection_candidates,
+    _validate_topology_extra_fields,
+    deterministic_concat_topology_blocks,
+    deterministic_gather_topology_block,
+    path_diffraction_block,
+    path_filter_block,
+    path_filter_los,
+    path_finalize_blocks,
+    path_los_export,
+    path_los_visibility_inputs,
+    path_merge_blocks,
+)
 from .primitives import (
     core_pack_int2,
     deterministic_component_counts,
@@ -12,11 +29,26 @@ from .primitives import (
 
 
 __all__ = [
+    "_DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA",
+    "_PATH_BLOCK_SCHEMA",
+    "_validate_deterministic_topology_block",
+    "_validate_path_block",
+    "_validate_path_reflection_candidates",
+    "_validate_topology_extra_fields",
     "core_pack_int2",
+    "deterministic_concat_topology_blocks",
     "deterministic_component_counts",
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
     "deterministic_selected_edge_count",
+    "deterministic_gather_topology_block",
     "mc_selected_edge_indices",
     "path_concat_vec3",
+    "path_diffraction_block",
+    "path_filter_block",
+    "path_filter_los",
+    "path_finalize_blocks",
+    "path_los_export",
+    "path_los_visibility_inputs",
+    "path_merge_blocks",
 ]

@@ -19,6 +19,7 @@ from witwin.channel_native.propagation.geometry.kernels import (
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
+from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.propagation.fields.kernels import (
     autograd as field_autograd,
 )
@@ -139,7 +140,7 @@ def concatenate_path_blocks(
         else _pad_topology_sequences(block, width=sequence_width)
         for block in nonempty
     ]
-    return ops.deterministic_concat_topology_blocks(
+    return topology_blocks.deterministic_concat_topology_blocks(
         nonempty, sequence_width=sequence_width
     )
 
@@ -654,7 +655,7 @@ def _from_path_block(
         max_paths=max_paths,
         max_paths_scope=max_paths_scope,
     )
-    selected = ops.deterministic_gather_topology_block(
+    selected = topology_blocks.deterministic_gather_topology_block(
         paths,
         order,
         max_count=-1,
@@ -2701,7 +2702,7 @@ def export_topology(
     diffraction_vector_field = None
 
     if "los" in components:
-        exported = ops.path_los_export(
+        exported = topology_blocks.path_los_export(
             tx_positions,
             tx_power,
             rx_positions,
@@ -2712,7 +2713,7 @@ def export_topology(
         rx_id = exported["rx_id"]
         visible = None
         if bool(scene.structures) and int(tx_id.numel()) > 0:
-            visibility_inputs = ops.path_los_visibility_inputs(
+            visibility_inputs = topology_blocks.path_los_visibility_inputs(
                 tx_positions,
                 rx_positions,
                 tx_id.to(dtype=torch.int32).contiguous(),
