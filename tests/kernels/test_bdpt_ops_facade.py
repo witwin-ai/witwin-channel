@@ -3,6 +3,7 @@ import torch
 import math
 
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.runtime import symbols
 
 
 def _endpoint_subpath_state(
@@ -1083,7 +1084,7 @@ def test_bdpt_face_material_tensors_from_host_has_no_python_fallback(monkeypatch
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT material tensors")
 
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_face_material_tensors_from_host CUDA kernel is required"):
         ops.bdpt_face_material_tensors_from_host((2.0,), (0.1,), (1.0,), (0,))

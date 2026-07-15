@@ -5,6 +5,7 @@ import torch
 
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels import raydn_backend
+from witwin.channel_native.materials.kernels import functional as material_functional
 
 
 def test_validate_cuda_tensor_accepts_matching_cuda_tensor_when_available():
@@ -1997,7 +1998,7 @@ def test_mc_face_material_tensors_requires_native_cuda_kernel(monkeypatch):
     sigma_e = torch.zeros((1,), device="cuda", dtype=torch.float32)
     mu_r = torch.ones((1,), device="cuda", dtype=torch.float32)
     face_material_id = torch.zeros((1,), device="cuda", dtype=torch.int32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(material_functional, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_face_material_tensors CUDA kernel is required"):
         ops.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)

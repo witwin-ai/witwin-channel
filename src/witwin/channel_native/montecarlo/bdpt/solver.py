@@ -49,10 +49,10 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_subpath_intersection_inputs,
     bdpt_transmitted_light_subpath_state,
     bdpt_zero_matrix,
-    em_layer_stack_eval,
     mc_component_map_buffer,
     mc_store_component_map,
 )
+from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
 from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
 )

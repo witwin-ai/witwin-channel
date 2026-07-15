@@ -21,12 +21,10 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native.core.kernels.ops import (
-    _ad_frequency_value,
-    em_layer_stack_ad,
-    em_layer_stack_eval,
-)
+from witwin.channel_native.materials.kernels.autograd import em_layer_stack_ad
+from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.runtime.autograd_contracts import _ad_frequency_value
 
 
 _MIN_EPSILON_M = 1.0e-6

@@ -74,7 +74,7 @@ from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.materials.kernels import functional as material_kernels
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.core.materials import PhaseScreen
 from witwin.channel_native.core.path_topology import (
@@ -697,7 +697,7 @@ def _realization_rows(
                     continue
 
                 # Smooth-stack Jones at the mean plane per patch.
-                stack = ops.em_layer_stack_eval(
+                stack = material_kernels.em_layer_stack_eval(
                     cos_i[rows].contiguous(),
                     torch.full(
                         (int(rows.numel()),),
