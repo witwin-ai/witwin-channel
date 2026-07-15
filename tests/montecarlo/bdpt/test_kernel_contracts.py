@@ -13,7 +13,7 @@ from witwin.channel_native.materials.kernels import contracts as material_contra
 from witwin.channel_native.montecarlo.bdpt import connections
 from witwin.channel_native.montecarlo.bdpt import kernels
 from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
-from witwin.channel_native.montecarlo.bdpt.kernels import maps, paths
+from witwin.channel_native.montecarlo.bdpt.kernels import maps, paths, sampling
 from witwin.channel_native.montecarlo.bdpt.solver import _BDPTTopologyOptions
 from witwin.channel_native.propagation import geometry
 from witwin.channel_native.propagation.geometry.kernels import bridge
@@ -63,6 +63,15 @@ _MAP_OWNER_NAMES = (
     "bdpt_store_scaled_component_map",
     "bdpt_transmitter_tensors",
     "bdpt_zero_matrix",
+)
+
+_SAMPLING_OWNER_NAMES = (
+    "bdpt_diffraction_state_pack",
+    "bdpt_diffraction_state_wi",
+    "bdpt_pack_vec3",
+    "bdpt_reflection_launch_inputs",
+    "bdpt_sample_directions",
+    "bdpt_selected_edge_indices",
 )
 
 
@@ -140,6 +149,51 @@ def test_bdpt_maps_uses_canonical_runtime_dependencies():
     assert maps.native_extension is symbols.native_extension
     assert maps._required_native_op is symbols.required_symbol
     assert maps.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+
+
+@pytest.mark.parametrize("name", _SAMPLING_OWNER_NAMES)
+def test_bdpt_sampling_is_the_single_object_owner(name: str):
+    owner = getattr(sampling, name)
+
+    assert owner.__module__ == sampling.__name__
+    assert getattr(ops, name) is owner
+    assert not hasattr(kernels, name)
+
+
+def test_bdpt_sampling_preserves_all_frozen_body_contracts():
+    manifest = migration.load_manifest(MANIFEST_PATH)
+    contracts = {entry["id"]: entry for entry in manifest["contracts"]}
+    prefix = f"{sampling.__name__}."
+    definitions = [
+        item
+        for item in migration.scan_definitions(REPOSITORY_ROOT)
+        if item.qualified_name.startswith(prefix)
+    ]
+
+    assert {definition.terminal_name for definition in definitions} == set(
+        _SAMPLING_OWNER_NAMES
+    )
+    for definition in definitions:
+        contract = contracts[definition.terminal_name]
+        assert definition.signature == contract["signature"]
+        assert definition.body_sha256 == contract["body_sha256"]
+        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+
+
+def test_bdpt_sampling_uses_canonical_runtime_dependencies():
+    assert sampling._required_native_op is symbols.required_symbol
+    assert sampling.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+
+
+def test_bdpt_solver_uses_canonical_sampling_owners():
+    for name in (
+        "bdpt_diffraction_state_pack",
+        "bdpt_diffraction_state_wi",
+        "bdpt_reflection_launch_inputs",
+        "bdpt_sample_directions",
+        "bdpt_selected_edge_indices",
+    ):
+        assert getattr(bdpt_solver, name) is getattr(sampling, name)
 
 
 def test_bdpt_host_vec3_resolves_canonical_transmitter_helper():
@@ -295,6 +349,46 @@ def test_bdpt_maps_import_order_preserves_facade_identity(imports: str):
         f"{imports}; "
         f"names={names}; "
         "assert all(getattr(ops, name) is getattr(maps, name) for name in names)"
+    )
+    environment = os.environ.copy()
+    source_root = str(REPOSITORY_ROOT / "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (source_root, environment.get("PYTHONPATH"))
+        if value
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
+            "from witwin.channel_native.core.kernels import ops; "
+            "from witwin.channel_native.montecarlo.bdpt.kernels import sampling"
+        ),
+        (
+            "from witwin.channel_native.montecarlo.bdpt.kernels import sampling; "
+            "from witwin.channel_native.core.kernels import ops"
+        ),
+    ),
+)
+def test_bdpt_sampling_import_order_preserves_facade_identity(imports: str):
+    names = repr(_SAMPLING_OWNER_NAMES)
+    code = (
+        f"{imports}; "
+        f"names={names}; "
+        "assert all(getattr(ops, name) is getattr(sampling, name) for name in names)"
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")

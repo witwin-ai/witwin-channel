@@ -25,7 +25,7 @@ from witwin.channel_native.core.receiver_geometry import (
 )
 from witwin.channel_native.core.path_topology import export_topology
 
-from witwin.channel_native.core.kernels.ops import (
+from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
     bdpt_diffraction_state_pack,
     bdpt_diffraction_state_wi,
     bdpt_reflection_launch_inputs,
