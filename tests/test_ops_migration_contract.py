@@ -91,8 +91,8 @@ def test_current_manifest_covers_every_movable_ops_body():
 
     assert migration.check_manifest(REPOSITORY_ROOT, manifest) == []
     assert len(manifest["contracts"]) == 282
-    assert len(manifest["active_ops"]) == 152
-    assert len(manifest["canonical_owners"]) == 130
+    assert len(manifest["active_ops"]) == 148
+    assert len(manifest["canonical_owners"]) == 134
     assert migration.BOOTSTRAP_CANONICAL_OWNERS.items() <= (
         manifest["canonical_owners"].items()
     )

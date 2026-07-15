@@ -75,7 +75,7 @@ from typing import Any
 import torch
 from witwin.channel_native.core.tensor_math import normalize_vec3
 
-from witwin.channel_native.core.kernels.ops import (
+from witwin.channel_native.scattering.kernels.functional import (
     scattering_event_probabilities,
     scattering_table_sample,
 )

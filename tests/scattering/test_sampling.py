@@ -13,7 +13,7 @@ from witwin.channel_native.scattering import (
     pdf_reverse,
     sample_directions,
 )
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.runtime import symbols
 
 _EPS0 = 8.8541878128e-12
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -130,7 +130,7 @@ def test_pdf_zero_below_horizon(table):
 
 def test_runtime_table_ops_have_no_pytorch_fallback(table, monkeypatch):
     wi = _fixed_wi(table, 12)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="scattering_table_eval CUDA kernel is required"):
         from witwin.channel_native.scattering import eval_bsdf

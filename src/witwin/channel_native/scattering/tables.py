@@ -496,7 +496,9 @@ def eval_bsdf(
     surface. Directions below the horizon return 0.
     """
 
-    from witwin.channel_native.core.kernels.ops import scattering_table_eval
+    from witwin.channel_native.scattering.kernels.functional import (
+        scattering_table_eval,
+    )
 
     return scattering_table_eval(
         wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
@@ -518,7 +520,9 @@ def sample_directions(
     sampled density is piecewise constant per outgoing bin.
     """
 
-    from witwin.channel_native.core.kernels.ops import scattering_table_sample
+    from witwin.channel_native.scattering.kernels.functional import (
+        scattering_table_sample,
+    )
 
     uniforms = torch.stack((u1, u2), dim=1).contiguous()
     out = scattering_table_sample(
@@ -539,7 +543,7 @@ def pdf(table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor) -> torch.Tens
     over the hemisphere by construction. Zero below the horizon.
     """
 
-    from witwin.channel_native.core.kernels.ops import scattering_table_pdf
+    from witwin.channel_native.scattering.kernels.functional import scattering_table_pdf
 
     return scattering_table_pdf(
         wi.contiguous(), wo.contiguous(), table.sample_density, reverse=False
@@ -554,7 +558,7 @@ def pdf_reverse(table: KirchhoffTable, wo: torch.Tensor, wi: torch.Tensor) -> to
     reverse table exists.
     """
 
-    from witwin.channel_native.core.kernels.ops import scattering_table_pdf
+    from witwin.channel_native.scattering.kernels.functional import scattering_table_pdf
 
     return scattering_table_pdf(
         wi.contiguous(), wo.contiguous(), table.sample_density, reverse=True

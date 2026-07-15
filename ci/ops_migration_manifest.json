@@ -2135,11 +2135,7 @@
     "path_los_export",
     "path_los_visibility_inputs",
     "path_merge_blocks",
-    "path_reflection_candidates",
-    "scattering_event_probabilities",
-    "scattering_table_eval",
-    "scattering_table_pdf",
-    "scattering_table_sample"
+    "path_reflection_candidates"
   ],
   "canonical_owners": {
     "_CoupledRdPrepareAdFunction.backward": "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.backward",
@@ -2271,6 +2267,10 @@
     "raydn_trace_reflections_backward": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_backward",
     "raydn_trace_reflections_forward": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_trace_reflections_forward",
     "raydn_trace_reflections_forward_tape": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_forward_tape",
-    "raydn_trace_reflections_jvp": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_jvp"
+    "raydn_trace_reflections_jvp": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_jvp",
+    "scattering_event_probabilities": "witwin.channel_native.scattering.kernels.functional.scattering_event_probabilities",
+    "scattering_table_eval": "witwin.channel_native.scattering.kernels.functional.scattering_table_eval",
+    "scattering_table_pdf": "witwin.channel_native.scattering.kernels.functional.scattering_table_pdf",
+    "scattering_table_sample": "witwin.channel_native.scattering.kernels.functional.scattering_table_sample"
   }
 }
