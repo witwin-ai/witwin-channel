@@ -1,8 +1,5 @@
 """Internal row-aligned propagation data contracts."""
 
-from .evaluated import EvaluatedPaths
-from .fields import PathFields
-from .geometry import PathGeometry
-from .topology import PathTopology
+from .models import EvaluatedPaths, PathFields, PathGeometry, PathTopology
 
 __all__ = ["EvaluatedPaths", "PathFields", "PathGeometry", "PathTopology"]
