@@ -26,7 +26,8 @@ _FORBIDDEN_BUILD_SUFFIXES = {
     ".pdb",
 }
 _ABSOLUTE_PATH_PATTERN = re.compile(
-    rb"(?:[A-Za-z]:[\\/]|/(?:home|Users|private/tmp|tmp|workspace)/)"
+    rb"(?:(?<![A-Za-z0-9+.-])[A-Za-z]:[\\/]"
+    rb"|(?<![A-Za-z0-9])/(?:home|Users|private/tmp|tmp|workspace)/)"
 )
 
 

@@ -58,6 +58,18 @@ def test_wheel_content_audit_accepts_owned_runtime_files(tmp_path: Path):
     wheel_smoke._audit_wheel_contents(wheel)
 
 
+def test_wheel_content_audit_does_not_treat_https_url_as_drive_path(tmp_path: Path):
+    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel-native", version="0.1.0")
+    with zipfile.ZipFile(wheel, "a") as archive:
+        archive.writestr(
+            "witwin/channel_native/runtime/source.json",
+            b'{"repository_url":"https://github.com/Asixa/RayD.git"}',
+        )
+
+    wheel_smoke._audit_wheel_contents(wheel)
+
+
 @pytest.mark.parametrize(
     ("member", "payload"),
     [
