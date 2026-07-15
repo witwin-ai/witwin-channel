@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+from .autograd import (
+    _RaydnIntersectAdFunction,
+    _RaydnReflectionEpcPathsAdFunction,
+    _RaydnTraceReflectionsAdFunction,
+    _epc_paths_frozen_winner_checks,
+    raydn_intersect_ad,
+    raydn_intersect_backward,
+    raydn_intersect_jvp,
+    raydn_reflection_epc_paths_ad,
+    raydn_reflection_epc_paths_backward,
+    raydn_reflection_epc_paths_jvp,
+    raydn_trace_reflections_ad,
+    raydn_trace_reflections_backward,
+    raydn_trace_reflections_forward_tape,
+    raydn_trace_reflections_jvp,
+)
 from .bridge import (
     bdpt_diffraction_accumulation_forward,
     bdpt_diffraction_discover_edges,
@@ -18,6 +34,10 @@ from .bridge import (
 
 
 __all__ = [
+    "_RaydnIntersectAdFunction",
+    "_RaydnReflectionEpcPathsAdFunction",
+    "_RaydnTraceReflectionsAdFunction",
+    "_epc_paths_frozen_winner_checks",
     "bdpt_diffraction_accumulation_forward",
     "bdpt_diffraction_discover_edges",
     "bdpt_diffraction_discover_edges_counted",
@@ -27,8 +47,18 @@ __all__ = [
     "raydn_diffraction_accumulation_forward",
     "raydn_diffraction_discover_edges",
     "raydn_diffraction_discover_edges_counted",
+    "raydn_intersect_ad",
+    "raydn_intersect_backward",
+    "raydn_intersect_jvp",
     "raydn_reflection_accumulation_forward",
+    "raydn_reflection_epc_paths_ad",
+    "raydn_reflection_epc_paths_backward",
     "raydn_reflection_epc_paths_forward",
+    "raydn_reflection_epc_paths_jvp",
+    "raydn_trace_reflections_ad",
+    "raydn_trace_reflections_backward",
     "raydn_trace_reflections_forward",
+    "raydn_trace_reflections_forward_tape",
+    "raydn_trace_reflections_jvp",
     "raydn_visibility_forward",
 ]

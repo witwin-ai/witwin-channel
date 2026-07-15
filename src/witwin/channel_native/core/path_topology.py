@@ -13,6 +13,9 @@ from witwin.channel_native.core import ad_geometry
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.geometry.kernels import (
+    autograd as geometry_autograd,
+)
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -855,7 +858,7 @@ def _reflection_geometry_ad(
             device=face_id.device, dtype=torch.long
         ).contiguous(),
     )
-    epc = ops.raydn_reflection_epc_paths_ad(
+    epc = geometry_autograd.raydn_reflection_epc_paths_ad(
         raydn.require_handle(),
         vertices,
         source,
