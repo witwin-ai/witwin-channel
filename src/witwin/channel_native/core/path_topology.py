@@ -25,6 +25,9 @@ from witwin.channel_native.propagation.fields.kernels import (
 from witwin.channel_native.propagation.fields.kernels import (
     functional as field_functional,
 )
+from witwin.channel_native.propagation.topology.kernels import (
+    primitives as topology_primitives,
+)
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -2055,8 +2058,8 @@ def _deterministic_diffraction_states(
         if preserve_imported_edges
         else _cached_diffraction_edge_geometry(raydn)
     )
-    return ops.deterministic_diffraction_state_pack(
-        ops.mc_selected_edge_indices(selected),
+    return topology_primitives.deterministic_diffraction_state_pack(
+        topology_primitives.mc_selected_edge_indices(selected),
         edge_pos,
         edge_dir,
         line_min,
@@ -2355,7 +2358,7 @@ def _coupled_reflection_diffraction_topology_order2(
         if preserve_imported_edges
         else _cached_diffraction_edge_geometry(raydn)
     )
-    selected_edges = ops.mc_selected_edge_indices(selected)
+    selected_edges = topology_primitives.mc_selected_edge_indices(selected)
     edge_count = int(selected_edges.shape[0])
     candidates_per_pair = group_count * edge_count
     if candidates_per_pair == 0:
@@ -2846,7 +2849,9 @@ def export_topology(
         for block in blocks
     ]
     paths = concatenate_path_blocks(padded_blocks, device=device)
-    selected_edge_count = ops.deterministic_selected_edge_count(paths["edge_id"])
+    selected_edge_count = topology_primitives.deterministic_selected_edge_count(
+        paths["edge_id"]
+    )
     result = _from_path_block(
         paths,
         max_paths=config.max_paths,

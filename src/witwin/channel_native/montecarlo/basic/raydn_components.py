@@ -10,8 +10,6 @@ from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
 from witwin.channel_native.core.kernels.ops import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
-    deterministic_diffraction_state_pack,
-    deterministic_diffraction_state_pack_selected,
     mc_diffraction_state_wi,
     mc_los_component_maps_from_matrix,
     mc_los_grid_maps_ad,
@@ -32,6 +30,10 @@ from witwin.channel_native.core.diffraction_geometry import (
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
+)
+from witwin.channel_native.propagation.topology.kernels.primitives import (
+    deterministic_diffraction_state_pack,
+    deterministic_diffraction_state_pack_selected,
 )
 from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,

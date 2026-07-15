@@ -6,6 +6,9 @@ import torch
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels import raydn_backend
 from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel_native.propagation.topology.kernels import (
+    primitives as topology_primitives,
+)
 
 
 def test_validate_cuda_tensor_accepts_matching_cuda_tensor_when_available():
@@ -1724,7 +1727,7 @@ def test_mc_selected_edge_indices_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC selected edge compaction")
 
     selected = torch.ones((1,), device="cuda", dtype=torch.bool)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(topology_primitives, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_selected_edge_indices CUDA kernel is required"):
         ops.mc_selected_edge_indices(selected)

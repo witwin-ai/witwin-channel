@@ -15,7 +15,9 @@ from witwin.channel_native.capabilities import (
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
-from witwin.channel_native.core.kernels.ops import deterministic_component_counts
+from witwin.channel_native.propagation.topology.kernels.primitives import (
+    deterministic_component_counts,
+)
 from witwin.channel_native.core.components import component_availability_status
 
 from .accumulation import (

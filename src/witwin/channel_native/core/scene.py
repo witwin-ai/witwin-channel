@@ -14,7 +14,7 @@ from .runtime.material_store import MaterialStore
 from .runtime.raydn import RayDNScene, build_scene_from_structures
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
-from .kernels.ops import bdpt_zero_matrix, core_pack_int2
+from .kernels.ops import bdpt_zero_matrix
 from .materials import (
     GEOMETRY_MODE_IDS,
     MATERIAL_ABI_VERSION,
@@ -24,6 +24,9 @@ from .materials import (
 )
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
+)
+from witwin.channel_native.propagation.topology.kernels import (
+    primitives as topology_primitives,
 )
 
 
@@ -264,8 +267,10 @@ def _compile_geometry(
         vertices=records.vertices,
         faces=records.faces,
         face_normals=records.face_normals,
-        edges=core_pack_int2(records.edge_v0, records.edge_v1),
-        edge_adj_faces=core_pack_int2(records.face0, records.face1),
+        edges=topology_primitives.core_pack_int2(records.edge_v0, records.edge_v1),
+        edge_adj_faces=topology_primitives.core_pack_int2(
+            records.face0, records.face1
+        ),
         edge_param_range=bdpt_zero_matrix(
             records.vertices, rows=records.edge_v0.shape[0], cols=2
         ),
