@@ -7,6 +7,7 @@ from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels import raydn_backend
 from witwin.channel_native.deterministic.kernels import fields as deterministic_fields
 from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
 from witwin.channel_native.runtime import symbols as runtime_symbols
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
@@ -1451,7 +1452,7 @@ def test_mc_sample_directions_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC sample directions")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_sample_directions CUDA kernel is required"):
         ops.mc_sample_directions(1, reference)
@@ -1477,7 +1478,7 @@ def test_mc_transmitter_tensors_creates_cuda_positions_and_power():
 
 
 def test_mc_transmitter_tensors_requires_native_cuda_helper(monkeypatch):
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_transmitter_tensors CUDA helper is required"):
         ops.mc_transmitter_tensors((0.0, 0.0, 0.0), (1.0,))
@@ -1506,7 +1507,7 @@ def test_mc_pack_vec3_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC vec3 packing")
 
     x = torch.zeros((1,), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_pack_vec3 CUDA kernel is required"):
         ops.mc_pack_vec3(x, x, x)
@@ -1634,7 +1635,7 @@ def test_mc_receiver_grid_points_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC receiver grid points")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_receiver_grid_points CUDA kernel is required"):
         ops.mc_receiver_grid_points(
@@ -1673,7 +1674,7 @@ def test_mc_reflection_launch_inputs_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC reflection launch inputs")
 
     tx_positions = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_reflection_launch_inputs CUDA kernel is required"):
         ops.mc_reflection_launch_inputs(tx_positions, tx_index=0, sample_count=1)
@@ -1706,7 +1707,7 @@ def test_mc_diffraction_state_wi_requires_native_cuda_kernel(monkeypatch):
 
     edge_pos = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     src = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_diffraction_state_wi CUDA kernel is required"):
         ops.mc_diffraction_state_wi(edge_pos, src)
@@ -1878,7 +1879,7 @@ def test_mc_diffraction_state_pack_requires_native_cuda_kernel(monkeypatch):
     face = torch.zeros((1,), device="cuda", dtype=torch.int32)
     tx = torch.zeros((3,), device="cuda", dtype=torch.float32)
     tx_power = torch.tensor(1.0, device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_diffraction_state_pack CUDA kernel is required"):
         ops.mc_diffraction_state_pack(

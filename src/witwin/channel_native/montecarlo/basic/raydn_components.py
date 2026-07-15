@@ -5,24 +5,23 @@ import math
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
 from witwin.channel_native.core.kernels.ops import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
-    mc_diffraction_state_wi,
     mc_los_component_maps_from_matrix,
     mc_los_grid_maps_ad,
     mc_los_visibility_inputs,
-    mc_reflection_launch_inputs,
     mc_sionna_reflection_accumulate,
     mc_sionna_reflection_accumulate_ad,
-    mc_sample_directions,
     mc_sionna_diffraction_tape_accumulate,
     mc_sionna_diffraction_tape_accumulate_ad,
     mc_store_component_map,
     mc_store_scaled_component_map,
 )
+from typing import TYPE_CHECKING
+from witwin.channel_native.montecarlo.basic.kernels import sampling as sampling_kernels
 from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
@@ -35,6 +34,7 @@ from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
 )
+
 from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
@@ -49,6 +49,9 @@ from witwin.channel_native.montecarlo.transmission import (
 )
 
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
+
+if TYPE_CHECKING:
+    from witwin.channel_native.core.scene import Scene
 
 __all__ = ["_diffraction_edge_geometry"]
 
@@ -102,6 +105,8 @@ def _grid_los_matrix(
     ad: bool = False,
     ledger: object | None = None,
 ) -> torch.Tensor:
+    from witwin.channel_native.core.scene import Scene
+
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los
     grid_scene = Scene(
@@ -177,7 +182,7 @@ def los_component_map(
 
 
 def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
-    return mc_sample_directions(count, reference)
+    return sampling_kernels.mc_sample_directions(count, reference)
 
 
 def transmission_component_map(
@@ -368,7 +373,9 @@ def reflection_component_maps_with_wedges(
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
         ray_d = _sample_directions(samples, reference=tx_pos)
-        launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples)
+        launch_inputs = sampling_kernels.mc_reflection_launch_inputs(
+            tx_pos, tx_index=tx_index, sample_count=samples
+        )
         ray_o = launch_inputs["ray_o"]
         ray_tmax = launch_inputs["ray_tmax"]
         active = launch_inputs["active"]
@@ -781,7 +788,7 @@ def diffraction_component_map(
             device=device,
             dtype=torch.float32,
         )
-        state_wi = mc_diffraction_state_wi(states[1], states[10])
+        state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
         sampled = geometry_bridge.raydn_diffraction_accumulation_forward(
             handle, None, *states, state_wi, state_wi,
             material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,

@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel_native.core.kernels.ops import mc_pack_vec3
 from witwin.channel_native.scene.kernels.rayd_scene import (
     raydn_scene_create,
     raydn_scene_edge_records,
@@ -46,13 +45,15 @@ class RayDNScene:
         return self.handle
 
     def edge_records(self) -> RayDNEdgeRecords:
+        from witwin.channel_native.montecarlo.basic.kernels import sampling
+
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
             return cached  # type: ignore[return-value]
         values = raydn_scene_edge_records(self.require_handle())
         if len(values) != 12:
             raise RuntimeError(f"RayDN edge_records returned {len(values)} tensors, expected 12")
-        face_normals = mc_pack_vec3(values[2], values[3], values[4])
+        face_normals = sampling.mc_pack_vec3(values[2], values[3], values[4])
         records = RayDNEdgeRecords(
             vertices=values[0],
             faces=values[1],

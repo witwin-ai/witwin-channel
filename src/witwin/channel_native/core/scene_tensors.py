@@ -3,10 +3,6 @@ from __future__ import annotations
 import torch
 
 from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint
-from witwin.channel_native.core.kernels.ops import (
-    mc_receiver_grid_points,
-    mc_transmitter_tensors,
-)
 from witwin.channel_native.core.receiver_geometry import vector3_tuple
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
@@ -17,7 +13,9 @@ LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 
 def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torch.Tensor:
-    return mc_receiver_grid_points(
+    from witwin.channel_native.montecarlo.basic.kernels import sampling
+
+    return sampling.mc_receiver_grid_points(
         reference,
         origin=vector3_tuple(grid.origin),
         x_axis=vector3_tuple(grid.x_axis),
@@ -28,8 +26,10 @@ def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torc
 
 
 def host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
+    from witwin.channel_native.montecarlo.basic.kernels import sampling
+
     powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
-    return mc_transmitter_tensors(flat_positions, powers)["positions"]
+    return sampling.mc_transmitter_tensors(flat_positions, powers)["positions"]
 
 
 def receiver_positions(
@@ -80,9 +80,11 @@ def receiver_positions(
 def transmitter_positions(
     scene: object, *, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    from witwin.channel_native.montecarlo.basic.kernels import sampling
+
     del device
     if not scene.transmitters:
-        exported = mc_transmitter_tensors((), ())
+        exported = sampling.mc_transmitter_tensors((), ())
         return exported["positions"], exported["power"]
     flat_positions = tuple(
         component
@@ -90,5 +92,5 @@ def transmitter_positions(
         for component in vector3_tuple(transmitter.position)
     )
     powers = tuple(float(transmitter.power_w) for transmitter in scene.transmitters)
-    exported = mc_transmitter_tensors(flat_positions, powers)
+    exported = sampling.mc_transmitter_tensors(flat_positions, powers)
     return exported["positions"], exported["power"]
