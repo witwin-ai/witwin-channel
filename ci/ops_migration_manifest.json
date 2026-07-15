@@ -1987,9 +1987,7 @@
       "normalized_ast_sha256": "25b149cc7e045b7f58fb4e80f35a39ed3a87646ff42a138e13615450b4af3723"
     }
   ],
-  "active_ops": [
-    "_required_native_op"
-  ],
+  "active_ops": [],
   "canonical_owners": {
     "_CoupledRdPrepareAdFunction.backward": "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.backward",
     "_CoupledRdPrepareAdFunction.forward": "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.forward",
@@ -2092,6 +2090,7 @@
     "_validate_topology_extra_fields": "witwin.channel_native.propagation.topology.kernels.blocks._validate_topology_extra_fields",
     "_raydn_module_handle": "witwin.channel_native.scene.kernels.rayd_scene._raydn_module_handle",
     "_raydn_scene_handle_id": "witwin.channel_native.scene.kernels.rayd_scene._raydn_scene_handle_id",
+    "_required_native_op": "witwin.channel_native.runtime.symbols._required_native_op",
     "bdpt_accumulate_connection_samples": "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_accumulate_connection_samples",
     "bdpt_apply_los_visibility": "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_apply_los_visibility",
     "bdpt_compact_connection_samples": "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_compact_connection_samples",

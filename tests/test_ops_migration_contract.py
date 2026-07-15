@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import copy
 import json
 from pathlib import Path
@@ -91,8 +92,8 @@ def test_current_manifest_covers_every_movable_ops_body():
 
     assert migration.check_manifest(REPOSITORY_ROOT, manifest) == []
     assert len(manifest["contracts"]) == 282
-    assert len(manifest["active_ops"]) == 1
-    assert len(manifest["canonical_owners"]) == 281
+    assert len(manifest["active_ops"]) == 0
+    assert len(manifest["canonical_owners"]) == 282
     assert migration.BOOTSTRAP_CANONICAL_OWNERS.items() <= (
         manifest["canonical_owners"].items()
     )
@@ -109,6 +110,15 @@ def test_current_manifest_covers_every_movable_ops_body():
     assert "_RaydnIntersectAdFunction.forward" in contract_ids
     assert "_FieldCoupledRdAdFunction.backward.material_column" not in contract_ids
     assert "_FieldCoupledRdAdFunction.jvp.material_pack" not in contract_ids
+
+
+def test_ops_facade_is_a_bounded_pure_reexport_module():
+    path = REPOSITORY_ROOT / "src/witwin/channel_native/core/kernels/ops.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    assert len(source.splitlines()) <= 300
+    assert all(isinstance(node, ast.ImportFrom) for node in tree.body)
 
 
 def test_pure_move_with_compatibility_reexport_has_one_body(tmp_path: Path):
@@ -233,7 +243,9 @@ def test_frozen_universe_and_ledger_cannot_grow():
     contract_issues = migration.check_manifest(REPOSITORY_ROOT, changed_contract)
     ledger_issues = migration.check_manifest(REPOSITORY_ROOT, changed_ledger)
 
-    assert any("frozen ops contract universe changed" in issue for issue in contract_issues)
+    assert any(
+        "frozen ops contract universe changed" in issue for issue in contract_issues
+    )
     assert any("unknown migration IDs: new_debt" in issue for issue in ledger_issues)
 
 

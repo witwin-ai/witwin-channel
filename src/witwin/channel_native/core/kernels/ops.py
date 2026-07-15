@@ -70,6 +70,7 @@ from witwin.channel_native.materials.kernels.autograd import (  # noqa: F401
     _EmLayerStackAdFunction,
     em_layer_stack_ad,
 )
+from witwin.channel_native.materials.kernels.contracts import _validate_layer_csr  # noqa: F401
 from witwin.channel_native.propagation.fields.kernels.autograd import (  # noqa: F401
     _CoupledRdPrepareAdFunction,
     _FieldCoupledRdAdFunction,
@@ -152,7 +153,11 @@ from witwin.channel_native.propagation.geometry.kernels.primitives import (  # n
     mc_diffraction_edge_geometry,
     mc_surface_group_edge_candidates,
 )
-from witwin.channel_native.runtime import symbols as _native_symbols
+from witwin.channel_native.runtime.symbols import (  # noqa: F401
+    _required_native_op,
+    native_extension,
+)
+from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor  # noqa: F401
 from witwin.channel_native.runtime.autograd_contracts import (  # noqa: F401
     _ad_active_ctx,
     _ad_check_active,
@@ -172,152 +177,12 @@ from witwin.channel_native.runtime.autograd_contracts import (  # noqa: F401
     _ad_reject_fixed_tangents,
     _ad_still_wrapped,
 )
-from witwin.channel_native.scene.kernels.rayd_scene import (  # noqa: F401
-    raydn_scene_create,
-    raydn_scene_edge_records,
-)
+from witwin.channel_native.scene.kernels.rayd_scene import raydn_scene_create, raydn_scene_edge_records  # noqa: F401
 
 from .metadata import make_metadata, noop_metadata, validate_metadata  # noqa: F401
 
 
-native_extension = _native_symbols.native_extension
-
-
-def _required_native_op(name: str):
-    return _native_symbols._required_symbol(native_extension(), name)
-
-
-# ---------------------------------------------------------------------------
-# RayDN differentiable geometry (AD-A0).
-#
-# These entry points expose RayD's fixed-winner differentiable geometry
-# kernels across the source-linked C bridge (no rayd.torch import, no torch
-# dispatcher). Discrete winner records (prim ids, barycentrics, hit points,
-# normals) are detached tape constants; gradients flow only through the
-# continuous outputs (t, p, n, image sources, EPC field, path length) with
-# respect to mesh vertices, ray origin/direction, and EPC source/receiver.
-# They are opt-in AD entry points: no public solver calls them and the
-# ad_mode="none" forward paths are untouched.
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# RayDN reflection EPC paths geometry AD (plan 07 AD-2 layer 1).
-#
-# The reflection EPC path export (direct-plane mode) is the discovery entry
-# the deterministic/path solvers use. Its geometry companions differentiate
-# the continuous specular chain (hit points, emitted unit normals, path
-# length) with respect to the scene vertex table and the per-row endpoints,
-# under a frozen winner: the face sequence, the validity mask, the
-# containment resolution and the visibility casts are detached discovery
-# records. RayD chains each bounce's plane cotangents to the winner
-# triangle's vertices itself, so no hit geometry is ever re-derived here.
-# ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------------------
-# Fixed-topology EM-response AD for the field transport kernels (plan 07
-# AD-1 materials/frequency, AD-2 geometry). Differentiable inputs:
-# per-bounce/per-layer eps_r, sigma_e, gain, thickness, the carrier frequency
-# and the continuous hit geometry (source, target, interaction_positions,
-# interaction_normals). The discrete winner (polarizations, tx_power, mu_r,
-# material ids, valid masks) stays fixed and fails loudly. path_length_m /
-# delay_s become differentiable outputs exactly when a geometry input is on
-# the graph; they carry zero cotangent into materials and frequency.
-# ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------------------
-# Plan 07 AD-4: differentiable UTD wedge diffraction (component 2 re-evaluated
-# from the frozen topology), receiver projection, coupled R-D transport
-# (components 3/4) and the coupled stationary-geometry re-solve. Each
-# torch.autograd.Function below is dispatch only; the math lives in
-# kernels/field_wedge_ad.cu (RayD's templated dual forward).
-# ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Import this compatibility facade only after the legacy bodies above are
-# defined.  ``core.scene`` reaches this module while the public package is
-# still initializing; the late import lets deterministic's eager public API
-# reuse the already-defined facade without exposing a partially built module.
+# Keep eager-domain imports late to preserve the facade's verified import order.
 from witwin.channel_native.deterministic.kernels.accumulation import (  # noqa: E402,F401
     _DETERMINISTIC_ACCUM_FIELDS,
     _DeterministicAccumulateFlatAdFunction,

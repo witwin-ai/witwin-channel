@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from .extension import _load_native_extension
 
 
@@ -19,6 +21,13 @@ def _required_symbol(extension: object, name: str) -> object:
     if extension is None or not hasattr(extension, name):
         raise NativeSymbolError(f"_channel_native.{name} CUDA kernel is required")
     return getattr(extension, name)
+
+
+_native_symbols = sys.modules[__name__]
+
+
+def _required_native_op(name: str):
+    return _native_symbols._required_symbol(native_extension(), name)
 
 
 def required_symbol(name: str) -> object:
