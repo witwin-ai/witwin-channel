@@ -2,7 +2,6 @@ import pytest
 import torch
 
 from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.kernels import ops as kernel_ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config, solve
@@ -358,14 +357,20 @@ def test_two_bounce_reflection_uses_raydn_epc_path_export(monkeypatch):
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native reflection is not built")
 
-    original = kernel_ops.raydn_reflection_epc_paths_forward
+    from witwin.channel_native.propagation.geometry.kernels import (
+        bridge as geometry_bridge,
+    )
+
+    original = geometry_bridge.raydn_reflection_epc_paths_forward
     calls = {"count": 0}
 
     def counted(*args, **kwargs):
         calls["count"] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(kernel_ops, "raydn_reflection_epc_paths_forward", counted)
+    monkeypatch.setattr(
+        geometry_bridge, "raydn_reflection_epc_paths_forward", counted
+    )
     result = solve(
         two_wall_multibounce_scene(),
         Config(

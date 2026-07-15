@@ -12,7 +12,6 @@ from witwin.channel_native.core.kernels.ops import (
     mc_los_visibility_inputs,
     mc_zero_matrix,
     path_los_export,
-    raydn_visibility_forward,
 )
 from witwin.channel_native.core.scene_tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
@@ -20,6 +19,7 @@ from witwin.channel_native.core.scene_tensors import (
     receiver_positions,
     transmitter_positions,
 )
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 
 __all__ = [
     "_LIGHT_SPEED_M_PER_S",
@@ -75,5 +75,9 @@ def apply_point_los_visibility(scene: Scene, raydn: object, los: torch.Tensor, *
     masks: list[torch.Tensor] = []
     for tx_index in range(int(tx_pos.shape[0])):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=int(rx_pos.shape[0]))
-        masks.append(raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0])
+        masks.append(
+            geometry_bridge.raydn_visibility_forward(
+                handle, inputs["start"], rx_pos, inputs["active"]
+            )[0]
+        )
     return los * torch.stack(masks, dim=0).to(dtype=los.dtype)

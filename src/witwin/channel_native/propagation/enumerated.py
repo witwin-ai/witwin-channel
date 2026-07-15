@@ -75,6 +75,7 @@ from witwin.channel_native.core.field_state import (
     transmitter_polarizations,
 )
 from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.core.materials import PhaseScreen
 from witwin.channel_native.core.path_topology import (
     TopologyBatch,
@@ -148,7 +149,7 @@ def _visible(
     for lo in range(0, count, _VISIBILITY_CHUNK):
         hi = min(lo + _VISIBILITY_CHUNK, count)
         masks.append(
-            ops.raydn_visibility_forward(
+            geometry_bridge.raydn_visibility_forward(
                 handle, start[lo:hi].contiguous(), end[lo:hi].contiguous(), None
             )[0]
         )

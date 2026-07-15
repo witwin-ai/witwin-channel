@@ -30,7 +30,6 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_compact_connection_samples,
     bdpt_concat_connection_samples,
     bdpt_count_valid_connection_samples,
-    bdpt_diffraction_accumulation_forward,
     bdpt_diffraction_connection_samples_from_tape,
     bdpt_diffraction_point_connection_samples,
     bdpt_diffraction_state_pack,
@@ -42,7 +41,6 @@ from witwin.channel_native.core.kernels.ops import (
     bdpt_finalize_point_components,
     bdpt_filter_connection_samples,
     bdpt_connection_variance,
-    bdpt_intersect_forward,
     bdpt_los_component_maps_from_matrix,
     bdpt_reflected_light_subpath_state,
     bdpt_reflection_launch_inputs,
@@ -54,11 +52,11 @@ from witwin.channel_native.core.kernels.ops import (
     em_layer_stack_eval,
     mc_component_map_buffer,
     mc_store_component_map,
-    raydn_visibility_forward,
 )
 from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
 )
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.montecarlo.scattering_events import (
     local_frames,
     rough_material_runtimes,
@@ -295,7 +293,7 @@ def _native_los_connection_samples(
         sensor,
         sample_count=int(samples["valid"].shape[0]),
     )
-    visible = raydn_visibility_forward(
+    visible = geometry_bridge.raydn_visibility_forward(
         raydn.require_handle(),
         visibility_inputs["start"],
         visibility_inputs["end"],
@@ -379,7 +377,7 @@ def _native_diffraction_component_maps(
         direct_samples = int(samples) if int(samples) >= state_count * cell_count else 0
         keller_samples = 0 if direct_samples else int(samples)
         suffix_samples = 0
-        out = bdpt_diffraction_accumulation_forward(
+        out = geometry_bridge.bdpt_diffraction_accumulation_forward(
             raydn.require_handle(),
             None,
             *states,
@@ -547,14 +545,14 @@ def _native_diffraction_point_connection_samples(
                 samples_out["rx_id"].add_(rx_start)
                 samples_out["grid_linear_id"].add_(rx_start)
                 samples_out["topology"][:, 1].add_(rx_start)
-            visible_source = raydn_visibility_forward(
+            visible_source = geometry_bridge.raydn_visibility_forward(
                 raydn.require_handle(),
                 exported["source_start"],
                 exported["source_end"],
                 exported["visibility_active"],
             )[0]
             filtered = bdpt_filter_connection_samples(samples_out, visible_source)
-            visible_target = raydn_visibility_forward(
+            visible_target = geometry_bridge.raydn_visibility_forward(
                 raydn.require_handle(),
                 exported["target_start"],
                 exported["target_end"],
@@ -842,7 +840,7 @@ def _transmission_sampled_connection_samples(
             "active": launch_inputs["active"],
         }
         for bounce in range(max(1, int(max_depth))):
-            hit = bdpt_intersect_forward(
+            hit = geometry_bridge.bdpt_intersect_forward(
                 raydn.require_handle(),
                 ray_inputs["ray_o"],
                 ray_inputs["ray_d"],
@@ -1077,7 +1075,7 @@ def _transmission_sampled_connection_samples(
                     sensor,
                     sample_count=int(samples_out["valid"].shape[0]),
                 )
-                visible = raydn_visibility_forward(
+                visible = geometry_bridge.raydn_visibility_forward(
                     raydn.require_handle(),
                     visibility_inputs["start"],
                     visibility_inputs["end"],

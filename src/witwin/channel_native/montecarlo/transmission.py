@@ -23,10 +23,10 @@ import torch
 
 from witwin.channel_native.core.kernels.ops import (
     _ad_frequency_value,
-    bdpt_intersect_forward,
     em_layer_stack_ad,
     em_layer_stack_eval,
 )
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 
 
 _MIN_EPSILON_M = 1.0e-6
@@ -186,7 +186,7 @@ def straight_transmission_chains(
     for depth in range(int(max_depth) + 1):
         if not bool(active.any()):
             break
-        hit = bdpt_intersect_forward(
+        hit = geometry_bridge.bdpt_intersect_forward(
             handle,
             origin.contiguous(),
             direction,

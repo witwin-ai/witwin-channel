@@ -10,11 +10,6 @@ from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
 from witwin.channel_native.core.kernels.ops import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
-    raydn_diffraction_accumulation_forward,
-    raydn_diffraction_discover_edges,
-    raydn_diffraction_discover_edges_counted,
-    raydn_trace_reflections_forward,
-    raydn_visibility_forward,
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
     mc_diffraction_state_wi,
@@ -35,6 +30,7 @@ from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
@@ -128,7 +124,9 @@ def _grid_visibility_masks(
     for tx_index in range(tx_pos.shape[0]):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
         masks.append(
-            raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0]
+            geometry_bridge.raydn_visibility_forward(
+                handle, inputs["start"], rx_pos, inputs["active"]
+            )[0]
         )
     return torch.stack(masks, dim=0)
 
@@ -167,7 +165,9 @@ def los_component_map(
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     for tx_index in range(tx_pos.shape[0]):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
-        visible = raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0]
+        visible = geometry_bridge.raydn_visibility_forward(
+            handle, inputs["start"], rx_pos, inputs["active"]
+        )[0]
         mc_apply_los_visibility(maps, los, visible, tx_index=tx_index)
     return maps
 
@@ -368,7 +368,7 @@ def reflection_component_maps_with_wedges(
         ray_o = launch_inputs["ray_o"]
         ray_tmax = launch_inputs["ray_tmax"]
         active = launch_inputs["active"]
-        trace = raydn_trace_reflections_forward(
+        trace = geometry_bridge.raydn_trace_reflections_forward(
             handle,
             ray_o,
             ray_d,
@@ -538,7 +538,7 @@ def _discover_diffraction_edges_from_wedges(
         edge_candidates = _cached_primitive_edge_candidates(raydn, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
     if wedges.event_count is not None:
-        return raydn_diffraction_discover_edges_counted(
+        return geometry_bridge.raydn_diffraction_discover_edges_counted(
             wedges.tx_pos,
             wedges.ray_dir,
             wedges.prim_id,
@@ -556,7 +556,7 @@ def _discover_diffraction_edges_from_wedges(
             line_max,
             face1,
         )
-    return raydn_diffraction_discover_edges(
+    return geometry_bridge.raydn_diffraction_discover_edges(
         wedges.tx_pos,
         wedges.ray_dir,
         wedges.prim_id,
@@ -778,7 +778,7 @@ def diffraction_component_map(
             dtype=torch.float32,
         )
         state_wi = mc_diffraction_state_wi(states[1], states[10])
-        sampled = raydn_diffraction_accumulation_forward(
+        sampled = geometry_bridge.raydn_diffraction_accumulation_forward(
             handle, None, *states, state_wi, state_wi,
             material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
             state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),

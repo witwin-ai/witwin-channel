@@ -12,6 +12,7 @@ from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core import ad_geometry
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -81,7 +82,7 @@ def _raydn_visibility_mask(
 ) -> torch.Tensor:
     if start.shape[0] == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
-    return ops.raydn_visibility_forward(
+    return geometry_bridge.raydn_visibility_forward(
         raydn.require_handle(), start.contiguous(), end.contiguous(), None
     )[0]
 
@@ -1584,7 +1585,7 @@ def _reflection_topology_order1(
                 rx_start=rx_start,
                 rx_end=rx_end,
             )
-            epc = ops.raydn_reflection_epc_paths_forward(
+            epc = geometry_bridge.raydn_reflection_epc_paths_forward(
                 raydn.require_handle(),
                 epc_inputs["tx_batch"],
                 epc_inputs["rx_batch"],
@@ -1698,7 +1699,7 @@ def _discovered_group_chains(
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
     ray_d = ops.mc_sample_directions(ray_count, tx.reshape(1, 3))
     ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
-    out = ops.raydn_trace_reflections_forward(
+    out = geometry_bridge.raydn_trace_reflections_forward(
         raydn.require_handle(),
         ray_o,
         ray_d,
@@ -1876,7 +1877,7 @@ def _reflection_topology_multibounce(
             rx_start=rx_start,
             rx_end=rx_end,
         )
-        epc = ops.raydn_reflection_epc_paths_forward(
+        epc = geometry_bridge.raydn_reflection_epc_paths_forward(
             raydn.require_handle(),
             epc_inputs["tx_batch"],
             epc_inputs["rx_batch"],
@@ -2088,7 +2089,7 @@ def _tx_visible_diffraction_states(
     for fraction in _DIFFRACTION_PREFILTER_EDGE_FRACTIONS:
         t = line_min + fraction * (line_max - line_min)
         point = (edge_anchor + t.unsqueeze(1) * edge_dir).contiguous()
-        visible |= ops.raydn_visibility_forward(
+        visible |= geometry_bridge.raydn_visibility_forward(
             raydn.require_handle(), starts, point, None
         )[0]
     if bool(visible.all()):
@@ -2557,7 +2558,7 @@ def _transmission_topology(
         if int(rows.shape[0]) == 0:
             break
         remaining = (total_length[rows] - traveled[rows]).clamp_min(0.0)
-        hit = ops.bdpt_intersect_forward(
+        hit = geometry_bridge.bdpt_intersect_forward(
             handle,
             origin[rows].contiguous(),
             direction[rows].contiguous(),
@@ -2698,7 +2699,7 @@ def export_topology(
                 tx_id.to(dtype=torch.int32).contiguous(),
                 rx_id.to(dtype=torch.int32).contiguous(),
             )
-            visible = ops.raydn_visibility_forward(
+            visible = geometry_bridge.raydn_visibility_forward(
                 compiled.raydn.require_handle(),
                 visibility_inputs["start"],
                 visibility_inputs["end"],

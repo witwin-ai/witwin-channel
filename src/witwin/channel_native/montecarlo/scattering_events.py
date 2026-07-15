@@ -76,7 +76,6 @@ import torch
 from witwin.channel_native.core.tensor_math import normalize_vec3
 
 from witwin.channel_native.core.kernels.ops import (
-    raydn_visibility_forward,
     scattering_event_probabilities,
     scattering_table_sample,
 )
@@ -84,6 +83,7 @@ from witwin.channel_native.core.materials import Roughness
 from witwin.channel_native.scattering import tables as kirchhoff_tables
 
 from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 
 from .transmission import (
     _EVENT_PROBABILITY_FLOOR,
@@ -505,7 +505,7 @@ def scattering_nee_connection_samples(
     )
     start = flat(expand_rows(position)) + wo_flat * epsilon[:, None]
     end = flat(rx_origin[None, :, :].expand(vertex_count, sensor_count, 3)).contiguous()
-    visible = raydn_visibility_forward(
+    visible = geometry_bridge.raydn_visibility_forward(
         raydn.require_handle(),
         start.contiguous(),
         end,
@@ -743,7 +743,7 @@ def scattering_map_matrix(
         # Unobstructed tx->point requirement (v1): binary visibility on the
         # segment shortened off the surface by the scale-aware epsilon.
         candidates = cos_i > 1.0e-6
-        visible_tx = raydn_visibility_forward(
+        visible_tx = geometry_bridge.raydn_visibility_forward(
             handle,
             tx_pos[tx_index][None, :].expand(count, 3).contiguous(),
             (points + normal_flipped * epsilon[:, None]).contiguous(),
@@ -783,7 +783,7 @@ def scattering_map_matrix(
                 runtimes,
             )
             f_unpol = 0.5 * (f_te + f_tm)
-            visible_rx = raydn_visibility_forward(
+            visible_rx = geometry_bridge.raydn_visibility_forward(
                 handle,
                 (points[:, None, :] + wo_world * epsilon[:, None, None])
                 .reshape(count * block, 3)
