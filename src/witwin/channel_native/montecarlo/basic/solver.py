@@ -13,7 +13,7 @@ from witwin.channel_native.core.memory_budget import (
     enforce_memory_budget,
     estimate_monte_carlo_memory,
 )
-from witwin.channel_native.core.path_topology import (
+from witwin.channel_native.materials.evaluation import (
     _require_frequency_ad_constant_materials,
 )
 from witwin.channel_native.core.receiver_geometry import first_receiver_grid

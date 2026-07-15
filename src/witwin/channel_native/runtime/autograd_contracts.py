@@ -232,6 +232,13 @@ def _ad_geometry_live(*values: object) -> bool:
     return False
 
 
+_participates_in_ad = _ad_geometry_live
+
+
+def _frequency_participates_in_ad(frequency: float | torch.Tensor) -> bool:
+    return _participates_in_ad(frequency)
+
+
 def _ad_geometry_tangent(
     name: str, tangent: object, primal: torch.Tensor
 ) -> torch.Tensor | None:
@@ -272,4 +279,5 @@ __all__ = [
     "_ad_reject_fixed_inputs",
     "_ad_reject_fixed_tangents",
     "_ad_still_wrapped",
+    "_frequency_participates_in_ad",
 ]
