@@ -1,4 +1,5 @@
 import inspect
+from dataclasses import replace
 
 import pytest
 import torch
@@ -10,6 +11,9 @@ from witwin.channel_native.core.runtime.material_store import MaterialStore
 from witwin.channel_native.scene.stores import _validation as canonical_validation
 from witwin.channel_native.scene.stores.geometry import (
     GeometryStore as CanonicalGeometryStore,
+)
+from witwin.channel_native.scene.stores.materials import (
+    MaterialStore as CanonicalMaterialStore,
 )
 
 
@@ -132,6 +136,123 @@ def test_material_store_rejects_per_face_parameter_expansion():
             cache_token="test",
             version=0,
         )
+
+
+def _material_store_kwargs() -> dict[str, object]:
+    return {
+        "material_id": torch.arange(2, dtype=torch.int32),
+        "eps_r": torch.tensor([2.0, 3.0], dtype=torch.float32),
+        "mu_r": torch.ones((2,), dtype=torch.float32),
+        "sigma_e": torch.zeros((2,), dtype=torch.float32),
+        "gain": torch.ones((2,), dtype=torch.float32),
+        "model_id": torch.ones((2,), dtype=torch.int32),
+        "thickness_m": torch.ones((2,), dtype=torch.float32),
+        "scattering_coefficient": torch.zeros((2,), dtype=torch.float32),
+        "xpd_coefficient": torch.zeros((2,), dtype=torch.float32),
+        "layer_offset": torch.tensor([0, 1], dtype=torch.int32),
+        "layer_count": torch.tensor([1, 2], dtype=torch.int32),
+        "layer_thickness_m": torch.ones((3,), dtype=torch.float32),
+        "layer_eps_r": torch.tensor([2.0, 3.0, 4.0], dtype=torch.float32),
+        "layer_sigma_e": torch.zeros((3,), dtype=torch.float32),
+        "layer_mu_r": torch.ones((3,), dtype=torch.float32),
+        "rough_sigma_h_m": torch.zeros((2,), dtype=torch.float32),
+        "rough_corr_x_m": torch.zeros((2,), dtype=torch.float32),
+        "rough_corr_y_m": torch.zeros((2,), dtype=torch.float32),
+        "rough_axis_rad": torch.zeros((2,), dtype=torch.float32),
+        "geometry_mode_id": torch.zeros((2,), dtype=torch.int32),
+        "scatter_model_id": torch.zeros((2,), dtype=torch.int32),
+        "material_keys": ("0:test:a", "1:test:b"),
+        "frequency_hz": 3.5e9,
+        "abi_version": 3,
+        "cache_token": "test",
+        "version": 0,
+    }
+
+
+def _material_store() -> CanonicalMaterialStore:
+    return CanonicalMaterialStore(**_material_store_kwargs())
+
+
+def test_material_store_canonical_owner_preserves_input_storage_and_scalar_view():
+    values = _material_store_kwargs()
+    store = CanonicalMaterialStore(**values)
+
+    assert CanonicalMaterialStore is MaterialStore
+    for name, value in values.items():
+        if isinstance(value, torch.Tensor):
+            stored = getattr(store, name)
+            assert stored is value
+            assert stored.untyped_storage().data_ptr() == (
+                value.untyped_storage().data_ptr()
+            )
+    assert store.eps_r.tolist() == store.layer_eps_r[store.layer_offset].tolist()
+    assert store.eps_r.untyped_storage().data_ptr() != (
+        store.layer_eps_r.untyped_storage().data_ptr()
+    )
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    (
+        (
+            {
+                "eps_r": torch.ones((3,), dtype=torch.float32),
+                "layer_eps_r": torch.ones((4,), dtype=torch.float32),
+            },
+            "material tensors must have the same length",
+        ),
+        (
+            {
+                "layer_eps_r": torch.ones((4,), dtype=torch.float32),
+                "layer_count": torch.tensor([0, 3], dtype=torch.int32),
+            },
+            "layer tensors must have the same length",
+        ),
+        (
+            {
+                "layer_count": torch.tensor([0, 3], dtype=torch.int32),
+                "layer_offset": torch.tensor([1, 0], dtype=torch.int32),
+            },
+            "layer_count must be >= 1 for every material",
+        ),
+        (
+            {
+                "layer_offset": torch.tensor([0, 2], dtype=torch.int32),
+                "frequency_hz": 0.0,
+            },
+            "layer_offset must be the exclusive scan of layer_count",
+        ),
+        (
+            {
+                "layer_count": torch.tensor([1, 1], dtype=torch.int32),
+                "frequency_hz": 0.0,
+            },
+            "layer_count must sum to the layer tensor length",
+        ),
+        (
+            {"frequency_hz": 0.0, "abi_version": 2},
+            "frequency_hz must be positive",
+        ),
+        (
+            {
+                "abi_version": 2,
+                "material_id": torch.tensor([1, 0], dtype=torch.int32),
+            },
+            "MaterialStore requires material ABI version 3",
+        ),
+        (
+            {
+                "material_id": torch.tensor([1, 0], dtype=torch.int32),
+                "material_keys": ("same", "same"),
+            },
+            "material_id must be dense and stable",
+        ),
+        ({"material_keys": ("same", "same")}, "material_keys must be unique"),
+    ),
+)
+def test_material_store_csr_and_abi_validation_order_is_exact(changes, message):
+    with pytest.raises(ValueError, match=message):
+        replace(_material_store(), **changes)
 
 
 def test_assignment_store_validates_face_material_length():

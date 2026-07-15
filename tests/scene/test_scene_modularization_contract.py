@@ -37,6 +37,7 @@ from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.scene import compiled as canonical_compiled
 from witwin.channel_native.scene.stores import _validation as canonical_validation
 from witwin.channel_native.scene.stores import geometry as canonical_geometry
+from witwin.channel_native.scene.stores import materials as canonical_material_stores
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -61,7 +62,7 @@ _LEGACY_CLASS_CASES = (
     (
         "witwin.channel_native.core.runtime.material_store",
         "MaterialStore",
-        legacy_material_store.MaterialStore,
+        canonical_material_stores.MaterialStore,
     ),
     (
         "witwin.channel_native.core.runtime.assignments",
@@ -191,7 +192,15 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
     assert canonical_geometry.GeometryStore.__module__ == (
         "witwin.channel_native.core.runtime.geometry"
     )
-    assert legacy_scene.MaterialStore is legacy_material_store.MaterialStore
+    assert (
+        canonical_material_stores.MaterialStore
+        is legacy_scene.MaterialStore
+        is legacy_material_store.MaterialStore
+        is canonical_compiled.MaterialStore
+    )
+    assert canonical_material_stores.MaterialStore.__module__ == (
+        "witwin.channel_native.core.runtime.material_store"
+    )
     assert legacy_scene.AssignmentStore is legacy_assignments.AssignmentStore
 
     for module, name, owner in _LEGACY_CLASS_CASES:
@@ -227,6 +236,73 @@ def test_geometry_store_schema_type_hints_and_validation_owner_are_exact():
     from witwin.channel_native.core.runtime import _validation as legacy_validation
 
     assert canonical_validation.require_tensor is legacy_validation.require_tensor
+
+
+def test_material_store_schema_type_hints_and_defaults_are_exact():
+    owner = canonical_material_stores.MaterialStore
+    schema = fields(owner)
+
+    assert tuple(item.name for item in schema) == (
+        "material_id",
+        "eps_r",
+        "mu_r",
+        "sigma_e",
+        "gain",
+        "model_id",
+        "thickness_m",
+        "scattering_coefficient",
+        "xpd_coefficient",
+        "layer_offset",
+        "layer_count",
+        "layer_thickness_m",
+        "layer_eps_r",
+        "layer_sigma_e",
+        "layer_mu_r",
+        "rough_sigma_h_m",
+        "rough_corr_x_m",
+        "rough_corr_y_m",
+        "rough_axis_rad",
+        "geometry_mode_id",
+        "scatter_model_id",
+        "material_keys",
+        "frequency_hz",
+        "abi_version",
+        "cache_token",
+        "version",
+        "frequency_dependent",
+    )
+    assert all(item.default is MISSING for item in schema[:-1])
+    assert all(item.default_factory is MISSING for item in schema)
+    assert schema[-1].default == ()
+    assert get_type_hints(owner) == {
+        "material_id": torch.Tensor,
+        "eps_r": torch.Tensor,
+        "mu_r": torch.Tensor,
+        "sigma_e": torch.Tensor,
+        "gain": torch.Tensor,
+        "model_id": torch.Tensor,
+        "thickness_m": torch.Tensor,
+        "scattering_coefficient": torch.Tensor,
+        "xpd_coefficient": torch.Tensor,
+        "layer_offset": torch.Tensor,
+        "layer_count": torch.Tensor,
+        "layer_thickness_m": torch.Tensor,
+        "layer_eps_r": torch.Tensor,
+        "layer_sigma_e": torch.Tensor,
+        "layer_mu_r": torch.Tensor,
+        "rough_sigma_h_m": torch.Tensor,
+        "rough_corr_x_m": torch.Tensor,
+        "rough_corr_y_m": torch.Tensor,
+        "rough_axis_rad": torch.Tensor,
+        "geometry_mode_id": torch.Tensor,
+        "scatter_model_id": torch.Tensor,
+        "material_keys": tuple[str, ...],
+        "frequency_hz": float,
+        "abi_version": int,
+        "cache_token": str,
+        "version": int,
+        "frequency_dependent": tuple[str, ...],
+    }
 
 
 @pytest.mark.parametrize(
@@ -283,10 +359,66 @@ def test_geometry_store_fresh_import_order_and_legacy_pickle_replay(imports: str
     )
 
 
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
+            "from witwin.channel_native.scene.stores import materials as canonical; "
+            "from witwin.channel_native.core.runtime import material_store as legacy; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+        (
+            "from witwin.channel_native.core.runtime import material_store as legacy; "
+            "from witwin.channel_native.scene import compiled; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene.stores import materials as canonical"
+        ),
+        (
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene.stores import materials as canonical; "
+            "from witwin.channel_native.core.runtime import material_store as legacy; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+    ),
+)
+def test_material_store_fresh_import_order_and_legacy_pickle_replay(imports: str):
+    source = (
+        f"{imports}; import pickle; from typing import get_type_hints; import torch; "
+        "owner = canonical.MaterialStore; "
+        "assert owner is legacy.MaterialStore is core_scene.MaterialStore; "
+        "assert owner is compiled.MaterialStore; "
+        "assert owner.__module__ == "
+        "'witwin.channel_native.core.runtime.material_store'; "
+        "assert get_type_hints(owner)['material_id'] is torch.Tensor; "
+        "assert pickle.loads("
+        "b'cwitwin.channel_native.core.runtime.material_store\\nMaterialStore\\n.'"
+        ") is owner; "
+        "assert pickle.loads(pickle.dumps(owner)) is owner"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (
+            str(REPOSITORY_ROOT / "src"),
+            environment.get("PYTHONPATH"),
+        )
+        if value
+    )
+
+    subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        check=True,
+    )
+
+
 def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
     owner = canonical_compiled.CompiledScene
     schema = fields(owner)
 
+    assert legacy_compiled.MaterialStore is canonical_material_stores.MaterialStore
     assert tuple(item.name for item in schema) == (
         "geometry",
         "materials",
