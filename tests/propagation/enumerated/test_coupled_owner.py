@@ -13,11 +13,14 @@ from ci import check_import_graph as graph
 from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import coupled
 from witwin.channel_native.propagation.geometry import coupled as geometry_coupled
+from witwin.channel_native.propagation.topology.discovery import (
+    coupled as discovery_coupled,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
-_COUPLED_DIGEST = "6822fb18131be6e05ee6526316eb8d7126e6892fcd58b1f5261747fc7af41618"
+_COUPLED_DIGEST = "6cd6c11c193f48e09ac4ede98766a2da44c0f3f170f757947f168b492789bbc5"
 
 
 def _digest(module, name: str) -> str:
@@ -43,6 +46,18 @@ def test_coupled_owner_preserves_function_and_constant_identity():
     assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES
     assert coupled._COUPLED_CANDIDATE_CHUNK_SIZE == 65_536
     assert coupled._MAX_COUPLED_CANDIDATES == 1_000_000
+    assert coupled._COUPLED_CANDIDATE_CHUNK_SIZE is (
+        discovery_coupled._COUPLED_CANDIDATE_CHUNK_SIZE
+    )
+    assert coupled._MAX_COUPLED_CANDIDATES is (
+        discovery_coupled._MAX_COUPLED_CANDIDATES
+    )
+    assert coupled.prepare_coupled_candidate_plan is (
+        discovery_coupled.prepare_coupled_candidate_plan
+    )
+    assert coupled.iter_coupled_candidate_requests is (
+        discovery_coupled.iter_coupled_candidate_requests
+    )
     assert coupled.CoupledGeometryQuery is geometry_coupled.CoupledGeometryQuery
     assert coupled.query_coupled_geometry is geometry_coupled.query_coupled_geometry
 
@@ -63,6 +78,14 @@ def test_enumerated_coupled_consumes_named_geometry_only():
         and node.value.id == "exported"
         for node in ast.walk(definition)
     )
+    call_names = {
+        node.func.id
+        for node in ast.walk(definition)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "prepare_coupled_candidate_plan" in call_names
+    assert "iter_coupled_candidate_requests" in call_names
+    assert "arange" not in call_names
 
 
 def test_export_component_stage_order_remains_canonical():
@@ -107,11 +130,17 @@ def test_fresh_process_import_order_preserves_coupled_identity(imports: str):
     code = (
         f"{imports}; "
         "from witwin.channel_native.propagation.geometry import coupled as geometry_coupled; "
+        "from witwin.channel_native.propagation.topology.discovery import "
+        "coupled as discovery_coupled; "
         "assert legacy._coupled_reflection_diffraction_topology_order2 is "
         "coupled._coupled_reflection_diffraction_topology_order2; "
         "assert legacy._COUPLED_CANDIDATE_CHUNK_SIZE is "
         "coupled._COUPLED_CANDIDATE_CHUNK_SIZE; "
         "assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES; "
+        "assert coupled.prepare_coupled_candidate_plan is "
+        "discovery_coupled.prepare_coupled_candidate_plan; "
+        "assert coupled.iter_coupled_candidate_requests is "
+        "discovery_coupled.iter_coupled_candidate_requests; "
         "assert coupled.CoupledGeometryQuery is geometry_coupled.CoupledGeometryQuery; "
         "assert coupled.query_coupled_geometry is geometry_coupled.query_coupled_geometry"
     )
