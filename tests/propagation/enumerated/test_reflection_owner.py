@@ -20,6 +20,9 @@ from witwin.channel_native.propagation.topology.discovery import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
 _DIGESTS = {
+    "_face_sequence_count": "d7932ea0ae0bb7b781b5113800044489b7b5356129ccd0169d305749a1dbf121",
+    "_face_sequence_chunks": "c2e35ad0f2221530491334a89aec3d102bb34c53816c730a02d511e9964074e5",
+    "_reflect_points": "2d94849ad9f55be907f1fa6b8aa3024035506e24d4315c3128a96c1871ff3d30",
     "_reflection_topology_order1": (
         "35cb2a0602c1d2d27dff2207524f1224129c53767858fa1f9ebd366abe2b5564"
     ),
@@ -47,6 +50,20 @@ def _digest(module, name: str) -> str:
 def test_reflection_owners_and_discovery_constants_preserve_identity():
     assert legacy._reflection_topology_order1 is reflection._reflection_topology_order1
     assert legacy._discovered_group_chains is reflection._discovered_group_chains
+    assert legacy._face_sequence_count is reflection._face_sequence_count
+    assert legacy._face_sequence_chunks is reflection._face_sequence_chunks
+    assert (
+        legacy._reflection_topology_multibounce
+        is reflection._reflection_topology_multibounce
+    )
+    assert (
+        legacy._MAX_MULTIBOUNCE_FACE_SEQUENCES
+        is discovery._MAX_MULTIBOUNCE_FACE_SEQUENCES
+    )
+    assert (
+        legacy._MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
+        is discovery._MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
+    )
     assert legacy._ORDER1_EXHAUSTIVE_GROUP_LIMIT is (
         discovery._ORDER1_EXHAUSTIVE_GROUP_LIMIT
     )
@@ -75,9 +92,17 @@ def test_moved_functions_and_untouched_multibounce_have_frozen_ast():
         == _DIGESTS["_discovered_group_chains"]
     )
     assert (
-        _digest(legacy, "_reflection_topology_multibounce")
+        _digest(reflection, "_reflection_topology_multibounce")
         == _DIGESTS["_reflection_topology_multibounce"]
     )
+    assert (
+        _digest(reflection, "_face_sequence_count") == _DIGESTS["_face_sequence_count"]
+    )
+    assert (
+        _digest(reflection, "_face_sequence_chunks")
+        == _DIGESTS["_face_sequence_chunks"]
+    )
+    assert _digest(legacy, "_reflect_points") == _DIGESTS["_reflect_points"]
 
 
 @pytest.mark.parametrize(
@@ -98,7 +123,11 @@ def test_fresh_process_import_order_preserves_owner_identity(imports: str):
         f"{imports}; "
         "assert legacy._reflection_topology_order1 is "
         "reflection._reflection_topology_order1; "
-        "assert legacy._discovered_group_chains is reflection._discovered_group_chains"
+        "assert legacy._discovered_group_chains is reflection._discovered_group_chains; "
+        "assert legacy._face_sequence_count is reflection._face_sequence_count; "
+        "assert legacy._face_sequence_chunks is reflection._face_sequence_chunks; "
+        "assert legacy._reflection_topology_multibounce is "
+        "reflection._reflection_topology_multibounce"
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")
