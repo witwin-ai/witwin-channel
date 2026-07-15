@@ -22,6 +22,8 @@ from witwin.channel_native.propagation.topology.discovery.reflection import (
     _MULTIBOUNCE_DISCOVERY_RAYS,
     _MULTIBOUNCE_PAIR_CHUNK_SIZE,
     _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE,
+    _face_sequence_chunks,
+    _face_sequence_count,
     iter_reflection_order1_epc_requests,
     prepare_reflection_order1_plan,
 )
@@ -272,49 +274,6 @@ def _discovered_group_chains(
     hit = prim_chain >= 0
     chains[hit] = face_group_id[prim_chain[hit]]
     return chains
-
-def _face_sequence_count(
-    face_count: int, depth: int, *, adjacent_distinct: bool
-) -> int:
-    if adjacent_distinct and depth > 1:
-        if face_count <= 1:
-            return 0
-        return int(face_count) * int(face_count - 1) ** int(depth - 1)
-    return int(face_count) ** int(depth)
-
-
-def _face_sequence_chunks(
-    face_count: int,
-    depth: int,
-    *,
-    chunk_size: int,
-    reference: torch.Tensor,
-    face_ids: torch.Tensor | None = None,
-    adjacent_distinct: bool = False,
-) -> object:
-    total = _face_sequence_count(face_count, depth, adjacent_distinct=adjacent_distinct)
-    for start in range(0, total, chunk_size):
-        end = min(start + chunk_size, total)
-        if face_ids is None:
-            sequences = topology_construction.deterministic_face_sequence_chunk(
-                reference,
-                face_count=face_count,
-                depth=depth,
-                start=start,
-                end=end,
-                adjacent_distinct=adjacent_distinct,
-            )
-        else:
-            sequences = topology_construction.deterministic_mapped_face_sequence_chunk(
-                face_ids,
-                depth=depth,
-                start=start,
-                end=end,
-                adjacent_distinct=adjacent_distinct,
-            )
-        if int(sequences.shape[0]) > 0:
-            yield sequences
-
 
 def _reflection_topology_multibounce(
     scene: Scene,

@@ -50,8 +50,21 @@ def _digest(module, name: str) -> str:
 def test_reflection_owners_and_discovery_constants_preserve_identity():
     assert legacy._reflection_topology_order1 is reflection._reflection_topology_order1
     assert legacy._discovered_group_chains is reflection._discovered_group_chains
-    assert legacy._face_sequence_count is reflection._face_sequence_count
-    assert legacy._face_sequence_chunks is reflection._face_sequence_chunks
+    assert (
+        legacy._face_sequence_count
+        is reflection._face_sequence_count
+        is discovery._face_sequence_count
+    )
+    assert (
+        legacy._face_sequence_chunks
+        is reflection._face_sequence_chunks
+        is discovery._face_sequence_chunks
+    )
+    assert discovery._face_sequence_count.__module__ == discovery.__name__
+    assert discovery._face_sequence_chunks.__module__ == discovery.__name__
+    globals_ = reflection._reflection_topology_multibounce.__globals__
+    assert globals_["_face_sequence_count"] is discovery._face_sequence_count
+    assert globals_["_face_sequence_chunks"] is discovery._face_sequence_chunks
     assert (
         legacy._reflection_topology_multibounce
         is reflection._reflection_topology_multibounce
@@ -96,11 +109,10 @@ def test_moved_functions_and_untouched_multibounce_have_frozen_ast():
         == _DIGESTS["_reflection_topology_multibounce"]
     )
     assert (
-        _digest(reflection, "_face_sequence_count") == _DIGESTS["_face_sequence_count"]
+        _digest(discovery, "_face_sequence_count") == _DIGESTS["_face_sequence_count"]
     )
     assert (
-        _digest(reflection, "_face_sequence_chunks")
-        == _DIGESTS["_face_sequence_chunks"]
+        _digest(discovery, "_face_sequence_chunks") == _DIGESTS["_face_sequence_chunks"]
     )
     assert _digest(legacy, "_reflect_points") == _DIGESTS["_reflect_points"]
 
@@ -120,12 +132,15 @@ def test_moved_functions_and_untouched_multibounce_have_frozen_ast():
 )
 def test_fresh_process_import_order_preserves_owner_identity(imports: str):
     code = (
-        f"{imports}; "
+        f"{imports}; from witwin.channel_native.propagation.topology.discovery "
+        "import reflection as discovery; "
         "assert legacy._reflection_topology_order1 is "
         "reflection._reflection_topology_order1; "
         "assert legacy._discovered_group_chains is reflection._discovered_group_chains; "
-        "assert legacy._face_sequence_count is reflection._face_sequence_count; "
-        "assert legacy._face_sequence_chunks is reflection._face_sequence_chunks; "
+        "assert legacy._face_sequence_count is reflection._face_sequence_count "
+        "is discovery._face_sequence_count; "
+        "assert legacy._face_sequence_chunks is reflection._face_sequence_chunks "
+        "is discovery._face_sequence_chunks; "
         "assert legacy._reflection_topology_multibounce is "
         "reflection._reflection_topology_multibounce"
     )

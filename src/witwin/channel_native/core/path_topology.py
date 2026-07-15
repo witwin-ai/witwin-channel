@@ -11,8 +11,6 @@ from witwin.channel_native.materials.evaluation import (
 )
 from witwin.channel_native.propagation.enumerated.reflection import (
     _discovered_group_chains,  # noqa: F401 - compatibility re-export
-    _face_sequence_chunks,  # noqa: F401 - compatibility re-export
-    _face_sequence_count,  # noqa: F401 - compatibility re-export
     _reflection_topology_order1,
     _reflection_topology_multibounce,
 )
@@ -70,6 +68,8 @@ from witwin.channel_native.propagation.topology.discovery.reflection import (
     _MULTIBOUNCE_PAIR_CHUNK_SIZE,
     _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE,  # noqa: F401 - compatibility re-export
     _ORDER1_EXHAUSTIVE_GROUP_LIMIT,  # noqa: F401 - compatibility re-export
+    _face_sequence_chunks,  # noqa: F401 - compatibility re-export
+    _face_sequence_count,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.runtime.autograd_contracts import (
     _frequency_participates_in_ad,  # noqa: F401 - compatibility re-export

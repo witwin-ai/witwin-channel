@@ -17,6 +17,50 @@ _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 65_536
 _MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
 _MULTIBOUNCE_DISCOVERY_RAYS = 262_144
 
+def _face_sequence_count(
+    face_count: int, depth: int, *, adjacent_distinct: bool
+) -> int:
+    if adjacent_distinct and depth > 1:
+        if face_count <= 1:
+            return 0
+        return int(face_count) * int(face_count - 1) ** int(depth - 1)
+    return int(face_count) ** int(depth)
+
+
+def _face_sequence_chunks(
+    face_count: int,
+    depth: int,
+    *,
+    chunk_size: int,
+    reference: torch.Tensor,
+    face_ids: torch.Tensor | None = None,
+    adjacent_distinct: bool = False,
+) -> object:
+    total = _face_sequence_count(face_count, depth, adjacent_distinct=adjacent_distinct)
+    for start in range(0, total, chunk_size):
+        end = min(start + chunk_size, total)
+        if face_ids is None:
+            sequences = topology_construction.deterministic_face_sequence_chunk(
+                reference,
+                face_count=face_count,
+                depth=depth,
+                start=start,
+                end=end,
+                adjacent_distinct=adjacent_distinct,
+            )
+        else:
+            sequences = topology_construction.deterministic_mapped_face_sequence_chunk(
+                face_ids,
+                depth=depth,
+                start=start,
+                end=end,
+                adjacent_distinct=adjacent_distinct,
+            )
+        if int(sequences.shape[0]) > 0:
+            yield sequences
+
+
+
 
 class TraceReflectionGroupChains(Protocol):
     def __call__(
