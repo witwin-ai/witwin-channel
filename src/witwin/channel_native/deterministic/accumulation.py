@@ -4,9 +4,9 @@ from collections.abc import Mapping
 
 import torch
 
-from witwin.channel_native.core.kernels import ops
-
 from .result import PathTable
+from .kernels import accumulation as accumulation_kernels
+from .kernels import fields as field_kernels
 from witwin.channel_native.core.path_topology import (
     ReceiverLayout,
     TopologyBatch,
@@ -21,7 +21,8 @@ from witwin.channel_native.core.path_topology import (
 # consumed per path by the path API, never materialized here). Under
 # ad_mode != "none" the same native forward runs inside a dispatch-only
 # autograd.Function whose backward/jvp are native CUDA companions
-# (ops.deterministic_accumulate_flat_ad), so the accumulated result keeps the
+# (accumulation_kernels.deterministic_accumulate_flat_ad), so the accumulated
+# result keeps the
 # autograd graph with no torch mirror of the kernel math. transmission
 # carries specular wall-penetration paths (wave 2) and joins the coherent
 # field total like the first three slots; scattering carries Kirchhoff
@@ -64,7 +65,7 @@ def accumulate_flat_components(
         # a dispatch-only autograd.Function with native backward/jvp
         # companions, so Result.path_gain / field / component_power carry
         # the complete graph of the per-path fields and powers.
-        exported = ops.deterministic_accumulate_flat_ad(
+        exported = accumulation_kernels.deterministic_accumulate_flat_ad(
             tx_id.to(dtype=torch.int32).contiguous(),
             rx_id.to(dtype=torch.int32).contiguous(),
             component_id.to(dtype=torch.int32).contiguous(),
@@ -84,7 +85,7 @@ def accumulate_flat_components(
             exported["component_field_real"], exported["component_field_imag"]
         )
     else:
-        exported = ops.deterministic_accumulate_flat(
+        exported = accumulation_kernels.deterministic_accumulate_flat(
             tx_id.to(dtype=torch.int32).contiguous(),
             rx_id.to(dtype=torch.int32).contiguous(),
             component_id.to(dtype=torch.int32).contiguous(),
@@ -96,12 +97,12 @@ def accumulate_flat_components(
             coherent=bool(coherent),
         )
         power_total = exported["power_total"]
-        field_total = ops.deterministic_pack_complex(
+        field_total = field_kernels.deterministic_pack_complex(
             exported["field_total_real"].reshape(-1).contiguous(),
             exported["field_total_imag"].reshape(-1).contiguous(),
         ).reshape(exported["field_total_real"].shape)
         component_power_tensor = exported["component_power"]
-        component_field_tensor = ops.deterministic_pack_complex(
+        component_field_tensor = field_kernels.deterministic_pack_complex(
             exported["component_field_real"].reshape(-1).contiguous(),
             exported["component_field_imag"].reshape(-1).contiguous(),
         ).reshape(exported["component_field_real"].shape)
@@ -196,12 +197,12 @@ def build_path_table(
 ) -> PathTable:
     if include_fields:
         path_field = paths.path_field.to(dtype=torch.complex64).contiguous()
-        phase = ops.deterministic_phase_from_field(
+        phase = field_kernels.deterministic_phase_from_field(
             path_field.real.to(dtype=torch.float32).contiguous(),
             path_field.imag.to(dtype=torch.float32).contiguous(),
         )
     else:
-        zero_field_phase = ops.deterministic_zero_field_phase(
+        zero_field_phase = field_kernels.deterministic_zero_field_phase(
             paths.path_gain.to(dtype=torch.float32).contiguous()
         )
         path_field = zero_field_phase["path_field"]
