@@ -20,6 +20,9 @@ from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel_native.propagation.topology.kernels import (
+    construction as topology_construction,
+)
 from witwin.channel_native.propagation.fields.kernels import (
     autograd as field_autograd,
 )
@@ -297,7 +300,9 @@ def _from_path_result(paths: object) -> TopologyBatch:
     def topology_defaults() -> dict[str, torch.Tensor]:
         nonlocal defaults
         if defaults is None:
-            defaults = ops.deterministic_topology_default_fields(path_gain)
+            defaults = topology_construction.deterministic_topology_default_fields(
+                path_gain
+            )
         return defaults
 
     path_field = getattr(paths, "path_field", None)
@@ -525,7 +530,7 @@ def _ensure_topology_fields(
     def topology_defaults() -> dict[str, torch.Tensor]:
         nonlocal defaults
         if defaults is None:
-            defaults = ops.deterministic_topology_default_fields(
+            defaults = topology_construction.deterministic_topology_default_fields(
                 block["path_gain"].to(dtype=torch.float32).contiguous()
             )
         return defaults
@@ -602,7 +607,7 @@ def _pad_topology_sequences(
     device = block["valid"].device
     empty_i32 = torch.empty((count, 0), device=device, dtype=torch.int32)
     empty_vec3 = torch.empty((count, 0, 3), device=device, dtype=torch.float32)
-    sequences = ops.deterministic_pad_topology_sequences(
+    sequences = topology_construction.deterministic_pad_topology_sequences(
         depth=block["depth"].to(dtype=torch.int32).contiguous(),
         primitive_id=block["primitive_id"].to(dtype=torch.int32).contiguous(),
         material_id=block["material_id"].to(dtype=torch.int32).contiguous(),
@@ -857,7 +862,7 @@ def _reflection_geometry_ad(
 
     raydn = compiled.raydn
     records = raydn.edge_records()
-    tri_a = ops.deterministic_face_anchor_points(
+    tri_a = topology_construction.deterministic_face_anchor_points(
         records.vertices.contiguous(), records.faces.contiguous()
     )
     normals_table = geometry_primitives.deterministic_normalize_vec3(
@@ -1323,7 +1328,7 @@ def _evaluate_shared_fields(
                 "tangent or disable coupled_paths."
             )
         if coupled_geometry_ad:
-            tri_a = ops.deterministic_face_anchor_points(
+            tri_a = topology_construction.deterministic_face_anchor_points(
                 records.vertices.contiguous(), records.faces.contiguous()
             )
             normals_table = geometry_primitives.deterministic_normalize_vec3(
@@ -1523,7 +1528,9 @@ def _reflection_topology_order1(
             }
         ), 0
 
-    tri_a = ops.deterministic_face_anchor_points(vertices.contiguous(), faces)
+    tri_a = topology_construction.deterministic_face_anchor_points(
+        vertices.contiguous(), faces
+    )
     face_eps_r, face_sigma_e, face_mu_r, face_gain, _face_valid = face_material_tensors(
         compiled, device=device
     )
@@ -1549,7 +1556,7 @@ def _reflection_topology_order1(
     representative_faces = groups["representative_faces"].contiguous()
     exhaustive = group_count <= _ORDER1_EXHAUSTIVE_GROUP_LIMIT
     base_sequences = (
-        ops.deterministic_mapped_face_sequence_chunk(
+        topology_construction.deterministic_mapped_face_sequence_chunk(
             representative_faces,
             depth=1,
             start=0,
@@ -1592,7 +1599,7 @@ def _reflection_topology_order1(
         rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
         for rx_start in range(0, rx_count, rx_chunk_size):
             rx_end = min(rx_start + rx_chunk_size, rx_count)
-            epc_inputs = ops.deterministic_reflection_epc_input_batch(
+            epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
                 tx=tx,
                 rx_positions=rx_positions.contiguous(),
                 sequences=sequences.contiguous(),
@@ -1659,7 +1666,7 @@ def _reflection_topology_order1(
             delay = field_result["delay_s"].to(dtype=torch.float32).contiguous()
             blocks.append(
                 _ensure_topology_fields(
-                    ops.deterministic_topology_base_fields(
+                    topology_construction.deterministic_topology_base_fields(
                         rx_id=selected["selected_rx_id"],
                         path_length_m=path_length.to(dtype=torch.float32).contiguous(),
                         delay_s=delay,
@@ -1753,7 +1760,7 @@ def _face_sequence_chunks(
     for start in range(0, total, chunk_size):
         end = min(start + chunk_size, total)
         if face_ids is None:
-            sequences = ops.deterministic_face_sequence_chunk(
+            sequences = topology_construction.deterministic_face_sequence_chunk(
                 reference,
                 face_count=face_count,
                 depth=depth,
@@ -1762,7 +1769,7 @@ def _face_sequence_chunks(
                 adjacent_distinct=adjacent_distinct,
             )
         else:
-            sequences = ops.deterministic_mapped_face_sequence_chunk(
+            sequences = topology_construction.deterministic_mapped_face_sequence_chunk(
                 face_ids,
                 depth=depth,
                 start=start,
@@ -1842,7 +1849,9 @@ def _reflection_topology_multibounce(
             0,
         )
 
-    tri_a = ops.deterministic_face_anchor_points(vertices.contiguous(), faces)
+    tri_a = topology_construction.deterministic_face_anchor_points(
+        vertices.contiguous(), faces
+    )
     face_eps_r, face_sigma_e, face_mu_r, face_gain, _face_valid = face_material_tensors(
         compiled, device=device
     )
@@ -1884,7 +1893,7 @@ def _reflection_topology_multibounce(
         rx_end: int,
     ) -> None:
         nonlocal launch_count
-        epc_inputs = ops.deterministic_reflection_epc_input_batch(
+        epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
             tx=tx,
             rx_positions=rx_positions.contiguous(),
             sequences=sequences.contiguous(),
@@ -1949,7 +1958,7 @@ def _reflection_topology_multibounce(
         empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
         blocks.append(
             _ensure_topology_fields(
-                ops.deterministic_topology_base_fields(
+                topology_construction.deterministic_topology_base_fields(
                     rx_id=selected["selected_rx_id"],
                     path_length_m=path_length,
                     delay_s=delay,
@@ -2266,7 +2275,7 @@ def _diffraction_topology_order1(
             empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
             blocks.append(
                 _ensure_topology_fields(
-                    ops.deterministic_topology_base_fields(
+                    topology_construction.deterministic_topology_base_fields(
                         rx_id=compacted["rx_id"],
                         path_length_m=path_length,
                         delay_s=delay,
@@ -2325,7 +2334,7 @@ def _coupled_reflection_diffraction_topology_order2(
     normals = geometry_primitives.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
-    tri_a = ops.deterministic_face_anchor_points(vertices, faces)
+    tri_a = topology_construction.deterministic_face_anchor_points(vertices, faces)
     groups = _cached_coplanar_face_groups(
         raydn,
         tri_a,
@@ -2728,7 +2737,7 @@ def export_topology(
             launch_count += 1
         candidate_count += int(tx_id.numel())
         los_block = _ensure_topology_fields(
-            ops.deterministic_los_topology_block(
+            topology_construction.deterministic_los_topology_block(
                 tx_id.to(dtype=torch.int32).contiguous(),
                 rx_id.to(dtype=torch.int32).contiguous(),
                 exported["path_length_m"].to(dtype=torch.float32).contiguous(),

@@ -7,6 +7,9 @@ from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel_native.propagation.topology.kernels import (
+    construction as topology_construction,
+)
 import witwin.channel_native.path as path_package
 
 
@@ -33,13 +36,15 @@ def test_los_hot_path_uses_native_topology_facade(monkeypatch):
         pytest.skip("CUDA is required for deterministic hot-path contract")
 
     calls = []
-    original = ops.deterministic_los_topology_block
+    original = topology_construction.deterministic_los_topology_block
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(ops, "deterministic_los_topology_block", wrapped)
+    monkeypatch.setattr(
+        topology_construction, "deterministic_los_topology_block", wrapped
+    )
 
     solve(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
 
