@@ -178,6 +178,109 @@ def _evaluate_los_fields(
     return launch_count
 
 
+def _evaluate_reflection_fields(
+    compiled: object,
+    topology: TopologyBatch,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    source_power: torch.Tensor,
+    tx_pol: torch.Tensor,
+    rx_pol: torch.Tensor,
+    components: frozenset[str] | set[str],
+    device: torch.device,
+    frequency: float | torch.Tensor,
+    geometry_ad: bool,
+    vertices: torch.Tensor | None,
+    reflection_field_op: Callable[..., dict[str, torch.Tensor]],
+    ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None,
+    field_xyz: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    path_length: torch.Tensor,
+    delay: torch.Tensor,
+    direction: torch.Tensor,
+    launch_count: int,
+) -> tuple[dict[str, torch.Tensor] | None, int]:
+    for depth_value in range(1, 6):
+        rows = torch.nonzero(
+            (topology.component_id == 1) & (topology.depth == depth_value),
+            as_tuple=False,
+        ).reshape(-1)
+        if int(rows.shape[0]) == 0:
+            continue
+        if material is None:
+            material = face_material_field_bundle(compiled, device=device)
+        face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
+        if geometry_ad:
+            positions, normals = _reflection_geometry_ad(
+                compiled,
+                vertices,
+                source[rows].contiguous(),
+                target[rows].contiguous(),
+                face_id,
+                depth_value,
+            )
+        else:
+            positions = topology.interaction_positions[
+                rows, :depth_value
+            ].contiguous()
+            normals = topology.interaction_normals[rows, :depth_value].contiguous()
+        reflection_args = (
+            source[rows].contiguous(),
+            target[rows].contiguous(),
+            positions,
+            normals,
+            source_power[rows].contiguous(),
+            tx_pol[rows].contiguous(),
+            rx_pol[rows].contiguous(),
+            material["eps_r"][face_id].contiguous(),
+            material["sigma_e"][face_id].contiguous(),
+            material["mu_r"][face_id].contiguous(),
+            material["gain"][face_id].contiguous(),
+            material["thickness"][face_id].contiguous(),
+        )
+        if ledger is not None:
+            if geometry_ad:
+                # The fixed-winner EPC re-solve registers its own companion.
+                ledger.add(vertices, source[rows], target[rows], face_id)
+            ledger.add(*reflection_args)
+        evaluated = reflection_field_op(*reflection_args)
+        # Rough-surface coherent attenuation / realization delta replacement
+        # (see _rough_reflection_factor). Applied Python-side on the native
+        # smooth-stack result; C_r is real, so field magnitude scaling is
+        # exact and phase-neutral.
+        rough_factor = _rough_reflection_factor(
+            compiled,
+            topology,
+            rows,
+            depth_value,
+            source,
+            material,
+            positions,
+            normals,
+            frequency_hz=frequency,
+            scattering_active="scattering" in components,
+        )
+        if rough_factor is not None:
+            field_scale = rough_factor.to(torch.float32)
+            evaluated = dict(evaluated)
+            evaluated["field_vector"] = evaluated["field_vector"] * field_scale[:, None]
+            evaluated["coefficient"] = evaluated["coefficient"] * field_scale
+            evaluated["path_field"] = evaluated["path_field"] * field_scale
+            evaluated["path_gain"] = evaluated["path_gain"] * field_scale.square()
+        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
+        coefficient.index_copy_(0, rows, evaluated["coefficient"])
+        path_field.index_copy_(0, rows, evaluated["path_field"])
+        path_gain.index_copy_(0, rows, evaluated["path_gain"])
+        path_length.index_copy_(0, rows, evaluated["path_length_m"])
+        delay.index_copy_(0, rows, evaluated["delay_s"])
+        direction.index_copy_(0, rows, evaluated["direction"])
+        launch_count += 1
+    return material, launch_count
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -303,81 +406,31 @@ def _evaluate_shared_fields(
     )
 
     material: dict[str, torch.Tensor] | None = None
-    for depth_value in range(1, 6):
-        rows = torch.nonzero(
-            (topology.component_id == 1) & (topology.depth == depth_value),
-            as_tuple=False,
-        ).reshape(-1)
-        if int(rows.shape[0]) == 0:
-            continue
-        if material is None:
-            material = face_material_field_bundle(compiled, device=device)
-        face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
-        if geometry_ad:
-            positions, normals = _reflection_geometry_ad(
-                compiled,
-                vertices,
-                source[rows].contiguous(),
-                target[rows].contiguous(),
-                face_id,
-                depth_value,
-            )
-        else:
-            positions = topology.interaction_positions[
-                rows, :depth_value
-            ].contiguous()
-            normals = topology.interaction_normals[rows, :depth_value].contiguous()
-        reflection_args = (
-            source[rows].contiguous(),
-            target[rows].contiguous(),
-            positions,
-            normals,
-            source_power[rows].contiguous(),
-            tx_pol[rows].contiguous(),
-            rx_pol[rows].contiguous(),
-            material["eps_r"][face_id].contiguous(),
-            material["sigma_e"][face_id].contiguous(),
-            material["mu_r"][face_id].contiguous(),
-            material["gain"][face_id].contiguous(),
-            material["thickness"][face_id].contiguous(),
-        )
-        if ledger is not None:
-            if geometry_ad:
-                # The fixed-winner EPC re-solve registers its own companion.
-                ledger.add(vertices, source[rows], target[rows], face_id)
-            ledger.add(*reflection_args)
-        evaluated = reflection_field_op(*reflection_args)
-        # Rough-surface coherent attenuation / realization delta replacement
-        # (see _rough_reflection_factor). Applied Python-side on the native
-        # smooth-stack result; C_r is real, so field magnitude scaling is
-        # exact and phase-neutral.
-        rough_factor = _rough_reflection_factor(
-            compiled,
-            topology,
-            rows,
-            depth_value,
-            source,
-            material,
-            positions,
-            normals,
-            frequency_hz=frequency,
-            scattering_active="scattering" in components,
-        )
-        if rough_factor is not None:
-            field_scale = rough_factor.to(torch.float32)
-            evaluated = dict(evaluated)
-            evaluated["field_vector"] = evaluated["field_vector"] * field_scale[:, None]
-            evaluated["coefficient"] = evaluated["coefficient"] * field_scale
-            evaluated["path_field"] = evaluated["path_field"] * field_scale
-            evaluated["path_gain"] = evaluated["path_gain"] * field_scale.square()
-        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, rows, evaluated["coefficient"])
-        path_field.index_copy_(0, rows, evaluated["path_field"])
-        path_gain.index_copy_(0, rows, evaluated["path_gain"])
-        path_length.index_copy_(0, rows, evaluated["path_length_m"])
-        delay.index_copy_(0, rows, evaluated["delay_s"])
-        direction.index_copy_(0, rows, evaluated["direction"])
-        launch_count += 1
+    material, launch_count = _evaluate_reflection_fields(
+        compiled,
+        topology,
+        source,
+        target,
+        source_power,
+        tx_pol,
+        rx_pol,
+        components,
+        device,
+        frequency,
+        geometry_ad,
+        vertices if geometry_ad else None,
+        reflection_field_op,
+        ledger,
+        material,
+        field_xyz,
+        coefficient,
+        path_field,
+        path_gain,
+        path_length,
+        delay,
+        direction,
+        launch_count,
+    )
 
     transmission_rows = torch.nonzero(
         topology.component_id == 5, as_tuple=False

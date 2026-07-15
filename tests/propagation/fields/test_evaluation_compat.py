@@ -55,6 +55,26 @@ _CONTRACTS = {
             "03816f9cd798d1e0d947a97b6dd964b354fc566b965cf540c30b31a893434cdc"
         ),
     },
+    "_evaluate_reflection_fields": {
+        "signature": (
+            "(compiled: object, topology: TopologyBatch, source: torch.Tensor, "
+            "target: torch.Tensor, source_power: torch.Tensor, tx_pol: "
+            "torch.Tensor, rx_pol: torch.Tensor, components: frozenset[str] | "
+            "set[str], device: torch.device, frequency: float | torch.Tensor, "
+            "geometry_ad: bool, vertices: torch.Tensor | None, "
+            "reflection_field_op: Callable[..., dict[str, torch.Tensor]], ledger: "
+            "AdLaunchLedger | None, material: dict[str, torch.Tensor] | None, "
+            "field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: "
+            "torch.Tensor, path_gain: torch.Tensor, path_length: torch.Tensor, "
+            "delay: torch.Tensor, direction: torch.Tensor, launch_count: int)"
+        ),
+        "body_sha256": (
+            "1518649e067ad93c37ae872b6610073f906d97d5f433198eaa1dec6e16e7d0db"
+        ),
+        "normalized_ast_sha256": (
+            "c91968647805603ea4070142c2293074ccab1535acddd546cc46e520c8904876"
+        ),
+    },
     "_evaluate_shared_fields": {
         "signature": (
             "(scene: Scene, compiled: object, topology: TopologyBatch, "
@@ -63,10 +83,10 @@ _CONTRACTS = {
             "ad_mode: str='none', frequency_value: float | None=None)"
         ),
         "body_sha256": (
-            "eefc058a136097a3830fa8dcc23ce8f0c9620c9c78bfe3c81765b7bd818801c6"
+            "b46a1b48acc65c7fef6be5bd9f9a98b8f10c4cb9950d8f05a0e56203f1974fef"
         ),
         "normalized_ast_sha256": (
-            "85dc45ea6f4bd7edf8fc651298dec5728a324c2b02311d66934a478e59fe49f7"
+            "9fc9141b6f34aecad8855c12b0fc33f370555b5776adfffea9e8402e39574c57"
         ),
     },
 }
@@ -125,6 +145,30 @@ def test_los_field_extraction_preserves_frozen_prefix_segment():
     )
 
 
+def test_reflection_field_extraction_preserves_frozen_prefix_segment():
+    helper = _function_node("_evaluate_reflection_fields")
+
+    assert _body_sha256(helper.body[:-1]) == (
+        "5f297e976b9995d55958b49f84103c1d2627801c2f7fd887bbec587587dd569e"
+    )
+    assert ast.dump(helper.body[-1], include_attributes=False) == (
+        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
+        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
+    )
+
+
+def test_component_field_helpers_do_not_clone_output_buffers():
+    for name in ("_evaluate_los_fields", "_evaluate_reflection_fields"):
+        helper = _function_node(name)
+
+        assert not any(
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr == "clone"
+            for call in ast.walk(helper)
+        )
+
+
 def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
     orchestrator = _function_node("_evaluate_shared_fields")
     clones = sorted(
@@ -158,13 +202,13 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
             target_names = {
                 target.id for target in statement.targets if isinstance(target, ast.Name)
             }
-            if (
-                target_names == {"launch_count"}
-                and isinstance(statement.value, ast.Call)
-                and isinstance(statement.value.func, ast.Name)
-                and statement.value.func.id == "_evaluate_los_fields"
+            if isinstance(statement.value, ast.Call) and isinstance(
+                statement.value.func, ast.Name
             ):
-                component_markers.append("los")
+                if statement.value.func.id == "_evaluate_los_fields":
+                    component_markers.append("los")
+                elif statement.value.func.id == "_evaluate_reflection_fields":
+                    component_markers.append("reflection")
             elif target_names == {"material"}:
                 component_markers.append("material")
             elif target_names & {"transmission_rows", "diffraction_rows", "coupled_rows"}:
