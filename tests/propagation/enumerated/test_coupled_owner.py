@@ -11,7 +11,7 @@ import pytest
 
 from ci import check_import_graph as graph
 from witwin.channel_native.core import path_topology as legacy
-from witwin.channel_native.propagation.enumerated import coupled
+from witwin.channel_native.propagation.enumerated import coupled, engine
 from witwin.channel_native.propagation.geometry import coupled as geometry_coupled
 from witwin.channel_native.propagation.topology.discovery import (
     coupled as discovery_coupled,
@@ -89,11 +89,12 @@ def test_enumerated_coupled_consumes_named_geometry_only():
 
 
 def test_export_component_stage_order_remains_canonical():
-    tree = ast.parse(Path(legacy.__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(Path(engine.__file__).read_text(encoding="utf-8"))
     definition = next(
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "export_topology"
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "evaluate_enumerated_paths"
     )
     call_lines = {
         node.func.id: node.lineno

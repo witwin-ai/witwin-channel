@@ -1,43 +1,45 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from types import SimpleNamespace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.materials.evaluation import (
-    _require_frequency_ad_constant_materials,
-)
 from witwin.channel_native.propagation.enumerated.coupled import (
     _COUPLED_CANDIDATE_CHUNK_SIZE,  # noqa: F401 - compatibility re-export
     _MAX_COUPLED_CANDIDATES,  # noqa: F401 - compatibility re-export
-    _coupled_reflection_diffraction_topology_order2,
+    _coupled_reflection_diffraction_topology_order2,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.enumerated.diffraction import (
     _DIFFRACTION_PREFILTER_EDGE_FRACTIONS,  # noqa: F401 - compatibility re-export
     _deterministic_diffraction_states,  # noqa: F401 - compatibility re-export
-    _diffraction_topology_order1,
+    _diffraction_topology_order1,  # noqa: F401 - compatibility re-export
     _tx_visible_diffraction_states,  # noqa: F401 - compatibility re-export
 )
-from witwin.channel_native.propagation.enumerated.los import _los_topology
+from witwin.channel_native.propagation.enumerated.engine import (
+    _path_components,  # noqa: F401 - compatibility re-export
+    evaluate_enumerated_paths,
+)
+from witwin.channel_native.propagation.enumerated.los import (  # noqa: F401 - compatibility re-export
+    _los_topology,
+)
 from witwin.channel_native.propagation.enumerated.reflection import (
     _discovered_group_chains,  # noqa: F401 - compatibility re-export
-    _reflection_topology_order1,
-    _reflection_topology_multibounce,
+    _reflection_topology_multibounce,  # noqa: F401 - compatibility re-export
+    _reflection_topology_order1,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.enumerated.transmission import (
-    _transmission_topology,
+    _transmission_topology,  # noqa: F401 - compatibility re-export
+)
+from witwin.channel_native.propagation.fields.evaluation import (
+    _evaluate_shared_fields,  # noqa: F401 - compatibility re-export
+    _rough_reflection_factor,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.geometry.endpoints import (
     ReceiverLayout,  # noqa: F401 - compatibility re-export
     apply_receiver_layout,  # noqa: F401 - compatibility re-export
-    receiver_positions_and_layout,
-    transmitter_tensors,
-)
-from witwin.channel_native.propagation.fields.evaluation import (
-    _evaluate_shared_fields,
-    _rough_reflection_factor,  # noqa: F401 - compatibility re-export
+    receiver_positions_and_layout,  # noqa: F401 - compatibility re-export
+    transmitter_tensors,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.geometry.reevaluate import (
     _PLANE_GROUP_QUANTIZATION,  # noqa: F401 - compatibility re-export
@@ -55,31 +57,16 @@ from witwin.channel_native.propagation.geometry.visibility import (
     _raydn_visibility_mask,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.models.contracts import TopologyConfig
-from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel_native.propagation.topology.kernels import (
-    compaction as topology_compaction,  # noqa: F401 - compatibility re-export
-)
-from witwin.channel_native.propagation.topology.kernels import (
-    construction as topology_construction,
-)
-from witwin.channel_native.propagation.topology.kernels import (
-    primitives as topology_primitives,
-)
-from witwin.channel_native.propagation.topology.kernels.sampling import (
-    mc_sample_directions,  # noqa: F401 - compatibility re-export
-)
+from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.topology.concatenate import (
     _block_sequence_width,  # noqa: F401 - compatibility re-export
-    _canonical_selection_order,
+    _canonical_selection_order,  # noqa: F401 - compatibility re-export
     _empty_path_block,  # noqa: F401 - compatibility re-export
-    _interaction_type_sequence,
-    _pad_topology_sequences,
+    _interaction_type_sequence,  # noqa: F401 - compatibility re-export
+    _pad_topology_sequences,  # noqa: F401 - compatibility re-export
     _sort_order,  # noqa: F401 - compatibility re-export
     canonical_sequence_key,  # noqa: F401 - compatibility re-export
-    concatenate_path_blocks,
-)
-from witwin.channel_native.propagation.topology.export import (
-    _ensure_topology_fields,  # noqa: F401 - compatibility re-export
+    concatenate_path_blocks,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.topology.discovery.reflection import (
     _MAX_MULTIBOUNCE_FACE_SEQUENCES,  # noqa: F401 - compatibility re-export
@@ -90,18 +77,27 @@ from witwin.channel_native.propagation.topology.discovery.reflection import (
     _face_sequence_chunks,  # noqa: F401 - compatibility re-export
     _face_sequence_count,  # noqa: F401 - compatibility re-export
 )
+from witwin.channel_native.propagation.topology.export import (
+    EvaluatedPathSidecars,
+    _ensure_topology_fields,  # noqa: F401 - compatibility re-export
+    evaluated_paths_from_block,
+    evaluated_paths_from_result,
+)
+from witwin.channel_native.propagation.topology.kernels import (
+    compaction as topology_compaction,  # noqa: F401 - compatibility re-export
+)
+from witwin.channel_native.propagation.topology.kernels.sampling import (
+    mc_sample_directions,  # noqa: F401 - compatibility re-export
+)
 from witwin.channel_native.runtime.autograd_contracts import (
     _frequency_participates_in_ad,  # noqa: F401 - compatibility re-export
+)
+from witwin.channel_native.core.material_runtime import (  # noqa: F401
+    face_material_tensors,
 )
 
 if TYPE_CHECKING:
     from witwin.channel_native.core.scene import Scene
-from witwin.channel_native.core.material_runtime import (  # noqa: F401
-    face_material_tensors,
-)
-from witwin.channel_native.core.scene_tensors import (
-    _frequency_scalar,
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,118 +138,53 @@ class TopologyBatch:
     ad_tape_bytes: int = 0
 
 
-def _path_components(config: TopologyConfig) -> set[str]:
-    components = set(config.components)
-    if config.max_depth == 0:
-        # Every non-LoS component is a surface interaction that needs at least
-        # one bounce. transmission is a wall penetration event and scattering is
-        # a single-bounce rough-surface event, so both drop out at depth 0.
-        components.discard("reflection")
-        components.discard("diffraction")
-        components.discard("transmission")
-        components.discard("scattering")
-    if int(getattr(config, "max_diffraction_order", 1)) == 0:
-        components.discard("diffraction")
-    return components
+def _topology_batch_from_evaluated(
+    evaluated: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars,
+) -> TopologyBatch:
+    """Pack typed contracts into the legacy mixed table without tensor work."""
+
+    topology = evaluated.topology
+    geometry = evaluated.geometry
+    fields = evaluated.fields
+    execution = sidecars.execution
+    return TopologyBatch(
+        valid=topology.valid,
+        tx_id=topology.tx_id,
+        rx_id=topology.rx_id,
+        depth=topology.depth,
+        component_id=topology.component_id,
+        primitive_id=topology.primitive_id,
+        edge_id=topology.edge_id,
+        path_length_m=geometry.path_length_m,
+        delay_s=geometry.delay_s,
+        path_gain=fields.path_gain,
+        path_field=fields.path_field,
+        field_xyz=fields.field_xyz,
+        coefficient=fields.coefficient,
+        field_direction=geometry.field_direction,
+        interaction_position=geometry.interaction_position,
+        interaction_normal=geometry.interaction_normal,
+        material_id=topology.material_id,
+        primitive_sequence=topology.primitive_sequence,
+        material_sequence=topology.material_sequence,
+        interaction_type=topology.interaction_type,
+        interaction_positions=geometry.interaction_positions,
+        interaction_normals=geometry.interaction_normals,
+        launch_count=execution.launch_count,
+        visibility_rejection_count=execution.visibility_rejection_count,
+        selected_edge_count=execution.selected_edge_count,
+        candidate_count=execution.candidate_count,
+        guardrail_count=execution.guardrail_count,
+        diffraction_vector_field=sidecars.diffraction_vector_field,
+        ad_companion_launches=execution.ad_companion_launches,
+        ad_tape_bytes=execution.ad_tape_bytes,
+    )
 
 
 def _from_path_result(paths: object) -> TopologyBatch:
-    path_count = int(paths.valid.numel())
-    device = paths.valid.device
-    path_gain = paths.path_gain.to(dtype=torch.float32).contiguous()
-    defaults: dict[str, torch.Tensor] | None = None
-
-    def topology_defaults() -> dict[str, torch.Tensor]:
-        nonlocal defaults
-        if defaults is None:
-            defaults = topology_construction.deterministic_topology_default_fields(
-                path_gain
-            )
-        return defaults
-
-    path_field = getattr(paths, "path_field", None)
-    if path_field is None:
-        path_field = topology_defaults()["path_field"]
-    field_xyz = getattr(paths, "field_xyz", None)
-    if field_xyz is None:
-        field_xyz = torch.zeros(
-            (path_count, 3), device=device, dtype=torch.complex64
-        )
-    coefficient = getattr(paths, "coefficient", path_field)
-    field_direction = getattr(paths, "field_direction", None)
-    if field_direction is None:
-        field_direction = torch.zeros(
-            (path_count, 3), device=device, dtype=torch.float32
-        )
-    interaction_position = getattr(paths, "interaction_position", None)
-    if interaction_position is None:
-        interaction_position = topology_defaults()["interaction_position"]
-    interaction_normal = getattr(paths, "interaction_normal", None)
-    if interaction_normal is None:
-        interaction_normal = topology_defaults()["interaction_normal"]
-    material_id = getattr(paths, "material_id", None)
-    if material_id is None:
-        material_id = topology_defaults()["material_id"]
-    primitive_sequence = (
-        getattr(
-            paths,
-            "primitive_sequence",
-            torch.empty((path_count, 0), device=device, dtype=torch.int32),
-        )
-        .to(dtype=torch.int32)
-        .contiguous()
-    )
-    return TopologyBatch(
-        valid=paths.valid.contiguous(),
-        tx_id=paths.tx_id.to(dtype=torch.int32).contiguous(),
-        rx_id=paths.rx_id.to(dtype=torch.int32).contiguous(),
-        depth=paths.depth.to(dtype=torch.int32).contiguous(),
-        component_id=paths.component_id.to(dtype=torch.int32).contiguous(),
-        primitive_id=paths.primitive_id.to(dtype=torch.int32).contiguous(),
-        edge_id=paths.edge_id.to(dtype=torch.int32).contiguous(),
-        path_length_m=paths.path_length_m.to(dtype=torch.float32).contiguous(),
-        delay_s=paths.delay_s.to(dtype=torch.float32).contiguous(),
-        path_gain=path_gain,
-        path_field=path_field.to(dtype=torch.complex64).contiguous(),
-        field_xyz=field_xyz.to(dtype=torch.complex64).contiguous(),
-        coefficient=coefficient.to(dtype=torch.complex64).contiguous(),
-        field_direction=field_direction.to(dtype=torch.float32).contiguous(),
-        interaction_position=interaction_position.to(dtype=torch.float32).contiguous(),
-        interaction_normal=interaction_normal.to(dtype=torch.float32).contiguous(),
-        material_id=material_id.to(dtype=torch.int32).contiguous(),
-        primitive_sequence=primitive_sequence,
-        material_sequence=getattr(
-            paths,
-            "material_sequence",
-            torch.empty((path_count, 0), device=device, dtype=torch.int32),
-        )
-        .to(dtype=torch.int32)
-        .contiguous(),
-        interaction_type=_interaction_type_sequence(
-            component_id=paths.component_id,
-            depth=paths.depth,
-            width=int(primitive_sequence.shape[1]),
-        ),
-        interaction_positions=getattr(
-            paths,
-            "interaction_positions",
-            torch.empty((path_count, 0, 3), device=device, dtype=torch.float32),
-        )
-        .to(dtype=torch.float32)
-        .contiguous(),
-        interaction_normals=getattr(
-            paths,
-            "interaction_normals",
-            torch.empty((path_count, 0, 3), device=device, dtype=torch.float32),
-        )
-        .to(dtype=torch.float32)
-        .contiguous(),
-        launch_count=int(getattr(paths, "launch_count", 0)),
-        visibility_rejection_count=int(getattr(paths, "visibility_rejection_count", 0)),
-        selected_edge_count=int(getattr(paths, "selected_edge_count", 0)),
-        candidate_count=int(getattr(paths, "candidate_count", path_count)),
-        guardrail_count=int(getattr(paths, "guardrail_count", 0)),
-    )
+    evaluated, sidecars = evaluated_paths_from_result(paths)
+    return _topology_batch_from_evaluated(evaluated, sidecars)
 
 
 def _from_path_block(
@@ -269,33 +200,19 @@ def _from_path_block(
     candidate_count: int | None = None,
     guardrail_count: int = 0,
 ) -> TopologyBatch:
-    order = _canonical_selection_order(
+    evaluated, sidecars = evaluated_paths_from_block(
         paths,
-        tx_count=tx_count,
-        max_depth=max_depth,
         max_paths=max_paths,
         max_paths_scope=max_paths_scope,
+        tx_count=tx_count,
+        max_depth=max_depth,
+        launch_count=launch_count,
+        visibility_rejection_count=visibility_rejection_count,
+        selected_edge_count=selected_edge_count,
+        candidate_count=candidate_count,
+        guardrail_count=guardrail_count,
     )
-    selected = topology_blocks.deterministic_gather_topology_block(
-        paths,
-        order,
-        max_count=-1,
-        sequence_width=max_depth,
-    )
-    return _from_path_result(
-        SimpleNamespace(
-            **selected,
-            launch_count=launch_count,
-            visibility_rejection_count=visibility_rejection_count,
-            selected_edge_count=selected_edge_count,
-            candidate_count=int(
-                candidate_count
-                if candidate_count is not None
-                else paths["valid"].numel()
-            ),
-            guardrail_count=guardrail_count,
-        )
-    )
+    return _topology_batch_from_evaluated(evaluated, sidecars)
 
 
 def export_topology(
@@ -304,176 +221,9 @@ def export_topology(
     *,
     frequency_value: float | None = None,
 ) -> TopologyBatch:
-    device = torch.device("cuda")
-    tx_positions, tx_power = transmitter_tensors(scene, device=device)
-    rx_positions, _ = receiver_positions_and_layout(scene, device=device)
-    compiled = scene.compile()
-    # One host read of a tensor frequency for the whole export: discovery and
-    # the field seam below share this detached scalar (audit M3). Callers
-    # that already read it (the solver seams) pass it in.
-    frequency_hz = (
-        _frequency_scalar(scene) if frequency_value is None else float(frequency_value)
-    )
-    ad_mode = str(getattr(config, "ad_mode", "none"))
-    if ad_mode != "none":
-        _require_frequency_ad_constant_materials(scene, compiled, ad_mode=ad_mode)
-    components = _path_components(config)
-    coupled_paths = bool(getattr(config, "coupled_paths", False))
-    sequence_width = max(int(config.max_depth), 2 if coupled_paths else 0)
-    blocks: list[dict[str, torch.Tensor]] = []
-    launch_count = 0
-    visibility_rejection_count = 0
-    candidate_count = 0
-    guardrail_count = 0
-    diffraction_vector_field = None
-
-    if "los" in components:
-        los_block, los_launches, los_candidates, los_visibility_rejections = (
-            _los_topology(
-                scene,
-                compiled,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=frequency_hz,
-                sequence_width=sequence_width,
-            )
-        )
-        launch_count += los_launches
-        candidate_count += los_candidates
-        visibility_rejection_count += los_visibility_rejections
-        blocks.append(los_block)
-    if "reflection" in components and config.max_depth >= 1:
-        block, reflection_launches = _reflection_topology_order1(
-            scene,
-            compiled,
-            tx_positions,
-            tx_power,
-            rx_positions,
-            frequency_hz=frequency_hz,
-        )
-        launch_count += reflection_launches
-        candidate_count += int(block["valid"].numel())
-        blocks.append(block)
-    if "reflection" in components and config.max_depth >= 2:
-        block, reflection_launches, reflection_candidates = (
-            _reflection_topology_multibounce(
-                scene,
-                compiled,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=frequency_hz,
-                min_depth=2,
-                max_depth=int(config.max_depth),
-                max_paths=config.max_paths,
-            )
-        )
-        launch_count += reflection_launches
-        candidate_count += int(reflection_candidates)
-        blocks.append(block)
-    if "diffraction" in components and config.max_depth >= 1:
-        block, diffraction_launches, diffraction_vector_field = (
-            _diffraction_topology_order1(
-                scene,
-                compiled,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=frequency_hz,
-            )
-        )
-        launch_count += diffraction_launches
-        candidate_count += int(block["valid"].numel())
-        blocks.append(block)
-    if "transmission" in components and config.max_depth >= 1:
-        block, transmission_launches, transmission_candidates, transmission_guardrails = (
-            _transmission_topology(
-                scene,
-                compiled,
-                tx_positions,
-                rx_positions,
-                max_depth=int(config.max_depth),
-            )
-        )
-        launch_count += transmission_launches
-        candidate_count += transmission_candidates
-        guardrail_count += transmission_guardrails
-        blocks.append(block)
-    if (
-        coupled_paths
-        and config.max_depth >= 2
-        and {"reflection", "diffraction"}.issubset(components)
-    ):
-        block, coupled_launches, coupled_candidates = (
-            _coupled_reflection_diffraction_topology_order2(
-                scene,
-                compiled,
-                tx_positions,
-                rx_positions,
-                candidate_limit=int(
-                    getattr(config, "coupled_candidate_limit", 1_000_000)
-                ),
-            )
-        )
-        launch_count += coupled_launches
-        candidate_count += coupled_candidates
-        blocks.append(block)
-    if len(blocks) == 1 and components == {"los"} and config.max_paths is None:
-        result = _from_path_result(
-            SimpleNamespace(
-                **blocks[0],
-                launch_count=launch_count,
-                visibility_rejection_count=visibility_rejection_count,
-                selected_edge_count=0,
-                candidate_count=candidate_count,
-                guardrail_count=guardrail_count,
-            )
-        )
-        return _evaluate_shared_fields(
-            scene,
-            compiled,
-            result,
-            tx_positions,
-            tx_power,
-            rx_positions,
-            components=components,
-            ad_mode=ad_mode,
-            frequency_value=frequency_hz,
-        )
-    padded_blocks = [
-        block
-        if "primitive_sequence" in block
-        and int(block["primitive_sequence"].shape[1]) == sequence_width
-        else _pad_topology_sequences(block, width=sequence_width)
-        for block in blocks
-    ]
-    paths = concatenate_path_blocks(padded_blocks, device=device)
-    selected_edge_count = topology_primitives.deterministic_selected_edge_count(
-        paths["edge_id"]
-    )
-    result = _from_path_block(
-        paths,
-        max_paths=config.max_paths,
-        max_paths_scope=str(getattr(config, "max_paths_scope", "global")),
-        tx_count=len(scene.transmitters),
-        max_depth=config.max_depth,
-        launch_count=launch_count,
-        visibility_rejection_count=visibility_rejection_count,
-        selected_edge_count=selected_edge_count,
-        candidate_count=candidate_count,
-        guardrail_count=guardrail_count,
-    )
-    if diffraction_vector_field is not None:
-        result = replace(result, diffraction_vector_field=diffraction_vector_field)
-    return _evaluate_shared_fields(
+    evaluated, sidecars = evaluate_enumerated_paths(
         scene,
-        compiled,
-        result,
-        tx_positions,
-        tx_power,
-        rx_positions,
-        components=components,
-        ad_mode=ad_mode,
-        frequency_value=frequency_hz,
+        config,
+        frequency_value=frequency_value,
     )
+    return _topology_batch_from_evaluated(evaluated, sidecars)

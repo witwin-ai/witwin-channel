@@ -24,8 +24,11 @@ from witwin.channel_native.propagation.geometry.endpoints import (
 from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_component_counts,
 )
-from witwin.channel_native.propagation.topology.export import (
-    export_evaluated_rows,
+from witwin.channel_native.propagation.enumerated.engine import (
+    evaluate_enumerated_paths,
+)
+from witwin.channel_native.propagation.enumerated.scattering import (
+    append_scattering_evaluated_paths,
 )
 from witwin.channel_native.core.components import component_availability_status
 
@@ -36,7 +39,6 @@ from .accumulation import (
 )
 from .config import Config
 from .result import Result
-from witwin.channel_native.core.path_topology import export_topology
 
 if TYPE_CHECKING:
     from witwin.channel_native.core.scene import Scene
@@ -227,15 +229,19 @@ def solve(scene: Scene, config: Config) -> Result:
     # token must see the live value to stay correct under in-place
     # frequency mutation.
     frequency_hz = _frequency_scalar(scene)
-    path_result = export_topology(scene, config, frequency_value=frequency_hz)
+    evaluated, sidecars = evaluate_enumerated_paths(
+        scene,
+        config,
+        frequency_value=frequency_hz,
+    )
     scattering_info = None
     if "scattering" in config.components:
-        from witwin.channel_native.propagation.enumerated import append_scattering_paths
-
-        path_result, scattering_info = append_scattering_paths(
-            scene, config, path_result
+        evaluated, sidecars, scattering_info = append_scattering_evaluated_paths(
+            scene,
+            config,
+            evaluated,
+            sidecars,
         )
-    evaluated, sidecars = export_evaluated_rows(path_result)
     topology = evaluated.topology
     path_count = evaluated.row_count
     component_counts = deterministic_component_counts(topology.component_id)

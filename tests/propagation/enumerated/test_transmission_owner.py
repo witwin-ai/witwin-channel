@@ -10,7 +10,7 @@ import pytest
 
 from ci import check_import_graph as graph
 from witwin.channel_native.core import path_topology as legacy
-from witwin.channel_native.propagation.enumerated import transmission
+from witwin.channel_native.propagation.enumerated import engine, transmission
 from witwin.channel_native.propagation.geometry import (
     transmission as geometry_transmission,
 )
@@ -96,11 +96,12 @@ def test_transmission_owner_consumes_typed_plan_query_and_winners_in_order():
 
 
 def test_los_only_fast_path_remains_before_general_concat():
-    tree = ast.parse(Path(legacy.__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(Path(engine.__file__).read_text(encoding="utf-8"))
     definition = next(
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "export_topology"
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "evaluate_enumerated_paths"
     )
     fast_path = next(
         node

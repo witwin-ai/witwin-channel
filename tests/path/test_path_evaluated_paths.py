@@ -168,6 +168,10 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
 ):
     initial = _mixed_topology_batch()
     appended = _mixed_topology_batch()
+    initial_evaluated, initial_sidecars = evaluated_paths_from_topology_batch(initial)
+    appended_evaluated, appended_sidecars = evaluated_paths_from_topology_batch(
+        appended
+    )
     sentinel = object()
     calls: list[str] = []
     captured_metadata: dict[str, object] = {}
@@ -176,14 +180,19 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
         path_solver, "_validate_runtime", lambda _config: (True, True, True)
     )
 
-    def fake_export(_scene, _config):
-        calls.append("export")
-        return initial
+    def fake_engine(_scene, _config):
+        calls.append("engine")
+        return initial_evaluated, initial_sidecars
 
-    def fake_append(_scene, _config, topology):
-        assert topology is initial
+    def fake_append(_scene, _config, evaluated, sidecars):
+        assert evaluated is initial_evaluated
+        assert sidecars is initial_sidecars
         calls.append("append")
-        return appended, {"path_count": appended.valid.numel()}
+        return (
+            appended_evaluated,
+            appended_sidecars,
+            {"path_count": appended.valid.numel()},
+        )
 
     def fake_metadata(**kwargs):
         calls.append("metadata")
@@ -198,8 +207,12 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
         assert kwargs["metadata"]["kernel"]["launch_count"] == 1
         return sentinel
 
-    monkeypatch.setattr(path_solver, "export_topology", fake_export)
-    monkeypatch.setattr(path_solver, "append_scattering_paths", fake_append)
+    monkeypatch.setattr(path_solver, "evaluate_enumerated_paths", fake_engine)
+    monkeypatch.setattr(
+        path_solver,
+        "append_scattering_evaluated_paths",
+        fake_append,
+    )
     monkeypatch.setattr(path_solver, "_metadata", fake_metadata)
     monkeypatch.setattr(path_solver, "from_evaluated_paths", fake_pack)
     monkeypatch.setattr(
@@ -216,7 +229,7 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
     result = path_solver._solve_base(object(), Config(components={"los", "scattering"}))
 
     assert result is sentinel
-    assert calls == ["export", "append", "metadata", "pack"]
+    assert calls == ["engine", "append", "metadata", "pack"]
     assert captured_metadata["path_count"] == appended.valid.numel()
     assert captured_metadata["ad_companion_launches"] == 96
     assert captured_metadata["ad_tape_bytes"] == 97

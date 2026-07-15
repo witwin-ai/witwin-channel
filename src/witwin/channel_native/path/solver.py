@@ -9,14 +9,15 @@ from witwin.channel_native import Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
-from witwin.channel_native.core.path_topology import export_topology
 from witwin.channel_native.core.scene_tensors import (
     receiver_positions as _shared_receiver_positions,
     transmitter_positions as _shared_transmitter_positions,
 )
-from witwin.channel_native.propagation.enumerated import append_scattering_paths
-from witwin.channel_native.propagation.topology.export import (
-    export_evaluated_rows,
+from witwin.channel_native.propagation.enumerated.engine import (
+    evaluate_enumerated_paths,
+)
+from witwin.channel_native.propagation.enumerated.scattering import (
+    append_scattering_evaluated_paths,
 )
 
 from .config import Config
@@ -237,11 +238,15 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
         torch.cuda.synchronize()
         solve_start = perf_counter()
         peak_before = torch.cuda.max_memory_allocated()
-    topology = export_topology(scene, config)
+    evaluated, sidecars = evaluate_enumerated_paths(scene, config)
     scattering_info = None
     if "scattering" in config.components:
-        topology, scattering_info = append_scattering_paths(scene, config, topology)
-    evaluated, sidecars = export_evaluated_rows(topology)
+        evaluated, sidecars, scattering_info = append_scattering_evaluated_paths(
+            scene,
+            config,
+            evaluated,
+            sidecars,
+        )
     path_count = evaluated.row_count
     if ad_instrumented:
         torch.cuda.synchronize()
