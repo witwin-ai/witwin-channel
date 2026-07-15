@@ -10,7 +10,10 @@ from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.geometry.coupled import (
+    CoupledGeometryQuery,
+    query_coupled_geometry,
+)
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
@@ -162,25 +165,25 @@ def _coupled_reflection_diffraction_topology_order2(
             surface_group_members,
         )
         for reverse, component_id in ((False, 3), (True, 4)):
-            exported = geometry_bridge.raydn_coupled_rd_geometry_forward(
-                *common_args, reverse
+            exported = query_coupled_geometry(
+                CoupledGeometryQuery(*common_args, reverse=reverse)
             )
             launch_count += 1
             candidate_count += count
-            kept = torch.nonzero(exported["valid"], as_tuple=False).reshape(-1)
+            kept = torch.nonzero(exported.valid, as_tuple=False).reshape(-1)
             kept_count = int(kept.shape[0])
             if kept_count == 0:
                 continue
-            interaction_type = exported["interaction_type_sequence"][kept]
-            primitive_sequence = exported["primitive_sequence"][kept]
-            edge_sequence = exported["edge_sequence"][kept]
+            interaction_type = exported.interaction_type_sequence[kept]
+            primitive_sequence = exported.primitive_sequence[kept]
+            edge_sequence = exported.edge_sequence[kept]
             object_sequence = (
                 torch.where(interaction_type == 2, edge_sequence, primitive_sequence)
                 .to(dtype=torch.int32)
                 .contiguous()
             )
-            resolved_face = exported["face_id"][kept]
-            resolved_edge = exported["edge_id"][kept]
+            resolved_face = exported.face_id[kept]
+            resolved_edge = exported.edge_id[kept]
             reflection_material = face_material_id[resolved_face.to(dtype=torch.int64)]
             material_sequence = (
                 torch.where(
@@ -213,18 +216,18 @@ def _coupled_reflection_diffraction_topology_order2(
                         ),
                         "primitive_id": resolved_face.to(dtype=torch.int32),
                         "edge_id": resolved_edge.to(dtype=torch.int32),
-                        "path_length_m": exported["path_length_m"][kept],
-                        "delay_s": exported["delay_s"][kept],
+                        "path_length_m": exported.path_length_m[kept],
+                        "delay_s": exported.delay_s[kept],
                         "path_gain": nan,
                     },
-                    interaction_position=exported["interaction_positions"][kept, 0],
-                    interaction_normal=exported["interaction_normals"][kept, 0],
+                    interaction_position=exported.interaction_positions[kept, 0],
+                    interaction_normal=exported.interaction_normals[kept, 0],
                     material_id=reflection_material,
                     path_field=torch.complex(nan, nan),
                     primitive_sequence=object_sequence,
                     material_sequence=material_sequence,
-                    interaction_positions=exported["interaction_positions"][kept],
-                    interaction_normals=exported["interaction_normals"][kept],
+                    interaction_positions=exported.interaction_positions[kept],
+                    interaction_normals=exported.interaction_normals[kept],
                 )
             )
     return (

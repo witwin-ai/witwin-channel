@@ -12,11 +12,12 @@ import pytest
 from ci import check_import_graph as graph
 from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import coupled
+from witwin.channel_native.propagation.geometry import coupled as geometry_coupled
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
-_COUPLED_DIGEST = "cf85f05efb30d2e21356429316974b5c2dbbfa82476293aa732ece5821972836"
+_COUPLED_DIGEST = "6822fb18131be6e05ee6526316eb8d7126e6892fcd58b1f5261747fc7af41618"
 
 
 def _digest(module, name: str) -> str:
@@ -42,6 +43,26 @@ def test_coupled_owner_preserves_function_and_constant_identity():
     assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES
     assert coupled._COUPLED_CANDIDATE_CHUNK_SIZE == 65_536
     assert coupled._MAX_COUPLED_CANDIDATES == 1_000_000
+    assert coupled.CoupledGeometryQuery is geometry_coupled.CoupledGeometryQuery
+    assert coupled.query_coupled_geometry is geometry_coupled.query_coupled_geometry
+
+
+def test_enumerated_coupled_consumes_named_geometry_only():
+    tree = ast.parse(Path(coupled.__file__).read_text(encoding="utf-8"))
+    definition = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_coupled_reflection_diffraction_topology_order2"
+    )
+
+    assert "geometry_bridge" not in coupled.__dict__
+    assert not any(
+        isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "exported"
+        for node in ast.walk(definition)
+    )
 
 
 def test_export_component_stage_order_remains_canonical():
@@ -85,11 +106,14 @@ def test_export_component_stage_order_remains_canonical():
 def test_fresh_process_import_order_preserves_coupled_identity(imports: str):
     code = (
         f"{imports}; "
+        "from witwin.channel_native.propagation.geometry import coupled as geometry_coupled; "
         "assert legacy._coupled_reflection_diffraction_topology_order2 is "
         "coupled._coupled_reflection_diffraction_topology_order2; "
         "assert legacy._COUPLED_CANDIDATE_CHUNK_SIZE is "
         "coupled._COUPLED_CANDIDATE_CHUNK_SIZE; "
-        "assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES"
+        "assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES; "
+        "assert coupled.CoupledGeometryQuery is geometry_coupled.CoupledGeometryQuery; "
+        "assert coupled.query_coupled_geometry is geometry_coupled.query_coupled_geometry"
     )
     environment = os.environ.copy()
     environment["PYTHONPATH"] = os.pathsep.join(
