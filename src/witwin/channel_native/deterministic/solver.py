@@ -19,6 +19,9 @@ from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_component_counts,
 )
+from witwin.channel_native.propagation.models.adapters import (
+    evaluated_paths_from_topology_batch,
+)
 from witwin.channel_native.core.components import component_availability_status
 
 from .accumulation import (
@@ -232,19 +235,21 @@ def solve(scene: Scene, config: Config) -> Result:
         path_result, scattering_info = append_scattering_paths(
             scene, config, path_result
         )
-    path_count = int(path_result.valid.numel())
-    component_counts = deterministic_component_counts(path_result.component_id)
+    evaluated, sidecars = evaluated_paths_from_topology_batch(path_result)
+    topology = evaluated.topology
+    path_count = evaluated.row_count
+    component_counts = deterministic_component_counts(topology.component_id)
     # The native counter materializes only los/reflection/diffraction slots.
     for name, cid in (("transmission", 5), ("scattering", 6)):
         if name in config.components:
             component_counts[name] = int(
-                (path_result.component_id == cid).sum().item()
+                (topology.component_id == cid).sum().item()
             )
     extra_components = tuple(
         name for name in _OPTIONAL_COMPONENTS if name in config.components
     )
     path_gain, field, component_power, component_fields = accumulate_path_result(
-        path_result,
+        evaluated,
         frequency_hz=frequency_hz,
         num_tx=len(scene.transmitters),
         num_rx=layout.receiver_count,
@@ -259,11 +264,11 @@ def solve(scene: Scene, config: Config) -> Result:
     )
     exact_diffraction = None
     if (
-        path_result.diffraction_vector_field is not None
+        sidecars.diffraction_vector_field is not None
         and len(scene.receivers) == 1
         and isinstance(scene.receivers[0], ReceiverGrid)
     ):
-        vector_field = path_result.diffraction_vector_field
+        vector_field = sidecars.diffraction_vector_field
         exact_diffraction_flat = vector_field.abs().square().sum(dim=-1)
         exact_diffraction = apply_receiver_layout(exact_diffraction_flat, layout)
         previous_diffraction = component_power["diffraction"]
@@ -282,16 +287,16 @@ def solve(scene: Scene, config: Config) -> Result:
         native_info=native_info,
         path_count=path_count,
         component_counts=component_counts,
-        launch_count=path_result.launch_count,
-        ad_companion_launches=path_result.ad_companion_launches,
-        ad_tape_bytes=path_result.ad_tape_bytes,
+        launch_count=sidecars.execution.launch_count,
+        ad_companion_launches=sidecars.execution.ad_companion_launches,
+        ad_tape_bytes=sidecars.execution.ad_tape_bytes,
         forward_time_ms=forward_time_ms,
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
     )
     diagnostics = None
     if config.diagnostics:
-        candidate_count = int(path_result.candidate_count)
+        candidate_count = sidecars.execution.candidate_count
         diagnostics = {
             "path_gain_shape": tuple(path_gain.shape),
             "field_shape": tuple(field.shape),
@@ -299,19 +304,21 @@ def solve(scene: Scene, config: Config) -> Result:
             "component_counts": component_counts,
             "coherent": config.coherent,
             "accumulation_mode": "coherent" if config.coherent else "incoherent",
-            "native_launch_count": int(path_result.launch_count),
+            "native_launch_count": sidecars.execution.launch_count,
             "diffraction_accumulation": (
                 "exact_vector_coherent_paths"
                 if exact_diffraction is not None
                 else "scalar_path_accumulation"
             ),
-            "visibility_rejection_count": int(path_result.visibility_rejection_count),
-            "selected_edge_count": int(path_result.selected_edge_count),
+            "visibility_rejection_count": (
+                sidecars.execution.visibility_rejection_count
+            ),
+            "selected_edge_count": sidecars.execution.selected_edge_count,
             "path_planning": {
                 "max_paths": config.max_paths,
                 "max_paths_scope": config.max_paths_scope,
                 "candidate_count": candidate_count,
-                "guardrail_count": int(path_result.guardrail_count),
+                "guardrail_count": sidecars.execution.guardrail_count,
                 "truncated": config.max_paths is not None
                 and path_count < candidate_count,
             },
@@ -323,7 +330,7 @@ def solve(scene: Scene, config: Config) -> Result:
         component_fields=component_fields,
         paths=(
             build_path_table(
-                path_result,
+                evaluated,
                 frequency_hz=frequency_hz,
                 include_fields=config.return_field,
             )

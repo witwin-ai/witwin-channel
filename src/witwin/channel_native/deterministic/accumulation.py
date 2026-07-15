@@ -11,9 +11,9 @@ from witwin.channel_native.propagation.fields.kernels import (
 )
 from witwin.channel_native.core.path_topology import (
     ReceiverLayout,
-    TopologyBatch,
     apply_receiver_layout,
 )
+from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 
 
 # Component slots materialized by the native accumulator
@@ -159,7 +159,7 @@ def apply_layout_to_accumulation(
 
 
 def accumulate_path_result(
-    paths: TopologyBatch,
+    paths: EvaluatedPaths,
     *,
     frequency_hz: float,
     num_tx: int,
@@ -172,12 +172,14 @@ def accumulate_path_result(
 ) -> tuple[
     torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
 ]:
+    topology = paths.topology
+    fields = paths.fields
     power, field, component_power, component_fields = accumulate_flat_components(
-        tx_id=paths.tx_id,
-        rx_id=paths.rx_id,
-        component_id=paths.component_id,
-        path_gain=paths.path_gain,
-        path_field=paths.path_field,
+        tx_id=topology.tx_id,
+        rx_id=topology.rx_id,
+        component_id=topology.component_id,
+        path_gain=fields.path_gain,
+        path_field=fields.path_field,
         num_tx=num_tx,
         num_rx=num_rx,
         coherent=coherent,
@@ -195,51 +197,54 @@ def accumulate_path_result(
 
 
 def build_path_table(
-    paths: TopologyBatch, *, frequency_hz: float, include_fields: bool = True
+    paths: EvaluatedPaths, *, frequency_hz: float, include_fields: bool = True
 ) -> PathTable:
+    topology = paths.topology
+    geometry = paths.geometry
+    fields = paths.fields
     if include_fields:
-        path_field = paths.path_field.to(dtype=torch.complex64).contiguous()
+        path_field = fields.path_field.to(dtype=torch.complex64).contiguous()
         phase = field_kernels.deterministic_phase_from_field(
             path_field.real.to(dtype=torch.float32).contiguous(),
             path_field.imag.to(dtype=torch.float32).contiguous(),
         )
     else:
         zero_field_phase = field_kernels.deterministic_zero_field_phase(
-            paths.path_gain.to(dtype=torch.float32).contiguous()
+            fields.path_gain.to(dtype=torch.float32).contiguous()
         )
         path_field = zero_field_phase["path_field"]
         phase = zero_field_phase["phase_rad"]
     return PathTable(
-        valid=paths.valid.contiguous(),
-        tx_id=paths.tx_id.to(dtype=torch.int32).contiguous(),
-        rx_id=paths.rx_id.to(dtype=torch.int32).contiguous(),
-        depth=paths.depth.to(dtype=torch.int32).contiguous(),
-        component_id=paths.component_id.to(dtype=torch.int32).contiguous(),
-        primitive_id=paths.primitive_id.to(dtype=torch.int32).contiguous(),
-        edge_id=paths.edge_id.to(dtype=torch.int32).contiguous(),
-        path_length_m=paths.path_length_m.to(dtype=torch.float32).contiguous(),
-        delay_s=paths.delay_s.to(dtype=torch.float32).contiguous(),
-        path_gain=paths.path_gain.to(dtype=torch.float32).contiguous(),
-        interaction_position=paths.interaction_position.to(
+        valid=topology.valid.contiguous(),
+        tx_id=topology.tx_id.to(dtype=torch.int32).contiguous(),
+        rx_id=topology.rx_id.to(dtype=torch.int32).contiguous(),
+        depth=topology.depth.to(dtype=torch.int32).contiguous(),
+        component_id=topology.component_id.to(dtype=torch.int32).contiguous(),
+        primitive_id=topology.primitive_id.to(dtype=torch.int32).contiguous(),
+        edge_id=topology.edge_id.to(dtype=torch.int32).contiguous(),
+        path_length_m=geometry.path_length_m.to(dtype=torch.float32).contiguous(),
+        delay_s=geometry.delay_s.to(dtype=torch.float32).contiguous(),
+        path_gain=fields.path_gain.to(dtype=torch.float32).contiguous(),
+        interaction_position=geometry.interaction_position.to(
             dtype=torch.float32
         ).contiguous(),
-        interaction_normal=paths.interaction_normal.to(
+        interaction_normal=geometry.interaction_normal.to(
             dtype=torch.float32
         ).contiguous(),
-        material_id=paths.material_id.to(dtype=torch.int32).contiguous(),
-        primitive_sequence=paths.primitive_sequence.to(dtype=torch.int32).contiguous(),
-        material_sequence=paths.material_sequence.to(dtype=torch.int32).contiguous(),
-        interaction_positions=paths.interaction_positions.to(
+        material_id=topology.material_id.to(dtype=torch.int32).contiguous(),
+        primitive_sequence=topology.primitive_sequence.to(dtype=torch.int32).contiguous(),
+        material_sequence=topology.material_sequence.to(dtype=torch.int32).contiguous(),
+        interaction_positions=geometry.interaction_positions.to(
             dtype=torch.float32
         ).contiguous(),
-        interaction_normals=paths.interaction_normals.to(
+        interaction_normals=geometry.interaction_normals.to(
             dtype=torch.float32
         ).contiguous(),
         field_real=path_field.real.to(dtype=torch.float32).contiguous(),
         field_imag=path_field.imag.to(dtype=torch.float32).contiguous(),
-        coefficient=paths.coefficient.to(dtype=torch.complex64).contiguous(),
-        field_xyz=paths.field_xyz.to(dtype=torch.complex64).contiguous(),
-        field_direction=paths.field_direction.to(dtype=torch.float32).contiguous(),
+        coefficient=fields.coefficient.to(dtype=torch.complex64).contiguous(),
+        field_xyz=fields.field_xyz.to(dtype=torch.complex64).contiguous(),
+        field_direction=geometry.field_direction.to(dtype=torch.float32).contiguous(),
         phase_rad=phase,
-        interaction_count=paths.depth.to(dtype=torch.int32).contiguous(),
+        interaction_count=topology.depth.to(dtype=torch.int32).contiguous(),
     )
