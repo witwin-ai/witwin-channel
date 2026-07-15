@@ -39,4 +39,7 @@ def _validate_layer_csr(
             raise ValueError(f"{name} must share the op device")
 
 
-__all__ = ["_validate_layer_csr"]
+validate_layer_csr = _validate_layer_csr
+
+
+__all__ = ["_validate_layer_csr", "validate_layer_csr"]

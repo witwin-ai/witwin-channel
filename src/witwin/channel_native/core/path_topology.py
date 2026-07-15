@@ -19,6 +19,12 @@ from witwin.channel_native.propagation.geometry.kernels import (
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
+from witwin.channel_native.propagation.fields.kernels import (
+    autograd as field_autograd,
+)
+from witwin.channel_native.propagation.fields.kernels import (
+    functional as field_functional,
+)
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -929,17 +935,17 @@ def _evaluate_shared_fields(
             frequency_value = ops._ad_frequency_value(frequency)
         frequency_value = float(frequency_value)
         los_field_op = partial(
-            ops.field_free_space_ad,
+            field_autograd.field_free_space_ad,
             frequency=frequency,
             frequency_value=frequency_value,
         )
         reflection_field_op = partial(
-            ops.field_reflection_sequence_ad,
+            field_autograd.field_reflection_sequence_ad,
             frequency=frequency,
             frequency_value=frequency_value,
         )
         transmission_field_op = partial(
-            ops.field_transmission_sequence_ad,
+            field_autograd.field_transmission_sequence_ad,
             frequency=frequency,
             frequency_value=frequency_value,
         )
@@ -949,12 +955,12 @@ def _evaluate_shared_fields(
             if frequency_value is None
             else float(frequency_value)
         )
-        los_field_op = partial(ops.field_free_space, frequency_hz=frequency)
+        los_field_op = partial(field_functional.field_free_space, frequency_hz=frequency)
         reflection_field_op = partial(
-            ops.field_reflection_sequence, frequency_hz=frequency
+            field_functional.field_reflection_sequence, frequency_hz=frequency
         )
         transmission_field_op = partial(
-            ops.field_transmission_sequence, frequency_hz=frequency
+            field_functional.field_transmission_sequence, frequency_hz=frequency
         )
     device = topology.valid.device
     # AD-2: when a geometry leaf is on the graph, the endpoints come from the
@@ -1235,7 +1241,7 @@ def _evaluate_shared_fields(
                     *wedge_args,
                     *(wedge_vertices if wedge_vertices is not None else ()),
                 )
-            evaluated = ops.field_diffraction_wedge_ad(
+            evaluated = field_autograd.field_diffraction_wedge_ad(
                 *wedge_args,
                 frequency=frequency,
                 frequency_value=frequency_value,
@@ -1245,7 +1251,7 @@ def _evaluate_shared_fields(
             arrival = evaluated["direction"]
             if ledger is not None:
                 ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
-            projected = ops.field_project_complex3_ad(
+            projected = field_autograd.field_project_complex3_ad(
                 powered_xyz,
                 arrival,
                 rx_pol[diffraction_rows].contiguous(),
@@ -1259,7 +1265,7 @@ def _evaluate_shared_fields(
                 eps=1.0e-6,
             )
             powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
-            projected = ops.field_project_complex3(
+            projected = field_functional.field_project_complex3(
                 powered_xyz,
                 arrival,
                 rx_pol[diffraction_rows].contiguous(),
@@ -1347,7 +1353,7 @@ def _evaluate_shared_fields(
                 # reciprocal problem with the endpoints exchanged.
                 epc_source = target[rows] if reverse_order else source[rows]
                 epc_receiver = source[rows] if reverse_order else target[rows]
-                resolved = ops.coupled_rd_prepare_ad(
+                resolved = field_autograd.coupled_rd_prepare_ad(
                     epc_source.contiguous(),
                     epc_receiver.contiguous(),
                     tri_a[reflection_face].contiguous(),
@@ -1387,12 +1393,12 @@ def _evaluate_shared_fields(
 
             coupled_field_op = (
                 partial(
-                    ops.field_coupled_rd_ad,
+                    field_autograd.field_coupled_rd_ad,
                     frequency=frequency,
                     frequency_value=frequency_value,
                 )
                 if ad_enabled
-                else partial(ops.field_coupled_rd, frequency_hz=frequency)
+                else partial(field_functional.field_coupled_rd, frequency_hz=frequency)
             )
             reflection_materials = material_tuple(reflection_face)
             wedge_materials0 = material_tuple(face0)

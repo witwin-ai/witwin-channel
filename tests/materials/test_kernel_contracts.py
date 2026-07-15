@@ -21,6 +21,9 @@ def test_material_kernel_contract_has_one_same_object_owner():
     assert owner.__module__ == contracts.__name__
     assert kernels._validate_layer_csr is owner
     assert ops._validate_layer_csr is owner
+    assert contracts.validate_layer_csr is owner
+    assert kernels.validate_layer_csr is owner
+    assert public_materials.validate_layer_csr is owner
 
 
 def test_material_kernel_contract_preserves_the_frozen_body():

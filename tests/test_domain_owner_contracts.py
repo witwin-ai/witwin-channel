@@ -29,8 +29,15 @@ def test_domain_owner_docs_freeze_required_boundaries(owner_doc: Path):
     assert OWNER_SECTIONS <= set(content.splitlines())
 
 
-def test_materials_remains_a_module_until_its_dedicated_migration():
-    package_root = ROOT / "src" / "witwin" / "channel_native"
+def test_materials_package_preserves_public_identity_and_owns_kernel_contracts():
+    import witwin.channel_native.materials as public_materials
+    from witwin.channel_native.core import materials as core_materials
 
-    assert (package_root / "materials.py").is_file()
-    assert not (package_root / "materials").exists()
+    package_root = ROOT / "src" / "witwin" / "channel_native"
+    materials_root = package_root / "materials"
+
+    assert not (package_root / "materials.py").exists()
+    assert (materials_root / "__init__.py").is_file()
+    assert (materials_root / "kernels" / "contracts.py").is_file()
+    for name in public_materials.__all__:
+        assert getattr(public_materials, name) is getattr(core_materials, name)

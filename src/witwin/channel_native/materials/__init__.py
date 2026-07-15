@@ -12,6 +12,9 @@ from witwin.channel_native.core.materials import (
     SurfaceAssignment,
     TabulatedPermittivity,
 )
+from witwin.channel_native.materials.kernels import (
+    validate_layer_csr as validate_layer_csr,
+)
 
 __all__ = [
     "DebyeModel",
