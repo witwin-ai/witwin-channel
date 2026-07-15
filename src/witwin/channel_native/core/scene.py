@@ -14,7 +14,7 @@ from .runtime.material_store import MaterialStore
 from .runtime.raydn import RayDNScene, build_scene_from_structures
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
-from .kernels.ops import bdpt_zero_matrix
+from witwin.channel_native.runtime.native_buffers import bdpt_zero_matrix
 from .materials import (
     GEOMETRY_MODE_IDS,
     MATERIAL_ABI_VERSION,

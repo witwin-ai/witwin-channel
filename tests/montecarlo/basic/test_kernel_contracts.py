@@ -38,6 +38,11 @@ _NATIVE_BUFFER_OWNER_NAMES = (
     "mc_transmitter_tensors",
 )
 
+_FROZEN_NATIVE_BUFFER_OWNER_NAMES = (
+    "bdpt_zero_matrix",
+    *_NATIVE_BUFFER_OWNER_NAMES,
+)
+
 _OWNER_NAMES = _SAMPLING_OWNER_NAMES + _NATIVE_BUFFER_OWNER_NAMES
 
 _MAP_OWNER_NAMES = (
@@ -172,7 +177,7 @@ def test_runtime_native_buffers_preserves_all_frozen_body_contracts():
     ]
 
     assert {definition.terminal_name for definition in definitions} == set(
-        _NATIVE_BUFFER_OWNER_NAMES
+        _FROZEN_NATIVE_BUFFER_OWNER_NAMES
     )
     for definition in definitions:
         contract = contracts[definition.terminal_name]

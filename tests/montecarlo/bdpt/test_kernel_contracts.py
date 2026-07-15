@@ -8,6 +8,7 @@ import sys
 import pytest
 
 from ci import check_ops_migration as migration
+from witwin.channel_native.core import scene as core_scene
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.materials.kernels import contracts as material_contracts
 from witwin.channel_native.montecarlo.bdpt import connections
@@ -17,7 +18,7 @@ from witwin.channel_native.montecarlo.bdpt.kernels import maps, paths, sampling
 from witwin.channel_native.montecarlo.bdpt.solver import _BDPTTopologyOptions
 from witwin.channel_native.propagation import geometry
 from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.runtime import symbols, tensor_contracts
+from witwin.channel_native.runtime import native_buffers, symbols, tensor_contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -62,7 +63,6 @@ _MAP_OWNER_NAMES = (
     "bdpt_store_point_component_column",
     "bdpt_store_scaled_component_map",
     "bdpt_transmitter_tensors",
-    "bdpt_zero_matrix",
 )
 
 _SAMPLING_OWNER_NAMES = (
@@ -149,6 +149,66 @@ def test_bdpt_maps_uses_canonical_runtime_dependencies():
     assert maps.native_extension is symbols.native_extension
     assert maps._required_native_op is symbols.required_symbol
     assert maps.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+
+
+def test_bdpt_zero_matrix_has_one_neutral_owner():
+    owner = native_buffers.bdpt_zero_matrix
+
+    assert owner.__module__ == native_buffers.__name__
+    assert maps.bdpt_zero_matrix is owner
+    assert ops.bdpt_zero_matrix is owner
+    assert core_scene.bdpt_zero_matrix is owner
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.core.kernels import ops; "
+            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
+            "from witwin.channel_native.runtime import native_buffers"
+        ),
+        (
+            "from witwin.channel_native.runtime import native_buffers; "
+            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
+            "from witwin.channel_native.core.kernels import ops; "
+            "from witwin.channel_native.core import scene as core_scene"
+        ),
+        (
+            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.runtime import native_buffers; "
+            "from witwin.channel_native.core.kernels import ops"
+        ),
+    ),
+)
+def test_bdpt_zero_matrix_import_order_preserves_identity(imports: str):
+    code = (
+        f"{imports}; "
+        "owner=native_buffers.bdpt_zero_matrix; "
+        "assert maps.bdpt_zero_matrix is owner; "
+        "assert ops.bdpt_zero_matrix is owner; "
+        "assert core_scene.bdpt_zero_matrix is owner"
+    )
+    environment = os.environ.copy()
+    source_root = str(REPOSITORY_ROOT / "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (source_root, environment.get("PYTHONPATH"))
+        if value
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 @pytest.mark.parametrize("name", _SAMPLING_OWNER_NAMES)

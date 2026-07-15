@@ -159,6 +159,7 @@ from witwin.channel_native.runtime.symbols import (  # noqa: F401
     native_extension,
 )
 from witwin.channel_native.runtime.native_buffers import (  # noqa: F401
+    bdpt_zero_matrix,
     mc_pack_vec3,
     mc_receiver_grid_points,
     mc_transmitter_tensors,
@@ -225,7 +226,6 @@ from witwin.channel_native.montecarlo.bdpt.kernels.maps import (  # noqa: E402,F
     bdpt_store_point_component_column,
     bdpt_store_scaled_component_map,
     bdpt_transmitter_tensors,
-    bdpt_zero_matrix,
 )
 from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (  # noqa: E402,F401
     bdpt_diffraction_state_pack,

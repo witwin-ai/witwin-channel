@@ -2,29 +2,12 @@ from __future__ import annotations
 
 import torch
 
+from witwin.channel_native.runtime.native_buffers import bdpt_zero_matrix  # noqa: F401
 from witwin.channel_native.runtime.symbols import (
     native_extension,
     required_symbol as _required_native_op,
 )
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
-
-
-def bdpt_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
-    if rows < 0 or cols < 0:
-        raise ValueError("rows and cols must be non-negative")
-    native = native_extension()
-    if native is None or not hasattr(native, "bdpt_zero_matrix"):
-        raise RuntimeError("_channel_native.bdpt_zero_matrix CUDA kernel is required")
-    out = native.bdpt_zero_matrix(reference, int(rows), int(cols))
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_zero_matrix must return a tensor")
-    validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
-    if out.shape != (int(rows), int(cols)):
-        raise ValueError(
-            "_channel_native.bdpt_zero_matrix returned an unexpected shape"
-        )
-    return out
 
 
 def bdpt_store_point_component_column(

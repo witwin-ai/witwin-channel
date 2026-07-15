@@ -2139,7 +2139,7 @@
     "bdpt_transmitter_tensors": "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_transmitter_tensors",
     "bdpt_transmitted_light_subpath_state": "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_transmitted_light_subpath_state",
     "bdpt_visibility_forward": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_visibility_forward",
-    "bdpt_zero_matrix": "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_zero_matrix",
+    "bdpt_zero_matrix": "witwin.channel_native.runtime.native_buffers.bdpt_zero_matrix",
     "core_diffraction_edge_count": "witwin.channel_native.propagation.geometry.kernels.primitives.core_diffraction_edge_count",
     "core_pack_int2": "witwin.channel_native.propagation.topology.kernels.primitives.core_pack_int2",
     "coupled_rd_prepare_ad": "witwin.channel_native.propagation.fields.kernels.autograd.coupled_rd_prepare_ad",
