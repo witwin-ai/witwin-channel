@@ -44,6 +44,14 @@ from witwin.channel_native.propagation.geometry.reevaluate import (
     _reflection_geometry_ad,
     _vertices_participate_in_ad,
 )
+from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel_native.propagation.models.fields import PathFields
+from witwin.channel_native.propagation.models.geometry import PathGeometry
+from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.propagation.topology.export import (
+    PathExecutionStats,
+    export_evaluated_rows,
+)
 from witwin.channel_native.propagation.topology.kernels import (
     construction as topology_construction,
 )
@@ -58,7 +66,7 @@ if TYPE_CHECKING:
 
 def _rough_reflection_factor(
     compiled: object,
-    topology: TopologyBatch,
+    topology: PathTopology,
     rows: torch.Tensor,
     depth_value: int,
     source: torch.Tensor,
@@ -138,7 +146,7 @@ def _rough_reflection_factor(
 
 
 def _evaluate_los_fields(
-    topology: TopologyBatch,
+    topology: PathTopology,
     source: torch.Tensor,
     target: torch.Tensor,
     source_power: torch.Tensor,
@@ -180,7 +188,8 @@ def _evaluate_los_fields(
 
 def _evaluate_reflection_fields(
     compiled: object,
-    topology: TopologyBatch,
+    topology: PathTopology,
+    geometry: PathGeometry,
     source: torch.Tensor,
     target: torch.Tensor,
     source_power: torch.Tensor,
@@ -223,10 +232,10 @@ def _evaluate_reflection_fields(
                 depth_value,
             )
         else:
-            positions = topology.interaction_positions[
+            positions = geometry.interaction_positions[
                 rows, :depth_value
             ].contiguous()
-            normals = topology.interaction_normals[rows, :depth_value].contiguous()
+            normals = geometry.interaction_normals[rows, :depth_value].contiguous()
         reflection_args = (
             source[rows].contiguous(),
             target[rows].contiguous(),
@@ -283,7 +292,8 @@ def _evaluate_reflection_fields(
 
 def _evaluate_transmission_fields(
     compiled: object,
-    topology: TopologyBatch,
+    topology: PathTopology,
+    geometry: PathGeometry,
     source: torch.Tensor,
     target: torch.Tensor,
     source_power: torch.Tensor,
@@ -311,12 +321,12 @@ def _evaluate_transmission_fields(
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         rows = transmission_rows
-        width = int(topology.interaction_positions.shape[1])
+        width = int(geometry.interaction_positions.shape[1])
         slots = torch.arange(width, device=device).reshape(1, -1)
         event_valid = (
             slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
         ).contiguous()
-        positions = topology.interaction_positions[rows].contiguous()
+        positions = geometry.interaction_positions[rows].contiguous()
         if geometry_ad:
             # The transmission kernel reads only the straight source-target
             # ray and the wall normals, so the crossing points carry exactly
@@ -335,7 +345,7 @@ def _evaluate_transmission_fields(
             prim_sequence = topology.primitive_sequence[rows].to(dtype=torch.int64)
             normals = face_normal_table[prim_sequence.clamp_min(0)]
         else:
-            normals = topology.interaction_normals[rows].contiguous()
+            normals = geometry.interaction_normals[rows].contiguous()
         transmission_args = (
             source[rows].contiguous(),
             target[rows].contiguous(),
@@ -373,7 +383,9 @@ def _evaluate_transmission_fields(
 def _evaluate_diffraction_fields(
     scene: Scene,
     compiled: object,
-    topology: TopologyBatch,
+    topology: PathTopology,
+    geometry: PathGeometry,
+    input_fields: PathFields,
     source: torch.Tensor,
     target: torch.Tensor,
     source_power: torch.Tensor,
@@ -496,11 +508,11 @@ def _evaluate_diffraction_fields(
             arrival = geometry_primitives.deterministic_normalize_vec3(
                 (
                     target[diffraction_rows]
-                    - topology.interaction_positions[diffraction_rows, 0]
+                    - geometry.interaction_positions[diffraction_rows, 0]
                 ).contiguous(),
                 eps=1.0e-6,
             )
-            powered_xyz = topology.field_xyz[diffraction_rows].contiguous()
+            powered_xyz = input_fields.field_xyz[diffraction_rows].contiguous()
             projected = field_functional.field_project_complex3(
                 powered_xyz,
                 arrival,
@@ -521,7 +533,8 @@ def _evaluate_diffraction_fields(
 def _evaluate_coupled_fields(
     scene: Scene,
     compiled: object,
-    topology: TopologyBatch,
+    topology: PathTopology,
+    geometry: PathGeometry,
     source: torch.Tensor,
     target: torch.Tensor,
     source_power: torch.Tensor,
@@ -599,10 +612,10 @@ def _evaluate_coupled_fields(
             face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
             reflection_slot = 1 if reverse_order else 0
             edge_slot = 0 if reverse_order else 1
-            reflection_position = topology.interaction_positions[
+            reflection_position = geometry.interaction_positions[
                 rows, reflection_slot
             ].contiguous()
-            edge_position = topology.interaction_positions[
+            edge_position = geometry.interaction_positions[
                 rows, edge_slot
             ].contiguous()
             if coupled_geometry_ad:
@@ -668,7 +681,7 @@ def _evaluate_coupled_fields(
                 source[rows].contiguous(),
                 target[rows].contiguous(),
                 reflection_position,
-                topology.interaction_normals[
+                geometry.interaction_normals[
                     rows, reflection_slot
                 ].contiguous(),
                 edge_position,
@@ -706,10 +719,11 @@ def _evaluate_coupled_fields(
     return material, launch_count
 
 
-def _evaluate_shared_fields(
+def evaluate_path_fields(
     scene: Scene,
     compiled: object,
-    topology: TopologyBatch,
+    paths: EvaluatedPaths,
+    execution: PathExecutionStats,
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
     rx_positions: torch.Tensor,
@@ -717,7 +731,7 @@ def _evaluate_shared_fields(
     components: frozenset[str] | set[str] = frozenset(),
     ad_mode: str = "none",
     frequency_value: float | None = None,
-) -> TopologyBatch:
+) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
 
     ``ad_mode == "none"`` keeps the exact primal behavior (plain facades,
@@ -734,9 +748,12 @@ def _evaluate_shared_fields(
     torch and receives the same live frequency so dC_r/df is kept.
     """
 
-    count = int(topology.valid.shape[0])
+    topology = paths.topology
+    geometry = paths.geometry
+    input_fields = paths.fields
+    count = paths.row_count
     if count == 0:
-        return topology
+        return paths, execution
     ad_enabled = ad_mode != "none"
     # Plan 07 AD-4 metadata: one ledger entry per registered differentiable
     # Function, tape bytes mirroring each Function's save_for_backward set.
@@ -778,7 +795,7 @@ def _evaluate_shared_fields(
         transmission_field_op = partial(
             field_functional.field_transmission_sequence, frequency_hz=frequency
         )
-    device = topology.valid.device
+    device = paths.device
     # AD-2: when a geometry leaf is on the graph, the endpoints come from the
     # live scene tensors and the hit geometry comes from RayD's fixed-winner
     # chain companions (a native re-launch of the EPC discovery on the frozen
@@ -802,14 +819,14 @@ def _evaluate_shared_fields(
     tx_pol = transmitter_polarizations(scene, device=device)[tx_id].contiguous()
     rx_pol = receiver_polarizations(scene, device=device)[rx_id].contiguous()
 
-    field_xyz = topology.field_xyz.clone()
-    coefficient = topology.coefficient.clone()
-    path_field = topology.path_field.clone()
-    path_gain = topology.path_gain.clone()
-    path_length = topology.path_length_m.clone()
-    delay = topology.delay_s.clone()
-    direction = topology.field_direction.clone()
-    launch_count = topology.launch_count
+    field_xyz = input_fields.field_xyz.clone()
+    coefficient = input_fields.coefficient.clone()
+    path_field = input_fields.path_field.clone()
+    path_gain = input_fields.path_gain.clone()
+    path_length = geometry.path_length_m.clone()
+    delay = geometry.delay_s.clone()
+    direction = geometry.field_direction.clone()
+    launch_count = execution.launch_count
 
     launch_count = _evaluate_los_fields(
         topology,
@@ -834,6 +851,7 @@ def _evaluate_shared_fields(
     material, launch_count = _evaluate_reflection_fields(
         compiled,
         topology,
+        geometry,
         source,
         target,
         source_power,
@@ -860,6 +878,7 @@ def _evaluate_shared_fields(
     material, launch_count = _evaluate_transmission_fields(
         compiled,
         topology,
+        geometry,
         source,
         target,
         source_power,
@@ -885,6 +904,8 @@ def _evaluate_shared_fields(
         scene,
         compiled,
         topology,
+        geometry,
+        input_fields,
         source,
         target,
         source_power,
@@ -909,6 +930,7 @@ def _evaluate_shared_fields(
         scene,
         compiled,
         topology,
+        geometry,
         source,
         target,
         source_power,
@@ -929,24 +951,84 @@ def _evaluate_shared_fields(
         launch_count,
     )
 
-    return replace(
-        topology,
+    updated_geometry = PathGeometry(
+        row_identity=paths.row_identity,
         path_length_m=path_length,
         delay_s=delay,
+        field_direction=direction,
+        interaction_position=geometry.interaction_position,
+        interaction_normal=geometry.interaction_normal,
+        interaction_positions=geometry.interaction_positions,
+        interaction_normals=geometry.interaction_normals,
+    )
+    updated_fields = PathFields(
+        row_identity=paths.row_identity,
         path_gain=path_gain,
         path_field=path_field,
         field_xyz=field_xyz,
         coefficient=coefficient,
-        field_direction=direction,
+    )
+    evaluated = EvaluatedPaths(
+        topology=topology,
+        geometry=updated_geometry,
+        fields=updated_fields,
+    )
+    updated_execution = replace(
+        execution,
         launch_count=launch_count,
         ad_companion_launches=(
-            topology.ad_companion_launches + ledger.launches
+            execution.ad_companion_launches + ledger.launches
             if ledger is not None
-            else topology.ad_companion_launches
+            else execution.ad_companion_launches
         ),
         ad_tape_bytes=(
-            topology.ad_tape_bytes + ledger.tape_bytes
+            execution.ad_tape_bytes + ledger.tape_bytes
             if ledger is not None
-            else topology.ad_tape_bytes
+            else execution.ad_tape_bytes
         ),
+    )
+    return evaluated, updated_execution
+
+
+def _evaluate_shared_fields(
+    scene: Scene,
+    compiled: object,
+    topology: TopologyBatch,
+    tx_positions: torch.Tensor,
+    tx_power: torch.Tensor,
+    rx_positions: torch.Tensor,
+    *,
+    components: frozenset[str] | set[str] = frozenset(),
+    ad_mode: str = "none",
+    frequency_value: float | None = None,
+) -> TopologyBatch:
+    """Compatibility wrapper for the legacy mixed propagation row table."""
+
+    paths, sidecars = export_evaluated_rows(topology)
+    evaluated, execution = evaluate_path_fields(
+        scene,
+        compiled,
+        paths,
+        sidecars.execution,
+        tx_positions,
+        tx_power,
+        rx_positions,
+        components=components,
+        ad_mode=ad_mode,
+        frequency_value=frequency_value,
+    )
+    if evaluated is paths and execution is sidecars.execution:
+        return topology
+    return replace(
+        topology,
+        path_length_m=evaluated.geometry.path_length_m,
+        delay_s=evaluated.geometry.delay_s,
+        path_gain=evaluated.fields.path_gain,
+        path_field=evaluated.fields.path_field,
+        field_xyz=evaluated.fields.field_xyz,
+        coefficient=evaluated.fields.coefficient,
+        field_direction=evaluated.geometry.field_direction,
+        launch_count=execution.launch_count,
+        ad_companion_launches=execution.ad_companion_launches,
+        ad_tape_bytes=execution.ad_tape_bytes,
     )

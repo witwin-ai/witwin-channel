@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ast
-import hashlib
+import inspect
 import os
 from pathlib import Path
 import subprocess
@@ -9,12 +9,12 @@ import sys
 
 import pytest
 
-from ci import check_ops_migration as migration
 from tools.refactor_baseline import python_body_hashes
 from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.core import scene_tensors
 from witwin.channel_native.propagation.fields import evaluation
 from witwin.channel_native.propagation.geometry import reevaluate
+from witwin.channel_native.propagation.topology import export
 from witwin.channel_native.runtime import autograd_contracts
 
 
@@ -23,129 +23,6 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _COMPATIBILITY_EXPORTS = frozenset(
     {"_rough_reflection_factor", "_evaluate_shared_fields"}
 )
-_CONTRACTS = {
-    "_rough_reflection_factor": {
-        "signature": (
-            "(compiled: object, topology: TopologyBatch, rows: torch.Tensor, "
-            "depth_value: int, source: torch.Tensor, material: dict[str, "
-            "torch.Tensor], positions: torch.Tensor, normals: torch.Tensor, *, "
-            "frequency_hz: float | torch.Tensor, scattering_active: bool)"
-        ),
-        "body_sha256": (
-            "bf4ed6fd4c6fbd093aed5dbaffb010a15274ca1f062f01a3324a0341b4e97e48"
-        ),
-        "normalized_ast_sha256": (
-            "0261c6cd651790319819a3e1d3a1d14f93a9c4a771bce7933f993f75913a5fa5"
-        ),
-    },
-    "_evaluate_los_fields": {
-        "signature": (
-            "(topology: TopologyBatch, source: torch.Tensor, target: torch.Tensor, "
-            "source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: "
-            "torch.Tensor, los_field_op: Callable[..., dict[str, torch.Tensor]], "
-            "ledger: AdLaunchLedger | None, field_xyz: torch.Tensor, coefficient: "
-            "torch.Tensor, path_field: torch.Tensor, path_gain: torch.Tensor, "
-            "path_length: torch.Tensor, delay: torch.Tensor, direction: "
-            "torch.Tensor, launch_count: int)"
-        ),
-        "body_sha256": (
-            "b5b86149c055676fd8565a1000f28d33db1cf72641e8c0d374b58950b977e9da"
-        ),
-        "normalized_ast_sha256": (
-            "03816f9cd798d1e0d947a97b6dd964b354fc566b965cf540c30b31a893434cdc"
-        ),
-    },
-    "_evaluate_reflection_fields": {
-        "signature": (
-            "(compiled: object, topology: TopologyBatch, source: torch.Tensor, "
-            "target: torch.Tensor, source_power: torch.Tensor, tx_pol: "
-            "torch.Tensor, rx_pol: torch.Tensor, components: frozenset[str] | "
-            "set[str], device: torch.device, frequency: float | torch.Tensor, "
-            "geometry_ad: bool, vertices: torch.Tensor | None, "
-            "reflection_field_op: Callable[..., dict[str, torch.Tensor]], ledger: "
-            "AdLaunchLedger | None, material: dict[str, torch.Tensor] | None, "
-            "field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: "
-            "torch.Tensor, path_gain: torch.Tensor, path_length: torch.Tensor, "
-            "delay: torch.Tensor, direction: torch.Tensor, launch_count: int)"
-        ),
-        "body_sha256": (
-            "1518649e067ad93c37ae872b6610073f906d97d5f433198eaa1dec6e16e7d0db"
-        ),
-        "normalized_ast_sha256": (
-            "c91968647805603ea4070142c2293074ccab1535acddd546cc46e520c8904876"
-        ),
-    },
-    "_evaluate_transmission_fields": {
-        "signature": (
-            "(compiled: object, topology: TopologyBatch, source: torch.Tensor, "
-            "target: torch.Tensor, source_power: torch.Tensor, tx_pol: "
-            "torch.Tensor, rx_pol: torch.Tensor, device: torch.device, "
-            "geometry_ad: bool, vertices: torch.Tensor | None, "
-            "transmission_field_op: Callable[..., dict[str, torch.Tensor]], "
-            "ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | "
-            "None, field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: "
-            "torch.Tensor, path_gain: torch.Tensor, path_length: torch.Tensor, "
-            "delay: torch.Tensor, direction: torch.Tensor, launch_count: int)"
-        ),
-        "body_sha256": (
-            "be3ed774bf2b0dcf01d13891d98611f08017a2baf476ca16af52101e3e432251"
-        ),
-        "normalized_ast_sha256": (
-            "7c1bbc0e12d11b12bc7385c280d952234eb47b90672b11b1972a4e7bb76ad7ff"
-        ),
-    },
-    "_evaluate_diffraction_fields": {
-        "signature": (
-            "(scene: Scene, compiled: object, topology: TopologyBatch, source: "
-            "torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, "
-            "rx_pol: torch.Tensor, device: torch.device, frequency: float | "
-            "torch.Tensor, frequency_value: float | None, ad_enabled: bool, "
-            "geometry_ad: bool, vertices: torch.Tensor | None, ledger: "
-            "AdLaunchLedger | None, material: dict[str, torch.Tensor] | None, "
-            "field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: "
-            "torch.Tensor, path_gain: torch.Tensor, direction: torch.Tensor, "
-            "launch_count: int)"
-        ),
-        "body_sha256": (
-            "d89b7367a75646acb25c333698946eb870163edeba6ac0285ea0a459ebafa685"
-        ),
-        "normalized_ast_sha256": (
-            "d8dfe6e4652bd058dc8ee34e9ba01aa4c1375356254f0e74ecb9b66eb8ce1c24"
-        ),
-    },
-    "_evaluate_coupled_fields": {
-        "signature": (
-            "(scene: Scene, compiled: object, topology: TopologyBatch, source: "
-            "torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, "
-            "tx_pol: torch.Tensor, rx_pol: torch.Tensor, device: torch.device, "
-            "frequency: float | torch.Tensor, frequency_value: float | None, "
-            "ad_enabled: bool, geometry_ad: bool, ledger: AdLaunchLedger | None, "
-            "material: dict[str, torch.Tensor] | None, field_xyz: torch.Tensor, "
-            "coefficient: torch.Tensor, path_field: torch.Tensor, path_gain: "
-            "torch.Tensor, direction: torch.Tensor, launch_count: int)"
-        ),
-        "body_sha256": (
-            "e31f88623a982968a2e72b692e2012518167feb6d28cdde6e103783ae08a3c1a"
-        ),
-        "normalized_ast_sha256": (
-            "87d8c609ab9afb6af9efab47d2d91bda20295c084e1dd11546795ea1c2bca4a5"
-        ),
-    },
-    "_evaluate_shared_fields": {
-        "signature": (
-            "(scene: Scene, compiled: object, topology: TopologyBatch, "
-            "tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: "
-            "torch.Tensor, *, components: frozenset[str] | set[str]=frozenset(), "
-            "ad_mode: str='none', frequency_value: float | None=None)"
-        ),
-        "body_sha256": (
-            "92deeab268cbc08229f8d0767d821be8bad17c05fa50ad4ccedb11da3fdd61ff"
-        ),
-        "normalized_ast_sha256": (
-            "010cfc47ae2b566265abb6a777a4564576a09e18360190b01abe68d4a46c543f"
-        ),
-    },
-}
 
 
 def _function_node(name: str) -> ast.FunctionDef:
@@ -158,15 +35,6 @@ def _function_node(name: str) -> ast.FunctionDef:
     )
 
 
-def _body_sha256(statements: list[ast.stmt]) -> str:
-    dumped = ast.dump(
-        ast.Module(body=statements, type_ignores=[]),
-        annotate_fields=True,
-        include_attributes=False,
-    )
-    return hashlib.sha256(dumped.encode("utf-8")).hexdigest()
-
-
 def test_evaluation_helpers_are_same_object_compatibility_exports():
     for name in _COMPATIBILITY_EXPORTS:
         owner = getattr(evaluation, name)
@@ -175,78 +43,24 @@ def test_evaluation_helpers_are_same_object_compatibility_exports():
         assert getattr(legacy, name) is owner
 
 
-def test_evaluation_preserves_frozen_function_contracts():
-    definitions = {
-        item.terminal_name: item
-        for item in migration.scan_definitions(REPOSITORY_ROOT)
-        if item.qualified_name.startswith(f"{evaluation.__name__}.")
-    }
+def test_legacy_shared_field_signature_is_unchanged():
+    signature = inspect.signature(evaluation._evaluate_shared_fields)
 
-    assert definitions.keys() == _CONTRACTS.keys()
-    for name, contract in _CONTRACTS.items():
-        definition = definitions[name]
-        assert definition.signature == contract["signature"]
-        assert definition.body_sha256 == contract["body_sha256"]
-        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
-
-
-def test_los_field_extraction_preserves_frozen_prefix_segment():
-    helper = _function_node("_evaluate_los_fields")
-
-    assert _body_sha256(helper.body[:-1]) == (
-        "31115ef524f94736f69198345a846c03407da5849ed496fe795916864e047a12"
-    )
-    assert ast.dump(helper.body[-1], include_attributes=False) == (
-        "Return(value=Name(id='launch_count', ctx=Load()))"
-    )
-
-
-def test_reflection_field_extraction_preserves_frozen_prefix_segment():
-    helper = _function_node("_evaluate_reflection_fields")
-
-    assert _body_sha256(helper.body[:-1]) == (
-        "5f297e976b9995d55958b49f84103c1d2627801c2f7fd887bbec587587dd569e"
-    )
-    assert ast.dump(helper.body[-1], include_attributes=False) == (
-        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
-        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
-    )
-
-
-def test_transmission_field_extraction_preserves_frozen_prefix_segment():
-    helper = _function_node("_evaluate_transmission_fields")
-
-    assert _body_sha256(helper.body[:-1]) == (
-        "979b83f4bf93085a5978276b0dcce0e2be8ff961287e165f1410c431a01da8f2"
-    )
-    assert ast.dump(helper.body[-1], include_attributes=False) == (
-        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
-        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
-    )
-
-
-def test_diffraction_field_extraction_preserves_frozen_prefix_segment():
-    helper = _function_node("_evaluate_diffraction_fields")
-
-    assert _body_sha256(helper.body[:-1]) == (
-        "ac8b2a7976ee591ca6c6e6044ebd27983522e1cdd712b4520e0f30dd643d8baa"
-    )
-    assert ast.dump(helper.body[-1], include_attributes=False) == (
-        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
-        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
-    )
-
-
-def test_coupled_field_extraction_preserves_frozen_prefix_segment():
-    helper = _function_node("_evaluate_coupled_fields")
-
-    assert _body_sha256(helper.body[:-1]) == (
-        "3b1263b76cba3023a31885a6a83d254e278689a53492472e6e35dd25701bc8e8"
-    )
-    assert ast.dump(helper.body[-1], include_attributes=False) == (
-        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
-        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
-    )
+    assert list(signature.parameters) == [
+        "scene",
+        "compiled",
+        "topology",
+        "tx_positions",
+        "tx_power",
+        "rx_positions",
+        "components",
+        "ad_mode",
+        "frequency_value",
+    ]
+    assert signature.parameters["components"].default == frozenset()
+    assert signature.parameters["ad_mode"].default == "none"
+    assert signature.parameters["frequency_value"].default is None
+    assert signature.parameters["components"].kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_component_field_helpers_do_not_clone_output_buffers():
@@ -267,8 +81,8 @@ def test_component_field_helpers_do_not_clone_output_buffers():
         )
 
 
-def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
-    orchestrator = _function_node("_evaluate_shared_fields")
+def test_typed_field_orchestrator_preserves_component_order_and_clone_count():
+    orchestrator = _function_node("evaluate_path_fields")
     clones = sorted(
         (
             call
@@ -315,20 +129,12 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
                     component_markers.append("coupled")
             elif target_names == {"material"}:
                 component_markers.append("material")
-            elif target_names & {"transmission_rows", "diffraction_rows", "coupled_rows"}:
-                component_markers.extend(target_names)
         elif (
             isinstance(statement, ast.AnnAssign)
             and isinstance(statement.target, ast.Name)
             and statement.target.id == "material"
         ):
             component_markers.append("material")
-        elif (
-            isinstance(statement, ast.For)
-            and isinstance(statement.target, ast.Name)
-            and statement.target.id == "depth_value"
-        ):
-            component_markers.append("reflection")
         elif isinstance(statement, ast.Return):
             component_markers.append("epilogue")
 
@@ -341,6 +147,31 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
         "coupled",
         "epilogue",
     ]
+
+
+def test_typed_field_orchestrator_uses_split_domains_and_no_legacy_dependency():
+    orchestrator = _function_node("evaluate_path_fields")
+    source = Path(evaluation.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported_modules = {
+        node.module
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    assignments = {
+        node.targets[0].id: ast.unparse(node.value)
+        for node in orchestrator.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+    }
+
+    assert assignments["topology"] == "paths.topology"
+    assert assignments["geometry"] == "paths.geometry"
+    assert assignments["input_fields"] == "paths.fields"
+    assert "witwin.channel_native.core.path_topology" not in imported_modules
+    assert evaluation.PathExecutionStats is export.PathExecutionStats
+    assert evaluation.export_evaluated_rows is export.export_evaluated_rows
 
 
 def test_evaluation_preserves_nested_material_tuple_body():
@@ -393,10 +224,12 @@ def test_evaluation_import_order_preserves_facade_identity(imports: str):
     code = (
         f"{imports}; "
         "from witwin.channel_native.runtime import autograd_contracts; "
+        "from witwin.channel_native.propagation.topology import export; "
         f"names={names}; "
         "assert all(getattr(legacy, name) is getattr(evaluation, name) "
         "for name in names); "
-        "assert evaluation.ops is autograd_contracts"
+        "assert evaluation.ops is autograd_contracts; "
+        "assert evaluation.export_evaluated_rows is export.export_evaluated_rows"
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")

@@ -15,7 +15,6 @@ import pytest
 from ci import check_import_graph as graph
 from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation import models
-from witwin.channel_native.propagation.fields import evaluation
 from witwin.channel_native.propagation.models import adapters, contracts
 
 
@@ -28,30 +27,6 @@ _TOPOLOGY_CONFIG_DIGEST = (
 _EVALUATED_ROWS_BODY_DIGEST = (
     "af1220e6ab9211f6f6a3a314a6450250e6cdd455b8306e1b247b5e7b254b9aaf"
 )
-_FIELDS_FUNCTION_DIGESTS = {
-    "_rough_reflection_factor": (
-        "0261c6cd651790319819a3e1d3a1d14f93a9c4a771bce7933f993f75913a5fa5"
-    ),
-    "_evaluate_los_fields": (
-        "03816f9cd798d1e0d947a97b6dd964b354fc566b965cf540c30b31a893434cdc"
-    ),
-    "_evaluate_reflection_fields": (
-        "c91968647805603ea4070142c2293074ccab1535acddd546cc46e520c8904876"
-    ),
-    "_evaluate_transmission_fields": (
-        "7c1bbc0e12d11b12bc7385c280d952234eb47b90672b11b1972a4e7bb76ad7ff"
-    ),
-    "_evaluate_diffraction_fields": (
-        "d8dfe6e4652bd058dc8ee34e9ba01aa4c1375356254f0e74ecb9b66eb8ce1c24"
-    ),
-    "_evaluate_coupled_fields": (
-        "87d8c609ab9afb6af9efab47d2d91bda20295c084e1dd11546795ea1c2bca4a5"
-    ),
-    "_evaluate_shared_fields": (
-        "010cfc47ae2b566265abb6a777a4564576a09e18360190b01abe68d4a46c543f"
-    ),
-}
-
 _TOPOLOGY_CONFIG_FIELDS = {
     "max_depth",
     "components",
@@ -191,13 +166,11 @@ def test_topology_config_class_pickle_replays_through_legacy_owner():
     assert pickle.loads(legacy_payload) is contracts.TopologyConfig
 
 
-def test_moved_protocol_bodies_and_fields_functions_are_exact():
+def test_moved_protocol_bodies_are_exact():
     assert _definition_digest(contracts, "TopologyConfig") == (_TOPOLOGY_CONFIG_DIGEST)
     assert _body_digest(contracts, "EvaluatedRowsSource") == (
         _EVALUATED_ROWS_BODY_DIGEST
     )
-    for name, digest in _FIELDS_FUNCTION_DIGESTS.items():
-        assert _definition_digest(evaluation, name) == digest
 
 
 def test_contract_extraction_does_not_form_a_core_models_scc():
