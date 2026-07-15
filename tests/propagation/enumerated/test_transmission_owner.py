@@ -19,7 +19,6 @@ PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
 _TRANSMISSION_DIGEST = (
     "16a904413e97d78c27271b8b4d3eb89aa4dcc943b4b233a1eadb5efea245c3ce"
 )
-_EXPORT_DIGEST = "18e02bffb35b3a80fa2c474fb546d82b4742088ce65ad5de8ca4b8225b00de3c"
 
 
 def _digest(module, name: str) -> str:
@@ -41,8 +40,38 @@ def test_transmission_owner_preserves_function_identity_and_ast():
     assert _digest(transmission, owner.__name__) == _TRANSMISSION_DIGEST
 
 
-def test_export_body_and_caller_stage_order_remain_frozen():
-    assert _digest(legacy, "export_topology") == _EXPORT_DIGEST
+def test_los_only_fast_path_remains_before_general_concat():
+    tree = ast.parse(Path(legacy.__file__).read_text(encoding="utf-8"))
+    definition = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "export_topology"
+    )
+    fast_path = next(
+        node
+        for node in definition.body
+        if isinstance(node, ast.If)
+        and "components == {'los'}" in ast.unparse(node.test)
+    )
+    test_expression = ast.unparse(fast_path.test)
+    assert "len(blocks) == 1" in test_expression
+    assert "config.max_paths is None" in test_expression
+    los_call = next(
+        node
+        for node in ast.walk(definition)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_los_topology"
+    )
+    concat_call = next(
+        node
+        for node in ast.walk(definition)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "concatenate_path_blocks"
+    )
+    assert los_call.lineno < fast_path.lineno < concat_call.lineno
+    assert any(isinstance(node, ast.Return) for node in fast_path.body)
 
 
 @pytest.mark.parametrize(

@@ -20,6 +20,7 @@ from witwin.channel_native.propagation.enumerated.diffraction import (
     _diffraction_topology_order1,
     _tx_visible_diffraction_states,  # noqa: F401 - compatibility re-export
 )
+from witwin.channel_native.propagation.enumerated.los import _los_topology
 from witwin.channel_native.propagation.enumerated.reflection import (
     _discovered_group_chains,  # noqa: F401 - compatibility re-export
     _reflection_topology_order1,
@@ -38,7 +39,6 @@ from witwin.channel_native.propagation.fields.evaluation import (
     _evaluate_shared_fields,
     _rough_reflection_factor,  # noqa: F401 - compatibility re-export
 )
-from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
@@ -50,6 +50,10 @@ from witwin.channel_native.propagation.geometry.reevaluate import (
     _participates_in_ad,  # noqa: F401 - compatibility re-export
     _reflection_geometry_ad,  # noqa: F401 - compatibility re-export
     _vertices_participate_in_ad,  # noqa: F401 - compatibility re-export
+)
+from witwin.channel_native.propagation.geometry.visibility import (
+    _los_visibility_mask,  # noqa: F401 - compatibility re-export
+    _raydn_visibility_mask,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.models.contracts import TopologyConfig
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
@@ -86,7 +90,6 @@ from witwin.channel_native.propagation.topology.discovery.reflection import (
 from witwin.channel_native.runtime.autograd_contracts import (
     _frequency_participates_in_ad,  # noqa: F401 - compatibility re-export
 )
-from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
 
 if TYPE_CHECKING:
     from witwin.channel_native.core.scene import Scene
@@ -96,30 +99,6 @@ from witwin.channel_native.core.material_runtime import (  # noqa: F401
 from witwin.channel_native.core.scene_tensors import (
     _frequency_scalar,
 )
-
-
-def _raydn_visibility_mask(
-    raydn: object, start: torch.Tensor, end: torch.Tensor
-) -> torch.Tensor:
-    if start.shape[0] == 0:
-        return torch.empty((0,), device=start.device, dtype=torch.bool)
-    return geometry_bridge.raydn_visibility_forward(
-        raydn.require_handle(), start.contiguous(), end.contiguous(), None
-    )[0]
-
-
-def _los_visibility_mask(
-    raydn: object,
-    tx_for_path: torch.Tensor,
-    rx_for_path: torch.Tensor,
-    *,
-    has_structures: bool,
-) -> torch.Tensor | None:
-    if not has_structures or tx_for_path.shape[0] == 0:
-        return None
-    if not raydn.available:
-        raise RuntimeError("LoS visibility requires RayDN native scene capability")
-    return _raydn_visibility_mask(raydn, tx_for_path, rx_for_path)
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,47 +333,20 @@ def export_topology(
     diffraction_vector_field = None
 
     if "los" in components:
-        exported = topology_blocks.path_los_export(
-            tx_positions,
-            tx_power,
-            rx_positions,
-            frequency_hz=frequency_hz,
-        )
-        launch_count += 1
-        tx_id = exported["tx_id"]
-        rx_id = exported["rx_id"]
-        visible = None
-        if bool(scene.structures) and int(tx_id.numel()) > 0:
-            visibility_inputs = topology_blocks.path_los_visibility_inputs(
+        los_block, los_launches, los_candidates, los_visibility_rejections = (
+            _los_topology(
+                scene,
+                compiled,
                 tx_positions,
+                tx_power,
                 rx_positions,
-                tx_id.to(dtype=torch.int32).contiguous(),
-                rx_id.to(dtype=torch.int32).contiguous(),
-            )
-            visible = geometry_bridge.raydn_visibility_forward(
-                compiled.raydn.require_handle(),
-                visibility_inputs["start"],
-                visibility_inputs["end"],
-                visibility_inputs["active"],
-            )[0]
-            launch_count += 1
-        candidate_count += int(tx_id.numel())
-        los_block = _ensure_topology_fields(
-            topology_construction.deterministic_los_topology_block(
-                tx_id.to(dtype=torch.int32).contiguous(),
-                rx_id.to(dtype=torch.int32).contiguous(),
-                exported["path_length_m"].to(dtype=torch.float32).contiguous(),
-                exported["delay_s"].to(dtype=torch.float32).contiguous(),
-                exported["path_gain"].to(dtype=torch.float32).contiguous(),
-                visible,
                 frequency_hz=frequency_hz,
                 sequence_width=sequence_width,
             )
         )
-        if visible is not None:
-            visibility_rejection_count += int(tx_id.numel()) - int(
-                los_block["valid"].numel()
-            )
+        launch_count += los_launches
+        candidate_count += los_candidates
+        visibility_rejection_count += los_visibility_rejections
         blocks.append(los_block)
     if "reflection" in components and config.max_depth >= 1:
         block, reflection_launches = _reflection_topology_order1(
