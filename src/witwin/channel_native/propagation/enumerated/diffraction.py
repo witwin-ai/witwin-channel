@@ -6,20 +6,25 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.core.diffraction_geometry import (
-    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
-    diffraction_edge_geometry as _diffraction_edge_geometry,
-)
 from witwin.channel_native.core.material_runtime import face_material_tensors
 from witwin.channel_native.core.scene_tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
-from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.geometry.diffraction import (
+    _DIFFRACTION_PREFILTER_EDGE_FRACTIONS,  # noqa: F401 - compatibility re-export
+    _tx_visible_diffraction_states,  # noqa: F401 - compatibility re-export
+    DiffractionOrder1Query,
+    name_diffraction_states,
+    query_diffraction_edges,
+    query_diffraction_order1,
+)
 from witwin.channel_native.propagation.topology.concatenate import (
     concatenate_path_blocks,
 )
-from witwin.channel_native.propagation.topology.discovery.reflection import (
-    _MULTIBOUNCE_PAIR_CHUNK_SIZE,
+from witwin.channel_native.propagation.topology.discovery.diffraction import (
+    iter_diffraction_rx_chunk_requests,
+    iter_diffraction_tx_requests,
+    prepare_diffraction_order1_plan,
 )
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
 from witwin.channel_native.propagation.topology.kernels import (
@@ -44,77 +49,24 @@ def _deterministic_diffraction_states(
     *,
     preserve_imported_edges: bool = False,
 ) -> tuple[torch.Tensor, ...]:
-    (
-        selected,
-        edge_pos,
-        edge_dir,
-        _lengths,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-    ) = (
-        _diffraction_edge_geometry(raydn.edge_records())
-        if preserve_imported_edges
-        else _cached_diffraction_edge_geometry(raydn)
+    edges = query_diffraction_edges(
+        raydn,
+        preserve_imported_edges=preserve_imported_edges,
     )
     return topology_primitives.deterministic_diffraction_state_pack(
-        topology_primitives.mc_selected_edge_indices(selected),
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
+        topology_primitives.mc_selected_edge_indices(edges.selected),
+        edges.edge_position,
+        edges.edge_direction,
+        edges.line_min,
+        edges.line_max,
+        edges.n0,
+        edges.n1,
+        edges.face0,
+        edges.face1,
+        edges.exterior_angle,
         tx,
         tx_power,
         int(tx_index),
-    )
-
-
-_DIFFRACTION_PREFILTER_EDGE_FRACTIONS = (0.02, 1.0 / 3.0, 2.0 / 3.0, 0.98)
-
-
-def _tx_visible_diffraction_states(
-    raydn: object,
-    states: tuple[torch.Tensor, ...],
-    tx: torch.Tensor,
-) -> tuple[torch.Tensor, ...]:
-    """Drop edge states that are occluded from the transmitter.
-
-    The UTD kernel checks visibility at the per-receiver stationary point, so
-    a state is only culled when the transmitter cannot see the edge at any of
-    several sample points along it. This shrinks the rx x state workspace and
-    pair launches on city-scale scenes (mirrors the original tx_first
-    pruning) while keeping states whose midpoint happens to be occluded.
-    """
-
-    state_count = int(states[0].shape[0])
-    if state_count <= 0:
-        return states
-    edge_anchor = states[1]
-    edge_dir = states[2]
-    line_min = states[3]
-    line_max = states[4]
-    starts = tx.reshape(1, 3).expand(state_count, 3).contiguous()
-    visible = torch.zeros((state_count,), device=edge_anchor.device, dtype=torch.bool)
-    for fraction in _DIFFRACTION_PREFILTER_EDGE_FRACTIONS:
-        t = line_min + fraction * (line_max - line_min)
-        point = (edge_anchor + t.unsqueeze(1) * edge_dir).contiguous()
-        visible |= geometry_bridge.raydn_visibility_forward(
-            raydn.require_handle(), starts, point, None
-        )[0]
-    if bool(visible.all()):
-        return states
-    return tuple(
-        tensor[visible] if tensor.shape[:1] == (state_count,) else tensor
-        for tensor in states
     )
 
 
@@ -176,61 +128,69 @@ def _diffraction_topology_order1(
     )
     launch_count = 0
     rx_count = int(rx_positions.shape[0])
-    mitsuba_metadata = scene.metadata.get("mitsuba", {})
-    # Channel's merge_shapes import keeps the selected boundary-edge table
-    # intact.  The synthetic-scene path instead merges coincident structure
-    # boundaries into one physical wedge (the single-wedge test contract).
-    preserve_imported_edges = isinstance(mitsuba_metadata, dict) and bool(
-        mitsuba_metadata.get("merge_shapes", False)
+    plan = prepare_diffraction_order1_plan(
+        metadata=scene.metadata,
+        tx_count=int(tx_positions.shape[0]),
+        rx_count=rx_count,
     )
-    for tx_index, tx in enumerate(tx_positions):
+    for tx_request in iter_diffraction_tx_requests(
+        plan,
+        tx_positions=tx_positions,
+    ):
+        tx_index = tx_request.tx_index
+        tx = tx_request.tx
         states = _deterministic_diffraction_states(
             raydn,
             tx,
             tx_power,
             tx_index,
-            preserve_imported_edges=preserve_imported_edges,
+            preserve_imported_edges=plan.preserve_imported_edges,
         )
         states = _tx_visible_diffraction_states(raydn, states, tx)
-        state_count = int(states[0].shape[0])
+        named_states = name_diffraction_states(states)
+        state_count = int(named_states.edge_index.shape[0])
         if state_count <= 0:
             continue
         # Chunk receivers so the rx x edge-state workspace stays bounded on
         # city-scale scenes (audit P-2); the reflection paths already chunk.
-        rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // state_count)
-        for rx_start in range(0, rx_count, rx_chunk_size):
-            rx_end = min(rx_start + rx_chunk_size, rx_count)
+        for rx_request in iter_diffraction_rx_chunk_requests(
+            plan,
+            state_count=state_count,
+        ):
+            rx_start = rx_request.rx_start
+            rx_end = rx_request.rx_end
             rx_chunk = rx_positions[rx_start:rx_end].contiguous()
-            capacity = int(rx_chunk.shape[0]) * state_count
-            out = geometry_bridge.raydn_diffraction_paths_order1_forward(
-                handle,
-                tx.reshape(1, 3).contiguous(),
-                rx_chunk,
-                None,
-                *states,
-                face_eps_r,
-                face_sigma_e,
-                face_mu_r,
-                material_gain,
-                material_valid,
-                state_count,
-                capacity,
-                float(wavelength),
+            out = query_diffraction_order1(
+                DiffractionOrder1Query(
+                    handle=handle,
+                    tx_position=tx.reshape(1, 3).contiguous(),
+                    rx_positions=rx_chunk,
+                    active=None,
+                    states=named_states,
+                    material_eta_r=face_eps_r,
+                    material_sigma=face_sigma_e,
+                    material_mu_r=face_mu_r,
+                    material_gain=material_gain,
+                    material_valid=material_valid,
+                    state_count=state_count,
+                    capacity=rx_request.capacity,
+                    wavelength=float(wavelength),
+                )
             )
             launch_count += 1
             compacted = topology_compaction.deterministic_diffraction_order1_compact(
-                valid=out[1],
-                rx_id=out[3],
-                depth=out[4],
-                edge_id=out[5],
-                delay_s=out[8],
-                x_re=out[9],
-                x_im=out[10],
-                y_re=out[11],
-                y_im=out[12],
-                z_re=out[13],
-                z_im=out[14],
-                interaction_position=out[15],
+                valid=out.valid,
+                rx_id=out.rx_id,
+                depth=out.depth,
+                edge_id=out.edge_id,
+                delay_s=out.delay_s,
+                x_re=out.x_re,
+                x_im=out.x_im,
+                y_re=out.y_re,
+                y_im=out.y_im,
+                z_re=out.z_re,
+                z_im=out.z_im,
+                interaction_position=out.interaction_position,
             )
             if int(compacted["rx_id"].numel()) == 0:
                 continue
