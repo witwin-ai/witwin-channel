@@ -11,9 +11,16 @@ from witwin.channel_native.runtime.autograd_contracts import (  # noqa: F401
     _ad_check_rows,
     _ad_check_tangent_vec3,
     _ad_checked_tangent,
+    _ad_frequency_grad,
+    _ad_frequency_tangent,
+    _ad_frequency_value,
+    _ad_geometry_live,
+    _ad_geometry_tangent,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
     _ad_raise_composed_transforms,
+    _ad_reject_fixed_inputs,
+    _ad_reject_fixed_tangents,
     _ad_still_wrapped,
 )
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
@@ -4297,110 +4304,6 @@ _FIELD_AD_TANGENT_FIELDS = (
     "path_length_m",
     "delay_s",
 )
-
-
-def _ad_frequency_value(frequency: torch.Tensor | float) -> float:
-    """Read the scalar carrier frequency once per solve.
-
-    A 0-d CUDA tensor frequency costs one device-to-host synchronization per
-    read (documented plan 07 AD-1 decision: one sync per solve, never per
-    path); the native entry points keep a double scalar. The solve seams
-    call this once and thread the float to every ``field_*_ad`` facade as
-    ``frequency_value`` so no Function pays a second read (audit M3); a
-    facade called without it reads here exactly once.
-    """
-
-    if isinstance(frequency, torch.Tensor):
-        if frequency.ndim != 0:
-            raise ValueError("frequency must be a Python float or a 0-d tensor")
-        return float(_ad_native_tensor(frequency).detach())
-    return float(frequency)
-
-
-def _ad_frequency_tangent(tangent: torch.Tensor | None) -> float:
-    tangent = _ad_native_tangent_or_none(tangent)
-    if tangent is None:
-        return 0.0
-    if tangent.ndim != 0:
-        raise ValueError("frequency tangent must be a 0-d tensor")
-    return float(tangent.detach())
-
-
-def _ad_frequency_grad(
-    grad_frequency: torch.Tensor, meta: tuple[torch.dtype, torch.device]
-) -> torch.Tensor:
-    dtype, device = meta
-    return grad_frequency.to(dtype=dtype, device=device)[0]
-
-
-def _ad_reject_fixed_inputs(
-    op_name: str,
-    needs_input_grad: tuple[bool, ...],
-    fixed: tuple[tuple[int, str], ...],
-) -> None:
-    for index, name in fixed:
-        if needs_input_grad[index]:
-            raise NotImplementedError(
-                f"{op_name} does not differentiate {name}: tx_power, the "
-                "polarizations, mu_r, material ids and valid masks stay fixed "
-                "under the plan 07 fixed-topology contract"
-            )
-
-
-def _ad_reject_fixed_tangents(
-    op_name: str,
-    tangents: tuple[tuple[object, str], ...],
-) -> None:
-    for tangent, name in tangents:
-        if isinstance(tangent, torch.Tensor) and (
-            _ad_native_tangent_or_none(tangent) is not None
-        ):
-            raise NotImplementedError(
-                f"{op_name} does not differentiate {name}: tx_power, the "
-                "polarizations, mu_r, material ids and valid masks stay fixed "
-                "under the plan 07 fixed-topology contract"
-            )
-
-
-def _ad_geometry_live(*values: object) -> bool:
-    """True when any geometry input participates in AD (grad or tangent).
-
-    Drives the AD-2 need_grad_geometry plumbing and the conditional
-    differentiability of path_length_m / delay_s: a materials-only graph
-    keeps them detached exactly as in AD-1, so it never pays for geometry
-    adjoints it did not request.
-    """
-
-    for value in values:
-        if not isinstance(value, torch.Tensor):
-            continue
-        if value.requires_grad:
-            return True
-        if torch.autograd.forward_ad.unpack_dual(value).tangent is not None:
-            return True
-    return False
-
-
-def _ad_geometry_tangent(
-    name: str, tangent: object, primal: torch.Tensor
-) -> torch.Tensor | None:
-    """Unwrap and validate a geometry tangent against its primal tensor."""
-
-    value = _ad_native_tangent_or_none(
-        tangent if isinstance(tangent, torch.Tensor) else None
-    )
-    if value is None:
-        return None
-    if tuple(value.shape) != tuple(primal.shape):
-        raise ValueError(
-            f"{name} must match its primal shape {tuple(primal.shape)};"
-            f" got {tuple(value.shape)}"
-        )
-    if value.dtype != primal.dtype:
-        raise TypeError(f"{name} must match the primal dtype {primal.dtype}")
-    if not value.is_cuda:
-        raise ValueError(f"{name} must be a CUDA tensor")
-    return value
 
 
 def field_free_space_backward(

@@ -91,8 +91,20 @@ def test_current_manifest_covers_every_movable_ops_body():
 
     assert migration.check_manifest(REPOSITORY_ROOT, manifest) == []
     assert len(manifest["contracts"]) == 282
-    assert len(manifest["active_ops"]) == 278
-    assert manifest["canonical_owners"] == migration.BOOTSTRAP_CANONICAL_OWNERS
+    assert len(manifest["active_ops"]) == 261
+    assert len(manifest["canonical_owners"]) == 21
+    assert migration.BOOTSTRAP_CANONICAL_OWNERS.items() <= (
+        manifest["canonical_owners"].items()
+    )
+    assert {
+        owner
+        for entry_id, owner in manifest["canonical_owners"].items()
+        if entry_id.startswith("_ad_")
+    } == {
+        f"witwin.channel_native.runtime.autograd_contracts.{entry_id}"
+        for entry_id in manifest["canonical_owners"]
+        if entry_id.startswith("_ad_")
+    }
     contract_ids = {entry["id"] for entry in manifest["contracts"]}
     assert "_RaydnIntersectAdFunction.forward" in contract_ids
     assert "_FieldCoupledRdAdFunction.backward.material_column" not in contract_ids

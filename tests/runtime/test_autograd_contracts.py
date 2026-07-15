@@ -14,9 +14,16 @@ CONTRACT_NAMES = (
     "_ad_check_rows",
     "_ad_check_tangent_vec3",
     "_ad_checked_tangent",
+    "_ad_frequency_grad",
+    "_ad_frequency_tangent",
+    "_ad_frequency_value",
+    "_ad_geometry_live",
+    "_ad_geometry_tangent",
     "_ad_native_tangent_or_none",
     "_ad_native_tensor",
     "_ad_raise_composed_transforms",
+    "_ad_reject_fixed_inputs",
+    "_ad_reject_fixed_tangents",
     "_ad_still_wrapped",
 )
 
