@@ -8,7 +8,6 @@ from witwin.channel_native.core.ad_geometry import (
     transmitter_positions_ad,
 )
 from witwin.channel_native.core.kernels.ops import (
-    mc_los_path_gain_ad,
     mc_los_visibility_inputs,
     mc_zero_matrix,
 )
@@ -21,6 +20,7 @@ from witwin.channel_native.core.scene_tensors import (
 
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.topology.kernels.blocks import path_los_export
+from witwin.channel_native.montecarlo.basic.kernels.maps import mc_los_path_gain_ad
 
 if TYPE_CHECKING:
     from witwin.channel_native.core.scene import Scene

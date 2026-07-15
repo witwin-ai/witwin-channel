@@ -8,6 +8,7 @@ from witwin.channel_native.core.kernels import raydn_backend
 from witwin.channel_native.deterministic.kernels import fields as deterministic_fields
 from witwin.channel_native.materials.kernels import functional as material_functional
 from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
+from witwin.channel_native.montecarlo.basic.kernels import maps as mc_maps
 from witwin.channel_native.runtime import symbols as runtime_symbols
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
@@ -1332,7 +1333,7 @@ def test_mc_los_path_gain_ad_kernels_require_native_cuda_kernel(monkeypatch):
     tx_power = torch.ones((1,), device="cuda", dtype=torch.float32)
     rx_positions = torch.ones((1, 3), device="cuda", dtype=torch.float32)
     grad_output = torch.ones((1, 1), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_los_path_gain_backward CUDA kernel is required"):
         ops.mc_los_path_gain_backward(
