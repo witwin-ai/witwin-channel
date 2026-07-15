@@ -19,8 +19,8 @@ from witwin.channel_native.propagation.topology.concatenate import (
 )
 from witwin.channel_native.propagation.topology.discovery.reflection import (
     _MULTIBOUNCE_DISCOVERY_RAYS,
-    _MULTIBOUNCE_PAIR_CHUNK_SIZE,
-    _ORDER1_EXHAUSTIVE_GROUP_LIMIT,
+    iter_reflection_order1_epc_requests,
+    prepare_reflection_order1_plan,
 )
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
 from witwin.channel_native.propagation.topology.kernels import (
@@ -120,21 +120,10 @@ def _reflection_topology_order1(
     grouped_export = True
     group_count = int(groups["group_count"])
     representative_faces = groups["representative_faces"].contiguous()
-    exhaustive = group_count <= _ORDER1_EXHAUSTIVE_GROUP_LIMIT
-    base_sequences = (
-        topology_construction.deterministic_mapped_face_sequence_chunk(
-            representative_faces,
-            depth=1,
-            start=0,
-            end=group_count,
-        )
-        if exhaustive
-        else None
-    )
-    face_group_id = (
-        None
-        if exhaustive
-        else groups["face_group_id"].to(dtype=torch.long).contiguous()
+    plan = prepare_reflection_order1_plan(
+        group_count=group_count,
+        representative_faces=representative_faces,
+        face_group_id=groups["face_group_id"],
     )
 
     blocks: list[dict[str, torch.Tensor]] = []
@@ -145,113 +134,103 @@ def _reflection_topology_order1(
             concatenate_path_blocks(blocks, device=device)
         ), launch_count
 
-    for tx_index, tx in enumerate(tx_positions):
-        if exhaustive:
-            sequences = base_sequences
-        else:
-            # Large scenes: only transmitter-visible planes can host a valid
-            # first-order specular path; discover them by tracing.
-            chains = _discovered_group_chains(
-                raydn, tx, face_group_id=face_group_id, max_depth=1
-            )
-            launch_count += 1
-            first_groups = torch.unique(chains[chains[:, 0] >= 0][:, 0])
-            if int(first_groups.numel()) == 0:
-                continue
-            sequences = representative_faces[first_groups].reshape(-1, 1).contiguous()
-        sequence_count = int(sequences.shape[0])
-        if sequence_count <= 0:
-            continue
-        rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
-        for rx_start in range(0, rx_count, rx_chunk_size):
-            rx_end = min(rx_start + rx_chunk_size, rx_count)
-            epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
-                tx=tx,
-                rx_positions=rx_positions.contiguous(),
-                sequences=sequences.contiguous(),
-                tri_a=tri_a.contiguous(),
-                normals=normals.contiguous(),
-                rx_start=rx_start,
-                rx_end=rx_end,
-            )
-            epc = geometry_bridge.raydn_reflection_epc_paths_forward(
-                raydn.require_handle(),
-                epc_inputs["tx_batch"],
-                epc_inputs["rx_batch"],
-                None,
-                epc_inputs["sequence_batch"],
-                epc_inputs["direct_plane_points"],
-                epc_inputs["direct_plane_normals"],
-                groups["surface_group_id"],
-                groups["surface_group_size"],
-                groups["surface_group_members"],
-                1,
-                1,
-            )
-            launch_count += 1
-            selected = topology_compaction.deterministic_reflection_order1_compact(
-                visible=epc[0],
-                epc_faces=epc[2],
-                epc_hits=epc[4],
-                epc_normals=epc[5],
-                sequence_batch=epc_inputs["sequence_batch"],
-                rx_indices=epc_inputs["rx_indices"],
-                tx=tx,
-                rx_positions=rx_positions,
-                tx_power=tx_power.to(dtype=torch.float32).contiguous(),
-                tx_index=tx_index,
-                face_eps_r=face_eps_r,
-                face_sigma_e=face_sigma_e,
-                face_mu_r=face_mu_r,
-                face_gain=face_gain,
-                face_material_id=face_material_id,
-                grouped_export=grouped_export,
-            )
-            if int(selected["selected_faces"].numel()) == 0:
-                continue
+    def trace_group_chains(
+        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int
+    ) -> torch.Tensor:
+        nonlocal launch_count
+        chains = _discovered_group_chains(
+            raydn, tx, face_group_id=face_group_id, max_depth=max_depth
+        )
+        launch_count += 1
+        return chains
 
-            field_result = field_kernels.deterministic_reflection_field(
-                tx_position=selected["tx_keep"],
-                rx_position=selected["rx_keep"],
-                hit_position=selected["selected_points"],
-                normal=selected["selected_normals"],
-                tx_power=selected["tx_power"],
-                eps_r=selected["eps_r"],
-                sigma_e=selected["sigma_e"],
-                mu_r=selected["mu_r"],
-                gain=selected["gain"],
-                frequency_hz=frequency_hz,
+    for request in iter_reflection_order1_epc_requests(
+        plan,
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+        tri_a=tri_a,
+        normals=normals,
+        trace_group_chains=trace_group_chains,
+    ):
+        tx_index = request.tx_index
+        tx = request.tx
+        epc_inputs = request.epc_inputs
+        epc = geometry_bridge.raydn_reflection_epc_paths_forward(
+            raydn.require_handle(),
+            epc_inputs["tx_batch"],
+            epc_inputs["rx_batch"],
+            None,
+            epc_inputs["sequence_batch"],
+            epc_inputs["direct_plane_points"],
+            epc_inputs["direct_plane_normals"],
+            groups["surface_group_id"],
+            groups["surface_group_size"],
+            groups["surface_group_members"],
+            1,
+            1,
+        )
+        launch_count += 1
+        selected = topology_compaction.deterministic_reflection_order1_compact(
+            visible=epc[0],
+            epc_faces=epc[2],
+            epc_hits=epc[4],
+            epc_normals=epc[5],
+            sequence_batch=epc_inputs["sequence_batch"],
+            rx_indices=epc_inputs["rx_indices"],
+            tx=tx,
+            rx_positions=rx_positions,
+            tx_power=tx_power.to(dtype=torch.float32).contiguous(),
+            tx_index=tx_index,
+            face_eps_r=face_eps_r,
+            face_sigma_e=face_sigma_e,
+            face_mu_r=face_mu_r,
+            face_gain=face_gain,
+            face_material_id=face_material_id,
+            grouped_export=grouped_export,
+        )
+        if int(selected["selected_faces"].numel()) == 0:
+            continue
+
+        field_result = field_kernels.deterministic_reflection_field(
+            tx_position=selected["tx_keep"],
+            rx_position=selected["rx_keep"],
+            hit_position=selected["selected_points"],
+            normal=selected["selected_normals"],
+            tx_power=selected["tx_power"],
+            eps_r=selected["eps_r"],
+            sigma_e=selected["sigma_e"],
+            mu_r=selected["mu_r"],
+            gain=selected["gain"],
+            frequency_hz=frequency_hz,
+        )
+        path_gain = field_result["path_gain"].to(dtype=torch.float32).contiguous()
+        path_field = field_kernels.deterministic_pack_complex(
+            field_result["field_real"], field_result["field_imag"]
+        )
+        path_length = field_result["path_length_m"].to(dtype=torch.float32).contiguous()
+        delay = field_result["delay_s"].to(dtype=torch.float32).contiguous()
+        blocks.append(
+            _ensure_topology_fields(
+                topology_construction.deterministic_topology_base_fields(
+                    rx_id=selected["selected_rx_id"],
+                    path_length_m=path_length.to(dtype=torch.float32).contiguous(),
+                    delay_s=delay,
+                    path_gain=path_gain.to(dtype=torch.float32).contiguous(),
+                    tx_index=tx_index,
+                    component_id=1,
+                    depth_source=empty_i32,
+                    depth_value=1,
+                    primitive_source=selected["selected_faces"],
+                    primitive_value=-1,
+                    edge_source=empty_i32,
+                    edge_value=-1,
+                ),
+                interaction_position=selected["selected_points"],
+                interaction_normal=selected["selected_normals"],
+                material_id=selected["material_id"],
+                path_field=path_field,
             )
-            path_gain = field_result["path_gain"].to(dtype=torch.float32).contiguous()
-            path_field = field_kernels.deterministic_pack_complex(
-                field_result["field_real"], field_result["field_imag"]
-            )
-            path_length = (
-                field_result["path_length_m"].to(dtype=torch.float32).contiguous()
-            )
-            delay = field_result["delay_s"].to(dtype=torch.float32).contiguous()
-            blocks.append(
-                _ensure_topology_fields(
-                    topology_construction.deterministic_topology_base_fields(
-                        rx_id=selected["selected_rx_id"],
-                        path_length_m=path_length.to(dtype=torch.float32).contiguous(),
-                        delay_s=delay,
-                        path_gain=path_gain.to(dtype=torch.float32).contiguous(),
-                        tx_index=tx_index,
-                        component_id=1,
-                        depth_source=empty_i32,
-                        depth_value=1,
-                        primitive_source=selected["selected_faces"],
-                        primitive_value=-1,
-                        edge_source=empty_i32,
-                        edge_value=-1,
-                    ),
-                    interaction_position=selected["selected_points"],
-                    interaction_normal=selected["selected_normals"],
-                    material_id=selected["material_id"],
-                    path_field=path_field,
-                )
-            )
+        )
     return _ensure_topology_fields(
         concatenate_path_blocks(blocks, device=device)
     ), launch_count

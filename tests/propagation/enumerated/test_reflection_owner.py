@@ -21,7 +21,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
 _DIGESTS = {
     "_reflection_topology_order1": (
-        "158c0c6c0142ecd0c3cc65b079070ad63a97a2453d23daddbb54da793c5d0dc3"
+        "35cb2a0602c1d2d27dff2207524f1224129c53767858fa1f9ebd366abe2b5564"
     ),
     "_discovered_group_chains": (
         "0ab4299eb5a2c6ece2296ccdf9432de986f1e15fdf127ecd595b61bee6b04fa7"
@@ -57,6 +57,12 @@ def test_reflection_owners_and_discovery_constants_preserve_identity():
     assert discovery._ORDER1_EXHAUSTIVE_GROUP_LIMIT == 4096
     assert discovery._MULTIBOUNCE_PAIR_CHUNK_SIZE == 4_194_304
     assert discovery._MULTIBOUNCE_DISCOVERY_RAYS == 262_144
+    assert reflection.prepare_reflection_order1_plan is (
+        discovery.prepare_reflection_order1_plan
+    )
+    assert reflection.iter_reflection_order1_epc_requests is (
+        discovery.iter_reflection_order1_epc_requests
+    )
 
 
 def test_moved_functions_and_untouched_multibounce_have_frozen_ast():
