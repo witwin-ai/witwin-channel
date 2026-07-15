@@ -9,11 +9,19 @@ import torch
 from witwin.channel_native.core.scene_tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
-from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
+from witwin.channel_native.propagation.geometry.transmission import (
+    TransmissionClosestHitQuery,
+    query_transmission_closest_hit,
+)
 from witwin.channel_native.propagation.topology.concatenate import _empty_path_block
+from witwin.channel_native.propagation.topology.discovery.transmission import (
+    iter_transmission_active_rows,
+    prepare_transmission_pair_plan,
+    select_transmission_winner_rows,
+)
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
 
 if TYPE_CHECKING:
@@ -69,13 +77,15 @@ def _transmission_topology(
 
     tx_count = int(tx_positions.shape[0])
     rx_count = int(rx_positions.shape[0])
-    pair_count = tx_count * rx_count
-    tx_index = torch.arange(
-        tx_count, device=device, dtype=torch.int64
-    ).repeat_interleave(rx_count)
-    rx_index = torch.arange(rx_count, device=device, dtype=torch.int64).repeat(
-        tx_count
+    pair_plan = prepare_transmission_pair_plan(
+        tx_count=tx_count,
+        rx_count=rx_count,
+        max_depth=max_depth,
+        device=device,
     )
+    pair_count = pair_plan.pair_count
+    tx_index = pair_plan.tx_index
+    rx_index = pair_plan.rx_index
     source = tx_positions[tx_index].contiguous()
     target = rx_positions[rx_index].contiguous()
     offset = target - source
@@ -97,25 +107,26 @@ def _transmission_topology(
     traveled = torch.zeros_like(total_length)
     launch_count = 0
 
-    # max_depth events plus one probe that distinguishes "clear behind the
-    # last wall" from "more than max_depth penetrations" (depth cap stays
-    # truthful: deeper chains are dropped, never truncated).
-    for _step in range(max_depth + 1):
-        rows = torch.nonzero(~done & ~invalid, as_tuple=False).reshape(-1)
-        if int(rows.shape[0]) == 0:
-            break
+    for active_rows in iter_transmission_active_rows(
+        pair_plan,
+        done=done,
+        invalid=invalid,
+    ):
+        rows = active_rows.rows
         remaining = (total_length[rows] - traveled[rows]).clamp_min(0.0)
-        hit = geometry_bridge.bdpt_intersect_forward(
-            handle,
-            origin[rows].contiguous(),
-            direction[rows].contiguous(),
-            remaining.contiguous(),
-            None,
-            flags=7,
+        hit = query_transmission_closest_hit(
+            TransmissionClosestHitQuery(
+                handle=handle,
+                origin=origin[rows].contiguous(),
+                direction=direction[rows].contiguous(),
+                ray_tmax=remaining.contiguous(),
+                active=None,
+                flags=7,
+            )
         )
         launch_count += 1
-        hit_t = hit["t"]
-        hit_prim = hit["global_prim_id"].to(dtype=torch.int64)
+        hit_t = hit.t
+        hit_prim = hit.global_primitive_id.to(dtype=torch.int64)
         blocked = (hit_prim >= 0) & torch.isfinite(hit_t) & (hit_t < remaining)
         done[rows[~blocked]] = True
         hit_rows = rows[blocked]
@@ -127,9 +138,9 @@ def _transmission_topology(
         if int(keep.shape[0]) == 0:
             continue
         kept = ~overflow
-        hit_position = hit["p"][blocked][kept]
+        hit_position = hit.position[blocked][kept]
         hit_normal = geometry_primitives.deterministic_normalize_vec3(
-            hit["geo_n"][blocked][kept].contiguous(), eps=1.0e-9
+            hit.geometric_normal[blocked][kept].contiguous(), eps=1.0e-9
         )
         kept_prim = hit_prim[blocked][kept]
         kept_t = hit_t[blocked][kept]
@@ -154,12 +165,15 @@ def _transmission_topology(
     bad_material = (
         event_active & ((mats < 0) | (geometry_mode_id[mats.clamp_min(0)] != 0))
     ).any(dim=-1)
-    penetrated = done & ~invalid & (depth_count >= 1)
-    selected = penetrated & ~bad_material
-    candidate_count = int((invalid | penetrated).sum())
-    guardrail_count = int((invalid | (penetrated & bad_material)).sum())
-
-    chosen = torch.nonzero(selected, as_tuple=False).reshape(-1)
+    winners = select_transmission_winner_rows(
+        done=done,
+        invalid=invalid,
+        depth_count=depth_count,
+        bad_material=bad_material,
+    )
+    chosen = winners.chosen
+    candidate_count = winners.candidate_count
+    guardrail_count = winners.guardrail_count
     count = int(chosen.shape[0])
     if count == 0:
         return (
