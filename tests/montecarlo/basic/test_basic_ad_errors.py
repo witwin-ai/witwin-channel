@@ -31,3 +31,35 @@ def test_basic_ad_solve_rejects_pending_components(ad_mode, component):
     )
     with pytest.raises(RuntimeError, match=component):
         solve(scene, config)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
+@pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
+def test_basic_ad_solve_rejects_reflection_depth_over_ad_cap(ad_mode, monkeypatch):
+    # The reflection radiomap AD companions hard-cap contribution_depth in
+    # the native kernels; the solver must name that cap and reject the
+    # configuration at solve() time, before any forward launch (not
+    # mid-backward). The monkeypatched trace entry proves no forward ran.
+    from witwin.channel_native.core.kernels.ops import mc_reflection_ad_max_depth
+    from witwin.channel_native.montecarlo.basic import raydn_components
+
+    depth_cap = mc_reflection_ad_max_depth()
+    assert depth_cap >= 1
+
+    def _forbidden_forward(*args, **kwargs):
+        raise AssertionError(
+            "reflection forward launched before the AD depth-cap rejection"
+        )
+
+    monkeypatch.setattr(
+        raydn_components, "raydn_trace_reflections_forward", _forbidden_forward
+    )
+    scene = empty_space_los_scene()
+    config = Config(
+        samples=64,
+        components={"reflection"},
+        max_depth=depth_cap + 1,
+        ad_mode=ad_mode,
+    )
+    with pytest.raises(RuntimeError, match="reflection AD depth cap"):
+        solve(scene, config)

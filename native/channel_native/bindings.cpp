@@ -352,40 +352,6 @@ pybind11::tuple cn_raydn_trace_reflections_jvp(
     pybind11::object tangent_ray_d,
     torch::Tensor image_sources,
     std::uintptr_t raydn_module_handle);
-pybind11::tuple cn_raydn_refl_epc_field_forward(
-    int64_t scene_handle,
-    torch::Tensor source,
-    torch::Tensor receiver,
-    pybind11::object active,
-    int64_t max_bounces,
-    std::uintptr_t raydn_module_handle);
-pybind11::tuple cn_raydn_refl_epc_backward(
-    int64_t scene_handle,
-    torch::Tensor source,
-    torch::Tensor receiver,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    torch::Tensor tape_t,
-    pybind11::object grad_field_real,
-    pybind11::object grad_field_imag,
-    pybind11::object grad_path_length,
-    bool need_grad_vertices,
-    bool need_grad_source,
-    bool need_grad_receiver,
-    std::uintptr_t raydn_module_handle);
-pybind11::tuple cn_raydn_refl_epc_jvp(
-    int64_t scene_handle,
-    torch::Tensor source,
-    torch::Tensor receiver,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    torch::Tensor tape_t,
-    pybind11::object tangent_vertices,
-    pybind11::object tangent_source,
-    pybind11::object tangent_receiver,
-    std::uintptr_t raydn_module_handle);
 pybind11::tuple cn_raydn_reflection_epc_paths_backward(
     int64_t scene_handle,
     torch::Tensor source,
@@ -1263,6 +1229,7 @@ torch::Tensor cn_mc_sionna_reflection_accumulate(
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
     double solid_angle_per_ray, double cell_area);
+int64_t cn_mc_reflection_ad_max_depth_cuda();
 pybind11::tuple cn_mc_sionna_reflection_accumulate_backward(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
@@ -1798,18 +1765,6 @@ PYBIND11_MODULE(_channel_native, module) {
         &cn_raydn_trace_reflections_jvp,
         "Call the RayDN fixed-winner reflection chain JVP through the native C bridge.");
     module.def(
-        "raydn_refl_epc_field_forward",
-        &cn_raydn_refl_epc_field_forward,
-        "Call the RayDN tape-emitting reflection EPC field forward through the native C bridge.");
-    module.def(
-        "raydn_refl_epc_backward",
-        &cn_raydn_refl_epc_backward,
-        "Call the RayDN fixed-winner reflection EPC VJP through the native C bridge.");
-    module.def(
-        "raydn_refl_epc_jvp",
-        &cn_raydn_refl_epc_jvp,
-        "Call the RayDN fixed-winner reflection EPC JVP through the native C bridge.");
-    module.def(
         "raydn_reflection_epc_paths_backward",
         &cn_raydn_reflection_epc_paths_backward,
         "Call the RayDN fixed-winner reflection EPC paths geometry VJP through the native C bridge.");
@@ -2105,6 +2060,10 @@ PYBIND11_MODULE(_channel_native, module) {
         "mc_sionna_reflection_accumulate",
         &cn_mc_sionna_reflection_accumulate,
         "Accumulate finite-thickness Sionna/ITU specular reflections from RayDN traces.");
+    module.def(
+        "mc_reflection_ad_max_depth",
+        &cn_mc_reflection_ad_max_depth_cuda,
+        "Depth cap of the reflection radiomap AD companions (mirrors the native kernel constant).");
     module.def(
         "mc_sionna_reflection_accumulate_backward",
         &cn_mc_sionna_reflection_accumulate_backward,

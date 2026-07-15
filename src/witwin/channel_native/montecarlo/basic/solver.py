@@ -22,6 +22,7 @@ from witwin.channel_native.core.kernels.ops import (
     mc_finalize_component_maps,
     mc_finalize_component_maps_ad,
     mc_point_component_power,
+    mc_reflection_ad_max_depth,
     mc_zero_matrix,
 )
 
@@ -54,6 +55,14 @@ def _validate_ad_config(config: Config) -> None:
             raise RuntimeError(
                 f"MC basic ad_mode='{config.ad_mode}' does not support the "
                 f"{name} component yet (plan 07 AD-4)"
+            )
+    if "reflection" in config.components:
+        depth_cap = mc_reflection_ad_max_depth()
+        if config.max_depth > depth_cap:
+            raise RuntimeError(
+                f"MC basic ad_mode='{config.ad_mode}' supports the reflection "
+                f"component only up to max_depth={depth_cap} (native "
+                f"reflection AD depth cap); got max_depth={config.max_depth}"
             )
 
 

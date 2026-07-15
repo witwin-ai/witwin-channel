@@ -694,6 +694,14 @@ at::Tensor reflection_zero_filled(at::IntArrayRef sizes, const at::TensorOptions
 
 }  // namespace
 
+// Single source of truth for the reflection AD depth cap: the AD companions
+// below stage per-bounce state in kReflectionAdMaxDepth-sized register
+// arrays, so the solver reads this cap to reject an over-deep AD
+// configuration before any forward launch.
+int64_t cn_mc_reflection_ad_max_depth_cuda() {
+    return kReflectionAdMaxDepth;
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_mc_sionna_reflection_accumulate_backward_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,

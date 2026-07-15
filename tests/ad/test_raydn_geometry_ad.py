@@ -442,258 +442,12 @@ def test_reflection_chain_jvp_vjp_inner_product_duality():
     assert relative_error(lhs.cpu(), rhs.cpu(), abs_floor=ABS_TOL) <= REL_TOL_PATH
 
 
-def _epc_endpoints() -> tuple[torch.Tensor, torch.Tensor]:
-    # The EPC tape winner is the first primitive on the source -> receiver
-    # segment (ray o = source, unnormalized d = receiver - source), so the
-    # endpoints must straddle the wall plane.
-    source = torch.tensor([[-0.4, 0.2, -1.0]], dtype=torch.float32, device="cuda")
-    receiver = torch.tensor([[0.5, -0.1, 0.9]], dtype=torch.float32, device="cuda")
-    return source, receiver
-
-
-def _epc_loss_weights() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    generator = torch.Generator(device="cpu").manual_seed(37)
-    w_real = torch.randn(1, generator=generator).to("cuda")
-    w_imag = torch.randn(1, generator=generator).to("cuda")
-    w_len = torch.randn(1, generator=generator).to("cuda")
-    return w_real, w_imag, w_len
-
-
-def _epc_tape(
-    raydn: object, source: torch.Tensor, receiver: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Winner tape for the EPC kernels: intersect of ray (source, receiver - source)."""
-
-    hit = ops.bdpt_intersect_forward(
-        raydn,
-        source.contiguous(),
-        (receiver - source).contiguous(),
-        _empty_tmax(),
-        None,
-        flags=7,
-    )
-    return hit["global_prim_id"], hit["barycentric"], hit["t"]
-
-
-def _epc_analytic_loss(
-    raydn: object,
-    source: torch.Tensor,
-    receiver: torch.Tensor,
-    weights: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-) -> torch.Tensor:
-    """Primal of the EPC kernels along their tape contract.
-
-    RayD's refl_epc backward/jvp kernels differentiate field_real =
-    cos(t) / (1 + t), field_imag = sin(t) / (1 + t) and path_length = t,
-    where t is the ray parameter of the winner intersection for the
-    unnormalized ray (source, receiver - source).
-    """
-
-    _prim, _bary, t = _epc_tape(raydn, source, receiver)
-    t = t.double().cpu()
-    w_real, w_imag, w_len = (value.double().cpu() for value in weights)
-    field_real = torch.cos(t) / (1.0 + t)
-    field_imag = torch.sin(t) / (1.0 + t)
-    loss = (w_real * field_real).sum()
-    loss = loss + (w_imag * field_imag).sum()
-    loss = loss + (w_len * t).sum()
-    return loss
-
-
-def test_refl_epc_backward_matches_fd_wrt_source_and_receiver():
-    """Validates RayD's exposed EPC backward kernel contract (toy analytic
-    field, see _epc_analytic_loss), not _RaydnReflEpcFieldAdFunction: the
-    Function withholds field gradients because this contract does not match
-    the EM field of the EPC forward."""
-
-    raydn, vertices = _wall_scene()
-    del vertices
-    source, receiver = _epc_endpoints()
-    weights = _epc_loss_weights()
-    tape_prim_id, tape_barycentric, tape_t = _epc_tape(raydn, source, receiver)
-    assert int(tape_prim_id.min()) >= 0
-
-    w_real, w_imag, w_len = weights
-    grads = ops.raydn_refl_epc_backward(
-        raydn,
-        source,
-        receiver,
-        None,
-        tape_prim_id,
-        tape_barycentric,
-        tape_t,
-        grad_field_real=w_real,
-        grad_field_imag=w_imag,
-        grad_path_length=w_len,
-        need_grad_source=True,
-        need_grad_receiver=True,
-    )
-
-    fd_source = central_difference_gradient(
-        lambda x: _epc_analytic_loss(raydn, x, receiver, weights),
-        source,
-        FD_STEP_POSITION,
-    )
-    fd_receiver = central_difference_gradient(
-        lambda x: _epc_analytic_loss(raydn, source, x, weights),
-        receiver,
-        FD_STEP_POSITION,
-    )
-    assert relative_error(grads[1], fd_source, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
-    assert relative_error(grads[2], fd_receiver, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
-
-
-def test_refl_epc_jvp_matches_fd_wrt_source_and_receiver():
-    """Validates RayD's exposed EPC jvp kernel contract (toy analytic field,
-    see _epc_analytic_loss), not _RaydnReflEpcFieldAdFunction."""
-
-    raydn, vertices = _wall_scene()
-    del vertices
-    source, receiver = _epc_endpoints()
-    weights = _epc_loss_weights()
-    tape_prim_id, tape_barycentric, tape_t = _epc_tape(raydn, source, receiver)
-    assert int(tape_prim_id.min()) >= 0
-
-    generator = torch.Generator(device="cpu").manual_seed(43)
-    v_source = torch.randn(source.shape, generator=generator).to("cuda")
-    v_receiver = torch.randn(receiver.shape, generator=generator).to("cuda")
-    tangents = ops.raydn_refl_epc_jvp(
-        raydn,
-        source,
-        receiver,
-        None,
-        tape_prim_id,
-        tape_barycentric,
-        tape_t,
-        tangent_source=v_source,
-        tangent_receiver=v_receiver,
-    )
-    w_real, w_imag, w_len = weights
-    tangent_loss = (w_real.double().cpu() * tangents[0].double().cpu()).sum()
-    tangent_loss = tangent_loss + (w_imag.double().cpu() * tangents[1].double().cpu()).sum()
-    tangent_loss = tangent_loss + (w_len.double().cpu() * tangents[2].double().cpu()).sum()
-
-    def joint_loss(packed: torch.Tensor) -> torch.Tensor:
-        return _epc_analytic_loss(raydn, packed[:1], packed[1:], weights)
-
-    packed = torch.cat([source, receiver], dim=0)
-    direction = torch.cat([v_source, v_receiver], dim=0)
-    fd_value = central_difference_directional(
-        joint_loss, packed, direction, FD_STEP_POSITION
-    )
-    assert relative_error(tangent_loss, fd_value, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
-
-
-def test_refl_epc_jvp_vjp_inner_product_duality():
-    """Validates RayD's exposed EPC kernel pair (toy analytic field
-    contract), not _RaydnReflEpcFieldAdFunction."""
-
-    raydn, vertices = _wall_scene()
-    source, receiver = _epc_endpoints()
-    tape_prim_id, tape_barycentric, tape_t = _epc_tape(raydn, source, receiver)
-    assert int(tape_prim_id.min()) >= 0
-
-    generator = torch.Generator(device="cpu").manual_seed(41)
-    u_real = torch.randn(1, generator=generator).to("cuda")
-    u_imag = torch.randn(1, generator=generator).to("cuda")
-    u_len = torch.randn(1, generator=generator).to("cuda")
-    v_source = torch.randn(source.shape, generator=generator).to("cuda")
-    v_receiver = torch.randn(receiver.shape, generator=generator).to("cuda")
-    v_vertices = torch.randn(vertices.shape, generator=generator).to("cuda")
-
-    tangents = ops.raydn_refl_epc_jvp(
-        raydn,
-        source,
-        receiver,
-        None,
-        tape_prim_id,
-        tape_barycentric,
-        tape_t,
-        tangent_vertices=v_vertices,
-        tangent_source=v_source,
-        tangent_receiver=v_receiver,
-    )
-    lhs = (tangents[0].double() * u_real.double()).sum()
-    lhs = lhs + (tangents[1].double() * u_imag.double()).sum()
-    lhs = lhs + (tangents[2].double() * u_len.double()).sum()
-
-    grads = ops.raydn_refl_epc_backward(
-        raydn,
-        source,
-        receiver,
-        None,
-        tape_prim_id,
-        tape_barycentric,
-        tape_t,
-        grad_field_real=u_real,
-        grad_field_imag=u_imag,
-        grad_path_length=u_len,
-        need_grad_vertices=True,
-        need_grad_source=True,
-        need_grad_receiver=True,
-    )
-    rhs = (grads[0].double() * v_vertices.double()).sum()
-    rhs = rhs + (grads[1].double() * v_source.double()).sum()
-    rhs = rhs + (grads[2].double() * v_receiver.double()).sum()
-
-    assert relative_error(lhs.cpu(), rhs.cpu(), abs_floor=ABS_TOL) <= REL_TOL_PATH
-
-
-def test_refl_epc_field_ad_reports_invalid_paths_with_zero_grads():
-    """RayD's EPC discovery forward cannot validate single-plane fixtures
-    (its winner tape stays empty); the autograd.Function must then yield
-    exact zero path-length gradients instead of failing or fabricating
-    gradients (field outputs are non-differentiable by contract)."""
-
-    raydn, vertices = _wall_scene()
-    source, receiver = _epc_endpoints()
-
-    vertices_ad = vertices.detach().clone().requires_grad_(True)
-    source_ad = source.clone().requires_grad_(True)
-    receiver_ad = receiver.clone().requires_grad_(True)
-    out = ops.raydn_refl_epc_field_ad(
-        raydn, vertices_ad, source_ad, receiver_ad, None, 1
-    )
-    assert not bool(out["valid"].any())
-    loss = out["path_length"].sum()
-    loss.backward()
-    assert source_ad.grad is not None and float(source_ad.grad.abs().max()) == 0.0
-    assert receiver_ad.grad is not None and float(receiver_ad.grad.abs().max()) == 0.0
-    assert vertices_ad.grad is not None and float(vertices_ad.grad.abs().max()) == 0.0
-
-
-def test_refl_epc_field_ad_withholds_field_gradients():
-    """field_real/field_imag must not require grad (upstream RayD's EPC field
-    backward implements a toy contract that does not match its EM forward)
-    while path_length stays differentiable; a field-only loss fails loudly."""
-
-    raydn, vertices = _wall_scene()
-    source, receiver = _epc_endpoints()
-
-    vertices_ad = vertices.detach().clone().requires_grad_(True)
-    source_ad = source.clone().requires_grad_(True)
-    receiver_ad = receiver.clone().requires_grad_(True)
-    out = ops.raydn_refl_epc_field_ad(
-        raydn, vertices_ad, source_ad, receiver_ad, None, 1
-    )
-    assert not out["field_real"].requires_grad
-    assert not out["field_imag"].requires_grad
-    assert out["path_length"].requires_grad
-
-    field_only_loss = out["field_real"].sum() + out["field_imag"].sum()
-    with pytest.raises(RuntimeError):
-        field_only_loss.backward()
-
-
 def test_fixed_winner_tape_outputs_are_non_differentiable():
     raydn, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
-    source, receiver = _epc_endpoints()
 
     vertices_ad = vertices.detach().clone().requires_grad_(True)
     ray_o_ad = ray_o.clone().requires_grad_(True)
-    source_ad = source.clone().requires_grad_(True)
-    receiver_ad = receiver.clone().requires_grad_(True)
 
     intersect_out = ops.raydn_intersect_ad(
         raydn, vertices_ad, ray_o_ad, ray_d, _empty_tmax()
@@ -718,21 +472,6 @@ def test_fixed_winner_tape_outputs_are_non_differentiable():
     ):
         assert not reflection_out[name].requires_grad
         assert reflection_out[name].grad_fn is None
-
-    epc_out = ops.raydn_refl_epc_field_ad(
-        raydn, vertices_ad, source_ad, receiver_ad, None, 1
-    )
-    assert epc_out["path_length"].requires_grad
-    for name in (
-        "field_real",
-        "field_imag",
-        "valid",
-        "resolved_prim_id",
-        "tape_prim_id",
-        "tape_barycentric",
-    ):
-        assert not epc_out[name].requires_grad
-        assert epc_out[name].grad_fn is None
 
 
 def test_intersect_vjp_matches_fd_wrt_normal_and_barycentric_cotangents():
@@ -827,38 +566,6 @@ def test_reflection_chain_functional_jvp_matches_native():
     assert float(expected[0].abs().max()) > 0.0
     assert relative_error(tangents[0], expected[0], abs_floor=ABS_TOL) <= REL_TOL_PATH
     assert relative_error(tangents[1], expected[1], abs_floor=ABS_TOL) <= REL_TOL_PATH
-
-
-def test_refl_epc_functional_jvp_matches_native():
-    """Exercise _RaydnReflEpcFieldAdFunction.jvp through torch.func.jvp."""
-
-    raydn, vertices = _wall_scene()
-    source, receiver = _epc_endpoints()
-    forward = ops.raydn_refl_epc_field_forward(raydn, source, receiver, None, 1)
-    _fr, _fi, path_length, _valid, _resolved, tape_prim_id, tape_bary, _active = forward
-
-    generator = torch.Generator(device="cpu").manual_seed(67)
-    v_source = torch.randn(source.shape, generator=generator).to("cuda")
-    v_receiver = torch.randn(receiver.shape, generator=generator).to("cuda")
-    expected = ops.raydn_refl_epc_jvp(
-        raydn,
-        source,
-        receiver,
-        None,
-        tape_prim_id,
-        tape_bary,
-        path_length,
-        tangent_source=v_source,
-        tangent_receiver=v_receiver,
-    )
-
-    def f(s: torch.Tensor, r: torch.Tensor) -> torch.Tensor:
-        return ops.raydn_refl_epc_field_ad(raydn, vertices, s, r, None, 1)[
-            "path_length"
-        ]
-
-    _primal, tangent = torch.func.jvp(f, (source, receiver), (v_source, v_receiver))
-    assert torch.allclose(tangent, expected[2])
 
 
 def test_jvp_facades_reject_wrong_shaped_tangents():
@@ -982,39 +689,6 @@ def test_reflection_facades_reject_mismatched_tape_batch():
         )
 
 
-def test_epc_facades_reject_mismatched_tape_batch():
-    raydn, vertices = _wall_scene()
-    source, receiver = _epc_endpoints()
-    tape_prim_id, tape_barycentric, tape_t = _epc_tape(raydn, source, receiver)
-
-    source2 = source.repeat(2, 1).contiguous()
-    receiver2 = receiver.repeat(2, 1).contiguous()
-    grad_len2 = torch.ones(2, dtype=torch.float32, device="cuda")
-    with pytest.raises(ValueError):
-        ops.raydn_refl_epc_backward(
-            raydn,
-            source2,
-            receiver2,
-            None,
-            tape_prim_id,
-            tape_barycentric,
-            tape_t,
-            grad_path_length=grad_len2,
-            need_grad_source=True,
-        )
-    with pytest.raises(ValueError):
-        ops.raydn_refl_epc_jvp(
-            raydn,
-            source2,
-            receiver2,
-            None,
-            tape_prim_id,
-            tape_barycentric,
-            tape_t,
-            tangent_source=torch.zeros_like(source2),
-        )
-
-
 def test_composed_functorch_transforms_raise_not_implemented():
     """torch.func.grad over forward-mode jvp (the HVP recipe) must fail
     loudly instead of silently returning zeros (plan 07 section 7)."""
@@ -1068,14 +742,3 @@ def test_double_backward_raises():
     )
     with pytest.raises(RuntimeError):
         refl_grad.sum().backward()
-
-    source, receiver = _epc_endpoints()
-    source_ad = source.clone().requires_grad_(True)
-    epc_out = ops.raydn_refl_epc_field_ad(
-        wall, wall_vertices, source_ad, receiver, None, 1
-    )
-    (epc_grad,) = torch.autograd.grad(
-        epc_out["path_length"].sum(), source_ad, create_graph=True
-    )
-    with pytest.raises(RuntimeError):
-        epc_grad.sum().backward()

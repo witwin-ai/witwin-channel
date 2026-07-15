@@ -154,7 +154,11 @@ priority `scattering > diffraction > transmission > reflection > los`.
   and the solver fails loudly (`NotImplementedError`) instead of returning
   a silently incomplete gradient (registered as `xfail(strict=True)`).
 - Explicit-failure policy: the scattering component raises a `RuntimeError`
-  naming the interaction before any launch when `ad_mode != "none"`.
+  naming the interaction before any launch when `ad_mode != "none"`. A
+  montecarlo.basic reflection solve whose `max_depth` exceeds the native
+  reflection AD depth cap (`ops.mc_reflection_ad_max_depth()`, mirrored from
+  the kernel constant) is rejected the same way at `solve()` instead of
+  failing mid-backward.
 - AD metadata (plan 07 AD-4): `result.metadata["kernel"]` reports the real
   `ad_status`, `tape_bytes` (bytes retained via `save_for_backward`; zero
   for `none`/`jvp`), `backward_launch_count` / `jvp_launch_count`

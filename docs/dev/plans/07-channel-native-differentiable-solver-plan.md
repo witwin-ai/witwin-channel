@@ -252,14 +252,14 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 
 | 参数 | LoS | 单反射 | 多反射 | 透射/多层 | 绕射 UTD | 耦合 R↔D |
 |---|---|---|---|---|---|---|
-| `eps_r` | — | D/P/M | D/P | D/P/M | D/P/M | D/P |
-| `sigma_e` | — | D/P/M | D/P | D/P/M | D/P/M | D/P |
+| `eps_r` | — | D/P/M | D/P | D/P/M | D/P/M | P |
+| `sigma_e` | — | D/P/M | D/P | D/P/M | D/P/M | P |
 | `thickness` | — | — | — | D/P/M | — | — |
-| frequency | D/P/M | D/P/M | D/P | D/P/M | D/P/M | D/P |
-| TX/RX pos | D/P/M | D/P/M | D/P | D/P/M | D/P/M | D/P |
-| mesh vertex | D/P | D/P | D/P | D/P | D/P | D/P |
+| frequency | D/P/M | D/P/M | D/P | D/P/M | D/P/M | P |
+| TX/RX pos | D/P/M | D/P/M | D/P | D/P/M | D/P/M | P |
+| mesh vertex | D/P | D/P | D/P | D/P | D/P | P |
 
-D=deterministic, P=path, M=montecarlo.basic。**D/P 验证复系数（含相位/时延）导数；M 只验证实数功率增益导数**（basic 非相干、无复系数）。频率是原版**未**测的维度，本轮必测（channel_native 把它作为一等可微参数）。空格=物理上不适用。M 的耦合 R↔D、多反射不在 basic 组件集内故留空。BDPT 全部推迟（§7 非目标），不进本矩阵。
+D=deterministic, P=path, M=montecarlo.basic。**D/P 验证复系数（含相位/时延）导数；M 只验证实数功率增益导数**（basic 非相干、无复系数）。频率是原版**未**测的维度，本轮必测（channel_native 把它作为一等可微参数）。空格=物理上不适用。耦合 R↔D 是 path solver 专属：只有 `PathConfig.coupled_paths` 会产生 component_id 3/4 的行，deterministic 没有 coupled_paths 字段，结构上不可达，故该列仅 P。M 的耦合 R↔D、多反射不在 basic 组件集内故留空。BDPT 全部推迟（§7 非目标），不进本矩阵。
 
 ### 9.4 基础设施
 

@@ -618,6 +618,85 @@ def test_face_normals_ad_function_routes_vertex_gradients():
     assert relative_error(tangent, expected_tangent, abs_floor=ABS_TOL) <= REL_TOL_PATH
 
 
+# Healthy triangle (faces row 0) plus a sliver triangle (faces row 1) whose
+# raw cross product has |cross| = 1e-8, well below the face-normal table's
+# 1e-6 normalize clamp. The sliver's perturbed coordinates (base 0 or 1e-8)
+# stay exactly representable in float32, so the scene-rebuild FD is clean.
+_SLIVER_VERTICES = (
+    (0.0, 0.0, 0.0),
+    (2.0, 0.0, 0.3),
+    (0.0, 2.0, 0.2),
+    (5.0, 0.0, 0.0),
+    (6.0, 0.0, 0.0),
+    (7.0, 1.0e-8, 0.0),
+)
+_SLIVER_FACES = ((0, 1, 2), (3, 4, 5))
+# FD step for sliver perturbations: keeps |cross| <= ~1.1e-7 on both sides of
+# the difference, so the primal never leaves the clamped branch.
+_SLIVER_FD_STEP = 1.0e-7
+
+
+def test_face_normals_companions_follow_sliver_clamp_branch():
+    """Below the table's 1e-6 normalize clamp the primal is the constant
+    scale raw / 1e-6, so its exact derivative is that constant times the
+    identity: no projection (which would drop the radial component) and no
+    1/|raw| scale (which would blow up as the face degenerates). Adjoint and
+    tangent are FD-anchored against the true clamped primal via scene
+    rebuild; the healthy face in the same scene keeps its projection-branch
+    derivative."""
+
+    base = torch.tensor(_SLIVER_VERTICES, dtype=torch.float32)
+    raydn = _build_raydn_scene(base, _SLIVER_FACES)
+    records = raydn.edge_records()
+    raw = records.face_normals
+    # The fixture must actually sit below the clamp, or this test is vacuous.
+    assert float(raw[1].norm()) < 1.0e-6
+    assert float(raw[0].norm()) > 1.0e-6
+
+    generator = torch.Generator(device="cpu").manual_seed(157)
+    w = torch.randn(2, 3, generator=generator).to("cuda")
+
+    vertices_ad = records.vertices.detach().clone().requires_grad_(True)
+    table = ops.raydn_face_normals_ad(raydn, vertices_ad, raw.contiguous())
+    (w * table).sum().backward()
+    assert vertices_ad.grad is not None
+
+    def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
+        rebuilt = _build_raydn_scene(perturbed_vertices, _SLIVER_FACES)
+        rebuilt_table = ops.deterministic_normalize_vec3(
+            rebuilt.edge_records().face_normals.contiguous(), eps=1.0e-6
+        )
+        return (w.double().cpu() * rebuilt_table.double().cpu()).sum()
+
+    # Radial direction: moves the raw cross along its own axis, the component
+    # an unclamped projection adjoint drops entirely.
+    radial = torch.zeros(6, 3)
+    radial[5, 1] = 1.0
+    # Tangential direction: stays in the projection subspace, where an
+    # unclamped adjoint would scale by 1/|raw| = 1e8 instead of 1/eps = 1e6.
+    tangential = torch.zeros(6, 3)
+    tangential[5, 2] = 1.0
+    # Healthy direction: only the healthy triangle's vertices move.
+    healthy = torch.zeros(6, 3)
+    healthy[:3] = torch.randn(3, 3, generator=generator)
+
+    for direction, step in (
+        (radial, _SLIVER_FD_STEP),
+        (tangential, _SLIVER_FD_STEP),
+        (healthy, FD_STEP_GEOMETRY),
+    ):
+        direction = direction.to("cuda")
+        fd_value = central_difference_directional(
+            rebuild_loss, base.cuda(), direction, step
+        )
+        vjp_value = (vertices_ad.grad.double() * direction.double()).sum().cpu()
+        tangent = ops.raydn_scene_face_normals_jvp(raydn, direction.contiguous())
+        jvp_value = (w.double().cpu() * tangent.double().cpu()).sum()
+        assert float(fd_value.abs()) > 0.0
+        assert relative_error(vjp_value, fd_value, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+        assert relative_error(jvp_value, fd_value, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
 def test_epc_paths_backward_skips_invalid_rows():
     """A row the discovery rejected must contribute exactly zero gradient."""
 
