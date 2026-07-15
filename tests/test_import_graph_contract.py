@@ -112,6 +112,36 @@ import witwin.channel_native.materials.kernels.private
     }
 
 
+def test_propagation_legacy_path_topology_dependencies_are_hard_failures(
+    tmp_path: Path,
+):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "core/path_topology.py": "",
+            "core/legacy_path_topology.py": "",
+            "propagation/fields.py": (
+                "from witwin.channel_native.core.path_topology import TopologyBatch\n"
+            ),
+            "propagation/geometry.py": (
+                "import witwin.channel_native.core.legacy_path_topology\n"
+            ),
+        },
+    )
+
+    rules = Counter(violation.rule for violation in graph.scan_package(package_root))
+
+    assert rules == {"propagation_legacy_path_topology_dependency": 2}
+
+
+def test_real_propagation_graph_has_no_legacy_path_topology_dependency():
+    assert not any(
+        violation.rule == "propagation_legacy_path_topology_dependency"
+        for violation in graph.scan_package(PACKAGE_ROOT)
+    )
+
+
 def test_wildcard_and_relative_boundary_escapes_are_hard_failures(tmp_path: Path):
     package_root = _synthetic_package(
         tmp_path,

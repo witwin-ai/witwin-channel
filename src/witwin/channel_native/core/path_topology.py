@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -33,6 +33,7 @@ from witwin.channel_native.propagation.geometry.reevaluate import (
     _reflection_geometry_ad,  # noqa: F401 - compatibility re-export
     _vertices_participate_in_ad,  # noqa: F401 - compatibility re-export
 )
+from witwin.channel_native.propagation.models.contracts import TopologyConfig
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.propagation.topology.kernels import (
     compaction as topology_compaction,
@@ -72,13 +73,6 @@ from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-
-
-class TopologyConfig(Protocol):
-    max_depth: int
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
-    max_paths: int | None
-    max_paths_scope: str
 
 
 _MAX_MULTIBOUNCE_FACE_SEQUENCES = 100_000

@@ -3,49 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
 
 import torch
 
+from .contracts import EvaluatedRowsSource
 from .evaluated import EvaluatedPaths
 from .fields import PathFields
 from .geometry import PathGeometry
 from .topology import PathTopology
-
-
-class _TopologyBatchSource(Protocol):
-    """Structural source contract for the legacy mixed row table."""
-
-    valid: torch.Tensor
-    tx_id: torch.Tensor
-    rx_id: torch.Tensor
-    depth: torch.Tensor
-    component_id: torch.Tensor
-    primitive_id: torch.Tensor
-    edge_id: torch.Tensor
-    material_id: torch.Tensor
-    primitive_sequence: torch.Tensor
-    material_sequence: torch.Tensor
-    interaction_type: torch.Tensor
-    path_length_m: torch.Tensor
-    delay_s: torch.Tensor
-    field_direction: torch.Tensor
-    interaction_position: torch.Tensor
-    interaction_normal: torch.Tensor
-    interaction_positions: torch.Tensor
-    interaction_normals: torch.Tensor
-    path_gain: torch.Tensor
-    path_field: torch.Tensor
-    field_xyz: torch.Tensor
-    coefficient: torch.Tensor
-    launch_count: int
-    visibility_rejection_count: int
-    selected_edge_count: int
-    candidate_count: int
-    guardrail_count: int
-    ad_companion_launches: int
-    ad_tape_bytes: int
-    diffraction_vector_field: torch.Tensor | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +35,7 @@ class TopologyBatchSidecars:
 
 
 def evaluated_paths_from_topology_batch(
-    source: _TopologyBatchSource,
+    source: EvaluatedRowsSource,
 ) -> tuple[EvaluatedPaths, TopologyBatchSidecars]:
     """Expose a legacy mixed row table through the split propagation contracts."""
 

@@ -270,6 +270,14 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
     target = edge.target
     target_solver = _solver_owner(target)
 
+    if _matches(source, f"{PACKAGE}.propagation") and target in {
+        f"{PACKAGE}.core.path_topology",
+        f"{PACKAGE}.core.legacy_path_topology",
+    }:
+        violations.append(
+            _violation(edge, "propagation_legacy_path_topology_dependency")
+        )
+
     if _matches(source, f"{PACKAGE}.propagation.enumerated") and (
         target_solver is not None
         or _matches(target, f"{PACKAGE}.montecarlo")

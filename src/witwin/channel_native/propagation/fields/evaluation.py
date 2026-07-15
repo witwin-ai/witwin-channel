@@ -49,8 +49,10 @@ from witwin.channel_native.propagation.topology.kernels import (
 from witwin.channel_native.runtime import autograd_contracts as ops
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.path_topology import TopologyBatch
     from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.propagation.models.contracts import (
+        EvaluatedRowsSource as TopologyBatch,
+    )
 
 
 def _rough_reflection_factor(
