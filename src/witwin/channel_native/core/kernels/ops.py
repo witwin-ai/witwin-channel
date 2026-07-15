@@ -4524,6 +4524,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
         layer_sigma_e,
         layer_mu_r,
         frequency,
+        frequency_value,
     ):
         out = em_layer_stack_eval(
             cos_theta,
@@ -4534,7 +4535,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             layer_eps_r,
             layer_sigma_e,
             layer_mu_r,
-            frequency_hz=_ad_frequency_value(frequency),
+            frequency_hz=frequency_value,
         )
         return tuple(out[name] for name in _EM_LAYER_STACK_FIELDS)
 
@@ -4546,7 +4547,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in inputs[:8]
         )
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = inputs[9]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -4558,7 +4559,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
-        none_grads = (None,) * 9
+        none_grads = (None,) * 10
         _ad_reject_fixed_inputs(
             "em_layer_stack_ad",
             ctx.needs_input_grad,
@@ -4595,6 +4596,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             out["grad_layer_sigma_e"] if ctx.needs_input_grad[6] else None,
             None,
             grad_frequency,
+            None,
         )
 
     @staticmethod
@@ -4609,6 +4611,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
         t_layer_sigma_e,
         t_layer_mu_r,
         t_frequency,
+        _t_frequency_value,
     ):
         _ad_reject_fixed_tangents(
             "em_layer_stack_ad", ((t_layer_mu_r, "layer_mu_r"),)
@@ -4668,9 +4671,18 @@ def em_layer_stack_ad(
     layer_mu_r: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`em_layer_stack_eval` (plan 07 AD-3)."""
+    """Differentiable :func:`em_layer_stack_eval` (plan 07 AD-3).
 
+    ``frequency_value`` is the precomputed host scalar of ``frequency``; a
+    seam that applies several Functions per solve reads the 0-d tensor once
+    and threads the float here so no Function re-reads it (audit M3). When
+    not supplied it is read here, exactly once per apply.
+    """
+
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     values = _EmLayerStackAdFunction.apply(
         cos_theta,
         material_id,
@@ -4681,6 +4693,7 @@ def em_layer_stack_ad(
         layer_sigma_e,
         layer_mu_r,
         frequency,
+        float(frequency_value),
     )
     return dict(zip(_EM_LAYER_STACK_FIELDS, values, strict=True))
 
@@ -4898,8 +4911,11 @@ def _ad_frequency_value(frequency: torch.Tensor | float) -> float:
     """Read the scalar carrier frequency once per solve.
 
     A 0-d CUDA tensor frequency costs one device-to-host synchronization per
-    kernel invocation here (documented plan 07 AD-1 decision: one sync per
-    solve, never per path); the native entry points keep a double scalar.
+    read (documented plan 07 AD-1 decision: one sync per solve, never per
+    path); the native entry points keep a double scalar. The solve seams
+    call this once and thread the float to every ``field_*_ad`` facade as
+    ``frequency_value`` so no Function pays a second read (audit M3); a
+    facade called without it reads here exactly once.
     """
 
     if isinstance(frequency, torch.Tensor):
@@ -5339,8 +5355,15 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(source, target, tx_power, tx_polarization, rx_polarization, frequency):
-        frequency_value = _ad_frequency_value(frequency)
+    def forward(
+        source,
+        target,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        frequency,
+        frequency_value,
+    ):
         op_name = (
             "field_free_space_fwd64"
             if source.dtype == torch.float64
@@ -5359,12 +5382,20 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        source, target, tx_power, tx_polarization, rx_polarization, frequency = inputs
+        (
+            source,
+            target,
+            tx_power,
+            tx_polarization,
+            rx_polarization,
+            frequency,
+            frequency_value,
+        ) = inputs
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in (source, target, tx_power, tx_polarization, rx_polarization)
         )
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = frequency_value
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -5390,7 +5421,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         grad_delay,
         _grad_direction,
     ):
-        none_grads = (None,) * 6
+        none_grads = (None,) * 7
         _ad_reject_fixed_inputs(
             "field_free_space_ad",
             ctx.needs_input_grad,
@@ -5445,10 +5476,20 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             None,
             None,
             grad_frequency,
+            None,
         )
 
     @staticmethod
-    def jvp(ctx, t_source, t_target, t_tx_power, t_tx_pol, t_rx_pol, t_frequency):
+    def jvp(
+        ctx,
+        t_source,
+        t_target,
+        t_tx_power,
+        t_tx_pol,
+        t_rx_pol,
+        t_frequency,
+        _t_frequency_value,
+    ):
         _ad_reject_fixed_tangents(
             "field_free_space_ad",
             (
@@ -5498,11 +5539,25 @@ def field_free_space_ad(
     rx_polarization: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_free_space` (frequency only in AD-1)."""
+    """Differentiable :func:`field_free_space` (frequency only in AD-1).
 
+    ``frequency_value`` optionally carries the precomputed host scalar of
+    ``frequency`` (one read per solve at the seam, audit M3); when not
+    supplied it is read here, exactly once per apply.
+    """
+
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     values = _FieldFreeSpaceAdFunction.apply(
-        source, target, tx_power, tx_polarization, rx_polarization, frequency
+        source,
+        target,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        frequency,
+        float(frequency_value),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -5533,6 +5588,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         gain,
         thickness,
         frequency,
+        frequency_value,
     ):
         out = _required_native_op("field_reflection_sequence")(
             source,
@@ -5547,7 +5603,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             mu_r,
             gain,
             thickness,
-            _ad_frequency_value(frequency),
+            frequency_value,
         )
         return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
 
@@ -5559,7 +5615,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in inputs[:12]
         )
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = inputs[13]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -5585,7 +5641,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         grad_delay,
         _grad_direction,
     ):
-        none_grads = (None,) * 13
+        none_grads = (None,) * 14
         _ad_reject_fixed_inputs(
             "field_reflection_sequence_ad",
             ctx.needs_input_grad,
@@ -5679,6 +5735,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             out["grad_gain"] if need_gain else None,
             out["grad_thickness"] if need_thickness else None,
             grad_frequency,
+            None,
         )
 
     @staticmethod
@@ -5697,6 +5754,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         t_gain,
         t_thickness,
         t_frequency,
+        _t_frequency_value,
     ):
         _ad_reject_fixed_tangents(
             "field_reflection_sequence_ad",
@@ -5793,9 +5851,17 @@ def field_reflection_sequence_ad(
     thickness: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_reflection_sequence` (materials + frequency)."""
+    """Differentiable :func:`field_reflection_sequence` (materials + frequency).
 
+    ``frequency_value`` optionally carries the precomputed host scalar of
+    ``frequency`` (one read per solve at the seam, audit M3); when not
+    supplied it is read here, exactly once per apply.
+    """
+
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     values = _FieldReflectionSequenceAdFunction.apply(
         source,
         target,
@@ -5810,6 +5876,7 @@ def field_reflection_sequence_ad(
         gain,
         thickness,
         frequency,
+        float(frequency_value),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -5845,6 +5912,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         layer_sigma_e,
         layer_mu_r,
         frequency,
+        frequency_value,
     ):
         out = _required_native_op("field_transmission_sequence")(
             source,
@@ -5862,7 +5930,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             layer_eps_r,
             layer_sigma_e,
             layer_mu_r,
-            _ad_frequency_value(frequency),
+            frequency_value,
         )
         return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
 
@@ -5874,7 +5942,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in inputs[:15]
         )
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = inputs[16]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -5900,7 +5968,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         grad_delay,
         _grad_direction,
     ):
-        none_grads = (None,) * 16
+        none_grads = (None,) * 17
         _ad_reject_fixed_inputs(
             "field_transmission_sequence_ad",
             ctx.needs_input_grad,
@@ -5973,6 +6041,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             out["grad_layer_sigma_e"] if need_sigma else None,
             None,
             grad_frequency,
+            None,
         )
 
     @staticmethod
@@ -5994,6 +6063,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         t_layer_sigma_e,
         t_layer_mu_r,
         t_frequency,
+        _t_frequency_value,
     ):
         _ad_reject_fixed_tangents(
             "field_transmission_sequence_ad",
@@ -6086,9 +6156,17 @@ def field_transmission_sequence_ad(
     layer_mu_r: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_transmission_sequence` (layers + frequency)."""
+    """Differentiable :func:`field_transmission_sequence` (layers + frequency).
 
+    ``frequency_value`` optionally carries the precomputed host scalar of
+    ``frequency`` (one read per solve at the seam, audit M3); when not
+    supplied it is read here, exactly once per apply.
+    """
+
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     values = _FieldTransmissionSequenceAdFunction.apply(
         source,
         target,
@@ -6106,6 +6184,7 @@ def field_transmission_sequence_ad(
         layer_sigma_e,
         layer_mu_r,
         frequency,
+        float(frequency_value),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -6231,6 +6310,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         vertex_opp0,
         vertex_opp1,
         edge_boundary,
+        frequency_value,
     ):
         out = _required_native_op("field_diffraction_wedge")(
             source,
@@ -6253,7 +6333,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             face1_mu_r,
             face1_gain,
             tx_power,
-            _ad_frequency_value(frequency),
+            frequency_value,
             vertex_v0,
             vertex_v1,
             vertex_opp0,
@@ -6277,7 +6357,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             for value in inputs[21:26]
         )
         ctx.has_vertices = vertex_primals[0] is not None
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = inputs[26]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -6300,7 +6380,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, grad_field_vector, grad_direction):
-        none_grads = (None,) * 26
+        none_grads = (None,) * 27
         _ad_reject_fixed_inputs(
             "field_diffraction_wedge_ad",
             ctx.needs_input_grad,
@@ -6377,6 +6457,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             out["grad_vertex_v1"] if ctx.needs_input_grad[22] else None,
             out["grad_vertex_opp0"] if ctx.needs_input_grad[23] else None,
             out["grad_vertex_opp1"] if ctx.needs_input_grad[24] else None,
+            None,
             None,
         )
 
@@ -6487,6 +6568,7 @@ def field_diffraction_wedge_ad(
     tx_power: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
     vertices: tuple[torch.Tensor, ...] | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable :func:`field_diffraction_wedge`.
@@ -6494,13 +6576,18 @@ def field_diffraction_wedge_ad(
     ``vertices`` optionally supplies the winner edge vertices as
     ``(v0, v1, opp0, opp1, edge_boundary)`` per row; the kernel then rebuilds
     the edge tables from them so mesh-vertex gradients exist (plan 07 section
-    9.3 mesh-vertex x diffraction).
+    9.3 mesh-vertex x diffraction). ``frequency_value`` optionally carries
+    the precomputed host scalar of ``frequency`` (one read per solve at the
+    seam, audit M3); when not supplied it is read here, exactly once per
+    apply.
     """
 
     if vertices is not None and len(vertices) != 5:
         raise ValueError(
             "vertices must hold (v0, v1, opp0, opp1, edge_boundary) per row"
         )
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     vertex_args = vertices if vertices is not None else (None,) * 5
     values = _FieldDiffractionWedgeAdFunction.apply(
         source,
@@ -6525,6 +6612,7 @@ def field_diffraction_wedge_ad(
         tx_power,
         frequency,
         *vertex_args,
+        float(frequency_value),
     )
     return dict(zip(_WEDGE_OUTPUT_FIELDS, values, strict=True))
 
@@ -6656,6 +6744,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
         w1_thickness,
         frequency,
         reverse,
+        frequency_value,
     ):
         out = _required_native_op("field_coupled_rd")(
             source,
@@ -6685,7 +6774,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             w1_mu_r,
             w1_gain,
             w1_thickness,
-            _ad_frequency_value(frequency),
+            frequency_value,
             bool(reverse),
         )
         return tuple(out[name] for name in _COUPLED_OUTPUT_FIELDS)
@@ -6698,7 +6787,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in inputs[:27]
         )
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = inputs[29]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -6719,7 +6808,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
         grad_path_gain,
         _grad_direction,
     ):
-        none_grads = (None,) * 29
+        none_grads = (None,) * 30
         _ad_reject_fixed_inputs(
             "field_coupled_rd_ad",
             ctx.needs_input_grad,
@@ -6813,6 +6902,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             material_column("grad_gain", 2, 25),
             material_column("grad_thickness", 2, 26),
             grad_frequency,
+            None,
             None,
         )
 
@@ -6928,9 +7018,15 @@ def field_coupled_rd_ad(
     wedge_material1: tuple[torch.Tensor, ...],
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
     reverse: bool,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_coupled_rd` (12 material scalars + frequency + geometry)."""
+    """Differentiable :func:`field_coupled_rd` (12 material scalars + frequency + geometry).
+
+    ``frequency_value`` optionally carries the precomputed host scalar of
+    ``frequency`` (one read per solve at the seam, audit M3); when not
+    supplied it is read here, exactly once per apply.
+    """
 
     if any(
         len(bundle) != 5
@@ -6939,6 +7035,8 @@ def field_coupled_rd_ad(
         raise ValueError(
             "coupled material bundles must contain eps/sigma/mu/gain/thickness"
         )
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     values = _FieldCoupledRdAdFunction.apply(
         source,
         target,
@@ -6957,6 +7055,7 @@ def field_coupled_rd_ad(
         *wedge_material1,
         frequency,
         bool(reverse),
+        float(frequency_value),
     )
     return dict(zip(_COUPLED_OUTPUT_FIELDS, values, strict=True))
 
@@ -9756,24 +9855,24 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(tx_positions, tx_power, rx_positions, frequency):
+    def forward(tx_positions, tx_power, rx_positions, frequency, frequency_value):
         exported = path_los_export(
             tx_positions,
             tx_power,
             rx_positions,
-            frequency_hz=_ad_frequency_value(frequency),
+            frequency_hz=frequency_value,
         )
         return exported["path_gain_matrix"]
 
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        tx_positions, tx_power, rx_positions, frequency = inputs
+        tx_positions, tx_power, rx_positions, frequency, frequency_value = inputs
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in (tx_positions, tx_power, rx_positions)
         )
-        ctx.frequency_value = _ad_frequency_value(frequency)
+        ctx.frequency_value = frequency_value
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -9794,7 +9893,7 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
         need_rx = bool(ctx.needs_input_grad[2])
         need_frequency = bool(ctx.needs_input_grad[3])
         if grad_output is None or not (need_tx or need_rx or need_frequency):
-            return None, None, None, None
+            return None, None, None, None, None
         tx_positions, tx_power, rx_positions = ctx.saved_tensors
         grad_tx, _grad_power, grad_rx, grad_frequency = mc_los_path_gain_backward(
             tx_positions,
@@ -9810,10 +9909,11 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
             _ad_frequency_grad(grad_frequency, ctx.frequency_meta)
             if need_frequency
             else None,
+            None,
         )
 
     @staticmethod
-    def jvp(ctx, t_tx, t_power, t_rx, t_frequency):
+    def jvp(ctx, t_tx, t_power, t_rx, t_frequency, _t_frequency_value):
         _ad_reject_fixed_tangents(
             "mc_los_path_gain_ad", ((t_power, "tx_power"),)
         )
@@ -9850,11 +9950,19 @@ def mc_los_path_gain_ad(
     rx_positions: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
+    frequency_value: float | None = None,
 ) -> torch.Tensor:
-    """Differentiable LoS path-gain matrix (endpoints and frequency)."""
+    """Differentiable LoS path-gain matrix (endpoints and frequency).
 
+    ``frequency_value`` optionally carries the precomputed host scalar of
+    ``frequency`` (one read per solve at the seam, audit M3); when not
+    supplied it is read here, exactly once per apply.
+    """
+
+    if frequency_value is None:
+        frequency_value = _ad_frequency_value(frequency)
     return _McLosPathGainAdFunction.apply(
-        tx_positions, tx_power, rx_positions, frequency
+        tx_positions, tx_power, rx_positions, frequency, float(frequency_value)
     )
 
 
@@ -11532,7 +11640,7 @@ def deterministic_accumulate_flat(
         dtype=torch.float32,
         ndim=3,
     )
-    expected_component_shape = (3, int(num_tx), int(num_rx))
+    expected_component_shape = (5, int(num_tx), int(num_rx))
     if tuple(exported["power_total"].shape) != (int(num_tx), int(num_rx)):
         raise ValueError(
             "_channel_native.deterministic_accumulate_flat returned bad power_total shape"
@@ -11644,15 +11752,19 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     The forward is the primal native accumulator: each kept path's complex
     field and real power scatter into a frozen (component_slot, tx, rx)
-    cell, then coherent cells square the summed field (|sum E|^2) while
-    incoherent cells sum per-path powers and expose a sqrt-power
-    pseudo-field. The scatter is linear in the per-path field/power, so the
-    adjoint is one masked-gather kernel through the same frozen gates with
-    the |.|^2 / sqrt cell nonlinearities linearized at the saved forward
-    outputs, and the pushforward is the same scatter applied to the
-    tangents. The slot/tx/rx ids are discrete winners and stay fixed. A
-    float64 input batch routes through the float64 companion forward so
-    torch.autograd.gradcheck can run in strict double precision.
+    cell over the five slots los / reflection / diffraction / transmission /
+    scattering, then coherent cells square the summed field (|sum E|^2 over
+    the four field slots) while incoherent cells sum per-path powers and
+    expose a sqrt-power pseudo-field. Scattering is a power-domain slot in
+    both modes: its gains add linearly to the totals and its cell field is
+    a diagnostic that reaches no total. The scatter is linear in the
+    per-path field/power, so the adjoint is one masked-gather kernel
+    through the same frozen gates with the |.|^2 / sqrt cell nonlinearities
+    linearized at the saved forward outputs, and the pushforward is the
+    same scatter applied to the tangents. The slot/tx/rx ids are discrete
+    winners and stay fixed. A float64 input batch routes through the
+    float64 companion forward so torch.autograd.gradcheck can run in
+    strict double precision.
     """
 
     @staticmethod

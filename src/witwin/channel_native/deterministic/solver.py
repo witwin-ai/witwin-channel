@@ -19,7 +19,7 @@ from witwin.channel_native.core.kernels.ops import deterministic_component_count
 from witwin.channel_native.core.components import component_availability_status
 
 from .accumulation import (
-    _PYTHON_ACCUMULATED_COMPONENTS,
+    _OPTIONAL_COMPONENTS,
     accumulate_path_result,
     build_path_table,
 )
@@ -213,7 +213,13 @@ def solve(scene: Scene, config: Config) -> Result:
 
     device = torch.device("cuda")
     _, layout = receiver_positions_and_layout(scene, device=device)
-    path_result = export_topology(scene, config)
+    # One host read of a tensor frequency for the whole solve: topology
+    # export, field evaluation, accumulation and path export share it
+    # (audit M3). Scene.compile() keeps its own read: the material cache
+    # token must see the live value to stay correct under in-place
+    # frequency mutation.
+    frequency_hz = _frequency_scalar(scene)
+    path_result = export_topology(scene, config, frequency_value=frequency_hz)
     scattering_info = None
     if "scattering" in config.components:
         path_result, scattering_info = append_scattering_paths(
@@ -228,20 +234,20 @@ def solve(scene: Scene, config: Config) -> Result:
                 (path_result.component_id == cid).sum().item()
             )
     extra_components = tuple(
-        name for name in _PYTHON_ACCUMULATED_COMPONENTS if name in config.components
+        name for name in _OPTIONAL_COMPONENTS if name in config.components
     )
     path_gain, field, component_power, component_fields = accumulate_path_result(
         path_result,
-        frequency_hz=_frequency_scalar(scene),
+        frequency_hz=frequency_hz,
         num_tx=len(scene.transmitters),
         num_rx=layout.receiver_count,
         layout=layout,
         coherent=config.coherent,
         return_field=config.return_field,
         extra_components=extra_components,
-        # AD modes route every component through the differentiable Python
-        # accumulation so Result.path_gain/field/component_power carry the
-        # complete graph; none-mode keeps the native zero-overhead kernel.
+        # AD modes run the same native accumulator inside its dispatch-only
+        # autograd.Function so Result.path_gain/field/component_power carry
+        # the complete graph; none-mode keeps the bare zero-overhead kernel.
         differentiable=config.ad_mode != "none",
     )
     exact_diffraction = None
@@ -311,7 +317,7 @@ def solve(scene: Scene, config: Config) -> Result:
         paths=(
             build_path_table(
                 path_result,
-                frequency_hz=_frequency_scalar(scene),
+                frequency_hz=frequency_hz,
                 include_fields=config.return_field,
             )
             if config.export_paths

@@ -2007,11 +2007,21 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic accumulation")
 
-    tx_id = torch.tensor([0, 0, 0, 1], device="cuda", dtype=torch.int32)
-    rx_id = torch.tensor([0, 0, 1, 1], device="cuda", dtype=torch.int32)
-    component_id = torch.tensor([0, 1, 1, 2], device="cuda", dtype=torch.int32)
-    path_gain = torch.tensor([1.0, 4.0, 9.0, 16.0], device="cuda", dtype=torch.float32)
-    field = torch.tensor([1.0 + 0.0j, 0.0 + 2.0j, 3.0 + 0.0j, 0.0 + 4.0j], device="cuda", dtype=torch.complex64)
+    # Component ids 0/1/2/5/6 map to slots 0/1/2/3/4; transmission (slot 3)
+    # joins the coherent field sum while scattering (slot 4) folds into the
+    # totals in the power domain and keeps its field as a diagnostic.
+    tx_id = torch.tensor([0, 0, 0, 1, 0, 0], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, 0, 1, 1, 1, 0], device="cuda", dtype=torch.int32)
+    component_id = torch.tensor([0, 1, 1, 2, 5, 6], device="cuda", dtype=torch.int32)
+    path_gain = torch.tensor(
+        [1.0, 4.0, 9.0, 16.0, 25.0, 0.5], device="cuda", dtype=torch.float32
+    )
+    field = torch.tensor(
+        [1.0 + 0.0j, 0.0 + 2.0j, 3.0 + 0.0j, 0.0 + 4.0j, 5.0 + 1.0j, 0.5 + 0.0j],
+        device="cuda",
+        dtype=torch.complex64,
+    )
+    slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4}
 
     result = ops.deterministic_accumulate_flat(
         tx_id,
@@ -2025,16 +2035,21 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
         coherent=True,
     )
 
-    expected_component_field = torch.zeros((3, 2, 2), device="cuda", dtype=torch.complex64)
-    expected_component_power = torch.zeros((3, 2, 2), device="cuda", dtype=torch.float32)
+    expected_component_field = torch.zeros((5, 2, 2), device="cuda", dtype=torch.complex64)
+    expected_scattering_power = torch.zeros((2, 2), device="cuda", dtype=torch.float32)
     for index in range(int(tx_id.numel())):
         cid = int(component_id[index])
         tx = int(tx_id[index])
         rx = int(rx_id[index])
-        expected_component_field[cid, tx, rx] += field[index]
+        expected_component_field[slot_of[cid], tx, rx] += field[index]
+        if cid == 6:
+            expected_scattering_power[tx, rx] += path_gain[index]
     expected_component_power = expected_component_field.abs().square()
-    expected_field_total = expected_component_field.sum(dim=0)
-    expected_power_total = expected_field_total.abs().square()
+    expected_component_power[4] = expected_scattering_power
+    expected_field_total = expected_component_field[:4].sum(dim=0)
+    expected_power_total = (
+        expected_field_total.abs().square() + expected_scattering_power
+    )
 
     torch.testing.assert_close(result["component_power"], expected_component_power)
     torch.testing.assert_close(torch.complex(result["component_field_real"], result["component_field_imag"]), expected_component_field)

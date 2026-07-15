@@ -22,6 +22,7 @@ from typing import Any
 import torch
 
 from witwin.channel_native.core.kernels.ops import (
+    _ad_frequency_value,
     bdpt_intersect_forward,
     em_layer_stack_ad,
     em_layer_stack_eval,
@@ -144,6 +145,7 @@ def straight_transmission_chains(
     face_material_id: torch.Tensor,
     layer_csr: dict[str, torch.Tensor],
     frequency_hz: float | torch.Tensor,
+    frequency_value: float | None = None,
     max_depth: int,
     scene_diagonal: float,
     ad: bool = False,
@@ -162,6 +164,10 @@ def straight_transmission_chains(
 
     device = origins.device
     count = int(origins.shape[0])
+    if ad and frequency_value is None:
+        # One host read of a tensor frequency for the whole march; every
+        # per-wall em_layer_stack_ad below reuses this scalar (audit M3).
+        frequency_value = _ad_frequency_value(frequency_hz)
     handle = raydn.require_handle()
     delta = targets - origins
     distance = delta.norm(dim=-1)
@@ -231,6 +237,7 @@ def straight_transmission_chains(
                 layer_csr["layer_sigma_e"],
                 layer_csr["layer_mu_r"],
                 frequency=frequency_hz,
+                frequency_value=frequency_value,
             )
         else:
             stack = em_layer_stack_eval(

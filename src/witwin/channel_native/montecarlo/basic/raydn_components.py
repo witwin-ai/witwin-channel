@@ -229,6 +229,11 @@ def transmission_component_map(
     layer_csr = layer_csr_view(bundle)
     diagonal = scene_diagonal_m(scene)
     rx_count = int(rx_pos.shape[0])
+    # One host read of a tensor frequency for every per-tx chain march below
+    # (audit M3); the AD march additionally keeps the live tensor so the
+    # carrier gradient survives.
+    frequency_value = _frequency_scalar(scene)
+    frequency_hz = scene.frequency if ad else frequency_value
     gains = []
     for tx_index in range(int(tx_pos.shape[0])):
         origins = tx_march[tx_index].unsqueeze(0).repeat(rx_count, 1)
@@ -238,7 +243,8 @@ def transmission_component_map(
             rx_pos,
             face_material_id=bundle["material_id"],
             layer_csr=layer_csr,
-            frequency_hz=scene.frequency if ad else float(scene.frequency),
+            frequency_hz=frequency_hz,
+            frequency_value=frequency_value if ad else None,
             max_depth=int(max_depth),
             scene_diagonal=diagonal,
             ad=ad,

@@ -158,11 +158,16 @@ nobody assumes the reverse pass is as cheap as the forward:
 - **Scalar-gradient atomics.** `grad_frequency` (1 address) and the MC
   `grad_source` (3 addresses) accumulate with `atomicAdd` from every row/lane; a
   block reduction would cut the serialization on large radiomaps.
-- **Frequency host syncs under AD.** A tensor frequency is read to a host float
-  more than once per solve under AD (each field Function reads it). This is AD-path
-  overhead only; none-mode reads it through the detaching scalar path.
 
-None of the above affects `ad_mode="none"`. The none-mode primal is unchanged.
+Measured on small analytic scenes (frequency gradient, tensor-frequency): the AD
+forward is within ~1.0-1.15x of the none-mode forward and the reverse pass is a
+fraction of it. Device-to-host synchronizations during a solve: `ad_mode="none"`
+takes 0; a tensor-frequency AD solve takes 2 (one for the compiled material
+cache token, one solve-level read shared by discovery, fields and accumulation)
+rather than one per field kernel; the reverse pass takes 0. Material and geometry
+reverse mode carries additional per-parameter dual cost (the seeded-dual choice
+above) beyond the frequency figure. None of this affects `ad_mode="none"`: the
+none-mode primal is byte-identical and uninstrumented.
 
 ## 6. Verification
 

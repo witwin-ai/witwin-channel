@@ -887,6 +887,7 @@ def _evaluate_shared_fields(
     *,
     components: frozenset[str] | set[str] = frozenset(),
     ad_mode: str = "none",
+    frequency_value: float | None = None,
 ) -> TopologyBatch:
     """Evaluate selected canonical rows with the shared complex3 ABI.
 
@@ -894,11 +895,14 @@ def _evaluate_shared_fields(
     float frequency, no autograd graph). ``jvp``/``vjp`` route LoS,
     reflection and transmission through the differentiable field Functions:
     material gathers stay on the torch graph and the frequency is forwarded
-    as a 0-d tensor when the scene stores one. Hit geometry stays detached
-    under the fixed-topology contract unless a geometry leaf participates in
-    AD, in which case it comes from RayD's fixed-winner geometry companions
-    (see ``_reflection_geometry_ad``). The rough-surface C_r attenuation is
-    pure torch and receives the same live frequency so dC_r/df is kept.
+    as a 0-d tensor when the scene stores one, alongside one precomputed
+    host scalar (``frequency_value``) threaded into every field Function so
+    a tensor-frequency solve pays a single device-to-host frequency read
+    (audit M3). Hit geometry stays detached under the fixed-topology
+    contract unless a geometry leaf participates in AD, in which case it
+    comes from RayD's fixed-winner geometry companions (see
+    ``_reflection_geometry_ad``). The rough-surface C_r attenuation is pure
+    torch and receives the same live frequency so dC_r/df is kept.
     """
 
     count = int(topology.valid.shape[0])
@@ -914,15 +918,30 @@ def _evaluate_shared_fields(
             if isinstance(scene.frequency, torch.Tensor)
             else float(scene.frequency)
         )
-        los_field_op = partial(ops.field_free_space_ad, frequency=frequency)
+        if frequency_value is None:
+            frequency_value = ops._ad_frequency_value(frequency)
+        frequency_value = float(frequency_value)
+        los_field_op = partial(
+            ops.field_free_space_ad,
+            frequency=frequency,
+            frequency_value=frequency_value,
+        )
         reflection_field_op = partial(
-            ops.field_reflection_sequence_ad, frequency=frequency
+            ops.field_reflection_sequence_ad,
+            frequency=frequency,
+            frequency_value=frequency_value,
         )
         transmission_field_op = partial(
-            ops.field_transmission_sequence_ad, frequency=frequency
+            ops.field_transmission_sequence_ad,
+            frequency=frequency,
+            frequency_value=frequency_value,
         )
     else:
-        frequency = _frequency_scalar(scene)
+        frequency = (
+            _frequency_scalar(scene)
+            if frequency_value is None
+            else float(frequency_value)
+        )
         los_field_op = partial(ops.field_free_space, frequency_hz=frequency)
         reflection_field_op = partial(
             ops.field_reflection_sequence, frequency_hz=frequency
@@ -1212,6 +1231,7 @@ def _evaluate_shared_fields(
             evaluated = ops.field_diffraction_wedge_ad(
                 *wedge_args,
                 frequency=frequency,
+                frequency_value=frequency_value,
                 vertices=wedge_vertices,
             )
             powered_xyz = evaluated["field_vector"]
@@ -1359,7 +1379,11 @@ def _evaluate_shared_fields(
                 )
 
             coupled_field_op = (
-                partial(ops.field_coupled_rd_ad, frequency=frequency)
+                partial(
+                    ops.field_coupled_rd_ad,
+                    frequency=frequency,
+                    frequency_value=frequency_value,
+                )
                 if ad_enabled
                 else partial(ops.field_coupled_rd, frequency_hz=frequency)
             )
@@ -2627,11 +2651,22 @@ def _transmission_topology(
     return block, launch_count, candidate_count, guardrail_count
 
 
-def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
+def export_topology(
+    scene: Scene,
+    config: TopologyConfig,
+    *,
+    frequency_value: float | None = None,
+) -> TopologyBatch:
     device = torch.device("cuda")
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
     rx_positions, _ = receiver_positions_and_layout(scene, device=device)
     compiled = scene.compile()
+    # One host read of a tensor frequency for the whole export: discovery and
+    # the field seam below share this detached scalar (audit M3). Callers
+    # that already read it (the solver seams) pass it in.
+    frequency_hz = (
+        _frequency_scalar(scene) if frequency_value is None else float(frequency_value)
+    )
     ad_mode = str(getattr(config, "ad_mode", "none"))
     if ad_mode != "none":
         _require_frequency_ad_constant_materials(scene, compiled, ad_mode=ad_mode)
@@ -2650,7 +2685,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             tx_positions,
             tx_power,
             rx_positions,
-            frequency_hz=_frequency_scalar(scene),
+            frequency_hz=frequency_hz,
         )
         launch_count += 1
         tx_id = exported["tx_id"]
@@ -2679,7 +2714,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 exported["delay_s"].to(dtype=torch.float32).contiguous(),
                 exported["path_gain"].to(dtype=torch.float32).contiguous(),
                 visible,
-                frequency_hz=_frequency_scalar(scene),
+                frequency_hz=frequency_hz,
                 sequence_width=sequence_width,
             )
         )
@@ -2695,7 +2730,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             tx_positions,
             tx_power,
             rx_positions,
-            frequency_hz=_frequency_scalar(scene),
+            frequency_hz=frequency_hz,
         )
         launch_count += reflection_launches
         candidate_count += int(block["valid"].numel())
@@ -2708,7 +2743,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 tx_positions,
                 tx_power,
                 rx_positions,
-                frequency_hz=_frequency_scalar(scene),
+                frequency_hz=frequency_hz,
                 min_depth=2,
                 max_depth=int(config.max_depth),
                 max_paths=config.max_paths,
@@ -2725,7 +2760,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
                 tx_positions,
                 tx_power,
                 rx_positions,
-                frequency_hz=_frequency_scalar(scene),
+                frequency_hz=frequency_hz,
             )
         )
         launch_count += diffraction_launches
@@ -2784,6 +2819,7 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
             rx_positions,
             components=components,
             ad_mode=ad_mode,
+            frequency_value=frequency_hz,
         )
     padded_blocks = [
         block
@@ -2817,4 +2853,5 @@ def export_topology(scene: Scene, config: TopologyConfig) -> TopologyBatch:
         rx_positions,
         components=components,
         ad_mode=ad_mode,
+        frequency_value=frequency_hz,
     )

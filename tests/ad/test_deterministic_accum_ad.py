@@ -1,9 +1,11 @@
 """Direct AD checks of the native deterministic flat-accumulation Function.
 
 Strict float64 torch.autograd.gradcheck of
-ops.deterministic_accumulate_flat_ad on a small path fixture (coherent
-|sum field|^2 totals and incoherent power sums with the sqrt pseudo-field),
-a jvp-vs-vjp inner-product duality check, float32 forward parity against the
+ops.deterministic_accumulate_flat_ad on a small path fixture covering all
+five materialized slots (coherent |sum field|^2 totals over the los /
+reflection / diffraction / transmission field slots, the power-domain
+scattering slot, and incoherent power sums with the sqrt pseudo-field), a
+jvp-vs-vjp inner-product duality check, float32 forward parity against the
 primal native accumulator, and the frozen-gate contract: rows outside the
 materialized component slots or the tx/rx ranges receive exactly zero
 gradient.
@@ -32,15 +34,17 @@ _OUTPUT_FIELDS = (
     "component_field_imag",
 )
 
-# Rows 0-4 and 8 are kept (cell (0, 0) carries a same-slot collision on slot
-# 0 plus a second slot, so the cell nonlinearities mix several paths). Row 5
-# has a component id outside the three materialized slots (a transmission
-# row the Python side accumulates separately), row 6 an out-of-range tx and
-# row 7 an out-of-range rx: the accumulator must drop all three.
-_TX_ID = (0, 0, 0, 1, 1, 0, -1, 0, 0)
-_RX_ID = (0, 0, 1, 1, 0, 1, 0, 3, 0)
-_COMPONENT_ID = (0, 1, 1, 2, 0, 5, 1, 2, 0)
-_DROPPED_ROWS = (5, 6, 7)
+# Rows 0-5 and 8-9 are kept and cover every materialized slot: cell (0, 0)
+# carries a same-slot collision on slot 0 plus reflection and scattering
+# rows, so the cell nonlinearities mix several paths; row 5 is a
+# transmission row (slot 3, part of the coherent field sum) and row 9 a
+# scattering row (slot 4, power-domain in both modes). Row 6 has an
+# out-of-range tx, row 7 an out-of-range rx and row 10 a coupled component
+# id without a slot: the accumulator must drop all three.
+_TX_ID = (0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 1)
+_RX_ID = (0, 0, 1, 1, 0, 1, 0, 3, 0, 0, 1)
+_COMPONENT_ID = (0, 1, 1, 2, 0, 5, 1, 2, 0, 6, 3)
+_DROPPED_ROWS = (6, 7, 10)
 
 
 def _fixture(dtype: torch.dtype):
