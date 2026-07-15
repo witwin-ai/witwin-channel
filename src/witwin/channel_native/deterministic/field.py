@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from .kernels import fields as field_kernels
 
 
 LIGHT_SPEED_M_PER_S = 299_792_458.0
@@ -10,7 +10,7 @@ _EPSILON0 = 8.854187817e-12
 
 
 def free_space_phase_rad(path_length_m: torch.Tensor, frequency_hz: float) -> torch.Tensor:
-    return ops.deterministic_phase_from_length(path_length_m.contiguous(), frequency_hz=float(frequency_hz))
+    return field_kernels.deterministic_phase_from_length(path_length_m.contiguous(), frequency_hz=float(frequency_hz))
 
 
 def free_space_complex_field(
@@ -18,22 +18,22 @@ def free_space_complex_field(
     path_length_m: torch.Tensor,
     frequency_hz: float,
 ) -> torch.Tensor:
-    exported = ops.deterministic_los_field(
+    exported = field_kernels.deterministic_los_field(
         path_gain.contiguous(),
         path_length_m.contiguous(),
         frequency_hz=float(frequency_hz),
     )
-    return ops.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
+    return field_kernels.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
 
 
 def equivalent_field_from_power_phase(path_gain: torch.Tensor, phase_rad: torch.Tensor) -> torch.Tensor:
-    exported = ops.deterministic_field_from_power_phase(path_gain.contiguous(), phase_rad.contiguous())
-    return ops.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
+    exported = field_kernels.deterministic_field_from_power_phase(path_gain.contiguous(), phase_rad.contiguous())
+    return field_kernels.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
 
 
 def phase_rad_from_complex_field(path_field: torch.Tensor) -> torch.Tensor:
     field = path_field.contiguous()
-    return ops.deterministic_phase_from_field(
+    return field_kernels.deterministic_phase_from_field(
         field.real.contiguous(),
         field.imag.contiguous(),
     )
@@ -47,7 +47,7 @@ def equivalent_field_from_vector_components(
     z_re: torch.Tensor,
     z_im: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    exported = ops.deterministic_diffraction_vector_field(
+    exported = field_kernels.deterministic_diffraction_vector_field(
         x_re.contiguous(),
         x_im.contiguous(),
         y_re.contiguous(),
@@ -55,7 +55,7 @@ def equivalent_field_from_vector_components(
         z_re.contiguous(),
         z_im.contiguous(),
     )
-    field = ops.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
+    field = field_kernels.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
     return exported["path_gain"], field
 
 
@@ -76,7 +76,7 @@ def reflection_complex_field(
     gain: torch.Tensor,
     frequency_hz: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    exported = ops.deterministic_reflection_field(
+    exported = field_kernels.deterministic_reflection_field(
         tx_position=tx_position.contiguous(),
         rx_position=rx_position.contiguous(),
         hit_position=hit_position.contiguous(),
@@ -88,7 +88,7 @@ def reflection_complex_field(
         gain=gain.contiguous(),
         frequency_hz=float(frequency_hz),
     )
-    field = ops.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
+    field = field_kernels.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
     return exported["path_gain"], field
 
 
@@ -116,7 +116,7 @@ def reflection_sequence_complex_field(
     gain: torch.Tensor,
     frequency_hz: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    exported = ops.deterministic_reflection_sequence_field(
+    exported = field_kernels.deterministic_reflection_sequence_field(
         tx_position=tx_position.contiguous(),
         rx_position=rx_position.contiguous(),
         hit_positions=hit_positions.contiguous(),
@@ -128,5 +128,5 @@ def reflection_sequence_complex_field(
         gain=gain.contiguous(),
         frequency_hz=float(frequency_hz),
     )
-    field = ops.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
+    field = field_kernels.deterministic_pack_complex(exported["field_real"], exported["field_imag"])
     return exported["path_gain"], field, exported["path_length_m"]

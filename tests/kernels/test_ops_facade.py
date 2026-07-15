@@ -5,6 +5,7 @@ import torch
 
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels import raydn_backend
+from witwin.channel_native.deterministic.kernels import fields as deterministic_fields
 from witwin.channel_native.materials.kernels import functional as material_functional
 from witwin.channel_native.runtime import symbols as runtime_symbols
 from witwin.channel_native.propagation.topology.kernels import (
@@ -1149,7 +1150,7 @@ def test_deterministic_reflection_field_requires_native_cuda_kernel(monkeypatch)
 
     tensor = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     one = torch.ones((1,), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(deterministic_fields, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="deterministic_reflection_field CUDA kernel is required"):
         ops.deterministic_reflection_field(

@@ -5,6 +5,7 @@ from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config, solve
+from witwin.channel_native.deterministic.kernels import fields as deterministic_fields
 from witwin.channel_native.core import path_topology as topology
 from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.path import solve as solve_paths
@@ -308,7 +309,7 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native reflection is not built")
 
-    original = topology.ops.deterministic_reflection_sequence_field
+    original = deterministic_fields.deterministic_reflection_sequence_field
     calls = 0
 
     def count_native_sequence_field(**kwargs):
@@ -317,7 +318,7 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
         return original(**kwargs)
 
     monkeypatch.setattr(
-        topology.ops,
+        deterministic_fields,
         "deterministic_reflection_sequence_field",
         count_native_sequence_field,
     )

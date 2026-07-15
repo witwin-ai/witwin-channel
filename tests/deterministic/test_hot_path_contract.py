@@ -3,9 +3,9 @@ import torch
 
 from tests.support.scenes import empty_space_los_scene
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
+from witwin.channel_native.deterministic.kernels import fields as deterministic_fields
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.propagation.topology.kernels import (
     construction as topology_construction,
@@ -58,13 +58,15 @@ def test_diffraction_hot_path_uses_native_vector_field_facade(monkeypatch):
         pytest.skip("RayDN native diffraction is not built")
 
     calls = []
-    original = ops.deterministic_diffraction_vector_field
+    original = deterministic_fields.deterministic_diffraction_vector_field
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(ops, "deterministic_diffraction_vector_field", wrapped)
+    monkeypatch.setattr(
+        deterministic_fields, "deterministic_diffraction_vector_field", wrapped
+    )
 
     solve(wedge_diffraction_scene(), Config(max_depth=1, components={"diffraction"}))
 

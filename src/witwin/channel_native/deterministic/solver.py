@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene
+
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.capabilities import (
     capabilities,
@@ -15,6 +15,7 @@ from witwin.channel_native.capabilities import (
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
+from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_component_counts,
 )
@@ -27,13 +28,15 @@ from .accumulation import (
 )
 from .config import Config
 from .result import Result
-from witwin.channel_native.propagation.enumerated import append_scattering_paths
 from witwin.channel_native.core.path_topology import (
     _frequency_scalar,
     apply_receiver_layout,
     export_topology,
     receiver_positions_and_layout,
 )
+
+if TYPE_CHECKING:
+    from witwin.channel_native.core.scene import Scene
 
 
 def _validate_requested_components(config: Config) -> None:
@@ -224,6 +227,8 @@ def solve(scene: Scene, config: Config) -> Result:
     path_result = export_topology(scene, config, frequency_value=frequency_hz)
     scattering_info = None
     if "scattering" in config.components:
+        from witwin.channel_native.propagation.enumerated import append_scattering_paths
+
         path_result, scattering_info = append_scattering_paths(
             scene, config, path_result
         )

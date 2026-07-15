@@ -4,12 +4,12 @@ import math
 from dataclasses import dataclass, replace
 from functools import partial
 from types import SimpleNamespace
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
 from witwin.channel_native.core import ad_geometry
+from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
@@ -39,6 +39,9 @@ from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
+
+if TYPE_CHECKING:
+    from witwin.channel_native.core.scene import Scene
 from witwin.channel_native.core.material_runtime import (
     face_material_field_bundle,
     face_material_tensors,
@@ -1487,6 +1490,8 @@ def _reflection_topology_order1(
     *,
     frequency_hz: float,
 ) -> tuple[dict[str, torch.Tensor], int]:
+    from witwin.channel_native.deterministic.kernels import fields as field_kernels
+
     device = tx_positions.device
     raydn = compiled.raydn
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
@@ -1647,7 +1652,7 @@ def _reflection_topology_order1(
             if int(selected["selected_faces"].numel()) == 0:
                 continue
 
-            field_result = ops.deterministic_reflection_field(
+            field_result = field_kernels.deterministic_reflection_field(
                 tx_position=selected["tx_keep"],
                 rx_position=selected["rx_keep"],
                 hit_position=selected["selected_points"],
@@ -1660,7 +1665,7 @@ def _reflection_topology_order1(
                 frequency_hz=frequency_hz,
             )
             path_gain = field_result["path_gain"].to(dtype=torch.float32).contiguous()
-            path_field = ops.deterministic_pack_complex(
+            path_field = field_kernels.deterministic_pack_complex(
                 field_result["field_real"], field_result["field_imag"]
             )
             path_length = (
@@ -1795,6 +1800,8 @@ def _reflection_topology_multibounce(
     max_depth: int,
     max_paths: int | None,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
+    from witwin.channel_native.deterministic.kernels import fields as field_kernels
+
     device = tx_positions.device
     raydn = compiled.raydn
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
@@ -1940,7 +1947,7 @@ def _reflection_topology_multibounce(
         count = int(selected["selected_sequences"].shape[0])
         if count == 0:
             return
-        field_result = ops.deterministic_reflection_sequence_field(
+        field_result = field_kernels.deterministic_reflection_sequence_field(
             tx_position=selected["selected_tx"],
             rx_position=selected["selected_rx"],
             hit_positions=selected["selected_hits"],
@@ -1953,7 +1960,7 @@ def _reflection_topology_multibounce(
             frequency_hz=frequency_hz,
         )
         path_gain = field_result["path_gain"].to(dtype=torch.float32).contiguous()
-        path_field = ops.deterministic_pack_complex(
+        path_field = field_kernels.deterministic_pack_complex(
             field_result["field_real"], field_result["field_imag"]
         )
         path_length = field_result["path_length_m"].to(dtype=torch.float32).contiguous()
@@ -2137,6 +2144,8 @@ def _diffraction_topology_order1(
     *,
     frequency_hz: float,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
+    from witwin.channel_native.deterministic.kernels import fields as field_kernels
+
     device = tx_positions.device
     raydn = compiled.raydn
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
@@ -2253,7 +2262,7 @@ def _diffraction_topology_order1(
                     receiver_index,
                     torch.complex(compacted[real_index], compacted[imag_index]),
                 )
-            field_result = ops.deterministic_diffraction_vector_field(
+            field_result = field_kernels.deterministic_diffraction_vector_field(
                 x_re=compacted["x_re"],
                 x_im=compacted["x_im"],
                 y_re=compacted["y_re"],
@@ -2262,7 +2271,7 @@ def _diffraction_topology_order1(
                 z_im=compacted["z_im"],
             )
             field_power = field_result["path_gain"]
-            path_field = ops.deterministic_pack_complex(
+            path_field = field_kernels.deterministic_pack_complex(
                 field_result["field_real"], field_result["field_imag"]
             )
             field_xyz = torch.stack(
@@ -2274,7 +2283,7 @@ def _diffraction_topology_order1(
                 dim=1,
             ).contiguous()
             delay = compacted["delay_s"]
-            path_length = ops.deterministic_delay_to_path_length(delay)
+            path_length = field_kernels.deterministic_delay_to_path_length(delay)
             empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
             blocks.append(
                 _ensure_topology_fields(
