@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import torch
 
 from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint
@@ -12,8 +14,27 @@ from witwin.channel_native.runtime.native_buffers import (
     mc_transmitter_tensors,
 )
 
+if TYPE_CHECKING:
+    from witwin.channel_native.core.scene import Scene
+
 
 LIGHT_SPEED_M_PER_S = 299_792_458.0
+
+
+def _frequency_scalar(scene: Scene) -> float:
+    """Detached scalar carrier for non-differentiable consumers.
+
+    Topology discovery and metadata never differentiate with respect to
+    frequency (fixed-topology contract), so detach before float() to keep AD
+    solves with a requires_grad tensor frequency warning-free. The field
+    evaluation seam must NOT use this helper: it forwards the live tensor so
+    the frequency stays on the autograd graph.
+    """
+
+    frequency = scene.frequency
+    if isinstance(frequency, torch.Tensor):
+        return float(frequency.detach())
+    return float(frequency)
 
 
 def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torch.Tensor:

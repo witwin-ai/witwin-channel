@@ -69,6 +69,7 @@ from witwin.channel_native.core.material_runtime import (
 )
 from witwin.channel_native.core.scene_tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
+    _frequency_scalar,
     receiver_positions as _native_receiver_positions,
     transmitter_positions as _native_transmitter_positions,
 )
@@ -89,22 +90,6 @@ _MAX_MULTIBOUNCE_FACE_SEQUENCES = 100_000
 _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 65_536
 _MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
 _ORDER1_EXHAUSTIVE_GROUP_LIMIT = 4096
-
-
-def _frequency_scalar(scene: Scene) -> float:
-    """Detached scalar carrier for non-differentiable consumers.
-
-    Topology discovery and metadata never differentiate with respect to
-    frequency (fixed-topology contract), so detach before float() to keep AD
-    solves with a requires_grad tensor frequency warning-free. The field
-    evaluation seam must NOT use this helper: it forwards the live tensor so
-    the frequency stays on the autograd graph.
-    """
-
-    frequency = scene.frequency
-    if isinstance(frequency, torch.Tensor):
-        return float(frequency.detach())
-    return float(frequency)
 
 
 def _raydn_visibility_mask(
