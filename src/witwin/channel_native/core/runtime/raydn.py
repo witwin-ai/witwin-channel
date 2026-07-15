@@ -4,7 +4,11 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel_native.core.kernels.ops import mc_pack_vec3, raydn_scene_create, raydn_scene_edge_records
+from witwin.channel_native.core.kernels.ops import mc_pack_vec3
+from witwin.channel_native.scene.kernels.rayd_scene import (
+    raydn_scene_create,
+    raydn_scene_edge_records,
+)
 
 
 @dataclass(frozen=True, slots=True)
