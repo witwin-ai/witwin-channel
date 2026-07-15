@@ -196,13 +196,15 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     assert offenders == []
 
 
-def test_path_solver_uses_the_shared_core_topology():
+def test_path_solver_uses_the_typed_enumerated_engine():
     repo = Path(__file__).resolve().parents[2]
     source = (
         repo / "src" / "witwin" / "channel_native" / "path" / "solver.py"
     ).read_text()
 
-    assert "core.path_topology import export_topology" in source
+    assert "propagation.enumerated.engine import" in source
+    assert "evaluate_enumerated_paths" in source
+    assert "core.path_topology import export_topology" not in source
     assert "reflection_paths_order1" not in source
     assert "diffraction_paths_order1" not in source
 

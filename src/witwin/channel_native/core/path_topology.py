@@ -5,6 +5,9 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from witwin.channel_native.materials.evaluation import (
+    _require_frequency_ad_constant_materials,  # noqa: F401 - compatibility re-export
+)
 from witwin.channel_native.propagation.enumerated.coupled import (
     _COUPLED_CANDIDATE_CHUNK_SIZE,  # noqa: F401 - compatibility re-export
     _MAX_COUPLED_CANDIDATES,  # noqa: F401 - compatibility re-export
@@ -94,6 +97,9 @@ from witwin.channel_native.runtime.autograd_contracts import (
 )
 from witwin.channel_native.core.material_runtime import (  # noqa: F401
     face_material_tensors,
+)
+from witwin.channel_native.core.scene_tensors import (
+    _frequency_scalar,  # noqa: F401 - compatibility re-export
 )
 
 if TYPE_CHECKING:
