@@ -28,15 +28,9 @@ from witwin.channel_native.core.path_topology import export_topology
 from witwin.channel_native.core.kernels.ops import (
     bdpt_diffraction_state_pack,
     bdpt_diffraction_state_wi,
-    bdpt_finalize_component_maps,
-    bdpt_finalize_point_components,
-    bdpt_los_component_maps_from_matrix,
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,
     bdpt_selected_edge_indices,
-    bdpt_zero_matrix,
-    mc_component_map_buffer,
-    mc_store_component_map,
 )
 from witwin.channel_native.core.scene import Scene
 from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
@@ -54,6 +48,14 @@ from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_reflected_light_subpath_state,
     bdpt_subpath_intersection_inputs,
     bdpt_transmitted_light_subpath_state,
+)
+from witwin.channel_native.montecarlo.bdpt.kernels.maps import (
+    bdpt_component_map_buffer,
+    bdpt_finalize_component_maps,
+    bdpt_finalize_point_components,
+    bdpt_los_component_maps_from_matrix,
+    bdpt_store_component_map,
+    bdpt_zero_matrix,
 )
 from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
 from witwin.channel_native.core.diffraction_geometry import (
@@ -354,7 +356,7 @@ def _native_diffraction_component_maps(
     )
     spec = _grid_spec(grid)
     dim0, dim1 = grid.shape[1], grid.shape[0]
-    maps = mc_component_map_buffer(
+    maps = bdpt_component_map_buffer(
         tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1
     )
     edge_geometry = _cached_diffraction_edge_geometry(raydn)
@@ -442,7 +444,7 @@ def _native_diffraction_component_maps(
             None,
         )
         diffraction_map = out[0] * float(cell_count) if direct_samples else out[0]
-        maps = mc_store_component_map(
+        maps = bdpt_store_component_map(
             maps,
             diffraction_map,
             tx_index=tx_index,

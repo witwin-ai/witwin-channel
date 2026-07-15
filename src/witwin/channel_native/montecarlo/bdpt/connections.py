@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint
-from witwin.channel_native.core.kernels.ops import (
+from witwin.channel_native.montecarlo.bdpt.kernels.maps import (
     bdpt_host_vec3_tensor,
     bdpt_receiver_grid_points,
     bdpt_transmitter_tensors,

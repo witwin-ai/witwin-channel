@@ -572,18 +572,31 @@ def _module_index(
     definitions: dict[str, ast.AST] = {}
     imports: dict[str, tuple[str, str | None]] = {}
     is_package = path.name == "__init__.py"
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            definitions[node.name] = node
-        elif isinstance(node, ast.ImportFrom):
+
+    def index_import(node: ast.ImportFrom | ast.Import) -> None:
+        if isinstance(node, ast.ImportFrom):
             target_module = _resolve_import_from(module, is_package, node)
             for alias in node.names:
                 local = alias.asname or alias.name
                 imports[local] = (target_module, alias.name)
-        elif isinstance(node, ast.Import):
+        else:
             for alias in node.names:
                 local = alias.asname or alias.name.split(".")[0]
                 imports[local] = (alias.name, None)
+
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            definitions[node.name] = node
+        elif isinstance(node, (ast.ImportFrom, ast.Import)):
+            index_import(node)
+        elif (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "TYPE_CHECKING"
+        ):
+            for child in node.body:
+                if isinstance(child, (ast.ImportFrom, ast.Import)):
+                    index_import(child)
     return definitions, imports
 
 

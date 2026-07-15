@@ -4,13 +4,14 @@ import torch
 
 from witwin.channel_native.core.edge_selection import refine_edge_geometry
 from witwin.channel_native.core.runtime.raydn import RayDNScene
-from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
 
 
 def diffraction_edge_geometry(records: object) -> tuple[torch.Tensor, ...]:
+    from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
+
     return geometry_primitives.mc_diffraction_edge_geometry(
         records.vertices,
         records.faces,

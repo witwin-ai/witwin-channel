@@ -28,7 +28,7 @@
         {"id": "ops-023", "path": "src/witwin/channel_native/scattering/tables.py", "line": 542, "column": 4, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.scattering.tables", "target": "witwin.channel_native.core.kernels.ops"},
         {"id": "ops-024", "path": "src/witwin/channel_native/scattering/tables.py", "line": 557, "column": 4, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.scattering.tables", "target": "witwin.channel_native.core.kernels.ops"}
       ],
-      "allowed": ["ops-003", "ops-005", "ops-013", "ops-016"]
+      "allowed": ["ops-003", "ops-005", "ops-016"]
     },
     "existing_boundary": {
       "baseline": [
