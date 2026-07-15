@@ -2100,9 +2100,7 @@
     "mc_store_component_map",
     "mc_store_scaled_component_map",
     "mc_transmitter_tensors",
-    "mc_zero_matrix",
-    "path_diffraction_paths_order1",
-    "path_reflection_candidates"
+    "mc_zero_matrix"
   ],
   "canonical_owners": {
     "_CoupledRdPrepareAdFunction.backward": "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.backward",
@@ -2243,12 +2241,14 @@
     "mc_surface_group_edge_candidates": "witwin.channel_native.propagation.geometry.kernels.primitives.mc_surface_group_edge_candidates",
     "path_concat_vec3": "witwin.channel_native.propagation.topology.kernels.primitives.path_concat_vec3",
     "path_diffraction_block": "witwin.channel_native.propagation.topology.kernels.blocks.path_diffraction_block",
+    "path_diffraction_paths_order1": "witwin.channel_native.propagation.topology.kernels.candidates.path_diffraction_paths_order1",
     "path_filter_block": "witwin.channel_native.propagation.topology.kernels.blocks.path_filter_block",
     "path_filter_los": "witwin.channel_native.propagation.topology.kernels.blocks.path_filter_los",
     "path_finalize_blocks": "witwin.channel_native.propagation.topology.kernels.blocks.path_finalize_blocks",
     "path_los_export": "witwin.channel_native.propagation.topology.kernels.blocks.path_los_export",
     "path_los_visibility_inputs": "witwin.channel_native.propagation.topology.kernels.blocks.path_los_visibility_inputs",
     "path_merge_blocks": "witwin.channel_native.propagation.topology.kernels.blocks.path_merge_blocks",
+    "path_reflection_candidates": "witwin.channel_native.propagation.topology.kernels.candidates.path_reflection_candidates",
     "raydn_coupled_rd_geometry_forward": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_rd_geometry_forward",
     "raydn_diffraction_paths_order1_forward": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_diffraction_paths_order1_forward",
     "raydn_face_normals_ad": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_face_normals_ad",
