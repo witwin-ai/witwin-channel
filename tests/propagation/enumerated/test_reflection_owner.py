@@ -30,7 +30,7 @@ _DIGESTS = {
         "0ab4299eb5a2c6ece2296ccdf9432de986f1e15fdf127ecd595b61bee6b04fa7"
     ),
     "_reflection_topology_multibounce": (
-        "b7a236cf404f607d748f816f00c4f8ac9ea8634bc9e3543b067c7fbe1ed1e0a2"
+        "aefac5c00bbca1557ca091e3589125a3d2c0e26702f8148a0bb709008fc5f6ec"
     ),
 }
 
@@ -92,6 +92,12 @@ def test_reflection_owners_and_discovery_constants_preserve_identity():
     )
     assert reflection.iter_reflection_order1_epc_requests is (
         discovery.iter_reflection_order1_epc_requests
+    )
+    assert reflection.prepare_reflection_multibounce_plan is (
+        discovery.prepare_reflection_multibounce_plan
+    )
+    assert reflection.iter_reflection_multibounce_epc_requests is (
+        discovery.iter_reflection_multibounce_epc_requests
     )
 
 

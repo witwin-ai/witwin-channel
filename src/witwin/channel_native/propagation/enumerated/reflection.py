@@ -18,14 +18,13 @@ from witwin.channel_native.propagation.topology.concatenate import (
     concatenate_path_blocks,
 )
 from witwin.channel_native.propagation.topology.discovery.reflection import (
-    _MAX_MULTIBOUNCE_FACE_SEQUENCES,
     _MULTIBOUNCE_DISCOVERY_RAYS,
-    _MULTIBOUNCE_PAIR_CHUNK_SIZE,
-    _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE,
-    _face_sequence_chunks,
-    _face_sequence_count,
+    _face_sequence_chunks,  # noqa: F401 - compatibility re-export
+    _face_sequence_count,  # noqa: F401 - compatibility re-export
     iter_reflection_order1_epc_requests,
+    iter_reflection_multibounce_epc_requests,
     prepare_reflection_order1_plan,
+    prepare_reflection_multibounce_plan,
 )
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
 from witwin.channel_native.propagation.topology.kernels import (
@@ -275,6 +274,7 @@ def _discovered_group_chains(
     chains[hit] = face_group_id[prim_chain[hit]]
     return chains
 
+
 def _reflection_topology_multibounce(
     scene: Scene,
     compiled: object,
@@ -360,7 +360,6 @@ def _reflection_topology_multibounce(
     face_group_source = compiled.geometry.face_surface_id.to(
         device=device, dtype=torch.long
     ).contiguous()
-    planning_guard = _MAX_MULTIBOUNCE_FACE_SEQUENCES
     # Coplanar plane groups carry the specular semantics (dedup, adjacency,
     # visibility-ignore scope). When the exhaustive plane-sequence space fits
     # the planning guard, enumerate it exactly; otherwise discover reachable
@@ -372,35 +371,46 @@ def _reflection_topology_multibounce(
     surface_group_id = groups["surface_group_id"]
     surface_group_size = groups["surface_group_size"]
     surface_group_members = groups["surface_group_members"]
-    exhaustive = all(
-        _face_sequence_count(group_count, depth, adjacent_distinct=True)
-        <= planning_guard
-        for depth in range(min_depth, max_depth + 1)
+    plan = prepare_reflection_multibounce_plan(
+        group_count=group_count,
+        representative_faces=representative_faces,
+        face_group_id=groups["face_group_id"],
+        min_depth=min_depth,
+        max_depth=max_depth,
     )
     tx_power_f32 = tx_power.to(dtype=torch.float32).contiguous()
-    rx_count = int(rx_positions.shape[0])
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0
     theoretical_candidate_count = 0
 
-    def emit_epc_chunk(
-        sequences: torch.Tensor,
-        depth: int,
-        tx: torch.Tensor,
-        tx_index: int,
-        rx_start: int,
-        rx_end: int,
-    ) -> None:
+    def trace_group_chains(
+        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int
+    ) -> torch.Tensor:
         nonlocal launch_count
-        epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
-            tx=tx,
-            rx_positions=rx_positions.contiguous(),
-            sequences=sequences.contiguous(),
-            tri_a=tri_a.contiguous(),
-            normals=normals.contiguous(),
-            rx_start=rx_start,
-            rx_end=rx_end,
+        chains = _discovered_group_chains(
+            raydn, tx, face_group_id=face_group_id, max_depth=max_depth
         )
+        launch_count += 1
+        return chains
+
+    def record_candidate_count(candidate_count: int) -> None:
+        nonlocal theoretical_candidate_count
+        theoretical_candidate_count += candidate_count
+
+    for request in iter_reflection_multibounce_epc_requests(
+        plan,
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+        sequence_reference=tx_power_f32,
+        tri_a=tri_a,
+        normals=normals,
+        trace_group_chains=trace_group_chains,
+        record_candidate_count=record_candidate_count,
+    ):
+        depth = request.depth
+        tx_index = request.tx_index
+        tx = request.tx
+        epc_inputs = request.epc_inputs
         epc = geometry_bridge.raydn_reflection_epc_paths_forward(
             raydn.require_handle(),
             epc_inputs["tx_batch"],
@@ -435,7 +445,7 @@ def _reflection_topology_multibounce(
         )
         count = int(selected["selected_sequences"].shape[0])
         if count == 0:
-            return
+            continue
         field_result = field_kernels.deterministic_reflection_sequence_field(
             tx_position=selected["selected_tx"],
             rx_position=selected["selected_rx"],
@@ -481,59 +491,6 @@ def _reflection_topology_multibounce(
                 interaction_normals=selected["selected_normals"],
             )
         )
-
-    if exhaustive:
-        for depth in range(min_depth, max_depth + 1):
-            candidate_count = _face_sequence_count(
-                group_count, depth, adjacent_distinct=True
-            )
-            theoretical_candidate_count += candidate_count
-            chunk_size = min(_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE, max(candidate_count, 1))
-            for sequences in _face_sequence_chunks(
-                group_count,
-                depth,
-                chunk_size=chunk_size,
-                reference=tx_power_f32,
-                face_ids=representative_faces,
-                adjacent_distinct=True,
-            ):
-                sequence_count = int(sequences.shape[0])
-                if sequence_count <= 0:
-                    continue
-                rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
-                for rx_start in range(0, rx_count, rx_chunk_size):
-                    rx_end = min(rx_start + rx_chunk_size, rx_count)
-                    for tx_index, tx in enumerate(tx_positions):
-                        emit_epc_chunk(sequences, depth, tx, tx_index, rx_start, rx_end)
-    else:
-        face_group_id = groups["face_group_id"].to(dtype=torch.long).contiguous()
-        for tx_index, tx in enumerate(tx_positions):
-            group_chains = _discovered_group_chains(
-                raydn,
-                tx,
-                face_group_id=face_group_id,
-                max_depth=max_depth,
-            )
-            launch_count += 1
-            for depth in range(min_depth, max_depth + 1):
-                reached = group_chains[:, depth - 1] >= 0
-                if not bool(reached.any()):
-                    continue
-                unique_chains = torch.unique(group_chains[reached][:, :depth], dim=0)
-                theoretical_candidate_count += int(unique_chains.shape[0])
-                sequences_all = representative_faces[unique_chains].contiguous()
-                for start in range(
-                    0, int(sequences_all.shape[0]), _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
-                ):
-                    sequences = sequences_all[
-                        start : start + _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
-                    ].contiguous()
-                    rx_chunk_size = max(
-                        1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // int(sequences.shape[0])
-                    )
-                    for rx_start in range(0, rx_count, rx_chunk_size):
-                        rx_end = min(rx_start + rx_chunk_size, rx_count)
-                        emit_epc_chunk(sequences, depth, tx, tx_index, rx_start, rx_end)
 
     return (
         _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
