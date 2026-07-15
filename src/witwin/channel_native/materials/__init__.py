@@ -1,4 +1,4 @@
-from .core.materials import (
+from witwin.channel_native.core.materials import (
     DebyeModel,
     Dielectric,
     DispersiveMaterial,

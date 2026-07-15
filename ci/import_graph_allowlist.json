@@ -41,7 +41,7 @@
         {"id": "boundary-007", "path": "src/witwin/channel_native/montecarlo/bdpt/solver.py", "line": 16, "column": 0, "rule": "solver_raw_extension", "source": "witwin.channel_native.montecarlo.bdpt.solver", "target": "witwin.channel_native.core.kernels.extension"},
         {"id": "boundary-008", "path": "src/witwin/channel_native/path/solver.py", "line": 9, "column": 0, "rule": "solver_raw_extension", "source": "witwin.channel_native.path.solver", "target": "witwin.channel_native.core.kernels.extension"}
       ],
-      "allowed": ["boundary-001", "boundary-003", "boundary-004", "boundary-005", "boundary-006", "boundary-007", "boundary-008"]
+      "allowed": ["boundary-001", "boundary-003", "boundary-004", "boundary-006", "boundary-007", "boundary-008"]
     },
     "solver_to_solver": {
       "baseline": [
