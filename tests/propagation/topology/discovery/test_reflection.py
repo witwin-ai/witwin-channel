@@ -129,6 +129,22 @@ def test_contract_fields_and_forbidden_imports():
         "tx",
         "epc_inputs",
     ]
+    assert [field.name for field in fields(reflection.ReflectionMultibouncePlan)] == [
+        "exhaustive",
+        "group_count",
+        "representative_faces",
+        "face_group_id",
+        "min_depth",
+        "max_depth",
+    ]
+    assert [
+        field.name for field in fields(reflection.ReflectionMultibounceEpcRequest)
+    ] == ["depth", "tx_index", "tx", "epc_inputs"]
+    assert reflection.ReflectionMultibouncePlan.__dataclass_params__.frozen
+    assert not hasattr(
+        reflection.ReflectionMultibouncePlan(True, 0, torch.empty(0), None, 1, 0),
+        "__dict__",
+    )
     tree = ast.parse(Path(reflection.__file__).read_text(encoding="utf-8"))
     imports = {
         node.module
@@ -139,3 +155,151 @@ def test_contract_fields_and_forbidden_imports():
         "core" in module or "geometry" in module or "fields" in module
         for module in imports
     )
+
+
+@pytest.mark.parametrize(("groups", "exhaustive"), [(316, True), (317, False)])
+def test_multibounce_planning_guard_boundary(groups, exhaustive):
+    plan = reflection.prepare_reflection_multibounce_plan(
+        group_count=groups,
+        representative_faces=torch.arange(groups),
+        face_group_id=torch.arange(groups),
+        min_depth=2,
+        max_depth=2,
+    )
+    assert plan.exhaustive is exhaustive
+    assert (plan.face_group_id is None) is exhaustive
+
+
+def test_multibounce_plan_empty_depth_range_short_circuits_guard(monkeypatch):
+    monkeypatch.setattr(
+        reflection,
+        "_face_sequence_count",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("count")),
+    )
+    plan = reflection.prepare_reflection_multibounce_plan(
+        group_count=1,
+        representative_faces=torch.tensor([0]),
+        face_group_id=torch.tensor([0]),
+        min_depth=3,
+        max_depth=2,
+    )
+    assert plan.exhaustive
+
+
+def _multibounce_inputs():
+    return {
+        "tx_positions": torch.arange(6, dtype=torch.float32).reshape(2, 3),
+        "rx_positions": torch.arange(9, dtype=torch.float32).reshape(3, 3),
+        "sequence_reference": torch.ones(1),
+        "tri_a": torch.zeros((2, 3)),
+        "normals": torch.ones((2, 3)),
+    }
+
+
+def test_exhaustive_order_is_depth_candidate_chunk_rx_tx_and_lazy(monkeypatch):
+    events = []
+    sentinel = {"sentinel": torch.ones(())}
+    plan = reflection.ReflectionMultibouncePlan(
+        True, 2, torch.tensor([4, 5]), None, 1, 2
+    )
+    monkeypatch.setattr(reflection, "_MULTIBOUNCE_PAIR_CHUNK_SIZE", 2)
+    monkeypatch.setattr(
+        reflection,
+        "_face_sequence_count",
+        lambda count, depth, **k: events.append(f"count{depth}") or depth,
+    )
+
+    def chunks(count, depth, **kwargs):
+        events.append(f"chunk{depth}")
+        yield torch.arange(depth).reshape(-1, 1)
+
+    monkeypatch.setattr(reflection, "_face_sequence_chunks", chunks)
+    monkeypatch.setattr(
+        reflection.topology_construction,
+        "deterministic_reflection_epc_input_batch",
+        lambda **k: (
+            events.append(
+                f"build{k['sequences'].shape[0]}:{k['rx_start']}:{int(k['tx'][0])}"
+            )
+            or sentinel
+        ),
+    )
+    iterator = reflection.iter_reflection_multibounce_epc_requests(
+        plan,
+        trace_group_chains=lambda *a, **k: None,
+        record_candidate_count=lambda value: events.append(f"record{value}"),
+        **_multibounce_inputs(),
+    )
+    assert events == []
+    requests = list(iterator)
+    assert all(request.epc_inputs is sentinel for request in requests)
+    assert events[:4] == ["count1", "record1", "chunk1", "build1:0:0"]
+    assert events.index("count2") > events.index("build1:2:3")
+
+
+def test_traced_order_unique_minus_one_and_no_reached_depth(monkeypatch):
+    events = []
+    plan = reflection.ReflectionMultibouncePlan(
+        False, 3, torch.tensor([10, 11, 12]), torch.arange(3), 1, 2
+    )
+    chains = torch.tensor([[2, -1], [1, 2], [1, 2], [-1, -1]])
+
+    def trace(tx, **kwargs):
+        events.append(f"trace{int(tx[0])}")
+        return chains
+
+    monkeypatch.setattr(
+        reflection.topology_construction,
+        "deterministic_reflection_epc_input_batch",
+        lambda **k: (
+            events.append(f"build{int(k['tx'][0])}:{k['sequences'].tolist()}")
+            or {"sentinel": torch.ones(())}
+        ),
+    )
+    requests = list(
+        reflection.iter_reflection_multibounce_epc_requests(
+            plan,
+            trace_group_chains=trace,
+            record_candidate_count=lambda value: events.append(f"record{value}"),
+            **_multibounce_inputs(),
+        )
+    )
+    assert [request.tx_index for request in requests] == [0, 0, 1, 1]
+    assert events[:3] == ["trace0", "record2", "build0:[[11], [12]]"]
+    assert "record1" in events
+    assert events.index("trace3") > events.index("record1")
+
+
+def test_traced_no_chain_records_no_candidate_or_request(monkeypatch):
+    plan = reflection.ReflectionMultibouncePlan(
+        False, 0, torch.empty(0, dtype=torch.long), torch.empty(0), 1, 2
+    )
+    recorded = []
+    assert (
+        list(
+            reflection.iter_reflection_multibounce_epc_requests(
+                plan,
+                trace_group_chains=lambda *a, **k: torch.full((2, 2), -1),
+                record_candidate_count=recorded.append,
+                **_multibounce_inputs(),
+            )
+        )
+        == []
+    )
+    assert recorded == []
+
+
+def test_multibounce_callbacks_and_builder_errors_propagate(monkeypatch):
+    plan = reflection.ReflectionMultibouncePlan(True, 1, torch.tensor([0]), None, 1, 1)
+    monkeypatch.setattr(reflection, "_face_sequence_count", lambda *a, **k: 1)
+    with pytest.raises(RuntimeError, match="candidate"):
+        next(
+            reflection.iter_reflection_multibounce_epc_requests(
+                plan,
+                trace_group_chains=lambda *a, **k: None,
+                record_candidate_count=lambda value: (_ for _ in ()).throw(
+                    RuntimeError("candidate")
+                ),
+                **_multibounce_inputs(),
+            )
+        )

@@ -17,6 +17,7 @@ _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 65_536
 _MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
 _MULTIBOUNCE_DISCOVERY_RAYS = 262_144
 
+
 def _face_sequence_count(
     face_count: int, depth: int, *, adjacent_distinct: bool
 ) -> int:
@@ -60,8 +61,6 @@ def _face_sequence_chunks(
             yield sequences
 
 
-
-
 class TraceReflectionGroupChains(Protocol):
     def __call__(
         self,
@@ -70,6 +69,10 @@ class TraceReflectionGroupChains(Protocol):
         face_group_id: torch.Tensor,
         max_depth: int,
     ) -> torch.Tensor: ...
+
+
+class RecordReflectionCandidateCount(Protocol):
+    def __call__(self, candidate_count: int) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +86,24 @@ class ReflectionOrder1Plan:
 
 @dataclass(frozen=True, slots=True)
 class ReflectionOrder1EpcRequest:
+    tx_index: int
+    tx: torch.Tensor
+    epc_inputs: dict[str, torch.Tensor]
+
+
+@dataclass(frozen=True, slots=True)
+class ReflectionMultibouncePlan:
+    exhaustive: bool
+    group_count: int
+    representative_faces: torch.Tensor
+    face_group_id: torch.Tensor | None
+    min_depth: int
+    max_depth: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReflectionMultibounceEpcRequest:
+    depth: int
     tx_index: int
     tx: torch.Tensor
     epc_inputs: dict[str, torch.Tensor]
@@ -163,3 +184,122 @@ def iter_reflection_order1_epc_requests(
                 tx=tx,
                 epc_inputs=epc_inputs,
             )
+
+
+def prepare_reflection_multibounce_plan(
+    *,
+    group_count: int,
+    representative_faces: torch.Tensor,
+    face_group_id: torch.Tensor,
+    min_depth: int,
+    max_depth: int,
+) -> ReflectionMultibouncePlan:
+    exhaustive = all(
+        _face_sequence_count(group_count, depth, adjacent_distinct=True)
+        <= _MAX_MULTIBOUNCE_FACE_SEQUENCES
+        for depth in range(min_depth, max_depth + 1)
+    )
+    selected_face_group_id = (
+        None if exhaustive else face_group_id.to(dtype=torch.long).contiguous()
+    )
+    return ReflectionMultibouncePlan(
+        exhaustive=exhaustive,
+        group_count=group_count,
+        representative_faces=representative_faces,
+        face_group_id=selected_face_group_id,
+        min_depth=min_depth,
+        max_depth=max_depth,
+    )
+
+
+def iter_reflection_multibounce_epc_requests(
+    plan: ReflectionMultibouncePlan,
+    *,
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    sequence_reference: torch.Tensor,
+    tri_a: torch.Tensor,
+    normals: torch.Tensor,
+    trace_group_chains: TraceReflectionGroupChains,
+    record_candidate_count: RecordReflectionCandidateCount,
+) -> Iterator[ReflectionMultibounceEpcRequest]:
+    rx_count = int(rx_positions.shape[0])
+    if plan.exhaustive:
+        for depth in range(plan.min_depth, plan.max_depth + 1):
+            candidate_count = _face_sequence_count(
+                plan.group_count, depth, adjacent_distinct=True
+            )
+            record_candidate_count(candidate_count)
+            chunk_size = min(_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE, max(candidate_count, 1))
+            for sequences in _face_sequence_chunks(
+                plan.group_count,
+                depth,
+                chunk_size=chunk_size,
+                reference=sequence_reference,
+                face_ids=plan.representative_faces,
+                adjacent_distinct=True,
+            ):
+                sequence_count = int(sequences.shape[0])
+                if sequence_count <= 0:
+                    continue
+                rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
+                for rx_start in range(0, rx_count, rx_chunk_size):
+                    rx_end = min(rx_start + rx_chunk_size, rx_count)
+                    for tx_index, tx in enumerate(tx_positions):
+                        epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
+                            tx=tx,
+                            rx_positions=rx_positions.contiguous(),
+                            sequences=sequences.contiguous(),
+                            tri_a=tri_a.contiguous(),
+                            normals=normals.contiguous(),
+                            rx_start=rx_start,
+                            rx_end=rx_end,
+                        )
+                        yield ReflectionMultibounceEpcRequest(
+                            depth=depth,
+                            tx_index=tx_index,
+                            tx=tx,
+                            epc_inputs=epc_inputs,
+                        )
+    else:
+        for tx_index, tx in enumerate(tx_positions):
+            group_chains = trace_group_chains(
+                tx,
+                face_group_id=plan.face_group_id,
+                max_depth=plan.max_depth,
+            )
+            for depth in range(plan.min_depth, plan.max_depth + 1):
+                reached = group_chains[:, depth - 1] >= 0
+                if not bool(reached.any()):
+                    continue
+                unique_chains = torch.unique(group_chains[reached][:, :depth], dim=0)
+                record_candidate_count(int(unique_chains.shape[0]))
+                sequences_all = plan.representative_faces[unique_chains].contiguous()
+                for start in range(
+                    0,
+                    int(sequences_all.shape[0]),
+                    _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE,
+                ):
+                    sequences = sequences_all[
+                        start : start + _MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
+                    ].contiguous()
+                    rx_chunk_size = max(
+                        1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // int(sequences.shape[0])
+                    )
+                    for rx_start in range(0, rx_count, rx_chunk_size):
+                        rx_end = min(rx_start + rx_chunk_size, rx_count)
+                        epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
+                            tx=tx,
+                            rx_positions=rx_positions.contiguous(),
+                            sequences=sequences.contiguous(),
+                            tri_a=tri_a.contiguous(),
+                            normals=normals.contiguous(),
+                            rx_start=rx_start,
+                            rx_end=rx_end,
+                        )
+                        yield ReflectionMultibounceEpcRequest(
+                            depth=depth,
+                            tx_index=tx_index,
+                            tx=tx,
+                            epc_inputs=epc_inputs,
+                        )
