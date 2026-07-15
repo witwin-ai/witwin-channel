@@ -1,0 +1,2276 @@
+{
+  "schema_version": 1,
+  "source_module": "witwin.channel_native.core.kernels.ops",
+  "approved_owner_roots": [
+    "witwin.channel_native.runtime",
+    "witwin.channel_native.scene",
+    "witwin.channel_native.materials",
+    "witwin.channel_native.propagation",
+    "witwin.channel_native.scattering",
+    "witwin.channel_native.path",
+    "witwin.channel_native.deterministic",
+    "witwin.channel_native.montecarlo"
+  ],
+  "contracts": [
+    {
+      "id": "_CoupledRdPrepareAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_edge_point, grad_reflection_point, _grad_active)",
+      "body_sha256": "fc6d531a48b1e881c6b7a62d8158591c3c81d4e5a0bb20409773d88d99a559dc",
+      "normalized_ast_sha256": "7aedd3dec9b86162073a816fcb94d5d453d034681495d7a77a8788014e93dd7b"
+    },
+    {
+      "id": "_CoupledRdPrepareAdFunction.forward",
+      "kind": "function",
+      "signature": "(source, receiver, plane_point, plane_normal, edge_pos, edge_dir, edge_t_min, edge_t_max)",
+      "body_sha256": "8e3e59e92e221ff91fcc97893c94b331c4a2b50022317ddc04411440835c77ea",
+      "normalized_ast_sha256": "f26582de139fa8baa2c2024d754d09ad57606d993bf985c4265b8003dcda64e2"
+    },
+    {
+      "id": "_CoupledRdPrepareAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_source, t_receiver, *t_rest)",
+      "body_sha256": "f357b826b0feaba7b50c9306826b7a97533176597d1b5bdb3527be19bc44b3c3",
+      "normalized_ast_sha256": "4a0f9e6fa4f171ca4dad40bb78c34758159b315032195e45f1276a9363b77385"
+    },
+    {
+      "id": "_CoupledRdPrepareAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "465fb89fb40a4231ad85f0447c1e4455f6c59ff7715c5b5bcb276a79b02a118e",
+      "normalized_ast_sha256": "56ef45521c89a066c7baed8677c1cdba5e37c64d12eb1053de70a3d40252571e"
+    },
+    {
+      "id": "_DeterministicAccumulateFlatAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_power_total, grad_field_total_real, grad_field_total_imag, grad_component_power, grad_component_field_real, grad_component_field_imag)",
+      "body_sha256": "3e30389d6b7b71255777dd3a5b49a81da433fe27f6dd5f9f247d99799d4c7b18",
+      "normalized_ast_sha256": "26e000cf505764f0f68282072f71f20f376c20707adb1e089b616f516d14040d"
+    },
+    {
+      "id": "_DeterministicAccumulateFlatAdFunction.forward",
+      "kind": "function",
+      "signature": "(tx_id, rx_id, component_id, path_gain, field_real, field_imag, num_tx, num_rx, coherent)",
+      "body_sha256": "141b33a9755d497a0ecafccef2dce8ccce989a9fd6ceba2e1b06c106afbbf721",
+      "normalized_ast_sha256": "82d50ee2f98027d4014d8276e2c3f10419f47bec892be4b78f03a8217c9fcdba"
+    },
+    {
+      "id": "_DeterministicAccumulateFlatAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, _t_tx_id, _t_rx_id, _t_component_id, t_path_gain, t_field_real, t_field_imag, _t_num_tx, _t_num_rx, _t_coherent)",
+      "body_sha256": "5651d106202b5ac6d0191dd0ea5c0f93a1cd20102991cec6efca881cd2fdf882",
+      "normalized_ast_sha256": "287e059394891cc23c8967d1b335d3a9520ca955922dcf39f44af18577765569"
+    },
+    {
+      "id": "_DeterministicAccumulateFlatAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "78f8507a8c73e7d07a7cf3c031a3a4ce9976096605ac20b899d50fd391dad23e",
+      "normalized_ast_sha256": "05b29f42fd822f6d3a3895201d4846b8894ee8ce119f5a9b3f2b570d9cbe98e7"
+    },
+    {
+      "id": "_EmLayerStackAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, *grad_outputs)",
+      "body_sha256": "cf92244283e6569d392246ed6d5f8dcf4deba29f2f65142179e5394d75ce66c6",
+      "normalized_ast_sha256": "93805e7890ff9f83faf32efa0514bac1f70160e37290e9aeb2c08284250d5482"
+    },
+    {
+      "id": "_EmLayerStackAdFunction.forward",
+      "kind": "function",
+      "signature": "(cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r, frequency, frequency_value)",
+      "body_sha256": "715a738163efd23692a7b420395099665d056829f79cee5e994fb551b5fd2bad",
+      "normalized_ast_sha256": "ba6d3e4cfac77cb4f4a99ce781761f7f572cda8cfed678a3999747f1168ade50"
+    },
+    {
+      "id": "_EmLayerStackAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_cos_theta, _t_material_id, _t_layer_offset, _t_layer_count, t_layer_thickness, t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency, _t_frequency_value)",
+      "body_sha256": "58e81ff8924c59d03865822a555bfb9ff0b180e662863f685cc97f59780595a9",
+      "normalized_ast_sha256": "3e5bd2b9a0b2c8850fe9ecf6bf322895aff0260a7cc1bb1a156954bd78077ba8"
+    },
+    {
+      "id": "_EmLayerStackAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "07d4b530f4f5452d00e0fead50fb1e6a36b18406a475bd072381fe31fc54421c",
+      "normalized_ast_sha256": "6345b254b9de3169c1a00fb215376154466e1b2de5f5d720e06d4359c5a1977a"
+    },
+    {
+      "id": "_FieldCoupledRdAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, _grad_direction)",
+      "body_sha256": "04adc59a45b1bb478af54bd98388cf43f3f05e5bbdb51fd044203e0253d7a098",
+      "normalized_ast_sha256": "9fe7df1954b39840b5306c858ac67adfde0e7e16236a82a9b0eff6309d2a00d3"
+    },
+    {
+      "id": "_FieldCoupledRdAdFunction.forward",
+      "kind": "function",
+      "signature": "(source, target, reflection_position, reflection_normal, edge_position, edge_direction, edge_n0, edge_n1, exterior_angle, tx_power, tx_polarization, rx_polarization, refl_eps_r, refl_sigma_e, refl_mu_r, refl_gain, refl_thickness, w0_eps_r, w0_sigma_e, w0_mu_r, w0_gain, w0_thickness, w1_eps_r, w1_sigma_e, w1_mu_r, w1_gain, w1_thickness, frequency, reverse, frequency_value)",
+      "body_sha256": "53eda3a413bca3a9ae8991fa2f1db717e151968972c10674f56e207a54d32254",
+      "normalized_ast_sha256": "0eb6206362332ed21eee4fbf4f0441db2b646b27816c0eb8b8106f2e4840fd1e"
+    },
+    {
+      "id": "_FieldCoupledRdAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, *tangents)",
+      "body_sha256": "261ec76e52f9cc2c3acadc9e89ee0fecd7fe9d0d1656afec00c5daa1ca816513",
+      "normalized_ast_sha256": "bd1d07eff72e02456b070df9cf9546a5cfc120a84ede28c14bb01b9ed4feb2c0"
+    },
+    {
+      "id": "_FieldCoupledRdAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "b99c8ace6305ff00cc295188cb5040385e770e3eb4872634a1599c3a4a9f6d7b",
+      "normalized_ast_sha256": "20142e7966e1c8a71ae072abe5bfad8e03977f59913beae63172d4eba6db8d41"
+    },
+    {
+      "id": "_FieldDiffractionWedgeAdFunction._unpack_saved",
+      "kind": "function",
+      "signature": "(ctx)",
+      "body_sha256": "95c197a18d3dc0d53bf8d148774e34fc5745098d42f4c0885235ca44b3e761f5",
+      "normalized_ast_sha256": "7e259533696154da09b421c35fb874667f45a29d905169181913d71fafacc4b0"
+    },
+    {
+      "id": "_FieldDiffractionWedgeAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_field_vector, grad_direction)",
+      "body_sha256": "5bcac6a701bbc31d0a12bdd0022a8c27da37f4da4a61b5d4fee0d4e22296e696",
+      "normalized_ast_sha256": "249cb2603b621e2a5a3ec85222729bc8822735f8fc3b3250859e08d6c8ba7e31"
+    },
+    {
+      "id": "_FieldDiffractionWedgeAdFunction.forward",
+      "kind": "function",
+      "signature": "(source, target, edge_position, edge_direction, edge_t_min, edge_t_max, edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r, face0_sigma_e, face0_mu_r, face0_gain, face1_valid, face1_eps_r, face1_sigma_e, face1_mu_r, face1_gain, tx_power, frequency, vertex_v0, vertex_v1, vertex_opp0, vertex_opp1, edge_boundary, frequency_value)",
+      "body_sha256": "17871865bf0272369d55917eb594c5122823f7c2a772b1dbdf30f59492da99a3",
+      "normalized_ast_sha256": "6fe766744af1eaaabe27b588ba0e327c8ae1222e9e15fa0867ca201c64273214"
+    },
+    {
+      "id": "_FieldDiffractionWedgeAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, *tangents)",
+      "body_sha256": "07bf0a93e73da17a97853fc678b69ac7e99f000cbbd17199a268dc8626e59d25",
+      "normalized_ast_sha256": "10f0a313913fc95a8d417a96430181fd444a006a57731d0e68f9de40a4e0104a"
+    },
+    {
+      "id": "_FieldDiffractionWedgeAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "d3716d15f5c2ab2621ed065a823e2509e01f84247e3e287db0a0e617907ffecc",
+      "normalized_ast_sha256": "415b0a3226bc4cde8b645aefdaf12481c2ed87bdd6fdb556b0625a1794d594a2"
+    },
+    {
+      "id": "_FieldFreeSpaceAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length, grad_delay, _grad_direction)",
+      "body_sha256": "6ac95d703d8b290bffb353653faff42289f5e9458895a7c37cde0150c18a8dd9",
+      "normalized_ast_sha256": "c1a49ec720f661ea62f02dc54d5dd11ea7996b96d9e2e5ef6c5967dad5f5ef32"
+    },
+    {
+      "id": "_FieldFreeSpaceAdFunction.forward",
+      "kind": "function",
+      "signature": "(source, target, tx_power, tx_polarization, rx_polarization, frequency, frequency_value)",
+      "body_sha256": "e086311e0da534d25de2fa9a71735d0e21cc37a1d7d4fa5d56aef9eb0ee1cc28",
+      "normalized_ast_sha256": "ed9e33e09417ecc6c8b987ebdd8765677467d1853a4e7cb1eee4a619e45d884a"
+    },
+    {
+      "id": "_FieldFreeSpaceAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_source, t_target, t_tx_power, t_tx_pol, t_rx_pol, t_frequency, _t_frequency_value)",
+      "body_sha256": "d3471ab11e589d8eacad99466fe957a51dab56018659d47419262fde9eea9214",
+      "normalized_ast_sha256": "66b1f572f86daa6f78e17577daa86bb1f66247c06f37b45c19db3d86d07af5db"
+    },
+    {
+      "id": "_FieldFreeSpaceAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "115a1a55444232269c509ba1b18e07b5820264f174f0e1179521088505c31fa5",
+      "normalized_ast_sha256": "d5c2e8c0bc37a1e9258fafe970f5c8bdff9cbae0eaf02f00b44150fdfd173dcb"
+    },
+    {
+      "id": "_FieldProjectComplex3AdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_coefficient, grad_path_gain)",
+      "body_sha256": "67d85483a1734bb6f86525eb78084072b1e5f50787553aae27cf8ef1fd7295ee",
+      "normalized_ast_sha256": "019e5c6c764adb0d9867e2cb872799b3515ef7269e22b6cc3ef4827595444403"
+    },
+    {
+      "id": "_FieldProjectComplex3AdFunction.forward",
+      "kind": "function",
+      "signature": "(field_vector, direction, rx_polarization)",
+      "body_sha256": "f81b4b263fea16ccd9957acb3dab5837f1f53adcbda05ec074cdad70046755b0",
+      "normalized_ast_sha256": "37a8176846c720122aa16687a074e601ba44e541312e451cd73a192464c321d4"
+    },
+    {
+      "id": "_FieldProjectComplex3AdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_field_vector, t_direction, t_rx_polarization)",
+      "body_sha256": "6ccd6f82bd02b13c4bd7040ca68de4ff46ac1e481906c47d77479450669c47b0",
+      "normalized_ast_sha256": "5ff4a929dc63d2f7e5e17fb1557b3c5befd9a107a620ffdac75d0d15adeee3ca"
+    },
+    {
+      "id": "_FieldProjectComplex3AdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "4fd1dcab766d0ed9d7053098ae5fce2dbc3b8a8123b56086227f04a71e83f8d0",
+      "normalized_ast_sha256": "d6655de1e0b50f88e4a338302fc0511ece12521221032c014452e15f2bc99338"
+    },
+    {
+      "id": "_FieldReflectionSequenceAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length, grad_delay, _grad_direction)",
+      "body_sha256": "fd38c1766f6f8741adbabdae8ab80c65b23632901bbb112753c6e5e1f65b8c87",
+      "normalized_ast_sha256": "767d1a1b2eb7964eabe39abc5ac7a11967bea5f785b13cf97fb2f180524f9ea0"
+    },
+    {
+      "id": "_FieldReflectionSequenceAdFunction.forward",
+      "kind": "function",
+      "signature": "(source, target, interaction_positions, interaction_normals, tx_power, tx_polarization, rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, frequency, frequency_value)",
+      "body_sha256": "fe1d133608b830aa940ff8fa8ad348ed6098a2fb770ae529ba60fa4fc4d9a962",
+      "normalized_ast_sha256": "9b1ea1a1436748b39c6066792412ea975bc7adc17bb8b11c1ec1b3a95596d7d4"
+    },
+    {
+      "id": "_FieldReflectionSequenceAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_source, t_target, t_positions, t_normals, t_tx_power, t_tx_pol, t_rx_pol, t_eps_r, t_sigma_e, t_mu_r, t_gain, t_thickness, t_frequency, _t_frequency_value)",
+      "body_sha256": "9978b3e7feeef9647f2bdb82f25156f63476c6c0f9291d1d03fe5ee076d7541e",
+      "normalized_ast_sha256": "202ba98a35d72d21fca4408c18817ecf23e6b8448ac7e567fb9a6fd44653d21f"
+    },
+    {
+      "id": "_FieldReflectionSequenceAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "640fa00030ebc627b0d6fc2ef82acbb986952ca6bf63de2ebe93a92e5d00da5a",
+      "normalized_ast_sha256": "ad34b67aa3e37af0e4a8a9ae02bca8c51fee10b9088975d95a03be3858236172"
+    },
+    {
+      "id": "_FieldTransmissionSequenceAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length, grad_delay, _grad_direction)",
+      "body_sha256": "2d9b53877fca79ee2c95ef31a020d5167cf4616df5e2c3a2cb7fad01004e69ee",
+      "normalized_ast_sha256": "cf2b7a32e39d9fc6ddc0441dbd155361713e3fbf082b17025565d0a73b57fe3e"
+    },
+    {
+      "id": "_FieldTransmissionSequenceAdFunction.forward",
+      "kind": "function",
+      "signature": "(source, target, interaction_positions, interaction_normals, interaction_material_id, interaction_valid, tx_power, tx_polarization, rx_polarization, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r, frequency, frequency_value)",
+      "body_sha256": "bbaa1f470ddcde90d85eb39054b03634cb2b2676e300232bf4177a019bb0f982",
+      "normalized_ast_sha256": "aa1217b90c0a33e67a672af4a464ee9a8de26ea6ba6338862f3f7c4da9b8be07"
+    },
+    {
+      "id": "_FieldTransmissionSequenceAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_source, t_target, t_positions, t_normals, _t_material_id, _t_valid, t_tx_power, t_tx_pol, t_rx_pol, _t_layer_offset, _t_layer_count, t_layer_thickness, t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency, _t_frequency_value)",
+      "body_sha256": "10bbb0f5141d38532408ef558faa56b0abd942d860627314b3b1ba4e98d5f394",
+      "normalized_ast_sha256": "dfb56b7a111fb8945583f372eb1f32d10c6a51ea7bae9436eee625e875e59665"
+    },
+    {
+      "id": "_FieldTransmissionSequenceAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "00549c5b02c3e10ebece934385aecc6f0afa069e7c47c71221f19013bcfc1c82",
+      "normalized_ast_sha256": "206c70bab34e2fd4d507c8f3dce6c3229fcec226751ee5159427a5db69b5ed30"
+    },
+    {
+      "id": "_McDiffractionMapAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_output)",
+      "body_sha256": "5843ceca8cc8d3a9af7fda873a1e99101c525c58f4b444f82e7881d761618702",
+      "normalized_ast_sha256": "fd8344550b21bf2df05ec8a200501f1070b62ac4bb1de99d8d28bfcccd8649bf"
+    },
+    {
+      "id": "_McDiffractionMapAdFunction.forward",
+      "kind": "function",
+      "signature": "(tx_anchor, eta_r, sigma_e, gain, thickness, frequency, tape_active, tape_state, tape_cell, tape_u, state_edge_pos, state_edge_dir, state_t_min, state_t_max, state_n0, state_n1, state_prim0, state_prim1, state_exterior_angle, state_src, state_src_power, material_mu_r, material_valid, params)",
+      "body_sha256": "5361eb1c5c7368ae13bcfcc9bb6a396a6acf2749addb9b8d3f06fbac6d260601",
+      "normalized_ast_sha256": "064921f9c13bd11be0c0b3f347a99fe3d7061286770e8aa8a16a9c5bfc960f48"
+    },
+    {
+      "id": "_McDiffractionMapAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_anchor, t_eta, t_sigma, t_gain, t_thickness, t_frequency, *t_rest)",
+      "body_sha256": "e27100505bdad2d105ac272b6eabb71c3119961176b098bce4eff02d51c57174",
+      "normalized_ast_sha256": "defa0e88d19515006f1e359d110add2bfa88578dbd4b6c3469ae2a57a64142c9"
+    },
+    {
+      "id": "_McDiffractionMapAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "95c897ca1da5549a78c8190dc74c94a1f8c65434df32ebf44110cae7d5efd308",
+      "normalized_ast_sha256": "4016d42da16cee558cc50546cb347a48a9885c74cf1f7fc6b860cde8905422d4"
+    },
+    {
+      "id": "_McFinalizeComponentMapsAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_path_gain, *grad_powers)",
+      "body_sha256": "43ea1081dc4212952202cd5832f6dace438abb3d5e08d15e48aa942ad5cd8b3c",
+      "normalized_ast_sha256": "4e1d112e95a4cf3cca038584ff1eb521543b4f9e15d7b9f0ca70faa0879819c3"
+    },
+    {
+      "id": "_McFinalizeComponentMapsAdFunction.forward",
+      "kind": "function",
+      "signature": "(los, reflection, diffraction, transmission, scattering)",
+      "body_sha256": "8bbf78cec80dcf2475f05a8391cd06d8ccfa55e40a66876ff5571ff7de825ef6",
+      "normalized_ast_sha256": "db396667f7bdf14ab6bf0e2ea78379e74875f6ca01bc3b4932c26e41f9c6ba77"
+    },
+    {
+      "id": "_McFinalizeComponentMapsAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_los, t_reflection, t_diffraction, t_transmission, t_scattering)",
+      "body_sha256": "83235eaae9f0336e3fed0536f7466e57c7b0cef20884f6c86e8acd235dfb6c9f",
+      "normalized_ast_sha256": "0d213e290b2a40e3dbee3e274512e65e422ae17d1b81059600044b5367adfe25"
+    },
+    {
+      "id": "_McFinalizeComponentMapsAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "c0576acb5723b61f2e64e72db6e3bd6a894b1d99780670f64173f2179d739b02",
+      "normalized_ast_sha256": "af3741ff6c374201e1f2dffb22209b92e0c93354574fdf9dae5273475994e8fb"
+    },
+    {
+      "id": "_McLosGridMapsAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_maps)",
+      "body_sha256": "ece5390924fa2d2d03551d1acd81ed9e1030a596abf44d6af8923675fde7f5de",
+      "normalized_ast_sha256": "aeafcd7ffc2b7f90138df0ab2d033a6f5150888c7e3b93ec86be88f3c00ef03c"
+    },
+    {
+      "id": "_McLosGridMapsAdFunction.forward",
+      "kind": "function",
+      "signature": "(matrix, visible, rows, cols)",
+      "body_sha256": "6ba4b85ecc99532862c8d408d41ba3e6dc51ac2ca6081694161c70eaf51226fc",
+      "normalized_ast_sha256": "a5197f30aa0a25720c96349f7a1752b948092872ec6e873a1229b35f8f5b3425"
+    },
+    {
+      "id": "_McLosGridMapsAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_matrix, _t_visible, _t_rows, _t_cols)",
+      "body_sha256": "4794fff75ae54549b5f687199ac1779d7a7a4c23d06f09303bcf64f2b3fdba5e",
+      "normalized_ast_sha256": "2f1f0039c834309d9904a945ba8a26a8ebe3a61ac577735a8fbf505ff59e98ad"
+    },
+    {
+      "id": "_McLosGridMapsAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "fb321db0dfa0fe0d7ac5f7254672cb99a2bbbcf076169d737af91880643996ad",
+      "normalized_ast_sha256": "b57f9c5d690dbb967c0e2332be3fcaaa3175e4ce0e1506e449db7e8971c04dd8"
+    },
+    {
+      "id": "_McLosPathGainAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_output)",
+      "body_sha256": "31add6ca29214ccfa5ee3f4aa0bf86aa057f6c581a450cc5d6548527dfb255eb",
+      "normalized_ast_sha256": "da00496d3bd57b46ebb33c75eb75c09f143a3f2b8e43c7d5e9fbd6773ab843c4"
+    },
+    {
+      "id": "_McLosPathGainAdFunction.forward",
+      "kind": "function",
+      "signature": "(tx_positions, tx_power, rx_positions, frequency, frequency_value)",
+      "body_sha256": "01e0b3e9639d1a9dab15952ee602acfa453f2a5755da3435c9e56d5d3274dd09",
+      "normalized_ast_sha256": "87dcf9a01098d817c1246868f76143cad78575421003d3ef448a1cccc139e85b"
+    },
+    {
+      "id": "_McLosPathGainAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_tx, t_power, t_rx, t_frequency, _t_frequency_value)",
+      "body_sha256": "c488cd4444c528a48aef223d5d0330eae4dc6df0a9df7a80d3b9db495b083cbc",
+      "normalized_ast_sha256": "5bffe617a1464ae156871c9144dea18cd8331b7058b41692ef76f31aa7814dd8"
+    },
+    {
+      "id": "_McLosPathGainAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "7727d85c03de6ca3c258363fa4808ef0b98fe0d22d80fa47fa7f28bdf9c46940",
+      "normalized_ast_sha256": "967db105b25c3f6a9cf7ae1d8501fb359dddfb1d8bd938ce02b0df17cdf04791"
+    },
+    {
+      "id": "_McReflectionMapAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_output)",
+      "body_sha256": "2c2edca46a9ad31a55a6580812581132f2b78d01800ebcc76ac0fd3a9dd55e14",
+      "normalized_ast_sha256": "6e199dc5dee05808ea24e62b9c0c754781436d4c80705a9876268e69b8d99948"
+    },
+    {
+      "id": "_McReflectionMapAdFunction.forward",
+      "kind": "function",
+      "signature": "(tx_anchor, eta_r, sigma_e, gain, thickness, frequency, ray_o, ray_d, trace_valid, trace_t, trace_prim, face_normals, material_valid, params)",
+      "body_sha256": "fb8f7a92b256d49703933504fd8695b0d96febf3fc4f46b1ed42f9cdeec17bf4",
+      "normalized_ast_sha256": "ccde42822f90dd106f316da198e7bf18395f951289be9d991afce18227c87a68"
+    },
+    {
+      "id": "_McReflectionMapAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, t_anchor, t_eta, t_sigma, t_gain, t_thickness, t_frequency, t_ray_o, t_ray_d, t_trace_valid, t_trace_t, t_trace_prim, t_face_normals, t_material_valid, _t_params)",
+      "body_sha256": "b2b52253002db9dc3ed502b95ce50a901adf6969827e9a640f34d6b96bd168da",
+      "normalized_ast_sha256": "9e19d415b7ad716cd16289d3ffbcd234de347a41c9216c8cc9d22611719aa953"
+    },
+    {
+      "id": "_McReflectionMapAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "e20d556b11515fda79053c512bb68daa1f6b1016baaa5f5a29abedd15733b2f3",
+      "normalized_ast_sha256": "08117234dd8125b087013c1253a776d4fd10a810e4ec5ddb355ce4a65e312b58"
+    },
+    {
+      "id": "_RaydnFaceNormalsAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, grad_face_normals)",
+      "body_sha256": "ce3c9001b170add121c1e245ed4d9fd9124a3fa585981c824f63dd1a4289692b",
+      "normalized_ast_sha256": "af116933885697064fae34f3aa5cd48477abf5d9c730b8782b650f672d81e487"
+    },
+    {
+      "id": "_RaydnFaceNormalsAdFunction.forward",
+      "kind": "function",
+      "signature": "(scene_handle, vertices, raw_face_normals)",
+      "body_sha256": "9148e03bba537dd0bed4e841583410e62411ba3505a70e9d6ce67a0259aa8e8f",
+      "normalized_ast_sha256": "d557ff138a25d76906908ede2225b1e42ba13814220c196d70f0f3c0aef64190"
+    },
+    {
+      "id": "_RaydnFaceNormalsAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, _grad_handle, grad_vertices, _grad_raw_face_normals)",
+      "body_sha256": "73adc49e2a3161a07f345cdb7c6c24b57fd52c3c22a6f4a1a27724e3a4b7422a",
+      "normalized_ast_sha256": "3ef62008e17ced0795c683424bc3dafabcf5b18a9d859beb75ee22f0388ba180"
+    },
+    {
+      "id": "_RaydnFaceNormalsAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "4607ebbc8e63a7c3e0ec0aa2085479e489667e9c3adec81964b21aef5532f6b3",
+      "normalized_ast_sha256": "cdf1d0caad56058a7fc82bda5d915f13672f7e242318f6aa4aa8793833aad27a"
+    },
+    {
+      "id": "_RaydnIntersectAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, *grad_outputs)",
+      "body_sha256": "9858afcbddc92b2fec69b136d69cdb56fa88e1d7e0bb2f48105200eb53c5abbf",
+      "normalized_ast_sha256": "f77015ab9a6f5e2c1f54ae253d339273467435f8385d41ef9f2aa1936692e4f2"
+    },
+    {
+      "id": "_RaydnIntersectAdFunction.forward",
+      "kind": "function",
+      "signature": "(scene_handle, vertices, ray_o, ray_d, ray_tmax, active)",
+      "body_sha256": "6c4e7d5a026a76ac6050d87c83db291bdfdcc2dd0abb973737e28bd7ea73a935",
+      "normalized_ast_sha256": "8914890f5f37716aea0374737bf202562cc2e0ffccd0529b352755581700024a"
+    },
+    {
+      "id": "_RaydnIntersectAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active)",
+      "body_sha256": "21a88f943b178313069cb0d8033c75606fa48a3ff4756bfb3854731752975c1f",
+      "normalized_ast_sha256": "152003c9e3a6e183133655f061677041d47e746cbb11d5221ba9b8d422234cb6"
+    },
+    {
+      "id": "_RaydnIntersectAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "a403c30880400ade403a708422ceb9ef3921862800d4838e3d756c2f395a899b",
+      "normalized_ast_sha256": "e5d11443177acaaa5dee6fdc9d966671b38e909acdbdd7e0bbf77533ad3b6705"
+    },
+    {
+      "id": "_RaydnReflectionEpcPathsAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, *grad_outputs)",
+      "body_sha256": "591ddf88e0d5e02706735e45b755fd0f0b32ab19d70f86a5381f0cd36babf15b",
+      "normalized_ast_sha256": "77fcfb651991901efe3b8614d462f77161b11f8b71f49bbaece8c960d1d74b69"
+    },
+    {
+      "id": "_RaydnReflectionEpcPathsAdFunction.forward",
+      "kind": "function",
+      "signature": "(scene_handle, vertices, source, receiver, sequence, plane_points, plane_normals, surface_group_id, surface_group_size, surface_group_members, max_bounces, visibility_ignore_mode)",
+      "body_sha256": "a2f53f8e61329057f3ba7dea5e43971f30d904196a79a568d60e76e8893b4467",
+      "normalized_ast_sha256": "e30cff9046584eb0a8fcdca692028166492353937aa98c6cae148cd07fc5aceb"
+    },
+    {
+      "id": "_RaydnReflectionEpcPathsAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, _grad_handle, grad_vertices, grad_source, grad_receiver, *_frozen_tangents)",
+      "body_sha256": "8a71a526b1510b152ae0dce87755dc51e1cad1946fd9f38e24821b46a13d4fab",
+      "normalized_ast_sha256": "c856576e08e784039a05f0f49f3099fcd0e5bbeb1c754a987c7260c5085fb34b"
+    },
+    {
+      "id": "_RaydnReflectionEpcPathsAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "e04fb9853e72d2746007670a0658657557dec3b275241be441c0d431874899ef",
+      "normalized_ast_sha256": "f8fa36810b18ad334f6e38c17a1dcbc5725ae82cac7f54ba1c1bd662cd3fb68b"
+    },
+    {
+      "id": "_RaydnTraceReflectionsAdFunction.backward",
+      "kind": "function",
+      "signature": "(ctx, *grad_outputs)",
+      "body_sha256": "8a04fe42fd17650c26ed2cb681f3898ef40a1dea20ccd6a14a2b34049a902293",
+      "normalized_ast_sha256": "7df11ec6941ef3050dddfb147b7ef943d3913a05c80f25539f04e66962c0f51b"
+    },
+    {
+      "id": "_RaydnTraceReflectionsAdFunction.forward",
+      "kind": "function",
+      "signature": "(scene_handle, vertices, ray_o, ray_d, ray_tmax, active, max_bounces)",
+      "body_sha256": "4f8277191350dbdfc78d039a9302d389a7b56cc6ce9940a127e95811277c6d94",
+      "normalized_ast_sha256": "f520ba481f9325302110c4ea38a77467fff10f352735ef4be0d9e49fe0aeef0e"
+    },
+    {
+      "id": "_RaydnTraceReflectionsAdFunction.jvp",
+      "kind": "function",
+      "signature": "(ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active, _grad_max_bounces)",
+      "body_sha256": "2fde588ee48acab992b9cf091c81f481e8ce03973955e707b3e15414a434fa15",
+      "normalized_ast_sha256": "b5433e80ba3a979e6128fb4f8bd1ea323517983d2c66b7cb516b0621feec4dcc"
+    },
+    {
+      "id": "_RaydnTraceReflectionsAdFunction.setup_context",
+      "kind": "function",
+      "signature": "(ctx, inputs, output)",
+      "body_sha256": "579bb5a6599b81166c6711430e47dbb9061b7d5f931dd124fb7975b294d4f99d",
+      "normalized_ast_sha256": "e68d11cb6a1ae02e451bba7f9ddd3868ca1fe9e220d405e93e2764618b07ff9f"
+    },
+    {
+      "id": "_ad_active_ctx",
+      "kind": "function",
+      "signature": "(active: torch.Tensor | None, like: torch.Tensor)",
+      "body_sha256": "46e1917cb79819ee7b4dea0b9c0847c2cf56ad487e7aa8b19300149879d1a246",
+      "normalized_ast_sha256": "f8123d30584667b30516906eed9cddb55f40ac364db93ee99e0de0518534172e"
+    },
+    {
+      "id": "_ad_check_active",
+      "kind": "function",
+      "signature": "(active: torch.Tensor | None, rows: int)",
+      "body_sha256": "fcbef9748097c295492e5bc566c5a07a531ddbde15245f5db50031bc62942e1b",
+      "normalized_ast_sha256": "6a41624e849df596201b9af6e12a1f873d74c2526d57e40faf654c072bbf7fcb"
+    },
+    {
+      "id": "_ad_check_optional_grad",
+      "kind": "function",
+      "signature": "(name: str, grad: torch.Tensor | None, allowed_shapes: tuple[tuple[int, ...], ...])",
+      "body_sha256": "3200004bcb55be8d7fbb11c9519ad62927e49506a3a052c6de63b14943a591fd",
+      "normalized_ast_sha256": "e51b434f0be4ba5949f36730b161af044142cefa003e0605eec58a2b1cb859a8"
+    },
+    {
+      "id": "_ad_check_rows",
+      "kind": "function",
+      "signature": "(name: str, tensor: torch.Tensor, rows: int)",
+      "body_sha256": "f80146c2f169f07d4a25fbebf74bd88286cb1ac7f0c7a195a7fe3b11e55caf5f",
+      "normalized_ast_sha256": "b473f1cab5306792f366a68925674fef66fda2af95d34603da6d1fab1db272f8"
+    },
+    {
+      "id": "_ad_check_tangent_vec3",
+      "kind": "function",
+      "signature": "(name: str, tangent: torch.Tensor | None, rows: int | None)",
+      "body_sha256": "fd432b1721b4cdfea34c88747aaff7b384a5a1c1f1cf29048dc21a92e4554063",
+      "normalized_ast_sha256": "1b7f35146ca0294afc08218a4c5a12172594239a16820b9f3be82d31f24a4011"
+    },
+    {
+      "id": "_ad_checked_tangent",
+      "kind": "function",
+      "signature": "(name: str, tangent: torch.Tensor | None, primal_shape: tuple[int, ...])",
+      "body_sha256": "dc2af40ee85529dc80ff64335d7c527b4f0f737f9ac5db84aa46ee9676d081ba",
+      "normalized_ast_sha256": "e3953d77297cf2b77d6e5384ec483b031cba61c91e9e4ac8051b021fc7a9214b"
+    },
+    {
+      "id": "_ad_frequency_grad",
+      "kind": "function",
+      "signature": "(grad_frequency: torch.Tensor, meta: tuple[torch.dtype, torch.device])",
+      "body_sha256": "4c6a2506a79839207591077d1da803b529f834531953d273622599e288bc7087",
+      "normalized_ast_sha256": "90ea1b5e1016ffabd9f83e93621b2c37aca080513e39ebb7834cc434bfb42fc5"
+    },
+    {
+      "id": "_ad_frequency_tangent",
+      "kind": "function",
+      "signature": "(tangent: torch.Tensor | None)",
+      "body_sha256": "d3aacfdcf694772b0e84654ec5ba99afbd6f95b6cdd6e46b084bcacc3a697960",
+      "normalized_ast_sha256": "d782706bb35b784acad3a6cb30759ac42e12fc8f0a3004d63cee0fabbfae7b47"
+    },
+    {
+      "id": "_ad_frequency_value",
+      "kind": "function",
+      "signature": "(frequency: torch.Tensor | float)",
+      "body_sha256": "f2b66910f00f07ccaf380518fc43554511a82ae1b4895cac30cec5e5332322b4",
+      "normalized_ast_sha256": "5862b662ad50d3e4e7cb03b90b1c659ed80069f538c0eb21a9e0eaef4cf90c07"
+    },
+    {
+      "id": "_ad_geometry_live",
+      "kind": "function",
+      "signature": "(*values: object)",
+      "body_sha256": "35bda40c26c0f74f9f950d5b8d44427b6faba4079ac855f0938adb3db44572c6",
+      "normalized_ast_sha256": "983d697e7e745eb3a105f77e42af2d6c6a293f872ac7f941d70f681ee2539b62"
+    },
+    {
+      "id": "_ad_geometry_tangent",
+      "kind": "function",
+      "signature": "(name: str, tangent: object, primal: torch.Tensor)",
+      "body_sha256": "ee17e1e4ba9ea519429ac1ac153eb9c9f12ca4c970523cd8a98cceaccdb43af9",
+      "normalized_ast_sha256": "1acd2703d35fbd713af2a967eca9519430eeb1b2741ebea48b31eca44cc154e2"
+    },
+    {
+      "id": "_ad_native_tangent_or_none",
+      "kind": "function",
+      "signature": "(value: torch.Tensor | None)",
+      "body_sha256": "80f881d85c77274e8d94e73434408683198ac2cb812508576c33d9debb8b4e7f",
+      "normalized_ast_sha256": "e616987029bee58cdc444ae75cb643a38426a2af08e8a7e5a06104ca3de0ee17"
+    },
+    {
+      "id": "_ad_native_tensor",
+      "kind": "function",
+      "signature": "(value: torch.Tensor | None)",
+      "body_sha256": "36dd50b2f2f320c01670df2660c2e2fdad12c922ac1bc0ad1c265348310c9cd7",
+      "normalized_ast_sha256": "de3268ea5086a9fd0db7d431fb42af7aa857b50d92622895425487632b6fb7a3"
+    },
+    {
+      "id": "_ad_raise_composed_transforms",
+      "kind": "function",
+      "signature": "()",
+      "body_sha256": "0e6b2e8e9b37285d9f934085f5096e250c8b3980988bd4bcd734d9de63bea714",
+      "normalized_ast_sha256": "bc9b2016da393160d934298e3ce65b699a1cbbf8a11ed7fc354fd4b4180a7801"
+    },
+    {
+      "id": "_ad_reject_fixed_inputs",
+      "kind": "function",
+      "signature": "(op_name: str, needs_input_grad: tuple[bool, ...], fixed: tuple[tuple[int, str], ...])",
+      "body_sha256": "41af2213052049465dd8fc14ec3d4300c6dd52d2c21a91029f43aeb3ec9e2135",
+      "normalized_ast_sha256": "0fbe62100d4fabb74b3bd46fcf4ec00b492d333820584ba95f1b85056d3c2097"
+    },
+    {
+      "id": "_ad_reject_fixed_tangents",
+      "kind": "function",
+      "signature": "(op_name: str, tangents: tuple[tuple[object, str], ...])",
+      "body_sha256": "0861ee625da4dd7bc8008ed6be6e855ec91d77a5f17defd683204c11add0d559",
+      "normalized_ast_sha256": "ac9517773f84d2ed2faeb7f8dc83ab990c7d0522575b5ea5e825a455ff4bff15"
+    },
+    {
+      "id": "_ad_still_wrapped",
+      "kind": "function",
+      "signature": "(value: torch.Tensor)",
+      "body_sha256": "41cfc0f1ccf91e09f5e3869e6a69debdd5888cefb79ac15652bd86a8aff4af37",
+      "normalized_ast_sha256": "622545a5a36cda5c016da8b065b607dad08cbc4574760df109ce682dd57e796a"
+    },
+    {
+      "id": "_bdpt_mis_mode_id",
+      "kind": "function",
+      "signature": "(mis: str)",
+      "body_sha256": "1b155104129f2b88ac4552366ef005ec34eacc0508a49e204792fb56959d465b",
+      "normalized_ast_sha256": "9a641b5c0a28b9ad3541eefe7754644eb37cede24fa1f67b645b3e1292efe729"
+    },
+    {
+      "id": "_epc_paths_frozen_winner_checks",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, receiver: torch.Tensor, sequence: torch.Tensor, plane_points: torch.Tensor, plane_normals: torch.Tensor, valid: torch.Tensor, bounce_count: torch.Tensor)",
+      "body_sha256": "fbaa7668193ab28fcbfc5a6ba822f099f26c5f35725711335dfb3d37ade63b9a",
+      "normalized_ast_sha256": "197f4c722763d68c4489c0d3299250d49b3f1e2bc4dfc5abd31d4d369fdb5c6f"
+    },
+    {
+      "id": "_raydn_module_handle",
+      "kind": "function",
+      "signature": "()",
+      "body_sha256": "0c3db41a6ca4d2c7028981e9cd2eddc49a248bc0069ea79456341fcdf69c7e4d",
+      "normalized_ast_sha256": "189cf831059f83cdc559bfde6568c1c283cdce4c0473f8a796bbf2a611975dd4"
+    },
+    {
+      "id": "_raydn_scene_handle_id",
+      "kind": "function",
+      "signature": "(handle: object)",
+      "body_sha256": "fff47329014201358ba9871fa91452f843a74d5ef36b1e1abc33743d3a5ef1c5",
+      "normalized_ast_sha256": "bcf1418a22d12068a23be36c951f3d4659ab585ac77232811db929d05421924e"
+    },
+    {
+      "id": "_required_native_op",
+      "kind": "function",
+      "signature": "(name: str)",
+      "body_sha256": "f60ee207119d675d9a7b6b9982131fbc44b1238eb3ce8274b1607136fbfc490d",
+      "normalized_ast_sha256": "7b56c53edc656035db923c40532b9dd3c8849e9e35ffdc748bcc5561484ee6a3"
+    },
+    {
+      "id": "_validate_bdpt_connection_samples",
+      "kind": "function",
+      "signature": "(name: str, exported: dict[str, torch.Tensor], expected_count: int | None)",
+      "body_sha256": "c7e4c6253c9f8b394d2f45e82260274c86f8e92f29ddfc6c07bce880c3c11609",
+      "normalized_ast_sha256": "4aeec0ee1ec6da3065743ded361886867f35e609c8773b36678386574baf8f35"
+    },
+    {
+      "id": "_validate_bdpt_subpath_state",
+      "kind": "function",
+      "signature": "(name: str, exported: dict[str, torch.Tensor], expected_count: int | None)",
+      "body_sha256": "043b1c2daa06aeed1f33629f1afcd303a5c33721b0660d1ef8bb11d99b951197",
+      "normalized_ast_sha256": "f67151ab8e2b9cd4b78fb5e932436e74fab4ce160f8aa27ab0408741c13dd76c"
+    },
+    {
+      "id": "_validate_deterministic_topology_block",
+      "kind": "function",
+      "signature": "(name: str, block: dict[str, torch.Tensor], sequence_width: int)",
+      "body_sha256": "e98f06d510d52d8a0e79db57a9952ed02aac779941c3243a3418744bd83d687a",
+      "normalized_ast_sha256": "67839d16cbc8175cd9f7f78c9d6a4de4b580b87c5685eec8a265cb798a7b1208"
+    },
+    {
+      "id": "_validate_layer_csr",
+      "kind": "function",
+      "signature": "(layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, device: int)",
+      "body_sha256": "6092400b1bcefd6cdf72b430f3512a040906168b6313e7b2d9214f5d18e657b6",
+      "normalized_ast_sha256": "a98550909345bcda1034d996658a96b8271b321784a1095ea230298e4069c61a"
+    },
+    {
+      "id": "_validate_path_block",
+      "kind": "function",
+      "signature": "(name: str, block: dict[str, torch.Tensor])",
+      "body_sha256": "b4f90545efc69ccbc0cbd9e16d228b050c98adde60fa2df4208821e8ae6c7fa7",
+      "normalized_ast_sha256": "623b3d331136c65a6b434afdd3728eb671e2938585e7c3f715557dbb15292728"
+    },
+    {
+      "id": "_validate_path_reflection_candidates",
+      "kind": "function",
+      "signature": "(name: str, candidates: dict[str, torch.Tensor])",
+      "body_sha256": "ae64ab463d9ee33a5ca8d289b5ce13f28b6017d38724bceb405eb203a79df8c6",
+      "normalized_ast_sha256": "d675562dbf20ec0e80c6eedb6fab4361df897ff98ac89740693bd92ecdbeb98f"
+    },
+    {
+      "id": "_validate_topology_extra_fields",
+      "kind": "function",
+      "signature": "(name: str, block: dict[str, torch.Tensor], sequence_width: int, expected_presence: dict[str, bool])",
+      "body_sha256": "356eda29b2d5de5229c5290197d162b4414a1677d516cefa9aa36333621e3dd4",
+      "normalized_ast_sha256": "63377db3636e8d4f52843d0c486a7f3d5ad54387cb6b81a4e4c41ffaf5586b48"
+    },
+    {
+      "id": "bdpt_accumulate_connection_samples",
+      "kind": "function",
+      "signature": "(samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int, accumulation_strategy: str='atomic')",
+      "body_sha256": "925798ad19ed200e71d830df688dedce4084b82ce2c86956ed4fef19f4933325",
+      "normalized_ast_sha256": "d9d4dedcab16cafacb7844a837477bc1b509408f1409c681d9c53a3ba2574b26"
+    },
+    {
+      "id": "bdpt_apply_los_visibility",
+      "kind": "function",
+      "signature": "(maps: torch.Tensor, los: torch.Tensor, visible: torch.Tensor, *, tx_index: int)",
+      "body_sha256": "c67a4ac9e85ebdaf08809b2c7732cbd71ddf658758282fd0e8fcb6c18b292449",
+      "normalized_ast_sha256": "108085e0424ad66c11e7b19795873f2f6216a363d9f33b5e36f9976c9f8981ca"
+    },
+    {
+      "id": "bdpt_compact_connection_samples",
+      "kind": "function",
+      "signature": "(samples: dict[str, torch.Tensor], *, max_paths: int | None=None)",
+      "body_sha256": "6544b26a1d307d692afa7d385b09726af31793fdcb182853ba4610d56c2d4919",
+      "normalized_ast_sha256": "fa92f2c9e10f17d3ce9a17b0e93e566904d9f5a885497464bdee04bf114ec1fc"
+    },
+    {
+      "id": "bdpt_component_map_buffer",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, tx_count: int, dim0: int, dim1: int)",
+      "body_sha256": "99542544a03cd540d0f689f6e8fefc4091ef800502c334ce9f2abd35174aae1d",
+      "normalized_ast_sha256": "ee5d3ea5017bced741cd9312c98e3e8e2d353b8b3c5c427a0b1a630b439dcfc5"
+    },
+    {
+      "id": "bdpt_concat_connection_samples",
+      "kind": "function",
+      "signature": "(samples: tuple[dict[str, torch.Tensor], ...] | list[dict[str, torch.Tensor]])",
+      "body_sha256": "ac8a0caa55df175ce75bade8deebaeae3cabfa0f314649740201fe6565ad18ca",
+      "normalized_ast_sha256": "05a06577ebb4d5793088847931cd3a428e79e80d847f91932e1f895c68d61e1c"
+    },
+    {
+      "id": "bdpt_connection_variance",
+      "kind": "function",
+      "signature": "(samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int, samples_per_tx: int)",
+      "body_sha256": "cd6b100324908623e3d256afbdd1d93a6a383063227dfc22c630fe955806c5b4",
+      "normalized_ast_sha256": "2c8308b3896582dc8d79b0ab8c610eb759ad61ac05f31552bb7d9c54a0bc31bf"
+    },
+    {
+      "id": "bdpt_count_valid_connection_samples",
+      "kind": "function",
+      "signature": "(samples: dict[str, torch.Tensor])",
+      "body_sha256": "6be73ab0ef10ae1ad5594eebc737e74d10e88f10782d26f2bc73794766b748dd",
+      "normalized_ast_sha256": "a628888069944001fa1f65de63ce90457424f3e8ef8c5dfc193deb197d3e6155"
+    },
+    {
+      "id": "bdpt_diffraction_accumulation_forward",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "8bf1cce9620a34e884f0cb59e1d080cfd85cd42c2151731b1055cb34cde918b3",
+      "normalized_ast_sha256": "a65f65d2f56de180a3b4ff8fd749a234a1df006ca9a727fb218d42055962da15"
+    },
+    {
+      "id": "bdpt_diffraction_connection_samples_from_tape",
+      "kind": "function",
+      "signature": "(tape: dict[str, torch.Tensor], states: tuple[torch.Tensor, ...], material_gain: torch.Tensor, material_valid: torch.Tensor, *, tx_index: int, state_count: int, grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, grid_cell_area: float, wavelength: float, direct_samples: int, keller_samples: int, mis: str='power_heuristic', beta: float=2.0, strategy_count: int=1)",
+      "body_sha256": "3acfc0f5f3ce8caca52a368d060cc59c72795e660805ec11e5dbf252273fae8c",
+      "normalized_ast_sha256": "594242c6a841c62532fc329431565d1be54ff2fa20de6e6d33cfd418cf898702"
+    },
+    {
+      "id": "bdpt_diffraction_discover_edges",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "2db99699bffbf65a7ba484fc8c76687ff5f0779eb16d471c7e32b614d1935dae",
+      "normalized_ast_sha256": "13eb0e58883c0cb05f7a6f286bd428b93b9c75b601126979d822b08c6386f3a2"
+    },
+    {
+      "id": "bdpt_diffraction_discover_edges_counted",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "5391ce76e18d7f76ecb7924978efb5c66bd9ac76a550318073104a951d8bfe86",
+      "normalized_ast_sha256": "a9dda69e225cc9bfb7141eba8d74a4fa83873ca962a1eef55a0aa1111d3c8815"
+    },
+    {
+      "id": "bdpt_diffraction_edge_geometry",
+      "kind": "function",
+      "signature": "(vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor, edge_v0: torch.Tensor, edge_v1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, *, plane_tol: float)",
+      "body_sha256": "21199b53df09b7a494d3783122a2979175d764e9ff2d19ff8aed75fe0346adba",
+      "normalized_ast_sha256": "5d44d625827cf413058ea4355135c3206f67516237c0b64c61bb77b400e2f094"
+    },
+    {
+      "id": "bdpt_diffraction_point_connection_samples",
+      "kind": "function",
+      "signature": "(rx_positions: torch.Tensor, states: tuple[torch.Tensor, ...], material_gain: torch.Tensor, material_valid: torch.Tensor, *, tx_index: int, state_count: int, direct_samples: int, keller_samples: int, seed: int, wavelength: float, mis: str='power_heuristic', beta: float=2.0, strategy_count: int=1)",
+      "body_sha256": "be8adecbcf2009581440bdb1de7ce066766d9ee4f48d3123fc11b45bdeda7a4c",
+      "normalized_ast_sha256": "fd57a2b6cca460085c1c97ad4bc62a3c969898f16ba11a7431e51ef6c0f5fd6e"
+    },
+    {
+      "id": "bdpt_diffraction_state_pack",
+      "kind": "function",
+      "signature": "(edge_indices: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor, line_min: torch.Tensor, line_max: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor, tx: torch.Tensor, tx_power: torch.Tensor)",
+      "body_sha256": "2a1db053027bbb7027badef465d0ddc700f7a20c0e15d9fb68da9bb7679eafe5",
+      "normalized_ast_sha256": "747c24d988b7889347e98c61836dbc34734b01ff3a1255b0c009a8224d1f4d03"
+    },
+    {
+      "id": "bdpt_diffraction_state_wi",
+      "kind": "function",
+      "signature": "(state_edge_pos: torch.Tensor, state_src: torch.Tensor)",
+      "body_sha256": "1f126ed2bea6fcd448a1d43843cba0bbe42edb18fe70118ce4a413e893369ad6",
+      "normalized_ast_sha256": "863e878be70336f8be7d025dfddb2021c915ec9764498a5c24ecb08a3e343efd"
+    },
+    {
+      "id": "bdpt_empty_subpath_state",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor)",
+      "body_sha256": "d52975cf27552d0d65dc1aff8eb8467a2de26051b56e0f252d1f9a4c5a919ce8",
+      "normalized_ast_sha256": "67b0e1aebd7caf623e472593b55d721f4f4d5c00857c8d7657a01b703464311d"
+    },
+    {
+      "id": "bdpt_endpoint_connection_samples",
+      "kind": "function",
+      "signature": "(light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, frequency_hz: float, samples_per_tx: int, max_paths: int | None=None, mis: str='power_heuristic', beta: float=2.0, strategy_count: int=1)",
+      "body_sha256": "500987f5e0b2ccf2a28037e6dc054a9c21209972fe4eaa4b018e56b3f6d40065",
+      "normalized_ast_sha256": "860640905d7c417c3cd1cf2589d4f1f8ccb9c42da2ccb4383c3fe736d8a44411"
+    },
+    {
+      "id": "bdpt_endpoint_connection_visibility_inputs",
+      "kind": "function",
+      "signature": "(light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, sample_count: int)",
+      "body_sha256": "64c48011508b805618e237571e6b42c5677eecdf56b2eadabfeb080565c51fd7",
+      "normalized_ast_sha256": "0c3c28edc8243efcba364b586d2aa12f9e52bd58471311a730b46daf78315277"
+    },
+    {
+      "id": "bdpt_endpoint_subpath_state",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_positions: torch.Tensor, rx_polarization: torch.Tensor, launch_tx_id: torch.Tensor, light_seed: torch.Tensor)",
+      "body_sha256": "ca3e453168ce2be216fd1aea250728efd044d0f01fc8142073bc5e79234d4de6",
+      "normalized_ast_sha256": "73accd162ca4f03ab25d67f5c12a200038b328c4a26a5674f616c8fc4fa32abf"
+    },
+    {
+      "id": "bdpt_face_material_tensors",
+      "kind": "function",
+      "signature": "(material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, face_material_id: torch.Tensor)",
+      "body_sha256": "02fcb2dd6e014afbb17c3aee892eeb231078dba0c9d38d16883b09f12ffc4aae",
+      "normalized_ast_sha256": "a6d4631fe5306980043ffac67259cf9739a942827592bd6208ba5dd69086a6a3"
+    },
+    {
+      "id": "bdpt_face_material_tensors_from_host",
+      "kind": "function",
+      "signature": "(material_eps_r: tuple[float, ...], material_sigma_e: tuple[float, ...], material_mu_r: tuple[float, ...], face_material_id: tuple[int, ...])",
+      "body_sha256": "75057b40ce2466606cf42604b9df9d809efc958a102df472da4cf7e892477a2e",
+      "normalized_ast_sha256": "1480c6dd30b3281022fb5b27141e923652458d3cb4e7937f964295f210c2537b"
+    },
+    {
+      "id": "bdpt_filter_connection_samples",
+      "kind": "function",
+      "signature": "(samples: dict[str, torch.Tensor], visible: torch.Tensor)",
+      "body_sha256": "566559a9bd77458922f16590374ef6063958ba26af5e3e0e1f8dac469d8ced74",
+      "normalized_ast_sha256": "583e0608e6c58ed2f350a6814dbdd1be0c6b53714eef9d3fad2ae81d7a645d29"
+    },
+    {
+      "id": "bdpt_finalize_component_maps",
+      "kind": "function",
+      "signature": "(los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor, transmission: torch.Tensor, scattering: torch.Tensor)",
+      "body_sha256": "236de80739612de548ac53d5bc614c272262b53dc17135e79c381c062c054971",
+      "normalized_ast_sha256": "168991c4444f2bae8d1658b6af6efc5f8a8425d492fb2d8bf1f8926ad85da6d3"
+    },
+    {
+      "id": "bdpt_finalize_point_components",
+      "kind": "function",
+      "signature": "(los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor, transmission: torch.Tensor, scattering: torch.Tensor)",
+      "body_sha256": "88cd8d1955ee2e70327564aad68c497a3b6964f44edfc59675fc3b4e8d64cd76",
+      "normalized_ast_sha256": "3b8f8388d1fb9bf8aab7516d266c590fa17a8edb964d6e4d443b175f70c3e150"
+    },
+    {
+      "id": "bdpt_host_vec3_tensor",
+      "kind": "function",
+      "signature": "(flat_positions: tuple[float, ...])",
+      "body_sha256": "3c2887b248021fde76edf81d3df3ae83754eed7e9feefa0fb4e516f3678b144b",
+      "normalized_ast_sha256": "9aa995e02ad4f762cbb4546a6e1f27988229af7840994f41c9e90eec48457a58"
+    },
+    {
+      "id": "bdpt_intersect_forward",
+      "kind": "function",
+      "signature": "(handle: object, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor, active: torch.Tensor | None, *, flags: int=7)",
+      "body_sha256": "b5f060706ef86afeff2595a1f954dd58ea2cccf3f0c9937eb4e000212d819d24",
+      "normalized_ast_sha256": "563c56f6d5df8d4141276ed8847d400a85db05557e43b16119f47b34e5ffe277"
+    },
+    {
+      "id": "bdpt_launch_state",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, tx_count: int, samples: int, sample_streams: int, seed: int)",
+      "body_sha256": "236044c80e38970cfbc3005aa897e2060f6713008ddfccadcea904cc25abed79",
+      "normalized_ast_sha256": "05710d21fe9a6860a38a6b4edc91c95afa2519cd295c932333f7afa7fdc65e9e"
+    },
+    {
+      "id": "bdpt_los_component_maps",
+      "kind": "function",
+      "signature": "(los: torch.Tensor)",
+      "body_sha256": "d532621bdf1ab60d833fb60584a377261ea28f0ce127c5814f8d454855d4e149",
+      "normalized_ast_sha256": "98b1b12394ea28f63b214a462c660feaf8da2d56cb0c5dcd0c2ddd1db1526484"
+    },
+    {
+      "id": "bdpt_los_component_maps_from_matrix",
+      "kind": "function",
+      "signature": "(los: torch.Tensor, *, rows: int, cols: int)",
+      "body_sha256": "5c3ea014a2740f55727b715e592eda82b400964bca08225d074a6e65a2228eab",
+      "normalized_ast_sha256": "b6ec7db5ec5664141a4c952415a4b1dbbdd88cfbdb675f0dca298b65fda6293a"
+    },
+    {
+      "id": "bdpt_los_export",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "502e36dc49c8224994a66e387a2b1233c99dbf423463c12555a07a0010f9c82c",
+      "normalized_ast_sha256": "fb7264221c978fc695a00dd9ece46c3db5c6c0e49ae407513b6432cf4504e5ca"
+    },
+    {
+      "id": "bdpt_los_visibility_inputs",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, *, tx_index: int, rx_count: int)",
+      "body_sha256": "950210e922503c94927fc5e1d17dc4c7c1736bc5ae971f976f767aede18976ed",
+      "normalized_ast_sha256": "55d20bdd8e1c8b3297bd99ff58f31b56bc8a0bf098fc15bf9b02d7922edebf40"
+    },
+    {
+      "id": "bdpt_mis_weights",
+      "kind": "function",
+      "signature": "(pdf: torch.Tensor, strategy_pdf_sum: torch.Tensor, *, mis: str, beta: float=2.0)",
+      "body_sha256": "3591ceb440e1d0bd748262f951d4cf9443daa95f2ea72e9e1bb69b30881f2366",
+      "normalized_ast_sha256": "bc519cd93fba6d9d90022fde242ed16e3851a3869ba173f7a2d10749dbc6416c"
+    },
+    {
+      "id": "bdpt_pack_vec3",
+      "kind": "function",
+      "signature": "(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor)",
+      "body_sha256": "dd882e2c610f4b1a5a5d9df78c746759e7ec5f1a24d23a0456c12f5bbd323c24",
+      "normalized_ast_sha256": "8ddc7fe44aa915079b55b459033a5759cf9d62cfd8e2b6766bd3eb335d14a0f2"
+    },
+    {
+      "id": "bdpt_point_component_power",
+      "kind": "function",
+      "signature": "(path_gain: torch.Tensor, *, include_los: bool)",
+      "body_sha256": "b9f9b2da29dd990817b3f922ccebb1fa137aac88fa6e6e4a4c2ead39a3b9f477",
+      "normalized_ast_sha256": "2d90443541d9f388e2d7486c1e340c11ae7f3044c4943e9e791dccd39343cdd3"
+    },
+    {
+      "id": "bdpt_receiver_grid_points",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, origin: tuple[float, float, float], x_axis: tuple[float, float, float], y_axis: tuple[float, float, float], shape: tuple[int, int], spacing: tuple[float, float])",
+      "body_sha256": "f469929cb5cebca68fc3d09475c5c90b014ca9be19fef1996550a7c91d479446",
+      "normalized_ast_sha256": "7de8f91a28c55921bdd392ebcb19b8af5f36d42f902cbef8ee96a3b5fab7b75a"
+    },
+    {
+      "id": "bdpt_reflected_light_subpath_state",
+      "kind": "function",
+      "signature": "(light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *, material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor, frequency_hz: float)",
+      "body_sha256": "e6f5be20157e2af198cd55206d6a10c4a7d8407a6203120ab9d00dc77ac2a469",
+      "normalized_ast_sha256": "df10383ade6362bfd8eb5d4f40d84f77b4d40c67527b97ea332fa515f0c268e5"
+    },
+    {
+      "id": "bdpt_reflection_accumulation_forward",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "9df6e4233b8a9b1624979331090e9a9eb4d2535d49b6197932fb3980599a2e1a",
+      "normalized_ast_sha256": "586bc5b6119c7d84a3409d4b241a336bb4729f7fa4bcfef0b5f429cba9d158ff"
+    },
+    {
+      "id": "bdpt_reflection_launch_inputs",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, *, tx_index: int, sample_count: int)",
+      "body_sha256": "13806a77179cf20e603c06780dadcaef2e51a5dbcb199e54649281f35d471185",
+      "normalized_ast_sha256": "c9739a606167b111f505aa1de13d23628942d2641c3686722d49ad3a0076e23a"
+    },
+    {
+      "id": "bdpt_sample_directions",
+      "kind": "function",
+      "signature": "(count: int, reference: torch.Tensor, *, seed: int)",
+      "body_sha256": "106c8b763df94bc12a6886d2295963b1342a4a238b85f0ef36cfc519930d06a0",
+      "normalized_ast_sha256": "cb651553f1cf930ad30523a1baede7ecbcde9b7ce3d7f0a79282c1af7883c8ab"
+    },
+    {
+      "id": "bdpt_selected_edge_indices",
+      "kind": "function",
+      "signature": "(selected: torch.Tensor)",
+      "body_sha256": "40e89b41724be867a69d1195f8afa40cd41c140cb30893073f272960676fc253",
+      "normalized_ast_sha256": "9675feb3f29a6044120a70b80fcfb53a9d66bb8998b8902894fe603de8b915ce"
+    },
+    {
+      "id": "bdpt_store_component_map",
+      "kind": "function",
+      "signature": "(maps: torch.Tensor, source: torch.Tensor, *, tx_index: int)",
+      "body_sha256": "8adf2e57e1865f32532e8c6c66b206144c6d2140cdb1fdeaae8acb395dad3f6e",
+      "normalized_ast_sha256": "f3d810edfa354ec1f7b35b4018f1f1467332453e0d023e592f7881e221812b3a"
+    },
+    {
+      "id": "bdpt_store_point_component_column",
+      "kind": "function",
+      "signature": "(target: torch.Tensor, source: torch.Tensor, *, rx_index: int)",
+      "body_sha256": "e98e7b49b17182ff539715c552f5426de111f20ca9fb651b0cb7cbeed8ba6a0d",
+      "normalized_ast_sha256": "6d159bc18ab9f032ff3840def18acdf43a2b1cff662cee3885d39dca6375e0d0"
+    },
+    {
+      "id": "bdpt_store_scaled_component_map",
+      "kind": "function",
+      "signature": "(maps: torch.Tensor, source: torch.Tensor, scale_values: torch.Tensor, *, tx_index: int, scale_index: int)",
+      "body_sha256": "02f265f390792056538c2e0e850c756eff73aef1795989536b2c57a8a18b8716",
+      "normalized_ast_sha256": "d4128f1a33a25afb61d7048300a7f02a900d51ed94dc43172d4e7f901ea93c8d"
+    },
+    {
+      "id": "bdpt_subpath_intersection_inputs",
+      "kind": "function",
+      "signature": "(subpath: dict[str, torch.Tensor])",
+      "body_sha256": "32641b1e25c5a6157246fdb9b4d1ab74ec6276e791b2ef87822e227bba37b64c",
+      "normalized_ast_sha256": "d2a449e3f93601f795ab781ee130abc18da6064ff9468028c9269063bc9e6bf6"
+    },
+    {
+      "id": "bdpt_surface_group_edge_candidates",
+      "kind": "function",
+      "signature": "(vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor, edge_v0: torch.Tensor, edge_v1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, selected: torch.Tensor, *, plane_tol: float)",
+      "body_sha256": "463a645439e5ccafad0aa3b11cb016fb2b91da02bb57ada7d48b7a0fedc4ab1b",
+      "normalized_ast_sha256": "48b3ebce8eb7e1cf96efa4ef494410c2b07c2611e85b0ee33340487d9625d006"
+    },
+    {
+      "id": "bdpt_transmitted_light_subpath_state",
+      "kind": "function",
+      "signature": "(light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *, face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, frequency_hz: float)",
+      "body_sha256": "d48cbfd7b3ba9c45cc5ecbb608e617ee83e55d0f81fe3036894e8a210cce04c7",
+      "normalized_ast_sha256": "d159a6e04e02988d7d24634600129a7814a61f7537c7347c29f69643b16252fa"
+    },
+    {
+      "id": "bdpt_transmitter_tensors",
+      "kind": "function",
+      "signature": "(flat_positions: tuple[float, ...], powers: tuple[float, ...])",
+      "body_sha256": "f335eb663be7159c2f7a15ba17cf2d304a1a9f747073dc2aca9a85790b363afc",
+      "normalized_ast_sha256": "e07661c330afc8d774d5e305de2f1a887411ab76dca8ebd41c200fc84cd2f5c3"
+    },
+    {
+      "id": "bdpt_visibility_forward",
+      "kind": "function",
+      "signature": "(handle: int, start: torch.Tensor, end: torch.Tensor, active: torch.Tensor | None)",
+      "body_sha256": "75009a882455c113813e7676ac9226070b7d40c9f90a719c0a2595ec5faf8558",
+      "normalized_ast_sha256": "27c7f2ba021d7673db8a3890e9167085e0b3ceab993cfb0c78bc8f52ff9daad9"
+    },
+    {
+      "id": "bdpt_zero_matrix",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, rows: int, cols: int)",
+      "body_sha256": "a46d8b627b4cb0261e43bac9add75717bd48b849ac8dd52bea3f5e014a93638a",
+      "normalized_ast_sha256": "139a53aa7155dda81b4526f1b2cf43140e0fc642e0bf043a6c75faf569bb177c"
+    },
+    {
+      "id": "core_diffraction_edge_count",
+      "kind": "function",
+      "signature": "(*, vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor, edge_v0: torch.Tensor, edge_v1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, vertical_only: bool, vertical_ratio: float, boundary_half_plane: bool, plane_tol: float)",
+      "body_sha256": "b91f9dd04b97fec85bce143cfdd8bfdf8ea0e56cc735e758121cf04b03a351ab",
+      "normalized_ast_sha256": "b5aadc9f2886445014c3d02f1bc0f2a0c20cf1969cd8888b93e654d7927e28e5"
+    },
+    {
+      "id": "core_pack_int2",
+      "kind": "function",
+      "signature": "(x: torch.Tensor, y: torch.Tensor)",
+      "body_sha256": "eb5952e648ba1a82d09161dbd5802ea38d3ca2b9d0f40921cd190328c020393a",
+      "normalized_ast_sha256": "47ccf6df7da048085d19c2665b7fae3249646d600309b84b4fa4e474dcf65062"
+    },
+    {
+      "id": "coupled_rd_prepare_ad",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, receiver: torch.Tensor, plane_point: torch.Tensor, plane_normal: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor)",
+      "body_sha256": "ce5b1e58e0cb97557bee256ea06d3abce66be73eb0e878349dfbdacd9542843e",
+      "normalized_ast_sha256": "0db479dd1fcd892c2a9828fea2d9b1257e2fcdbe7a6dff58e05f330708f1d970"
+    },
+    {
+      "id": "deterministic_accumulate_flat",
+      "kind": "function",
+      "signature": "(tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor, path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int, num_rx: int, coherent: bool)",
+      "body_sha256": "6398bc63a5332fb9925e9b66a61322660d485838ae07ae008238aaebcc89fe81",
+      "normalized_ast_sha256": "c7cd52f421b8a7ed65542a7cc63e87af930c376fb2ae0301c4efaa87f09fcb08"
+    },
+    {
+      "id": "deterministic_accumulate_flat_ad",
+      "kind": "function",
+      "signature": "(tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor, path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int, num_rx: int, coherent: bool)",
+      "body_sha256": "7741aee9ecb32bfc54bb1f2b0ca3c9b82a3dba7db1346955bebb76fa43bc56ae",
+      "normalized_ast_sha256": "0a29f0ad7856fd4d1d3b9ce23e4be795dc4aad467f5ebb6631c255c8be755c92"
+    },
+    {
+      "id": "deterministic_accumulate_flat_backward",
+      "kind": "function",
+      "signature": "(tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor, component_field_real: torch.Tensor, component_field_imag: torch.Tensor, field_total_real: torch.Tensor, field_total_imag: torch.Tensor, power_total: torch.Tensor, *, grad_power_total: torch.Tensor | None=None, grad_field_total_real: torch.Tensor | None=None, grad_field_total_imag: torch.Tensor | None=None, grad_component_power: torch.Tensor | None=None, grad_component_field_real: torch.Tensor | None=None, grad_component_field_imag: torch.Tensor | None=None, num_tx: int, num_rx: int, coherent: bool)",
+      "body_sha256": "2f1d847c1d4505bb8cb9417509b0cf0e73c669c32904ef5b74125034ba080e2b",
+      "normalized_ast_sha256": "d1bda4d0907389d7218283d2b9906ff8241efe284b9e2745611cda16663daad9"
+    },
+    {
+      "id": "deterministic_accumulate_flat_jvp",
+      "kind": "function",
+      "signature": "(tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor, component_field_real: torch.Tensor, component_field_imag: torch.Tensor, power_total: torch.Tensor, *, tangent_path_gain: torch.Tensor | None=None, tangent_field_real: torch.Tensor | None=None, tangent_field_imag: torch.Tensor | None=None, num_tx: int, num_rx: int, coherent: bool)",
+      "body_sha256": "41788fc0da76b6fe6d40fa4739dfb4b2488bbc1d742300c7f6f83f29a7309653",
+      "normalized_ast_sha256": "d2207728311b95ec0979606d3beabaf41164414e4d4dee85778012f02af8ac60"
+    },
+    {
+      "id": "deterministic_component_counts",
+      "kind": "function",
+      "signature": "(component_id: torch.Tensor)",
+      "body_sha256": "bbcc2b1f2752d1af4d1cd5dac39afc869512bf7bcba28085320da246008e0b95",
+      "normalized_ast_sha256": "5731878e27d7e484fd9797bf1b42d332f06ec3f0339d21ecc8e16ac0a2804535"
+    },
+    {
+      "id": "deterministic_concat_topology_blocks",
+      "kind": "function",
+      "signature": "(blocks: tuple[dict[str, torch.Tensor], ...] | list[dict[str, torch.Tensor]], *, sequence_width: int)",
+      "body_sha256": "ef6d8efe9a3f2f75c8e1894797607ed9a6162b5525a80d82a47012aeef417625",
+      "normalized_ast_sha256": "ab03a0b2c489c9999e517ec3aa3d587853cbe797e45179f6c344a9a80d1b54de"
+    },
+    {
+      "id": "deterministic_delay_to_path_length",
+      "kind": "function",
+      "signature": "(delay_s: torch.Tensor)",
+      "body_sha256": "096690776433f8a6496136b758f958f59cd0f5c89013ee452e5f4df1f9bfc68a",
+      "normalized_ast_sha256": "fb97fb390c7ce0ee9b6cf406927b6bee8b57f400f0d40e07e7ad0031e5ca6f2e"
+    },
+    {
+      "id": "deterministic_diffraction_order1_compact",
+      "kind": "function",
+      "signature": "(*, valid: torch.Tensor, rx_id: torch.Tensor, depth: torch.Tensor, edge_id: torch.Tensor, delay_s: torch.Tensor, x_re: torch.Tensor, x_im: torch.Tensor, y_re: torch.Tensor, y_im: torch.Tensor, z_re: torch.Tensor, z_im: torch.Tensor, interaction_position: torch.Tensor)",
+      "body_sha256": "3d92332d4fe3667683e23cb4ad3b34aefaa2d0394a91c7fe687e97d1a49a867f",
+      "normalized_ast_sha256": "df870d7d1ca222dac12392d39eb3154bff4b54f6b6683c5999b1c19d378d8abb"
+    },
+    {
+      "id": "deterministic_diffraction_state_pack",
+      "kind": "function",
+      "signature": "(edge_indices: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor, line_min: torch.Tensor, line_max: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor, tx: torch.Tensor, tx_power: torch.Tensor, tx_power_index: int)",
+      "body_sha256": "167b34e7074527ab7449cfd01969dcfa29c073e7a5dddee0d7d9e87e3f94f49f",
+      "normalized_ast_sha256": "b34b78144a1f2a8e375c3a0e8bc904a2d6ca845b8b0c6a768eb1939d3eebc47d"
+    },
+    {
+      "id": "deterministic_diffraction_state_pack_selected",
+      "kind": "function",
+      "signature": "(selected: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor, line_min: torch.Tensor, line_max: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor, tx: torch.Tensor, tx_power: torch.Tensor, tx_power_index: int)",
+      "body_sha256": "c54fedf4f063cf57889010614751fbbe5c3461d9290e2b67d1484b8e385cbbdd",
+      "normalized_ast_sha256": "e57c188736e52f8246fb22f329543c006e40764ca8f04f09a597aece6890538a"
+    },
+    {
+      "id": "deterministic_diffraction_vector_field",
+      "kind": "function",
+      "signature": "(x_re: torch.Tensor, x_im: torch.Tensor, y_re: torch.Tensor, y_im: torch.Tensor, z_re: torch.Tensor, z_im: torch.Tensor)",
+      "body_sha256": "b0302bbdeb4dc9feeb580020fb52d3cbbfec5c7e33218bc9b3b4c29bb84f6d18",
+      "normalized_ast_sha256": "f1f3977b190897d95f2778acb09167b6221c1b727bc72f54756a450e996ba2f5"
+    },
+    {
+      "id": "deterministic_face_anchor_points",
+      "kind": "function",
+      "signature": "(vertices: torch.Tensor, faces: torch.Tensor)",
+      "body_sha256": "34fe29954c59044de4bf5152c74731a60b9f3f009b27801c83f5252b88f0c67b",
+      "normalized_ast_sha256": "3226b13491d6237c30a09fcc4821bbfb33c2e45cb10da901c0b76569a0153f6c"
+    },
+    {
+      "id": "deterministic_face_groups",
+      "kind": "function",
+      "signature": "(tri_a: torch.Tensor, normals: torch.Tensor, surface_ids: torch.Tensor, *, quantization: float)",
+      "body_sha256": "803878e95eece306b6ecb1cd799caba1751a17ea0972c33c950916b62c0a7928",
+      "normalized_ast_sha256": "2bf84c3ce36297fd7250503996439f7de7f0b35656451f1f8f037807691c5226"
+    },
+    {
+      "id": "deterministic_face_sequence_chunk",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, face_count: int, depth: int, start: int, end: int, adjacent_distinct: bool=False)",
+      "body_sha256": "50c4ac2b5fc5edcd0ccfc10f2fc3f83310806c0efe13b67f3e324e8265c3d3f3",
+      "normalized_ast_sha256": "5d0e01b932e4505e86e83f1983bdd4c3309181069e4250ec4ac21ffa7406a1a7"
+    },
+    {
+      "id": "deterministic_field_from_power_phase",
+      "kind": "function",
+      "signature": "(path_gain: torch.Tensor, phase_rad: torch.Tensor)",
+      "body_sha256": "d3be24f5045064c3699fa79f6d034c22f15aef4f8aebfd74859feb0a6b15b178",
+      "normalized_ast_sha256": "2399e2bdf6c2a430d57bef579faf1a0c807f7c00e508453bc0557baa3ab611a6"
+    },
+    {
+      "id": "deterministic_gather_topology_block",
+      "kind": "function",
+      "signature": "(block: dict[str, torch.Tensor], order: torch.Tensor, *, max_count: int, sequence_width: int)",
+      "body_sha256": "566706020911c0a81915f008b609e3123accf2ddb0a041239f6b98cf9d7e4058",
+      "normalized_ast_sha256": "7c785bd295369e54d721ccb0d2f4eb8a617e01104edf9488936e33d664ddc007"
+    },
+    {
+      "id": "deterministic_los_field",
+      "kind": "function",
+      "signature": "(path_gain: torch.Tensor, path_length_m: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "93e0765c9d1d4b262d8e45570d1e2a4fbe3ba1e23f5120e010b97d79381aa61d",
+      "normalized_ast_sha256": "786b8f4b67b03d24956d01de8013503f5f7621dc626d54f0162607a50f134b19"
+    },
+    {
+      "id": "deterministic_los_topology_block",
+      "kind": "function",
+      "signature": "(tx_id: torch.Tensor, rx_id: torch.Tensor, path_length_m: torch.Tensor, delay_s: torch.Tensor, path_gain: torch.Tensor, visible: torch.Tensor | None, *, frequency_hz: float, sequence_width: int)",
+      "body_sha256": "cebf5f22dc70e289241ddb8380baf84564a059365ec41cbe140144f1c188eeb2",
+      "normalized_ast_sha256": "1010c57fc50474992cd557f4679ec38534b2240e355b4c3160ca685152cce94f"
+    },
+    {
+      "id": "deterministic_mapped_face_sequence_chunk",
+      "kind": "function",
+      "signature": "(face_ids: torch.Tensor, *, depth: int, start: int, end: int, adjacent_distinct: bool=False)",
+      "body_sha256": "e17073a266c0c66cf525b240c283569f52ac8e8aae1d7ce967bd2c9789c96668",
+      "normalized_ast_sha256": "e9007e74e1c736e8f5eb1e3c8c3c8a778e8519e43ebb713242646d4f4a475ea2"
+    },
+    {
+      "id": "deterministic_normalize_vec3",
+      "kind": "function",
+      "signature": "(values: torch.Tensor, *, eps: float=1e-06)",
+      "body_sha256": "52af19526d858312fb1977bc5cac30f0ce81d7f2040b8b07fb0ce6d131c6f419",
+      "normalized_ast_sha256": "6e8fc8f49262de7f04890639e17fb88692b3f50f965f4f26bdae52ca997a4f0b"
+    },
+    {
+      "id": "deterministic_pack_complex",
+      "kind": "function",
+      "signature": "(field_real: torch.Tensor, field_imag: torch.Tensor)",
+      "body_sha256": "1cab123e488e374cd2ba496146b805b4f1a5c7d67c7d8478a5e020c228210eab",
+      "normalized_ast_sha256": "18fdf4a9e8e844542cc4a091aec5f3cb606988e4e838c027132a4bb7b2af3d68"
+    },
+    {
+      "id": "deterministic_pad_topology_sequences",
+      "kind": "function",
+      "signature": "(*, depth: torch.Tensor, primitive_id: torch.Tensor, material_id: torch.Tensor, interaction_position: torch.Tensor, interaction_normal: torch.Tensor, primitive_sequence: torch.Tensor, material_sequence: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, width: int)",
+      "body_sha256": "901011af4fdcc2249656fa5ff3b62cd228d08750ccd323bfb543eb367759257c",
+      "normalized_ast_sha256": "1678c36ea9ad79102bf28773753e0b4b8c0e8662ecf9d374cdc1b25848ad820e"
+    },
+    {
+      "id": "deterministic_phase_from_field",
+      "kind": "function",
+      "signature": "(field_real: torch.Tensor, field_imag: torch.Tensor)",
+      "body_sha256": "fa0bdd295c201633120b91152018ff0cc86af1aba261b486d1ee228adbbc18cc",
+      "normalized_ast_sha256": "08f2d300d5715fad4e88d5d2a352a53169050506be72ff6742800dc885d59d67"
+    },
+    {
+      "id": "deterministic_phase_from_length",
+      "kind": "function",
+      "signature": "(path_length_m: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "573553185b80ed625c331d7e769b733e627b7dd83e847b7b8ddc2f6f9a525244",
+      "normalized_ast_sha256": "9aeea6eac8288a0f7a7203947f12bfeff42491d8615fbb8bfe36c48ec81d3c71"
+    },
+    {
+      "id": "deterministic_reflect_points",
+      "kind": "function",
+      "signature": "(points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor)",
+      "body_sha256": "cd2ef383f42c04bbb16947fa48928855b729f4fb947e1ec073fce3201b149071",
+      "normalized_ast_sha256": "8945f16093ec68d4bb934112d7ea62f415a12244aab4d2ced48f9bad0b02748b"
+    },
+    {
+      "id": "deterministic_reflection_epc_input_batch",
+      "kind": "function",
+      "signature": "(*, tx: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor, tri_a: torch.Tensor, normals: torch.Tensor, rx_start: int, rx_end: int)",
+      "body_sha256": "52e185ad0838381f1502b513a3de2dd3da241cfe8184f72ce6565f8d1222f922",
+      "normalized_ast_sha256": "a4ebec059de791a7ae92e671aecaeb097675e2cced6b6c49c852093257ca84aa"
+    },
+    {
+      "id": "deterministic_reflection_field",
+      "kind": "function",
+      "signature": "(tx_position: torch.Tensor, rx_position: torch.Tensor, hit_position: torch.Tensor, normal: torch.Tensor, tx_power: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "0b727a6ab4aa6d2498ce8c13fa23f72e996df3606a901e6367ad89292cf56b51",
+      "normalized_ast_sha256": "b1d198fcdc3d8a63d3a5ab79e590047e02259eb971637ee07bf4be013824c4bd"
+    },
+    {
+      "id": "deterministic_reflection_order1_compact",
+      "kind": "function",
+      "signature": "(*, visible: torch.Tensor, epc_faces: torch.Tensor, epc_hits: torch.Tensor, epc_normals: torch.Tensor, sequence_batch: torch.Tensor, rx_indices: torch.Tensor, tx: torch.Tensor, rx_positions: torch.Tensor, tx_power: torch.Tensor, tx_index: int, face_eps_r: torch.Tensor, face_sigma_e: torch.Tensor, face_mu_r: torch.Tensor, face_gain: torch.Tensor, face_material_id: torch.Tensor, grouped_export: bool)",
+      "body_sha256": "f828541314ea7dba8bd2d3b5069b16dbcd06f12f56322f3acb744d56dbe0d553",
+      "normalized_ast_sha256": "e28f2a6edff31ef51c7a22cc75a5c456e23096b12d9edeb2f023dd3d00a08ae7"
+    },
+    {
+      "id": "deterministic_reflection_sequence_compact",
+      "kind": "function",
+      "signature": "(*, visible: torch.Tensor, epc_sequences: torch.Tensor, epc_hits: torch.Tensor, epc_normals: torch.Tensor, rx_indices: torch.Tensor, tx: torch.Tensor, rx_positions: torch.Tensor, tx_power: torch.Tensor, tx_index: int, face_eps_r: torch.Tensor, face_sigma_e: torch.Tensor, face_mu_r: torch.Tensor, face_gain: torch.Tensor, face_material_id: torch.Tensor, max_count: int=-1)",
+      "body_sha256": "5cda87f9b0fcd2950a3047ca2cc7d0bcc153eb4887b08dc56b36ad6ab87d86ca",
+      "normalized_ast_sha256": "c4571cae42869c25869025ab78da364abd4269d3fa01c8788ff8d109f29edea0"
+    },
+    {
+      "id": "deterministic_reflection_sequence_field",
+      "kind": "function",
+      "signature": "(tx_position: torch.Tensor, rx_position: torch.Tensor, hit_positions: torch.Tensor, normals: torch.Tensor, tx_power: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "a2b6d8ad9e9e840133ecb35a4ad37f3d4f9c664b698193c5bc798a4f7474fc95",
+      "normalized_ast_sha256": "478215d0b6d29d567510bb5ae406c0a2e869025cd6080d9dc7186c1bc9729068"
+    },
+    {
+      "id": "deterministic_repeat_range",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, start: int, end: int, repeats: int)",
+      "body_sha256": "616dd7e063dc2417130f6802f40c98c63f118f3b86c0b282fe39c45cb4fe3a8f",
+      "normalized_ast_sha256": "39514ce4030a5a3c568f3428eb41e751a9a4aa75d5c22f390833d524ca0bb9a7"
+    },
+    {
+      "id": "deterministic_selected_edge_count",
+      "kind": "function",
+      "signature": "(edge_id: torch.Tensor)",
+      "body_sha256": "a75b6af38b163f5a279fb7fd5c7e5974ca29e6d5ea1b8290d7a9bb478d00c200",
+      "normalized_ast_sha256": "e3aac00cd826aa8629e9773de9afd11375eff69c796cabb794c138dc8879afda"
+    },
+    {
+      "id": "deterministic_sort_order",
+      "kind": "function",
+      "signature": "(valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, depth: torch.Tensor, component_id: torch.Tensor, primitive_id: torch.Tensor, edge_id: torch.Tensor, primitive_sequence: torch.Tensor)",
+      "body_sha256": "9694f7d318b51dfaff0a2533ac06624266ab73943a98f209b3ee7cafb65d4b16",
+      "normalized_ast_sha256": "e810dc6a3bd9fa2a49fc7848085fdc68442e775e07e99c161517e7d2563b890c"
+    },
+    {
+      "id": "deterministic_surface_face_groups",
+      "kind": "function",
+      "signature": "(surface_ids: torch.Tensor)",
+      "body_sha256": "db96b02fb10cab1eb58b223a290eee0d848b3c7ee9619ffcf4f2227fabfae7d0",
+      "normalized_ast_sha256": "842908010c72a9ee7aa6ec8218a618adadc3103940b6f1b58424af4d630b4b6e"
+    },
+    {
+      "id": "deterministic_topology_base_fields",
+      "kind": "function",
+      "signature": "(*, rx_id: torch.Tensor, path_length_m: torch.Tensor, delay_s: torch.Tensor, path_gain: torch.Tensor, tx_index: int, component_id: int, depth_source: torch.Tensor, depth_value: int, primitive_source: torch.Tensor, primitive_value: int, edge_source: torch.Tensor, edge_value: int)",
+      "body_sha256": "f2c9e9680c3b746e985cd01c73f965a32b3e5e0465ef81509028d02742332706",
+      "normalized_ast_sha256": "0a93f25a03b077ca9816817efa5bd1efcd1b07ef9766d2bf7e44404e38586e5b"
+    },
+    {
+      "id": "deterministic_topology_default_fields",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor)",
+      "body_sha256": "8900796116b6f3ec588b73b3c52484889a60b41616b0d5dbbf02eef21b3149e5",
+      "normalized_ast_sha256": "7f5c6cd9f0c9149e8b41488e2eb3edfe491039c585875fadd20810d13aad0b36"
+    },
+    {
+      "id": "deterministic_zero_field_phase",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor)",
+      "body_sha256": "1e83e1ecfd816a5148d26b5c72f9cd0563e34181c31c15e372d79ab8a2992fd8",
+      "normalized_ast_sha256": "c60f49c95e5313c639fdba8f242b8ad7015ca747d863e6e46651b982bd0adb8a"
+    },
+    {
+      "id": "em_layer_stack_ad",
+      "kind": "function",
+      "signature": "(cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency: torch.Tensor | float, frequency_value: float | None=None)",
+      "body_sha256": "1267e3b7d0eb0a99a9decb7dd5043ff969531e880ba4918327845c5594523e09",
+      "normalized_ast_sha256": "dcbef9c706d2c1c4934c90a55a5e15dcbdeffbc23840fd2dbd2c317efae4e8de"
+    },
+    {
+      "id": "em_layer_stack_backward",
+      "kind": "function",
+      "signature": "(cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, grad_outputs: tuple[torch.Tensor | None, ...], *, frequency_hz: float, need_cos_theta: bool, need_layers: bool, need_frequency: bool)",
+      "body_sha256": "4f960669b1591405ae094d4d15db73437f03361f76af7969bca3965d02571910",
+      "normalized_ast_sha256": "4fc032a1b787555f69224dbc812647ac5f69b2dae795713bca13757253183496"
+    },
+    {
+      "id": "em_layer_stack_eval",
+      "kind": "function",
+      "signature": "(cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "83c714e53412024bf6789aa8471300bd69409d53698794cc96260830733618bf",
+      "normalized_ast_sha256": "c8ecd95f513f2d0eeee8d69ff176ee77b3c9cdcb5c8ee8161355d3ea47d51bc9"
+    },
+    {
+      "id": "em_layer_stack_jvp",
+      "kind": "function",
+      "signature": "(cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float, tangent_cos_theta: torch.Tensor | None, tangent_layer_thickness: torch.Tensor | None, tangent_layer_eps_r: torch.Tensor | None, tangent_layer_sigma_e: torch.Tensor | None, tangent_frequency: float)",
+      "body_sha256": "e831643fc08aea762d1510cf3116285f27a6ed20009667f27d60e31e6bc5ee7c",
+      "normalized_ast_sha256": "ea062cf4e45d975f5581b5c628caf951a97e565a92a60d571663762e049c9482"
+    },
+    {
+      "id": "field_coupled_rd",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, reflection_position: torch.Tensor, reflection_normal: torch.Tensor, edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, reflection_material: tuple[torch.Tensor, ...], wedge_material0: tuple[torch.Tensor, ...], wedge_material1: tuple[torch.Tensor, ...], *, frequency_hz: float, reverse: bool)",
+      "body_sha256": "6620cccaba0636e43a6543f8bac5322e24e7a9f47cc56c8444a10e47ef46cfda",
+      "normalized_ast_sha256": "c5da8bc13e96be93f73d20e563b3ad4f08683b4fd14535eaafffd93f3cb02b15"
+    },
+    {
+      "id": "field_coupled_rd_ad",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, reflection_position: torch.Tensor, reflection_normal: torch.Tensor, edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, reflection_material: tuple[torch.Tensor, ...], wedge_material0: tuple[torch.Tensor, ...], wedge_material1: tuple[torch.Tensor, ...], *, frequency: torch.Tensor | float, frequency_value: float | None=None, reverse: bool)",
+      "body_sha256": "cf7d2a8969bb2ce96de323f09eb014e82af6db1840d384877cf5eb9c3daaa83d",
+      "normalized_ast_sha256": "6b34224a67f9a3ea0f5c7496ba19c2def133970068b7cc96b403285ebd36b70a"
+    },
+    {
+      "id": "field_diffraction_wedge",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor, edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor, face0_valid: torch.Tensor, face0_eps_r: torch.Tensor, face0_sigma_e: torch.Tensor, face0_mu_r: torch.Tensor, face0_gain: torch.Tensor, face1_valid: torch.Tensor, face1_eps_r: torch.Tensor, face1_sigma_e: torch.Tensor, face1_mu_r: torch.Tensor, face1_gain: torch.Tensor, tx_power: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "81a38c32e3db2eae3b8d8bcdb84de505c9b4fddb37aa0ec555e10a7c83630202",
+      "normalized_ast_sha256": "e7fe2c096900d9a504278e53fbca0766c42eacf243d0c4779bac98c3fb2baea9"
+    },
+    {
+      "id": "field_diffraction_wedge_ad",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor, edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor, face0_valid: torch.Tensor, face0_eps_r: torch.Tensor, face0_sigma_e: torch.Tensor, face0_mu_r: torch.Tensor, face0_gain: torch.Tensor, face1_valid: torch.Tensor, face1_eps_r: torch.Tensor, face1_sigma_e: torch.Tensor, face1_mu_r: torch.Tensor, face1_gain: torch.Tensor, tx_power: torch.Tensor, *, frequency: torch.Tensor | float, frequency_value: float | None=None, vertices: tuple[torch.Tensor, ...] | None=None)",
+      "body_sha256": "8ff1bc858a11925700309d8c7a0a963363c1ce45406f7bf4dca6b9f5f2a4ffb0",
+      "normalized_ast_sha256": "5d146b0fc10a811042bc5dffad9eee339720c4371b635a66fc07a35c8a726389"
+    },
+    {
+      "id": "field_free_space",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "033bd5e1b036441b39fa06f62d638da1c80d28baa12a0b70f2670dfe594227cd",
+      "normalized_ast_sha256": "9bc2fef1cc29b45062bca361d39e9aad99b18b1eaadf5d7230156de99f1dc13a"
+    },
+    {
+      "id": "field_free_space_ad",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency: torch.Tensor | float, frequency_value: float | None=None)",
+      "body_sha256": "ebf775e7a459a15bfb31247d6163913f98ee1eaaf54ef0b24edffac0fb7e57cb",
+      "normalized_ast_sha256": "5762a35324b904d3ba2cd68d554489490cdde716cc9ff1201420ea5e24e69af8"
+    },
+    {
+      "id": "field_free_space_backward",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency_hz: float, grad_field_vector: torch.Tensor | None=None, grad_coefficient: torch.Tensor | None=None, grad_path_field: torch.Tensor | None=None, grad_path_gain: torch.Tensor | None=None, grad_path_length: torch.Tensor | None=None, grad_delay: torch.Tensor | None=None, need_grad_frequency: bool=True, need_grad_geometry: bool=False)",
+      "body_sha256": "93674e0acdca49314a520ba6601d42ff7a569de92a488a7b5a318d2711412d66",
+      "normalized_ast_sha256": "dde4d0997c76a6e9948b0c0df918d212c2f98aaee0a392aeb6834c1e7b616273"
+    },
+    {
+      "id": "field_free_space_jvp",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency_hz: float, tangent_frequency: float, tangent_source: torch.Tensor | None=None, tangent_target: torch.Tensor | None=None)",
+      "body_sha256": "f19429eac3b8672687b3672787a7a07fd3c4f8442b02239a660231523e8f3005",
+      "normalized_ast_sha256": "874b3f83a0f3f82fc1b78495d2f565119b082e8405b6240e703ea8d354f3a072"
+    },
+    {
+      "id": "field_project_complex3",
+      "kind": "function",
+      "signature": "(field_vector: torch.Tensor, direction: torch.Tensor, rx_polarization: torch.Tensor)",
+      "body_sha256": "9655b7d26df16b2cb996f8e0bd13adcae42bb5ae6bbf094e9284e2603ffa82ad",
+      "normalized_ast_sha256": "3de1049186c697ca6025b20ebe9986f3825924051cac158fea6e169c1af89e83"
+    },
+    {
+      "id": "field_project_complex3_ad",
+      "kind": "function",
+      "signature": "(field_vector: torch.Tensor, direction: torch.Tensor, rx_polarization: torch.Tensor)",
+      "body_sha256": "6dff789fe1b876c9f7a469212e16057a3e052801eb3a3ce4b4cb2a0805229b21",
+      "normalized_ast_sha256": "1109aa0e8e2a9413e90ddf7058c285b6d9b56f14a45480a4f237b0ff4d45c894"
+    },
+    {
+      "id": "field_reflection_sequence",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "3a636805feb2a92a1b9768cfd5670921e96c3a636d50f6f1c6c4343da47e1690",
+      "normalized_ast_sha256": "b1dfe2c37b259d06616c23be6594f511759c096987e8b9717cd52add7f6b88e8"
+    },
+    {
+      "id": "field_reflection_sequence_ad",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, thickness: torch.Tensor, *, frequency: torch.Tensor | float, frequency_value: float | None=None)",
+      "body_sha256": "8520cf5319fa6d7cfed18414e7660a30e46a6296952b6f67bd56b90cbef54f8b",
+      "normalized_ast_sha256": "7765532ec39449dcc2d4aed95f6b9ddb262246dda230db2d115ab3368d402aaa"
+    },
+    {
+      "id": "field_reflection_sequence_backward",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float, grad_field_vector: torch.Tensor | None=None, grad_coefficient: torch.Tensor | None=None, grad_path_field: torch.Tensor | None=None, grad_path_gain: torch.Tensor | None=None, grad_path_length: torch.Tensor | None=None, grad_delay: torch.Tensor | None=None, need_grad_eps_r: bool=True, need_grad_sigma_e: bool=True, need_grad_gain: bool=False, need_grad_thickness: bool=True, need_grad_frequency: bool=True, need_grad_geometry: bool=False)",
+      "body_sha256": "fe07de8a76fc941d76214ceeaa6acf409da6f3b2d90cc10a81ffa7f5e2689394",
+      "normalized_ast_sha256": "65f12d4f8e3716ccdf5342ecd89c79efa66cc6e6fd927b6c81db5e66216328fa"
+    },
+    {
+      "id": "field_reflection_sequence_jvp",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float, tangent_eps_r: torch.Tensor | None=None, tangent_sigma_e: torch.Tensor | None=None, tangent_gain: torch.Tensor | None=None, tangent_thickness: torch.Tensor | None=None, tangent_frequency: float=0.0, tangent_source: torch.Tensor | None=None, tangent_target: torch.Tensor | None=None, tangent_interaction_positions: torch.Tensor | None=None, tangent_interaction_normals: torch.Tensor | None=None)",
+      "body_sha256": "19ca65497a4d95ef3ff79760a291b567d3eac571972b2fe900ef39f50aef8760",
+      "normalized_ast_sha256": "3415fa475967da66ca2a419d809bfc27d4a7e86451cbc5671b723ccba908f24a"
+    },
+    {
+      "id": "field_transmission_sequence",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "14d5b754ee6b773df5d4697a3c27c598e65cc78431fbd51be80dc6498c069eb4",
+      "normalized_ast_sha256": "7276ddfe69b027aa03dd5c2eae417bbe2b7bff4186587823f30b809b73215974"
+    },
+    {
+      "id": "field_transmission_sequence_ad",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency: torch.Tensor | float, frequency_value: float | None=None)",
+      "body_sha256": "75398500c4b94075847113c8ca370de83a6ecd3ef69e7b9cba2fdc2d3249475f",
+      "normalized_ast_sha256": "ba6d089965b3ee8f25c47994bfd4d0f3795b6e6c75163202983cee3fc7883c59"
+    },
+    {
+      "id": "field_transmission_sequence_backward",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float, grad_field_vector: torch.Tensor | None=None, grad_coefficient: torch.Tensor | None=None, grad_path_field: torch.Tensor | None=None, grad_path_gain: torch.Tensor | None=None, grad_path_length: torch.Tensor | None=None, grad_delay: torch.Tensor | None=None, need_grad_layer_thickness: bool=True, need_grad_layer_eps_r: bool=True, need_grad_layer_sigma_e: bool=True, need_grad_frequency: bool=True, need_grad_geometry: bool=False)",
+      "body_sha256": "8ba94c9002d1b046fcfdfd2c33d7e7a2ca9eb00b9878c8d8cd17925fb53b1e4f",
+      "normalized_ast_sha256": "29bad8ef75a325b3664e28939f4fbb7b2d61d4943d8a6a147f1ffd07a2a8e723"
+    },
+    {
+      "id": "field_transmission_sequence_jvp",
+      "kind": "function",
+      "signature": "(source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor, interaction_normals: torch.Tensor, interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float, tangent_layer_thickness_m: torch.Tensor | None=None, tangent_layer_eps_r: torch.Tensor | None=None, tangent_layer_sigma_e: torch.Tensor | None=None, tangent_frequency: float=0.0, tangent_source: torch.Tensor | None=None, tangent_target: torch.Tensor | None=None, tangent_interaction_positions: torch.Tensor | None=None, tangent_interaction_normals: torch.Tensor | None=None)",
+      "body_sha256": "68d399dbbfe0e3c2de11333fdd01bc685a929364efeda261edb0c82cc18a155d",
+      "normalized_ast_sha256": "14cbea7ed7d363a9f9a75d03e6ce062ff3ac85ee111797dd6f4bd44bd4a23c1c"
+    },
+    {
+      "id": "mc_apply_los_visibility",
+      "kind": "function",
+      "signature": "(maps: torch.Tensor, los: torch.Tensor, visible: torch.Tensor, *, tx_index: int)",
+      "body_sha256": "5c43c259f8fba438edf0a33f776bbb5f14eb27b03e89e1f5f7e91c773df0d1e1",
+      "normalized_ast_sha256": "59af712cbbbfd8a1ae872eb3fb4ad6ea092c898611d6bcd7dc940f9f8ec38709"
+    },
+    {
+      "id": "mc_component_map_buffer",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, tx_count: int, dim0: int, dim1: int)",
+      "body_sha256": "dc55aad185453bfcb642b6f3c3483a0a0bdb2ecc9e711eb0cc52c7bd468b3aa7",
+      "normalized_ast_sha256": "684729abedb2bcee760683bcf675a2c41414fbcb1fc226357f324b81e8885dd4"
+    },
+    {
+      "id": "mc_diffraction_edge_geometry",
+      "kind": "function",
+      "signature": "(vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor, edge_v0: torch.Tensor, edge_v1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, *, plane_tol: float)",
+      "body_sha256": "f8fa8f766d0b77c7b87c87cd555ef62e88862f10eb9836c8b3c0fa5227fdeb29",
+      "normalized_ast_sha256": "27ce15dddeea6a66269a7139a64176540d49f724867917a12a60855c157f6675"
+    },
+    {
+      "id": "mc_diffraction_state_pack",
+      "kind": "function",
+      "signature": "(edge_indices: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor, line_min: torch.Tensor, line_max: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor, tx: torch.Tensor, tx_power: torch.Tensor)",
+      "body_sha256": "65ab3de66dc7ee1edf3ef96c1f4d68068e4bcef59adcaec6fafe7c31702bb970",
+      "normalized_ast_sha256": "114b21f99be9d1e04e1eeb16164fc81aa6000a0aceb0da3398631bb158e2c6cb"
+    },
+    {
+      "id": "mc_diffraction_state_wi",
+      "kind": "function",
+      "signature": "(state_edge_pos: torch.Tensor, state_src: torch.Tensor)",
+      "body_sha256": "2d3b9fd4463ae0d65ad260a3a233482ae8bf91ab7ecb4fdcc9489b33441cf844",
+      "normalized_ast_sha256": "975fd1dffa9b3febc19bbe60943fa489179b0620f2a451203a3c4e67ab06cf1e"
+    },
+    {
+      "id": "mc_face_material_tensors",
+      "kind": "function",
+      "signature": "(material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, face_material_id: torch.Tensor)",
+      "body_sha256": "b312cb1fb8298fde202019a2da0e7fcb159f7b599a666db3c3fe8eb073acb0ee",
+      "normalized_ast_sha256": "ec23f25ac1b39bfd7b411d10b4e90da091d2bf8d5fd5315437494eab9bd00785"
+    },
+    {
+      "id": "mc_finalize_component_maps",
+      "kind": "function",
+      "signature": "(los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor, transmission: torch.Tensor, scattering: torch.Tensor)",
+      "body_sha256": "beabd044045651e7cb2dcd6c91ee386f4ce1dae568267a0ced24879c410eb086",
+      "normalized_ast_sha256": "82aab420a7545ae86f277d2f141372f689118124ae909c2a51aa6ac77564c678"
+    },
+    {
+      "id": "mc_finalize_component_maps_ad",
+      "kind": "function",
+      "signature": "(los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor, transmission: torch.Tensor, scattering: torch.Tensor)",
+      "body_sha256": "7e2b4bb82c11c15e8dba0716214e20a0fa1ade38ae7e80851a3a8113dc518b3c",
+      "normalized_ast_sha256": "de204418967ecb0ec67da7fa34a9fb4233490a06b66885b5cf596734d371f46b"
+    },
+    {
+      "id": "mc_los_component_maps",
+      "kind": "function",
+      "signature": "(los: torch.Tensor)",
+      "body_sha256": "9599df179888ec088c080dcd83fa166de6a26cf32498ba31b9ca0c09ee26a88f",
+      "normalized_ast_sha256": "7a706d4544d39ee614caa61350f2fe918eb77b873a4a322ef8948f480dd36f52"
+    },
+    {
+      "id": "mc_los_component_maps_adjoint",
+      "kind": "function",
+      "signature": "(grad_maps: torch.Tensor, visible: torch.Tensor | None)",
+      "body_sha256": "5876a453f1d2c8f24f73403f7039272acc5c575dfd17b0ef1da5558b241499f2",
+      "normalized_ast_sha256": "c4ba5334d405ccbb8ccbd4269f90f1567a0b1f470a1c98c7aff45b72597dddcb"
+    },
+    {
+      "id": "mc_los_component_maps_from_matrix",
+      "kind": "function",
+      "signature": "(los: torch.Tensor, *, rows: int, cols: int)",
+      "body_sha256": "28a48540e541e9ad153e62e44689527be227218ddf70637e96d8d4988b7140f6",
+      "normalized_ast_sha256": "ff9790c3cddab0cab407b0b82843a5d1fbd92a68ccacae3e9131b148b4f26a5c"
+    },
+    {
+      "id": "mc_los_grid_maps_ad",
+      "kind": "function",
+      "signature": "(matrix: torch.Tensor, visible: torch.Tensor | None, *, rows: int, cols: int)",
+      "body_sha256": "2f988789b5fe921a373614b875c93b7e93869b6944d80640915b824e33d7f6b3",
+      "normalized_ast_sha256": "a68b2753b36a29a5c86b4b5a96a84e117fec41196010cd72575e672db3965a47"
+    },
+    {
+      "id": "mc_los_path_gain_ad",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *, frequency: torch.Tensor | float, frequency_value: float | None=None)",
+      "body_sha256": "e1ed5be261031e5e1e77db4968d46615d1b2778d1c93140adae03e773ccf05f8",
+      "normalized_ast_sha256": "17248d45499068d26e758af94b18b88559f604e420e11e0d23a52554c61488ea"
+    },
+    {
+      "id": "mc_los_path_gain_backward",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, grad_output: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "80bc9228bb3b665d2f6ceb3708962d30057c05f205bd931eab4e50427c50b723",
+      "normalized_ast_sha256": "0c4c0c8bd7d8ef0f802d51be97024a7184681ad767c91132d6bd1f3528dd9dd0"
+    },
+    {
+      "id": "mc_los_path_gain_jvp",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, tx_tangent: torch.Tensor, power_tangent: torch.Tensor, rx_tangent: torch.Tensor, has_tx_tangent: bool, has_power_tangent: bool, has_rx_tangent: bool, *, frequency_hz: float, frequency_tangent: float=0.0)",
+      "body_sha256": "1f782fa0789eaee2748a1aa94e76cc5a66d1b6c748c27aa076f2676ec43e0618",
+      "normalized_ast_sha256": "7e31aa3b06cbe6f6d70ce790a8c5c7044cd44224af7c2dbce9338337ac51eeb0"
+    },
+    {
+      "id": "mc_los_visibility_inputs",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, *, tx_index: int, rx_count: int)",
+      "body_sha256": "1da10b67562e94dce61f354c4cbb2b3ef53381293a5b4a67c398cb1ef9671f0b",
+      "normalized_ast_sha256": "b609332193fad06b9cc8a3d8f34681d5f8b643250f25c3b9a332da794dc362b6"
+    },
+    {
+      "id": "mc_pack_vec3",
+      "kind": "function",
+      "signature": "(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor)",
+      "body_sha256": "1c16116b98060365e400c4a4da3b00a5162e03c1fe7ce7b7517fde26715e041c",
+      "normalized_ast_sha256": "6d30312ca9e8a02f74b261d343ec24e725cc5d3083b1bd858d6bbed55cee9015"
+    },
+    {
+      "id": "mc_point_component_power",
+      "kind": "function",
+      "signature": "(path_gain: torch.Tensor, *, include_los: bool)",
+      "body_sha256": "7692b58d2ab2854937ea8896bf63072d828e768040455e09c321bb4bd35f524c",
+      "normalized_ast_sha256": "71ee6039860b32720b265853d0c40c13f27302b3dc41956447aa8759e84ae8a5"
+    },
+    {
+      "id": "mc_receiver_grid_points",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, origin: tuple[float, float, float], x_axis: tuple[float, float, float], y_axis: tuple[float, float, float], shape: tuple[int, int], spacing: tuple[float, float])",
+      "body_sha256": "43e1f85b274f54d87259cbdeea6937068bb261b1466116ab24f3db631ad3bdea",
+      "normalized_ast_sha256": "b907bfc7ab066d20c03456607ea867bfd3b6300afc37d6be94128373fdebf96c"
+    },
+    {
+      "id": "mc_reflection_ad_max_depth",
+      "kind": "function",
+      "signature": "()",
+      "body_sha256": "20547cdf588968f7882469440afdeb44ae0a3c3ca97bbb8bf786afe842866853",
+      "normalized_ast_sha256": "2f1692f2ade3e0d9d1c8363aef65615f6b12481e6c3564cd62dfc5b9fe90bc28"
+    },
+    {
+      "id": "mc_reflection_launch_inputs",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, *, tx_index: int, sample_count: int)",
+      "body_sha256": "e41ac4121e403f1fda7ec4e9291a312db3bbc61af245903a91747188a0b0d0a7",
+      "normalized_ast_sha256": "0041efd17a8ebe7c956ce239b65fc7ea95a7f3a55a74ef5bf5550fe0041a8292"
+    },
+    {
+      "id": "mc_sample_directions",
+      "kind": "function",
+      "signature": "(count: int, reference: torch.Tensor)",
+      "body_sha256": "aa3f245ff954cda734a725a7a63aacda809e58eaa3bf90c93e86d7760a6b0832",
+      "normalized_ast_sha256": "c604c73a1e49528d745260125b4a403e2aacd53b5fea9408c60b67a9caa000cb"
+    },
+    {
+      "id": "mc_selected_edge_indices",
+      "kind": "function",
+      "signature": "(selected: torch.Tensor)",
+      "body_sha256": "8c6fdf12b608e5c975222c00900e74ef0e1c1e242f726056bb83ca2208f04768",
+      "normalized_ast_sha256": "fcfaec2fa6441c20eca642fe00ac04928410afee3118347ac528f91415bb067e"
+    },
+    {
+      "id": "mc_sionna_diffraction_tape_accumulate",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "5de7a235b9e03f2e6bf6701d77f61bb8d6266916d4980d80cd3da3b693c71b55",
+      "normalized_ast_sha256": "70131b2e781a66e85f5a7077bc1c6afdc378bc230a8ffab96be1188fec332e39"
+    },
+    {
+      "id": "mc_sionna_diffraction_tape_accumulate_ad",
+      "kind": "function",
+      "signature": "(tx_anchor: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_gain: torch.Tensor, material_thickness: torch.Tensor, frequency: torch.Tensor | float, tape_tensors: tuple[torch.Tensor, ...], state_tensors: tuple[torch.Tensor, ...], material_mu_r: torch.Tensor, material_valid: torch.Tensor, *, grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, grid_cell_area: float, seed: int, total_edge_length: float)",
+      "body_sha256": "f55f93cf60a7b824b74a810e852d9baceafb8142eb43f678bf3cca85d130985f",
+      "normalized_ast_sha256": "50c070c11130e6c2fd09a00c0b1f0348a0c8da6747a95ab0e3e189c1675863ae"
+    },
+    {
+      "id": "mc_sionna_diffraction_tape_accumulate_backward",
+      "kind": "function",
+      "signature": "(tape_tensors: tuple[torch.Tensor, ...], state_tensors: tuple[torch.Tensor, ...], material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_mu_r: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor, grad_output: torch.Tensor, *, need_materials: bool, need_source: bool, need_frequency: bool, grid_axis: int, grid_position: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, grid_cell_area: float, seed: int, total_edge_length: float, wavelength_dfreq: float)",
+      "body_sha256": "f21d3a6b9b3c69921850a2e950d4991a88cf54547c4c62540c651fb2ccbea446",
+      "normalized_ast_sha256": "b64c0760886e7c0d5c38fe9db28fb8d632e941a22983c40ed9b8a052ed15d6e4"
+    },
+    {
+      "id": "mc_sionna_diffraction_tape_accumulate_jvp",
+      "kind": "function",
+      "signature": "(tape_tensors: tuple[torch.Tensor, ...], state_tensors: tuple[torch.Tensor, ...], material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_mu_r: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor, tangent_eta_r: torch.Tensor | None, tangent_sigma: torch.Tensor | None, tangent_gain: torch.Tensor | None, tangent_thickness: torch.Tensor | None, tangent_source: torch.Tensor | None, *, grid_axis: int, grid_position: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, grid_cell_area: float, seed: int, total_edge_length: float, wavelength_tangent: float)",
+      "body_sha256": "8b675f023c16f17910bd157f7ff6290a1aff06fdf82deddd969f650306fd0385",
+      "normalized_ast_sha256": "24f971c5d9e2a2f510f34cfe86611763f4b9fe5fdb17672cfea03cfe5b082820"
+    },
+    {
+      "id": "mc_sionna_reflection_accumulate",
+      "kind": "function",
+      "signature": "(ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor, trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor, *, contribution_depth: int, grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float, grid_cell_area: float)",
+      "body_sha256": "ba351ed7b2629668bdb1d2e8273e66d7bce1911e790aecc411a9a4f5be9d6f4f",
+      "normalized_ast_sha256": "449491429343633c9989f8a9afd6977f1c02ad2c3346e160dc5e82864fd681d0"
+    },
+    {
+      "id": "mc_sionna_reflection_accumulate_ad",
+      "kind": "function",
+      "signature": "(tx_anchor: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_gain: torch.Tensor, material_thickness: torch.Tensor, frequency: torch.Tensor | float, ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor, trace_prim: torch.Tensor, face_normals: torch.Tensor, material_valid: torch.Tensor, *, contribution_depth: int, grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float, grid_cell_area: float)",
+      "body_sha256": "dd53954bfef3b09a658830e967ea196e38da5339724f585a317312c9f853844d",
+      "normalized_ast_sha256": "99f3eca9a365eb85647c811c3c7fc5965d271ceb9439d3f086b30770d735be41"
+    },
+    {
+      "id": "mc_sionna_reflection_accumulate_backward",
+      "kind": "function",
+      "signature": "(ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor, trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor, grad_output: torch.Tensor, *, need_materials: bool, need_frequency: bool, contribution_depth: int, grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float, grid_cell_area: float, wavelength_dfreq: float)",
+      "body_sha256": "580d6efe88ef538615a9b63ca8209ed5457c47b087af8b242a3d2965ccb47df0",
+      "normalized_ast_sha256": "841db624f55a3b0f8a58ea71a9fe93a0040708283b07b9e8298044ee523db574"
+    },
+    {
+      "id": "mc_sionna_reflection_accumulate_jvp",
+      "kind": "function",
+      "signature": "(ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor, trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor, tangent_eta_r: torch.Tensor | None, tangent_sigma: torch.Tensor | None, tangent_gain: torch.Tensor | None, tangent_thickness: torch.Tensor | None, *, contribution_depth: int, grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float, grid_cell_area: float, wavelength_tangent: float)",
+      "body_sha256": "d514b4e34da9bd10d20068a1fd67c8bdcc3427fa53ee058e5fb93af12e37fe19",
+      "normalized_ast_sha256": "04f52b421087044e0462a190b536ae2307f7692ceab553f9a7cdaceae1b59335"
+    },
+    {
+      "id": "mc_store_component_map",
+      "kind": "function",
+      "signature": "(maps: torch.Tensor, source: torch.Tensor, *, tx_index: int)",
+      "body_sha256": "3c86ad2a9f7917e4898041ca6c2cac4f3140c3f1470801814202704ad8d8e6b0",
+      "normalized_ast_sha256": "8d7a01fcd471964c0762e0a2ec8afa0c7ab31c4191fc1c67581eb94b0b2e0376"
+    },
+    {
+      "id": "mc_store_scaled_component_map",
+      "kind": "function",
+      "signature": "(maps: torch.Tensor, source: torch.Tensor, scale_values: torch.Tensor, *, tx_index: int, scale_index: int)",
+      "body_sha256": "7a8a431234369f966767f8c4b8b3e880eb6199c1752e3595fbfa0d5fd35cb935",
+      "normalized_ast_sha256": "b9bd683b916729bda73de5b1f230416bb46fa2ef98aa68f428b7ebdd78b83679"
+    },
+    {
+      "id": "mc_surface_group_edge_candidates",
+      "kind": "function",
+      "signature": "(vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor, edge_v0: torch.Tensor, edge_v1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, selected: torch.Tensor, *, plane_tol: float)",
+      "body_sha256": "d7746890cc68067d1dd70c2f884a751527ef3087e95cc6eb90f0a54f25511276",
+      "normalized_ast_sha256": "88fe0ae8bdf18bcd2330b88ebdc2ae9d9f60ba2417b9fad19926fd10a09a52de"
+    },
+    {
+      "id": "mc_transmitter_tensors",
+      "kind": "function",
+      "signature": "(flat_positions: tuple[float, ...], powers: tuple[float, ...])",
+      "body_sha256": "20a5d5325d50334737a6f2c44ec6942cd85c879e8d691502e89bfea1af5ac055",
+      "normalized_ast_sha256": "123c9d7ec9c9cfd16de0d7a289ac84f4ddddf868afb5c42ce7def430edb23444"
+    },
+    {
+      "id": "mc_zero_matrix",
+      "kind": "function",
+      "signature": "(reference: torch.Tensor, *, rows: int, cols: int)",
+      "body_sha256": "4bf111f36e5052ba675e6d1cbfaac0eda45e6130e86447cb57d9ed1f7cfb288a",
+      "normalized_ast_sha256": "4ab1ecf5d424dda62e69572c6358b004331c5ae3153e67c7dbedd4f4bf02dd36"
+    },
+    {
+      "id": "path_concat_vec3",
+      "kind": "function",
+      "signature": "(blocks: tuple[torch.Tensor, ...] | list[torch.Tensor])",
+      "body_sha256": "0b80413e42aba4cc48a0b45fac930e1d60ffabf7d9968feb2d2dfa4ceb77e8c5",
+      "normalized_ast_sha256": "9923e2740f2fe695c7023c1be7328b8d09cc3b66772cf67fdd5c417fabf2863b"
+    },
+    {
+      "id": "path_diffraction_block",
+      "kind": "function",
+      "signature": "(raydn_output: tuple[torch.Tensor, ...], *, tx_index: int)",
+      "body_sha256": "07051902934fb79a31e50df285f8373a0e1288890ad79b54c8d36995638e0a71",
+      "normalized_ast_sha256": "02fbc6fa3723bfb9c7905980f35b56d8e9b6e3a382412f8df8ca0a713c0558d6"
+    },
+    {
+      "id": "path_diffraction_paths_order1",
+      "kind": "function",
+      "signature": "(scene_handle: object, tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, edge_geometry: tuple[torch.Tensor, ...], material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_mu_r: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor, *, wavelength: float)",
+      "body_sha256": "b201274f16c43893cd5209b0a8d0bb6b783aff1efebb591dfbc26be90f50b874",
+      "normalized_ast_sha256": "9b21968b82fb3c53cb227d6d8747a88d9682365539bdf7791732a0f6c442f86f"
+    },
+    {
+      "id": "path_filter_block",
+      "kind": "function",
+      "signature": "(block: dict[str, torch.Tensor], visible0: torch.Tensor, visible1: torch.Tensor)",
+      "body_sha256": "01819834d336f8d62b9a4935b2c9e2b7c39405810a95a9bcfb8f3ac2cfb579f2",
+      "normalized_ast_sha256": "2836550b3d5ce372c1325de06f7a9b27c111ecdc4c5b67e3fbfa6009af93d534"
+    },
+    {
+      "id": "path_filter_los",
+      "kind": "function",
+      "signature": "(tx_id: torch.Tensor, rx_id: torch.Tensor, path_length_m: torch.Tensor, delay_s: torch.Tensor, path_gain: torch.Tensor, visible: torch.Tensor)",
+      "body_sha256": "37c37d27951b17c0cc0bd4fd013b71b062569c8a7779904cafaaf8747fe0060d",
+      "normalized_ast_sha256": "623cb8f1bf01b0453d600ecc3dbeddf2be4e7e6ecfdc9b38db8b62023dc0715b"
+    },
+    {
+      "id": "path_finalize_blocks",
+      "kind": "function",
+      "signature": "(los: dict[str, torch.Tensor], reflection: dict[str, torch.Tensor], diffraction: dict[str, torch.Tensor], *, max_paths: int | None, tx_count: int, max_depth: int)",
+      "body_sha256": "cb5462caea3b4dc6175372ea3b27e028118eef090353302468b5307d0e5dd90f",
+      "normalized_ast_sha256": "edd0543c178c7b3d1f589180f44888c61b93b3562b03042fd6832ef177140193"
+    },
+    {
+      "id": "path_los_export",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "5c88a97acbb3ad5fbc25462a0660e55d5cf117b3d7f0bd34a14479beef36a8d3",
+      "normalized_ast_sha256": "25cc072d727f8f841386cb9daf26ee7dff9fe44c97432f3c1af1e7e7b6446c53"
+    },
+    {
+      "id": "path_los_visibility_inputs",
+      "kind": "function",
+      "signature": "(tx_positions: torch.Tensor, rx_positions: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor)",
+      "body_sha256": "160aec353783a8c0c7b8f829d98a92ea76b4f186b5367d2a536ea327c24bd900",
+      "normalized_ast_sha256": "3d52ecf3294305a87bb85dde6baf9031dd95bc1bd3a74504b18af14db2beaefd"
+    },
+    {
+      "id": "path_merge_blocks",
+      "kind": "function",
+      "signature": "(blocks: tuple[dict[str, torch.Tensor], ...] | list[dict[str, torch.Tensor]], *, tx_count: int, max_depth: int)",
+      "body_sha256": "643ff4d9f308ab9511c0bf5ad0c9e29145c94b2685c99029717f0731a264cb57",
+      "normalized_ast_sha256": "09f97d235358ee11a9b8523fec4271142ac52961c29ea9050561980d67270ce6"
+    },
+    {
+      "id": "path_reflection_candidates",
+      "kind": "function",
+      "signature": "(vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor, face_gain: torch.Tensor, tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *, frequency_hz: float)",
+      "body_sha256": "85ff129059f08edc4e57c394b7703609ff9a9320f65de38db597010fef9ed399",
+      "normalized_ast_sha256": "a79f2a5ba27b1dbb235611234686167d9f02da6051b78c11d60922b706d0e5a5"
+    },
+    {
+      "id": "raydn_coupled_rd_geometry_forward",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "81c11ec73254a9a0901d38c32d4b3fe03645e13246554aa741172db4c9a6a3ef",
+      "normalized_ast_sha256": "fe3b1358794869dba1f4d0bc25d687acdbf330b484f953c7d818a857f3ac0e86"
+    },
+    {
+      "id": "raydn_diffraction_paths_order1_forward",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "8796455c36759a900e200e47779b195e2786ded0d2b61f22792d82d6f935ef2d",
+      "normalized_ast_sha256": "e40ec1f3a6b0f97b57c6d236ddbc15a663cf14b30e3e11ca1810f4e232784600"
+    },
+    {
+      "id": "raydn_face_normals_ad",
+      "kind": "function",
+      "signature": "(handle: object, vertices: torch.Tensor, raw_face_normals: torch.Tensor)",
+      "body_sha256": "e5e47282cff4c9c6d8fad1ed527182cab9808bc80b1713406e54cc2302156d15",
+      "normalized_ast_sha256": "ab3acce92b89a012e826a88d3a630433d16d8a1e5b4d4622165e571c3591692d"
+    },
+    {
+      "id": "raydn_intersect_ad",
+      "kind": "function",
+      "signature": "(handle: object, vertices: torch.Tensor, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor, active: torch.Tensor | None=None)",
+      "body_sha256": "f0bfd7521b37802f6e8e9d742e0daec5899eaeee7bf365c3ce9da546c518b655",
+      "normalized_ast_sha256": "f3cc7fadd449bfecc6dcd4905716fc6f4f13e9bc375e6500641b9acc915b9efb"
+    },
+    {
+      "id": "raydn_intersect_backward",
+      "kind": "function",
+      "signature": "(handle: object, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor, active: torch.Tensor | None, tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, *, grad_t: torch.Tensor | None=None, grad_p: torch.Tensor | None=None, grad_n: torch.Tensor | None=None, grad_geo_n: torch.Tensor | None=None, grad_uv: torch.Tensor | None=None, grad_barycentric: torch.Tensor | None=None, need_grad_vertices: bool=False, need_grad_ray_o: bool=False, need_grad_ray_d: bool=False, need_grad_ray_tmax: bool=False)",
+      "body_sha256": "f62b1e052a74bd4e7b4cd6fed063d6994a4be0db897caa925b6c83485a664b22",
+      "normalized_ast_sha256": "7f8e84134cb8864c215e07bd1a2108af896ab688ec558c2d906f5d759073546a"
+    },
+    {
+      "id": "raydn_intersect_jvp",
+      "kind": "function",
+      "signature": "(handle: object, ray_o: torch.Tensor, ray_d: torch.Tensor, active: torch.Tensor | None, tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, *, tangent_vertices: torch.Tensor | None=None, tangent_ray_o: torch.Tensor | None=None, tangent_ray_d: torch.Tensor | None=None, flags: int=_RAYDN_RAY_FLAGS_ALL)",
+      "body_sha256": "aead1d432ea5fe889b6f05eed7a28a4719022c15d73c09dc88e0ebc73e5afe0e",
+      "normalized_ast_sha256": "be582daa972f32464b8bd3c1832d1189343601774a81725d04342efe8a5ea37b"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_ad",
+      "kind": "function",
+      "signature": "(handle: object, vertices: torch.Tensor, source: torch.Tensor, receiver: torch.Tensor, sequence: torch.Tensor, plane_points: torch.Tensor, plane_normals: torch.Tensor, surface_group_id: torch.Tensor, surface_group_size: torch.Tensor, surface_group_members: torch.Tensor, max_bounces: int, visibility_ignore_mode: int)",
+      "body_sha256": "650b5a0ad4ae9abf9cf1c1999a51e8adc45e7649e0299f99f9d042bcdd786c76",
+      "normalized_ast_sha256": "666939dbfbf4b9be9256b73167fb1500b37a6c7ba090aa24a337e3d45509295b"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_backward",
+      "kind": "function",
+      "signature": "(handle: object, source: torch.Tensor, receiver: torch.Tensor, sequence: torch.Tensor, plane_points: torch.Tensor, plane_normals: torch.Tensor, valid: torch.Tensor, bounce_count: torch.Tensor, *, grad_points: torch.Tensor | None=None, grad_normals: torch.Tensor | None=None, grad_path_length: torch.Tensor | None=None, need_grad_vertices: bool=False, need_grad_source: bool=False, need_grad_receiver: bool=False)",
+      "body_sha256": "af78d7d4748cb4063aa122d98d442a314bd6ece76c5dddf314d885b58de2b651",
+      "normalized_ast_sha256": "68a49e69711e378ab1bfa3c85042cdc102872b78d836aa0bda1ffe43b0798688"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_forward",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "b55abe8daac7c30c832d449bab9ded5a04529e37180322bff9e85dfad8923e12",
+      "normalized_ast_sha256": "278d7cf8976cdf21cb76064520260eb0bbab649d24037ed4bc51a7b899010228"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_jvp",
+      "kind": "function",
+      "signature": "(handle: object, source: torch.Tensor, receiver: torch.Tensor, sequence: torch.Tensor, plane_points: torch.Tensor, plane_normals: torch.Tensor, valid: torch.Tensor, bounce_count: torch.Tensor, *, tangent_vertices: torch.Tensor | None=None, tangent_source: torch.Tensor | None=None, tangent_receiver: torch.Tensor | None=None)",
+      "body_sha256": "83c57e18510499c74da24b2d0d2d67a857c19972d6237a453a5432fcd66e8dee",
+      "normalized_ast_sha256": "23b3df0cc6e5f0cf0a65b2b914bd1bb0cfe261be9ac28ac90f13df3882fff8d3"
+    },
+    {
+      "id": "raydn_scene_create",
+      "kind": "function",
+      "signature": "(vertices: list[torch.Tensor], faces: list[torch.Tensor], uv: list[torch.Tensor], face_uv: list[torch.Tensor], to_world_left: list[torch.Tensor], to_world_right: list[torch.Tensor], mesh_flags: list[int])",
+      "body_sha256": "8301c17cc2cdac558e5cfb963db617b38722c2941b33c745bf9d774311844ffe",
+      "normalized_ast_sha256": "c4f8317dd9f98fbb7b50d6ebae47c14863914d9dd8a05f7863314bc93c7cd27d"
+    },
+    {
+      "id": "raydn_scene_edge_records",
+      "kind": "function",
+      "signature": "(handle: int)",
+      "body_sha256": "192d67cd69c9cdebee1ad883ad198dc48c5967f504e3546bbc4aee65f7bdfd09",
+      "normalized_ast_sha256": "644178ff72175be00a3f87b021bbe9ba74e2d1cce641d49d55d61e3fe34d2ef4"
+    },
+    {
+      "id": "raydn_scene_face_normals_backward",
+      "kind": "function",
+      "signature": "(handle: object, grad_face_normals: torch.Tensor)",
+      "body_sha256": "9480b98fecae03ac0db8bb3ca313e72679f1127dacd0a5061873341e7023eb4f",
+      "normalized_ast_sha256": "ca70f299d99cccf8d2d37d96561b4811c412cfb6408b258a64b5ea23bfe0af2c"
+    },
+    {
+      "id": "raydn_scene_face_normals_jvp",
+      "kind": "function",
+      "signature": "(handle: object, tangent_vertices: torch.Tensor)",
+      "body_sha256": "4b63c80cf8e8f30b825b3dffcce9ab9086da94e0eb3827eef2a6e29341e041ee",
+      "normalized_ast_sha256": "6c41c82e89dd6727b135eaac8b5db75110cc40f50a9317cee9c56cbda1ff7be1"
+    },
+    {
+      "id": "raydn_trace_reflections_ad",
+      "kind": "function",
+      "signature": "(handle: object, vertices: torch.Tensor, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor, active: torch.Tensor | None, max_bounces: int)",
+      "body_sha256": "92f91fb073206576578aca15ca736a50c57ef99ce829c8bd271b9099e13a7546",
+      "normalized_ast_sha256": "0a6e003aa0f05ebc4faac245b5dc109a8778ff5610f52abcb88b616153bb2586"
+    },
+    {
+      "id": "raydn_trace_reflections_backward",
+      "kind": "function",
+      "signature": "(handle: object, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor, active: torch.Tensor | None, tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, tape_hit_points: torch.Tensor, tape_normals: torch.Tensor, image_sources: torch.Tensor, *, grad_t: torch.Tensor | None=None, grad_image_sources: torch.Tensor | None=None)",
+      "body_sha256": "cc6cbe2a6c80571f548d92190367b8e3eaa4c935039661b2489d7d1303530d59",
+      "normalized_ast_sha256": "a75e7fc978f2dbf06a17b7db2e9662f4679a085ef2c1bcf102b94c67ef2ffd60"
+    },
+    {
+      "id": "raydn_trace_reflections_forward",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "5a9053063d98371f12b1098c64279b239db616922b394058e8dfdcbf7ed114ce",
+      "normalized_ast_sha256": "d1f4af53ad51e2a67a4d95c70093184f400c3ad5aa73924d8393be19da7ab603"
+    },
+    {
+      "id": "raydn_trace_reflections_forward_tape",
+      "kind": "function",
+      "signature": "(*args: object)",
+      "body_sha256": "584b2fd613c07fef457e5a9a8cf27de975832b5507d5030aa3c9a1d1c0be37ca",
+      "normalized_ast_sha256": "c54f7228871bef7bca71a6b93b94ef4820af390d3dc8bea57a97e0cbd008de90"
+    },
+    {
+      "id": "raydn_trace_reflections_jvp",
+      "kind": "function",
+      "signature": "(handle: object, ray_o: torch.Tensor, ray_d: torch.Tensor, active: torch.Tensor | None, tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, tape_hit_points: torch.Tensor, tape_normals: torch.Tensor, image_sources: torch.Tensor, *, tangent_vertices: torch.Tensor | None=None, tangent_ray_o: torch.Tensor | None=None, tangent_ray_d: torch.Tensor | None=None)",
+      "body_sha256": "6aa8c3e64c62fcfd8a463ee2af298a45eadcc4b47150abfd42f3cd7c6cfd7bbc",
+      "normalized_ast_sha256": "5e6dbf276253b269cd38ddb1f400c813eeb9f8016461b1a1ff994d377a814fb9"
+    },
+    {
+      "id": "scattering_event_probabilities",
+      "kind": "function",
+      "signature": "(cos_theta: torch.Tensor, material_id: torch.Tensor, cap_r_te: torch.Tensor, cap_r_tm: torch.Tensor, cap_t_te: torch.Tensor, cap_t_tm: torch.Tensor, rough_sigma_h_m: torch.Tensor, scatter_model_id: torch.Tensor, *, frequency_hz: float, probability_floor: float)",
+      "body_sha256": "363fae22d1c5546066135bfb270f8d3dda1fd8a2df81dd6254e28684e16f3b22",
+      "normalized_ast_sha256": "8e44b02e2ee419e93bd12989819d0e530be600d49494cfdca4d3a4da7677ffef"
+    },
+    {
+      "id": "scattering_table_eval",
+      "kind": "function",
+      "signature": "(wi: torch.Tensor, wo: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor)",
+      "body_sha256": "296a872e41f235b20ac1b0c3e7985cc57694d455419ebfef11729d1f71fdd03e",
+      "normalized_ast_sha256": "303ad7e09f9421086394e6f378696a3b94c8962da671bd50dec8d6d1abebd2eb"
+    },
+    {
+      "id": "scattering_table_pdf",
+      "kind": "function",
+      "signature": "(wi: torch.Tensor, wo: torch.Tensor, sample_density: torch.Tensor, *, reverse: bool=False)",
+      "body_sha256": "ee5619821654bfc8c7408e8bfc98492403541c774b8730b93c1a0af4172a6ef7",
+      "normalized_ast_sha256": "02edef01e669bfe063fa357dacf126b43c00fbf1945b1fc6ffbdb774cae845bf"
+    },
+    {
+      "id": "scattering_table_sample",
+      "kind": "function",
+      "signature": "(wi: torch.Tensor, uniforms: torch.Tensor, marginal_cdf: torch.Tensor, conditional_cdf: torch.Tensor, sample_density: torch.Tensor)",
+      "body_sha256": "a9985b3cfa05424a51f63cd91b50dfa969d39bc0bfe63be7cc0d23c6bc9edd57",
+      "normalized_ast_sha256": "25b149cc7e045b7f58fb4e80f35a39ed3a87646ff42a138e13615450b4af3723"
+    }
+  ],
+  "active_ops": [
+    "_CoupledRdPrepareAdFunction.backward",
+    "_CoupledRdPrepareAdFunction.forward",
+    "_CoupledRdPrepareAdFunction.jvp",
+    "_CoupledRdPrepareAdFunction.setup_context",
+    "_DeterministicAccumulateFlatAdFunction.backward",
+    "_DeterministicAccumulateFlatAdFunction.forward",
+    "_DeterministicAccumulateFlatAdFunction.jvp",
+    "_DeterministicAccumulateFlatAdFunction.setup_context",
+    "_EmLayerStackAdFunction.backward",
+    "_EmLayerStackAdFunction.forward",
+    "_EmLayerStackAdFunction.jvp",
+    "_EmLayerStackAdFunction.setup_context",
+    "_FieldCoupledRdAdFunction.backward",
+    "_FieldCoupledRdAdFunction.forward",
+    "_FieldCoupledRdAdFunction.jvp",
+    "_FieldCoupledRdAdFunction.setup_context",
+    "_FieldDiffractionWedgeAdFunction._unpack_saved",
+    "_FieldDiffractionWedgeAdFunction.backward",
+    "_FieldDiffractionWedgeAdFunction.forward",
+    "_FieldDiffractionWedgeAdFunction.jvp",
+    "_FieldDiffractionWedgeAdFunction.setup_context",
+    "_FieldFreeSpaceAdFunction.backward",
+    "_FieldFreeSpaceAdFunction.forward",
+    "_FieldFreeSpaceAdFunction.jvp",
+    "_FieldFreeSpaceAdFunction.setup_context",
+    "_FieldProjectComplex3AdFunction.backward",
+    "_FieldProjectComplex3AdFunction.forward",
+    "_FieldProjectComplex3AdFunction.jvp",
+    "_FieldProjectComplex3AdFunction.setup_context",
+    "_FieldReflectionSequenceAdFunction.backward",
+    "_FieldReflectionSequenceAdFunction.forward",
+    "_FieldReflectionSequenceAdFunction.jvp",
+    "_FieldReflectionSequenceAdFunction.setup_context",
+    "_FieldTransmissionSequenceAdFunction.backward",
+    "_FieldTransmissionSequenceAdFunction.forward",
+    "_FieldTransmissionSequenceAdFunction.jvp",
+    "_FieldTransmissionSequenceAdFunction.setup_context",
+    "_McDiffractionMapAdFunction.backward",
+    "_McDiffractionMapAdFunction.forward",
+    "_McDiffractionMapAdFunction.jvp",
+    "_McDiffractionMapAdFunction.setup_context",
+    "_McFinalizeComponentMapsAdFunction.backward",
+    "_McFinalizeComponentMapsAdFunction.forward",
+    "_McFinalizeComponentMapsAdFunction.jvp",
+    "_McFinalizeComponentMapsAdFunction.setup_context",
+    "_McLosGridMapsAdFunction.backward",
+    "_McLosGridMapsAdFunction.forward",
+    "_McLosGridMapsAdFunction.jvp",
+    "_McLosGridMapsAdFunction.setup_context",
+    "_McLosPathGainAdFunction.backward",
+    "_McLosPathGainAdFunction.forward",
+    "_McLosPathGainAdFunction.jvp",
+    "_McLosPathGainAdFunction.setup_context",
+    "_McReflectionMapAdFunction.backward",
+    "_McReflectionMapAdFunction.forward",
+    "_McReflectionMapAdFunction.jvp",
+    "_McReflectionMapAdFunction.setup_context",
+    "_RaydnFaceNormalsAdFunction.backward",
+    "_RaydnFaceNormalsAdFunction.forward",
+    "_RaydnFaceNormalsAdFunction.jvp",
+    "_RaydnFaceNormalsAdFunction.setup_context",
+    "_RaydnIntersectAdFunction.backward",
+    "_RaydnIntersectAdFunction.forward",
+    "_RaydnIntersectAdFunction.jvp",
+    "_RaydnIntersectAdFunction.setup_context",
+    "_RaydnReflectionEpcPathsAdFunction.backward",
+    "_RaydnReflectionEpcPathsAdFunction.forward",
+    "_RaydnReflectionEpcPathsAdFunction.jvp",
+    "_RaydnReflectionEpcPathsAdFunction.setup_context",
+    "_RaydnTraceReflectionsAdFunction.backward",
+    "_RaydnTraceReflectionsAdFunction.forward",
+    "_RaydnTraceReflectionsAdFunction.jvp",
+    "_RaydnTraceReflectionsAdFunction.setup_context",
+    "_ad_active_ctx",
+    "_ad_check_active",
+    "_ad_check_optional_grad",
+    "_ad_check_rows",
+    "_ad_check_tangent_vec3",
+    "_ad_checked_tangent",
+    "_ad_frequency_grad",
+    "_ad_frequency_tangent",
+    "_ad_frequency_value",
+    "_ad_geometry_live",
+    "_ad_geometry_tangent",
+    "_ad_native_tangent_or_none",
+    "_ad_native_tensor",
+    "_ad_raise_composed_transforms",
+    "_ad_reject_fixed_inputs",
+    "_ad_reject_fixed_tangents",
+    "_ad_still_wrapped",
+    "_bdpt_mis_mode_id",
+    "_epc_paths_frozen_winner_checks",
+    "_required_native_op",
+    "_validate_bdpt_connection_samples",
+    "_validate_bdpt_subpath_state",
+    "_validate_deterministic_topology_block",
+    "_validate_layer_csr",
+    "_validate_path_block",
+    "_validate_path_reflection_candidates",
+    "_validate_topology_extra_fields",
+    "bdpt_accumulate_connection_samples",
+    "bdpt_apply_los_visibility",
+    "bdpt_compact_connection_samples",
+    "bdpt_component_map_buffer",
+    "bdpt_concat_connection_samples",
+    "bdpt_connection_variance",
+    "bdpt_count_valid_connection_samples",
+    "bdpt_diffraction_accumulation_forward",
+    "bdpt_diffraction_connection_samples_from_tape",
+    "bdpt_diffraction_discover_edges",
+    "bdpt_diffraction_discover_edges_counted",
+    "bdpt_diffraction_edge_geometry",
+    "bdpt_diffraction_point_connection_samples",
+    "bdpt_diffraction_state_pack",
+    "bdpt_diffraction_state_wi",
+    "bdpt_empty_subpath_state",
+    "bdpt_endpoint_connection_samples",
+    "bdpt_endpoint_connection_visibility_inputs",
+    "bdpt_endpoint_subpath_state",
+    "bdpt_face_material_tensors",
+    "bdpt_face_material_tensors_from_host",
+    "bdpt_filter_connection_samples",
+    "bdpt_finalize_component_maps",
+    "bdpt_finalize_point_components",
+    "bdpt_host_vec3_tensor",
+    "bdpt_intersect_forward",
+    "bdpt_launch_state",
+    "bdpt_los_component_maps",
+    "bdpt_los_component_maps_from_matrix",
+    "bdpt_los_export",
+    "bdpt_los_visibility_inputs",
+    "bdpt_mis_weights",
+    "bdpt_pack_vec3",
+    "bdpt_point_component_power",
+    "bdpt_receiver_grid_points",
+    "bdpt_reflected_light_subpath_state",
+    "bdpt_reflection_accumulation_forward",
+    "bdpt_reflection_launch_inputs",
+    "bdpt_sample_directions",
+    "bdpt_selected_edge_indices",
+    "bdpt_store_component_map",
+    "bdpt_store_point_component_column",
+    "bdpt_store_scaled_component_map",
+    "bdpt_subpath_intersection_inputs",
+    "bdpt_surface_group_edge_candidates",
+    "bdpt_transmitted_light_subpath_state",
+    "bdpt_transmitter_tensors",
+    "bdpt_visibility_forward",
+    "bdpt_zero_matrix",
+    "core_diffraction_edge_count",
+    "core_pack_int2",
+    "coupled_rd_prepare_ad",
+    "deterministic_accumulate_flat",
+    "deterministic_accumulate_flat_ad",
+    "deterministic_accumulate_flat_backward",
+    "deterministic_accumulate_flat_jvp",
+    "deterministic_component_counts",
+    "deterministic_concat_topology_blocks",
+    "deterministic_delay_to_path_length",
+    "deterministic_diffraction_order1_compact",
+    "deterministic_diffraction_state_pack",
+    "deterministic_diffraction_state_pack_selected",
+    "deterministic_diffraction_vector_field",
+    "deterministic_face_anchor_points",
+    "deterministic_face_groups",
+    "deterministic_face_sequence_chunk",
+    "deterministic_field_from_power_phase",
+    "deterministic_gather_topology_block",
+    "deterministic_los_field",
+    "deterministic_los_topology_block",
+    "deterministic_mapped_face_sequence_chunk",
+    "deterministic_normalize_vec3",
+    "deterministic_pack_complex",
+    "deterministic_pad_topology_sequences",
+    "deterministic_phase_from_field",
+    "deterministic_phase_from_length",
+    "deterministic_reflect_points",
+    "deterministic_reflection_epc_input_batch",
+    "deterministic_reflection_field",
+    "deterministic_reflection_order1_compact",
+    "deterministic_reflection_sequence_compact",
+    "deterministic_reflection_sequence_field",
+    "deterministic_repeat_range",
+    "deterministic_selected_edge_count",
+    "deterministic_sort_order",
+    "deterministic_surface_face_groups",
+    "deterministic_topology_base_fields",
+    "deterministic_topology_default_fields",
+    "deterministic_zero_field_phase",
+    "em_layer_stack_ad",
+    "em_layer_stack_backward",
+    "em_layer_stack_eval",
+    "em_layer_stack_jvp",
+    "field_coupled_rd",
+    "field_coupled_rd_ad",
+    "field_diffraction_wedge",
+    "field_diffraction_wedge_ad",
+    "field_free_space",
+    "field_free_space_ad",
+    "field_free_space_backward",
+    "field_free_space_jvp",
+    "field_project_complex3",
+    "field_project_complex3_ad",
+    "field_reflection_sequence",
+    "field_reflection_sequence_ad",
+    "field_reflection_sequence_backward",
+    "field_reflection_sequence_jvp",
+    "field_transmission_sequence",
+    "field_transmission_sequence_ad",
+    "field_transmission_sequence_backward",
+    "field_transmission_sequence_jvp",
+    "mc_apply_los_visibility",
+    "mc_component_map_buffer",
+    "mc_diffraction_edge_geometry",
+    "mc_diffraction_state_pack",
+    "mc_diffraction_state_wi",
+    "mc_face_material_tensors",
+    "mc_finalize_component_maps",
+    "mc_finalize_component_maps_ad",
+    "mc_los_component_maps",
+    "mc_los_component_maps_adjoint",
+    "mc_los_component_maps_from_matrix",
+    "mc_los_grid_maps_ad",
+    "mc_los_path_gain_ad",
+    "mc_los_path_gain_backward",
+    "mc_los_path_gain_jvp",
+    "mc_los_visibility_inputs",
+    "mc_pack_vec3",
+    "mc_point_component_power",
+    "mc_receiver_grid_points",
+    "mc_reflection_ad_max_depth",
+    "mc_reflection_launch_inputs",
+    "mc_sample_directions",
+    "mc_selected_edge_indices",
+    "mc_sionna_diffraction_tape_accumulate",
+    "mc_sionna_diffraction_tape_accumulate_ad",
+    "mc_sionna_diffraction_tape_accumulate_backward",
+    "mc_sionna_diffraction_tape_accumulate_jvp",
+    "mc_sionna_reflection_accumulate",
+    "mc_sionna_reflection_accumulate_ad",
+    "mc_sionna_reflection_accumulate_backward",
+    "mc_sionna_reflection_accumulate_jvp",
+    "mc_store_component_map",
+    "mc_store_scaled_component_map",
+    "mc_surface_group_edge_candidates",
+    "mc_transmitter_tensors",
+    "mc_zero_matrix",
+    "path_concat_vec3",
+    "path_diffraction_block",
+    "path_diffraction_paths_order1",
+    "path_filter_block",
+    "path_filter_los",
+    "path_finalize_blocks",
+    "path_los_export",
+    "path_los_visibility_inputs",
+    "path_merge_blocks",
+    "path_reflection_candidates",
+    "raydn_coupled_rd_geometry_forward",
+    "raydn_diffraction_paths_order1_forward",
+    "raydn_face_normals_ad",
+    "raydn_intersect_ad",
+    "raydn_intersect_backward",
+    "raydn_intersect_jvp",
+    "raydn_reflection_epc_paths_ad",
+    "raydn_reflection_epc_paths_backward",
+    "raydn_reflection_epc_paths_forward",
+    "raydn_reflection_epc_paths_jvp",
+    "raydn_scene_face_normals_backward",
+    "raydn_scene_face_normals_jvp",
+    "raydn_trace_reflections_ad",
+    "raydn_trace_reflections_backward",
+    "raydn_trace_reflections_forward",
+    "raydn_trace_reflections_forward_tape",
+    "raydn_trace_reflections_jvp",
+    "scattering_event_probabilities",
+    "scattering_table_eval",
+    "scattering_table_pdf",
+    "scattering_table_sample"
+  ],
+  "canonical_owners": {
+    "_raydn_module_handle": "witwin.channel_native.scene.kernels.rayd_scene._raydn_module_handle",
+    "_raydn_scene_handle_id": "witwin.channel_native.scene.kernels.rayd_scene._raydn_scene_handle_id",
+    "raydn_scene_create": "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_create",
+    "raydn_scene_edge_records": "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_edge_records"
+  }
+}
