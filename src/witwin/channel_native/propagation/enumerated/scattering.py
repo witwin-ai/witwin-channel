@@ -80,11 +80,11 @@ from witwin.channel_native.propagation.geometry.endpoints import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
-from witwin.channel_native.core.materials import PhaseScreen
-from witwin.channel_native.core.path_topology import (
+from witwin.channel_native.propagation.enumerated.contracts import (
     TopologyBatch,
     TopologyConfig,
 )
+from witwin.channel_native.core.materials import PhaseScreen
 from witwin.channel_native.physics.oracle import C0
 from witwin.channel_native.scattering import eval_bsdf, patch_phase_integral
 from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE

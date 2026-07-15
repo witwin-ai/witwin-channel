@@ -12,7 +12,7 @@ import torch
 from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.deterministic import accumulation, solver
-from witwin.channel_native.propagation import enumerated
+from witwin.channel_native.propagation.enumerated import scattering as enumerated
 from witwin.channel_native.propagation.geometry import endpoints
 
 
@@ -53,17 +53,20 @@ def test_endpoint_helpers_are_same_object_compatibility_exports():
             "from witwin.channel_native.propagation.geometry import endpoints; "
             "from witwin.channel_native.core import path_topology as legacy; "
             "from witwin.channel_native.deterministic import accumulation, solver; "
-            "from witwin.channel_native.propagation import enumerated"
+            "from witwin.channel_native.propagation.enumerated import "
+            "scattering as enumerated"
         ),
         (
             "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation import enumerated; "
+            "from witwin.channel_native.propagation.enumerated import "
+            "scattering as enumerated; "
             "from witwin.channel_native.deterministic import accumulation, solver; "
             "from witwin.channel_native.propagation.geometry import endpoints"
         ),
         (
             "from witwin.channel_native.deterministic import accumulation, solver; "
-            "from witwin.channel_native.propagation import enumerated; "
+            "from witwin.channel_native.propagation.enumerated import "
+            "scattering as enumerated; "
             "from witwin.channel_native.core import path_topology as legacy; "
             "from witwin.channel_native.propagation.geometry import endpoints"
         ),
