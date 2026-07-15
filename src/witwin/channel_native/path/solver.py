@@ -14,7 +14,7 @@ from witwin.channel_native.core.scene_tensors import (
     receiver_positions as _shared_receiver_positions,
     transmitter_positions as _shared_transmitter_positions,
 )
-from witwin.channel_native.deterministic.scattering import append_scattering_paths
+from witwin.channel_native.propagation.enumerated import append_scattering_paths
 
 from .config import Config
 from .arrays import (

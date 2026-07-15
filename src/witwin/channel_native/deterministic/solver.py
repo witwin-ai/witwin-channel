@@ -25,7 +25,7 @@ from .accumulation import (
 )
 from .config import Config
 from .result import Result
-from .scattering import append_scattering_paths
+from witwin.channel_native.propagation.enumerated import append_scattering_paths
 from witwin.channel_native.core.path_topology import (
     _frequency_scalar,
     apply_receiver_layout,
