@@ -75,6 +75,25 @@ _CONTRACTS = {
             "c91968647805603ea4070142c2293074ccab1535acddd546cc46e520c8904876"
         ),
     },
+    "_evaluate_transmission_fields": {
+        "signature": (
+            "(compiled: object, topology: TopologyBatch, source: torch.Tensor, "
+            "target: torch.Tensor, source_power: torch.Tensor, tx_pol: "
+            "torch.Tensor, rx_pol: torch.Tensor, device: torch.device, "
+            "geometry_ad: bool, vertices: torch.Tensor | None, "
+            "transmission_field_op: Callable[..., dict[str, torch.Tensor]], "
+            "ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | "
+            "None, field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: "
+            "torch.Tensor, path_gain: torch.Tensor, path_length: torch.Tensor, "
+            "delay: torch.Tensor, direction: torch.Tensor, launch_count: int)"
+        ),
+        "body_sha256": (
+            "be3ed774bf2b0dcf01d13891d98611f08017a2baf476ca16af52101e3e432251"
+        ),
+        "normalized_ast_sha256": (
+            "7c1bbc0e12d11b12bc7385c280d952234eb47b90672b11b1972a4e7bb76ad7ff"
+        ),
+    },
     "_evaluate_shared_fields": {
         "signature": (
             "(scene: Scene, compiled: object, topology: TopologyBatch, "
@@ -83,10 +102,10 @@ _CONTRACTS = {
             "ad_mode: str='none', frequency_value: float | None=None)"
         ),
         "body_sha256": (
-            "b46a1b48acc65c7fef6be5bd9f9a98b8f10c4cb9950d8f05a0e56203f1974fef"
+            "c22db91edbcce1ee47415d86c6c0b85da1c34bcf2f17f873d27d7e997df78f8a"
         ),
         "normalized_ast_sha256": (
-            "9fc9141b6f34aecad8855c12b0fc33f370555b5776adfffea9e8402e39574c57"
+            "f0eb2317117abe115dec2320d128c27e40a688cba4c93152db72ae6476b4aa02"
         ),
     },
 }
@@ -157,8 +176,24 @@ def test_reflection_field_extraction_preserves_frozen_prefix_segment():
     )
 
 
+def test_transmission_field_extraction_preserves_frozen_prefix_segment():
+    helper = _function_node("_evaluate_transmission_fields")
+
+    assert _body_sha256(helper.body[:-1]) == (
+        "979b83f4bf93085a5978276b0dcce0e2be8ff961287e165f1410c431a01da8f2"
+    )
+    assert ast.dump(helper.body[-1], include_attributes=False) == (
+        "Return(value=Tuple(elts=[Name(id='material', ctx=Load()), "
+        "Name(id='launch_count', ctx=Load())], ctx=Load()))"
+    )
+
+
 def test_component_field_helpers_do_not_clone_output_buffers():
-    for name in ("_evaluate_los_fields", "_evaluate_reflection_fields"):
+    for name in (
+        "_evaluate_los_fields",
+        "_evaluate_reflection_fields",
+        "_evaluate_transmission_fields",
+    ):
         helper = _function_node(name)
 
         assert not any(
@@ -209,6 +244,8 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
                     component_markers.append("los")
                 elif statement.value.func.id == "_evaluate_reflection_fields":
                     component_markers.append("reflection")
+                elif statement.value.func.id == "_evaluate_transmission_fields":
+                    component_markers.append("transmission")
             elif target_names == {"material"}:
                 component_markers.append("material")
             elif target_names & {"transmission_rows", "diffraction_rows", "coupled_rows"}:
@@ -232,7 +269,7 @@ def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
         "los",
         "material",
         "reflection",
-        "transmission_rows",
+        "transmission",
         "diffraction_rows",
         "coupled_rows",
         "epilogue",

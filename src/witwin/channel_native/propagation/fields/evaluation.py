@@ -281,6 +281,95 @@ def _evaluate_reflection_fields(
     return material, launch_count
 
 
+def _evaluate_transmission_fields(
+    compiled: object,
+    topology: TopologyBatch,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    source_power: torch.Tensor,
+    tx_pol: torch.Tensor,
+    rx_pol: torch.Tensor,
+    device: torch.device,
+    geometry_ad: bool,
+    vertices: torch.Tensor | None,
+    transmission_field_op: Callable[..., dict[str, torch.Tensor]],
+    ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None,
+    field_xyz: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    path_length: torch.Tensor,
+    delay: torch.Tensor,
+    direction: torch.Tensor,
+    launch_count: int,
+) -> tuple[dict[str, torch.Tensor] | None, int]:
+    transmission_rows = torch.nonzero(
+        topology.component_id == 5, as_tuple=False
+    ).reshape(-1)
+    if int(transmission_rows.shape[0]) > 0:
+        if material is None:
+            material = face_material_field_bundle(compiled, device=device)
+        rows = transmission_rows
+        width = int(topology.interaction_positions.shape[1])
+        slots = torch.arange(width, device=device).reshape(1, -1)
+        event_valid = (
+            slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
+        ).contiguous()
+        positions = topology.interaction_positions[rows].contiguous()
+        if geometry_ad:
+            # The transmission kernel reads only the straight source-target
+            # ray and the wall normals, so the crossing points carry exactly
+            # zero gradient and stay the detached discovery values. The
+            # normals come from RayD's differentiable face-normal table
+            # gathered by the frozen winner prim; the kernel orients them
+            # against the incident ray internally, so the table's sign
+            # convention does not matter. Invalid slots gather face 0 but are
+            # skipped by the kernel, so they receive a zero cotangent.
+            records = compiled.raydn.edge_records()
+            face_normal_table = geometry_autograd.raydn_face_normals_ad(
+                compiled.raydn.require_handle(),
+                vertices,
+                records.face_normals.contiguous(),
+            )
+            prim_sequence = topology.primitive_sequence[rows].to(dtype=torch.int64)
+            normals = face_normal_table[prim_sequence.clamp_min(0)]
+        else:
+            normals = topology.interaction_normals[rows].contiguous()
+        transmission_args = (
+            source[rows].contiguous(),
+            target[rows].contiguous(),
+            positions,
+            normals,
+            topology.material_sequence[rows].contiguous(),
+            event_valid,
+            source_power[rows].contiguous(),
+            tx_pol[rows].contiguous(),
+            rx_pol[rows].contiguous(),
+            material["layer_offset"],
+            material["layer_count"],
+            material["layer_thickness_m"],
+            material["layer_eps_r"],
+            material["layer_sigma_e"],
+            material["layer_mu_r"],
+        )
+        if ledger is not None:
+            if geometry_ad:
+                # The differentiable face-normal table registers a companion.
+                ledger.add(vertices)
+            ledger.add(*transmission_args)
+        evaluated = transmission_field_op(*transmission_args)
+        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
+        coefficient.index_copy_(0, rows, evaluated["coefficient"])
+        path_field.index_copy_(0, rows, evaluated["path_field"])
+        path_gain.index_copy_(0, rows, evaluated["path_gain"])
+        path_length.index_copy_(0, rows, evaluated["path_length_m"])
+        delay.index_copy_(0, rows, evaluated["delay_s"])
+        direction.index_copy_(0, rows, evaluated["direction"])
+        launch_count += 1
+    return material, launch_count
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -432,69 +521,29 @@ def _evaluate_shared_fields(
         launch_count,
     )
 
-    transmission_rows = torch.nonzero(
-        topology.component_id == 5, as_tuple=False
-    ).reshape(-1)
-    if int(transmission_rows.shape[0]) > 0:
-        if material is None:
-            material = face_material_field_bundle(compiled, device=device)
-        rows = transmission_rows
-        width = int(topology.interaction_positions.shape[1])
-        slots = torch.arange(width, device=device).reshape(1, -1)
-        event_valid = (
-            slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
-        ).contiguous()
-        positions = topology.interaction_positions[rows].contiguous()
-        if geometry_ad:
-            # The transmission kernel reads only the straight source-target
-            # ray and the wall normals, so the crossing points carry exactly
-            # zero gradient and stay the detached discovery values. The
-            # normals come from RayD's differentiable face-normal table
-            # gathered by the frozen winner prim; the kernel orients them
-            # against the incident ray internally, so the table's sign
-            # convention does not matter. Invalid slots gather face 0 but are
-            # skipped by the kernel, so they receive a zero cotangent.
-            records = compiled.raydn.edge_records()
-            face_normal_table = geometry_autograd.raydn_face_normals_ad(
-                compiled.raydn.require_handle(),
-                vertices,
-                records.face_normals.contiguous(),
-            )
-            prim_sequence = topology.primitive_sequence[rows].to(dtype=torch.int64)
-            normals = face_normal_table[prim_sequence.clamp_min(0)]
-        else:
-            normals = topology.interaction_normals[rows].contiguous()
-        transmission_args = (
-            source[rows].contiguous(),
-            target[rows].contiguous(),
-            positions,
-            normals,
-            topology.material_sequence[rows].contiguous(),
-            event_valid,
-            source_power[rows].contiguous(),
-            tx_pol[rows].contiguous(),
-            rx_pol[rows].contiguous(),
-            material["layer_offset"],
-            material["layer_count"],
-            material["layer_thickness_m"],
-            material["layer_eps_r"],
-            material["layer_sigma_e"],
-            material["layer_mu_r"],
-        )
-        if ledger is not None:
-            if geometry_ad:
-                # The differentiable face-normal table registers a companion.
-                ledger.add(vertices)
-            ledger.add(*transmission_args)
-        evaluated = transmission_field_op(*transmission_args)
-        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, rows, evaluated["coefficient"])
-        path_field.index_copy_(0, rows, evaluated["path_field"])
-        path_gain.index_copy_(0, rows, evaluated["path_gain"])
-        path_length.index_copy_(0, rows, evaluated["path_length_m"])
-        delay.index_copy_(0, rows, evaluated["delay_s"])
-        direction.index_copy_(0, rows, evaluated["direction"])
-        launch_count += 1
+    material, launch_count = _evaluate_transmission_fields(
+        compiled,
+        topology,
+        source,
+        target,
+        source_power,
+        tx_pol,
+        rx_pol,
+        device,
+        geometry_ad,
+        vertices if geometry_ad else None,
+        transmission_field_op,
+        ledger,
+        material,
+        field_xyz,
+        coefficient,
+        path_field,
+        path_gain,
+        path_length,
+        delay,
+        direction,
+        launch_count,
+    )
 
     diffraction_rows = torch.nonzero(
         topology.component_id == 2, as_tuple=False
