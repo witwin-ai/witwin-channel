@@ -37,9 +37,18 @@ _OWNER_NAMES = (
 
 _MAP_OWNER_NAMES = (
     "_McLosPathGainAdFunction",
+    "mc_apply_los_visibility",
+    "mc_component_map_buffer",
+    "mc_los_component_maps",
+    "mc_los_component_maps_from_matrix",
     "mc_los_path_gain_ad",
     "mc_los_path_gain_backward",
     "mc_los_path_gain_jvp",
+    "mc_los_visibility_inputs",
+    "mc_point_component_power",
+    "mc_store_component_map",
+    "mc_store_scaled_component_map",
+    "mc_zero_matrix",
 )
 
 _MAP_CONTRACT_IDS = (
@@ -47,9 +56,18 @@ _MAP_CONTRACT_IDS = (
     "_McLosPathGainAdFunction.forward",
     "_McLosPathGainAdFunction.jvp",
     "_McLosPathGainAdFunction.setup_context",
+    "mc_apply_los_visibility",
+    "mc_component_map_buffer",
+    "mc_los_component_maps",
+    "mc_los_component_maps_from_matrix",
     "mc_los_path_gain_ad",
     "mc_los_path_gain_backward",
     "mc_los_path_gain_jvp",
+    "mc_los_visibility_inputs",
+    "mc_point_component_power",
+    "mc_store_component_map",
+    "mc_store_scaled_component_map",
+    "mc_zero_matrix",
 )
 
 
@@ -116,6 +134,7 @@ def test_mc_basic_maps_preserves_exactly_the_frozen_los_ad_contracts():
 
 def test_mc_basic_maps_uses_canonical_runtime_dependencies():
     assert maps.native_extension is symbols.native_extension
+    assert maps._required_native_op is symbols.required_symbol
     assert maps.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
     assert maps.torch_compat is torch_compat
     assert maps._ad_frequency_grad is autograd_contracts._ad_frequency_grad

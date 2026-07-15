@@ -2018,204 +2018,6 @@ def mc_los_grid_maps_ad(
     return _McLosGridMapsAdFunction.apply(matrix, visible, int(rows), int(cols))
 
 
-def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
-    if rows < 0 or cols < 0:
-        raise ValueError("rows and cols must be non-negative")
-    out = _required_native_op("mc_zero_matrix")(reference, int(rows), int(cols))
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_zero_matrix must return a tensor")
-    validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
-    if out.shape != (int(rows), int(cols)):
-        raise ValueError("_channel_native.mc_zero_matrix returned an unexpected shape")
-    return out
-
-
-def mc_point_component_power(
-    path_gain: torch.Tensor, *, include_los: bool
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=2)
-    exported = _required_native_op("mc_point_component_power")(
-        path_gain, bool(include_los)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_point_component_power must return a dict")
-    for name in ("los", "reflection", "diffraction"):
-        validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
-    return exported
-
-
-def mc_component_map_buffer(
-    reference: torch.Tensor,
-    *,
-    tx_count: int,
-    dim0: int,
-    dim1: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
-    if tx_count < 0 or dim0 < 0 or dim1 < 0:
-        raise ValueError("tx_count, dim0, and dim1 must be non-negative")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_component_map_buffer"):
-        raise RuntimeError(
-            "_channel_native.mc_component_map_buffer CUDA kernel is required"
-        )
-    maps = native.mc_component_map_buffer(
-        reference, int(tx_count), int(dim0), int(dim1)
-    )
-    if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel_native.mc_component_map_buffer must return a tensor")
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    if maps.shape != (tx_count, dim0, dim1):
-        raise ValueError(
-            "_channel_native.mc_component_map_buffer returned an unexpected shape"
-        )
-    return maps
-
-
-def mc_store_component_map(
-    maps: torch.Tensor,
-    source: torch.Tensor,
-    *,
-    tx_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
-    if source.shape != maps.shape[1:]:
-        raise ValueError("source shape must match one maps slot")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_store_component_map"):
-        raise RuntimeError(
-            "_channel_native.mc_store_component_map CUDA kernel is required"
-        )
-    out = native.mc_store_component_map(maps, source, int(tx_index))
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_store_component_map must return a tensor")
-    validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
-    return out
-
-
-def mc_store_scaled_component_map(
-    maps: torch.Tensor,
-    source: torch.Tensor,
-    scale_values: torch.Tensor,
-    *,
-    tx_index: int,
-    scale_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("scale_values", scale_values, dtype=torch.float32, ndim=1)
-    if source.shape != maps.shape[1:]:
-        raise ValueError("source shape must match one maps slot")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_store_scaled_component_map"):
-        raise RuntimeError(
-            "_channel_native.mc_store_scaled_component_map CUDA kernel is required"
-        )
-    out = native.mc_store_scaled_component_map(
-        maps,
-        source,
-        scale_values,
-        int(tx_index),
-        int(scale_index),
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel_native.mc_store_scaled_component_map must return a tensor"
-        )
-    validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
-    return out
-
-
-def mc_los_component_maps(los: torch.Tensor) -> torch.Tensor:
-    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_los_component_maps"):
-        raise RuntimeError(
-            "_channel_native.mc_los_component_maps CUDA kernel is required"
-        )
-    maps = native.mc_los_component_maps(los)
-    if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel_native.mc_los_component_maps must return a tensor")
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    return maps
-
-
-def mc_los_component_maps_from_matrix(
-    los: torch.Tensor, *, rows: int, cols: int
-) -> torch.Tensor:
-    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
-    if rows < 0 or cols < 0:
-        raise ValueError("rows and cols must be non-negative")
-    if los.shape[1] != rows * cols:
-        raise ValueError("los columns must match rows * cols")
-    maps = _required_native_op("mc_los_component_maps_from_matrix")(
-        los, int(rows), int(cols)
-    )
-    if not isinstance(maps, torch.Tensor):
-        raise TypeError(
-            "_channel_native.mc_los_component_maps_from_matrix must return a tensor"
-        )
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    if maps.shape != (los.shape[0], cols, rows):
-        raise ValueError(
-            "_channel_native.mc_los_component_maps_from_matrix returned an unexpected shape"
-        )
-    return maps
-
-
-def mc_apply_los_visibility(
-    maps: torch.Tensor,
-    los: torch.Tensor,
-    visible: torch.Tensor,
-    *,
-    tx_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
-    if maps.shape[0] != los.shape[0] or los.shape[1] != maps.shape[1] * maps.shape[2]:
-        raise ValueError("los must match maps flattened grid layout")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_apply_los_visibility"):
-        raise RuntimeError(
-            "_channel_native.mc_apply_los_visibility CUDA kernel is required"
-        )
-    out = native.mc_apply_los_visibility(maps, los, visible, int(tx_index))
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_apply_los_visibility must return a tensor")
-    return out
-
-
-def mc_los_visibility_inputs(
-    tx_positions: torch.Tensor,
-    *,
-    tx_index: int,
-    rx_count: int,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    if rx_count < 0:
-        raise ValueError("rx_count must be non-negative")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_los_visibility_inputs"):
-        raise RuntimeError(
-            "_channel_native.mc_los_visibility_inputs CUDA kernel is required"
-        )
-    exported = native.mc_los_visibility_inputs(
-        tx_positions, int(tx_index), int(rx_count)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_los_visibility_inputs must return a dict")
-    validate_cuda_tensor(
-        "start", exported["start"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
-    return exported
-
-
 def mc_sionna_reflection_accumulate(
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
@@ -3286,7 +3088,16 @@ from witwin.channel_native.montecarlo.basic.kernels.sampling import (  # noqa: E
 from witwin.channel_native.montecarlo.basic.kernels.maps import (  # noqa: E402,F401
     _LIGHT_SPEED_M_PER_S_AD,
     _McLosPathGainAdFunction,
+    mc_apply_los_visibility,
+    mc_component_map_buffer,
+    mc_los_component_maps,
+    mc_los_component_maps_from_matrix,
     mc_los_path_gain_ad,
     mc_los_path_gain_backward,
     mc_los_path_gain_jvp,
+    mc_los_visibility_inputs,
+    mc_point_component_power,
+    mc_store_component_map,
+    mc_store_scaled_component_map,
+    mc_zero_matrix,
 )

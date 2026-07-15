@@ -1422,7 +1422,7 @@ def test_mc_component_map_store_requires_native_cuda_kernel(monkeypatch):
 
     maps = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
     source = torch.ones((2, 2), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_store_component_map CUDA kernel is required"):
         ops.mc_store_component_map(maps, source, tx_index=0)
@@ -1566,7 +1566,7 @@ def test_mc_apply_los_visibility_requires_native_cuda_kernel(monkeypatch):
     los = torch.zeros((1, 4), device="cuda", dtype=torch.float32)
     maps = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
     visible = torch.ones((4,), device="cuda", dtype=torch.bool)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_apply_los_visibility CUDA kernel is required"):
         ops.mc_apply_los_visibility(maps, los, visible, tx_index=0)
@@ -1595,7 +1595,7 @@ def test_mc_los_visibility_inputs_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC LoS visibility inputs")
 
     tx_positions = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_los_visibility_inputs CUDA kernel is required"):
         ops.mc_los_visibility_inputs(tx_positions, tx_index=0, rx_count=1)
