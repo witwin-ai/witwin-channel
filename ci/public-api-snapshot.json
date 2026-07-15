@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "generator": "tools.refactor_baseline.api_manifest/v1",
+  "modules": [
+    {
+      "module": "witwin.channel_native",
+      "exports": [
+        {
+          "name": "AntennaArray",
+          "kind": "class",
+          "target": "witwin.channel_native.core.antenna.AntennaArray",
+          "contract_sha256": "727f0d62739db394c1c6a4921c18ba7252bcfdb4279f8c3cd3f64587a373e3d1"
+        },
+        {
+          "name": "AntennaPattern",
+          "kind": "class",
+          "target": "witwin.channel_native.core.antenna.AntennaPattern",
+          "contract_sha256": "317a76c0be74d176bb67973cb62d883f41d6fd7a0797be5f9773077fd065e9a7"
+        },
+        {
+          "name": "ReceiverGrid",
+          "kind": "class",
+          "target": "witwin.channel_native.core.objects.ReceiverGrid",
+          "contract_sha256": "9f5beee91b69baf979c16a65945364e1ec0dd5580d8fbf471527a9193b117d49"
+        },
+        {
+          "name": "ReceiverPoint",
+          "kind": "class",
+          "target": "witwin.channel_native.core.objects.ReceiverPoint",
+          "contract_sha256": "b1669a6940d610f179d3f06afbcce8f0d6d6438e6f751fca2973c5c3894efd9b"
+        },
+        {
+          "name": "Scene",
+          "kind": "class",
+          "target": "witwin.channel_native.core.scene.Scene",
+          "contract_sha256": "b8f0e941fd94308145c09e443ef45680dfb1f25022b20bf0dce5941a9e3e626d"
+        },
+        {
+          "name": "Structure",
+          "kind": "class",
+          "target": "witwin.channel_native.core.objects.Structure",
+          "contract_sha256": "88d32414b4caaee6464196038a808d11b1259931817692869c0e5571f2fcbfdc"
+        },
+        {
+          "name": "Transmitter",
+          "kind": "class",
+          "target": "witwin.channel_native.core.objects.Transmitter",
+          "contract_sha256": "49b9e67e703bbd45bbe976a7ac0ae1ce9bbcc1bd4064fed1d192c237b74251cf"
+        },
+        {
+          "name": "Complex3State",
+          "kind": "class",
+          "target": "witwin.channel_native.core.field_state.Complex3State",
+          "contract_sha256": "f526cdf87611ad8dcf2c66f8f447ebbb5de30a04645998f998d6879d9196fae8"
+        },
+        {
+          "name": "JonesState",
+          "kind": "class",
+          "target": "witwin.channel_native.core.field_state.JonesState",
+          "contract_sha256": "1aa5da3d4846b83f03060d60e979cb4fc33230e45d91c835d6beda4308a89bb7"
+        },
+        {
+          "name": "build_info",
+          "kind": "function",
+          "target": "witwin.channel_native.runtime.extension.build_info",
+          "contract_sha256": "d285cf2bc36e692fdddc9f32efc7a8f8f9d5167c1e99730a3f29ff0e18de2534",
+          "signature": "()"
+        },
+        {
+          "name": "pipeline_cache_key",
+          "kind": "function",
+          "target": "witwin.channel_native.deployment.pipeline_cache_key",
+          "contract_sha256": "7a4c6f742c8299d16d92381d479cece2761323a7b374732f481eda76024b38ff",
+          "signature": "(*, geometry_version: int, material_version: int, assignment_version: int, frequency_hz: float, solver: str, build: dict[str, Any] | None=None)"
+        },
+        {
+          "name": "runtime_diagnostics",
+          "kind": "function",
+          "target": "witwin.channel_native.deployment.runtime_diagnostics",
+          "contract_sha256": "ce88357b4226018f5020612f26d8804bba8f3d3dd77428959eeeb8b3fb447671",
+          "signature": "()"
+        },
+        {
+          "name": "capabilities",
+          "kind": "function",
+          "target": "witwin.channel_native.capabilities.capabilities",
+          "contract_sha256": "edfdc2c4641809875e3e00a8b8324ccab987f60117d9d3867e7c5764cdc0edea",
+          "signature": "()"
+        },
+        {
+          "name": "Dielectric",
+          "kind": "class",
+          "target": "witwin.channel_native.core.materials.Dielectric",
+          "contract_sha256": "76a9ebcbd4e18e6f150ddf03fcad19bf5f50f8f57da3f4ce9582f915a8049321"
+        },
+        {
+          "name": "DispersiveMaterial",
+          "kind": "class",
+          "target": "witwin.channel_native.core.materials.DispersiveMaterial",
+          "contract_sha256": "07222883da0b16614dd10ca03721be221f5d384e1554d04b14bc66b361c6a467"
+        },
+        {
+          "name": "ITUMaterial",
+          "kind": "class",
+          "target": "witwin.channel_native.core.materials.ITUMaterial",
+          "contract_sha256": "272c8aada4504906ecf0c6f380279940efdd82159f1865d91bb0b39b66d26487"
+        },
+        {
+          "name": "LossyDielectric",
+          "kind": "class",
+          "target": "witwin.channel_native.core.materials.LossyDielectric",
+          "contract_sha256": "c1f017386d56588b467ada27e6101ace277787d2e1e20a6314bc32ca8e31c1ee"
+        },
+        {
+          "name": "PerfectConductor",
+          "kind": "class",
+          "target": "witwin.channel_native.core.materials.PerfectConductor",
+          "contract_sha256": "bcc7bea5ba3bfc7c08b26e725881d7825dfd39addc901e0f0de198312693adb8"
+        }
+      ]
+    },
+    {
+      "module": "witwin.channel_native.path",
+      "exports": [
+        {
+          "name": "Config",
+          "kind": "class",
+          "target": "witwin.channel_native.path.config.Config",
+          "contract_sha256": "9a264f063ac91ca8bde85b2a9676acbc6716b9f7fcc434e094d5e28851ccfaa3"
+        },
+        {
+          "name": "InteractionType",
+          "kind": "class",
+          "target": "witwin.channel_native.path.result.InteractionType",
+          "contract_sha256": "de6925e8a28896c150469c442e001e53d7d8ad113e265326f42cb80500ef2ed0"
+        },
+        {
+          "name": "PathResult",
+          "kind": "class",
+          "target": "witwin.channel_native.path.result.PathResult",
+          "contract_sha256": "a81aa56440d174d6f5131ae297cb453d0aea2b5c3a8bbe97fa29847c6098e793"
+        },
+        {
+          "name": "RaggedPathSoA",
+          "kind": "class",
+          "target": "witwin.channel_native.path.schema.RaggedPathSoA",
+          "contract_sha256": "a03a6b164699a41d5de337e925a924f503621248f7e8536233ac37a92bb33e31"
+        },
+        {
+          "name": "solve",
+          "kind": "function",
+          "target": "witwin.channel_native.path.solver.solve",
+          "contract_sha256": "225bb80c94cb6dea779e910296611ae1725f4bc51a587e391791e5f7fc957b7f",
+          "signature": "(scene: Scene, config: Config)"
+        },
+        {
+          "name": "pack_synthetic_arrays",
+          "kind": "function",
+          "target": "witwin.channel_native.path.arrays.pack_synthetic_arrays",
+          "contract_sha256": "a0424d8aa7ecda3429227ad1dd6347a74c4770626c82c44c9173e5766d9b478e",
+          "signature": "(result: PathResult, *, frequency_hz: float, transmitters: Sequence[Transmitter], receivers: Sequence[Receiver])"
+        },
+        {
+          "name": "explicit_array_scene",
+          "kind": "function",
+          "target": "witwin.channel_native.path.arrays.explicit_array_scene",
+          "contract_sha256": "773a3100c9104e6504cc0d84ab10485225c14322dcf04493aa2c035aa1eadd66",
+          "signature": "(scene: Scene)"
+        },
+        {
+          "name": "pack_explicit_arrays",
+          "kind": "function",
+          "target": "witwin.channel_native.path.arrays.pack_explicit_arrays",
+          "contract_sha256": "6c9ed03e7e18a48f2c8921842672e12d059cdf190ff873ef2cb7c462a40f8bf8",
+          "signature": "(result: PathResult, *, scene: Scene, num_rx_ant: int, num_tx_ant: int)"
+        }
+      ]
+    },
+    {
+      "module": "witwin.channel_native.deterministic",
+      "exports": [
+        {
+          "name": "Config",
+          "kind": "class",
+          "target": "witwin.channel_native.deterministic.config.Config",
+          "contract_sha256": "bf48f320804f3949c26d92c9ee6314e6f2b205cfd24388963fc191bc044bab0f"
+        },
+        {
+          "name": "PathTable",
+          "kind": "class",
+          "target": "witwin.channel_native.deterministic.result.PathTable",
+          "contract_sha256": "27f052b080597e7438823445ab36671a300b07ec40970b76a2b21e12bb7d142d"
+        },
+        {
+          "name": "Result",
+          "kind": "class",
+          "target": "witwin.channel_native.deterministic.result.Result",
+          "contract_sha256": "1149a859ca4ef3ebcc627e084d94ee899e41f289776ed4ae56a50d52d31a10ee"
+        },
+        {
+          "name": "solve",
+          "kind": "function",
+          "target": "witwin.channel_native.deterministic.solver.solve",
+          "contract_sha256": "1b94c035cbd3afdf1cf5722b79ba8487e7f0f73e3835a9459a07ca997b8c9852",
+          "signature": "(scene: Scene, config: Config)"
+        }
+      ]
+    },
+    {
+      "module": "witwin.channel_native.montecarlo.basic",
+      "exports": [
+        {
+          "name": "Config",
+          "kind": "class",
+          "target": "witwin.channel_native.montecarlo.basic.config.Config",
+          "contract_sha256": "d1a615c188030e6c354ebeb84b812f898e02ac866edb796d4a7972af861fdede"
+        },
+        {
+          "name": "Result",
+          "kind": "class",
+          "target": "witwin.channel_native.montecarlo.basic.result.Result",
+          "contract_sha256": "3c6b00999c968bcafe894909b3d26eac194651271b47220e4428e0a0da514eae"
+        },
+        {
+          "name": "solve",
+          "kind": "function",
+          "target": "witwin.channel_native.montecarlo.basic.solver.solve",
+          "contract_sha256": "e0fc2ebe01658e45fe2111d0fbb3d921bbaaa7b4b424a634a0817a3fbf86669c",
+          "signature": "(scene: Scene, config: Config)"
+        }
+      ]
+    },
+    {
+      "module": "witwin.channel_native.montecarlo.bdpt",
+      "exports": [
+        {
+          "name": "BDPTPathSamples",
+          "kind": "class",
+          "target": "witwin.channel_native.montecarlo.bdpt.result.BDPTPathSamples",
+          "contract_sha256": "be1eec13744fcf212ee7ea69c726d9c9b4c74e4c7908954ee4324b63687092b6"
+        },
+        {
+          "name": "Config",
+          "kind": "class",
+          "target": "witwin.channel_native.montecarlo.bdpt.config.Config",
+          "contract_sha256": "f9ac0dec7f0c8abe46b4ed4868f5be8daf16ef8a54802047e2434b43387edd19"
+        },
+        {
+          "name": "Result",
+          "kind": "class",
+          "target": "witwin.channel_native.montecarlo.bdpt.result.Result",
+          "contract_sha256": "b3826d00d8c4419efecae60aacaeff70d1a42350fdc28527b6a2a688cec5bee6"
+        },
+        {
+          "name": "solve",
+          "kind": "function",
+          "target": "witwin.channel_native.montecarlo.bdpt.solver.solve",
+          "contract_sha256": "b01f569889f97d7adace9861e449e5db34d300b2e590e58e7d67d3c0b483a7d6",
+          "signature": "(scene: Scene, config: Config)"
+        }
+      ]
+    }
+  ]
+}
