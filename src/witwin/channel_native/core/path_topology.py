@@ -44,6 +44,7 @@ from witwin.channel_native.propagation.geometry.kernels import (
 )
 from witwin.channel_native.propagation.geometry.reevaluate import (
     _PLANE_GROUP_QUANTIZATION,  # noqa: F401 - compatibility re-export
+    _cached_coplanar_face_groups,  # noqa: F401 - compatibility re-export
     _coplanar_face_groups,  # noqa: F401 - compatibility re-export
     _geometry_participates_in_ad,  # noqa: F401 - compatibility re-export
     _opposite_vertex_ids,  # noqa: F401 - compatibility re-export
@@ -72,11 +73,15 @@ from witwin.channel_native.propagation.topology.kernels.sampling import (
 from witwin.channel_native.propagation.topology.concatenate import (
     _block_sequence_width,  # noqa: F401 - compatibility re-export
     _canonical_selection_order,
+    _empty_path_block,  # noqa: F401 - compatibility re-export
     _interaction_type_sequence,
     _pad_topology_sequences,
     _sort_order,  # noqa: F401 - compatibility re-export
     canonical_sequence_key,  # noqa: F401 - compatibility re-export
     concatenate_path_blocks,
+)
+from witwin.channel_native.propagation.topology.export import (
+    _ensure_topology_fields,  # noqa: F401 - compatibility re-export
 )
 from witwin.channel_native.propagation.topology.discovery.reflection import (
     _MAX_MULTIBOUNCE_FACE_SEQUENCES,  # noqa: F401 - compatibility re-export
