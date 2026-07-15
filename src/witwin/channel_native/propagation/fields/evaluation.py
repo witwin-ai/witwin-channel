@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
 from typing import TYPE_CHECKING
@@ -136,6 +137,47 @@ def _rough_reflection_factor(
     return factor
 
 
+def _evaluate_los_fields(
+    topology: TopologyBatch,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    source_power: torch.Tensor,
+    tx_pol: torch.Tensor,
+    rx_pol: torch.Tensor,
+    los_field_op: Callable[..., dict[str, torch.Tensor]],
+    ledger: AdLaunchLedger | None,
+    field_xyz: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    path_length: torch.Tensor,
+    delay: torch.Tensor,
+    direction: torch.Tensor,
+    launch_count: int,
+) -> int:
+    los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
+    if int(los_rows.shape[0]) > 0:
+        los_args = (
+            source[los_rows].contiguous(),
+            target[los_rows].contiguous(),
+            source_power[los_rows].contiguous(),
+            tx_pol[los_rows].contiguous(),
+            rx_pol[los_rows].contiguous(),
+        )
+        if ledger is not None:
+            ledger.add(*los_args)
+        evaluated = los_field_op(*los_args)
+        field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
+        coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
+        path_field.index_copy_(0, los_rows, evaluated["path_field"])
+        path_gain.index_copy_(0, los_rows, evaluated["path_gain"])
+        path_length.index_copy_(0, los_rows, evaluated["path_length_m"])
+        delay.index_copy_(0, los_rows, evaluated["delay_s"])
+        direction.index_copy_(0, los_rows, evaluated["direction"])
+        launch_count += 1
+    return launch_count
+
+
 def _evaluate_shared_fields(
     scene: Scene,
     compiled: object,
@@ -241,26 +283,24 @@ def _evaluate_shared_fields(
     direction = topology.field_direction.clone()
     launch_count = topology.launch_count
 
-    los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
-    if int(los_rows.shape[0]) > 0:
-        los_args = (
-            source[los_rows].contiguous(),
-            target[los_rows].contiguous(),
-            source_power[los_rows].contiguous(),
-            tx_pol[los_rows].contiguous(),
-            rx_pol[los_rows].contiguous(),
-        )
-        if ledger is not None:
-            ledger.add(*los_args)
-        evaluated = los_field_op(*los_args)
-        field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
-        path_field.index_copy_(0, los_rows, evaluated["path_field"])
-        path_gain.index_copy_(0, los_rows, evaluated["path_gain"])
-        path_length.index_copy_(0, los_rows, evaluated["path_length_m"])
-        delay.index_copy_(0, los_rows, evaluated["delay_s"])
-        direction.index_copy_(0, los_rows, evaluated["direction"])
-        launch_count += 1
+    launch_count = _evaluate_los_fields(
+        topology,
+        source,
+        target,
+        source_power,
+        tx_pol,
+        rx_pol,
+        los_field_op,
+        ledger,
+        field_xyz,
+        coefficient,
+        path_field,
+        path_gain,
+        path_length,
+        delay,
+        direction,
+        launch_count,
+    )
 
     material: dict[str, torch.Tensor] | None = None
     for depth_value in range(1, 6):

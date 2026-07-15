@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -18,6 +20,9 @@ from witwin.channel_native.runtime import autograd_contracts
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
+_COMPATIBILITY_EXPORTS = frozenset(
+    {"_rough_reflection_factor", "_evaluate_shared_fields"}
+)
 _CONTRACTS = {
     "_rough_reflection_factor": {
         "signature": (
@@ -33,6 +38,23 @@ _CONTRACTS = {
             "0261c6cd651790319819a3e1d3a1d14f93a9c4a771bce7933f993f75913a5fa5"
         ),
     },
+    "_evaluate_los_fields": {
+        "signature": (
+            "(topology: TopologyBatch, source: torch.Tensor, target: torch.Tensor, "
+            "source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: "
+            "torch.Tensor, los_field_op: Callable[..., dict[str, torch.Tensor]], "
+            "ledger: AdLaunchLedger | None, field_xyz: torch.Tensor, coefficient: "
+            "torch.Tensor, path_field: torch.Tensor, path_gain: torch.Tensor, "
+            "path_length: torch.Tensor, delay: torch.Tensor, direction: "
+            "torch.Tensor, launch_count: int)"
+        ),
+        "body_sha256": (
+            "b5b86149c055676fd8565a1000f28d33db1cf72641e8c0d374b58950b977e9da"
+        ),
+        "normalized_ast_sha256": (
+            "03816f9cd798d1e0d947a97b6dd964b354fc566b965cf540c30b31a893434cdc"
+        ),
+    },
     "_evaluate_shared_fields": {
         "signature": (
             "(scene: Scene, compiled: object, topology: TopologyBatch, "
@@ -41,17 +63,36 @@ _CONTRACTS = {
             "ad_mode: str='none', frequency_value: float | None=None)"
         ),
         "body_sha256": (
-            "98624e873cdbfc8caa1e575ccb40ce2e3293700653892c265a9083790c3d1438"
+            "eefc058a136097a3830fa8dcc23ce8f0c9620c9c78bfe3c81765b7bd818801c6"
         ),
         "normalized_ast_sha256": (
-            "0cc5f7790c24b0d23718eb396f9ed934d24ccdde123300760fc21d3180a1b714"
+            "85dc45ea6f4bd7edf8fc651298dec5728a324c2b02311d66934a478e59fe49f7"
         ),
     },
 }
 
 
+def _function_node(name: str) -> ast.FunctionDef:
+    source = Path(evaluation.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    return next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+
+
+def _body_sha256(statements: list[ast.stmt]) -> str:
+    dumped = ast.dump(
+        ast.Module(body=statements, type_ignores=[]),
+        annotate_fields=True,
+        include_attributes=False,
+    )
+    return hashlib.sha256(dumped.encode("utf-8")).hexdigest()
+
+
 def test_evaluation_helpers_are_same_object_compatibility_exports():
-    for name in _CONTRACTS:
+    for name in _COMPATIBILITY_EXPORTS:
         owner = getattr(evaluation, name)
 
         assert owner.__module__ == evaluation.__name__
@@ -71,6 +112,87 @@ def test_evaluation_preserves_frozen_function_contracts():
         assert definition.signature == contract["signature"]
         assert definition.body_sha256 == contract["body_sha256"]
         assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+
+
+def test_los_field_extraction_preserves_frozen_prefix_segment():
+    helper = _function_node("_evaluate_los_fields")
+
+    assert _body_sha256(helper.body[:-1]) == (
+        "31115ef524f94736f69198345a846c03407da5849ed496fe795916864e047a12"
+    )
+    assert ast.dump(helper.body[-1], include_attributes=False) == (
+        "Return(value=Name(id='launch_count', ctx=Load()))"
+    )
+
+
+def test_shared_field_orchestrator_preserves_component_order_and_clone_count():
+    orchestrator = _function_node("_evaluate_shared_fields")
+    clones = sorted(
+        (
+            call
+            for call in ast.walk(orchestrator)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr == "clone"
+        ),
+        key=lambda call: call.lineno,
+    )
+    assert len(clones) == 7
+    assert [
+        call.func.value.attr
+        for call in clones
+        if isinstance(call.func.value, ast.Attribute)
+    ] == [
+        "field_xyz",
+        "coefficient",
+        "path_field",
+        "path_gain",
+        "path_length_m",
+        "delay_s",
+        "field_direction",
+    ]
+
+    component_markers = []
+    for statement in orchestrator.body:
+        if isinstance(statement, ast.Assign):
+            target_names = {
+                target.id for target in statement.targets if isinstance(target, ast.Name)
+            }
+            if (
+                target_names == {"launch_count"}
+                and isinstance(statement.value, ast.Call)
+                and isinstance(statement.value.func, ast.Name)
+                and statement.value.func.id == "_evaluate_los_fields"
+            ):
+                component_markers.append("los")
+            elif target_names == {"material"}:
+                component_markers.append("material")
+            elif target_names & {"transmission_rows", "diffraction_rows", "coupled_rows"}:
+                component_markers.extend(target_names)
+        elif (
+            isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+            and statement.target.id == "material"
+        ):
+            component_markers.append("material")
+        elif (
+            isinstance(statement, ast.For)
+            and isinstance(statement.target, ast.Name)
+            and statement.target.id == "depth_value"
+        ):
+            component_markers.append("reflection")
+        elif isinstance(statement, ast.Return):
+            component_markers.append("epilogue")
+
+    assert component_markers == [
+        "los",
+        "material",
+        "reflection",
+        "transmission_rows",
+        "diffraction_rows",
+        "coupled_rows",
+        "epilogue",
+    ]
 
 
 def test_evaluation_preserves_nested_material_tuple_body():
@@ -119,7 +241,7 @@ def test_evaluation_uses_canonical_dependencies():
     ),
 )
 def test_evaluation_import_order_preserves_facade_identity(imports: str):
-    names = repr(tuple(_CONTRACTS))
+    names = repr(tuple(_COMPATIBILITY_EXPORTS))
     code = (
         f"{imports}; "
         "from witwin.channel_native.runtime import autograd_contracts; "
