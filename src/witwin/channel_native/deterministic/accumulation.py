@@ -9,7 +9,7 @@ from .kernels import accumulation as accumulation_kernels
 from witwin.channel_native.propagation.fields.kernels import (
     deterministic as field_kernels,
 )
-from witwin.channel_native.core.path_topology import (
+from witwin.channel_native.propagation.geometry.endpoints import (
     ReceiverLayout,
     apply_receiver_layout,
 )
