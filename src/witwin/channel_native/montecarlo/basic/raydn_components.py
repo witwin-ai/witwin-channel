@@ -24,13 +24,15 @@ from witwin.channel_native.core.kernels.ops import (
     mc_sionna_diffraction_tape_accumulate_ad,
     mc_store_component_map,
     mc_store_scaled_component_map,
-    mc_surface_group_edge_candidates,
 )
 from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.geometry.kernels import (
+    primitives as geometry_primitives,
+)
 from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
@@ -486,7 +488,7 @@ def reflection_component_maps_with_wedges(
 
 
 def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    return mc_surface_group_edge_candidates(
+    return geometry_primitives.mc_surface_group_edge_candidates(
         records.vertices,
         records.faces,
         records.face_normals,

@@ -31,6 +31,17 @@ from .bridge import (
     raydn_trace_reflections_forward,
     raydn_visibility_forward,
 )
+from .primitives import (
+    bdpt_diffraction_edge_geometry,
+    bdpt_surface_group_edge_candidates,
+    core_diffraction_edge_count,
+    deterministic_face_groups,
+    deterministic_normalize_vec3,
+    deterministic_reflect_points,
+    deterministic_surface_face_groups,
+    mc_diffraction_edge_geometry,
+    mc_surface_group_edge_candidates,
+)
 
 
 __all__ = [
@@ -38,12 +49,21 @@ __all__ = [
     "_RaydnReflectionEpcPathsAdFunction",
     "_RaydnTraceReflectionsAdFunction",
     "_epc_paths_frozen_winner_checks",
+    "bdpt_diffraction_edge_geometry",
     "bdpt_diffraction_accumulation_forward",
     "bdpt_diffraction_discover_edges",
     "bdpt_diffraction_discover_edges_counted",
     "bdpt_intersect_forward",
     "bdpt_reflection_accumulation_forward",
+    "bdpt_surface_group_edge_candidates",
     "bdpt_visibility_forward",
+    "core_diffraction_edge_count",
+    "deterministic_face_groups",
+    "deterministic_normalize_vec3",
+    "deterministic_reflect_points",
+    "deterministic_surface_face_groups",
+    "mc_diffraction_edge_geometry",
+    "mc_surface_group_edge_candidates",
     "raydn_diffraction_accumulation_forward",
     "raydn_diffraction_discover_edges",
     "raydn_diffraction_discover_edges_counted",

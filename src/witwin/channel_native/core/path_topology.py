@@ -16,6 +16,9 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 from witwin.channel_native.propagation.geometry.kernels import (
     autograd as geometry_autograd,
 )
+from witwin.channel_native.propagation.geometry.kernels import (
+    primitives as geometry_primitives,
+)
 from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
@@ -228,7 +231,7 @@ def _coplanar_face_groups(
     if surface_ids.ndim != 1 or surface_ids.shape[0] != tri_a.shape[0]:
         raise ValueError("surface_ids must have shape (face_count,)")
 
-    return ops.deterministic_face_groups(
+    return geometry_primitives.deterministic_face_groups(
         tri_a.to(dtype=torch.float32).contiguous(),
         normals.to(dtype=torch.float32).contiguous(),
         surface_ids.to(device=tri_a.device, dtype=torch.long).contiguous(),
@@ -847,7 +850,7 @@ def _reflection_geometry_ad(
     tri_a = ops.deterministic_face_anchor_points(
         records.vertices.contiguous(), records.faces.contiguous()
     )
-    normals_table = ops.deterministic_normalize_vec3(
+    normals_table = geometry_primitives.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     groups = _cached_coplanar_face_groups(
@@ -1248,7 +1251,7 @@ def _evaluate_shared_fields(
                 rx_pol[diffraction_rows].contiguous(),
             )
         else:
-            arrival = ops.deterministic_normalize_vec3(
+            arrival = geometry_primitives.deterministic_normalize_vec3(
                 (
                     target[diffraction_rows]
                     - topology.interaction_positions[diffraction_rows, 0]
@@ -1313,7 +1316,7 @@ def _evaluate_shared_fields(
             tri_a = ops.deterministic_face_anchor_points(
                 records.vertices.contiguous(), records.faces.contiguous()
             )
-            normals_table = ops.deterministic_normalize_vec3(
+            normals_table = geometry_primitives.deterministic_normalize_vec3(
                 records.face_normals.contiguous(), eps=1.0e-6
             )
         for component_id, reverse_order in ((3, False), (4, True)):
@@ -1491,7 +1494,7 @@ def _reflection_topology_order1(
     records = raydn.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
-    normals = ops.deterministic_normalize_vec3(
+    normals = geometry_primitives.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     if faces.shape[0] == 0:
@@ -1674,7 +1677,7 @@ def _reflection_topology_order1(
 def _reflect_points(
     points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor
 ) -> torch.Tensor:
-    return ops.deterministic_reflect_points(
+    return geometry_primitives.deterministic_reflect_points(
         points.contiguous(), plane_points.contiguous(), normals.contiguous()
     )
 
@@ -1803,7 +1806,7 @@ def _reflection_topology_multibounce(
     records = raydn.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
-    normals = ops.deterministic_normalize_vec3(
+    normals = geometry_primitives.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     face_count = int(faces.shape[0])
@@ -2309,7 +2312,7 @@ def _coupled_reflection_diffraction_topology_order2(
     if int(faces.shape[0]) == 0:
         return _ensure_topology_fields(_empty_path_block(device)), 0, 0
     vertices = records.vertices.contiguous()
-    normals = ops.deterministic_normalize_vec3(
+    normals = geometry_primitives.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     tri_a = ops.deterministic_face_anchor_points(vertices, faces)
@@ -2538,7 +2541,9 @@ def _transmission_topology(
     target = rx_positions[rx_index].contiguous()
     offset = target - source
     total_length = offset.norm(dim=-1)
-    direction = ops.deterministic_normalize_vec3(offset.contiguous(), eps=1.0e-9)
+    direction = geometry_primitives.deterministic_normalize_vec3(
+        offset.contiguous(), eps=1.0e-9
+    )
 
     positions = torch.zeros(
         (pair_count, max_depth, 3), device=device, dtype=torch.float32
@@ -2584,7 +2589,7 @@ def _transmission_topology(
             continue
         kept = ~overflow
         hit_position = hit["p"][blocked][kept]
-        hit_normal = ops.deterministic_normalize_vec3(
+        hit_normal = geometry_primitives.deterministic_normalize_vec3(
             hit["geo_n"][blocked][kept].contiguous(), eps=1.0e-9
         )
         kept_prim = hit_prim[blocked][kept]

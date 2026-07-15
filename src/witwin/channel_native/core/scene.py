@@ -14,13 +14,16 @@ from .runtime.material_store import MaterialStore
 from .runtime.raydn import RayDNScene, build_scene_from_structures
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
-from .kernels.ops import bdpt_zero_matrix, core_diffraction_edge_count, core_pack_int2
+from .kernels.ops import bdpt_zero_matrix, core_pack_int2
 from .materials import (
     GEOMETRY_MODE_IDS,
     MATERIAL_ABI_VERSION,
     PhaseScreen,
     SurfaceAssignment,
     effective_sigma_e,
+)
+from witwin.channel_native.propagation.geometry.kernels import (
+    primitives as geometry_primitives,
 )
 
 
@@ -214,7 +217,7 @@ def _diffraction_edge_count_from_raydn_scene(
     raydn_scene: RayDNScene, edge_policy: EdgePolicy
 ) -> int:
     records = raydn_scene.edge_records()
-    return core_diffraction_edge_count(
+    return geometry_primitives.core_diffraction_edge_count(
         vertices=records.vertices,
         faces=records.faces,
         face_normals=records.face_normals,
