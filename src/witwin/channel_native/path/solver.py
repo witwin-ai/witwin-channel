@@ -15,8 +15,8 @@ from witwin.channel_native.core.scene_tensors import (
     transmitter_positions as _shared_transmitter_positions,
 )
 from witwin.channel_native.propagation.enumerated import append_scattering_paths
-from witwin.channel_native.propagation.models.adapters import (
-    evaluated_paths_from_topology_batch,
+from witwin.channel_native.propagation.topology.export import (
+    export_evaluated_rows,
 )
 
 from .config import Config
@@ -241,7 +241,7 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
     scattering_info = None
     if "scattering" in config.components:
         topology, scattering_info = append_scattering_paths(scene, config, topology)
-    evaluated, sidecars = evaluated_paths_from_topology_batch(topology)
+    evaluated, sidecars = export_evaluated_rows(topology)
     path_count = evaluated.row_count
     if ad_instrumented:
         torch.cuda.synchronize()

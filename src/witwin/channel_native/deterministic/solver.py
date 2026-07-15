@@ -24,8 +24,8 @@ from witwin.channel_native.propagation.geometry.endpoints import (
 from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_component_counts,
 )
-from witwin.channel_native.propagation.models.adapters import (
-    evaluated_paths_from_topology_batch,
+from witwin.channel_native.propagation.topology.export import (
+    export_evaluated_rows,
 )
 from witwin.channel_native.core.components import component_availability_status
 
@@ -235,7 +235,7 @@ def solve(scene: Scene, config: Config) -> Result:
         path_result, scattering_info = append_scattering_paths(
             scene, config, path_result
         )
-    evaluated, sidecars = evaluated_paths_from_topology_batch(path_result)
+    evaluated, sidecars = export_evaluated_rows(path_result)
     topology = evaluated.topology
     path_count = evaluated.row_count
     component_counts = deterministic_component_counts(topology.component_id)
