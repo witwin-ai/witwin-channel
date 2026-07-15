@@ -600,6 +600,30 @@ def _module_index(
     return definitions, imports
 
 
+def _class_module_overrides(tree: ast.Module) -> dict[str, str]:
+    """Return literal ``Class.__module__`` compatibility assignments."""
+    defined_classes: set[str] = set()
+    overrides: dict[str, str] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            defined_classes.add(node.name)
+            overrides.pop(node.name, None)
+            continue
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Attribute)
+            and node.targets[0].attr == "__module__"
+            and isinstance(node.targets[0].value, ast.Name)
+            and node.targets[0].value.id in defined_classes
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            continue
+        overrides[node.targets[0].value.id] = node.value.value
+    return overrides
+
+
 def _decorator_names(
     node: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
 ) -> list[str]:
@@ -691,10 +715,12 @@ def api_manifest(repo: Path, public_modules: Sequence[str]) -> dict[str, object]
     indices: dict[
         str, tuple[dict[str, ast.AST], dict[str, tuple[str, str | None]]]
     ] = {}
+    class_module_overrides: dict[str, dict[str, str]] = {}
     for module, path in paths.items():
         _, tree = _read_python(path)
         parsed[module] = (path, tree)
         indices[module] = _module_index(module, path, tree)
+        class_module_overrides[module] = _class_module_overrides(tree)
 
     def describe(
         module: str, name: str, seen: set[tuple[str, str]]
@@ -707,7 +733,12 @@ def api_manifest(repo: Path, public_modules: Sequence[str]) -> dict[str, object]
             return {"target": f"{module}.{name}", "kind": "external-or-missing"}
         definitions, imports = indices[module]
         if name in definitions:
-            return _describe_definition(module, definitions[name])
+            description = _describe_definition(module, definitions[name])
+            if isinstance(definitions[name], ast.ClassDef) and (
+                compatibility_module := class_module_overrides[module].get(name)
+            ):
+                description["target"] = f"{compatibility_module}.{name}"
+            return description
         if name in imports:
             target_module, target_name = imports[name]
             if target_name is None:

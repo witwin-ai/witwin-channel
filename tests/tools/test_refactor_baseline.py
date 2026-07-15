@@ -69,6 +69,84 @@ def solve(scene, config: Config | None = None):
     ]
 
 
+def test_api_manifest_keeps_class_definition_module_without_override(tmp_path: Path):
+    _write(
+        tmp_path / "src/witwin/channel_native/api.py",
+        "class Config:\n    pass\n\n__all__ = ['Config']\n",
+    )
+
+    manifest = baseline.api_manifest(tmp_path, ["witwin.channel_native.api"])
+
+    assert manifest["modules"][0]["objects"][0]["target"] == (
+        "witwin.channel_native.api.Config"
+    )
+
+
+def test_api_manifest_uses_literal_class_module_override(tmp_path: Path):
+    _write(
+        tmp_path / "src/witwin/channel_native/api.py",
+        """
+class Config:
+    pass
+
+Config.__module__ = "legacy.compat.path"
+__all__ = ["Config"]
+""",
+    )
+
+    manifest = baseline.api_manifest(tmp_path, ["witwin.channel_native.api"])
+
+    assert manifest["modules"][0]["objects"][0]["target"] == (
+        "legacy.compat.path.Config"
+    )
+
+
+def test_api_manifest_ignores_nonliteral_and_unrelated_assignments(tmp_path: Path):
+    _write(
+        tmp_path / "src/witwin/channel_native/api.py",
+        """
+compatibility_module = "legacy.compat.path"
+
+class Config:
+    pass
+
+Config.__module__ = compatibility_module
+Config.compatibility_module = "legacy.compat.unrelated"
+__all__ = ["Config"]
+""",
+    )
+
+    manifest = baseline.api_manifest(tmp_path, ["witwin.channel_native.api"])
+
+    assert manifest["modules"][0]["objects"][0]["target"] == (
+        "witwin.channel_native.api.Config"
+    )
+
+
+def test_api_manifest_resolves_literal_module_override_through_reexport(
+    tmp_path: Path,
+):
+    _write(
+        tmp_path / "src/witwin/channel_native/__init__.py",
+        "from .api import Config\n__all__ = ['Config']\n",
+    )
+    _write(
+        tmp_path / "src/witwin/channel_native/api.py",
+        """
+class Config:
+    pass
+
+Config.__module__ = "legacy.compat.path"
+""",
+    )
+
+    manifest = baseline.api_manifest(tmp_path, ["witwin.channel_native"])
+
+    assert manifest["modules"][0]["objects"][0]["target"] == (
+        "legacy.compat.path.Config"
+    )
+
+
 def test_python_body_hash_ignores_locations_comments_and_formatting(tmp_path: Path):
     first = tmp_path / "first"
     second = tmp_path / "second"
