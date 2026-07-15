@@ -1,8 +1,8 @@
 """Deterministic rough-surface scattering (plan 05 wave 3, contract section 6).
 
-Appends single-bounce ``component_id=6`` scattering rows to a canonical
-:class:`~witwin.channel_native.core.path_topology.TopologyBatch` after the
-specular components were evaluated. Two mutually exclusive per-surface modes:
+Appends single-bounce ``component_id=6`` scattering rows through one canonical
+tensor-concatenation owner shared by the legacy ``TopologyBatch`` wrapper and
+the typed ``EvaluatedPaths`` bridge. Two mutually exclusive per-surface modes:
 
 - ``ensemble`` (production): Kirchhoff ensemble BSDF patch quadrature.
   Incoherent POWER rows, one row per visible patch sample.
@@ -64,7 +64,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import torch
 from witwin.channel_native.core.tensor_math import normalize_vec3
@@ -83,6 +83,11 @@ from witwin.channel_native.propagation.enumerated.contracts import (
     TopologyBatch,
     TopologyConfig,
 )
+from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel_native.propagation.models.fields import PathFields
+from witwin.channel_native.propagation.models.geometry import PathGeometry
+from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.propagation.topology.export import EvaluatedPathSidecars
 from witwin.channel_native.core.materials import PhaseScreen
 from witwin.channel_native.physics.oracle import C0
 from witwin.channel_native.scattering import eval_bsdf, patch_phase_integral
@@ -818,39 +823,73 @@ def _realization_rows(
                 )
 
 
-def _extend_topology(
-    topology: TopologyBatch,
+class _ExtendedScatteringRows(TypedDict):
+    valid: torch.Tensor
+    tx_id: torch.Tensor
+    rx_id: torch.Tensor
+    depth: torch.Tensor
+    component_id: torch.Tensor
+    primitive_id: torch.Tensor
+    edge_id: torch.Tensor
+    path_length_m: torch.Tensor
+    delay_s: torch.Tensor
+    path_gain: torch.Tensor
+    path_field: torch.Tensor
+    field_xyz: torch.Tensor
+    coefficient: torch.Tensor
+    field_direction: torch.Tensor
+    interaction_position: torch.Tensor
+    interaction_normal: torch.Tensor
+    material_id: torch.Tensor
+    primitive_sequence: torch.Tensor
+    material_sequence: torch.Tensor
+    interaction_type: torch.Tensor
+    interaction_positions: torch.Tensor
+    interaction_normals: torch.Tensor
+
+
+def _extended_scattering_rows(
+    source: TopologyBatch | EvaluatedPaths,
     rows: dict[str, torch.Tensor],
-    *,
-    launch_count_delta: int,
-    candidate_count_delta: int,
-    guardrail_count_delta: int,
-) -> TopologyBatch:
+) -> _ExtendedScatteringRows:
+    """Single 22-tensor cat owner shared by the legacy and typed entrypoints."""
+
+    if isinstance(source, EvaluatedPaths):
+        topology = source.topology
+        geometry = source.geometry
+        fields = source.fields
+    else:
+        topology = source
+        geometry = source
+        fields = source
+
     device = topology.valid.device
     count = int(rows["path_gain"].shape[0])
     width = int(topology.primitive_sequence.shape[1])
+    primitive_sequence_base = topology.primitive_sequence
+    material_sequence_base = topology.material_sequence
+    interaction_type_base = topology.interaction_type
+    interaction_positions_base = geometry.interaction_positions
+    interaction_normals_base = geometry.interaction_normals
     if width < 1:
         # A scattering-only request has no specular block from which to infer
         # sequence width. Give any existing zero-depth rows one inactive slot
         # before appending the single SCATTERING interaction.
         existing = int(topology.valid.numel())
-        topology = replace(
-            topology,
-            primitive_sequence=torch.full(
-                (existing, 1), -1, device=device, dtype=torch.int32
-            ),
-            material_sequence=torch.full(
-                (existing, 1), -1, device=device, dtype=torch.int32
-            ),
-            interaction_type=torch.zeros(
-                (existing, 1), device=device, dtype=torch.int32
-            ),
-            interaction_positions=torch.zeros(
-                (existing, 1, 3), device=device, dtype=torch.float32
-            ),
-            interaction_normals=torch.zeros(
-                (existing, 1, 3), device=device, dtype=torch.float32
-            ),
+        primitive_sequence_base = torch.full(
+            (existing, 1), -1, device=device, dtype=torch.int32
+        )
+        material_sequence_base = torch.full(
+            (existing, 1), -1, device=device, dtype=torch.int32
+        )
+        interaction_type_base = torch.zeros(
+            (existing, 1), device=device, dtype=torch.int32
+        )
+        interaction_positions_base = torch.zeros(
+            (existing, 1, 3), device=device, dtype=torch.float32
+        )
+        interaction_normals_base = torch.zeros(
+            (existing, 1, 3), device=device, dtype=torch.float32
         )
         width = 1
 
@@ -873,9 +912,10 @@ def _extend_topology(
     def cat(existing: torch.Tensor, new: torch.Tensor) -> torch.Tensor:
         return torch.cat((existing, new.to(existing.dtype))).contiguous()
 
-    return replace(
-        topology,
-        valid=cat(topology.valid, torch.ones((count,), device=device, dtype=torch.bool)),
+    return _ExtendedScatteringRows(
+        valid=cat(
+            topology.valid, torch.ones((count,), device=device, dtype=torch.bool)
+        ),
         tx_id=cat(topology.tx_id, rows["tx_id"]),
         rx_id=cat(topology.rx_id, rows["rx_id"]),
         depth=cat(topology.depth, depth),
@@ -885,39 +925,102 @@ def _extend_topology(
             topology.edge_id,
             torch.full((count,), -1, device=device, dtype=torch.int32),
         ),
-        path_length_m=cat(topology.path_length_m, rows["path_length_m"]),
-        delay_s=cat(topology.delay_s, rows["path_length_m"] / C0),
-        path_gain=cat(topology.path_gain, rows["path_gain"]),
-        path_field=cat(topology.path_field, rows["path_field"]),
-        field_xyz=cat(topology.field_xyz, field_xyz),
-        coefficient=cat(topology.coefficient, rows["coefficient"]),
-        field_direction=cat(topology.field_direction, rows["direction"]),
-        interaction_position=cat(topology.interaction_position, rows["position"]),
-        interaction_normal=cat(topology.interaction_normal, rows["normal"]),
+        path_length_m=cat(geometry.path_length_m, rows["path_length_m"]),
+        delay_s=cat(geometry.delay_s, rows["path_length_m"] / C0),
+        path_gain=cat(fields.path_gain, rows["path_gain"]),
+        path_field=cat(fields.path_field, rows["path_field"]),
+        field_xyz=cat(fields.field_xyz, field_xyz),
+        coefficient=cat(fields.coefficient, rows["coefficient"]),
+        field_direction=cat(geometry.field_direction, rows["direction"]),
+        interaction_position=cat(geometry.interaction_position, rows["position"]),
+        interaction_normal=cat(geometry.interaction_normal, rows["normal"]),
         material_id=cat(topology.material_id, rows["material_id"]),
-        primitive_sequence=cat(topology.primitive_sequence, primitive_sequence),
-        material_sequence=cat(topology.material_sequence, material_sequence),
-        interaction_type=cat(topology.interaction_type, interaction_type),
-        interaction_positions=cat(topology.interaction_positions, positions),
-        interaction_normals=cat(topology.interaction_normals, normals),
+        primitive_sequence=cat(primitive_sequence_base, primitive_sequence),
+        material_sequence=cat(material_sequence_base, material_sequence),
+        interaction_type=cat(interaction_type_base, interaction_type),
+        interaction_positions=cat(interaction_positions_base, positions),
+        interaction_normals=cat(interaction_normals_base, normals),
+    )
+
+
+def _extend_topology(
+    topology: TopologyBatch,
+    rows: dict[str, torch.Tensor],
+    *,
+    launch_count_delta: int,
+    candidate_count_delta: int,
+    guardrail_count_delta: int,
+) -> TopologyBatch:
+    return replace(
+        topology,
+        **_extended_scattering_rows(topology, rows),
         launch_count=topology.launch_count + launch_count_delta,
         candidate_count=topology.candidate_count + candidate_count_delta,
         guardrail_count=topology.guardrail_count + guardrail_count_delta,
     )
 
 
-def append_scattering_paths(
-    scene: Scene, config: TopologyConfig, topology: TopologyBatch
-) -> tuple[TopologyBatch, dict[str, Any]]:
-    """Append component_id=6 scattering rows and return (topology, info).
+def _extend_evaluated_paths(
+    evaluated: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars,
+    rows: dict[str, torch.Tensor],
+    *,
+    launch_count_delta: int,
+    candidate_count_delta: int,
+    guardrail_count_delta: int,
+) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
+    extended = _extended_scattering_rows(evaluated, rows)
+    topology = PathTopology(
+        valid=extended["valid"],
+        tx_id=extended["tx_id"],
+        rx_id=extended["rx_id"],
+        depth=extended["depth"],
+        component_id=extended["component_id"],
+        primitive_id=extended["primitive_id"],
+        edge_id=extended["edge_id"],
+        material_id=extended["material_id"],
+        primitive_sequence=extended["primitive_sequence"],
+        material_sequence=extended["material_sequence"],
+        interaction_type=extended["interaction_type"],
+    )
+    geometry = PathGeometry(
+        row_identity=topology.row_identity,
+        path_length_m=extended["path_length_m"],
+        delay_s=extended["delay_s"],
+        field_direction=extended["field_direction"],
+        interaction_position=extended["interaction_position"],
+        interaction_normal=extended["interaction_normal"],
+        interaction_positions=extended["interaction_positions"],
+        interaction_normals=extended["interaction_normals"],
+    )
+    fields = PathFields(
+        row_identity=topology.row_identity,
+        path_gain=extended["path_gain"],
+        path_field=extended["path_field"],
+        field_xyz=extended["field_xyz"],
+        coefficient=extended["coefficient"],
+    )
+    evaluated = EvaluatedPaths(
+        topology=topology,
+        geometry=geometry,
+        fields=fields,
+    )
+    sidecars = replace(
+        sidecars,
+        execution=replace(
+            sidecars.execution,
+            launch_count=sidecars.execution.launch_count + launch_count_delta,
+            candidate_count=(
+                sidecars.execution.candidate_count + candidate_count_delta
+            ),
+            guardrail_count=sidecars.execution.guardrail_count + guardrail_count_delta,
+        ),
+    )
+    return evaluated, sidecars
 
-    No-ops (empty info) when scattering was not requested, ``max_depth < 1``
-    or the scene carries no rough/phase-screen surfaces. Scattering rows are
-    appended after the canonical specular selection, so ``max_paths`` does
-    not apply to them; their budget is ``scattering_max_paths_per_pair``.
-    """
 
-    info: dict[str, Any] = {
+def _scattering_info() -> dict[str, Any]:
+    return {
         "scattering_paths_incoherent": True,
         "accumulation": "power_domain",
         "ensemble_face_count": 0,
@@ -929,13 +1032,15 @@ def append_scattering_paths(
         "path_count": 0,
         "capped_path_count": 0,
     }
-    components = set(config.components)
-    if "scattering" not in components or int(config.max_depth) < 1:
-        return topology, info
-    if not scene.structures:
-        return topology, info
 
-    device = topology.valid.device
+
+def _collect_scattering_rows(
+    scene: Scene,
+    config: TopologyConfig,
+    *,
+    device: torch.device,
+    info: dict[str, Any],
+) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = scene.compile()
     screens = _realization_structures(compiled)
     face_material = compiled.assignments.face_material_id.to(
@@ -955,7 +1060,7 @@ def append_scattering_paths(
     ).reshape(-1)
     info["realization_structure_count"] = len(screens)
     if int(ensemble_faces.numel()) == 0 and not screens:
-        return topology, info
+        return None, 0, 0, 0
     if not compiled.raydn.available:
         raise RuntimeError(
             "deterministic scattering requires RayDN native scene capability"
@@ -964,7 +1069,7 @@ def append_scattering_paths(
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
     rx_positions, _layout = receiver_positions_and_layout(scene, device=device)
     if tx_positions.numel() == 0 or rx_positions.numel() == 0:
-        return topology, info
+        return None, 0, 0, 0
     tx_pol = transmitter_polarizations(scene, device=device)
     rx_pol = receiver_polarizations(scene, device=device)
     records = compiled.raydn.edge_records()
@@ -1006,7 +1111,7 @@ def append_scattering_paths(
 
     rows = collector.cat()
     if rows is None:
-        return topology, info
+        return None, 0, 0, 0
 
     candidate_count = int(rows["path_gain"].shape[0])
     cap = int(getattr(config, "scattering_max_paths_per_pair", 4096))
@@ -1031,11 +1136,81 @@ def append_scattering_paths(
         rows = {name: value[keep] for name, value in rows.items()}
     info["path_count"] = int(rows["path_gain"].shape[0])
 
+    return (
+        rows,
+        info["visibility_launch_count"] - launch_before,
+        candidate_count,
+        dropped,
+    )
+
+
+def append_scattering_paths(
+    scene: Scene, config: TopologyConfig, topology: TopologyBatch
+) -> tuple[TopologyBatch, dict[str, Any]]:
+    """Append component_id=6 scattering rows and return (topology, info).
+
+    No-ops (empty info) when scattering was not requested, ``max_depth < 1``
+    or the scene carries no rough/phase-screen surfaces. Scattering rows are
+    appended after the canonical specular selection, so ``max_paths`` does
+    not apply to them; their budget is ``scattering_max_paths_per_pair``.
+    """
+
+    info = _scattering_info()
+    components = set(config.components)
+    if "scattering" not in components or int(config.max_depth) < 1:
+        return topology, info
+    if not scene.structures:
+        return topology, info
+
+    rows, launch_delta, candidate_delta, guardrail_delta = _collect_scattering_rows(
+        scene,
+        config,
+        device=topology.valid.device,
+        info=info,
+    )
+    if rows is None:
+        return topology, info
+
     extended = _extend_topology(
         topology,
         rows,
-        launch_count_delta=info["visibility_launch_count"] - launch_before,
-        candidate_count_delta=candidate_count,
-        guardrail_count_delta=dropped,
+        launch_count_delta=launch_delta,
+        candidate_count_delta=candidate_delta,
+        guardrail_count_delta=guardrail_delta,
     )
     return extended, info
+
+
+def append_scattering_evaluated_paths(
+    scene: Scene,
+    config: TopologyConfig,
+    evaluated: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars,
+) -> tuple[EvaluatedPaths, EvaluatedPathSidecars, dict[str, Any]]:
+    """Append scattering rows to canonical typed path contracts."""
+
+    info = _scattering_info()
+    components = set(config.components)
+    if "scattering" not in components or int(config.max_depth) < 1:
+        return evaluated, sidecars, info
+    if not scene.structures:
+        return evaluated, sidecars, info
+
+    rows, launch_delta, candidate_delta, guardrail_delta = _collect_scattering_rows(
+        scene,
+        config,
+        device=evaluated.device,
+        info=info,
+    )
+    if rows is None:
+        return evaluated, sidecars, info
+
+    evaluated, sidecars = _extend_evaluated_paths(
+        evaluated,
+        sidecars,
+        rows,
+        launch_count_delta=launch_delta,
+        candidate_count_delta=candidate_delta,
+        guardrail_count_delta=guardrail_delta,
+    )
+    return evaluated, sidecars, info
