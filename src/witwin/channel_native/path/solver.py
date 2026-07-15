@@ -15,6 +15,9 @@ from witwin.channel_native.core.scene_tensors import (
     transmitter_positions as _shared_transmitter_positions,
 )
 from witwin.channel_native.propagation.enumerated import append_scattering_paths
+from witwin.channel_native.propagation.models.adapters import (
+    evaluated_paths_from_topology_batch,
+)
 
 from .config import Config
 from .arrays import (
@@ -23,7 +26,7 @@ from .arrays import (
     pack_synthetic_arrays,
     validate_synthetic_array_scene,
 )
-from .result import PathResult, from_topology_result
+from .result import PathResult, from_evaluated_paths
 
 
 _COMPONENT_ID = {
@@ -238,7 +241,8 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
     scattering_info = None
     if "scattering" in config.components:
         topology, scattering_info = append_scattering_paths(scene, config, topology)
-    path_count = int(topology.valid.numel())
+    evaluated, sidecars = evaluated_paths_from_topology_batch(topology)
+    path_count = evaluated.row_count
     if ad_instrumented:
         torch.cuda.synchronize()
         forward_time_ms = (perf_counter() - solve_start) * 1.0e3
@@ -253,21 +257,27 @@ def _solve_base(scene: Scene, config: Config) -> PathResult:
         diffraction_available=diffraction_available,
         path_native_available=path_native_available,
         transmission_path_count=int(
-            (topology.component_id == _COMPONENT_ID["transmission"]).sum().item()
+            (
+                evaluated.topology.component_id
+                == _COMPONENT_ID["transmission"]
+            ).sum().item()
         ),
         scattering_path_count=int(
-            (topology.component_id == _COMPONENT_ID["scattering"]).sum().item()
+            (
+                evaluated.topology.component_id
+                == _COMPONENT_ID["scattering"]
+            ).sum().item()
         ),
-        ad_companion_launches=topology.ad_companion_launches,
-        ad_tape_bytes=topology.ad_tape_bytes,
+        ad_companion_launches=sidecars.execution.ad_companion_launches,
+        ad_tape_bytes=sidecars.execution.ad_tape_bytes,
         forward_time_ms=forward_time_ms,
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
     )
     tx_positions, _tx_power = _transmitter_tensors(scene)
     rx_positions = _receiver_positions(scene, reference=tx_positions)
-    result = from_topology_result(
-        topology,
+    result = from_evaluated_paths(
+        evaluated,
         num_rx=int(rx_positions.shape[0]),
         num_tx=int(tx_positions.shape[0]),
         tx_positions=tx_positions,
