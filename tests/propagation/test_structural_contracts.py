@@ -32,8 +32,23 @@ _FIELDS_FUNCTION_DIGESTS = {
     "_rough_reflection_factor": (
         "0261c6cd651790319819a3e1d3a1d14f93a9c4a771bce7933f993f75913a5fa5"
     ),
+    "_evaluate_los_fields": (
+        "03816f9cd798d1e0d947a97b6dd964b354fc566b965cf540c30b31a893434cdc"
+    ),
+    "_evaluate_reflection_fields": (
+        "c91968647805603ea4070142c2293074ccab1535acddd546cc46e520c8904876"
+    ),
+    "_evaluate_transmission_fields": (
+        "7c1bbc0e12d11b12bc7385c280d952234eb47b90672b11b1972a4e7bb76ad7ff"
+    ),
+    "_evaluate_diffraction_fields": (
+        "d8dfe6e4652bd058dc8ee34e9ba01aa4c1375356254f0e74ecb9b66eb8ce1c24"
+    ),
+    "_evaluate_coupled_fields": (
+        "87d8c609ab9afb6af9efab47d2d91bda20295c084e1dd11546795ea1c2bca4a5"
+    ),
     "_evaluate_shared_fields": (
-        "0cc5f7790c24b0d23718eb396f9ed934d24ccdde123300760fc21d3180a1b714"
+        "010cfc47ae2b566265abb6a777a4564576a09e18360190b01abe68d4a46c543f"
     ),
 }
 
