@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import torch
 
-from ._validation import require_tensor
+from witwin.channel_native.scene.stores._validation import require_tensor
 
 
 @dataclass(frozen=True, slots=True)

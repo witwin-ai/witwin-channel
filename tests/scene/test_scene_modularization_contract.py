@@ -35,6 +35,8 @@ from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.scene import compiled as canonical_compiled
+from witwin.channel_native.scene.stores import _validation as canonical_validation
+from witwin.channel_native.scene.stores import geometry as canonical_geometry
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +56,7 @@ _LEGACY_CLASS_CASES = (
     (
         "witwin.channel_native.core.runtime.geometry",
         "GeometryStore",
-        legacy_geometry.GeometryStore,
+        canonical_geometry.GeometryStore,
     ),
     (
         "witwin.channel_native.core.runtime.material_store",
@@ -181,13 +183,104 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
     assert canonical_compiled.CompiledScene.__module__ == (
         "witwin.channel_native.core.runtime.compiled_scene"
     )
-    assert legacy_scene.GeometryStore is legacy_geometry.GeometryStore
+    assert (
+        canonical_geometry.GeometryStore
+        is legacy_scene.GeometryStore
+        is legacy_geometry.GeometryStore
+    )
+    assert canonical_geometry.GeometryStore.__module__ == (
+        "witwin.channel_native.core.runtime.geometry"
+    )
     assert legacy_scene.MaterialStore is legacy_material_store.MaterialStore
     assert legacy_scene.AssignmentStore is legacy_assignments.AssignmentStore
 
     for module, name, owner in _LEGACY_CLASS_CASES:
         assert pickle.loads(_pickle_global(module, name)) is owner
         assert pickle.loads(pickle.dumps(owner)) is owner
+
+
+def test_geometry_store_schema_type_hints_and_validation_owner_are_exact():
+    owner = canonical_geometry.GeometryStore
+
+    assert tuple(item.name for item in fields(owner)) == (
+        "vertices",
+        "faces",
+        "face_normals",
+        "edges",
+        "edge_adj_faces",
+        "edge_param_range",
+        "face_structure_id",
+        "face_surface_id",
+        "version",
+    )
+    assert get_type_hints(owner) == {
+        "vertices": torch.Tensor,
+        "faces": torch.Tensor,
+        "face_normals": torch.Tensor,
+        "edges": torch.Tensor,
+        "edge_adj_faces": torch.Tensor,
+        "edge_param_range": torch.Tensor,
+        "face_structure_id": torch.Tensor,
+        "face_surface_id": torch.Tensor,
+        "version": int,
+    }
+    from witwin.channel_native.core.runtime import _validation as legacy_validation
+
+    assert canonical_validation.require_tensor is legacy_validation.require_tensor
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
+            "from witwin.channel_native.scene.stores import geometry as canonical; "
+            "from witwin.channel_native.core.runtime import geometry as legacy; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+        (
+            "from witwin.channel_native.core.runtime import geometry as legacy; "
+            "from witwin.channel_native.scene import compiled; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene.stores import geometry as canonical"
+        ),
+        (
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene.stores import geometry as canonical; "
+            "from witwin.channel_native.core.runtime import geometry as legacy; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+    ),
+)
+def test_geometry_store_fresh_import_order_and_legacy_pickle_replay(imports: str):
+    source = (
+        f"{imports}; import pickle; from typing import get_type_hints; import torch; "
+        "owner = canonical.GeometryStore; "
+        "assert owner is legacy.GeometryStore is core_scene.GeometryStore; "
+        "assert owner is compiled.GeometryStore; "
+        "assert owner.__module__ == 'witwin.channel_native.core.runtime.geometry'; "
+        "assert get_type_hints(owner)['vertices'] is torch.Tensor; "
+        "assert pickle.loads("
+        "b'cwitwin.channel_native.core.runtime.geometry\\nGeometryStore\\n.'"
+        ") is owner; "
+        "assert pickle.loads(pickle.dumps(owner)) is owner"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (
+            str(REPOSITORY_ROOT / "src"),
+            environment.get("PYTHONPATH"),
+        )
+        if value
+    )
+
+    subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        check=True,
+    )
 
 
 def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
