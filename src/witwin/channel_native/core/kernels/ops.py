@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import torch
 
-from .extension import native_extension
+from witwin.channel_native.runtime import symbols as _native_symbols
+
 from .metadata import make_metadata, validate_metadata  # noqa: F401
+
+
+native_extension = _native_symbols.native_extension
 
 
 def validate_cuda_tensor(
@@ -30,10 +34,7 @@ def validate_cuda_tensor(
 
 
 def _required_native_op(name: str):
-    native = native_extension()
-    if native is None or not hasattr(native, name):
-        raise RuntimeError(f"_channel_native.{name} CUDA kernel is required")
-    return getattr(native, name)
+    return _native_symbols._required_symbol(native_extension(), name)
 
 
 def _raydn_module_handle() -> int:

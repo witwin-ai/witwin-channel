@@ -365,8 +365,8 @@ def _load_developer_extension(path: str, expected_fingerprint: str) -> object:
 
 
 @lru_cache(maxsize=1)
-def native_extension() -> object:
-    """Return the validated extension, refusing implicit global modules."""
+def _load_native_extension() -> object:
+    """Load the validated extension, refusing implicit global modules."""
 
     package_spec = util.find_spec(_PACKAGE_MODULE)
     if package_spec is not None:
@@ -402,5 +402,18 @@ def _clear_loader_caches() -> None:
 
     _load_packaged_extension.cache_clear()
     _load_developer_extension.cache_clear()
-    native_extension.cache_clear()
+    _load_native_extension.cache_clear()
     _validated_native_build_info.cache_clear()
+
+
+from .symbols import native_extension  # noqa: E402
+
+
+__all__ = [
+    "CHANNEL_NATIVE_ABI_VERSION",
+    "ExtensionABIError",
+    "ExtensionLoadError",
+    "ExtensionSymbolError",
+    "build_info",
+    "native_extension",
+]
