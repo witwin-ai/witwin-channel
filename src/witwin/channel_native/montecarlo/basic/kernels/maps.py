@@ -1278,3 +1278,471 @@ def mc_sionna_reflection_accumulate_ad(
         material_valid,
         params,
     )
+
+
+def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
+    native = native_extension()
+    if native is None or not hasattr(native, "mc_sionna_diffraction_tape_accumulate"):
+        raise RuntimeError(
+            "_channel_native.mc_sionna_diffraction_tape_accumulate CUDA kernel is required"
+        )
+    output = native.mc_sionna_diffraction_tape_accumulate(*args)
+    if not isinstance(output, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_sionna_diffraction_tape_accumulate must return a tensor"
+        )
+    return output
+
+
+# ---------------------------------------------------------------------------
+# MC basic incoherent power-map AD (plan 07 AD-3). The solver emits a REAL
+# power map assembled from per-component maps; the differentiable inputs are
+# the compiled material store leaves (per-face eta_r / sigma_e / gain /
+# thickness, per-layer CSR parameters), the carrier frequency and the LoS
+# endpoint positions. The RayD trace and sampling tapes, the sampled ray
+# directions, the deposit binning and the visibility masks are all frozen
+# winners (plan 07 section 4): gradients cover the continuous part only. The
+# reflection deposit weight is analytically independent of the ray origin
+# (the weight is |Gamma|^2 * solid_angle * (lambda/4pi)^2 / (A_cell * |cos|),
+# with the 1/d^2 spreading carried by the frozen ray density), so the
+# transmitter-position gradient of the reflection map is exactly zero and is
+# returned without a kernel launch.
+# ---------------------------------------------------------------------------
+
+def mc_sionna_diffraction_tape_accumulate_backward(
+    tape_tensors: tuple[torch.Tensor, ...],
+    state_tensors: tuple[torch.Tensor, ...],
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_mu_r: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_valid: torch.Tensor,
+    material_thickness: torch.Tensor,
+    grad_output: torch.Tensor,
+    *,
+    need_materials: bool,
+    need_source: bool,
+    need_frequency: bool,
+    grid_axis: int,
+    grid_position: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    grid_cell_area: float,
+    seed: int,
+    total_edge_length: float,
+    wavelength_dfreq: float,
+) -> tuple[torch.Tensor, ...]:
+    gradients = _required_native_op("mc_sionna_diffraction_tape_accumulate_backward")(
+        *tape_tensors,
+        *state_tensors,
+        material_eta_r,
+        material_sigma,
+        material_mu_r,
+        material_gain,
+        material_valid,
+        material_thickness,
+        grad_output,
+        bool(need_materials),
+        bool(need_source),
+        bool(need_frequency),
+        int(grid_axis),
+        float(grid_position),
+        int(grid_resolution0),
+        int(grid_resolution1),
+        float(wavelength),
+        float(grid_cell_area),
+        int(seed),
+        float(total_edge_length),
+        float(wavelength_dfreq),
+    )
+    if not isinstance(gradients, tuple) or len(gradients) != 6:
+        raise TypeError(
+            "_channel_native.mc_sionna_diffraction_tape_accumulate_backward "
+            "must return 6 tensors"
+        )
+    return gradients
+
+
+def mc_sionna_diffraction_tape_accumulate_jvp(
+    tape_tensors: tuple[torch.Tensor, ...],
+    state_tensors: tuple[torch.Tensor, ...],
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_mu_r: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_valid: torch.Tensor,
+    material_thickness: torch.Tensor,
+    tangent_eta_r: torch.Tensor | None,
+    tangent_sigma: torch.Tensor | None,
+    tangent_gain: torch.Tensor | None,
+    tangent_thickness: torch.Tensor | None,
+    tangent_source: torch.Tensor | None,
+    *,
+    grid_axis: int,
+    grid_position: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    grid_cell_area: float,
+    seed: int,
+    total_edge_length: float,
+    wavelength_tangent: float,
+) -> torch.Tensor:
+    output = _required_native_op("mc_sionna_diffraction_tape_accumulate_jvp")(
+        *tape_tensors,
+        *state_tensors,
+        material_eta_r,
+        material_sigma,
+        material_mu_r,
+        material_gain,
+        material_valid,
+        material_thickness,
+        tangent_eta_r if tangent_eta_r is not None else material_eta_r,
+        tangent_sigma if tangent_sigma is not None else material_sigma,
+        tangent_gain if tangent_gain is not None else material_gain,
+        tangent_thickness if tangent_thickness is not None else material_thickness,
+        tangent_source
+        if tangent_source is not None
+        else material_eta_r.new_empty((3,)),
+        tangent_eta_r is not None,
+        tangent_sigma is not None,
+        tangent_gain is not None,
+        tangent_thickness is not None,
+        tangent_source is not None,
+        int(grid_axis),
+        float(grid_position),
+        int(grid_resolution0),
+        int(grid_resolution1),
+        float(wavelength),
+        float(grid_cell_area),
+        int(seed),
+        float(total_edge_length),
+        float(wavelength_tangent),
+    )
+    if not isinstance(output, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_sionna_diffraction_tape_accumulate_jvp must "
+            "return a tensor"
+        )
+    return output
+
+
+class _McDiffractionMapAdFunction(torch.autograd.Function):
+    """Differentiable Sionna diffraction radiomap for one transmitter.
+
+    Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
+    carrier frequency and the transmitter anchor (the state sources are the
+    anchor broadcast per winner edge state, so the anchor gradient is the
+    per-state source gradient summed natively). The RayD sampling tape
+    (active / state / cell / u), the per-lane Keller-cone azimuth, the edge
+    state tables and the deposit binning are frozen winners and fail loudly
+    when a gradient is requested; the continuous source dependence (incident
+    spherical wave, incidence angles, cone orientation and the recomputed
+    plane-crossing Jacobian) flows through the templated dual row.
+    """
+
+    @staticmethod
+    def forward(
+        tx_anchor,
+        eta_r,
+        sigma_e,
+        gain,
+        thickness,
+        frequency,
+        tape_active,
+        tape_state,
+        tape_cell,
+        tape_u,
+        state_edge_pos,
+        state_edge_dir,
+        state_t_min,
+        state_t_max,
+        state_n0,
+        state_n1,
+        state_prim0,
+        state_prim1,
+        state_exterior_angle,
+        state_src,
+        state_src_power,
+        material_mu_r,
+        material_valid,
+        params,
+    ):
+        return mc_sionna_diffraction_tape_accumulate(
+            tape_active,
+            tape_state,
+            tape_cell,
+            tape_u,
+            state_edge_pos,
+            state_edge_dir,
+            state_t_min,
+            state_t_max,
+            state_n0,
+            state_n1,
+            state_prim0,
+            state_prim1,
+            state_exterior_angle,
+            state_src,
+            state_src_power,
+            eta_r,
+            sigma_e,
+            material_mu_r,
+            gain,
+            material_valid,
+            thickness,
+            params["grid_axis"],
+            params["grid_position"],
+            params["grid_coord0_min"],
+            params["grid_coord0_max"],
+            params["grid_coord1_min"],
+            params["grid_coord1_max"],
+            params["grid_resolution0"],
+            params["grid_resolution1"],
+            params["wavelength"],
+            params["grid_cell_area"],
+            params["seed"],
+            params["total_edge_length"],
+        )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in inputs[:5]
+        )
+        frequency = inputs[5]
+        ctx.frequency_meta = (
+            (frequency.dtype, frequency.device)
+            if isinstance(frequency, torch.Tensor)
+            else None
+        )
+        ctx.params = inputs[23]
+        ctx.anchor_shape = tuple(inputs[0].shape)
+        saved = (*primals[1:], *inputs[6:23])
+        ctx.save_for_backward(*saved)
+        ctx.save_for_forward(*saved)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_output):
+        none_grads = (None,) * 24
+        _ad_reject_fixed_inputs(
+            "mc_sionna_diffraction_tape_accumulate_ad",
+            ctx.needs_input_grad,
+            (
+                (6, "tape_active"),
+                (7, "tape_state"),
+                (8, "tape_cell"),
+                (9, "tape_u"),
+                (10, "state_edge_pos"),
+                (11, "state_edge_dir"),
+                (12, "state_t_min"),
+                (13, "state_t_max"),
+                (14, "state_n0"),
+                (15, "state_n1"),
+                (18, "state_exterior_angle"),
+                (19, "state_src"),
+                (20, "state_src_power"),
+                (21, "material_mu_r"),
+                (22, "material_valid"),
+            ),
+        )
+        if grad_output is None:
+            return none_grads
+        saved = ctx.saved_tensors
+        (eta_r, sigma_e, gain, thickness) = saved[:4]
+        tape_tensors = saved[4:8]
+        state_tensors = saved[8:19]
+        material_mu_r = saved[19]
+        material_valid = saved[20]
+        need_anchor = bool(ctx.needs_input_grad[0])
+        need_eta = bool(ctx.needs_input_grad[1])
+        need_sigma = bool(ctx.needs_input_grad[2])
+        need_gain = bool(ctx.needs_input_grad[3])
+        need_thickness = bool(ctx.needs_input_grad[4])
+        need_materials = need_eta or need_sigma or need_gain or need_thickness
+        need_frequency = bool(ctx.needs_input_grad[5])
+        if not (need_anchor or need_materials or need_frequency):
+            return none_grads
+        params = ctx.params
+        wavelength = float(params["wavelength"])
+        gradients = mc_sionna_diffraction_tape_accumulate_backward(
+            tuple(tape_tensors),
+            tuple(state_tensors),
+            eta_r,
+            sigma_e,
+            material_mu_r,
+            gain,
+            material_valid,
+            thickness,
+            grad_output,
+            need_materials=need_materials,
+            need_source=need_anchor,
+            need_frequency=need_frequency,
+            grid_axis=params["grid_axis"],
+            grid_position=params["grid_position"],
+            grid_resolution0=params["grid_resolution0"],
+            grid_resolution1=params["grid_resolution1"],
+            wavelength=wavelength,
+            grid_cell_area=params["grid_cell_area"],
+            seed=params["seed"],
+            total_edge_length=params["total_edge_length"],
+            wavelength_dfreq=-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD,
+        )
+        grad_frequency = (
+            _ad_frequency_grad(gradients[5], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return (
+            gradients[4] if need_anchor else None,
+            gradients[0] if need_eta else None,
+            gradients[1] if need_sigma else None,
+            gradients[2] if need_gain else None,
+            gradients[3] if need_thickness else None,
+            grad_frequency,
+        ) + (None,) * 18
+
+    @staticmethod
+    def jvp(ctx, t_anchor, t_eta, t_sigma, t_gain, t_thickness, t_frequency, *t_rest):
+        _ad_reject_fixed_tangents(
+            "mc_sionna_diffraction_tape_accumulate_ad",
+            (
+                (t_rest[4], "state_edge_pos"),
+                (t_rest[5], "state_edge_dir"),
+                (t_rest[8], "state_n0"),
+                (t_rest[9], "state_n1"),
+                (t_rest[13], "state_src"),
+                (t_rest[14], "state_src_power"),
+            ),
+        )
+        saved = ctx.saved_tensors
+        face_shape = tuple(saved[0].shape)
+        tangent_eta = _ad_checked_tangent(
+            "mc_sionna_diffraction_tape_accumulate_ad tangent_eta_r",
+            _ad_native_tangent_or_none(t_eta),
+            face_shape,
+        )
+        tangent_sigma = _ad_checked_tangent(
+            "mc_sionna_diffraction_tape_accumulate_ad tangent_sigma_e",
+            _ad_native_tangent_or_none(t_sigma),
+            face_shape,
+        )
+        tangent_gain = _ad_checked_tangent(
+            "mc_sionna_diffraction_tape_accumulate_ad tangent_gain",
+            _ad_native_tangent_or_none(t_gain),
+            face_shape,
+        )
+        tangent_thickness = _ad_checked_tangent(
+            "mc_sionna_diffraction_tape_accumulate_ad tangent_thickness",
+            _ad_native_tangent_or_none(t_thickness),
+            face_shape,
+        )
+        tangent_anchor = _ad_native_tangent_or_none(
+            t_anchor if isinstance(t_anchor, torch.Tensor) else None
+        )
+        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        params = ctx.params
+        if (
+            tangent_eta is None
+            and tangent_sigma is None
+            and tangent_gain is None
+            and tangent_thickness is None
+            and tangent_anchor is None
+            and tangent_frequency == 0.0
+        ):
+            return None
+        (eta_r, sigma_e, gain, thickness) = saved[:4]
+        tape_tensors = tuple(_ad_native_tensor(value) for value in saved[4:8])
+        state_tensors = tuple(_ad_native_tensor(value) for value in saved[8:19])
+        wavelength = float(params["wavelength"])
+        with torch_compat.disable_functorch():
+            return mc_sionna_diffraction_tape_accumulate_jvp(
+                tape_tensors,
+                state_tensors,
+                _ad_native_tensor(eta_r),
+                _ad_native_tensor(sigma_e),
+                _ad_native_tensor(saved[19]),
+                _ad_native_tensor(gain),
+                _ad_native_tensor(saved[20]),
+                _ad_native_tensor(thickness),
+                tangent_eta,
+                tangent_sigma,
+                tangent_gain,
+                tangent_thickness,
+                tangent_anchor,
+                grid_axis=params["grid_axis"],
+                grid_position=params["grid_position"],
+                grid_resolution0=params["grid_resolution0"],
+                grid_resolution1=params["grid_resolution1"],
+                wavelength=wavelength,
+                grid_cell_area=params["grid_cell_area"],
+                seed=params["seed"],
+                total_edge_length=params["total_edge_length"],
+                wavelength_tangent=(
+                    -wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD
+                )
+                * tangent_frequency,
+            )
+
+
+def mc_sionna_diffraction_tape_accumulate_ad(
+    tx_anchor: torch.Tensor,
+    material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor,
+    material_gain: torch.Tensor,
+    material_thickness: torch.Tensor,
+    frequency: torch.Tensor | float,
+    tape_tensors: tuple[torch.Tensor, ...],
+    state_tensors: tuple[torch.Tensor, ...],
+    material_mu_r: torch.Tensor,
+    material_valid: torch.Tensor,
+    *,
+    grid_axis: int,
+    grid_position: float,
+    grid_coord0_min: float,
+    grid_coord0_max: float,
+    grid_coord1_min: float,
+    grid_coord1_max: float,
+    grid_resolution0: int,
+    grid_resolution1: int,
+    wavelength: float,
+    grid_cell_area: float,
+    seed: int,
+    total_edge_length: float,
+) -> torch.Tensor:
+    """Differentiable :func:`mc_sionna_diffraction_tape_accumulate` (one tx)."""
+
+    if len(tape_tensors) != 4:
+        raise ValueError("tape_tensors must hold (active, state, cell, u)")
+    if len(state_tensors) != 11:
+        raise ValueError("state_tensors must hold the 11 packed state tables")
+    params = {
+        "grid_axis": int(grid_axis),
+        "grid_position": float(grid_position),
+        "grid_coord0_min": float(grid_coord0_min),
+        "grid_coord0_max": float(grid_coord0_max),
+        "grid_coord1_min": float(grid_coord1_min),
+        "grid_coord1_max": float(grid_coord1_max),
+        "grid_resolution0": int(grid_resolution0),
+        "grid_resolution1": int(grid_resolution1),
+        "wavelength": float(wavelength),
+        "grid_cell_area": float(grid_cell_area),
+        "seed": int(seed),
+        "total_edge_length": float(total_edge_length),
+    }
+    return _McDiffractionMapAdFunction.apply(
+        tx_anchor,
+        material_eta_r,
+        material_sigma,
+        material_gain,
+        material_thickness,
+        frequency,
+        *tape_tensors,
+        *state_tensors,
+        material_mu_r,
+        material_valid,
+        params,
+    )

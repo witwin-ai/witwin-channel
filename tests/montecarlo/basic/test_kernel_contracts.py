@@ -36,9 +36,11 @@ _OWNER_NAMES = (
 )
 
 _MAP_OWNER_NAMES = (
+    "_McDiffractionMapAdFunction",
     "_McFinalizeComponentMapsAdFunction",
     "_McLosGridMapsAdFunction",
     "_McLosPathGainAdFunction",
+    "_McReflectionMapAdFunction",
     "mc_apply_los_visibility",
     "mc_component_map_buffer",
     "mc_finalize_component_maps",
@@ -52,12 +54,25 @@ _MAP_OWNER_NAMES = (
     "mc_los_path_gain_jvp",
     "mc_los_visibility_inputs",
     "mc_point_component_power",
+    "mc_reflection_ad_max_depth",
+    "mc_sionna_diffraction_tape_accumulate",
+    "mc_sionna_diffraction_tape_accumulate_ad",
+    "mc_sionna_diffraction_tape_accumulate_backward",
+    "mc_sionna_diffraction_tape_accumulate_jvp",
+    "mc_sionna_reflection_accumulate",
+    "mc_sionna_reflection_accumulate_ad",
+    "mc_sionna_reflection_accumulate_backward",
+    "mc_sionna_reflection_accumulate_jvp",
     "mc_store_component_map",
     "mc_store_scaled_component_map",
     "mc_zero_matrix",
 )
 
 _MAP_CONTRACT_IDS = (
+    "_McDiffractionMapAdFunction.backward",
+    "_McDiffractionMapAdFunction.forward",
+    "_McDiffractionMapAdFunction.jvp",
+    "_McDiffractionMapAdFunction.setup_context",
     "_McFinalizeComponentMapsAdFunction.backward",
     "_McFinalizeComponentMapsAdFunction.forward",
     "_McFinalizeComponentMapsAdFunction.jvp",
@@ -70,6 +85,10 @@ _MAP_CONTRACT_IDS = (
     "_McLosPathGainAdFunction.forward",
     "_McLosPathGainAdFunction.jvp",
     "_McLosPathGainAdFunction.setup_context",
+    "_McReflectionMapAdFunction.backward",
+    "_McReflectionMapAdFunction.forward",
+    "_McReflectionMapAdFunction.jvp",
+    "_McReflectionMapAdFunction.setup_context",
     "mc_apply_los_visibility",
     "mc_component_map_buffer",
     "mc_finalize_component_maps",
@@ -83,6 +102,15 @@ _MAP_CONTRACT_IDS = (
     "mc_los_path_gain_jvp",
     "mc_los_visibility_inputs",
     "mc_point_component_power",
+    "mc_reflection_ad_max_depth",
+    "mc_sionna_diffraction_tape_accumulate",
+    "mc_sionna_diffraction_tape_accumulate_ad",
+    "mc_sionna_diffraction_tape_accumulate_backward",
+    "mc_sionna_diffraction_tape_accumulate_jvp",
+    "mc_sionna_reflection_accumulate",
+    "mc_sionna_reflection_accumulate_ad",
+    "mc_sionna_reflection_accumulate_backward",
+    "mc_sionna_reflection_accumulate_jvp",
     "mc_store_component_map",
     "mc_store_scaled_component_map",
     "mc_zero_matrix",
@@ -249,6 +277,47 @@ def test_mc_basic_maps_grid_ad_methods_resolve_canonical_siblings():
     assert (
         maps.mc_los_grid_maps_ad.__globals__["_McLosGridMapsAdFunction"] is function
     )
+
+
+@pytest.mark.parametrize(
+    ("class_name", "forward_name", "backward_name", "jvp_name", "entry_name"),
+    (
+        (
+            "_McReflectionMapAdFunction",
+            "mc_sionna_reflection_accumulate",
+            "mc_sionna_reflection_accumulate_backward",
+            "mc_sionna_reflection_accumulate_jvp",
+            "mc_sionna_reflection_accumulate_ad",
+        ),
+        (
+            "_McDiffractionMapAdFunction",
+            "mc_sionna_diffraction_tape_accumulate",
+            "mc_sionna_diffraction_tape_accumulate_backward",
+            "mc_sionna_diffraction_tape_accumulate_jvp",
+            "mc_sionna_diffraction_tape_accumulate_ad",
+        ),
+    ),
+)
+def test_mc_basic_maps_component_ad_methods_resolve_canonical_siblings(
+    class_name: str,
+    forward_name: str,
+    backward_name: str,
+    jvp_name: str,
+    entry_name: str,
+):
+    function = getattr(maps, class_name)
+
+    assert function.forward.__globals__ is maps.__dict__
+    assert function.setup_context.__globals__ is maps.__dict__
+    assert inspect.unwrap(function.backward).__globals__ is maps.__dict__
+    assert function.jvp.__globals__ is maps.__dict__
+    assert function.forward.__globals__[forward_name] is getattr(maps, forward_name)
+    assert (
+        inspect.unwrap(function.backward).__globals__[backward_name]
+        is getattr(maps, backward_name)
+    )
+    assert function.jvp.__globals__[jvp_name] is getattr(maps, jvp_name)
+    assert getattr(maps, entry_name).__globals__[class_name] is function
 
 
 def test_mc_basic_maps_uses_package_level_los_export_same_object_alias():

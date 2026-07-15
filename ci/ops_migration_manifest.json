@@ -1988,10 +1988,6 @@
     }
   ],
   "active_ops": [
-    "_McDiffractionMapAdFunction.backward",
-    "_McDiffractionMapAdFunction.forward",
-    "_McDiffractionMapAdFunction.jvp",
-    "_McDiffractionMapAdFunction.setup_context",
     "_bdpt_mis_mode_id",
     "_required_native_op",
     "_validate_bdpt_connection_samples",
@@ -2034,11 +2030,7 @@
     "bdpt_subpath_intersection_inputs",
     "bdpt_transmitted_light_subpath_state",
     "bdpt_transmitter_tensors",
-    "bdpt_zero_matrix",
-    "mc_sionna_diffraction_tape_accumulate",
-    "mc_sionna_diffraction_tape_accumulate_ad",
-    "mc_sionna_diffraction_tape_accumulate_backward",
-    "mc_sionna_diffraction_tape_accumulate_jvp"
+    "bdpt_zero_matrix"
   ],
   "canonical_owners": {
     "_CoupledRdPrepareAdFunction.backward": "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.backward",
@@ -2082,6 +2074,10 @@
     "_McFinalizeComponentMapsAdFunction.forward": "witwin.channel_native.montecarlo.basic.kernels.maps._McFinalizeComponentMapsAdFunction.forward",
     "_McFinalizeComponentMapsAdFunction.jvp": "witwin.channel_native.montecarlo.basic.kernels.maps._McFinalizeComponentMapsAdFunction.jvp",
     "_McFinalizeComponentMapsAdFunction.setup_context": "witwin.channel_native.montecarlo.basic.kernels.maps._McFinalizeComponentMapsAdFunction.setup_context",
+    "_McDiffractionMapAdFunction.backward": "witwin.channel_native.montecarlo.basic.kernels.maps._McDiffractionMapAdFunction.backward",
+    "_McDiffractionMapAdFunction.forward": "witwin.channel_native.montecarlo.basic.kernels.maps._McDiffractionMapAdFunction.forward",
+    "_McDiffractionMapAdFunction.jvp": "witwin.channel_native.montecarlo.basic.kernels.maps._McDiffractionMapAdFunction.jvp",
+    "_McDiffractionMapAdFunction.setup_context": "witwin.channel_native.montecarlo.basic.kernels.maps._McDiffractionMapAdFunction.setup_context",
     "_McLosGridMapsAdFunction.backward": "witwin.channel_native.montecarlo.basic.kernels.maps._McLosGridMapsAdFunction.backward",
     "_McLosGridMapsAdFunction.forward": "witwin.channel_native.montecarlo.basic.kernels.maps._McLosGridMapsAdFunction.forward",
     "_McLosGridMapsAdFunction.jvp": "witwin.channel_native.montecarlo.basic.kernels.maps._McLosGridMapsAdFunction.jvp",
@@ -2230,6 +2226,10 @@
     "mc_reflection_launch_inputs": "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_reflection_launch_inputs",
     "mc_sample_directions": "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_sample_directions",
     "mc_selected_edge_indices": "witwin.channel_native.propagation.topology.kernels.primitives.mc_selected_edge_indices",
+    "mc_sionna_diffraction_tape_accumulate": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate",
+    "mc_sionna_diffraction_tape_accumulate_ad": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_ad",
+    "mc_sionna_diffraction_tape_accumulate_backward": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_backward",
+    "mc_sionna_diffraction_tape_accumulate_jvp": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_jvp",
     "mc_sionna_reflection_accumulate": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate",
     "mc_sionna_reflection_accumulate_ad": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate_ad",
     "mc_sionna_reflection_accumulate_backward": "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate_backward",
