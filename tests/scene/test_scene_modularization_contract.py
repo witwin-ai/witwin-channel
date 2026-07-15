@@ -36,6 +36,7 @@ from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.scene import compiled as canonical_compiled
 from witwin.channel_native.scene.stores import _validation as canonical_validation
+from witwin.channel_native.scene.stores import assignments as canonical_assignments
 from witwin.channel_native.scene.stores import geometry as canonical_geometry
 from witwin.channel_native.scene.stores import materials as canonical_material_stores
 
@@ -67,7 +68,7 @@ _LEGACY_CLASS_CASES = (
     (
         "witwin.channel_native.core.runtime.assignments",
         "AssignmentStore",
-        legacy_assignments.AssignmentStore,
+        canonical_assignments.AssignmentStore,
     ),
     (
         "witwin.channel_native.core.runtime.raydn",
@@ -201,7 +202,15 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
     assert canonical_material_stores.MaterialStore.__module__ == (
         "witwin.channel_native.core.runtime.material_store"
     )
-    assert legacy_scene.AssignmentStore is legacy_assignments.AssignmentStore
+    assert (
+        canonical_assignments.AssignmentStore
+        is legacy_scene.AssignmentStore
+        is legacy_assignments.AssignmentStore
+        is canonical_compiled.AssignmentStore
+    )
+    assert canonical_assignments.AssignmentStore.__module__ == (
+        "witwin.channel_native.core.runtime.assignments"
+    )
 
     for module, name, owner in _LEGACY_CLASS_CASES:
         assert pickle.loads(_pickle_global(module, name)) is owner
@@ -302,6 +311,37 @@ def test_material_store_schema_type_hints_and_defaults_are_exact():
         "cache_token": str,
         "version": int,
         "frequency_dependent": tuple[str, ...],
+    }
+
+
+def test_assignment_store_schema_type_hints_and_defaults_are_exact():
+    owner = canonical_assignments.AssignmentStore
+    schema = fields(owner)
+
+    assert tuple(item.name for item in schema) == (
+        "face_material_id",
+        "edge_material_id0",
+        "edge_material_id1",
+        "surface_material_id",
+        "structure_material_id",
+        "num_faces",
+        "num_edges",
+        "version",
+        "structure_phase_screens",
+    )
+    assert all(item.default is MISSING for item in schema[:-1])
+    assert schema[-1].default is MISSING
+    assert schema[-1].default_factory is dict
+    assert get_type_hints(owner) == {
+        "face_material_id": torch.Tensor,
+        "edge_material_id0": torch.Tensor,
+        "edge_material_id1": torch.Tensor,
+        "surface_material_id": torch.Tensor,
+        "structure_material_id": torch.Tensor,
+        "num_faces": int,
+        "num_edges": int,
+        "version": int,
+        "structure_phase_screens": dict[int, public_materials.PhaseScreen],
     }
 
 
@@ -414,11 +454,70 @@ def test_material_store_fresh_import_order_and_legacy_pickle_replay(imports: str
     )
 
 
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
+            "from witwin.channel_native.scene.stores import assignments as canonical; "
+            "from witwin.channel_native.core.runtime import assignments as legacy; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+        (
+            "from witwin.channel_native.core.runtime import assignments as legacy; "
+            "from witwin.channel_native.scene import compiled; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene.stores import assignments as canonical"
+        ),
+        (
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene.stores import assignments as canonical; "
+            "from witwin.channel_native.core.runtime import assignments as legacy; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+    ),
+)
+def test_assignment_store_fresh_import_order_and_legacy_pickle_replay(imports: str):
+    source = (
+        f"{imports}; import pickle; from typing import get_type_hints; import torch; "
+        "from witwin.channel_native.core.materials import PhaseScreen; "
+        "owner = canonical.AssignmentStore; "
+        "assert owner is legacy.AssignmentStore is core_scene.AssignmentStore; "
+        "assert owner is compiled.AssignmentStore; "
+        "assert owner.__module__ == "
+        "'witwin.channel_native.core.runtime.assignments'; "
+        "hints = get_type_hints(owner); "
+        "assert hints['face_material_id'] is torch.Tensor; "
+        "assert hints['structure_phase_screens'] == dict[int, PhaseScreen]; "
+        "assert pickle.loads("
+        "b'cwitwin.channel_native.core.runtime.assignments\\nAssignmentStore\\n.'"
+        ") is owner; "
+        "assert pickle.loads(pickle.dumps(owner)) is owner"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (
+            str(REPOSITORY_ROOT / "src"),
+            environment.get("PYTHONPATH"),
+        )
+        if value
+    )
+
+    subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        check=True,
+    )
+
+
 def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
     owner = canonical_compiled.CompiledScene
     schema = fields(owner)
 
     assert legacy_compiled.MaterialStore is canonical_material_stores.MaterialStore
+    assert legacy_compiled.AssignmentStore is canonical_assignments.AssignmentStore
     assert tuple(item.name for item in schema) == (
         "geometry",
         "materials",

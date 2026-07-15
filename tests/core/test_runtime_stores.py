@@ -9,6 +9,9 @@ from witwin.channel_native.core.runtime.assignments import AssignmentStore
 from witwin.channel_native.core.runtime.geometry import GeometryStore
 from witwin.channel_native.core.runtime.material_store import MaterialStore
 from witwin.channel_native.scene.stores import _validation as canonical_validation
+from witwin.channel_native.scene.stores.assignments import (
+    AssignmentStore as CanonicalAssignmentStore,
+)
 from witwin.channel_native.scene.stores.geometry import (
     GeometryStore as CanonicalGeometryStore,
 )
@@ -267,3 +270,93 @@ def test_assignment_store_validates_face_material_length():
             num_edges=3,
             version=0,
         )
+
+
+def _assignment_store_kwargs() -> dict[str, object]:
+    return {
+        "face_material_id": torch.zeros((1,), dtype=torch.int32),
+        "edge_material_id0": torch.zeros((3,), dtype=torch.int32),
+        "edge_material_id1": torch.zeros((3,), dtype=torch.int32),
+        "surface_material_id": torch.zeros((1,), dtype=torch.int32),
+        "structure_material_id": torch.zeros((1,), dtype=torch.int32),
+        "num_faces": 1,
+        "num_edges": 3,
+        "version": 0,
+    }
+
+
+def test_assignment_store_canonical_owner_preserves_input_and_dict_aliases():
+    values = _assignment_store_kwargs()
+    phase_screens = {}
+    store = CanonicalAssignmentStore(
+        **values,
+        structure_phase_screens=phase_screens,
+    )
+
+    assert CanonicalAssignmentStore is AssignmentStore
+    for name, value in values.items():
+        if isinstance(value, torch.Tensor):
+            stored = getattr(store, name)
+            assert stored is value
+            assert stored.untyped_storage().data_ptr() == (
+                value.untyped_storage().data_ptr()
+            )
+    assert store.structure_phase_screens is phase_screens
+
+
+def test_assignment_store_default_factory_is_independent_per_instance():
+    first = CanonicalAssignmentStore(**_assignment_store_kwargs())
+    second = CanonicalAssignmentStore(**_assignment_store_kwargs())
+
+    assert first.structure_phase_screens == {}
+    assert second.structure_phase_screens == {}
+    assert first.structure_phase_screens is not second.structure_phase_screens
+
+
+@pytest.mark.parametrize(
+    ("changes", "error", "message"),
+    (
+        (
+            {
+                "face_material_id": torch.zeros((2,), dtype=torch.float32),
+                "edge_material_id0": torch.zeros((2,), dtype=torch.int32),
+            },
+            TypeError,
+            "face_material_id must have dtype torch.int32",
+        ),
+        (
+            {
+                "face_material_id": torch.zeros((2,), dtype=torch.int32),
+                "edge_material_id0": torch.zeros((2,), dtype=torch.int32),
+            },
+            ValueError,
+            "face_material_id length must match num_faces",
+        ),
+        (
+            {
+                "edge_material_id0": torch.zeros((2,), dtype=torch.int32),
+                "edge_material_id1": torch.zeros((2,), dtype=torch.int32),
+            },
+            ValueError,
+            "edge_material_id0 length must match num_edges",
+        ),
+        (
+            {"structure_phase_screens": {-1: object()}},
+            ValueError,
+            "structure_phase_screens keys must be structure indices",
+        ),
+        (
+            {"structure_phase_screens": {0: object()}},
+            ValueError,
+            "structure_phase_screens values must be PhaseScreen",
+        ),
+    ),
+)
+def test_assignment_store_validation_order_and_errors_are_exact(
+    changes, error, message
+):
+    values = _assignment_store_kwargs()
+    values.update(changes)
+
+    with pytest.raises(error, match=message):
+        CanonicalAssignmentStore(**values)
