@@ -21,6 +21,9 @@ from witwin.channel_native.propagation.geometry.kernels import (
 )
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.propagation.topology.kernels import (
+    compaction as topology_compaction,
+)
+from witwin.channel_native.propagation.topology.kernels import (
     construction as topology_construction,
 )
 from witwin.channel_native.propagation.fields.kernels import (
@@ -399,7 +402,7 @@ def _sort_order(
         sequence = torch.empty(
             (paths["valid"].numel(), 0), device=paths["valid"].device, dtype=torch.int32
         )
-    return ops.deterministic_sort_order(
+    return topology_compaction.deterministic_sort_order(
         paths["valid"],
         paths["tx_id"],
         paths["rx_id"],
@@ -1623,7 +1626,7 @@ def _reflection_topology_order1(
                 1,
             )
             launch_count += 1
-            selected = ops.deterministic_reflection_order1_compact(
+            selected = topology_compaction.deterministic_reflection_order1_compact(
                 visible=epc[0],
                 epc_faces=epc[2],
                 epc_hits=epc[4],
@@ -1917,7 +1920,7 @@ def _reflection_topology_multibounce(
             1,
         )
         launch_count += 1
-        selected = ops.deterministic_reflection_sequence_compact(
+        selected = topology_compaction.deterministic_reflection_sequence_compact(
             visible=epc[0],
             epc_sequences=epc[2],
             epc_hits=epc[4],
@@ -2221,7 +2224,7 @@ def _diffraction_topology_order1(
                 float(wavelength),
             )
             launch_count += 1
-            compacted = ops.deterministic_diffraction_order1_compact(
+            compacted = topology_compaction.deterministic_diffraction_order1_compact(
                 valid=out[1],
                 rx_id=out[3],
                 depth=out[4],

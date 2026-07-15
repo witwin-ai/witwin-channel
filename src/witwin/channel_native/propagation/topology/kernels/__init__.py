@@ -17,6 +17,12 @@ from .blocks import (
     path_los_visibility_inputs,
     path_merge_blocks,
 )
+from .compaction import (
+    deterministic_diffraction_order1_compact,
+    deterministic_reflection_order1_compact,
+    deterministic_reflection_sequence_compact,
+    deterministic_sort_order,
+)
 from .construction import (
     deterministic_face_anchor_points,
     deterministic_face_sequence_chunk,
@@ -51,6 +57,7 @@ __all__ = [
     "deterministic_component_counts",
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
+    "deterministic_diffraction_order1_compact",
     "deterministic_face_anchor_points",
     "deterministic_face_sequence_chunk",
     "deterministic_gather_topology_block",
@@ -58,8 +65,11 @@ __all__ = [
     "deterministic_mapped_face_sequence_chunk",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
+    "deterministic_reflection_order1_compact",
+    "deterministic_reflection_sequence_compact",
     "deterministic_repeat_range",
     "deterministic_selected_edge_count",
+    "deterministic_sort_order",
     "deterministic_topology_base_fields",
     "deterministic_topology_default_fields",
     "mc_selected_edge_indices",
