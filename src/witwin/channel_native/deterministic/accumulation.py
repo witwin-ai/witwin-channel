@@ -6,7 +6,9 @@ import torch
 
 from .result import PathTable
 from .kernels import accumulation as accumulation_kernels
-from .kernels import fields as field_kernels
+from witwin.channel_native.propagation.fields.kernels import (
+    deterministic as field_kernels,
+)
 from witwin.channel_native.core.path_topology import (
     ReceiverLayout,
     TopologyBatch,

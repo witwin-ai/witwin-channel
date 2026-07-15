@@ -1490,7 +1490,9 @@ def _reflection_topology_order1(
     *,
     frequency_hz: float,
 ) -> tuple[dict[str, torch.Tensor], int]:
-    from witwin.channel_native.deterministic.kernels import fields as field_kernels
+    from witwin.channel_native.propagation.fields.kernels import (
+        deterministic as field_kernels,
+    )
 
     device = tx_positions.device
     raydn = compiled.raydn
@@ -1800,7 +1802,9 @@ def _reflection_topology_multibounce(
     max_depth: int,
     max_paths: int | None,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
-    from witwin.channel_native.deterministic.kernels import fields as field_kernels
+    from witwin.channel_native.propagation.fields.kernels import (
+        deterministic as field_kernels,
+    )
 
     device = tx_positions.device
     raydn = compiled.raydn
@@ -2144,7 +2148,9 @@ def _diffraction_topology_order1(
     *,
     frequency_hz: float,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
-    from witwin.channel_native.deterministic.kernels import fields as field_kernels
+    from witwin.channel_native.propagation.fields.kernels import (
+        deterministic as field_kernels,
+    )
 
     device = tx_positions.device
     raydn = compiled.raydn

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import torch
 
-from .kernels import fields as field_kernels
+from witwin.channel_native.propagation.fields.kernels import (
+    deterministic as field_kernels,
+)
 
 
 LIGHT_SPEED_M_PER_S = 299_792_458.0

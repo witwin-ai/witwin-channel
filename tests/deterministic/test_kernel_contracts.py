@@ -10,7 +10,9 @@ import pytest
 
 from ci import check_ops_migration as migration
 from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.deterministic.kernels import accumulation, fields
+from witwin.channel_native.deterministic.kernels import accumulation
+from witwin.channel_native.deterministic.kernels import fields as compatibility_fields
+from witwin.channel_native.propagation.fields.kernels import deterministic as fields
 from witwin.channel_native.runtime import (
     autograd_contracts,
     symbols,
@@ -50,6 +52,7 @@ def test_deterministic_fields_is_the_single_object_owner(name: str):
 
     assert owner.__module__ == fields.__name__
     assert getattr(ops, name) is owner
+    assert getattr(compatibility_fields, name) is owner
 
 
 def test_deterministic_fields_preserves_all_frozen_body_contracts():
@@ -146,10 +149,16 @@ def test_deterministic_accumulation_ad_methods_resolve_canonical_siblings():
     (
         (
             "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.deterministic.kernels import fields"
+            "from witwin.channel_native.propagation.fields.kernels import "
+            "deterministic as fields; "
+            "from witwin.channel_native.deterministic.kernels import "
+            "fields as compatibility_fields"
         ),
         (
-            "from witwin.channel_native.deterministic.kernels import fields; "
+            "from witwin.channel_native.propagation.fields.kernels import "
+            "deterministic as fields; "
+            "from witwin.channel_native.deterministic.kernels import "
+            "fields as compatibility_fields; "
             "from witwin.channel_native.core.kernels import ops"
         ),
     ),
@@ -159,7 +168,8 @@ def test_deterministic_fields_import_order_preserves_facade_identity(imports: st
     code = (
         f"{imports}; "
         f"names={names}; "
-        "assert all(getattr(ops, name) is getattr(fields, name) for name in names)"
+        "assert all(getattr(ops, name) is getattr(fields, name) "
+        "is getattr(compatibility_fields, name) for name in names)"
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")

@@ -157,6 +157,11 @@ from witwin.channel_native.runtime.symbols import (  # noqa: F401
     _required_native_op,
     native_extension,
 )
+from witwin.channel_native.runtime.native_buffers import (  # noqa: F401
+    mc_pack_vec3,
+    mc_receiver_grid_points,
+    mc_transmitter_tensors,
+)
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor  # noqa: F401
 from witwin.channel_native.runtime.autograd_contracts import (  # noqa: F401
     _ad_active_ctx,
@@ -191,7 +196,7 @@ from witwin.channel_native.deterministic.kernels.accumulation import (  # noqa: 
     deterministic_accumulate_flat_backward,
     deterministic_accumulate_flat_jvp,
 )
-from witwin.channel_native.deterministic.kernels.fields import (  # noqa: E402,F401
+from witwin.channel_native.propagation.fields.kernels.deterministic import (  # noqa: E402,F401
     deterministic_delay_to_path_length,
     deterministic_diffraction_vector_field,
     deterministic_field_from_power_phase,
@@ -232,11 +237,8 @@ from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (  # noqa: E4
 from witwin.channel_native.montecarlo.basic.kernels.sampling import (  # noqa: E402,F401
     mc_diffraction_state_pack,
     mc_diffraction_state_wi,
-    mc_pack_vec3,
-    mc_receiver_grid_points,
     mc_reflection_launch_inputs,
     mc_sample_directions,
-    mc_transmitter_tensors,
 )
 from witwin.channel_native.montecarlo.basic.kernels.maps import (  # noqa: E402,F401
     _LIGHT_SPEED_M_PER_S_AD,

@@ -5,7 +5,9 @@ from tests.support.scenes import empty_space_los_scene
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
-from witwin.channel_native.deterministic.kernels import fields as deterministic_fields
+from witwin.channel_native.propagation.fields.kernels import (
+    deterministic as deterministic_fields,
+)
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.propagation.topology.kernels import (
     construction as topology_construction,

@@ -16,6 +16,7 @@ from witwin.channel_native.propagation import topology
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.runtime import (
     autograd_contracts,
+    native_buffers,
     symbols,
     tensor_contracts,
     torch_compat,
@@ -25,15 +26,20 @@ from witwin.channel_native.runtime import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 MANIFEST_PATH = REPOSITORY_ROOT / "ci" / "ops_migration_manifest.json"
 
-_OWNER_NAMES = (
+_SAMPLING_OWNER_NAMES = (
     "mc_diffraction_state_pack",
     "mc_diffraction_state_wi",
-    "mc_pack_vec3",
-    "mc_receiver_grid_points",
     "mc_reflection_launch_inputs",
     "mc_sample_directions",
+)
+
+_NATIVE_BUFFER_OWNER_NAMES = (
+    "mc_pack_vec3",
+    "mc_receiver_grid_points",
     "mc_transmitter_tensors",
 )
+
+_OWNER_NAMES = _SAMPLING_OWNER_NAMES + _NATIVE_BUFFER_OWNER_NAMES
 
 _MAP_OWNER_NAMES = (
     "_McDiffractionMapAdFunction",
@@ -117,11 +123,21 @@ _MAP_CONTRACT_IDS = (
 )
 
 
-@pytest.mark.parametrize("name", _OWNER_NAMES)
+@pytest.mark.parametrize("name", _SAMPLING_OWNER_NAMES)
 def test_mc_basic_sampling_is_the_single_object_owner(name: str):
     owner = getattr(sampling, name)
 
     assert owner.__module__ == sampling.__name__
+    assert getattr(ops, name) is owner
+    assert not hasattr(kernels, name)
+
+
+@pytest.mark.parametrize("name", _NATIVE_BUFFER_OWNER_NAMES)
+def test_runtime_native_buffers_is_the_neutral_single_object_owner(name: str):
+    owner = getattr(native_buffers, name)
+
+    assert owner.__module__ == native_buffers.__name__
+    assert getattr(sampling, name) is owner
     assert getattr(ops, name) is owner
     assert not hasattr(kernels, name)
 
@@ -136,7 +152,29 @@ def test_mc_basic_sampling_preserves_all_frozen_body_contracts():
         if item.qualified_name.startswith(prefix)
     ]
 
-    assert {definition.terminal_name for definition in definitions} == set(_OWNER_NAMES)
+    assert {definition.terminal_name for definition in definitions} == set(
+        _SAMPLING_OWNER_NAMES
+    )
+    for definition in definitions:
+        contract = contracts[definition.terminal_name]
+        assert definition.signature == contract["signature"]
+        assert definition.body_sha256 == contract["body_sha256"]
+        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+
+
+def test_runtime_native_buffers_preserves_all_frozen_body_contracts():
+    manifest = migration.load_manifest(MANIFEST_PATH)
+    contracts = {entry["id"]: entry for entry in manifest["contracts"]}
+    prefix = f"{native_buffers.__name__}."
+    definitions = [
+        item
+        for item in migration.scan_definitions(REPOSITORY_ROOT)
+        if item.qualified_name.startswith(prefix)
+    ]
+
+    assert {definition.terminal_name for definition in definitions} == set(
+        _NATIVE_BUFFER_OWNER_NAMES
+    )
     for definition in definitions:
         contract = contracts[definition.terminal_name]
         assert definition.signature == contract["signature"]
@@ -147,6 +185,11 @@ def test_mc_basic_sampling_preserves_all_frozen_body_contracts():
 def test_mc_basic_sampling_uses_canonical_runtime_dependencies():
     assert sampling.native_extension is symbols.native_extension
     assert sampling.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+
+
+def test_runtime_native_buffers_uses_canonical_runtime_dependencies():
+    assert native_buffers.native_extension is symbols.native_extension
+    assert native_buffers.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
 
 
 @pytest.mark.parametrize("name", _MAP_OWNER_NAMES)
@@ -331,20 +374,32 @@ def test_mc_basic_maps_uses_package_level_los_export_same_object_alias():
     (
         (
             "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.montecarlo.basic.kernels import sampling"
+            "from witwin.channel_native.montecarlo.basic.kernels import sampling; "
+            "from witwin.channel_native.runtime import native_buffers"
+        ),
+        (
+            "from witwin.channel_native.runtime import native_buffers; "
+            "from witwin.channel_native.montecarlo.basic.kernels import sampling; "
+            "from witwin.channel_native.core.kernels import ops"
         ),
         (
             "from witwin.channel_native.montecarlo.basic.kernels import sampling; "
+            "from witwin.channel_native.runtime import native_buffers; "
             "from witwin.channel_native.core.kernels import ops"
         ),
     ),
 )
 def test_mc_basic_sampling_import_order_preserves_facade_identity(imports: str):
-    names = repr(_OWNER_NAMES)
+    sampling_names = repr(_SAMPLING_OWNER_NAMES)
+    buffer_names = repr(_NATIVE_BUFFER_OWNER_NAMES)
     code = (
         f"{imports}; "
-        f"names={names}; "
-        "assert all(getattr(ops, name) is getattr(sampling, name) for name in names)"
+        f"sampling_names={sampling_names}; "
+        f"buffer_names={buffer_names}; "
+        "assert all(getattr(ops, name) is getattr(sampling, name) "
+        "for name in sampling_names); "
+        "assert all(getattr(ops, name) is getattr(sampling, name) "
+        "is getattr(native_buffers, name) for name in buffer_names)"
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")
