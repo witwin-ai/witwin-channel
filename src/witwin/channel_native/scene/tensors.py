@@ -15,7 +15,7 @@ from witwin.channel_native.runtime.native_buffers import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 LIGHT_SPEED_M_PER_S = 299_792_458.0

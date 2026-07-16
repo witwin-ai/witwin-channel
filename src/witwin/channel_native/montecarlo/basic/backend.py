@@ -23,7 +23,7 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 from witwin.channel_native.propagation.topology.kernels.blocks import path_los_export
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 __all__ = [
     "_LIGHT_SPEED_M_PER_S",

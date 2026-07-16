@@ -8,7 +8,7 @@ from witwin.channel_native.montecarlo.bdpt.kernels.maps import (
     bdpt_receiver_grid_points,
     bdpt_transmitter_tensors,
 )
-from witwin.channel_native.core.scene import Scene
+from witwin.channel_native.scene.models import Scene
 from witwin.channel_native.core.receiver_geometry import (
     vector3_tuple as _vector3_tuple,
 )

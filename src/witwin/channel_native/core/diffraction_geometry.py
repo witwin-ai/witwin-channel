@@ -10,7 +10,7 @@ from witwin.channel_native.propagation.geometry.kernels import (
 
 
 def diffraction_edge_geometry(records: object) -> tuple[torch.Tensor, ...]:
-    from witwin.channel_native.core.scene import _RAYD_EDGE_INFO_PLANE_TOL
+    from witwin.channel_native.scene.models import _RAYD_EDGE_INFO_PLANE_TOL
 
     return geometry_primitives.mc_diffraction_edge_geometry(
         records.vertices,

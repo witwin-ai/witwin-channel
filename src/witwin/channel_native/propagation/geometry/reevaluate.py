@@ -16,7 +16,7 @@ from witwin.channel_native.propagation.topology.kernels import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 _PLANE_GROUP_QUANTIZATION = 1.0e-4

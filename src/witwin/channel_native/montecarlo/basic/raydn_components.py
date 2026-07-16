@@ -51,7 +51,7 @@ from witwin.channel_native.montecarlo.transmission import (
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 __all__ = ["_diffraction_edge_geometry"]
 
@@ -105,7 +105,7 @@ def _grid_los_matrix(
     ad: bool = False,
     ledger: object | None = None,
 ) -> torch.Tensor:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los

@@ -9,7 +9,7 @@ from witwin.channel_native.runtime.autograd_contracts import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 def _require_frequency_ad_constant_materials(

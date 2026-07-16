@@ -47,7 +47,7 @@ from witwin.channel_native.propagation.topology.kernels import (
 from witwin.channel_native.scene.tensors import _frequency_scalar
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 def _path_components(config: TopologyConfig) -> set[str]:

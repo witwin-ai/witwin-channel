@@ -176,6 +176,10 @@ def _assert_object_graph_resource_free(value: object, seen: set[int]) -> None:
 
 
 def test_public_and_legacy_scene_class_identity_and_pickle_replay():
+    assert canonical_models.Scene is legacy_scene.Scene is public.Scene
+    assert canonical_models.Scene.__module__ == "witwin.channel_native.core.scene"
+    assert canonical_models.Scene.compile.__globals__ is vars(canonical_models)
+    assert "__all__" not in vars(legacy_scene)
     assert (
         canonical_models.Structure
         is legacy_objects.Structure

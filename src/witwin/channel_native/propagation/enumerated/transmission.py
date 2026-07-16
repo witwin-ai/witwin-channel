@@ -25,7 +25,7 @@ from witwin.channel_native.propagation.topology.discovery.transmission import (
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 def _transmission_topology(

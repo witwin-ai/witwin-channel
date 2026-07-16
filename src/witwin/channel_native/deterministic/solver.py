@@ -41,7 +41,7 @@ from .config import Config
 from .result import Result
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 def _validate_requested_components(config: Config) -> None:

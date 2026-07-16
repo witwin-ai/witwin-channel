@@ -41,7 +41,7 @@ from .result import Result
 from .sampling import make_cuda_generator
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 # Components whose Monte Carlo power maps have no AD companions yet: the

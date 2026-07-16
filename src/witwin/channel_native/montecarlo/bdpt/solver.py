@@ -32,7 +32,7 @@ from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
     bdpt_sample_directions,
     bdpt_selected_edge_indices,
 )
-from witwin.channel_native.core.scene import Scene
+from witwin.channel_native.scene.models import Scene
 from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_accumulate_connection_samples,
     bdpt_compact_connection_samples,

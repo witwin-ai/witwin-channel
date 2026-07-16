@@ -39,7 +39,7 @@ from witwin.channel_native.propagation.topology.kernels import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 def _coupled_reflection_diffraction_topology_order2(

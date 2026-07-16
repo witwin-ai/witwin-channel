@@ -94,7 +94,7 @@ from witwin.channel_native.scattering import eval_bsdf, patch_phase_integral
 from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 __all__ = ["append_scattering_paths"]
 

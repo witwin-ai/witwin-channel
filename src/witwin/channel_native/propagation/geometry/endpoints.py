@@ -12,7 +12,7 @@ from witwin.channel_native.scene.tensors import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.scene import Scene
+    from witwin.channel_native.scene.models import Scene
 
 
 @dataclass(frozen=True, slots=True)
