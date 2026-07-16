@@ -45,3 +45,10 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_configs = true
+
+[tool.coverage.run]
+branch = true
+source = ["src/witwin/channel_native"]
+
+[tool.coverage.report]
+precision = 2
