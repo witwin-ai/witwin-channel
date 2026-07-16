@@ -49,6 +49,34 @@ COMMON_HOST_HELPERS = {
     "check_path_block_shapes",
     "launch_blocks",
 }
+TOPOLOGY_KERNELS = {
+    "deterministic_order_init_kernel",
+    "deterministic_sort_key_1d_kernel",
+    "deterministic_sort_key_sequence_kernel",
+    "deterministic_face_group_keys_kernel",
+    "deterministic_surface_group_keys_kernel",
+    "deterministic_face_group_sort_key_kernel",
+    "deterministic_face_group_flags_kernel",
+    "deterministic_face_group_assign_kernel",
+    "deterministic_face_group_members_kernel",
+}
+TOPOLOGY_PRIVATE_FUNCTIONS = {
+    "block_tensor",
+    "block_has_field",
+    "check_optional_field_presence",
+    "check_topology_concat_schema",
+    "copy_tensor_rows",
+    "deterministic_gather_rows_kernel",
+    "gather_tensor_rows",
+}
+TOPOLOGY_ABI = {
+    "cn_deterministic_concat_topology_blocks",
+    "cn_deterministic_gather_topology_block",
+    "cn_deterministic_face_groups",
+    "cn_deterministic_surface_face_groups",
+    "cn_deterministic_sort_order",
+}
+TOPOLOGY_FUNCTIONS = TOPOLOGY_KERNELS | TOPOLOGY_PRIVATE_FUNCTIONS | TOPOLOGY_ABI
 
 
 def _function_names_by_path() -> dict[str, set[str]]:
@@ -85,6 +113,17 @@ def test_path_compaction_translation_unit_owns_the_audited_functions() -> None:
     )
 
 
+def test_deterministic_topology_translation_unit_owns_the_audited_functions() -> None:
+    names = _function_names_by_path()
+    topology = "native/channel_native/kernels/deterministic_topology.cu"
+    trace = "native/channel_native/kernels/path_trace.cu"
+    compaction = "native/channel_native/kernels/path_compaction.cu"
+
+    assert TOPOLOGY_FUNCTIONS <= names[topology]
+    assert not TOPOLOGY_FUNCTIONS & names[trace]
+    assert not TOPOLOGY_FUNCTIONS & names[compaction]
+
+
 def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
     source_evidence = next(
@@ -94,7 +133,11 @@ def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     )
     sources = "\n".join(
         (KERNEL_ROOT / name).read_text(encoding="utf-8-sig")
-        for name in ("path_trace.cu", "path_compaction.cu")
+        for name in (
+            "deterministic_topology.cu",
+            "path_trace.cu",
+            "path_compaction.cu",
+        )
     )
 
     actual_launches = Counter(
@@ -111,25 +154,41 @@ def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     assert sources.count("cudaStreamSynchronize(") == len(
         source_evidence["explicit_sync_sites"]
     )
+    actual_by_unit = {}
+    for name in (
+        "deterministic_topology.cu",
+        "path_trace.cu",
+        "path_compaction.cu",
+    ):
+        source = (KERNEL_ROOT / name).read_text(encoding="utf-8-sig")
+        actual_by_unit[name] = (
+            source.count("<<<"),
+            source.count("cudaStreamSynchronize("),
+        )
+    assert actual_by_unit == {
+        "deterministic_topology.cu": (16, 4),
+        "path_trace.cu": (19, 0),
+        "path_compaction.cu": (16, 7),
+    }
 
 
-def test_path_split_is_registered_once_and_below_the_hard_limit() -> None:
+def test_path_split_is_registered_once_and_below_the_recommended_limit() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
     policy = inventory["translation_unit_policy"]
 
-    for name in ("path_trace.cu", "path_compaction.cu"):
+    for name in (
+        "deterministic_topology.cu",
+        "path_trace.cu",
+        "path_compaction.cu",
+    ):
         relative = f"native/channel_native/kernels/{name}"
         line_count = len(
             (KERNEL_ROOT / name).read_text(encoding="utf-8-sig").splitlines()
         )
         assert cmake.count(relative) == 1
-        assert line_count <= policy["hard_limit_lines"]
+        assert line_count < policy["recommended_limit_lines"]
 
-    assert policy["planned_owner_debt"][
-        "native/channel_native/kernels/path_trace.cu"
-    ] == len(
-        (KERNEL_ROOT / "path_trace.cu")
-        .read_text(encoding="utf-8-sig")
-        .splitlines()
-    )
+    assert "native/channel_native/kernels/path_trace.cu" not in policy[
+        "planned_owner_debt"
+    ]

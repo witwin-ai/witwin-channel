@@ -485,6 +485,7 @@ Python_add_library(
     native/channel_native/kernels/diffraction_discovery.cu
     native/channel_native/kernels/deterministic_accum.cu
     native/channel_native/kernels/deterministic_field.cu
+    native/channel_native/kernels/deterministic_topology.cu
     native/channel_native/kernels/los.cu
     native/channel_native/kernels/material.cu
     native/channel_native/kernels/path_compaction.cu
