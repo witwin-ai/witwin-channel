@@ -26,7 +26,6 @@ python_version = "3.11"
 files = [
     "src/witwin/channel_native/capabilities.py",
     "src/witwin/channel_native/deployment.py",
-    "src/witwin/channel_native/runtime/autograd_contracts.py",
     "src/witwin/channel_native/runtime/native_buffers.py",
     "src/witwin/channel_native/runtime/native_handles.py",
     "src/witwin/channel_native/runtime/tensor_contracts.py",

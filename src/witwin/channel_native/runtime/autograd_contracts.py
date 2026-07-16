@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import overload
-
 import torch
 
 from witwin.channel_native.runtime import torch_compat
@@ -11,7 +9,7 @@ from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def _ad_still_wrapped(value: torch.Tensor) -> bool:
-    return bool(torch_compat.is_transform_wrapped_tensor(value))
+    return torch_compat.is_transform_wrapped_tensor(value)
 
 
 def _ad_raise_composed_transforms() -> None:
@@ -24,14 +22,6 @@ def _ad_raise_composed_transforms() -> None:
         " forward-mode jvp) are not supported by the native geometry kernels"
         " (first-order only)"
     )
-
-
-@overload
-def _ad_native_tensor(value: None) -> None: ...
-
-
-@overload
-def _ad_native_tensor(value: torch.Tensor) -> torch.Tensor: ...
 
 
 def _ad_native_tensor(value: torch.Tensor | None) -> torch.Tensor | None:
