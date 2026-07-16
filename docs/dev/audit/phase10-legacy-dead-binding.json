@@ -283,7 +283,8 @@
       "name": "_native_diffraction_component_maps",
       "definition": "src/witwin/channel_native/montecarlo/bdpt/pipeline.py:339",
       "classification": "dead",
-      "decision": "delete_in_phase10",
+      "decision": "removed",
+      "status": "removed",
       "evidence": ["Private superseded grid-map implementation has no static, dynamic, binding, or public caller."],
       "tests": ["tests/montecarlo/bdpt", "tests/acceptance"],
       "compatibility_cycle": "not_required"

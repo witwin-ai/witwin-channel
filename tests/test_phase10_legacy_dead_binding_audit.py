@@ -179,3 +179,33 @@ def test_phase10_fresnel_scalar_dead_candidate_is_removed_exactly() -> None:
     assert candidate["decision"] == candidate["status"] == "removed"
     assert "_fresnel_scalar_coefficient" not in top_level_names
     assert production_references == []
+
+
+def test_phase10_bdpt_native_diffraction_component_maps_is_removed_exactly() -> None:
+    audit = _audit()
+    candidate = next(
+        item
+        for item in audit["zero_reference_candidates"]
+        if item["name"] == "_native_diffraction_component_maps"
+    )
+    pipeline_path = (
+        REPOSITORY_ROOT
+        / "src/witwin/channel_native/montecarlo/bdpt/pipeline.py"
+    )
+    tree = ast.parse(pipeline_path.read_text(encoding="utf-8-sig"))
+    top_level_names = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    }
+    production_references = [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in PYTHON_ROOT.rglob("*.py")
+        if "_native_diffraction_component_maps"
+        in path.read_text(encoding="utf-8-sig")
+    ]
+
+    assert candidate["classification"] == "dead"
+    assert candidate["decision"] == candidate["status"] == "removed"
+    assert "_native_diffraction_component_maps" not in top_level_names
+    assert production_references == []

@@ -6,7 +6,6 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.field_state import (
@@ -19,14 +18,12 @@ from witwin.channel_native.core.memory_budget import (
     enforce_memory_budget,
 )
 from witwin.channel_native.core.receiver_geometry import (
-    axis_aligned_grid_spec as _grid_spec,
     first_receiver_grid,
 )
 from witwin.channel_native.core.path_topology import export_topology
 
 from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
     bdpt_diffraction_state_pack,
-    bdpt_diffraction_state_wi,
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,
     bdpt_selected_edge_indices,
@@ -38,7 +35,6 @@ from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_concat_connection_samples,
     bdpt_connection_variance,
     bdpt_count_valid_connection_samples,
-    bdpt_diffraction_connection_samples_from_tape,
     bdpt_diffraction_point_connection_samples,
     bdpt_endpoint_connection_samples,
     bdpt_endpoint_connection_visibility_inputs,
@@ -49,11 +45,9 @@ from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_transmitted_light_subpath_state,
 )
 from witwin.channel_native.montecarlo.bdpt.kernels.maps import (
-    bdpt_component_map_buffer,
     bdpt_finalize_component_maps,
     bdpt_finalize_point_components,
     bdpt_los_component_maps_from_matrix,
-    bdpt_store_component_map,
     bdpt_zero_matrix,
 )
 from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
@@ -334,156 +328,6 @@ def _diffraction_sample_split(sample_count: int, *, mis: str) -> tuple[int, int,
 
 def _diffraction_strategy_count(direct_samples: int, keller_samples: int) -> int:
     return (1 if direct_samples > 0 else 0) + (1 if keller_samples > 0 else 0)
-
-
-def _native_diffraction_component_maps(
-    scene: Scene,
-    raydn: Any,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    grid: ReceiverGrid,
-    material_tensors: tuple[torch.Tensor, ...],
-    *,
-    samples: int,
-    seed: int,
-    export_samples: bool,
-    mis: str,
-    beta: float,
-) -> tuple[torch.Tensor, list[dict[str, torch.Tensor]]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = (
-        material_tensors
-    )
-    spec = _grid_spec(grid)
-    dim0, dim1 = grid.shape[1], grid.shape[0]
-    maps = bdpt_component_map_buffer(
-        tx_positions, tx_count=tx_positions.shape[0], dim0=dim0, dim1=dim1
-    )
-    edge_geometry = _cached_diffraction_edge_geometry(raydn)
-    (
-        selected,
-        edge_pos,
-        edge_dir,
-        _lengths,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-    ) = edge_geometry
-    edge_indices = bdpt_selected_edge_indices(selected)
-    wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    sample_blocks: list[dict[str, torch.Tensor]] = []
-
-    for tx_index in range(int(tx_positions.shape[0])):
-        states = bdpt_diffraction_state_pack(
-            edge_indices,
-            edge_pos,
-            edge_dir,
-            line_min,
-            line_max,
-            n0,
-            n1,
-            face0,
-            face1,
-            exterior_angle,
-            tx_positions[tx_index],
-            tx_power[tx_index],
-        )
-        state_count = int(states[0].shape[0])
-        if state_count <= 0:
-            continue
-        state_wi = bdpt_diffraction_state_wi(states[1], states[10])
-        cell_count = int(spec.resolution0) * int(spec.resolution1)
-        direct_samples = int(samples) if int(samples) >= state_count * cell_count else 0
-        keller_samples = 0 if direct_samples else int(samples)
-        suffix_samples = 0
-        out = geometry_bridge.bdpt_diffraction_accumulation_forward(
-            raydn.require_handle(),
-            None,
-            *states,
-            state_wi,
-            state_wi,
-            _eps_r,
-            _sigma_e,
-            _mu_r,
-            material_gain,
-            material_valid,
-            state_count,
-            int(spec.axis),
-            float(spec.position),
-            float(spec.coord0_min),
-            float(spec.coord0_max),
-            float(spec.coord1_min),
-            float(spec.coord1_max),
-            int(spec.resolution0),
-            int(spec.resolution1),
-            float(spec.cell_area),
-            float(wavelength),
-            int(direct_samples),
-            int(keller_samples),
-            int(suffix_samples),
-            int(seed),
-            1,
-            0,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            1 if export_samples else 0,
-            None,
-            None,
-        )
-        diffraction_map = out[0] * float(cell_count) if direct_samples else out[0]
-        maps = bdpt_store_component_map(
-            maps,
-            diffraction_map,
-            tx_index=tx_index,
-        )
-        if export_samples:
-            tape = {
-                "active": out[14],
-                "state_idx": out[15],
-                "cell": out[16],
-                "material_idx": out[17],
-                "edge_u": out[18],
-            }
-            sample_blocks.append(
-                bdpt_diffraction_connection_samples_from_tape(
-                    tape,
-                    states,
-                    material_gain,
-                    material_valid,
-                    tx_index=tx_index,
-                    state_count=state_count,
-                    grid_axis=int(spec.axis),
-                    grid_position=float(spec.position),
-                    grid_coord0_min=float(spec.coord0_min),
-                    grid_coord0_max=float(spec.coord0_max),
-                    grid_coord1_min=float(spec.coord1_min),
-                    grid_coord1_max=float(spec.coord1_max),
-                    grid_resolution0=int(spec.resolution0),
-                    grid_resolution1=int(spec.resolution1),
-                    grid_cell_area=float(spec.cell_area),
-                    wavelength=float(wavelength),
-                    direct_samples=int(direct_samples),
-                    keller_samples=int(keller_samples),
-                    mis=mis,
-                    beta=beta,
-                    strategy_count=_diffraction_strategy_count(
-                        direct_samples, keller_samples
-                    ),
-                )
-            )
-    return maps, sample_blocks
 
 
 def _native_diffraction_point_connection_samples(
