@@ -10,6 +10,10 @@ from witwin.channel_native.scene.stores.assignments import (  # noqa: F401
 from witwin.channel_native.scene.stores.materials import (  # noqa: F401
     MaterialStore,
 )
+from witwin.channel_native.scene.scattering_resources import (  # noqa: F401
+    KirchhoffRuntimeResources,
+    PhaseScreenRuntimeResources,
+)
 from witwin.channel_native.scene.compiled import CompiledScene
 
 __all__ = ["CompiledScene"]

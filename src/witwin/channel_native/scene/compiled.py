@@ -4,10 +4,20 @@ from dataclasses import dataclass, field
 
 import torch
 
+from witwin.channel_native.scattering.phase_screen import PhaseScreenRuntime
+from witwin.channel_native.scattering.tables import KirchhoffTable
+from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
+from witwin.channel_native.scene.scattering_resources import (
+    KirchhoffRuntimeResources,
+    PhaseScreenRuntimeResources,
+    RoughMaterialRuntime,
+    ScatteringResourceKey,
+    build_kirchhoff_resources,
+    build_phase_screen_resources,
+)
 from witwin.channel_native.scene.stores.assignments import AssignmentStore
 from witwin.channel_native.scene.stores.geometry import GeometryStore
 from witwin.channel_native.scene.stores.materials import MaterialStore
-from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
 
 
 @dataclass(slots=True)
@@ -24,15 +34,15 @@ class CompiledScene:
     # compile cost). A CompiledScene instance is already cache-keyed by the
     # material cache_token in Scene.compile, so instance-level caching is
     # consistent with the material cache.
-    _kirchhoff_tables_cache: dict[int, object] | None = field(
+    _kirchhoff_resources_cache: KirchhoffRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
-    _phase_screen_runtimes_cache: dict[int, object] | None = field(
+    _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
 
     @property
-    def kirchhoff_tables(self) -> dict[int, object]:
+    def kirchhoff_resources(self) -> KirchhoffRuntimeResources:
         """Kirchhoff BSDF tables per material index (scatter_model_id == 1).
 
         Built lazily from the MaterialStore CSR layers and roughness fields
@@ -40,52 +50,55 @@ class CompiledScene:
         out-of-domain roughness (never silently degrades).
         """
 
-        if self._kirchhoff_tables_cache is None:
-            from witwin.channel_native.materials.models import Roughness
-            from witwin.channel_native.scattering import build_kirchhoff_table
-
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            store = self.materials
-            tables: dict[int, object] = {}
-            for index in range(int(store.material_id.numel())):
-                if int(store.scatter_model_id[index]) != 1:
-                    continue
-                offset = int(store.layer_offset[index])
-                count = int(store.layer_count[index])
-                layers = [
-                    (
-                        float(store.layer_thickness_m[row]),
-                        float(store.layer_eps_r[row]),
-                        float(store.layer_sigma_e[row]),
-                        float(store.layer_mu_r[row]),
-                    )
-                    for row in range(offset, offset + count)
-                ]
-                roughness = Roughness(
-                    rms_height_m=float(store.rough_sigma_h_m[index]),
-                    corr_length_x_m=float(store.rough_corr_x_m[index]),
-                    corr_length_y_m=float(store.rough_corr_y_m[index]),
-                    principal_axis_rad=float(store.rough_axis_rad[index]),
-                )
-                tables[index] = build_kirchhoff_table(
-                    roughness, layers, store.frequency_hz, device=device
-                )
-            self._kirchhoff_tables_cache = tables
-        return self._kirchhoff_tables_cache
+        key = self._scattering_resource_key()
+        if (
+            self._kirchhoff_resources_cache is None
+            or self._kirchhoff_resources_cache.key != key
+        ):
+            self._kirchhoff_resources_cache = build_kirchhoff_resources(
+                self.materials, key
+            )
+        return self._kirchhoff_resources_cache
 
     @property
-    def phase_screen_runtimes(self) -> dict[int, object]:
+    def phase_screen_resources(self) -> PhaseScreenRuntimeResources:
         """Phase-screen runtimes per structure index (lazy, GPU textures)."""
 
-        if self._phase_screen_runtimes_cache is None:
-            from witwin.channel_native.scattering import PhaseScreenRuntime
+        key = self._scattering_resource_key()
+        if (
+            self._phase_screen_resources_cache is None
+            or self._phase_screen_resources_cache.key != key
+        ):
+            self._phase_screen_resources_cache = build_phase_screen_resources(
+                self.assignments, key
+            )
+        return self._phase_screen_resources_cache
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            self._phase_screen_runtimes_cache = {
-                index: PhaseScreenRuntime(screen, device=device)
-                for index, screen in self.assignments.structure_phase_screens.items()
-            }
-        return self._phase_screen_runtimes_cache
+    @property
+    def kirchhoff_tables(self) -> dict[int, KirchhoffTable]:
+        """Compatibility view of the typed Kirchhoff table resources."""
+
+        return self.kirchhoff_resources.tables
+
+    @property
+    def phase_screen_runtimes(self) -> dict[int, PhaseScreenRuntime]:
+        """Compatibility view of the typed phase-screen resources."""
+
+        return self.phase_screen_resources.runtimes
+
+    @property
+    def rough_material_runtimes(self) -> dict[int, RoughMaterialRuntime]:
+        """Typed rough-material runtimes sharing the cached table objects."""
+
+        return self.kirchhoff_resources.materials
+
+    def _scattering_resource_key(self) -> ScatteringResourceKey:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return ScatteringResourceKey(
+            material_cache_token=self.materials.cache_token,
+            assignment_version=self.assignment_version,
+            device=device,
+        )
 
 
 CompiledScene.__module__ = "witwin.channel_native.core.runtime.compiled_scene"

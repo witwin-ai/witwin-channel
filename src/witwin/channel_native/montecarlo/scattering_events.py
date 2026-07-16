@@ -68,7 +68,7 @@ and future multi-bounce MIS.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # noqa: F401 - legacy reachable global
 import math
 from typing import Any
 
@@ -79,8 +79,10 @@ from witwin.channel_native.scattering.kernels.functional import (
     scattering_event_probabilities,
     scattering_table_sample,
 )
-from witwin.channel_native.materials.models import Roughness
+from witwin.channel_native.materials.models import Roughness  # noqa: F401
 from witwin.channel_native.scattering import tables as kirchhoff_tables
+from witwin.channel_native.scattering.tables import KirchhoffTable  # noqa: F401
+from witwin.channel_native.scene.scattering_resources import RoughMaterialRuntime
 
 from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
@@ -129,16 +131,6 @@ _MASK63 = (1 << 63) - 1
 _DEGENERATE_SIN_SQ = 1.0e-12
 
 
-@dataclass(frozen=True, slots=True)
-class RoughMaterialRuntime:
-    """Per-material scattering runtime: table plus oracle-layer inputs."""
-
-    material_index: int
-    table: Any  # KirchhoffTable
-    layers: tuple[tuple[float, float, float, float], ...]
-    roughness: Roughness
-
-
 def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
     """Kirchhoff runtimes per material index (``scatter_model_id == 1``).
 
@@ -147,33 +139,7 @@ def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
     raise ``kirchhoff_domain_exceeded`` for out-of-domain roughness.
     """
 
-    store = compiled.materials
-    runtimes: dict[int, RoughMaterialRuntime] = {}
-    for index, table in compiled.kirchhoff_tables.items():
-        offset = int(store.layer_offset[index])
-        count = int(store.layer_count[index])
-        layers = tuple(
-            (
-                float(store.layer_thickness_m[row]),
-                float(store.layer_eps_r[row]),
-                float(store.layer_sigma_e[row]),
-                float(store.layer_mu_r[row]),
-            )
-            for row in range(offset, offset + count)
-        )
-        roughness = Roughness(
-            rms_height_m=float(store.rough_sigma_h_m[index]),
-            corr_length_x_m=float(store.rough_corr_x_m[index]),
-            corr_length_y_m=float(store.rough_corr_y_m[index]),
-            principal_axis_rad=float(store.rough_axis_rad[index]),
-        )
-        runtimes[index] = RoughMaterialRuntime(
-            material_index=int(index),
-            table=table,
-            layers=layers,
-            roughness=roughness,
-        )
-    return runtimes
+    return compiled.rough_material_runtimes
 
 
 def scatter_direction_uniforms(

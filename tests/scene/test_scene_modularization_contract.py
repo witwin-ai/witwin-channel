@@ -36,6 +36,7 @@ from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.scene import models as canonical_models
 from witwin.channel_native.scene import compiled as canonical_compiled
+from witwin.channel_native.scene import scattering_resources
 from witwin.channel_native.scene.kernels import rayd_scene as canonical_raydn
 from witwin.channel_native.scene.stores import _validation as canonical_validation
 from witwin.channel_native.scene.stores import assignments as canonical_assignments
@@ -690,8 +691,8 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "geometry_version",
         "material_version",
         "assignment_version",
-        "_kirchhoff_tables_cache",
-        "_phase_screen_runtimes_cache",
+        "_kirchhoff_resources_cache",
+        "_phase_screen_resources_cache",
     )
     assert all(item.default is MISSING for item in schema[:8])
     assert all(item.default_factory is MISSING for item in schema)
@@ -706,8 +707,12 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "geometry_version": int,
         "material_version": int,
         "assignment_version": int,
-        "_kirchhoff_tables_cache": dict[int, object] | None,
-        "_phase_screen_runtimes_cache": dict[int, object] | None,
+        "_kirchhoff_resources_cache": (
+            scattering_resources.KirchhoffRuntimeResources | None
+        ),
+        "_phase_screen_resources_cache": (
+            scattering_resources.PhaseScreenRuntimeResources | None
+        ),
     }
 
 
@@ -870,14 +875,140 @@ def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatc
     monkeypatch.setattr(scattering, "PhaseScreenRuntime", build_screen)
 
     assert events == []
-    tables = compiled.kirchhoff_tables
+    assert compiled._kirchhoff_resources_cache is None
+    assert compiled._phase_screen_resources_cache is None
+    kirchhoff_resources = compiled.kirchhoff_resources
+    assert compiled.kirchhoff_resources is kirchhoff_resources
+    assert kirchhoff_resources.key == scattering_resources.ScatteringResourceKey(
+        material_cache_token="rough-material",
+        assignment_version=compiled.assignment_version,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    )
+    tables = kirchhoff_resources.tables
     assert tables == {0: table_resource}
     assert compiled.kirchhoff_tables is tables
+    materials_by_index = kirchhoff_resources.materials
+    assert compiled.rough_material_runtimes is materials_by_index
+    assert materials_by_index[0].table is table_resource
+    from witwin.channel_native.montecarlo import scattering_events
+
+    assert scattering_events.RoughMaterialRuntime is (
+        scattering_resources.RoughMaterialRuntime
+    )
+    assert pickle.loads(
+        _pickle_global(
+            "witwin.channel_native.montecarlo.scattering_events",
+            "RoughMaterialRuntime",
+        )
+    ) is scattering_resources.RoughMaterialRuntime
+    assert pickle.loads(pickle.dumps(scattering_events.RoughMaterialRuntime)) is (
+        scattering_resources.RoughMaterialRuntime
+    )
+    assert scattering_events.rough_material_runtimes(compiled) is materials_by_index
     assert events == ["table"]
-    runtimes = compiled.phase_screen_runtimes
+    assert compiled._phase_screen_resources_cache is None
+    phase_screen_resources = compiled.phase_screen_resources
+    assert compiled.phase_screen_resources is phase_screen_resources
+    runtimes = phase_screen_resources.runtimes
     assert runtimes == {0: screen_resource}
     assert compiled.phase_screen_runtimes is runtimes
     assert events == ["table", "screen"]
+
+
+def test_compiled_scattering_resource_failures_are_retryable(monkeypatch):
+    base = public.Scene(
+        structures=[], transmitters=[], receivers=[], frequency=3.5e9
+    ).compile()
+    compiled = replace(
+        base,
+        materials=replace(
+            base.materials,
+            scatter_model_id=torch.ones_like(base.materials.scatter_model_id),
+            rough_sigma_h_m=torch.full_like(base.materials.rough_sigma_h_m, 1.0e-3),
+            rough_corr_x_m=torch.full_like(base.materials.rough_corr_x_m, 0.1),
+            rough_corr_y_m=torch.full_like(base.materials.rough_corr_y_m, 0.2),
+        ),
+        assignments=replace(
+            base.assignments,
+            structure_material_id=torch.tensor([0], dtype=torch.int32),
+            structure_phase_screens={
+                0: public_materials.PhaseScreen(height=[[0.0]], height_scale_m=1.0)
+            },
+        ),
+    )
+    table_calls = 0
+    screen_calls = 0
+
+    def build_table(*args, **kwargs):
+        nonlocal table_calls
+        del args, kwargs
+        table_calls += 1
+        if table_calls == 1:
+            raise RuntimeError("table build failed")
+        return object()
+
+    def build_screen(*args, **kwargs):
+        nonlocal screen_calls
+        del args, kwargs
+        screen_calls += 1
+        if screen_calls == 1:
+            raise RuntimeError("screen build failed")
+        return object()
+
+    monkeypatch.setattr(scattering, "build_kirchhoff_table", build_table)
+    monkeypatch.setattr(scattering, "PhaseScreenRuntime", build_screen)
+
+    with pytest.raises(RuntimeError, match="table build failed"):
+        compiled.kirchhoff_resources
+    assert compiled._kirchhoff_resources_cache is None
+    assert compiled.kirchhoff_resources is compiled.kirchhoff_resources
+    assert table_calls == 2
+    assert screen_calls == 0
+
+    with pytest.raises(RuntimeError, match="screen build failed"):
+        compiled.phase_screen_resources
+    assert compiled._phase_screen_resources_cache is None
+    assert compiled.phase_screen_resources is compiled.phase_screen_resources
+    assert screen_calls == 2
+
+
+def test_smooth_compiled_scene_persists_independent_empty_resources():
+    compiled = public.Scene(
+        structures=[], transmitters=[], receivers=[], frequency=3.5e9
+    ).compile()
+
+    tables = compiled.kirchhoff_tables
+    assert tables == {}
+    assert compiled.kirchhoff_tables is tables
+    assert compiled.rough_material_runtimes == {}
+    assert compiled._phase_screen_resources_cache is None
+
+    runtimes = compiled.phase_screen_runtimes
+    assert runtimes == {}
+    assert compiled.phase_screen_runtimes is runtimes
+
+
+def test_compiled_scattering_resources_rebuild_when_key_changes():
+    compiled = public.Scene(
+        structures=[], transmitters=[], receivers=[], frequency=3.5e9
+    ).compile()
+    first_kirchhoff = compiled.kirchhoff_resources
+    first_screens = compiled.phase_screen_resources
+
+    changed = replace(
+        compiled,
+        materials=replace(compiled.materials, cache_token="changed-material"),
+        assignment_version=compiled.assignment_version + 1,
+    )
+
+    assert changed._kirchhoff_resources_cache is first_kirchhoff
+    assert changed._phase_screen_resources_cache is first_screens
+    assert changed.kirchhoff_resources is not first_kirchhoff
+    assert changed.phase_screen_resources is not first_screens
+    assert changed.kirchhoff_resources.key.material_cache_token == "changed-material"
+    assert changed.phase_screen_resources.key.assignment_version == (
+        compiled.assignment_version + 1
+    )
 
 
 @pytest.mark.parametrize(
