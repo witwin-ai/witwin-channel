@@ -80,7 +80,6 @@ def compile_scene(scene: Any) -> CompiledScene:
         materials=materials,
         assignments=assignments,
         raydn=raydn,
-        workspace=None,
         geometry_version=geometry.version,
         material_version=materials.version,
         assignment_version=assignments.version,

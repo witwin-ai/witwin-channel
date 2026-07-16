@@ -687,23 +687,21 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "materials",
         "assignments",
         "raydn",
-        "workspace",
         "geometry_version",
         "material_version",
         "assignment_version",
         "_kirchhoff_resources_cache",
         "_phase_screen_resources_cache",
     )
-    assert all(item.default is MISSING for item in schema[:8])
+    assert all(item.default is MISSING for item in schema[:7])
     assert all(item.default_factory is MISSING for item in schema)
-    assert tuple(item.default for item in schema[8:]) == (None, None)
-    assert all(not item.repr and not item.compare for item in schema[8:])
+    assert tuple(item.default for item in schema[7:]) == (None, None)
+    assert all(not item.repr and not item.compare for item in schema[7:])
     assert get_type_hints(owner) == {
         "geometry": legacy_geometry.GeometryStore,
         "materials": legacy_material_store.MaterialStore,
         "assignments": legacy_assignments.AssignmentStore,
         "raydn": legacy_raydn.RayDNScene,
-        "workspace": object | None,
         "geometry_version": int,
         "material_version": int,
         "assignment_version": int,

@@ -26,7 +26,6 @@ class CompiledScene:
     materials: MaterialStore
     assignments: AssignmentStore
     raydn: RayDNScene
-    workspace: object | None
     geometry_version: int
     material_version: int
     assignment_version: int
