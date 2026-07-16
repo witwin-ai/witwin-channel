@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from typing import Protocol
+from typing import Protocol, cast
 
 import torch
 
@@ -38,7 +38,7 @@ def interpreter_stack() -> tuple[_Interpreter, ...]:
 def is_jvp_transform(interpreter: _Interpreter) -> bool:
     """Return whether an interpreter stack entry is a JVP transform."""
 
-    return interpreter.key() == torch._C._functorch.TransformType.Jvp
+    return bool(interpreter.key() == torch._C._functorch.TransformType.Jvp)
 
 
 def unwrap_transform_tensor(value: torch.Tensor) -> torch.Tensor:
@@ -50,7 +50,7 @@ def unwrap_transform_tensor(value: torch.Tensor) -> torch.Tensor:
 def disable_functorch() -> AbstractContextManager[object]:
     """Disable functorch dispatch inside native/custom-AD bridge code."""
 
-    return torch._C._DisableFuncTorch()
+    return cast(AbstractContextManager[object], torch._C._DisableFuncTorch())
 
 
 def uses_cxx11_abi() -> bool:

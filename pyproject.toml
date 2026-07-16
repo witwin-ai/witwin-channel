@@ -20,3 +20,29 @@ wheel.packages = ["src/witwin"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+    "src/witwin/channel_native/capabilities.py",
+    "src/witwin/channel_native/deployment.py",
+    "src/witwin/channel_native/runtime/autograd_contracts.py",
+    "src/witwin/channel_native/runtime/native_buffers.py",
+    "src/witwin/channel_native/runtime/native_handles.py",
+    "src/witwin/channel_native/runtime/tensor_contracts.py",
+    "src/witwin/channel_native/runtime/torch_compat.py",
+    "src/witwin/channel_native/deterministic/config.py",
+    "src/witwin/channel_native/montecarlo/basic/config.py",
+    "src/witwin/channel_native/montecarlo/bdpt/config.py",
+    "src/witwin/channel_native/path/config.py",
+]
+follow_imports = "skip"
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true

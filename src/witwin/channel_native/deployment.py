@@ -7,7 +7,7 @@ import platform
 import sys
 from collections.abc import Callable
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 
 DEPLOYMENT_ABI = "witwin.channel_native.deployment.v1"
@@ -59,7 +59,7 @@ def sm_support(sm: int) -> dict[str, Any]:
 def _import_torch() -> ModuleType:
     import torch
 
-    return torch
+    return cast(ModuleType, torch)
 
 
 def _torch_runtime_diagnostics(torch: ModuleType) -> dict[str, Any]:
@@ -86,7 +86,7 @@ def _torch_runtime_diagnostics(torch: ModuleType) -> dict[str, Any]:
 def _import_native_build_info() -> Callable[[], dict[str, object]]:
     from .runtime.extension import build_info
 
-    return build_info
+    return cast(Callable[[], dict[str, object]], build_info)
 
 
 def _import_error(component: str, exc: ImportError | OSError) -> str:
