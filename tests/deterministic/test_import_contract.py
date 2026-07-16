@@ -37,6 +37,6 @@ def test_deterministic_import_does_not_import_forbidden_solver_stacks():
 def test_solver_facade_delegates_to_pipeline_owner():
     from witwin.channel_native.deterministic import pipeline, solver
 
-    assert solver.solve is pipeline.solve
     assert solver._metadata is pipeline._metadata
+    assert solver.solve.__module__ == solver.__name__
     assert pipeline.solve.__module__ == pipeline.__name__

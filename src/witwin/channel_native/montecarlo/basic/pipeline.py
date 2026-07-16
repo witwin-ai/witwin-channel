@@ -129,8 +129,12 @@ def solve_pipeline(
     *,
     build_info_fn=build_info,
     make_cuda_generator_fn=make_cuda_generator,
+    validate_scalar_endpoint_features_fn=validate_scalar_endpoint_features,
+    require_frequency_ad_constant_materials_fn=(
+        _require_frequency_ad_constant_materials
+    ),
 ) -> Result:
-    validate_scalar_endpoint_features(
+    validate_scalar_endpoint_features_fn(
         scene.transmitters, scene.receivers, solver="Monte Carlo basic"
     )
     _enforce_workspace_budget(scene, config)
@@ -139,7 +143,7 @@ def solve_pipeline(
     _validate_ad_config(config)
     ad = config.ad_mode != "none"
     if ad:
-        _require_frequency_ad_constant_materials(
+        require_frequency_ad_constant_materials_fn(
             scene, scene.compile(), ad_mode=config.ad_mode
         )
 
