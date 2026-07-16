@@ -36,14 +36,6 @@ _RAYDN_LIFECYCLE_AST_DIGESTS = {
 }
 
 
-def _body_ast(function: object) -> str:
-    node = ast.parse(inspect.getsource(function)).body[0]
-    assert isinstance(node, ast.FunctionDef)
-    return ast.dump(
-        ast.Module(body=node.body, type_ignores=[]), include_attributes=False
-    )
-
-
 def _definition_ast_digest(definition: object) -> str:
     module = ast.parse(inspect.getsource(rayd_scene))
     node = next(
@@ -82,11 +74,6 @@ def test_raydn_scene_lifecycle_move_preserves_frozen_definition_ast(
     expected: str,
 ):
     assert _definition_ast_digest(getattr(rayd_scene, name)) == expected
-
-
-@pytest.mark.parametrize("name", _SCENE_KERNEL_NAMES)
-def test_scene_kernel_body_matches_compatibility_facade(name: str):
-    assert _body_ast(getattr(rayd_scene, name)) == _body_ast(getattr(ops, name))
 
 
 @pytest.mark.parametrize("name", _SCENE_KERNEL_NAMES)

@@ -7,7 +7,7 @@
       "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel_native/montecarlo/bdpt/pipeline.py": {
-      "ceiling": 1441,
+      "ceiling": 1440,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
