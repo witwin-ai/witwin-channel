@@ -5,6 +5,7 @@ from pathlib import Path
 
 from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.deterministic import solver as deterministic_solver
+from witwin.channel_native.deterministic import pipeline as deterministic_pipeline
 from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
 from witwin.channel_native.path import solver as path_solver
 from witwin.channel_native.path import pipeline as path_pipeline
@@ -69,7 +70,7 @@ def test_canonical_engine_has_no_legacy_batch_or_adapter_dependency():
 
 def test_typed_engine_remains_before_optional_scattering_append():
     path_solve = _function(path_pipeline, "_solve_base")
-    deterministic_solve = _function(deterministic_solver, "solve")
+    deterministic_solve = _function(deterministic_pipeline, "solve")
 
     for definition in (path_solve, deterministic_solve):
         assert (
