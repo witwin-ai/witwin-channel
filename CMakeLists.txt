@@ -552,3 +552,29 @@ install(
 install(
     FILES "${CHANNEL_NATIVE_BUILD_FINGERPRINT_SOURCE}"
     DESTINATION witwin/channel_native/runtime)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(
+        channel_native_legacy_slab_lockstep
+        EXCLUDE_FROM_ALL
+        tests/native/legacy_slab_lockstep.cu)
+    set_target_properties(
+        channel_native_legacy_slab_lockstep
+        PROPERTIES CUDA_ARCHITECTURES "${CHANNEL_NATIVE_CUDA_ARCHITECTURES}")
+    target_compile_features(channel_native_legacy_slab_lockstep PRIVATE cxx_std_17)
+    target_include_directories(
+        channel_native_legacy_slab_lockstep
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/native/channel_native"
+            "${RAYD_SOURCE_DIR}/shared/include"
+            "${TORCH_INSTALL_PREFIX}/include"
+            "${TORCH_INSTALL_PREFIX}/include/torch/csrc/api/include")
+    target_link_libraries(channel_native_legacy_slab_lockstep PRIVATE CUDA::cudart)
+    add_test(
+        NAME channel_native.legacy_slab_lockstep
+        COMMAND channel_native_legacy_slab_lockstep)
+    set_tests_properties(
+        channel_native.legacy_slab_lockstep
+        PROPERTIES SKIP_RETURN_CODE 77)
+endif()
