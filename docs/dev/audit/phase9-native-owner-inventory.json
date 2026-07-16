@@ -1,6 +1,6 @@
 {
   "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
-  "manifest_sha256": "5db619106009635cb0d4633d0db465a2c7f1a0be086122fd60f0887fa52d20fc",
+  "manifest_sha256": "da079e2b8352539faae113886176b995223774a41476c7f15e690fdd4c20822a",
   "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
   "owners": [
     {
@@ -1529,6 +1529,12 @@
           "name": "cn_bdpt_endpoint_connection_samples_cuda",
           "signature_sha256": "b815e695dac011dd4156527fc2c6451bdba7d08be41629ea328e98d8bba8a7ee",
           "token_count": 1172
+        },
+        {
+          "body_sha256": "492c523a038763621d7ca5e1b5ae661c70e4df8969356bd82d60b8dff473ae4e",
+          "name": "cn_bdpt_endpoint_connection_visibility_inputs_cuda",
+          "signature_sha256": "fafd9f6fce0f332b5802db62eede99b2206ea364aa1c71c34e5c548d4b2c3dd7",
+          "token_count": 436
         }
       ],
       "expiry_condition": "Move each complete ABI operation; retain ConnectionSample row identity and launch count exactly.",
@@ -1683,6 +1689,12 @@
           "name": "bdpt_connection_variance_finalize_double_kernel",
           "signature_sha256": "046dd51968e95c519aeab7ee052893f7d6df5762deaad85a065d640bcab6969a",
           "token_count": 117
+        },
+        {
+          "body_sha256": "c549e363744a2d689d69dbb9c7843b1b5864971d4d48ca8bf776c754b100f08b",
+          "name": "cn_bdpt_accumulate_connection_samples_cuda",
+          "signature_sha256": "d4e7074191591e72f887e47d66b042fb6d1dd69aa61cf473df1d8f483dc61998",
+          "token_count": 1442
         },
         {
           "body_sha256": "873c48e125a4ab0d3c05693e0ac72e211341c89c75c2340ed892402e06d44d43",

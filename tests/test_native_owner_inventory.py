@@ -105,6 +105,37 @@ def test_path_compaction_abi_owner_is_complete_and_frozen() -> None:
     }
 
 
+def test_bdpt_abi_owners_are_complete_and_frozen() -> None:
+    owners = {owner["id"]: owner for owner in _load_inventory()["owners"]}
+    expected_by_owner = {
+        "bdpt.mis": {"cn_bdpt_mis_weights_cuda"},
+        "bdpt.endpoint_connection": {
+            "cn_bdpt_endpoint_connection_samples_cuda",
+            "cn_bdpt_endpoint_connection_visibility_inputs_cuda",
+        },
+        "bdpt.diffraction_connection": {
+            "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
+            "cn_bdpt_diffraction_point_connection_samples_cuda",
+        },
+        "bdpt.connection_storage": {
+            "cn_bdpt_accumulate_connection_samples_cuda",
+            "cn_bdpt_filter_connection_samples_cuda",
+            "cn_bdpt_count_valid_connection_samples_cuda",
+            "cn_bdpt_compact_connection_samples_cuda",
+            "cn_bdpt_concat_connection_samples_cuda",
+            "cn_bdpt_connection_variance_cuda",
+        },
+    }
+
+    for owner_id, expected in expected_by_owner.items():
+        owner = owners[owner_id]
+        frozen_names = {
+            entry["name"] for entry in owner["cpp_body_hash_multiset"]
+        }
+        assert set(owner["abi_owner"]) == expected
+        assert expected <= frozen_names
+
+
 def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() -> None:
     inventory = _load_inventory()
     expected = Counter(
