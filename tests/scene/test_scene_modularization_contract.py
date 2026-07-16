@@ -34,6 +34,7 @@ from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.scene import models as canonical_models
 from witwin.channel_native.scene import compiled as canonical_compiled
 from witwin.channel_native.scene.kernels import rayd_scene as canonical_raydn
 from witwin.channel_native.scene.stores import _validation as canonical_validation
@@ -175,14 +176,33 @@ def _assert_object_graph_resource_free(value: object, seen: set[int]) -> None:
 
 
 def test_public_and_legacy_scene_class_identity_and_pickle_replay():
-    assert legacy_objects.Structure is public.Structure is legacy_scene.Structure
-    assert legacy_objects.Transmitter is public.Transmitter is legacy_scene.Transmitter
     assert (
-        legacy_objects.ReceiverPoint
+        canonical_models.Structure
+        is legacy_objects.Structure
+        is public.Structure
+        is legacy_scene.Structure
+    )
+    assert (
+        canonical_models.Transmitter
+        is legacy_objects.Transmitter
+        is public.Transmitter
+        is legacy_scene.Transmitter
+    )
+    assert (
+        canonical_models.ReceiverPoint
+        is legacy_objects.ReceiverPoint
         is public.ReceiverPoint
         is legacy_scene.ReceiverPoint
     )
-    assert legacy_objects.ReceiverGrid is public.ReceiverGrid is legacy_scene.ReceiverGrid
+    assert (
+        canonical_models.ReceiverGrid
+        is legacy_objects.ReceiverGrid
+        is public.ReceiverGrid
+        is legacy_scene.ReceiverGrid
+    )
+    assert canonical_models.Material is legacy_objects.Material
+    assert canonical_models.planar_uv is legacy_objects.planar_uv
+    assert "__all__" not in vars(legacy_objects)
     assert (
         canonical_compiled.CompiledScene
         is legacy_scene.CompiledScene

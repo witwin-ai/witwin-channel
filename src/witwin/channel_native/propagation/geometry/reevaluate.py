@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.core.objects import ReceiverPoint
+from witwin.channel_native.scene.models import ReceiverPoint
 from witwin.channel_native.propagation.geometry.kernels import (
     autograd as geometry_autograd,
 )

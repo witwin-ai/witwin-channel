@@ -5,7 +5,7 @@ import math
 
 import torch
 
-from witwin.channel_native.core.objects import ReceiverGrid
+from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
 from typing import TYPE_CHECKING
 from witwin.channel_native.montecarlo.basic.kernels.maps import (

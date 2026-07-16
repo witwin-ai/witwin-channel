@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint
+from witwin.channel_native.scene.models import ReceiverGrid, ReceiverPoint
 from witwin.channel_native.core.receiver_geometry import vector3_tuple
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,

@@ -6,7 +6,7 @@ from dataclasses import replace
 import torch
 
 from witwin.channel_native.core.antenna import orientation_matrix, steering_vector
-from witwin.channel_native.core.objects import ReceiverGrid, ReceiverPoint, Transmitter
+from witwin.channel_native.scene.models import ReceiverGrid, ReceiverPoint, Transmitter
 from witwin.channel_native.core.scene import Scene
 
 from .result import PathResult

@@ -11,7 +11,7 @@ import torch
 
 from .edge_policy import EdgePolicy
 from witwin.channel_native.materials.models import Dielectric, ITUMaterial
-from .objects import Structure
+from witwin.channel_native.scene.models import Structure
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]

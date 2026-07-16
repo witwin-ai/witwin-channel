@@ -15,7 +15,7 @@ from witwin.channel_native.capabilities import (
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
-from witwin.channel_native.core.objects import ReceiverGrid
+from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.scene_tensors import _frequency_scalar
 from witwin.channel_native.propagation.geometry.endpoints import (
     apply_receiver_layout,

@@ -6,7 +6,7 @@ import json
 
 import torch
 
-from .objects import ReceiverGrid, ReceiverPoint, Structure, Transmitter
+from witwin.channel_native.scene.models import ReceiverGrid, ReceiverPoint, Structure, Transmitter
 from witwin.channel_native.scene.compiled import CompiledScene
 from witwin.channel_native.scene.stores.assignments import AssignmentStore
 from witwin.channel_native.scene.stores.geometry import GeometryStore

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.core.objects import ReceiverGrid
+from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.scene_tensors import (
     receiver_positions as _native_receiver_positions,
     transmitter_positions as _native_transmitter_positions,

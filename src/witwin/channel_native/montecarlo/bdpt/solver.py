@@ -6,7 +6,7 @@ from typing import Any
 
 import torch
 
-from witwin.channel_native.core.objects import ReceiverGrid
+from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.field_state import (
