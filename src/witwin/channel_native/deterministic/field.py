@@ -61,10 +61,6 @@ def equivalent_field_from_vector_components(
     return exported["path_gain"], field
 
 
-def _fresnel_scalar_coefficient(**_kwargs: object) -> torch.Tensor:
-    raise RuntimeError("deterministic Fresnel coefficient evaluation requires native field kernels")
-
-
 def reflection_complex_field(
     *,
     tx_position: torch.Tensor,

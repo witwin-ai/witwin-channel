@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from collections import Counter
 import json
 from pathlib import Path
@@ -35,7 +36,7 @@ def test_phase10_zero_reference_inventory_is_complete_and_classified() -> None:
         "dead": 2,
     }
     for candidate in candidates:
-        assert set(candidate) == {
+        required_fields = {
             "name",
             "definition",
             "classification",
@@ -44,6 +45,8 @@ def test_phase10_zero_reference_inventory_is_complete_and_classified() -> None:
             "tests",
             "compatibility_cycle",
         }
+        assert required_fields <= set(candidate)
+        assert set(candidate) <= required_fields | {"status"}
         assert candidate["evidence"]
         assert candidate["tests"]
         assert candidate["compatibility_cycle"]
@@ -148,4 +151,31 @@ def test_phase10_raydn_backend_shim_is_removed_without_a_production_replacement(
         "witwin.channel_native.runtime.symbols.native_extension"
     )
     assert not shim_path.exists()
+    assert production_references == []
+
+
+def test_phase10_fresnel_scalar_dead_candidate_is_removed_exactly() -> None:
+    audit = _audit()
+    candidate = next(
+        item
+        for item in audit["zero_reference_candidates"]
+        if item["name"] == "_fresnel_scalar_coefficient"
+    )
+    field_path = REPOSITORY_ROOT / "src/witwin/channel_native/deterministic/field.py"
+    tree = ast.parse(field_path.read_text(encoding="utf-8-sig"))
+    top_level_names = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    }
+    production_references = [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in PYTHON_ROOT.rglob("*.py")
+        if "_fresnel_scalar_coefficient"
+        in path.read_text(encoding="utf-8-sig")
+    ]
+
+    assert candidate["classification"] == "dead"
+    assert candidate["decision"] == candidate["status"] == "removed"
+    assert "_fresnel_scalar_coefficient" not in top_level_names
     assert production_references == []

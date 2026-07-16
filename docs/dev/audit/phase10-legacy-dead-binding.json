@@ -242,9 +242,14 @@
       "name": "_fresnel_scalar_coefficient",
       "definition": "src/witwin/channel_native/deterministic/field.py:64",
       "classification": "dead",
-      "decision": "delete_in_phase10",
+      "decision": "removed",
+      "status": "removed",
       "evidence": ["Private fail-loud stub has no static, dynamic, binding, or public caller."],
-      "tests": ["tests/deterministic", "tests/acceptance"],
+      "tests": [
+        "tests/deterministic",
+        "tests/acceptance",
+        "tests/test_phase10_legacy_dead_binding_audit.py"
+      ],
       "compatibility_cycle": "not_required"
     },
     {
