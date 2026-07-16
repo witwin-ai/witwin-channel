@@ -4,10 +4,7 @@ import torch
 
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel_native.scene.native_handles import (
-    _raydn_module_handle,
-    _raydn_scene_handle_id,
-)
+from witwin.channel_native.scene.native_handles import _raydn_scene_handle_id
 
 
 def bdpt_visibility_forward(
@@ -27,7 +24,6 @@ def bdpt_visibility_forward(
         start,
         end,
         active,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
@@ -90,7 +86,6 @@ def bdpt_intersect_forward(
         ray_tmax,
         active,
         int(flags),
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != len(_BDPT_INTERSECTION_FIELDS):
         raise TypeError("_channel_native.bdpt_intersect_forward must return 10 tensors")
@@ -118,7 +113,6 @@ def bdpt_reflection_accumulation_forward(*args: object) -> tuple[torch.Tensor, .
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("bdpt_reflection_accumulation_forward")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
@@ -130,7 +124,6 @@ def bdpt_reflection_accumulation_forward(*args: object) -> tuple[torch.Tensor, .
 def bdpt_diffraction_discover_edges(*args: object) -> torch.Tensor:
     out = _required_native_op("bdpt_diffraction_discover_edges")(
         *args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
@@ -142,7 +135,6 @@ def bdpt_diffraction_discover_edges(*args: object) -> torch.Tensor:
 def bdpt_diffraction_discover_edges_counted(*args: object) -> torch.Tensor:
     out = _required_native_op("bdpt_diffraction_discover_edges_counted")(
         *args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
@@ -159,7 +151,6 @@ def bdpt_diffraction_accumulation_forward(*args: object) -> tuple[torch.Tensor, 
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("bdpt_diffraction_accumulation_forward")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
@@ -181,7 +172,6 @@ def raydn_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("raydn_trace_reflections_forward")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
@@ -198,7 +188,6 @@ def raydn_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("raydn_reflection_epc_paths_forward")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
@@ -224,7 +213,6 @@ def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("raydn_coupled_rd_geometry_forward")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, dict):
         raise TypeError(
@@ -278,7 +266,6 @@ def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor,
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("raydn_diffraction_paths_order1_forward")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(

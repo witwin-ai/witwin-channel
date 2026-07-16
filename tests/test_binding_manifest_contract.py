@@ -74,6 +74,13 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert len(set(current_names)) == EXPECTED_BINDING_COUNT
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
+    baseline_dummy_bindings = {
+        symbol["name"]
+        for symbol in baseline["symbols"]
+        if any(
+            parameter["name"] == parameter_name for parameter in symbol["parameters"]
+        )
+    }
     current_dummy_bindings = {
         symbol["name"]
         for symbol in current["symbols"]
@@ -81,9 +88,14 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
             parameter["name"] == parameter_name for parameter in symbol["parameters"]
         )
     }
-    assert retirement["status"] == "present"
-    assert current_dummy_bindings == binding_names
-    assert _semantic_projection(current) == _semantic_projection(baseline)
+    assert retirement["status"] == "removed"
+    assert baseline_dummy_bindings == binding_names
+    assert current_dummy_bindings == set()
+    for symbol in baseline["symbols"]:
+        if symbol["name"] in binding_names:
+            parameter_names = [parameter["name"] for parameter in symbol["parameters"]]
+            assert parameter_names.count(parameter_name) == 1
+            assert parameter_names[-1] == parameter_name
     assert _semantic_projection(
         current, removed_parameters=removed_parameters
     ) == _semantic_projection(baseline, removed_parameters=removed_parameters)

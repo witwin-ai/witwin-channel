@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import ast
 from collections import defaultdict
+import copy
 from dataclasses import dataclass
 import hashlib
 import json
@@ -70,6 +71,90 @@ class Definition:
     signature: str
     body_sha256: str
     normalized_ast_sha256: str
+    projected_native_symbol: str | None
+    projected_body_sha256: str | None
+    projected_normalized_ast_sha256: str | None
+
+
+class _RestoreRaydnModuleHandle(ast.NodeTransformer):
+    def __init__(self, native_symbol: str) -> None:
+        self.native_symbol = native_symbol
+        self.restored = 0
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:  # noqa: N802
+        self.generic_visit(node)
+        factory = node.func
+        if not (
+            isinstance(factory, ast.Call)
+            and isinstance(factory.func, ast.Name)
+            and factory.func.id == "_required_native_op"
+            and len(factory.args) == 1
+            and isinstance(factory.args[0], ast.Constant)
+            and factory.args[0].value == self.native_symbol
+        ):
+            return node
+        if node.args and isinstance(node.args[-1], ast.Call):
+            trailing = node.args[-1]
+            if (
+                isinstance(trailing.func, ast.Name)
+                and trailing.func.id == "_raydn_module_handle"
+                and not trailing.args
+                and not trailing.keywords
+            ):
+                return node
+        node.args.append(
+            ast.Call(
+                func=ast.Name(id="_raydn_module_handle", ctx=ast.Load()),
+                args=[],
+                keywords=[],
+            )
+        )
+        self.restored += 1
+        return node
+
+
+def _project_removed_raydn_module_handle(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> tuple[str | None, str | None, str | None]:
+    symbols = {
+        str(factory.args[0].value)
+        for call in ast.walk(node)
+        if isinstance(call, ast.Call)
+        and isinstance((factory := call.func), ast.Call)
+        and isinstance(factory.func, ast.Name)
+        and factory.func.id == "_required_native_op"
+        and len(factory.args) == 1
+        and isinstance(factory.args[0], ast.Constant)
+        and isinstance(factory.args[0].value, str)
+    }
+    projected: list[tuple[str, str, str]] = []
+    for native_symbol in sorted(symbols):
+        candidate = copy.deepcopy(node)
+        transformer = _RestoreRaydnModuleHandle(native_symbol)
+        candidate = transformer.visit(candidate)
+        if transformer.restored != 1:
+            continue
+        ast.fix_missing_locations(candidate)
+        body_ast = ast.dump(
+            ast.Module(body=candidate.body, type_ignores=[]),
+            annotate_fields=True,
+            include_attributes=False,
+        )
+        normalized_ast = ast.dump(
+            candidate,
+            annotate_fields=True,
+            include_attributes=False,
+        )
+        projected.append(
+            (
+                native_symbol,
+                hashlib.sha256(body_ast.encode()).hexdigest(),
+                hashlib.sha256(normalized_ast.encode()).hexdigest(),
+            )
+        )
+    if len(projected) != 1:
+        return None, None, None
+    return projected[0]
 
 
 def _module_name(repo: Path, path: Path) -> str:
@@ -115,6 +200,9 @@ def scan_definitions(repo: Path) -> list[Definition]:
         for terminal_name, node in _direct_functions(tree):
             qualified_name = f"{module}.{terminal_name}"
             entry = hash_entries[(relative_path, node.lineno, qualified_name)]
+            projected_symbol, projected_body, projected_ast = (
+                _project_removed_raydn_module_handle(node)
+            )
             definitions.append(
                 Definition(
                     terminal_name=terminal_name,
@@ -125,6 +213,9 @@ def scan_definitions(repo: Path) -> list[Definition]:
                     signature=f"({ast.unparse(node.args)})",
                     body_sha256=str(entry["body_sha256"]),
                     normalized_ast_sha256=str(entry["normalized_ast_sha256"]),
+                    projected_native_symbol=projected_symbol,
+                    projected_body_sha256=projected_body,
+                    projected_normalized_ast_sha256=projected_ast,
                 )
             )
     return sorted(definitions)
@@ -164,6 +255,7 @@ def build_manifest(repo: Path) -> dict[str, object]:
         ],
         "canonical_owners": BOOTSTRAP_CANONICAL_OWNERS,
         "retired_ops": [],
+        "approved_body_projections": [],
     }
 
 
@@ -273,6 +365,44 @@ def _ledger(
     return active, owners, retired, issues
 
 
+def _body_projection_ledger(
+    manifest: dict[str, Any],
+    contracts: dict[str, dict[str, str]],
+    owners: dict[str, str],
+) -> tuple[dict[str, dict[str, str]], list[str]]:
+    value = manifest.get("approved_body_projections")
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        return {}, ["approved_body_projections must be a list of objects"]
+    projections: dict[str, dict[str, str]] = {}
+    issues: list[str] = []
+    required = {"id", "owner", "native_symbol", "kind"}
+    for entry in value:
+        if set(entry) != required or not all(
+            isinstance(entry.get(field), str) for field in required
+        ):
+            issues.append(
+                "approved body projection entries must contain string fields: "
+                "id, owner, native_symbol, kind"
+            )
+            continue
+        entry_id = str(entry["id"])
+        if entry_id in projections:
+            issues.append(f"duplicate approved body projection ID: {entry_id}")
+            continue
+        projection = {field: str(entry[field]) for field in required}
+        projections[entry_id] = projection
+        if entry_id not in contracts:
+            issues.append(f"unknown approved body projection ID: {entry_id}")
+        if projection["kind"] != "remove_trailing_raydn_module_handle":
+            issues.append(f"unsupported body projection kind for {entry_id}")
+        if owners.get(entry_id) != projection["owner"]:
+            issues.append(
+                f"approved body projection owner mismatch for {entry_id}: "
+                f"{projection['owner']}"
+            )
+    return projections, issues
+
+
 def check_manifest(
     repo: Path,
     manifest: dict[str, Any],
@@ -301,6 +431,10 @@ def check_manifest(
     issues.extend(contract_issues)
     active, owners, retired, ledger_issues = _ledger(manifest, contracts)
     issues.extend(ledger_issues)
+    body_projections, projection_issues = _body_projection_ledger(
+        manifest, contracts, owners
+    )
+    issues.extend(projection_issues)
     if contract_issues:
         return issues
 
@@ -363,9 +497,24 @@ def check_manifest(
                 f"duplicate canonical definition for {entry_id}: {expected_owner}"
             )
         item = candidates[0]
+        projection = body_projections.get(entry_id)
+        if projection is None:
+            for field, label in (
+                ("body_sha256", "body"),
+                ("normalized_ast_sha256", "normalized AST"),
+            ):
+                if getattr(item, field) != contract[field]:
+                    issues.append(f"{label} changed for {entry_id} at {expected_owner}")
+        elif (
+            item.projected_native_symbol != projection["native_symbol"]
+            or item.projected_body_sha256 != contract["body_sha256"]
+            or item.projected_normalized_ast_sha256 != contract["normalized_ast_sha256"]
+        ):
+            issues.append(
+                f"approved trailing RayDN handle projection mismatch for {entry_id} "
+                f"at {expected_owner}"
+            )
         for field, label in (
-            ("body_sha256", "body"),
-            ("normalized_ast_sha256", "normalized AST"),
             ("signature", "signature"),
             ("kind", "function kind"),
         ):

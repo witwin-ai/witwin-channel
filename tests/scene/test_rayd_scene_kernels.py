@@ -39,7 +39,9 @@ _RAYDN_LIFECYCLE_AST_DIGESTS = {
 def _body_ast(function: object) -> str:
     node = ast.parse(inspect.getsource(function)).body[0]
     assert isinstance(node, ast.FunctionDef)
-    return ast.dump(ast.Module(body=node.body, type_ignores=[]), include_attributes=False)
+    return ast.dump(
+        ast.Module(body=node.body, type_ignores=[]), include_attributes=False
+    )
 
 
 def _definition_ast_digest(definition: object) -> str:
@@ -175,17 +177,13 @@ def test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive(
     face_uv = torch.tensor([[0, 1, 2]], dtype=torch.int32)
     structures = (
         SimpleNamespace(
-            vertices=torch.tensor(
-                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-            ),
+            vertices=torch.tensor([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
             faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
             uv=uv,
             face_uv=face_uv,
         ),
         SimpleNamespace(
-            vertices=torch.tensor(
-                [[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0]]
-            ),
+            vertices=torch.tensor([[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0]]),
             faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
         ),
     )
@@ -217,7 +215,9 @@ def test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive(
             left[index],
             right[index],
         )
-    assert exported_uv[0].untyped_storage().data_ptr() == uv.untyped_storage().data_ptr()
+    assert (
+        exported_uv[0].untyped_storage().data_ptr() == uv.untyped_storage().data_ptr()
+    )
     assert exported_face_uv[0].untyped_storage().data_ptr() == (
         face_uv.untyped_storage().data_ptr()
     )
@@ -231,7 +231,9 @@ def test_raydn_scene_builder_preserves_unavailable_reasons(
 ):
     monkeypatch.setattr(rayd_scene.torch.cuda, "is_available", lambda: False)
 
-    assert rayd_scene.build_scene_from_structures(()).reason == "scene has no structures"
+    assert (
+        rayd_scene.build_scene_from_structures(()).reason == "scene has no structures"
+    )
     assert rayd_scene.build_scene_from_structures((object(),)).reason == (
         "CUDA is unavailable"
     )
@@ -275,7 +277,6 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
             to_world_left,
             to_world_right,
             mesh_flags,
-            0,
         )
     ]
 
@@ -302,4 +303,4 @@ def test_scene_edge_records_normalizes_handle_and_tuple(
     monkeypatch.setattr(rayd_scene, "_required_native_op", required_symbol)
 
     assert rayd_scene.raydn_scene_edge_records(Handle()) == (record,)
-    assert calls == [(11, 0)]
+    assert calls == [(11,)]

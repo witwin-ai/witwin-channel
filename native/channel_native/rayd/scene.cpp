@@ -38,8 +38,7 @@ pybind11::tuple cn_raydn_scene_create(
     std::vector<torch::Tensor> face_uv,
     std::vector<torch::Tensor> to_world_left,
     std::vector<torch::Tensor> to_world_right,
-    std::vector<int64_t> mesh_flags,
-    std::uintptr_t raydn_module_handle) {
+    std::vector<int64_t> mesh_flags) {
     const size_t mesh_count = vertices.size();
     if (mesh_count == 0)
         throw std::runtime_error("raydn_scene_create requires at least one mesh");
@@ -51,7 +50,7 @@ pybind11::tuple cn_raydn_scene_create(
         mesh_flags.size() != mesh_count) {
         throw std::runtime_error("raydn_scene_create input lists must have the same length");
     }
-    int64_t scene_handle = raydn_scene_create_fn(raydn_module_handle)(
+    int64_t scene_handle = raydn_scene_create_fn(0)(
         vertices.data(),
         faces.data(),
         uv.data(),
@@ -60,17 +59,15 @@ pybind11::tuple cn_raydn_scene_create(
         to_world_right.data(),
         mesh_flags.data(),
         static_cast<int64_t>(mesh_count));
-    auto *owner = new RaydnSceneOwner{scene_handle, raydn_module_handle};
+    auto *owner = new RaydnSceneOwner{scene_handle, 0};
     pybind11::capsule capsule(owner, "channel_native.raydn_scene", destroy_raydn_scene_capsule);
     return pybind11::make_tuple(scene_handle, capsule);
 }
 
-pybind11::tuple cn_raydn_scene_edge_records(
-    int64_t scene_handle,
-    std::uintptr_t raydn_module_handle) {
+pybind11::tuple cn_raydn_scene_edge_records(int64_t scene_handle) {
     constexpr int64_t kOutputCount = 12;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_scene_edge_records_fn(raydn_module_handle)(
+    int64_t output_count = raydn_scene_edge_records_fn(0)(
         scene_handle,
         outputs.data(),
         kOutputCount);

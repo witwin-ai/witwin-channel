@@ -51,6 +51,9 @@ def test_geometry_autograd_is_the_single_object_owner(name: str):
 def test_geometry_autograd_preserves_all_frozen_body_contracts():
     manifest = migration.load_manifest(MANIFEST_PATH)
     contracts = {entry["id"]: entry for entry in manifest["contracts"]}
+    projections = {
+        entry["id"]: entry for entry in manifest["approved_body_projections"]
+    }
     prefix = f"{autograd.__name__}."
     definitions = [
         item
@@ -62,15 +65,24 @@ def test_geometry_autograd_preserves_all_frozen_body_contracts():
     for definition in definitions:
         contract = contracts[definition.terminal_name]
         assert definition.signature == contract["signature"]
-        assert definition.body_sha256 == contract["body_sha256"]
-        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+        projection = projections.get(definition.terminal_name)
+        if projection is None:
+            assert definition.body_sha256 == contract["body_sha256"]
+            assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+        else:
+            assert definition.projected_native_symbol == projection["native_symbol"]
+            assert definition.projected_body_sha256 == contract["body_sha256"]
+            assert (
+                definition.projected_normalized_ast_sha256
+                == contract["normalized_ast_sha256"]
+            )
 
 
 def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
     assert autograd._required_native_op is symbols.required_symbol
     assert autograd.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
     assert autograd.torch_compat is torch_compat
-    assert autograd._raydn_module_handle is native_handles._raydn_module_handle
+    assert "_raydn_module_handle" not in autograd.__dict__
     assert autograd._raydn_scene_handle_id is native_handles._raydn_scene_handle_id
     assert (
         autograd.deterministic_normalize_vec3 is primitives.deterministic_normalize_vec3
@@ -118,9 +130,7 @@ def test_autograd_methods_resolve_companions_in_the_canonical_owner():
         is autograd.raydn_intersect_jvp
     )
     assert (
-        inspect.unwrap(
-            autograd._RaydnTraceReflectionsAdFunction.backward
-        ).__globals__[
+        inspect.unwrap(autograd._RaydnTraceReflectionsAdFunction.backward).__globals__[
             "raydn_trace_reflections_backward"
         ]
         is autograd.raydn_trace_reflections_backward
@@ -134,9 +144,7 @@ def test_autograd_methods_resolve_companions_in_the_canonical_owner():
     assert (
         inspect.unwrap(
             autograd._RaydnReflectionEpcPathsAdFunction.backward
-        ).__globals__[
-            "raydn_reflection_epc_paths_backward"
-        ]
+        ).__globals__["raydn_reflection_epc_paths_backward"]
         is autograd.raydn_reflection_epc_paths_backward
     )
     assert (

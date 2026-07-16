@@ -35,6 +35,9 @@ def test_topology_candidates_is_the_single_object_owner(name: str):
 def test_topology_candidates_preserve_all_frozen_body_contracts():
     manifest = migration.load_manifest(MANIFEST_PATH)
     contracts = {entry["id"]: entry for entry in manifest["contracts"]}
+    projections = {
+        entry["id"]: entry for entry in manifest["approved_body_projections"]
+    }
     prefix = f"{candidates.__name__}."
     definitions = [
         item
@@ -46,8 +49,17 @@ def test_topology_candidates_preserve_all_frozen_body_contracts():
     for definition in definitions:
         contract = contracts[definition.terminal_name]
         assert definition.signature == contract["signature"]
-        assert definition.body_sha256 == contract["body_sha256"]
-        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+        projection = projections.get(definition.terminal_name)
+        if projection is None:
+            assert definition.body_sha256 == contract["body_sha256"]
+            assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
+        else:
+            assert definition.projected_native_symbol == projection["native_symbol"]
+            assert definition.projected_body_sha256 == contract["body_sha256"]
+            assert (
+                definition.projected_normalized_ast_sha256
+                == contract["normalized_ast_sha256"]
+            )
 
 
 def test_topology_candidates_use_only_canonical_dependencies():
@@ -58,10 +70,9 @@ def test_topology_candidates_use_only_canonical_dependencies():
         candidates._validate_path_reflection_candidates
         is blocks._validate_path_reflection_candidates
     )
-    assert candidates._raydn_module_handle is rayd_native_handles._raydn_module_handle
+    assert "_raydn_module_handle" not in candidates.__dict__
     assert (
-        candidates._raydn_scene_handle_id
-        is rayd_native_handles._raydn_scene_handle_id
+        candidates._raydn_scene_handle_id is rayd_native_handles._raydn_scene_handle_id
     )
     for name in _OWNER_NAMES:
         assert getattr(candidates, name).__globals__ is candidates.__dict__

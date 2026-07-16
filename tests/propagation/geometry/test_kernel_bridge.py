@@ -62,7 +62,7 @@ def test_raydn_aliases_remain_same_object(alias: str, canonical: str):
 def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
     assert bridge._required_native_op is symbols.required_symbol
     assert bridge.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
-    assert bridge._raydn_module_handle is rayd_scene._raydn_module_handle
+    assert "_raydn_module_handle" not in bridge.__dict__
     assert bridge._raydn_scene_handle_id is rayd_scene._raydn_scene_handle_id
 
 
@@ -98,9 +98,7 @@ def test_intersection_returns_the_named_tensor_contract(
     monkeypatch.setattr(bridge, "_required_native_op", required_symbol)
     monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
 
-    result = bridge.bdpt_intersect_forward(
-        17, ray_o, ray_d, ray_tmax, None, flags=5
-    )
+    result = bridge.bdpt_intersect_forward(17, ray_o, ray_d, ray_tmax, None, flags=5)
 
     assert tuple(result) == (
         "t",
@@ -115,4 +113,4 @@ def test_intersection_returns_the_named_tensor_contract(
         "global_prim_id",
     )
     assert all(actual is expected for actual, expected in zip(result.values(), outputs))
-    assert native_calls == [(17, ray_o, ray_d, ray_tmax, None, 5, 0)]
+    assert native_calls == [(17, ray_o, ray_d, ray_tmax, None, 5)]

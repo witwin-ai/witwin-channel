@@ -46,7 +46,6 @@ def raydn_scene_create(
         to_world_left,
         to_world_right,
         mesh_flags,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 2:
         raise TypeError(
@@ -63,7 +62,6 @@ def raydn_scene_create(
 def raydn_scene_edge_records(handle: int) -> tuple[torch.Tensor, ...]:
     out = _required_native_op("raydn_scene_edge_records")(
         _raydn_scene_handle_id(handle),
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
@@ -94,7 +92,9 @@ class RayDNScene:
     owner: object | None = None
     mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
     reason: str | None = None
-    runtime_cache: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
+    runtime_cache: dict[str, object] = field(
+        default_factory=dict, compare=False, repr=False
+    )
 
     @property
     def available(self) -> bool:
@@ -112,7 +112,9 @@ class RayDNScene:
             return cached  # type: ignore[return-value]
         values = raydn_scene_edge_records(self.require_handle())
         if len(values) != 12:
-            raise RuntimeError(f"RayDN edge_records returned {len(values)} tensors, expected 12")
+            raise RuntimeError(
+                f"RayDN edge_records returned {len(values)} tensors, expected 12"
+            )
         face_normals = mc_pack_vec3(values[2], values[3], values[4])
         records = RayDNEdgeRecords(
             vertices=values[0],
@@ -130,7 +132,9 @@ class RayDNScene:
         return records
 
 
-def _empty_tensor(shape: tuple[int, ...], *, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+def _empty_tensor(
+    shape: tuple[int, ...], *, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
     return torch.empty(shape, dtype=dtype, device=device)
 
 
@@ -168,7 +172,9 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
     keepalive: list[tuple[torch.Tensor, ...]] = []
 
     for structure in structures:
-        mesh_vertices = structure.vertices.to(device=device, dtype=torch.float32).contiguous()
+        mesh_vertices = structure.vertices.to(
+            device=device, dtype=torch.float32
+        ).contiguous()
         mesh_faces = structure.faces.to(device=device, dtype=torch.int32).contiguous()
         # Structures that carry a UV parametrization forward it to the native
         # mesh (RayD carries UV end-to-end); structures without UV keep the
@@ -177,7 +183,9 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
         structure_face_uv = getattr(structure, "face_uv", None)
         if structure_uv is not None and structure_face_uv is not None:
             mesh_uv = structure_uv.to(device=device, dtype=torch.float32).contiguous()
-            mesh_face_uv = structure_face_uv.to(device=device, dtype=torch.int32).contiguous()
+            mesh_face_uv = structure_face_uv.to(
+                device=device, dtype=torch.int32
+            ).contiguous()
         else:
             mesh_uv = _empty_tensor((0, 2), dtype=torch.float32, device=device)
             mesh_face_uv = _empty_tensor((0, 3), dtype=torch.int32, device=device)
@@ -189,7 +197,9 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
         face_uv.append(mesh_face_uv)
         to_world_left.append(mesh_to_world_left)
         to_world_right.append(mesh_to_world_right)
-        mesh_flags.append(_mesh_flags(use_face_normals=False, edges_enabled=True, dynamic=False))
+        mesh_flags.append(
+            _mesh_flags(use_face_normals=False, edges_enabled=True, dynamic=False)
+        )
         keepalive.append(
             (
                 mesh_vertices,

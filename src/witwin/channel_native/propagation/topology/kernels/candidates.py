@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.core.rayd_native_handles import (
-    _raydn_module_handle,
-    _raydn_scene_handle_id,
-)
+from witwin.channel_native.core.rayd_native_handles import _raydn_scene_handle_id
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
@@ -142,7 +139,6 @@ def path_diffraction_paths_order1(
         material_gain,
         material_valid,
         float(wavelength),
-        _raydn_module_handle(),
     )
     if not isinstance(out, dict):
         raise TypeError(

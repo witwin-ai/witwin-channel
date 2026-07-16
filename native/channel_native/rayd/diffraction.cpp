@@ -76,10 +76,9 @@ torch::Tensor cn_bdpt_diffraction_discover_edges(
     torch::Tensor edge_nn,
     torch::Tensor edge_line_min,
     torch::Tensor edge_line_max,
-    torch::Tensor edge_adjacent_face1,
-    std::uintptr_t raydn_module_handle) {
+    torch::Tensor edge_adjacent_face1) {
     at::Tensor out;
-    raydn_diffraction_discover_edges_fn(raydn_module_handle)(
+    raydn_diffraction_discover_edges_fn(0)(
         &tx_pos,
         &ray_dir,
         &prim_index,
@@ -115,10 +114,9 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
     torch::Tensor edge_nn,
     torch::Tensor edge_line_min,
     torch::Tensor edge_line_max,
-    torch::Tensor edge_adjacent_face1,
-    std::uintptr_t raydn_module_handle) {
+    torch::Tensor edge_adjacent_face1) {
     at::Tensor out;
-    raydn_diffraction_discover_edges_counted_fn(raydn_module_handle)(
+    raydn_diffraction_discover_edges_counted_fn(0)(
         &tx_pos,
         &ray_dir,
         &prim_index,
@@ -163,8 +161,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     torch::Tensor material_valid,
     int64_t state_limit,
     int64_t capacity,
-    double wavelength,
-    std::uintptr_t raydn_module_handle) {
+    double wavelength) {
     at::Tensor active_storage;
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     at::Tensor tx_pol = at::zeros_like(tx_pos);
@@ -172,7 +169,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
         tx_pol.select(1, 2).fill_(1.0);
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_diffraction_paths_order1_forward_fn(raydn_module_handle)(
+    int64_t output_count = raydn_diffraction_paths_order1_forward_fn(0)(
         scene_handle,
         &tx_pos,
         &tx_pol,
@@ -228,8 +225,7 @@ pybind11::dict cn_path_diffraction_paths_order1(
     torch::Tensor material_mu_r,
     torch::Tensor material_gain,
     torch::Tensor material_valid,
-    double wavelength,
-    std::uintptr_t raydn_module_handle) {
+    double wavelength) {
     check_vec3_table(tx_positions, "tx_positions");
     check_flat_tensor(tx_power, "tx_power", at::kFloat);
     check_vec3_table(rx_positions, "rx_positions");
@@ -310,7 +306,7 @@ pybind11::dict cn_path_diffraction_paths_order1(
         const int64_t state_limit = states[0].size(0);
         const int64_t capacity = rx_positions.size(0) * state_limit;
         std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-        const int64_t output_count = raydn_diffraction_paths_order1_forward_fn(raydn_module_handle)(
+        const int64_t output_count = raydn_diffraction_paths_order1_forward_fn(0)(
             scene_handle,
             &tx_view,
             &tx_pol,
@@ -426,8 +422,7 @@ pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
     pybind11::object recursive_state_exterior_angle,
     int64_t export_tape,
     pybind11::object sample_state_index,
-    pybind11::object sample_edge_weight,
-    std::uintptr_t raydn_module_handle) {
+    pybind11::object sample_edge_weight) {
     at::Tensor active_storage;
     at::Tensor state_wi_storage;
     at::Tensor state_d0_storage;
@@ -474,7 +469,7 @@ pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
 
     constexpr int64_t kOutputCount = 19;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_diffraction_accumulation_forward_fn(raydn_module_handle)(
+    int64_t output_count = raydn_diffraction_accumulation_forward_fn(0)(
         scene_handle,
         active_ptr,
         &state_edge_index,

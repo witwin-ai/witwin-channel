@@ -75,7 +75,7 @@ def test_phase10_binding_inventory_covers_all_current_symbols_and_python_owners(
     assert missing == []
 
 
-def test_phase10_dummy_projection_is_exact_and_not_yet_retired() -> None:
+def test_phase10_dummy_projection_is_exact_and_removed() -> None:
     audit = _audit()
     projection = audit["dummy_parameter_projection"]
     assert isinstance(projection, dict)
@@ -89,10 +89,27 @@ def test_phase10_dummy_projection_is_exact_and_not_yet_retired() -> None:
         )
     }
 
-    assert projection["status"] == "present"
+    assert projection["status"] == "removed"
     assert projection["allowed_transition"] == ("remove_from_all_listed_bindings_only")
     assert len(projection["bindings"]) == len(set(projection["bindings"])) == 22
-    assert current_bindings == set(projection["bindings"])
+    assert current_bindings == set()
+
+
+def test_phase10_python_call_projection_matches_the_ops_ledger() -> None:
+    audit = _audit()
+    projection = audit["python_call_projection"]
+    assert isinstance(projection, dict)
+    manifest = json.loads(OPS_MANIFEST_PATH.read_text(encoding="utf-8"))
+    entries = projection["entries"]
+    ids = [entry["id"] for entry in entries]
+
+    assert projection["status"] == "removed"
+    assert projection["parameter_expression"] == "_raydn_module_handle()"
+    assert len(ids) == len(set(ids)) == 25
+    assert entries == manifest["approved_body_projections"]
+    assert all(
+        manifest["canonical_owners"][entry["id"]] == entry["owner"] for entry in entries
+    )
 
 
 def test_phase10_retirement_ledger_is_empty_until_the_definition_is_removed() -> None:

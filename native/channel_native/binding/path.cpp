@@ -39,8 +39,7 @@ pybind11::dict cn_path_diffraction_paths_order1(
     torch::Tensor material_mu_r,
     torch::Tensor material_gain,
     torch::Tensor material_valid,
-    double wavelength,
-    std::uintptr_t raydn_module_handle);
+    double wavelength);
 pybind11::tuple cn_deterministic_diffraction_state_pack(
     torch::Tensor edge_indices,
     torch::Tensor edge_pos,

@@ -2272,5 +2272,157 @@
     "scattering_table_pdf": "witwin.channel_native.scattering.kernels.functional.scattering_table_pdf",
     "scattering_table_sample": "witwin.channel_native.scattering.kernels.functional.scattering_table_sample"
   },
-  "retired_ops": []
+  "retired_ops": [],
+  "approved_body_projections": [
+    {
+      "id": "_RaydnIntersectAdFunction.forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd._RaydnIntersectAdFunction.forward",
+      "native_symbol": "bdpt_intersect_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "_RaydnReflectionEpcPathsAdFunction.forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd._RaydnReflectionEpcPathsAdFunction.forward",
+      "native_symbol": "raydn_reflection_epc_paths_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "_RaydnTraceReflectionsAdFunction.forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd._RaydnTraceReflectionsAdFunction.forward",
+      "native_symbol": "raydn_trace_reflections_forward_tape",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "bdpt_diffraction_accumulation_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_accumulation_forward",
+      "native_symbol": "bdpt_diffraction_accumulation_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "bdpt_diffraction_discover_edges",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_discover_edges",
+      "native_symbol": "bdpt_diffraction_discover_edges",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "bdpt_diffraction_discover_edges_counted",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_discover_edges_counted",
+      "native_symbol": "bdpt_diffraction_discover_edges_counted",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "bdpt_intersect_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_intersect_forward",
+      "native_symbol": "bdpt_intersect_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "bdpt_reflection_accumulation_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_reflection_accumulation_forward",
+      "native_symbol": "bdpt_reflection_accumulation_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "bdpt_visibility_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_visibility_forward",
+      "native_symbol": "bdpt_visibility_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "path_diffraction_paths_order1",
+      "owner": "witwin.channel_native.propagation.topology.kernels.candidates.path_diffraction_paths_order1",
+      "native_symbol": "path_diffraction_paths_order1",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_coupled_rd_geometry_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_rd_geometry_forward",
+      "native_symbol": "raydn_coupled_rd_geometry_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_diffraction_paths_order1_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_diffraction_paths_order1_forward",
+      "native_symbol": "raydn_diffraction_paths_order1_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_intersect_backward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_intersect_backward",
+      "native_symbol": "raydn_intersect_backward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_intersect_jvp",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_intersect_jvp",
+      "native_symbol": "raydn_intersect_jvp",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_backward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_reflection_epc_paths_backward",
+      "native_symbol": "raydn_reflection_epc_paths_backward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_reflection_epc_paths_forward",
+      "native_symbol": "raydn_reflection_epc_paths_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_reflection_epc_paths_jvp",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_reflection_epc_paths_jvp",
+      "native_symbol": "raydn_reflection_epc_paths_jvp",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_scene_create",
+      "owner": "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_create",
+      "native_symbol": "raydn_scene_create",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_scene_edge_records",
+      "owner": "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_edge_records",
+      "native_symbol": "raydn_scene_edge_records",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_scene_face_normals_backward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_scene_face_normals_backward",
+      "native_symbol": "raydn_scene_face_normals_backward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_scene_face_normals_jvp",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_scene_face_normals_jvp",
+      "native_symbol": "raydn_scene_face_normals_jvp",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_trace_reflections_backward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_backward",
+      "native_symbol": "raydn_trace_reflections_backward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_trace_reflections_forward",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_trace_reflections_forward",
+      "native_symbol": "raydn_trace_reflections_forward",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_trace_reflections_forward_tape",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_forward_tape",
+      "native_symbol": "raydn_trace_reflections_forward_tape",
+      "kind": "remove_trailing_raydn_module_handle"
+    },
+    {
+      "id": "raydn_trace_reflections_jvp",
+      "owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_jvp",
+      "native_symbol": "raydn_trace_reflections_jvp",
+      "kind": "remove_trailing_raydn_module_handle"
+    }
+  ]
 }

@@ -49,13 +49,12 @@ pybind11::tuple cn_bdpt_intersect_forward(
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
-    int64_t flags,
-    std::uintptr_t raydn_module_handle) {
+    int64_t flags) {
     at::Tensor active_storage;
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     constexpr int64_t kOutputCount = 10;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_forward_fn(raydn_module_handle)(
+    int64_t output_count = raydn_intersect_forward_fn(0)(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -76,14 +75,13 @@ pybind11::tuple cn_bdpt_visibility_forward(
     int64_t scene_handle,
     torch::Tensor start,
     torch::Tensor end,
-    pybind11::object active,
-    std::uintptr_t raydn_module_handle) {
+    pybind11::object active) {
     at::Tensor active_storage;
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     at::Tensor visible;
     at::Tensor blocker_prim;
     at::Tensor tape_t;
-    raydn_visibility_forward_fn(raydn_module_handle)(
+    raydn_visibility_forward_fn(0)(
         scene_handle,
         &start,
         &end,
@@ -112,8 +110,7 @@ pybind11::tuple cn_raydn_intersect_backward(
     bool need_grad_vertices,
     bool need_grad_ray_o,
     bool need_grad_ray_d,
-    bool need_grad_ray_tmax,
-    std::uintptr_t raydn_module_handle) {
+    bool need_grad_ray_tmax) {
     at::Tensor active_storage;
     at::Tensor grad_t_storage;
     at::Tensor grad_p_storage;
@@ -131,7 +128,7 @@ pybind11::tuple cn_raydn_intersect_backward(
         optional_tensor(std::move(grad_barycentric), grad_barycentric_storage);
     constexpr int64_t kOutputCount = 4;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_backward_fn(raydn_module_handle)(
+    int64_t output_count = raydn_intersect_backward_fn(0)(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -169,8 +166,7 @@ pybind11::tuple cn_raydn_intersect_jvp(
     pybind11::object tangent_vertices,
     pybind11::object tangent_ray_o,
     pybind11::object tangent_ray_d,
-    int64_t flags,
-    std::uintptr_t raydn_module_handle) {
+    int64_t flags) {
     at::Tensor active_storage;
     at::Tensor tangent_vertices_storage;
     at::Tensor tangent_ray_o_storage;
@@ -184,7 +180,7 @@ pybind11::tuple cn_raydn_intersect_jvp(
         optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
     constexpr int64_t kOutputCount = 6;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_jvp_fn(raydn_module_handle)(
+    int64_t output_count = raydn_intersect_jvp_fn(0)(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -220,8 +216,7 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     torch::Tensor surface_group_id,
     torch::Tensor surface_group_size,
     torch::Tensor surface_group_members,
-    bool reverse,
-    std::uintptr_t raydn_module_handle) {
+    bool reverse) {
     check_vec3_table(source, "source");
     check_vec3_table(receiver, "receiver");
     check_flat_tensor(face_id, "face_id", at::kInt);
@@ -270,7 +265,7 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
 
     constexpr int64_t kEpcOutputCount = 6;
     std::array<at::Tensor, static_cast<size_t>(kEpcOutputCount)> epc;
-    const int64_t epc_output_count = raydn_reflection_epc_paths_forward_fn(raydn_module_handle)(
+    const int64_t epc_output_count = raydn_reflection_epc_paths_forward_fn(0)(
         scene_handle,
         &epc_source,
         &diffraction_point,
@@ -293,7 +288,7 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     at::Tensor suffix_visible;
     at::Tensor suffix_blocker;
     at::Tensor suffix_tape_t;
-    raydn_visibility_forward_fn(raydn_module_handle)(
+    raydn_visibility_forward_fn(0)(
         scene_handle,
         &diffraction_point,
         &epc_receiver,

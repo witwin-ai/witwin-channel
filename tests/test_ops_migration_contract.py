@@ -47,6 +47,7 @@ def _initial_manifest(repo: Path) -> dict[str, object]:
         "active_ops": [str(item["id"]) for item in contracts],
         "canonical_owners": {},
         "retired_ops": [],
+        "approved_body_projections": [],
     }
 
 
@@ -89,6 +90,35 @@ def _retire_move(manifest: dict[str, object]) -> None:
     retired.append("move")
 
 
+def _register_move_projection(manifest: dict[str, object]) -> None:
+    projections = manifest["approved_body_projections"]
+    assert isinstance(projections, list)
+    projections.append(
+        {
+            "id": "move",
+            "owner": "witwin.channel_native.scene.kernels.move",
+            "native_symbol": "move",
+            "kind": "remove_trailing_raydn_module_handle",
+        }
+    )
+
+
+def _projected_synthetic_manifest(tmp_path: Path) -> dict[str, object]:
+    _write_package(
+        tmp_path,
+        {
+            "core/kernels/ops.py": """
+def move(value=1):
+    return _required_native_op("move")(value, _raydn_module_handle())
+""",
+        },
+    )
+    manifest = _initial_manifest(tmp_path)
+    _register_move(manifest)
+    _register_move_projection(manifest)
+    return manifest
+
+
 def _check_synthetic(tmp_path: Path, manifest: dict[str, object]) -> list[str]:
     return migration.check_manifest(
         tmp_path,
@@ -105,6 +135,7 @@ def test_current_manifest_covers_every_movable_ops_body():
     assert len(manifest["active_ops"]) == 0
     assert len(manifest["canonical_owners"]) == 282
     assert manifest["retired_ops"] == []
+    assert len(manifest["approved_body_projections"]) == 25
     assert migration.contract_digest(manifest) == migration.FROZEN_CONTRACT_DIGEST
     assert migration.BOOTSTRAP_CANONICAL_OWNERS.items() <= (
         manifest["canonical_owners"].items()
@@ -307,6 +338,91 @@ def test_retired_ledger_cannot_name_an_unknown_contract(tmp_path: Path):
     issues = _check_synthetic(tmp_path, manifest)
 
     assert any("unknown migration IDs: unknown" in issue for issue in issues)
+
+
+def test_approved_body_projection_restores_only_the_removed_trailing_handle(
+    tmp_path: Path,
+):
+    manifest = _projected_synthetic_manifest(tmp_path)
+    _write_package(
+        tmp_path,
+        {
+            "core/kernels/ops.py": "",
+            "scene/kernels.py": """
+def move(value=1):
+    return _required_native_op("move")(value)
+""",
+        },
+    )
+
+    assert _check_synthetic(tmp_path, manifest) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        """
+def move(value=1):
+    return _required_native_op("move")(_raydn_module_handle())
+""",
+        """
+def move(value=1):
+    return _required_native_op("move")(value + 1)
+""",
+        """
+def move(value=1):
+    marker = 1
+    return _required_native_op("move")(value)
+""",
+        """
+def move(value=1):
+    return _required_native_op("other")(value)
+""",
+    ],
+    ids=(
+        "wrong_parameter",
+        "non_trailing_change",
+        "extra_body",
+        "other_native_call",
+    ),
+)
+def test_approved_body_projection_rejects_other_body_changes(
+    tmp_path: Path, source: str
+):
+    manifest = _projected_synthetic_manifest(tmp_path)
+    _write_package(
+        tmp_path,
+        {"core/kernels/ops.py": "", "scene/kernels.py": source},
+    )
+
+    issues = _check_synthetic(tmp_path, manifest)
+
+    assert any(
+        "approved trailing RayDN handle projection mismatch" in issue
+        for issue in issues
+    )
+
+
+def test_approved_body_projection_rejects_unknown_and_duplicate_ids(tmp_path: Path):
+    manifest = _synthetic_manifest(tmp_path)
+    projections = manifest["approved_body_projections"]
+    assert isinstance(projections, list)
+    entry = {
+        "id": "unknown",
+        "owner": "witwin.channel_native.scene.kernels.unknown",
+        "native_symbol": "unknown",
+        "kind": "remove_trailing_raydn_module_handle",
+    }
+    projections.extend([entry, copy.deepcopy(entry)])
+
+    issues = _check_synthetic(tmp_path, manifest)
+
+    assert any(
+        "unknown approved body projection ID: unknown" in issue for issue in issues
+    )
+    assert any(
+        "duplicate approved body projection ID: unknown" in issue for issue in issues
+    )
 
 
 def test_frozen_universe_and_ledger_cannot_grow():

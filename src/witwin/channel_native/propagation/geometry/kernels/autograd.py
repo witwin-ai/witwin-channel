@@ -15,10 +15,7 @@ from witwin.channel_native.runtime.autograd_contracts import (
 )
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel_native.scene.native_handles import (
-    _raydn_module_handle,
-    _raydn_scene_handle_id,
-)
+from witwin.channel_native.scene.native_handles import _raydn_scene_handle_id
 
 from .bridge import _BDPT_INTERSECTION_FIELDS
 from .primitives import deterministic_normalize_vec3
@@ -93,13 +90,13 @@ def raydn_intersect_backward(
         bool(need_grad_ray_o),
         bool(need_grad_ray_d),
         bool(need_grad_ray_tmax),
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
         raise TypeError(
             "_channel_native.raydn_intersect_backward must return 4 gradients"
         )
     return tuple(out)
+
 
 def raydn_intersect_jvp(
     handle: object,
@@ -148,11 +145,11 @@ def raydn_intersect_jvp(
         tangent_ray_o,
         tangent_ray_d,
         int(flags),
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 6:
         raise TypeError("_channel_native.raydn_intersect_jvp must return 6 tangents")
     return tuple(out)
+
 
 def raydn_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
@@ -162,13 +159,13 @@ def raydn_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, .
     native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
     out = _required_native_op("raydn_trace_reflections_forward_tape")(
         *native_args,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 9:
         raise TypeError(
             "_channel_native.raydn_trace_reflections_forward_tape must return 9 tensors"
         )
     return tuple(out)
+
 
 def raydn_trace_reflections_backward(
     handle: object,
@@ -223,9 +220,7 @@ def raydn_trace_reflections_backward(
     if tuple(tape_barycentric.shape[:2]) != (rows, bounces) or tape_barycentric.shape[
         2
     ] not in (2, 3):
-        raise ValueError(
-            f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)"
-        )
+        raise ValueError(f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)")
     for name, value in (
         ("tape_hit_points", tape_hit_points),
         ("tape_normals", tape_normals),
@@ -250,13 +245,13 @@ def raydn_trace_reflections_backward(
         image_sources,
         grad_t,
         grad_image_sources,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
         raise TypeError(
             "_channel_native.raydn_trace_reflections_backward must return 4 gradients"
         )
     return tuple(out)
+
 
 def raydn_trace_reflections_jvp(
     handle: object,
@@ -308,9 +303,7 @@ def raydn_trace_reflections_jvp(
     if tuple(tape_barycentric.shape[:2]) != (rows, bounces) or tape_barycentric.shape[
         2
     ] not in (2, 3):
-        raise ValueError(
-            f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)"
-        )
+        raise ValueError(f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)")
     for name, value in (
         ("tape_hit_points", tape_hit_points),
         ("tape_normals", tape_normals),
@@ -334,13 +327,13 @@ def raydn_trace_reflections_jvp(
         tangent_ray_o,
         tangent_ray_d,
         image_sources,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 2:
         raise TypeError(
             "_channel_native.raydn_trace_reflections_jvp must return 2 tangents"
         )
     return tuple(out)
+
 
 class _RaydnIntersectAdFunction(torch.autograd.Function):
     """Fixed-winner differentiable RayDN intersect over the C bridge.
@@ -360,7 +353,6 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
             ray_tmax,
             active,
             _RAYDN_RAY_FLAGS_ALL,
-            _raydn_module_handle(),
         )
         return tuple(out)
 
@@ -408,26 +400,24 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
             or need_grad_ray_tmax
         ):
             return none_grads
-        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = (
-            raydn_intersect_backward(
-                ctx.scene,
-                ray_o,
-                ray_d,
-                ray_tmax,
-                active_ctx,
-                tape_prim_id,
-                tape_barycentric,
-                grad_t=grad_outputs[0],
-                grad_p=grad_outputs[1],
-                grad_n=grad_outputs[2],
-                grad_geo_n=grad_outputs[3],
-                grad_uv=grad_outputs[4],
-                grad_barycentric=grad_outputs[5],
-                need_grad_vertices=need_grad_vertices,
-                need_grad_ray_o=need_grad_ray_o,
-                need_grad_ray_d=need_grad_ray_d,
-                need_grad_ray_tmax=need_grad_ray_tmax,
-            )
+        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = raydn_intersect_backward(
+            ctx.scene,
+            ray_o,
+            ray_d,
+            ray_tmax,
+            active_ctx,
+            tape_prim_id,
+            tape_barycentric,
+            grad_t=grad_outputs[0],
+            grad_p=grad_outputs[1],
+            grad_n=grad_outputs[2],
+            grad_geo_n=grad_outputs[3],
+            grad_uv=grad_outputs[4],
+            grad_barycentric=grad_outputs[5],
+            need_grad_vertices=need_grad_vertices,
+            need_grad_ray_o=need_grad_ray_o,
+            need_grad_ray_d=need_grad_ray_d,
+            need_grad_ray_tmax=need_grad_ray_tmax,
         )
         if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
@@ -443,7 +433,15 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active):
+    def jvp(
+        ctx,
+        _grad_handle,
+        grad_vertices,
+        grad_ray_o,
+        grad_ray_d,
+        _grad_tmax,
+        _grad_active,
+    ):
         ray_o, ray_d, active_ctx, tape_prim_id, tape_barycentric = ctx.saved_tensors
         with torch_compat.disable_functorch():
             values = raydn_intersect_jvp(
@@ -472,6 +470,7 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
             )
         return (*values, None, None, None, None)
 
+
 def raydn_intersect_ad(
     handle: object,
     vertices: torch.Tensor,
@@ -493,6 +492,7 @@ def raydn_intersect_ad(
     )
     return dict(zip(_BDPT_INTERSECTION_FIELDS, values, strict=True))
 
+
 class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
     """Fixed-winner differentiable RayDN reflection chain over the C bridge."""
 
@@ -505,7 +505,6 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
             ray_tmax,
             active,
             int(max_bounces),
-            _raydn_module_handle(),
         )
         (
             valid,
@@ -695,6 +694,7 @@ _RAYDN_TRACE_REFLECTIONS_AD_FIELDS = (
     "tape_normals",
 )
 
+
 def raydn_trace_reflections_ad(
     handle: object,
     vertices: torch.Tensor,
@@ -721,6 +721,7 @@ def raydn_trace_reflections_ad(
         int(max_bounces),
     )
     return dict(zip(_RAYDN_TRACE_REFLECTIONS_AD_FIELDS, values, strict=True))
+
 
 def _epc_paths_frozen_winner_checks(
     source: torch.Tensor,
@@ -764,6 +765,7 @@ def _epc_paths_frozen_winner_checks(
         raise ValueError("plane_normals must have shape (rows, bounces, 3)")
     return rows, bounces
 
+
 def raydn_reflection_epc_paths_backward(
     handle: object,
     source: torch.Tensor,
@@ -802,7 +804,6 @@ def raydn_reflection_epc_paths_backward(
         bool(need_grad_vertices),
         bool(need_grad_source),
         bool(need_grad_receiver),
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 3:
         raise TypeError(
@@ -810,6 +811,7 @@ def raydn_reflection_epc_paths_backward(
             " 3 gradients"
         )
     return tuple(out)
+
 
 def raydn_reflection_epc_paths_jvp(
     handle: object,
@@ -843,13 +845,13 @@ def raydn_reflection_epc_paths_jvp(
         tangent_vertices,
         tangent_source,
         tangent_receiver,
-        _raydn_module_handle(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 3:
         raise TypeError(
             "_channel_native.raydn_reflection_epc_paths_jvp must return 3 tangents"
         )
     return tuple(out)
+
 
 class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
     """Fixed-winner differentiable RayDN reflection EPC paths over the C bridge.
@@ -889,7 +891,6 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
             surface_group_members,
             int(max_bounces),
             int(visibility_ignore_mode),
-            _raydn_module_handle(),
         )
         return tuple(out)
 
@@ -926,11 +927,21 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
         ctx.scene = int(scene_handle)
         ctx.vertices_shape = tuple(vertices.shape)
         ctx.save_for_backward(
-            source, receiver, sequence, plane_points, plane_normals, valid,
+            source,
+            receiver,
+            sequence,
+            plane_points,
+            plane_normals,
+            valid,
             bounce_count,
         )
         ctx.save_for_forward(
-            source, receiver, sequence, plane_points, plane_normals, valid,
+            source,
+            receiver,
+            sequence,
+            plane_points,
+            plane_normals,
+            valid,
             bounce_count,
         )
         ctx.mark_non_differentiable(valid, resolved_prim_ids, surface_group_ids)
@@ -1058,6 +1069,7 @@ _RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS = (
     "normals",
 )
 
+
 def raydn_reflection_epc_paths_ad(
     handle: object,
     vertices: torch.Tensor,
@@ -1134,7 +1146,6 @@ def raydn_scene_face_normals_backward(
     out = _required_native_op("raydn_scene_face_normals_backward")(
         _raydn_scene_handle_id(handle),
         grad_face_normals,
-        _raydn_module_handle(),
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
@@ -1152,7 +1163,6 @@ def raydn_scene_face_normals_jvp(
     out = _required_native_op("raydn_scene_face_normals_jvp")(
         _raydn_scene_handle_id(handle),
         tangent_vertices,
-        _raydn_module_handle(),
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
@@ -1192,13 +1202,10 @@ class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
             )
         if grad_face_normals is None or not ctx.needs_input_grad[1]:
             return (None, None, None)
-        grad_vertices = raydn_scene_face_normals_backward(
-            ctx.scene, grad_face_normals
-        )
+        grad_vertices = raydn_scene_face_normals_backward(ctx.scene, grad_face_normals)
         if tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
-                "raydn_face_normals_ad vertices must be the scene global"
-                " vertex table"
+                "raydn_face_normals_ad vertices must be the scene global vertex table"
             )
         return (None, grad_vertices, None)
 

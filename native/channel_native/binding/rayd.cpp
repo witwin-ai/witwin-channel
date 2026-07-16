@@ -13,33 +13,28 @@ pybind11::tuple cn_raydn_scene_create(
     std::vector<torch::Tensor> face_uv,
     std::vector<torch::Tensor> to_world_left,
     std::vector<torch::Tensor> to_world_right,
-    std::vector<int64_t> mesh_flags,
-    std::uintptr_t raydn_module_handle);
+    std::vector<int64_t> mesh_flags);
 pybind11::tuple cn_raydn_scene_edge_records(
-    int64_t scene_handle,
-    std::uintptr_t raydn_module_handle);
+    int64_t scene_handle);
 pybind11::tuple cn_bdpt_intersect_forward(
     int64_t scene_handle,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
-    int64_t flags,
-    std::uintptr_t raydn_module_handle);
+    int64_t flags);
 pybind11::tuple cn_bdpt_visibility_forward(
     int64_t scene_handle,
     torch::Tensor start,
     torch::Tensor end,
-    pybind11::object active,
-    std::uintptr_t raydn_module_handle);
+    pybind11::object active);
 pybind11::tuple cn_raydn_trace_reflections_forward(
     int64_t scene_handle,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
-    int64_t max_bounces,
-    std::uintptr_t raydn_module_handle);
+    int64_t max_bounces);
 pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     int64_t scene_handle,
     torch::Tensor source,
@@ -52,8 +47,7 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     torch::Tensor surface_group_size,
     torch::Tensor surface_group_members,
     int64_t max_bounces,
-    int64_t visibility_ignore_mode,
-    std::uintptr_t raydn_module_handle);
+    int64_t visibility_ignore_mode);
 pybind11::tuple cn_raydn_intersect_backward(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -71,8 +65,7 @@ pybind11::tuple cn_raydn_intersect_backward(
     bool need_grad_vertices,
     bool need_grad_ray_o,
     bool need_grad_ray_d,
-    bool need_grad_ray_tmax,
-    std::uintptr_t raydn_module_handle);
+    bool need_grad_ray_tmax);
 pybind11::tuple cn_raydn_intersect_jvp(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -83,16 +76,14 @@ pybind11::tuple cn_raydn_intersect_jvp(
     pybind11::object tangent_vertices,
     pybind11::object tangent_ray_o,
     pybind11::object tangent_ray_d,
-    int64_t flags,
-    std::uintptr_t raydn_module_handle);
+    int64_t flags);
 pybind11::tuple cn_raydn_trace_reflections_forward_tape(
     int64_t scene_handle,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
-    int64_t max_bounces,
-    std::uintptr_t raydn_module_handle);
+    int64_t max_bounces);
 pybind11::tuple cn_raydn_trace_reflections_backward(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -105,8 +96,7 @@ pybind11::tuple cn_raydn_trace_reflections_backward(
     torch::Tensor tape_normals,
     torch::Tensor image_sources,
     pybind11::object grad_t,
-    pybind11::object grad_image_sources,
-    std::uintptr_t raydn_module_handle);
+    pybind11::object grad_image_sources);
 pybind11::tuple cn_raydn_trace_reflections_jvp(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -119,8 +109,7 @@ pybind11::tuple cn_raydn_trace_reflections_jvp(
     pybind11::object tangent_vertices,
     pybind11::object tangent_ray_o,
     pybind11::object tangent_ray_d,
-    torch::Tensor image_sources,
-    std::uintptr_t raydn_module_handle);
+    torch::Tensor image_sources);
 pybind11::tuple cn_raydn_reflection_epc_paths_backward(
     int64_t scene_handle,
     torch::Tensor source,
@@ -135,8 +124,7 @@ pybind11::tuple cn_raydn_reflection_epc_paths_backward(
     pybind11::object grad_path_length,
     bool need_grad_vertices,
     bool need_grad_source,
-    bool need_grad_receiver,
-    std::uintptr_t raydn_module_handle);
+    bool need_grad_receiver);
 pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
     int64_t scene_handle,
     torch::Tensor source,
@@ -148,16 +136,13 @@ pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
     torch::Tensor bounce_count,
     pybind11::object tangent_vertices,
     pybind11::object tangent_source,
-    pybind11::object tangent_receiver,
-    std::uintptr_t raydn_module_handle);
+    pybind11::object tangent_receiver);
 at::Tensor cn_raydn_scene_face_normals_backward(
     int64_t scene_handle,
-    torch::Tensor grad_face_normals,
-    std::uintptr_t raydn_module_handle);
+    torch::Tensor grad_face_normals);
 at::Tensor cn_raydn_scene_face_normals_jvp(
     int64_t scene_handle,
-    torch::Tensor tangent_vertices,
-    std::uintptr_t raydn_module_handle);
+    torch::Tensor tangent_vertices);
 pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     int64_t scene_handle,
     torch::Tensor source,
@@ -173,8 +158,7 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     torch::Tensor surface_group_id,
     torch::Tensor surface_group_size,
     torch::Tensor surface_group_members,
-    bool reverse,
-    std::uintptr_t raydn_module_handle);
+    bool reverse);
 pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -207,8 +191,7 @@ pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     int64_t compact_min_samples,
     int64_t staged_min_samples_per_cell,
     int64_t procedural_sample_count,
-    bool streaming_los_enabled,
-    std::uintptr_t raydn_module_handle);
+    bool streaming_los_enabled);
 torch::Tensor cn_bdpt_diffraction_discover_edges(
     torch::Tensor tx_pos,
     torch::Tensor ray_dir,
@@ -224,8 +207,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges(
     torch::Tensor edge_nn,
     torch::Tensor edge_line_min,
     torch::Tensor edge_line_max,
-    torch::Tensor edge_adjacent_face1,
-    std::uintptr_t raydn_module_handle);
+    torch::Tensor edge_adjacent_face1);
 torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
     torch::Tensor tx_pos,
     torch::Tensor ray_dir,
@@ -242,8 +224,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
     torch::Tensor edge_nn,
     torch::Tensor edge_line_min,
     torch::Tensor edge_line_max,
-    torch::Tensor edge_adjacent_face1,
-    std::uintptr_t raydn_module_handle);
+    torch::Tensor edge_adjacent_face1);
 pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     int64_t scene_handle,
     torch::Tensor tx_pos,
@@ -268,8 +249,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     torch::Tensor material_valid,
     int64_t state_limit,
     int64_t capacity,
-    double wavelength,
-    std::uintptr_t raydn_module_handle);
+    double wavelength);
 pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
     int64_t scene_handle,
     pybind11::object active,
@@ -322,8 +302,7 @@ pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
     pybind11::object recursive_state_exterior_angle,
     int64_t export_tape,
     pybind11::object sample_state_index,
-    pybind11::object sample_edge_weight,
-    std::uintptr_t raydn_module_handle);
+    pybind11::object sample_edge_weight);
 
 void register_rayd_geometry(pybind11::module_ &module) {
     module.def(
