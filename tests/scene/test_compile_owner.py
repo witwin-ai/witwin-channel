@@ -4,6 +4,9 @@ import ast
 import hashlib
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from witwin.channel_native import Scene
 from witwin.channel_native.core import scene as legacy_scene
@@ -24,7 +27,7 @@ _HELPER_BODY_HASHES = {
         "0496c3163d9e61f35d521d74b0f64c1a569c8c23d7da5668c339776ae6250904"
     ),
     "_frequency_dependent_material_keys": (
-        "2f144ce5dde58f2c189f3e2229ed74bb65fec02f69e8ad6ad522e01bb7406f2d"
+        "56819d7f8e2de0f2d7ac7cb16b4367d9f035dd361f2464320a492edebb8ef055"
     ),
     "_compile_materials": (
         "64b2c053c67c002ce5a2daa9ca6af4414b0db93057af6b1fbcddf9dc7e86350e"
@@ -112,3 +115,35 @@ def test_compile_cache_hit_preserves_the_exact_call_ledger(monkeypatch):
     ledger.clear()
     assert scene.compile() is compiled
     assert ledger == ["_material_records"]
+
+
+def test_frequency_dependency_probe_treats_value_error_as_dependent():
+    class ProbeMaterial:
+        def parameters(self, frequency_hz):
+            raise ValueError(f"probe frequency {frequency_hz} is out of range")
+
+    structures = (SimpleNamespace(material=ProbeMaterial()),)
+
+    assert canonical_compile._frequency_dependent_material_keys(
+        structures,
+        [{"name": "probe"}],
+        ("0:probe",),
+        1.0e9,
+    ) == ("0:probe",)
+
+
+@pytest.mark.parametrize("exception_type", (TypeError, RuntimeError))
+def test_frequency_dependency_probe_propagates_unexpected_errors(exception_type):
+    class ProbeMaterial:
+        def parameters(self, frequency_hz):
+            raise exception_type(f"unexpected probe failure at {frequency_hz}")
+
+    structures = (SimpleNamespace(material=ProbeMaterial()),)
+
+    with pytest.raises(exception_type, match="unexpected probe failure"):
+        canonical_compile._frequency_dependent_material_keys(
+            structures,
+            [{"name": "probe"}],
+            ("0:probe",),
+            1.0e9,
+        )

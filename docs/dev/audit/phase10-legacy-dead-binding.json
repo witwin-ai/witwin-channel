@@ -722,7 +722,8 @@
     "broad_exception": {
       "definition": "src/witwin/channel_native/scene/compile.py:275",
       "classification": "compute_path",
-      "decision": "narrow_to_value_error_in_phase10",
+      "decision": "resolved",
+      "status": "resolved",
       "tests": ["tests/scene/test_compile_owner.py"]
     }
   }

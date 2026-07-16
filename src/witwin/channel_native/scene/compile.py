@@ -272,7 +272,7 @@ def _frequency_dependent_material_keys(
         try:
             probe = dict(material.parameters(probe_hz))
             probe.update(_abi_v3_layer_view(probe))
-        except Exception:
+        except ValueError:
             dependent.append(keys[index])
             continue
         if probe != records[index]:
