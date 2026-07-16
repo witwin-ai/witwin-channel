@@ -50,7 +50,14 @@ def _expanded_scene(tx_count: int, rx_count: int) -> Scene:
     )
 
 
-def _operation(solver: str, scene: Scene, *, depth: int, samples: int):
+def _operation(
+    solver: str,
+    scene: Scene,
+    *,
+    depth: int,
+    samples: int,
+    workspace_limit_bytes: int,
+):
     components = {"los"} if depth == 0 else {"los", "reflection"}
     if solver == "path":
         from witwin.channel_native.path import Config, solve
@@ -65,12 +72,22 @@ def _operation(solver: str, scene: Scene, *, depth: int, samples: int):
     if solver == "basic":
         from witwin.channel_native.montecarlo.basic import Config, solve
 
-        config = Config(samples=samples, max_depth=depth, components=components)
+        config = Config(
+            samples=samples,
+            max_depth=depth,
+            components=components,
+            workspace_limit_bytes=workspace_limit_bytes,
+        )
         return lambda: solve(scene, config)
     if solver == "bdpt":
         from witwin.channel_native.montecarlo.bdpt import Config, solve
 
-        config = Config(samples=samples, max_depth=depth, components=components)
+        config = Config(
+            samples=samples,
+            max_depth=depth,
+            components=components,
+            workspace_limit_bytes=workspace_limit_bytes,
+        )
         return lambda: solve(scene, config)
     raise ValueError(f"unknown solver: {solver}")
 
@@ -87,7 +104,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     sample_axis = _ints(args.samples) if solver in {"basic", "bdpt"} else (1,)
                     for samples in sample_axis:
                         operation = _operation(
-                            solver, scene, depth=depth, samples=samples
+                            solver,
+                            scene,
+                            depth=depth,
+                            samples=samples,
+                            workspace_limit_bytes=int(
+                                args.gpu_budget_gib * (1 << 30)
+                            ),
                         )
                         result, measurement = benchmark_operation(
                             operation, warmup=args.warmup, repeats=args.repeats
@@ -128,6 +151,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "depth": _ints(args.depths),
                 "samples": _ints(args.samples),
             },
+            "gpu_budget_gib": args.gpu_budget_gib,
         },
         results=rows,
     )
@@ -142,8 +166,11 @@ def main() -> int:
     parser.add_argument("--samples", default="1000,1000000")
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--gpu-budget-gib", type=float, default=16.0)
     parser.add_argument("--output", type=Path, default=Path("artifacts/solver_scaling.v1.json"))
     args = parser.parse_args()
+    if args.gpu_budget_gib <= 0:
+        parser.error("--gpu-budget-gib must be positive")
     report = run(args)
     write_report(report, args.output)
     print(json.dumps(report, sort_keys=True))

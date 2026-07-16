@@ -69,6 +69,8 @@ def test_tiers_cover_the_required_gate_families() -> None:
         gate for gate in tiers.RELEASE_GATES if gate.id == "release.performance"
     )
     assert performance.args[performance.args.index("--profile") + 1] == "full"
+    scaling = next(gate for gate in tiers.RELEASE_GATES if gate.id == "release.scaling")
+    assert scaling.args[scaling.args.index("--gpu-budget-gib") + 1] == "16"
 
     nightly = _ids("nightly")
     coverage = [

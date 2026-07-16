@@ -216,6 +216,8 @@ RELEASE_GATES = (
             "benchmarks/bench_solver_scaling.py",
             "--solvers",
             "path,deterministic,basic,bdpt",
+            "--gpu-budget-gib",
+            "16",
             "--output",
             "artifacts/release/solver-scaling.v1.json",
         ),
