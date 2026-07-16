@@ -477,7 +477,9 @@ Python_add_library(
     native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/em_debug.cu
     native/channel_native/kernels/field_transport.cu
-    native/channel_native/kernels/field_transport_ad.cu
+    native/channel_native/kernels/field_transport_free_space.cu
+    native/channel_native/kernels/field_transport_reflection.cu
+    native/channel_native/kernels/field_transport_transmission.cu
     native/channel_native/kernels/field_wedge_ad.cu
     native/channel_native/kernels/diffraction.cu
     native/channel_native/kernels/diffraction_discovery.cu
