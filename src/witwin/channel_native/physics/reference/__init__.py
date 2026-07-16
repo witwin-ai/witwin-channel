@@ -1,4 +1,4 @@
-"""Compatibility facade for the canonical reference oracle."""
+"""Independent NumPy electromagnetic reference implementation."""
 
 from witwin.channel_native.physics.reference.oracle import (
     C0,
@@ -7,26 +7,18 @@ from witwin.channel_native.physics.reference.oracle import (
     MU0,
     Medium,
     RTCoefficients,
-    Sequence as Sequence,
-    _admittances as _admittances,
-    _interface_rt as _interface_rt,
-    _power_coefficients as _power_coefficients,
-    _stack_rt_one_pol as _stack_rt_one_pol,
     coherent_attenuation,
     complex_sqrt_passive,
-    dataclass as dataclass,
     fresnel_interface,
     hemisphere_integral,
     kirchhoff_diffuse_lobe_quadrature,
     kirchhoff_diffuse_lobe_series,
     layer_stack_rt,
     medium_params,
-    np as np,
     phase_screen_patch_integral,
     refraction_direction,
     vacuum_medium,
 )
-from witwin.channel_native.physics.reference.oracle import Callable as Callable
 
 __all__ = [
     "C0",
