@@ -263,10 +263,10 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
     assert "face_material_field_bundle" in module_source
 
 
-def test_bdpt_solver_does_not_use_derived_variance_or_component_map_path_export():
-    from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
+def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_export():
+    from witwin.channel_native.montecarlo.bdpt import pipeline as bdpt_pipeline
 
-    source = inspect.getsource(bdpt_solver)
+    source = inspect.getsource(bdpt_pipeline)
 
     assert "bdpt_variance_estimate" not in source
     assert "bdpt_export_component_paths" not in source
