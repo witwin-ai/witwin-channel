@@ -1,6 +1,6 @@
 {
   "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
-  "manifest_sha256": "e57a57dfd89b05bd95d4323c4c4a18436dac9e626e4fba95fcede9148e530a89",
+  "manifest_sha256": "66d6cbdd7bfc720cff2530de4c330a23023cd05d2da8a87746551220460af05e",
   "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
   "owners": [
     {
@@ -2370,8 +2370,7 @@
     "hard_limit_debt_allowlist": {},
     "hard_limit_lines": 3000,
     "planned_owner_debt": {
-      "native/channel_native/kernels/bdpt_connect.cu": 2356,
-      "native/channel_native/kernels/field_wedge_ad.cu": 2473
+      "native/channel_native/kernels/bdpt_connect.cu": 2356
     },
     "recommended_limit_lines": 2000
   }

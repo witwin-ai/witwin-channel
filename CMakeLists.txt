@@ -480,7 +480,10 @@ Python_add_library(
     native/channel_native/kernels/field_transport_free_space.cu
     native/channel_native/kernels/field_transport_reflection.cu
     native/channel_native/kernels/field_transport_transmission.cu
-    native/channel_native/kernels/field_wedge_ad.cu
+    native/channel_native/kernels/field_wedge_ad_diffraction.cu
+    native/channel_native/kernels/field_wedge_ad_coupled.cu
+    native/channel_native/kernels/field_wedge_ad_project.cu
+    native/channel_native/kernels/field_wedge_ad_prepare.cu
     native/channel_native/kernels/diffraction.cu
     native/channel_native/kernels/diffraction_discovery.cu
     native/channel_native/kernels/deterministic_accum.cu
