@@ -119,7 +119,7 @@ __device__ DualC3 reflect_complex3_dual(
 // Pure diffraction (component 2): re-evaluate RayD's order-1 wedge export
 // from the frozen topology. One templated row serves the forward (float) and
 // the derivative (Dual). The conventions below reproduce what the export
-// actually does (paths_optix.cu + raydn_bridge.cpp): stationary-point
+// actually does (paths_optix.cu + rayd/diffraction.cpp): stationary-point
 // selection inside the pair, half-space Fresnel from the face materials
 // (mat.omega = 2*pi*f > 0), the +z hard-coded tx polarization the bridge
 // hands to RayD, and the sqrt(tx_power) amplitude scale. The forward-parity
@@ -327,7 +327,7 @@ __device__ WedgeRowOutputs<T> wedge_row_eval(
     mat.sigma = T(0.f);
     mat.gain = T(1.f);
     mat.omega = 2.0f * field::UTD_PI * frequency;
-    // raydn_bridge.cpp hands RayD a hard-coded +z tx polarization for the
+    // rayd/diffraction.cpp hands RayD a hard-coded +z tx polarization for the
     // order-1 diffraction export; reproduce it (forward-parity gate).
     mat.txPolX = T(0.f);
     mat.txPolY = T(0.f);

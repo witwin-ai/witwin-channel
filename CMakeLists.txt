@@ -464,7 +464,11 @@ Python_add_library(
     native/channel_native/binding/bdpt.cpp
     native/channel_native/build_info.cpp
     native/channel_native/bdpt.cpp
-    native/channel_native/raydn_bridge.cpp
+    native/channel_native/rayd/common.cpp
+    native/channel_native/rayd/scene.cpp
+    native/channel_native/rayd/geometry.cpp
+    native/channel_native/rayd/reflection.cpp
+    native/channel_native/rayd/diffraction.cpp
     native/channel_native/kernels/accum.cu
     native/channel_native/kernels/bdpt_accum.cu
     native/channel_native/kernels/bdpt_connect.cu
@@ -508,7 +512,11 @@ if(MSVC)
     # std::terminate at the bridge call sites; /EHc- keeps them catchable so
     # they surface as Python RuntimeError like every other validation error.
     set_source_files_properties(
-        native/channel_native/raydn_bridge.cpp
+        native/channel_native/rayd/common.cpp
+        native/channel_native/rayd/scene.cpp
+        native/channel_native/rayd/geometry.cpp
+        native/channel_native/rayd/reflection.cpp
+        native/channel_native/rayd/diffraction.cpp
         PROPERTIES COMPILE_OPTIONS "/EHc-")
 endif()
 target_link_libraries(

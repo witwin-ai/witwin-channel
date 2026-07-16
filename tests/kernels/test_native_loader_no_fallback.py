@@ -303,9 +303,9 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
 
 def test_rayd_bridge_is_source_linked_without_dso_lookup():
     repo = Path(__file__).resolve().parents[2]
-    bridge_source = (
-        repo / "native" / "channel_native" / "raydn_bridge.cpp"
-    ).read_text()
+    bridge_root = repo / "native" / "channel_native" / "rayd"
+    bridge_paths = [bridge_root / "bridge.h", *sorted(bridge_root.glob("*.cpp"))]
+    bridge_source = "\n".join(path.read_text() for path in bridge_paths)
     ops_source = inspect.getsource(ops._raydn_module_handle)
 
     assert "LoadLibrary" not in bridge_source
