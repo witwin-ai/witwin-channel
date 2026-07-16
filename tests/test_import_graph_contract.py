@@ -133,6 +133,29 @@ def test_topology_cannot_import_canonical_or_legacy_compiled_scene(tmp_path: Pat
     assert rules == {"topology_forbidden_dependency": 2}
 
 
+def test_topology_and_geometry_cannot_import_scene_handle_helpers(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "scene/native_handles.py": "",
+            "propagation/topology.py": (
+                "from witwin.channel_native.scene.native_handles import helper\n"
+            ),
+            "propagation/geometry/kernels/helper.py": (
+                "from witwin.channel_native.scene.native_handles import helper\n"
+            ),
+        },
+    )
+
+    rules = Counter(violation.rule for violation in graph.scan_package(package_root))
+
+    assert rules == {
+        "topology_forbidden_dependency": 1,
+        "geometry_forbidden_dependency": 1,
+    }
+
+
 def test_propagation_legacy_path_topology_dependencies_are_hard_failures(
     tmp_path: Path,
 ):

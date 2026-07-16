@@ -305,6 +305,14 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
         _matches(target, f"{PACKAGE}.propagation.topology.discovery")
         or _matches(target, f"{PACKAGE}.propagation.fields")
         or target_solver is not None
+        or (
+            _matches(source, f"{PACKAGE}.propagation.geometry.kernels")
+            and (
+                _matches(target, f"{PACKAGE}.scene")
+                or _matches(target, f"{PACKAGE}.core.scene")
+                or target in _COMPILED_SCENE_MODULES
+            )
+        )
     ):
         violations.append(_violation(edge, "geometry_forbidden_dependency"))
 

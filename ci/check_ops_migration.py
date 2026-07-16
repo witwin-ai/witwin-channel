@@ -41,7 +41,7 @@ APPROVED_OWNER_ROOTS = (
 )
 BOOTSTRAP_CANONICAL_OWNERS = {
     "_raydn_scene_handle_id": (
-        f"{PACKAGE}.scene.kernels.rayd_scene._raydn_scene_handle_id"
+        f"{PACKAGE}.runtime.native_handles._raydn_scene_handle_id"
     ),
     "raydn_scene_create": f"{PACKAGE}.scene.kernels.rayd_scene.raydn_scene_create",
     "raydn_scene_edge_records": (

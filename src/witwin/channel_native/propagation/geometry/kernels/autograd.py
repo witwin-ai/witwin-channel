@@ -15,7 +15,7 @@ from witwin.channel_native.runtime.autograd_contracts import (
 )
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel_native.scene.native_handles import _raydn_scene_handle_id
+from witwin.channel_native.runtime.native_handles import _raydn_scene_handle_id
 
 from .bridge import _BDPT_INTERSECTION_FIELDS
 from .primitives import deterministic_normalize_vec3

@@ -5,21 +5,8 @@ from dataclasses import dataclass, field
 import torch
 
 from witwin.channel_native.runtime.native_buffers import mc_pack_vec3
+from witwin.channel_native.runtime.native_handles import _raydn_scene_handle_id
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
-
-
-def _raydn_scene_handle_id(handle: object) -> int:
-    if isinstance(handle, int):
-        return handle
-    value = getattr(handle, "handle", None)
-    if isinstance(value, int):
-        return value
-    handle_fn = getattr(handle, "handle", None)
-    if callable(handle_fn):
-        value = handle_fn()
-        if isinstance(value, int):
-            return value
-    raise TypeError("RayDN scene handle must be an int or expose handle() -> int")
 
 
 def raydn_scene_create(

@@ -9,9 +9,13 @@ from ci import check_ops_migration as migration
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.propagation.geometry import kernels
 from witwin.channel_native.propagation.geometry.kernels import autograd, primitives
-from witwin.channel_native.runtime import autograd_contracts, symbols, tensor_contracts
+from witwin.channel_native.runtime import (
+    autograd_contracts,
+    native_handles,
+    symbols,
+    tensor_contracts,
+)
 from witwin.channel_native.runtime import torch_compat
-from witwin.channel_native.scene import native_handles
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]

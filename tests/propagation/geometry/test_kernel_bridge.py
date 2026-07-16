@@ -6,8 +6,7 @@ import torch
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.propagation.geometry import kernels
 from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.runtime import symbols, tensor_contracts
-from witwin.channel_native.scene.kernels import rayd_scene
+from witwin.channel_native.runtime import native_handles, symbols, tensor_contracts
 
 
 _CANONICAL_FUNCTION_NAMES = (
@@ -63,7 +62,7 @@ def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
     assert bridge._required_native_op is symbols.required_symbol
     assert bridge.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
     assert "_raydn_module_handle" not in bridge.__dict__
-    assert bridge._raydn_scene_handle_id is rayd_scene._raydn_scene_handle_id
+    assert bridge._raydn_scene_handle_id is native_handles._raydn_scene_handle_id
 
 
 def test_intersection_returns_the_named_tensor_contract(

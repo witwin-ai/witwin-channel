@@ -14,14 +14,15 @@ from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core import scene as core_scene
 from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled
 from witwin.channel_native.core.runtime import raydn as legacy_raydn
+from witwin.channel_native.runtime import native_handles as runtime_native_handles
 from witwin.channel_native.runtime import symbols
+from witwin.channel_native.scene import native_handles as scene_native_handles
 from witwin.channel_native.scene import kernels
 from witwin.channel_native.scene import compiled
 from witwin.channel_native.scene.kernels import rayd_scene
 
 
 _SCENE_KERNEL_NAMES = (
-    "_raydn_scene_handle_id",
     "raydn_scene_create",
     "raydn_scene_edge_records",
 )
@@ -94,6 +95,16 @@ def test_scene_kernel_package_reexports_canonical_owner(name: str):
 
     assert owner.__module__ == rayd_scene.__name__
     assert getattr(kernels, name) is owner
+
+
+def test_scene_handle_normalizer_preserves_all_compatibility_identities():
+    owner = runtime_native_handles._raydn_scene_handle_id
+
+    assert owner.__module__ == runtime_native_handles.__name__
+    assert scene_native_handles._raydn_scene_handle_id is owner
+    assert rayd_scene._raydn_scene_handle_id is owner
+    assert kernels._raydn_scene_handle_id is owner
+    assert ops._raydn_scene_handle_id is owner
 
 
 def test_scene_kernel_uses_canonical_required_symbol():

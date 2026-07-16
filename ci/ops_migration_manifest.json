@@ -2088,7 +2088,7 @@
     "_validate_path_block": "witwin.channel_native.propagation.topology.kernels.blocks._validate_path_block",
     "_validate_path_reflection_candidates": "witwin.channel_native.propagation.topology.kernels.blocks._validate_path_reflection_candidates",
     "_validate_topology_extra_fields": "witwin.channel_native.propagation.topology.kernels.blocks._validate_topology_extra_fields",
-    "_raydn_scene_handle_id": "witwin.channel_native.scene.kernels.rayd_scene._raydn_scene_handle_id",
+    "_raydn_scene_handle_id": "witwin.channel_native.runtime.native_handles._raydn_scene_handle_id",
     "_required_native_op": "witwin.channel_native.runtime.symbols._required_native_op",
     "bdpt_accumulate_connection_samples": "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_accumulate_connection_samples",
     "bdpt_apply_los_visibility": "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_apply_los_visibility",
