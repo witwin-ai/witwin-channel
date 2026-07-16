@@ -20,8 +20,7 @@ Raw lobe shape (before normalization)::
     f_raw_q(wi, wo) = |q|^4 / (16*pi^2 * q_n^2 * cos_theta_i * cos_theta_o)
                       * |r_q_stack(cos_theta_h)|^2 * I(q_par, q_n)
 
-where ``I`` is the Beckmann series
-(:func:`witwin.channel_native.physics.oracle.kirchhoff_diffuse_lobe_series`)
+where ``I`` is the production Beckmann series implemented in this module
 and the polarized Fresnel factor is evaluated at the SPECULAR-EQUIVALENT
 local incidence angle onto the half vector
 ``h = normalize(wo - wi_dir) = normalize(wo + wi)``::
@@ -73,11 +72,8 @@ from typing import Sequence
 import numpy as np
 import torch
 
-from witwin.channel_native.physics.oracle import (
-    C0,
-    kirchhoff_diffuse_lobe_series,
-    layer_stack_rt,
-)
+from witwin.channel_native.materials.evaluation import layer_stack_rt
+from witwin.channel_native.physics.conventions import C0
 
 __all__ = [
     "KirchhoffTable",
@@ -103,6 +99,30 @@ N_PHI_O = 64
 # needs k0*l >= ~6 and moderate RMS slope sqrt(2)*sigma_h/l <= 0.5.
 MIN_K0_CORR_LENGTH = 6.0
 MAX_RMS_SLOPE = 0.5
+
+
+def _kirchhoff_diffuse_lobe_series(
+    q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64
+):
+    """Production Beckmann series for the Gaussian-correlation lobe."""
+
+    qx, qy, qn = np.broadcast_arrays(
+        np.asarray(q_par_x, dtype=np.float64),
+        np.asarray(q_par_y, dtype=np.float64),
+        np.asarray(q_n, dtype=np.float64),
+    )
+    g = (qn * float(sigma_h)) ** 2
+    rho2 = (qx * lx) ** 2 + (qy * ly) ** 2
+    m_flat = np.arange(1, n_terms + 1, dtype=np.float64)
+    shape = (n_terms,) + (1,) * g.ndim
+    m = m_flat.reshape(shape)
+    log_fact = np.cumsum(np.log(m_flat)).reshape(shape)
+    with np.errstate(divide="ignore"):
+        log_g = np.log(g)
+    log_term = m * log_g - log_fact - np.log(m) - rho2 / (4.0 * m) - g
+    series = np.exp(log_term).sum(axis=0)
+    result = np.pi * lx * ly * series
+    return result if result.ndim else float(result)
 
 @dataclass(frozen=True, slots=True)
 class KirchhoffTable:
@@ -218,7 +238,7 @@ def _raw_lobe_grid(
             qx = k0 * (wo_x + wi_x)
             qy = k0 * (wo_y + wi_y)
             qn = k0 * (wo_z + wi_z)
-            lobe = kirchhoff_diffuse_lobe_series(
+            lobe = _kirchhoff_diffuse_lobe_series(
                 qx, qy, qn, sigma_h, lx, ly, n_terms=n_terms
             )
             # Specular-equivalent local incidence: cos_theta_h = wi.h with

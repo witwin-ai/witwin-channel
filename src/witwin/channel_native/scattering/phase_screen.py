@@ -23,7 +23,7 @@ import numpy as np
 import torch
 
 from witwin.channel_native.materials.models import PhaseScreen, Roughness
-from witwin.channel_native.physics.oracle import C0
+from witwin.channel_native.physics.conventions import C0
 
 __all__ = [
     "PhaseScreenRuntime",
