@@ -455,7 +455,13 @@ Python_add_library(
     MODULE
     WITH_SOABI
     native/channel_native/binding/module.cpp
-    native/channel_native/binding/all.cpp
+    native/channel_native/binding/build.cpp
+    native/channel_native/binding/materials.cpp
+    native/channel_native/binding/fields.cpp
+    native/channel_native/binding/rayd.cpp
+    native/channel_native/binding/path.cpp
+    native/channel_native/binding/montecarlo.cpp
+    native/channel_native/binding/bdpt.cpp
     native/channel_native/build_info.cpp
     native/channel_native/bdpt.cpp
     native/channel_native/raydn_bridge.cpp
