@@ -93,7 +93,7 @@ class Scene:
 
     @classmethod
     def load_mitsuba(cls, filename: str, **kwargs) -> Scene:
-        from .scene_loader import load_mitsuba
+        from witwin.channel_native.scene.loader import load_mitsuba
 
         return load_mitsuba(filename, scene_cls=cls, **kwargs)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def itu_material_parameters(name: str, frequency_hz: float) -> tuple[float, float]:
-    from witwin.channel_native.core.scene_loader import (
+    from witwin.channel_native.scene.loader import (
         itu_material_parameters as _itu_material_parameters,
     )
 
