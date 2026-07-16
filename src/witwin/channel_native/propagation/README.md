@@ -48,7 +48,8 @@ return a zero result, or silently switch algorithms.
 
 ## Maintenance
 
-New internal exports or owner moves require a migration note and identity
-tests. Frozen kernel moves update `ci/ops_migration_manifest.json` without
-changing the contract; dependency changes must pass the import graph. A new
-root or solver public export also updates `ci/public-api-snapshot.json`.
+New internal exports or owner moves require a migration note and contract
+tests. The completed kernel migration ledger is archived at
+`docs/dev/audit/phase12-ops-migration-ledger.json`; dependency changes must pass
+the import graph. A new root or solver public export also updates
+`ci/public-api-snapshot.json`.

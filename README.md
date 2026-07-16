@@ -13,8 +13,8 @@ are internal unless their README says otherwise.
 
 ## Architecture
 
-- [`core`](src/witwin/channel_native/core/README.md): shared contracts and
-  compatibility facades.
+- [`core`](src/witwin/channel_native/core/README.md): small shared value
+  contracts and build metadata.
 - [`scene`](src/witwin/channel_native/scene/README.md): models, compilation,
   stores, caches, and RayD lifetime.
 - [`materials`](src/witwin/channel_native/materials/README.md): material models,
@@ -58,8 +58,7 @@ refer to them when describing the earlier architecture.
 ## Contract maintenance
 
 Public export or signature changes update `ci/public-api-snapshot.json` and a
-migration note. Moving an implementation frozen from `core.kernels.ops`
-updates its canonical owner in `ci/ops_migration_manifest.json` while
-preserving the frozen signature, body, and normalized AST unless a separately
-approved migration says otherwise. Cross-domain imports must satisfy the
-import-graph contract; new debt is not a substitute for an owner migration.
+migration note. The completed ops migration ledger is immutable historical
+evidence at `docs/dev/audit/phase12-ops-migration-ledger.json`; it is not an
+active routing or compatibility mechanism. Cross-domain imports must satisfy
+the import-graph contract; deleted legacy modules are hard failures.

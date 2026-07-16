@@ -44,7 +44,7 @@ stale native resources fail before solver execution.
 ## Maintenance
 
 Changing root scene exports or targets requires `ci/public-api-snapshot.json`,
-same-object compatibility tests, and a migration note. Frozen scene-kernel
-moves update `ci/ops_migration_manifest.json` while preserving the contract.
+contract tests, and a migration note. The completed scene-kernel migration
+ledger is archived at `docs/dev/audit/phase12-ops-migration-ledger.json`.
 Store/material ABI changes require a versioned migration; dependencies must
 satisfy the import graph.

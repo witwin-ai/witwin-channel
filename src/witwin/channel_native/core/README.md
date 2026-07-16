@@ -1,26 +1,23 @@
-# Core contract and compatibility boundary
+# Core value-contract boundary
 
 ## Ownership
 
 `core` owns small cross-domain value contracts: antenna definitions,
 component/edge policy, complex field state, memory budgets, and shared
-metadata. `core.scene`, `core.runtime`, and `core.kernels.ops` are
-identity-preserving compatibility facades for canonical domain owners, not a
-place for new implementation bodies.
+metadata. Domain implementations live in their canonical top-level owners.
+The retired `core.kernels.ops` and `core.path_topology` modules do not exist.
 
 ## Public entry points
 
 The root package exports `AntennaArray`, `AntennaPattern`, `Complex3State`, and
 `JonesState` from core owners. Other core modules are internal contracts.
-`core.kernels.ops` is a bounded re-export facade retained for compatibility,
-not a supported extension point.
+Native operations are imported from their scene, material, propagation,
+solver, scattering, or runtime owner.
 
 ## Dependency rules
 
-Value-contract modules remain solver-independent. Compatibility modules import
-canonical owners only to re-export the same object. New code imports the
-canonical domain directly and does not route around boundaries through
-`core.kernels.ops`.
+Value-contract modules remain solver-independent. Code imports canonical
+domains directly; no compatibility facade may route around those boundaries.
 
 ## Numerical and AD contract
 
@@ -33,8 +30,7 @@ integer metadata.
 
 Core defines the shared `none`, `jvp`, and `vjp` vocabulary and fixed-topology
 metadata. Discrete topology is non-differentiable; continuous leaves remain
-live only through their owning native AD seam. Compatibility facades must not
-detach, copy, or wrap canonical objects.
+live only through their owning native AD seam.
 
 ## Forbidden fallback
 
@@ -45,6 +41,6 @@ change component semantics. Required capabilities fail before computation.
 ## Maintenance
 
 Root export changes require `ci/public-api-snapshot.json` and a migration note.
-Moving an ops facade body requires a canonical-owner update in
-`ci/ops_migration_manifest.json` with frozen signature/body/AST preserved.
-Cross-domain changes must pass the import-graph manifest rather than add debt.
+The final historical ops ledger is archived at
+`docs/dev/audit/phase12-ops-migration-ledger.json`. Cross-domain changes must
+pass the import-graph manifest rather than add debt.

@@ -34,9 +34,9 @@ mutable caches, or workspaces. Required runtime resources are explicit pipeline
 inputs and remain owned by `CompiledScene`. `EvaluatedPaths` is not a public
 solver `Result` and does not own solver accumulation or execution metadata.
 
-## Migration constraint
+## Final migration state
 
-The existing `core.path_topology.TopologyBatch` remains unchanged in Phase 3.
-Future adapters may expose its existing tensors through these contracts, but
-must preserve exact tensor aliasing and row order. Fields without an existing
-owner, such as an invented path ID or offset table, are not added by this ADR.
+Phase 12 removed `core.path_topology.TopologyBatch` and its mixed
+topology/geometry/field adapters. Producers and consumers exchange the typed
+contracts above directly, preserving tensor aliasing and row order. Imports of
+the deleted compatibility module are rejected by the import-graph gate.

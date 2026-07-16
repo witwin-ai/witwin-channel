@@ -44,7 +44,7 @@ forbidden in production paths.
 ## Maintenance
 
 Export changes require a migration note and, if promoted to a curated public
-module, `ci/public-api-snapshot.json`. Frozen kernel moves update
-`ci/ops_migration_manifest.json` without altering the contract. Dependencies
+module, `ci/public-api-snapshot.json`. The completed kernel migration ledger is
+archived at `docs/dev/audit/phase12-ops-migration-ledger.json`. Dependencies
 must pass the import graph; numerical convention changes require separate
 oracle evidence.

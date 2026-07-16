@@ -104,10 +104,9 @@ metadata.
 
 - Any change to the eight stable exports requires an intentional
   `ci/public-api-snapshot.json` update and a migration note.
-- Moving a frozen wrapper owner requires a reviewed
-  `ci/ops_migration_manifest.json` ledger update; do not rewrite its frozen
-  signatures, bodies, or digests. Native ABI changes also require the relevant
-  binding/audit manifest update.
+- The completed wrapper migration ledger is immutable historical evidence at
+  `docs/dev/audit/phase12-ops-migration-ledger.json`. Native ABI changes require
+  the relevant binding/audit manifest update.
 - Dependency changes must pass `ci/check_import_graph.py`; do not create or
   relocate allowlisted architecture debt.
 - Update result/schema contract tests and this README when shapes, dtypes,

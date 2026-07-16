@@ -102,10 +102,9 @@ backend.
 
 - Adding, removing, renaming, or moving a stable basic/BDPT export requires an
   intentional update to `ci/public-api-snapshot.json` and a migration note.
-- Moving a Python owner of a frozen native wrapper requires updating
-  `ci/ops_migration_manifest.json` through its reviewed migration ledger
-  without changing the frozen contract payload. Native binding changes must
-  also update the relevant binding/audit manifest.
+- The completed wrapper migration ledger is immutable historical evidence at
+  `docs/dev/audit/phase12-ops-migration-ledger.json`. Native binding changes
+  must update the relevant binding/audit manifest.
 - New dependencies must pass the import-graph checker; architecture debt is not
   extended by editing the allowlist.
 - Keep solver capability metadata, contract tests, and this README synchronized

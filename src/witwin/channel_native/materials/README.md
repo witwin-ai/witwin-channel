@@ -44,6 +44,7 @@ materials, or zero coefficients.
 ## Maintenance
 
 Export changes require `ci/public-api-snapshot.json` and a migration note.
-Frozen kernel moves update `ci/ops_migration_manifest.json` without altering
-the contract. ABI changes require a versioned migration and fixtures;
-dependency changes must satisfy the import-graph manifest.
+The completed kernel migration ledger is archived at
+`docs/dev/audit/phase12-ops-migration-ledger.json`. ABI changes require a
+versioned migration and fixtures; dependency changes must satisfy the
+import-graph manifest.

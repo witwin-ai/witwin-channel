@@ -88,9 +88,8 @@ values; reference results are not clamped to make a comparison pass.
   If this surface is added to or changed within the curated public API
   snapshot, update `ci/public-api-snapshot.json` and include a migration note.
 - A production native wrapper or canonical Python owner move must update the
-  applicable binding/audit manifest and the reviewed
-  `ci/ops_migration_manifest.json` ledger; ordinary NumPy oracle changes do
-  not rewrite frozen native contracts.
+  applicable binding/audit manifest. The completed historical migration ledger
+  is archived at `docs/dev/audit/phase12-ops-migration-ledger.json`.
 - Any dependency change must pass the import-graph checker, and numerical
   convention changes require corresponding independent golden tests and an
   explicit migration explanation.
