@@ -43,6 +43,12 @@ EMPTY_FACTORIES = {
     "empty_path_block_from",
     "empty_deterministic_los_topology_block_from",
 }
+COMMON_HOST_HELPERS = {
+    "check_cuda_tensor",
+    "check_vec3_table",
+    "check_path_block_shapes",
+    "launch_blocks",
+}
 
 
 def _function_names_by_path() -> dict[str, set[str]]:
@@ -62,7 +68,21 @@ def test_path_compaction_translation_unit_owns_the_audited_functions() -> None:
     assert not (MOVED_KERNELS | MOVED_ABI) & names[trace]
     assert REMAINING_COMPACTION_ABI <= names[trace]
     assert not REMAINING_COMPACTION_ABI & names[compaction]
-    assert EMPTY_FACTORIES == names[common]
+    assert EMPTY_FACTORIES | COMMON_HOST_HELPERS == names[common]
+    assert not COMMON_HOST_HELPERS & names[trace]
+    assert not COMMON_HOST_HELPERS & names[compaction]
+
+    sources = {
+        path: (REPOSITORY_ROOT / path).read_text(encoding="utf-8-sig")
+        for path in (trace, compaction, common)
+    }
+    assert (
+        sum(
+            source.count("constexpr int kPathBlockSize = 256;")
+            for source in sources.values()
+        )
+        == 1
+    )
 
 
 def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:

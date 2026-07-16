@@ -16,61 +16,8 @@
 
 namespace {
 
-constexpr int kPathBlockSize = 256;
 constexpr double kLightSpeedMetersPerSecond = 299792458.0;
 constexpr float kPi = 3.14159265358979323846f;
-void check_cuda_tensor(
-    const at::Tensor& tensor,
-    const char* name,
-    c10::ScalarType dtype,
-    int64_t dimensions) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
-    TORCH_CHECK(tensor.dim() == dimensions, name, " has the wrong rank");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
-
-void check_vec3_table(const at::Tensor& tensor, const char* name) {
-    check_cuda_tensor(tensor, name, at::kFloat, 2);
-    TORCH_CHECK(tensor.size(1) == 3, name, " must have shape (N, 3)");
-}
-
-void check_path_block_shapes(
-    const at::Tensor& valid,
-    const at::Tensor& tx_id,
-    const at::Tensor& rx_id,
-    const at::Tensor& depth,
-    const at::Tensor& component_id,
-    const at::Tensor& primitive_id,
-    const at::Tensor& edge_id,
-    const at::Tensor& path_length,
-    const at::Tensor& delay,
-    const at::Tensor& path_gain) {
-    check_cuda_tensor(valid, "valid", at::kBool, 1);
-    check_cuda_tensor(tx_id, "tx_id", at::kInt, 1);
-    check_cuda_tensor(rx_id, "rx_id", at::kInt, 1);
-    check_cuda_tensor(depth, "depth", at::kInt, 1);
-    check_cuda_tensor(component_id, "component_id", at::kInt, 1);
-    check_cuda_tensor(primitive_id, "primitive_id", at::kInt, 1);
-    check_cuda_tensor(edge_id, "edge_id", at::kInt, 1);
-    check_cuda_tensor(path_length, "path_length_m", at::kFloat, 1);
-    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
-    check_cuda_tensor(path_gain, "path_gain", at::kFloat, 1);
-    const int64_t count = valid.size(0);
-    TORCH_CHECK(tx_id.size(0) == count, "tx_id must match valid");
-    TORCH_CHECK(rx_id.size(0) == count, "rx_id must match valid");
-    TORCH_CHECK(depth.size(0) == count, "depth must match valid");
-    TORCH_CHECK(component_id.size(0) == count, "component_id must match valid");
-    TORCH_CHECK(primitive_id.size(0) == count, "primitive_id must match valid");
-    TORCH_CHECK(edge_id.size(0) == count, "edge_id must match valid");
-    TORCH_CHECK(path_length.size(0) == count, "path_length_m must match valid");
-    TORCH_CHECK(delay.size(0) == count, "delay_s must match valid");
-    TORCH_CHECK(path_gain.size(0) == count, "path_gain must match valid");
-}
-
-int64_t launch_blocks(int64_t count) {
-    return (count + kPathBlockSize - 1) / kPathBlockSize;
-}
 
 __device__ float cn_neg_kd_phase(float k, float d) {
     // Reduce k*d mod 2*pi in double: the f32 product loses ~k*d*2^-24 of
