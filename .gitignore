@@ -61,3 +61,10 @@ build.ninja
 *.temp
 *.tmp
 *~
+
+# Repository-local agent and test scratch directories
+.pytest_tmp/
+.codex_tmp/
+.codex-tmp/
+.test-tmp/
+.tmp/
