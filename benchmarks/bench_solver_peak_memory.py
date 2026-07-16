@@ -11,8 +11,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT))
 
-from benchmarks.harness import versioned_report, write_report
-from witwin.channel_native.core.memory_budget import (
+# Local source and benchmark helpers must resolve from this checkout before importing them.
+from benchmarks.harness import versioned_report, write_report  # noqa: E402
+from witwin.channel_native.core.memory_budget import (  # noqa: E402
     MemoryBudgetError,
     enforce_memory_budget,
     estimate_monte_carlo_memory,

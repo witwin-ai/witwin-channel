@@ -6,8 +6,6 @@ from the tx->patch->rx geometric length, and the metadata flag
 ``scattering_paths_incoherent`` documenting the phase semantics.
 """
 
-import math
-
 import pytest
 import torch
 

@@ -8,7 +8,6 @@ integrates the analytic height function over the same parallelogram.
 import math
 
 import numpy as np
-import pytest
 import torch
 
 from witwin.channel_native.core.materials import PhaseScreen, Roughness
@@ -105,7 +104,9 @@ def test_sinusoidal_texture_matches_oracle():
 
     size = 0.5
     amplitude = 0.002
-    height_fn = lambda u, v: amplitude * np.sin(2.0 * math.pi * 3.0 * u)
+    def height_fn(u, v):
+        return amplitude * np.sin(2.0 * math.pi * 3.0 * u)
+
     corners, tris, uv = _rect_patch(size)
     k_i, k_s = _wave_vectors()
     screen = PhaseScreen(height=_texture_from_fn(height_fn, 512), height_scale_m=1.0)
@@ -122,9 +123,11 @@ def test_sinusoidal_texture_matches_oracle():
 def test_quadrature_refinement_converges():
     size = 0.5
     amplitude = 0.002
-    height_fn = lambda u, v: amplitude * np.sin(2.0 * math.pi * 3.0 * u) * np.cos(
-        2.0 * math.pi * 2.0 * v
-    )
+    def height_fn(u, v):
+        return amplitude * np.sin(2.0 * math.pi * 3.0 * u) * np.cos(
+            2.0 * math.pi * 2.0 * v
+        )
+
     _, tris, uv = _rect_patch(size)
     k_i, k_s = _wave_vectors()
     screen = PhaseScreen(height=_texture_from_fn(height_fn, 256), height_scale_m=1.0)

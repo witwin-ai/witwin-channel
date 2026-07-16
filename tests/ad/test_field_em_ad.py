@@ -18,7 +18,7 @@ from tests.ad._reference_fields import (
     reflection_sequence_reference,
     transmission_sequence_reference,
 )
-from tests.ad._tolerances import ABS_TOL, REL_TOL_GENERAL, REL_TOL_PATH
+from tests.ad._tolerances import ABS_TOL, REL_TOL_PATH
 from witwin.channel_native.core.kernels import ops
 
 pytestmark = pytest.mark.skipif(

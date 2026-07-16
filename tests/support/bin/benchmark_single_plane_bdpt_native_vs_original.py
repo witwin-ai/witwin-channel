@@ -16,9 +16,10 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+# Local source must resolve from this checkout before importing the benchmark target.
+from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
+from witwin.channel_native.core.materials import Dielectric  # noqa: E402
+from witwin.channel_native.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
 DEFAULT_CHANNEL_ROOT = _REPO_ROOT.parent / "channel"

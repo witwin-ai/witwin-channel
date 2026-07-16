@@ -13,8 +13,9 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.deterministic.test_reflection_multibounce import two_wall_multibounce_scene
-from witwin.channel_native.deterministic import Config, solve
+# Local source and test helpers must resolve from this checkout before importing them.
+from tests.deterministic.test_reflection_multibounce import two_wall_multibounce_scene  # noqa: E402
+from witwin.channel_native.deterministic import Config, solve  # noqa: E402
 
 
 def run_benchmark() -> dict[str, Any]:
