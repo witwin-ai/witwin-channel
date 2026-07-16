@@ -26,6 +26,7 @@ inject_native_paths()
 from tests.support.scenes import same_side_wall_reflection_scene  # noqa: E402
 from witwin.channel_native import ReceiverPoint, Scene, Transmitter  # noqa: E402
 from witwin.channel_native.core.memory_budget import (  # noqa: E402
+    MemoryBudgetError,
     estimate_monte_carlo_memory,
 )
 
@@ -112,10 +113,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 args.gpu_budget_gib * (1 << 30)
                             ),
                         )
-                        result, measurement = benchmark_operation(
-                            operation, warmup=args.warmup, repeats=args.repeats
-                        )
-                        output_bytes = tensor_bytes(result)
                         estimate = (
                             estimate_monte_carlo_memory(
                                 samples=samples,
@@ -126,6 +123,31 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                             if solver in {"basic", "bdpt"}
                             else None
                         )
+                        try:
+                            result, measurement = benchmark_operation(
+                                operation, warmup=args.warmup, repeats=args.repeats
+                            )
+                        except MemoryBudgetError as error:
+                            rows.append(
+                                {
+                                    "solver": solver,
+                                    "tx": tx_count,
+                                    "rx": rx_count,
+                                    "depth": depth,
+                                    "samples": samples,
+                                    "status": "preflight_rejected",
+                                    "preflight_error": str(error),
+                                    "timing": None,
+                                    "output_bytes": None,
+                                    "estimated_scale_memory": (
+                                        estimate.as_dict()
+                                        if estimate is not None
+                                        else None
+                                    ),
+                                }
+                            )
+                            continue
+                        output_bytes = tensor_bytes(result)
                         rows.append(
                             {
                                 "solver": solver,
@@ -133,6 +155,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 "rx": rx_count,
                                 "depth": depth,
                                 "samples": samples,
+                                "status": "measured",
+                                "preflight_error": None,
                                 "timing": measurement.as_dict(),
                                 "output_bytes": int(output_bytes),
                                 "estimated_scale_memory": (
