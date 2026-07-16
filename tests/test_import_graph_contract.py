@@ -29,7 +29,7 @@ def test_current_import_debt_is_exact_and_allowlisted():
     assert Counter(
         graph._DEBT_GROUP_BY_RULE[violation.rule] for violation in violations
     ) == {
-        "existing_boundary": 6,
+        "existing_boundary": 2,
     }
 
 
