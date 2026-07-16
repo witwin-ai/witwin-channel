@@ -185,6 +185,26 @@ def test_native_body_hash_uses_comment_and_whitespace_free_tokens(tmp_path: Path
     assert first_hash["body_sha256"] == second_hash["body_sha256"]
 
 
+def test_native_body_hash_captures_multiline_return_and_signature(tmp_path: Path):
+    _write(
+        tmp_path / "native/channel_native/op.cu",
+        """
+std::tuple<torch::Tensor, torch::Tensor>
+cn_pair_cuda(
+    torch::Tensor first,
+    torch::Tensor second)
+{
+    return {first, second};
+}
+""",
+    )
+
+    entries = baseline.cpp_body_hashes(tmp_path)
+
+    assert [entry["name"] for entry in entries] == ["cn_pair_cuda"]
+    assert entries[0]["token_count"] == 7
+
+
 def test_binding_manifest_records_cpp_signature_and_pybind_defaults(tmp_path: Path):
     _write(
         tmp_path / "native/channel_native/bindings.cpp",

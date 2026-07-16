@@ -1,11 +1,13 @@
 {
   "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
-  "manifest_sha256": "6737d0f674aa5cb96fbc041230cec8a2d545e03a482d52a96a70234bff8f9e5a",
+  "manifest_sha256": "da2eeaca92666bbe8d9001bf244d79fcbbbd885fc37f1545ab03e3e89cadb8c7",
   "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
   "owners": [
     {
       "abi_owner": [
         "cn_path_concat_vec3_cuda",
+        "cn_path_los_visibility_inputs_cuda",
+        "cn_path_filter_los_cuda",
         "cn_path_filter_block_cuda",
         "cn_path_diffraction_block_cuda",
         "cn_path_finalize_blocks_cuda"
@@ -73,10 +75,46 @@
           "token_count": 160
         },
         {
+          "body_sha256": "8b787e47b2a1cb5d248544a38a0e7de22d76cf56c7cb1aba0be8b5156cb18c3e",
+          "name": "empty_path_block_from",
+          "signature_sha256": "a4a4dec3ea4e8cf67974142a6632f806f36d9fee679da3efeef17f6188ad4b35",
+          "token_count": 162
+        },
+        {
           "body_sha256": "7439cebe5145504dd7c39a6aa863a4634ad366585ddc5c31f210dc989355c8e6",
           "name": "cn_path_concat_vec3_cuda",
           "signature_sha256": "3713d6ff317629b5bb557386e922432bc926b6888d195ccfb04b07b49a52b94c",
           "token_count": 235
+        },
+        {
+          "body_sha256": "daaa7e228d0446fb954d47de45146ae3b881c37f9892cef66e32eda969d079c6",
+          "name": "cn_path_los_visibility_inputs_cuda",
+          "signature_sha256": "e9b8c3a32cf6fdcf733ea949863190874e27377028c744ca23396ab9abb61cd3",
+          "token_count": 329
+        },
+        {
+          "body_sha256": "1fdf71160609a46449836b1e5c15882da2cd2a7df83fe825726f5ffe7be7eff2",
+          "name": "cn_path_filter_los_cuda",
+          "signature_sha256": "c60a41597a1d7dbc6cf90af1326136064286881f77dff7a91d460862ce91f3b3",
+          "token_count": 835
+        },
+        {
+          "body_sha256": "f1d24e6201b92bc2cd742f1e43ca11d9cbce61cb4c257f4a075e6d6c0f1d096f",
+          "name": "cn_path_filter_block_cuda",
+          "signature_sha256": "21240aee8079aa3eb762bfec5575b99d3626c280998a00ff03b2ddba8f9b81b3",
+          "token_count": 827
+        },
+        {
+          "body_sha256": "59c35686258db6f18bbad637d10f42a79b38f6b69b47b539e57fb3dd9a9f5ad8",
+          "name": "cn_path_diffraction_block_cuda",
+          "signature_sha256": "e5ef1e3364883c3fa53c9a5bffdc60414829df8650330333ac5ab7d22ed24f66",
+          "token_count": 973
+        },
+        {
+          "body_sha256": "c6e3de4bff6a35feac71d13cb0330898f367e253de8a8f96c323d8480defec38",
+          "name": "cn_path_finalize_blocks_cuda",
+          "signature_sha256": "dea4cb930f6d8ab407fa0df45b348432efec49bf57f8a895241e2e0e87b2b010",
+          "token_count": 1402
         }
       ],
       "expiry_condition": "May split into a dedicated TU once the complete scan/compact call chain moves with identical launches, sync sites, and body hashes.",

@@ -1048,6 +1048,17 @@ _CPP_FUNCTION = re.compile(
     r"(?:->\s*[^;{}]+\s*)?)\{"
 )
 
+_CPP_MULTILINE_FUNCTION = re.compile(
+    r"(?m)^[ \t]*(?P<signature>"
+    r"(?:template\s*<[^;{}]+>\s*)?"
+    r"(?:(?:[A-Za-z_]\w*::)*[A-Za-z_]\w*\s*<[^<>;{}()]+>\s*[\s*&]+|"
+    r"[A-Za-z_~][\w:<>]*[\s*&]+|\[\[[^\]]+\]\]\s*|__\w+__\s*)+"
+    r"(?P<name>(?:[A-Za-z_]\w*::)*~?[A-Za-z_]\w*)\s*"
+    r"\((?P<params>[^;{}]*)\)\s*"
+    r"(?:const\s*)?(?:noexcept(?:\s*\([^)]*\))?\s*)?"
+    r"(?:->\s*[^;{}]+\s*)?)\{"
+)
+
 
 def cpp_body_hashes(repo: Path) -> list[dict[str, object]]:
     entries = []
@@ -1055,11 +1066,15 @@ def cpp_body_hashes(repo: Path) -> list[dict[str, object]]:
     for path in _source_files(root, _SOURCE_SUFFIXES):
         source = path.read_text(encoding="utf-8-sig")
         masked = _mask_cpp_comments(source)
-        for match in _CPP_FUNCTION.finditer(masked):
+        matches_by_open_brace = {
+            match.end() - 1: match for match in _CPP_FUNCTION.finditer(masked)
+        }
+        for match in _CPP_MULTILINE_FUNCTION.finditer(masked):
+            matches_by_open_brace.setdefault(match.end() - 1, match)
+        for open_brace, match in sorted(matches_by_open_brace.items()):
             name = match.group("name")
             if name in {"catch", "for", "if", "switch", "while"}:
                 continue
-            open_brace = match.end() - 1
             close_brace = _matching_delimiter(source, open_brace, "{", "}")
             signature_tokens = _cpp_tokens(
                 source[match.start("signature") : open_brace]

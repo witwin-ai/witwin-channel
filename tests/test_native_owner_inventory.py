@@ -76,6 +76,35 @@ def test_native_owner_inventory_covers_the_planned_abi_fusion_owners() -> None:
         assert owner["cpp_body_hash_multiset"]
 
 
+def test_path_compaction_abi_owner_is_complete_and_frozen() -> None:
+    owners = {owner["id"]: owner for owner in _load_inventory()["owners"]}
+    expected = {
+        "cn_path_concat_vec3_cuda",
+        "cn_path_los_visibility_inputs_cuda",
+        "cn_path_filter_los_cuda",
+        "cn_path_filter_block_cuda",
+        "cn_path_diffraction_block_cuda",
+        "cn_path_finalize_blocks_cuda",
+    }
+    frozen_names = {
+        entry["name"]
+        for owner in owners.values()
+        for entry in owner["cpp_body_hash_multiset"]
+    }
+
+    assert set(owners["path.compaction"]["abi_owner"]) == expected
+    assert expected <= frozen_names
+    assert {
+        "cn_deterministic_los_topology_block",
+        "cn_deterministic_reflection_order1_compact",
+        "cn_deterministic_reflection_sequence_compact",
+        "cn_deterministic_diffraction_order1_compact",
+    } <= {
+        entry["name"]
+        for entry in owners["path.topology"]["cpp_body_hash_multiset"]
+    }
+
+
 def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() -> None:
     inventory = _load_inventory()
     expected = Counter(
