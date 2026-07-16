@@ -52,8 +52,9 @@ BOOTSTRAP_CANONICAL_OWNERS = {
 }
 
 # The digest covers immutable contracts and approved destinations, but excludes
-# the two migration ledgers. A migration may only remove an active_ops ID and
-# add that same ID to canonical_owners.
+# the migration ledgers. A migration may move an ID from active_ops to
+# canonical_owners; Phase 10 may then move a proven-dead canonical ID to
+# retired_ops without rewriting the frozen implementation contract.
 FROZEN_CONTRACT_DIGEST = (
     "ff9c4cd45b2f1091c9ba05e1a311e6e569945e18badc7b7a67a3f8f56ccda3a9"
 )
@@ -162,6 +163,7 @@ def build_manifest(repo: Path) -> dict[str, object]:
             if item["id"] not in BOOTSTRAP_CANONICAL_OWNERS
         ],
         "canonical_owners": BOOTSTRAP_CANONICAL_OWNERS,
+        "retired_ops": [],
     }
 
 
@@ -228,34 +230,47 @@ def _contract_index(
 
 def _ledger(
     manifest: dict[str, Any], contracts: dict[str, dict[str, str]]
-) -> tuple[set[str], dict[str, str], list[str]]:
+) -> tuple[set[str], dict[str, str], set[str], list[str]]:
     active_value = manifest.get("active_ops")
     owners_value = manifest.get("canonical_owners")
+    retired_value = manifest.get("retired_ops")
     if not isinstance(active_value, list) or not all(
         isinstance(item, str) for item in active_value
     ):
-        return set(), {}, ["active_ops must be a list of contract IDs"]
+        return set(), {}, set(), ["active_ops must be a list of contract IDs"]
     if not isinstance(owners_value, dict) or not all(
         isinstance(key, str) and isinstance(value, str)
         for key, value in owners_value.items()
     ):
-        return set(), {}, ["canonical_owners must map contract IDs to names"]
+        return set(), {}, set(), ["canonical_owners must map contract IDs to names"]
+    if not isinstance(retired_value, list) or not all(
+        isinstance(item, str) for item in retired_value
+    ):
+        return set(), {}, set(), ["retired_ops must be a list of contract IDs"]
     active = set(active_value)
     owners = {str(key): str(value) for key, value in owners_value.items()}
+    retired = set(retired_value)
     contract_ids = set(contracts)
     issues: list[str] = []
     if len(active) != len(active_value):
         issues.append("active_ops contains duplicate IDs")
-    unknown = (active | set(owners)) - contract_ids
+    if len(retired) != len(retired_value):
+        issues.append("retired_ops contains duplicate IDs")
+    unknown = (active | set(owners) | retired) - contract_ids
     if unknown:
         issues.append("unknown migration IDs: " + ", ".join(sorted(unknown)))
-    overlap = active & set(owners)
-    if overlap:
-        issues.append("IDs cannot be both active and migrated: " + ", ".join(sorted(overlap)))
-    missing = contract_ids - active - set(owners)
+    overlaps = {
+        "active and migrated": active & set(owners),
+        "active and retired": active & retired,
+        "migrated and retired": set(owners) & retired,
+    }
+    for label, overlap in overlaps.items():
+        if overlap:
+            issues.append(f"IDs cannot be both {label}: " + ", ".join(sorted(overlap)))
+    missing = contract_ids - active - set(owners) - retired
     if missing:
         issues.append("contracts without an owner: " + ", ".join(sorted(missing)))
-    return active, owners, issues
+    return active, owners, retired, issues
 
 
 def check_manifest(
@@ -284,7 +299,7 @@ def check_manifest(
 
     contracts, contract_issues = _contract_index(manifest)
     issues.extend(contract_issues)
-    active, owners, ledger_issues = _ledger(manifest, contracts)
+    active, owners, retired, ledger_issues = _ledger(manifest, contracts)
     issues.extend(ledger_issues)
     if contract_issues:
         return issues
@@ -305,9 +320,17 @@ def check_manifest(
     definitions = scan_definitions(repo)
     by_qualified: dict[str, list[Definition]] = defaultdict(list)
     by_terminal_body: dict[tuple[str, str], list[Definition]] = defaultdict(list)
+    by_terminal: dict[str, list[Definition]] = defaultdict(list)
     for item in definitions:
         by_qualified[item.qualified_name].append(item)
         by_terminal_body[(item.terminal_name, item.body_sha256)].append(item)
+        by_terminal[item.terminal_name].append(item)
+
+    for entry_id in sorted(retired):
+        remaining = by_terminal.get(entry_id, [])
+        if remaining:
+            locations = ", ".join(item.qualified_name for item in remaining)
+            issues.append(f"retired definition remains for {entry_id}: {locations}")
 
     ops_prefix = f"{OPS_MODULE}."
     for item in definitions:
@@ -328,9 +351,7 @@ def check_manifest(
             continue
         candidates = by_qualified.get(expected_owner, [])
         if not candidates:
-            matching = by_terminal_body.get(
-                (entry_id, contract["body_sha256"]), []
-            )
+            matching = by_terminal_body.get((entry_id, contract["body_sha256"]), [])
             locations = ", ".join(item.qualified_name for item in matching)
             detail = f"; frozen body found at {locations}" if locations else ""
             issues.append(
@@ -338,7 +359,9 @@ def check_manifest(
             )
             continue
         if len(candidates) > 1:
-            issues.append(f"duplicate canonical definition for {entry_id}: {expected_owner}")
+            issues.append(
+                f"duplicate canonical definition for {entry_id}: {expected_owner}"
+            )
         item = candidates[0]
         for field, label in (
             ("body_sha256", "body"),
@@ -357,9 +380,7 @@ def check_manifest(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--repository-root", type=Path, default=REPOSITORY_ROOT
-    )
+    parser.add_argument("--repository-root", type=Path, default=REPOSITORY_ROOT)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument(
         "--print-initial",
@@ -371,9 +392,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.print_initial:
         print(json.dumps(build_manifest(repository_root), indent=2) + "\n")
         return 0
-    manifest_path = (
-        args.manifest or repository_root / DEFAULT_MANIFEST_PATH
-    ).resolve()
+    manifest_path = (args.manifest or repository_root / DEFAULT_MANIFEST_PATH).resolve()
     try:
         manifest = load_manifest(manifest_path)
         issues = check_manifest(repository_root, manifest)

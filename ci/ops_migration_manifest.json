@@ -2271,5 +2271,6 @@
     "scattering_table_eval": "witwin.channel_native.scattering.kernels.functional.scattering_table_eval",
     "scattering_table_pdf": "witwin.channel_native.scattering.kernels.functional.scattering_table_pdf",
     "scattering_table_sample": "witwin.channel_native.scattering.kernels.functional.scattering_table_sample"
-  }
+  },
+  "retired_ops": []
 }

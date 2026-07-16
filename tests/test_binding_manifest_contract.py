@@ -18,10 +18,17 @@ BASELINE_PATH = (
     / "bindings.json"
 )
 EXPECTED_BINDING_COUNT = 174
+PHASE10_AUDIT_PATH = (
+    REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
+)
 
 
-def _semantic_projection(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+def _semantic_projection(
+    manifest: dict[str, Any], *, removed_parameters: dict[str, set[str]] | None = None
+) -> list[dict[str, Any]]:
     """Discard source locations while retaining the complete pybind contract."""
+
+    removed_parameters = removed_parameters or {}
 
     return sorted(
         (
@@ -35,6 +42,8 @@ def _semantic_projection(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                         "default": parameter["default"],
                     }
                     for parameter in symbol["parameters"]
+                    if parameter["name"]
+                    not in removed_parameters.get(symbol["name"], set())
                 ],
                 "pybind_arguments": symbol["pybind_arguments"],
                 "return_type": symbol["return_type"],
@@ -50,6 +59,11 @@ def _semantic_projection(manifest: dict[str, Any]) -> list[dict[str, Any]]:
 def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     current = binding_manifest(REPOSITORY_ROOT)
+    audit = json.loads(PHASE10_AUDIT_PATH.read_text(encoding="utf-8"))
+    retirement = audit["dummy_parameter_projection"]
+    parameter_name = retirement["parameter_name"]
+    binding_names = set(retirement["bindings"])
+    removed_parameters = {name: {parameter_name} for name in binding_names}
 
     baseline_names = [symbol["name"] for symbol in baseline["symbols"]]
     current_names = [symbol["name"] for symbol in current["symbols"]]
@@ -60,4 +74,16 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert len(set(current_names)) == EXPECTED_BINDING_COUNT
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
+    current_dummy_bindings = {
+        symbol["name"]
+        for symbol in current["symbols"]
+        if any(
+            parameter["name"] == parameter_name for parameter in symbol["parameters"]
+        )
+    }
+    assert retirement["status"] == "present"
+    assert current_dummy_bindings == binding_names
     assert _semantic_projection(current) == _semantic_projection(baseline)
+    assert _semantic_projection(
+        current, removed_parameters=removed_parameters
+    ) == _semantic_projection(baseline, removed_parameters=removed_parameters)

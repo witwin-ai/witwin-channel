@@ -46,6 +46,7 @@ def _initial_manifest(repo: Path) -> dict[str, object]:
         "contracts": contracts,
         "active_ops": [str(item["id"]) for item in contracts],
         "canonical_owners": {},
+        "retired_ops": [],
     }
 
 
@@ -79,6 +80,15 @@ def _register_move(manifest: dict[str, object]) -> None:
     owners["move"] = "witwin.channel_native.scene.kernels.move"
 
 
+def _retire_move(manifest: dict[str, object]) -> None:
+    owners = manifest["canonical_owners"]
+    retired = manifest["retired_ops"]
+    assert isinstance(owners, dict)
+    assert isinstance(retired, list)
+    owners.pop("move")
+    retired.append("move")
+
+
 def _check_synthetic(tmp_path: Path, manifest: dict[str, object]) -> list[str]:
     return migration.check_manifest(
         tmp_path,
@@ -94,6 +104,8 @@ def test_current_manifest_covers_every_movable_ops_body():
     assert len(manifest["contracts"]) == 282
     assert len(manifest["active_ops"]) == 0
     assert len(manifest["canonical_owners"]) == 282
+    assert manifest["retired_ops"] == []
+    assert migration.contract_digest(manifest) == migration.FROZEN_CONTRACT_DIGEST
     assert migration.BOOTSTRAP_CANONICAL_OWNERS.items() <= (
         manifest["canonical_owners"].items()
     )
@@ -231,6 +243,70 @@ class Worker:
     issues = _check_synthetic(tmp_path, manifest)
 
     assert any("body lost from canonical owner for move" in issue for issue in issues)
+
+
+def test_retired_contract_requires_the_definition_to_be_absent(tmp_path: Path):
+    manifest = _synthetic_manifest(tmp_path)
+    _register_move(manifest)
+    _retire_move(manifest)
+    _write_package(
+        tmp_path,
+        {
+            "core/kernels/ops.py": """
+def stay(value):
+    return value * 2
+
+class Worker:
+    @staticmethod
+    def work(value):
+        return value - 1
+""",
+            "scene/kernels.py": "",
+        },
+    )
+
+    assert _check_synthetic(tmp_path, manifest) == []
+
+    _write_package(
+        tmp_path,
+        {"scene/kernels.py": "def move(value=1):\n    return value + 1\n"},
+    )
+    issues = _check_synthetic(tmp_path, manifest)
+    assert any("retired definition remains for move" in issue for issue in issues)
+
+
+@pytest.mark.parametrize("ledger", ["active_ops", "canonical_owners"])
+def test_retired_contract_cannot_remain_in_another_ledger(tmp_path: Path, ledger: str):
+    manifest = _synthetic_manifest(tmp_path)
+    retired = manifest["retired_ops"]
+    assert isinstance(retired, list)
+    retired.append("move")
+
+    issues = _check_synthetic(tmp_path, manifest)
+
+    expected = (
+        "active and retired" if ledger == "active_ops" else "migrated and retired"
+    )
+    if ledger == "canonical_owners":
+        active = manifest["active_ops"]
+        owners = manifest["canonical_owners"]
+        assert isinstance(active, list)
+        assert isinstance(owners, dict)
+        active.remove("move")
+        owners["move"] = "witwin.channel_native.scene.kernels.move"
+        issues = _check_synthetic(tmp_path, manifest)
+    assert any(expected in issue for issue in issues)
+
+
+def test_retired_ledger_cannot_name_an_unknown_contract(tmp_path: Path):
+    manifest = _synthetic_manifest(tmp_path)
+    retired = manifest["retired_ops"]
+    assert isinstance(retired, list)
+    retired.append("unknown")
+
+    issues = _check_synthetic(tmp_path, manifest)
+
+    assert any("unknown migration IDs: unknown" in issue for issue in issues)
 
 
 def test_frozen_universe_and_ledger_cannot_grow():
