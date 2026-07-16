@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from witwin.channel_native.core.edge_selection import refine_edge_geometry
-from witwin.channel_native.core.runtime.raydn import RayDNScene
+from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )

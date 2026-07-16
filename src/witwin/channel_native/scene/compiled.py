@@ -7,7 +7,7 @@ import torch
 from witwin.channel_native.scene.stores.assignments import AssignmentStore
 from witwin.channel_native.scene.stores.geometry import GeometryStore
 from witwin.channel_native.scene.stores.materials import MaterialStore
-from witwin.channel_native.core.runtime.raydn import RayDNScene
+from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
 
 
 @dataclass(slots=True)

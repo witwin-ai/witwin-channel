@@ -1,7 +1,9 @@
 """Compatibility import for the canonical compiled scene owner."""
 
 from .geometry import GeometryStore  # noqa: F401 - annotation compatibility
-from .raydn import RayDNScene  # noqa: F401 - annotation compatibility
+from witwin.channel_native.scene.kernels.rayd_scene import (  # noqa: F401
+    RayDNScene,
+)
 from witwin.channel_native.scene.stores.assignments import (  # noqa: F401
     AssignmentStore,
 )

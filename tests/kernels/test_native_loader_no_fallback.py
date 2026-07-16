@@ -5,6 +5,7 @@ from witwin.channel_native.core.kernels import extension, raydn_backend
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.runtime import raydn as raydn_runtime
 from witwin.channel_native.montecarlo.basic import solver as mc_basic_solver
+from witwin.channel_native.scene.kernels import rayd_scene
 
 
 def test_channel_native_extension_loader_has_no_artifact_fallback():
@@ -88,8 +89,12 @@ def test_simplified_coherent_diffraction_grid_api_is_not_public():
 
 
 def test_raydn_scene_builder_uses_channel_native_scene_bridge():
-    source = inspect.getsource(raydn_runtime.build_scene_from_structures)
-    edge_source = inspect.getsource(raydn_runtime.RayDNScene.edge_records)
+    assert raydn_runtime.build_scene_from_structures is (
+        rayd_scene.build_scene_from_structures
+    )
+    assert raydn_runtime.RayDNScene is rayd_scene.RayDNScene
+    source = inspect.getsource(rayd_scene.build_scene_from_structures)
+    edge_source = inspect.getsource(rayd_scene.RayDNScene.edge_records)
 
     assert "torch.classes" not in source
     assert "raydn_backend" not in source

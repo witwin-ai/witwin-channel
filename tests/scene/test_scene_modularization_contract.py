@@ -35,6 +35,7 @@ from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.scene import compiled as canonical_compiled
+from witwin.channel_native.scene.kernels import rayd_scene as canonical_raydn
 from witwin.channel_native.scene.stores import _validation as canonical_validation
 from witwin.channel_native.scene.stores import assignments as canonical_assignments
 from witwin.channel_native.scene.stores import geometry as canonical_geometry
@@ -69,6 +70,11 @@ _LEGACY_CLASS_CASES = (
         "witwin.channel_native.core.runtime.assignments",
         "AssignmentStore",
         canonical_assignments.AssignmentStore,
+    ),
+    (
+        "witwin.channel_native.core.runtime.raydn",
+        "RayDNEdgeRecords",
+        legacy_raydn.RayDNEdgeRecords,
     ),
     (
         "witwin.channel_native.core.runtime.raydn",
@@ -349,6 +355,78 @@ def test_assignment_store_schema_type_hints_and_defaults_are_exact():
     "imports",
     (
         (
+            "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
+            "from witwin.channel_native.core.runtime import raydn as legacy; "
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.scene import compiled; "
+            "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled"
+        ),
+        (
+            "from witwin.channel_native.core.runtime import raydn as legacy; "
+            "from witwin.channel_native.scene import compiled; "
+            "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
+            "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled; "
+            "from witwin.channel_native.core import scene as core_scene"
+        ),
+        (
+            "from witwin.channel_native.core import scene as core_scene; "
+            "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled; "
+            "from witwin.channel_native.core.runtime import raydn as legacy; "
+            "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
+            "from witwin.channel_native.scene import compiled"
+        ),
+    ),
+)
+def test_raydn_scene_fresh_import_order_type_hints_and_legacy_pickle_replay(
+    imports: str,
+):
+    source = (
+        f"{imports}; import pickle; import torch; from typing import get_type_hints; "
+        "scene_owner = canonical.RayDNScene; "
+        "edge_owner = canonical.RayDNEdgeRecords; "
+        "assert scene_owner is legacy.RayDNScene is core_scene.RayDNScene; "
+        "assert scene_owner is compiled.RayDNScene is legacy_compiled.RayDNScene; "
+        "assert edge_owner is legacy.RayDNEdgeRecords; "
+        "assert canonical.build_scene_from_structures is "
+        "legacy.build_scene_from_structures is core_scene.build_scene_from_structures; "
+        "assert scene_owner.__module__ == "
+        "'witwin.channel_native.core.runtime.raydn'; "
+        "assert edge_owner.__module__ == "
+        "'witwin.channel_native.core.runtime.raydn'; "
+        "assert get_type_hints(edge_owner)['vertices'] is torch.Tensor; "
+        "assert get_type_hints(scene_owner)['mesh_tensors'] == "
+        "tuple[tuple[torch.Tensor, ...], ...]; "
+        "assert pickle.loads("
+        "b'cwitwin.channel_native.core.runtime.raydn\\nRayDNScene\\n.'"
+        ") is scene_owner; "
+        "assert pickle.loads("
+        "b'cwitwin.channel_native.core.runtime.raydn\\nRayDNEdgeRecords\\n.'"
+        ") is edge_owner; "
+        "assert pickle.loads(pickle.dumps(scene_owner)) is scene_owner; "
+        "assert pickle.loads(pickle.dumps(edge_owner)) is edge_owner"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (
+            str(REPOSITORY_ROOT / "src"),
+            environment.get("PYTHONPATH"),
+        )
+        if value
+    )
+
+    subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        check=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        (
             "from witwin.channel_native.scene.stores import geometry as canonical; "
             "from witwin.channel_native.core.runtime import geometry as legacy; "
             "from witwin.channel_native.core import scene as core_scene; "
@@ -509,6 +587,67 @@ def test_assignment_store_fresh_import_order_and_legacy_pickle_replay(imports: s
         cwd=REPOSITORY_ROOT,
         env=environment,
         check=True,
+    )
+
+
+def test_raydn_scene_lifecycle_identity_schema_type_hints_and_defaults_are_exact():
+    edge_owner = canonical_raydn.RayDNEdgeRecords
+    edge_schema = fields(edge_owner)
+
+    assert edge_owner is legacy_raydn.RayDNEdgeRecords
+    assert edge_owner.__module__ == "witwin.channel_native.core.runtime.raydn"
+    assert tuple(item.name for item in edge_schema) == (
+        "vertices",
+        "faces",
+        "face_normals",
+        "edge_v0",
+        "edge_v1",
+        "face0",
+        "face1",
+        "shape_id",
+        "local_edge_id",
+        "opposite",
+    )
+    assert all(item.default is MISSING for item in edge_schema)
+    assert all(item.default_factory is MISSING for item in edge_schema)
+    assert get_type_hints(edge_owner) == {
+        name: torch.Tensor for name in (item.name for item in edge_schema)
+    }
+
+    scene_owner = canonical_raydn.RayDNScene
+    scene_schema = fields(scene_owner)
+    assert (
+        scene_owner
+        is legacy_raydn.RayDNScene
+        is legacy_scene.RayDNScene
+        is canonical_compiled.RayDNScene
+        is legacy_compiled.RayDNScene
+    )
+    assert scene_owner.__module__ == "witwin.channel_native.core.runtime.raydn"
+    assert tuple(item.name for item in scene_schema) == (
+        "handle",
+        "owner",
+        "mesh_tensors",
+        "reason",
+        "runtime_cache",
+    )
+    assert tuple(item.default for item in scene_schema[:-1]) == (None, None, (), None)
+    assert all(item.default_factory is MISSING for item in scene_schema[:-1])
+    assert scene_schema[-1].default is MISSING
+    assert scene_schema[-1].default_factory is dict
+    assert not scene_schema[-1].compare and not scene_schema[-1].repr
+    assert get_type_hints(scene_owner) == {
+        "handle": int | None,
+        "owner": object | None,
+        "mesh_tensors": tuple[tuple[torch.Tensor, ...], ...],
+        "reason": str | None,
+        "runtime_cache": dict[str, object],
+    }
+    assert legacy_scene.build_scene_from_structures is (
+        canonical_raydn.build_scene_from_structures
+    )
+    assert legacy_raydn.build_scene_from_structures is (
+        canonical_raydn.build_scene_from_structures
     )
 
 

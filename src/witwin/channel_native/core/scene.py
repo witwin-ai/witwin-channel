@@ -11,7 +11,10 @@ from witwin.channel_native.scene.compiled import CompiledScene
 from witwin.channel_native.scene.stores.assignments import AssignmentStore
 from witwin.channel_native.scene.stores.geometry import GeometryStore
 from witwin.channel_native.scene.stores.materials import MaterialStore
-from .runtime.raydn import RayDNScene, build_scene_from_structures
+from witwin.channel_native.scene.kernels.rayd_scene import (
+    RayDNScene,
+    build_scene_from_structures,
+)
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.runtime.native_buffers import bdpt_zero_matrix
