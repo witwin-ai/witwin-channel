@@ -22,7 +22,7 @@ from witwin.channel_native.core.material_runtime import (
     face_material_field_bundle,
     face_material_tensors,
 )
-from witwin.channel_native.core.scene_tensors import (
+from witwin.channel_native.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
     _frequency_scalar,
 )

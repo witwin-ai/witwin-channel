@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.core.scene_tensors import (
+from witwin.channel_native.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
 from witwin.channel_native.propagation.geometry.kernels import (

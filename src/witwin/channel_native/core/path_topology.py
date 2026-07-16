@@ -98,7 +98,7 @@ from witwin.channel_native.runtime.autograd_contracts import (
 from witwin.channel_native.core.material_runtime import (  # noqa: F401
     face_material_tensors,
 )
-from witwin.channel_native.core.scene_tensors import (
+from witwin.channel_native.scene.tensors import (
     _frequency_scalar,  # noqa: F401 - compatibility re-export
 )
 

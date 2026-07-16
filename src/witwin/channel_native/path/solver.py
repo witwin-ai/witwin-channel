@@ -9,7 +9,7 @@ from witwin.channel_native import Scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.kernels.metadata import make_metadata
 from witwin.channel_native.core.field_state import PHASE_CONVENTION
-from witwin.channel_native.core.scene_tensors import (
+from witwin.channel_native.scene.tensors import (
     receiver_positions as _shared_receiver_positions,
     transmitter_positions as _shared_transmitter_positions,
 )

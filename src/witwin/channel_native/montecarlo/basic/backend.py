@@ -12,7 +12,7 @@ from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_los_visibility_inputs,
     mc_zero_matrix,
 )
-from witwin.channel_native.core.scene_tensors import (
+from witwin.channel_native.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
     receiver_grid_points,
     receiver_positions,

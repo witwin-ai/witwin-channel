@@ -44,7 +44,7 @@ from witwin.channel_native.propagation.topology.export import (
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
-from witwin.channel_native.core.scene_tensors import _frequency_scalar
+from witwin.channel_native.scene.tensors import _frequency_scalar
 
 if TYPE_CHECKING:
     from witwin.channel_native.core.scene import Scene
