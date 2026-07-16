@@ -18,7 +18,7 @@ from witwin.channel_native.scene.kernels.rayd_scene import (
 from .edge_policy import DEFAULT_EDGE_POLICY, EdgePolicy
 from .edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.runtime.native_buffers import bdpt_zero_matrix
-from .materials import (
+from witwin.channel_native.materials.models import (
     GEOMETRY_MODE_IDS,
     MATERIAL_ABI_VERSION,
     PhaseScreen,

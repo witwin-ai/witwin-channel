@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
-from witwin.channel_native.core.materials import PEC_EFFECTIVE_SIGMA_E, PEC_MODEL_ID
+from witwin.channel_native.materials.models import PEC_EFFECTIVE_SIGMA_E, PEC_MODEL_ID
 from witwin.channel_native.materials.kernels.functional import mc_face_material_tensors
 
 if TYPE_CHECKING:

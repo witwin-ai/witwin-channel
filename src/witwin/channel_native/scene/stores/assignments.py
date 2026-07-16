@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel_native.core.materials import PhaseScreen
+from witwin.channel_native.materials.models import PhaseScreen
 
 from ._validation import require_tensor
 

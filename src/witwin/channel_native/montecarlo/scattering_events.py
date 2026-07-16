@@ -79,7 +79,7 @@ from witwin.channel_native.scattering.kernels.functional import (
     scattering_event_probabilities,
     scattering_table_sample,
 )
-from witwin.channel_native.core.materials import Roughness
+from witwin.channel_native.materials.models import Roughness
 from witwin.channel_native.scattering import tables as kirchhoff_tables
 
 from witwin.channel_native.core.material_runtime import face_material_field_bundle

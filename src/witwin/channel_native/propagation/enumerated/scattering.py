@@ -88,7 +88,7 @@ from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.propagation.topology.export import EvaluatedPathSidecars
-from witwin.channel_native.core.materials import PhaseScreen
+from witwin.channel_native.materials.models import PhaseScreen
 from witwin.channel_native.physics.oracle import C0
 from witwin.channel_native.scattering import eval_bsdf, patch_phase_integral
 from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE

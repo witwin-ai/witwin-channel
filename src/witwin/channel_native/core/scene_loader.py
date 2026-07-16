@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from .edge_policy import EdgePolicy
-from .materials import Dielectric, ITUMaterial
+from witwin.channel_native.materials.models import Dielectric, ITUMaterial
 from .objects import Structure
 
 

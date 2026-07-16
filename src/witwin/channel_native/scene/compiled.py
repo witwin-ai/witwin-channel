@@ -41,7 +41,7 @@ class CompiledScene:
         """
 
         if self._kirchhoff_tables_cache is None:
-            from witwin.channel_native.core.materials import Roughness
+            from witwin.channel_native.materials.models import Roughness
             from witwin.channel_native.scattering import build_kirchhoff_table
 
             device = "cuda" if torch.cuda.is_available() else "cpu"

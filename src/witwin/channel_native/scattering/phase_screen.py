@@ -22,7 +22,7 @@ import math
 import numpy as np
 import torch
 
-from witwin.channel_native.core.materials import PhaseScreen, Roughness
+from witwin.channel_native.materials.models import PhaseScreen, Roughness
 from witwin.channel_native.physics.oracle import C0
 
 __all__ = [

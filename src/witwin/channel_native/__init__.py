@@ -7,7 +7,13 @@ from .core.antenna import AntennaArray, AntennaPattern
 from .core.objects import ReceiverGrid, ReceiverPoint, Structure, Transmitter
 from .core.field_state import Complex3State, JonesState
 from .core.scene import Scene
-from .core.materials import Dielectric, DispersiveMaterial, ITUMaterial, LossyDielectric, PerfectConductor
+from .materials.models import (
+    Dielectric,
+    DispersiveMaterial,
+    ITUMaterial,
+    LossyDielectric,
+    PerfectConductor,
+)
 
 __all__ = [
     "AntennaArray",
