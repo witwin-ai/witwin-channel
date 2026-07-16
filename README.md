@@ -1,15 +1,45 @@
 ﻿# witwin-channel-native
 
-Greenfield DrJit-free Torch/CUDA RF channel runtime under the `witwin.channel_native` namespace.
+DrJit-free Torch/CUDA RF channel runtime under the `witwin.channel_native`
+namespace. Python owns solver policy and typed contracts; one validated
+`_channel_native` extension owns production CUDA/RayD execution.
 
-Current implementation plan:
+## Public API
 
-- `docs/dev/plans/00-channel-native-greenfield-plan.md`
+The curated surface is `witwin.channel_native` plus the `path`,
+`deterministic`, `montecarlo.basic`, and `montecarlo.bdpt` solver packages.
+Exact exports are frozen in `ci/public-api-snapshot.json`; other domain modules
+are internal unless their README says otherwise.
 
-Native geometry dependency:
+## Architecture
 
-- RayD source tree (`backends/torch`), built in the same CMake graph as
-  `_channel_native`
+- [`core`](src/witwin/channel_native/core/README.md): shared contracts and
+  compatibility facades.
+- [`scene`](src/witwin/channel_native/scene/README.md): models, compilation,
+  stores, caches, and RayD lifetime.
+- [`materials`](src/witwin/channel_native/materials/README.md): material models,
+  ABI encoding, and electromagnetic evaluation.
+- [`propagation`](src/witwin/channel_native/propagation/README.md): topology,
+  geometry, fields, and enumerated stages.
+- [`path`](src/witwin/channel_native/path/README.md) and
+  [`deterministic`](src/witwin/channel_native/deterministic/README.md): coherent
+  field solvers.
+- [`montecarlo`](src/witwin/channel_native/montecarlo/README.md): basic and BDPT
+  stochastic solvers.
+- [`physics`](src/witwin/channel_native/physics/README.md) and
+  [`scattering`](src/witwin/channel_native/scattering/README.md): reference
+  conventions and rough-surface runtime.
+- [`runtime`](src/witwin/channel_native/runtime/README.md): validated extension,
+  symbols, tensor/AD contracts, buffers, and native handles.
+
+Dependencies flow from solvers through typed owners to runtime; runtime never
+imports scene or a solver. Production paths never silently fall back to
+CPU/PyTorch, a Python ray tracer, a global extension, a zero result, or a
+lower-fidelity algorithm.
+
+## Native build
+
+RayD (`backends/torch`) is built in the same CMake graph as `_channel_native`.
 
 The default source location is `../../RayDi` relative to this repository. Set a
 different checkout explicitly when configuring:
@@ -24,3 +54,12 @@ not build/import RayD's Python module, use the Torch dispatcher, or load a
 second DSO with `GetProcAddress`/`dlsym`. The former vendored `ext` snapshots
 are no longer part of the repository; historical plans and audits may still
 refer to them when describing the earlier architecture.
+
+## Contract maintenance
+
+Public export or signature changes update `ci/public-api-snapshot.json` and a
+migration note. Moving an implementation frozen from `core.kernels.ops`
+updates its canonical owner in `ci/ops_migration_manifest.json` while
+preserving the frozen signature, body, and normalized AST unless a separately
+approved migration says otherwise. Cross-domain imports must satisfy the
+import-graph contract; new debt is not a substitute for an owner migration.
