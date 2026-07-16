@@ -37,7 +37,7 @@ def test_import_scan_is_stable():
     assert graph.scan_package(PACKAGE_ROOT) == graph.scan_package(PACKAGE_ROOT)
 
 
-def test_solver_and_ops_boundaries_are_detected(tmp_path: Path):
+def test_solver_and_deleted_module_boundaries_are_detected(tmp_path: Path):
     package_root = _synthetic_package(
         tmp_path,
         {
@@ -52,7 +52,6 @@ from witwin.channel_native.runtime import native_extension
 """,
             "deterministic/solver.py": "",
             "montecarlo/scattering_events.py": "",
-            "core/kernels/ops.py": "",
             "runtime/extension.py": "",
         },
     )
@@ -62,7 +61,7 @@ from witwin.channel_native.runtime import native_extension
     assert rules == {
         "solver_to_solver": 1,
         "enumerated_pipeline_mc_internal": 1,
-        "direct_core_kernels_ops": 1,
+        "deleted_module_dependency": 1,
         "solver_raw_extension": 2,
     }
 
@@ -156,32 +155,28 @@ def test_topology_and_geometry_cannot_import_scene_handle_helpers(tmp_path: Path
     }
 
 
-def test_propagation_legacy_path_topology_dependencies_are_hard_failures(
-    tmp_path: Path,
-):
+def test_deleted_modules_are_global_hard_failures(tmp_path: Path):
     package_root = _synthetic_package(
         tmp_path,
         {
             "__init__.py": "",
-            "core/path_topology.py": "",
-            "core/legacy_path_topology.py": "",
             "propagation/fields.py": (
                 "from witwin.channel_native.core.path_topology import TopologyBatch\n"
             ),
             "propagation/geometry.py": (
-                "import witwin.channel_native.core.legacy_path_topology\n"
+                "from witwin.channel_native.core.kernels import ops\n"
             ),
         },
     )
 
     rules = Counter(violation.rule for violation in graph.scan_package(package_root))
 
-    assert rules == {"propagation_legacy_path_topology_dependency": 2}
+    assert rules == {"deleted_module_dependency": 2}
 
 
-def test_real_propagation_graph_has_no_legacy_path_topology_dependency():
+def test_real_graph_has_no_deleted_module_dependency():
     assert not any(
-        violation.rule == "propagation_legacy_path_topology_dependency"
+        violation.rule == "deleted_module_dependency"
         for violation in graph.scan_package(PACKAGE_ROOT)
     )
 

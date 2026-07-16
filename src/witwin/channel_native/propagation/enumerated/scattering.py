@@ -1,8 +1,7 @@
 """Deterministic rough-surface scattering (plan 05 wave 3, contract section 6).
 
-Appends single-bounce ``component_id=6`` scattering rows through one canonical
-tensor-concatenation owner shared by the legacy ``TopologyBatch`` wrapper and
-the typed ``EvaluatedPaths`` bridge. Two mutually exclusive per-surface modes:
+Appends single-bounce ``component_id=6`` scattering rows to canonical typed
+``EvaluatedPaths`` contracts. Two mutually exclusive per-surface modes:
 
 - ``ensemble`` (production): Kirchhoff ensemble BSDF patch quadrature.
   Incoherent POWER rows, one row per visible patch sample.
@@ -79,10 +78,7 @@ from witwin.channel_native.propagation.geometry.endpoints import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
-from witwin.channel_native.propagation.enumerated.contracts import (
-    TopologyBatch,
-    TopologyConfig,
-)
+from witwin.channel_native.propagation.enumerated.contracts import TopologyConfig
 from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
@@ -96,7 +92,7 @@ from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
-__all__ = ["append_scattering_paths"]
+__all__ = ["append_scattering_evaluated_paths"]
 
 # Documented caps (module docstring / config docstrings).
 _MAX_SAMPLES_PER_FACE = 4096
@@ -849,19 +845,14 @@ class _ExtendedScatteringRows(TypedDict):
 
 
 def _extended_scattering_rows(
-    source: TopologyBatch | EvaluatedPaths,
+    source: EvaluatedPaths,
     rows: dict[str, torch.Tensor],
 ) -> _ExtendedScatteringRows:
-    """Single 22-tensor cat owner shared by the legacy and typed entrypoints."""
+    """Single 22-tensor concatenation owner for typed path contracts."""
 
-    if isinstance(source, EvaluatedPaths):
-        topology = source.topology
-        geometry = source.geometry
-        fields = source.fields
-    else:
-        topology = source
-        geometry = source
-        fields = source
+    topology = source.topology
+    geometry = source.geometry
+    fields = source.fields
 
     device = topology.valid.device
     count = int(rows["path_gain"].shape[0])
@@ -940,23 +931,6 @@ def _extended_scattering_rows(
         interaction_type=cat(interaction_type_base, interaction_type),
         interaction_positions=cat(interaction_positions_base, positions),
         interaction_normals=cat(interaction_normals_base, normals),
-    )
-
-
-def _extend_topology(
-    topology: TopologyBatch,
-    rows: dict[str, torch.Tensor],
-    *,
-    launch_count_delta: int,
-    candidate_count_delta: int,
-    guardrail_count_delta: int,
-) -> TopologyBatch:
-    return replace(
-        topology,
-        **_extended_scattering_rows(topology, rows),
-        launch_count=topology.launch_count + launch_count_delta,
-        candidate_count=topology.candidate_count + candidate_count_delta,
-        guardrail_count=topology.guardrail_count + guardrail_count_delta,
     )
 
 
@@ -1142,43 +1116,6 @@ def _collect_scattering_rows(
         candidate_count,
         dropped,
     )
-
-
-def append_scattering_paths(
-    scene: Scene, config: TopologyConfig, topology: TopologyBatch
-) -> tuple[TopologyBatch, dict[str, Any]]:
-    """Append component_id=6 scattering rows and return (topology, info).
-
-    No-ops (empty info) when scattering was not requested, ``max_depth < 1``
-    or the scene carries no rough/phase-screen surfaces. Scattering rows are
-    appended after the canonical specular selection, so ``max_paths`` does
-    not apply to them; their budget is ``scattering_max_paths_per_pair``.
-    """
-
-    info = _scattering_info()
-    components = set(config.components)
-    if "scattering" not in components or int(config.max_depth) < 1:
-        return topology, info
-    if not scene.structures:
-        return topology, info
-
-    rows, launch_delta, candidate_delta, guardrail_delta = _collect_scattering_rows(
-        scene,
-        config,
-        device=topology.valid.device,
-        info=info,
-    )
-    if rows is None:
-        return topology, info
-
-    extended = _extend_topology(
-        topology,
-        rows,
-        launch_count_delta=launch_delta,
-        candidate_count_delta=candidate_delta,
-        guardrail_count_delta=guardrail_delta,
-    )
-    return extended, info
 
 
 def append_scattering_evaluated_paths(

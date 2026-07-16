@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.runtime import autograd_contracts
 
 
@@ -29,10 +28,9 @@ CONTRACT_NAMES = (
 
 
 @pytest.mark.parametrize("name", CONTRACT_NAMES)
-def test_ops_reexports_the_canonical_autograd_contract(name: str):
+def test_autograd_contract_has_the_canonical_owner(name: str):
     owner = getattr(autograd_contracts, name)
 
-    assert getattr(ops, name) is owner
     assert owner.__module__ == autograd_contracts.__name__
 
 

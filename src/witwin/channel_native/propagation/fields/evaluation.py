@@ -50,7 +50,6 @@ from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.propagation.topology.export import (
     PathExecutionStats,
-    export_evaluated_rows,
 )
 from witwin.channel_native.propagation.topology.kernels import (
     construction as topology_construction,
@@ -59,9 +58,6 @@ from witwin.channel_native.runtime import autograd_contracts as ops
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
-    from witwin.channel_native.propagation.models.contracts import (
-        EvaluatedRowsSource as TopologyBatch,
-    )
 
 
 def _rough_reflection_factor(
@@ -988,47 +984,3 @@ def evaluate_path_fields(
         ),
     )
     return evaluated, updated_execution
-
-
-def _evaluate_shared_fields(
-    scene: Scene,
-    compiled: object,
-    topology: TopologyBatch,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    components: frozenset[str] | set[str] = frozenset(),
-    ad_mode: str = "none",
-    frequency_value: float | None = None,
-) -> TopologyBatch:
-    """Compatibility wrapper for the legacy mixed propagation row table."""
-
-    paths, sidecars = export_evaluated_rows(topology)
-    evaluated, execution = evaluate_path_fields(
-        scene,
-        compiled,
-        paths,
-        sidecars.execution,
-        tx_positions,
-        tx_power,
-        rx_positions,
-        components=components,
-        ad_mode=ad_mode,
-        frequency_value=frequency_value,
-    )
-    if evaluated is paths and execution is sidecars.execution:
-        return topology
-    return replace(
-        topology,
-        path_length_m=evaluated.geometry.path_length_m,
-        delay_s=evaluated.geometry.delay_s,
-        path_gain=evaluated.fields.path_gain,
-        path_field=evaluated.fields.path_field,
-        field_xyz=evaluated.fields.field_xyz,
-        coefficient=evaluated.fields.coefficient,
-        field_direction=evaluated.geometry.field_direction,
-        launch_count=execution.launch_count,
-        ad_companion_launches=execution.ad_companion_launches,
-        ad_tape_bytes=execution.ad_tape_bytes,
-    )

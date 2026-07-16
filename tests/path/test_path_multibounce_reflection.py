@@ -6,7 +6,7 @@ from tests.deterministic.test_reflection_multibounce import (
     two_wall_multibounce_scene,
 )
 from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core import path_topology
+from witwin.channel_native.propagation.topology.export import evaluated_paths_from_block
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Dielectric
 from witwin.channel_native.deterministic import Config as DeterministicConfig
@@ -181,7 +181,7 @@ def test_shared_topology_deduplicates_canonical_sequences_and_caps_each_pair():
         "interaction_normals": torch.zeros((count, 1, 3), device=device),
     }
 
-    selected = path_topology._from_path_block(
+    selected, _ = evaluated_paths_from_block(
         block,
         max_paths=1,
         max_paths_scope="per_pair",
@@ -190,6 +190,6 @@ def test_shared_topology_deduplicates_canonical_sequences_and_caps_each_pair():
         launch_count=0,
     )
 
-    assert selected.rx_id.tolist() == [0, 1]
-    assert selected.primitive_sequence[:, 0].tolist() == [3, 3]
-    assert selected.path_length_m.tolist() == [0.0, 3.0]
+    assert selected.topology.rx_id.tolist() == [0, 1]
+    assert selected.topology.primitive_sequence[:, 0].tolist() == [3, 3]
+    assert selected.geometry.path_length_m.tolist() == [0.0, 3.0]

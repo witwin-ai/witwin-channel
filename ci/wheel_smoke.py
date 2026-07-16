@@ -39,6 +39,22 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _resolve_wheel(path: Path) -> Path:
+    """Resolve a wheel path or require exactly one wheel in a directory."""
+
+    path = path.resolve()
+    if path.is_dir():
+        wheels = sorted(path.glob("*.whl"))
+        if len(wheels) != 1:
+            raise ValueError(
+                f"wheel directory must contain exactly one .whl file; found {len(wheels)}"
+            )
+        return wheels[0]
+    if path.suffix != ".whl" or not path.is_file():
+        raise ValueError(f"wheel does not exist: {path}")
+    return path
+
+
 def _wheel_identity(path: Path) -> tuple[str, str]:
     with zipfile.ZipFile(path) as archive:
         metadata_files = [
@@ -181,10 +197,8 @@ def main() -> int:
     )
     parser.add_argument("wheel", type=Path)
     args = parser.parse_args()
-    wheel = args.wheel.resolve()
-    if wheel.suffix != ".whl" or not wheel.is_file():
-        parser.error(f"wheel does not exist: {wheel}")
     try:
+        wheel = _resolve_wheel(args.wheel)
         expected_name, expected_version = _wheel_identity(wheel)
         _audit_wheel_contents(wheel)
     except (OSError, ValueError, zipfile.BadZipFile) as exc:

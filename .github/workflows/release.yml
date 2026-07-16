@@ -15,6 +15,7 @@ env:
   WITWIN_CI_PYTHON: '${{ vars.WITWIN2_PYTHON }}'
   WITWIN_CHECKOUT_DIR: 'fresh/channel-native-${{ github.run_id }}-${{ github.run_attempt }}-release'
   WITWIN_RAYD_DIR: 'fresh/rayd-${{ github.run_id }}-${{ github.run_attempt }}-release'
+  WITWIN_CHANNEL_NATIVE_SCENE_ROOT: '${{ vars.WITWIN_CHANNEL_NATIVE_SCENE_ROOT }}'
 
 jobs:
   release:
@@ -43,6 +44,8 @@ jobs:
         run: |
           $python = $env:WITWIN_CI_PYTHON
           if ([string]::IsNullOrWhiteSpace($python)) { throw 'Repository variable WITWIN2_PYTHON is required' }
+          if ([string]::IsNullOrWhiteSpace($env:WITWIN_CHANNEL_NATIVE_SCENE_ROOT)) { throw 'Repository variable WITWIN_CHANNEL_NATIVE_SCENE_ROOT is required for full Munich/SF release acceptance' }
+          if (-not (Test-Path -LiteralPath $env:WITWIN_CHANNEL_NATIVE_SCENE_ROOT -PathType Container)) { throw "WITWIN_CHANNEL_NATIVE_SCENE_ROOT is not a directory: $env:WITWIN_CHANNEL_NATIVE_SCENE_ROOT" }
           if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "WITWIN2_PYTHON does not exist: $python" }
           & $python -c "import pathlib, sys, torch; assert sys.version_info[:2] == (3, 11); assert pathlib.Path(sys.prefix).name == 'witwin2'; assert torch.__version__.split('+')[0] == '2.10.0'; assert torch.version.cuda == '12.8'; assert torch.cuda.is_available(); assert torch.cuda.get_device_capability() == (12, 0)"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -3,7 +3,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.scattering.kernels import functional as ops
 from witwin.channel_native.runtime import symbols
 
 

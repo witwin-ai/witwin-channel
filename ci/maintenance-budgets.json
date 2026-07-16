@@ -12,12 +12,6 @@
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel_native/propagation/enumerated/scattering.py": {
-      "ceiling": 1216,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
-    },
     "src/witwin/channel_native/propagation/fields/kernels/autograd.py": {
       "ceiling": 1835,
       "expires_on": "2027-01-31",

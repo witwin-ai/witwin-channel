@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.geometry.kernels import bridge as ops
 from witwin.channel_native.runtime import symbols
 
 

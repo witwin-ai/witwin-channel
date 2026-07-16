@@ -18,11 +18,10 @@ DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 # This digest freezes the initial Phase 3 debt universe. Entries may be removed
 # from the active allowlist, but relocating or replacing an entry is rejected.
 FROZEN_BASELINE_DIGEST = (
-    "8208637209bf46c69f0e8b05767089e4f0291200fdc527af91aeeb0cd3d10779"
+    "daed11abc81eb111186aebc78826c52037b475f7682d68869bf85f0cac6d4e5a"
 )
 
 _DEBT_GROUP_BY_RULE = {
-    "direct_core_kernels_ops": "direct_core_kernels_ops",
     "solver_to_solver": "solver_to_solver",
     "public_init_internal": "existing_boundary",
     "relative_cross_domain": "existing_boundary",
@@ -226,12 +225,17 @@ def _basic_boundary_violations(edge: ImportEdge) -> list[Violation]:
     ):
         violations.append(_violation(edge, "relative_cross_domain"))
 
-    if (
-        target == f"{PACKAGE}.core.kernels.ops"
-        and source != f"{PACKAGE}.core.kernels"
-        and source != f"{PACKAGE}.core.kernels.ops"
-    ):
-        violations.append(_violation(edge, "direct_core_kernels_ops"))
+    deleted_modules = {
+        f"{PACKAGE}.core.kernels.ops",
+        f"{PACKAGE}.core.path_topology",
+    }
+    imported_target = (
+        f"{target}.{edge.imported_name}"
+        if edge.kind == "from" and edge.imported_name not in {"", "*"}
+        else target
+    )
+    if target in deleted_modules or imported_target in deleted_modules:
+        violations.append(_violation(edge, "deleted_module_dependency"))
     if source in _PUBLIC_INIT_MODULES and (
         _matches(target, f"{PACKAGE}.core.kernels")
         or _matches(target, f"{PACKAGE}.runtime")
@@ -275,14 +279,6 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
     source = edge.source
     target = edge.target
     target_solver = _solver_owner(target)
-
-    if _matches(source, f"{PACKAGE}.propagation") and target in {
-        f"{PACKAGE}.core.path_topology",
-        f"{PACKAGE}.core.legacy_path_topology",
-    }:
-        violations.append(
-            _violation(edge, "propagation_legacy_path_topology_dependency")
-        )
 
     if _matches(source, f"{PACKAGE}.propagation.enumerated") and (
         target_solver is not None

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.geometry.kernels import bridge as ops
 from witwin.channel_native.propagation.geometry import kernels
 from witwin.channel_native.propagation.geometry.kernels import bridge
 from witwin.channel_native.runtime import native_handles, symbols, tensor_contracts

@@ -34,7 +34,6 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "quick.import-graph",
         "quick.contract-coverage",
         "quick.public-api-binding-contract-manifests",
-        "quick.ops-migration-manifest",
         "quick.production-dependencies",
         "quick.repository-hygiene",
         "quick.maintenance-budgets",
@@ -66,6 +65,10 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "release.fresh-checkout-wheel-smoke",
         "release.rayd-lock-build-identity",
     } <= set(_ids("release"))
+    performance = next(
+        gate for gate in tiers.RELEASE_GATES if gate.id == "release.performance"
+    )
+    assert performance.args[performance.args.index("--profile") + 1] == "full"
 
     nightly = _ids("nightly")
     coverage = [

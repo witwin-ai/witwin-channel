@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 from types import SimpleNamespace
 
 import pytest
 import torch
 
 from ci import check_import_graph as graph
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import los
 from witwin.channel_native.propagation.geometry import visibility
 
@@ -30,53 +26,9 @@ def _fake_exported() -> dict[str, torch.Tensor]:
 
 
 def test_los_and_visibility_canonical_owner_identity():
-    assert legacy._los_topology is los._los_topology
-    assert legacy._raydn_visibility_mask is visibility._raydn_visibility_mask
-    assert legacy._los_visibility_mask is visibility._los_visibility_mask
     assert los._los_topology.__module__ == los.__name__
     assert visibility._raydn_visibility_mask.__module__ == visibility.__name__
     assert visibility._los_visibility_mask.__module__ == visibility.__name__
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.propagation.enumerated import los; "
-            "from witwin.channel_native.propagation.geometry import visibility; "
-            "from witwin.channel_native.core import path_topology as legacy"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.geometry import visibility; "
-            "from witwin.channel_native.propagation.enumerated import los"
-        ),
-    ),
-)
-def test_fresh_process_import_order_preserves_los_identity(imports: str):
-    code = (
-        f"{imports}; "
-        "assert legacy._los_topology is los._los_topology; "
-        "assert legacy._raydn_visibility_mask is visibility._raydn_visibility_mask; "
-        "assert legacy._los_visibility_mask is visibility._los_visibility_mask"
-    )
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (
-            str(REPOSITORY_ROOT / "src"),
-            environment.get("PYTHONPATH"),
-        )
-        if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
@@ -251,4 +203,4 @@ def test_los_owners_have_no_core_path_dependency_or_scc():
 def test_enumerated_public_all_is_unchanged():
     import witwin.channel_native.propagation.enumerated as enumerated
 
-    assert enumerated.__all__ == ["append_scattering_paths"]
+    assert enumerated.__all__ == []

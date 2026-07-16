@@ -7,9 +7,7 @@ import sys
 
 import pytest
 
-from ci import check_ops_migration as migration
 from witwin.channel_native.core import scene as core_scene
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.materials.kernels import contracts as material_contracts
 from witwin.channel_native.montecarlo.bdpt import connections
 from witwin.channel_native.montecarlo.bdpt import kernels
@@ -22,7 +20,6 @@ from witwin.channel_native.runtime import native_buffers, symbols, tensor_contra
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-MANIFEST_PATH = REPOSITORY_ROOT / "ci" / "ops_migration_manifest.json"
 
 _OWNER_NAMES = (
     "_bdpt_mis_mode_id",
@@ -80,28 +77,7 @@ def test_bdpt_paths_is_the_single_object_owner(name: str):
     owner = getattr(paths, name)
 
     assert owner.__module__ == paths.__name__
-    assert getattr(ops, name) is owner
     assert not hasattr(kernels, name)
-
-
-def test_bdpt_paths_preserves_all_frozen_body_contracts():
-    manifest = migration.load_manifest(MANIFEST_PATH)
-    contracts = {entry["id"]: entry for entry in manifest["contracts"]}
-    prefix = f"{paths.__name__}."
-    definitions = [
-        item
-        for item in migration.scan_definitions(REPOSITORY_ROOT)
-        if item.qualified_name.startswith(prefix)
-    ]
-
-    assert {definition.terminal_name for definition in definitions} == set(
-        _OWNER_NAMES
-    )
-    for definition in definitions:
-        contract = contracts[definition.terminal_name]
-        assert definition.signature == contract["signature"]
-        assert definition.body_sha256 == contract["body_sha256"]
-        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
 
 
 def test_bdpt_paths_uses_canonical_dependencies():
@@ -112,8 +88,8 @@ def test_bdpt_paths_uses_canonical_dependencies():
     assert paths._BDPT_INTERSECTION_FIELDS is geometry.BDPT_INTERSECTION_FIELDS
     assert geometry.BDPT_INTERSECTION_FIELDS is bridge._BDPT_INTERSECTION_FIELDS
     assert "BDPT_INTERSECTION_FIELDS" not in getattr(geometry, "__all__", ())
-    assert ops._BDPT_SUBPATH_SCHEMA is paths._BDPT_SUBPATH_SCHEMA
-    assert ops._BDPT_CONNECTION_SCHEMA is paths._BDPT_CONNECTION_SCHEMA
+    assert paths._BDPT_SUBPATH_SCHEMA
+    assert paths._BDPT_CONNECTION_SCHEMA
 
 
 @pytest.mark.parametrize("name", _MAP_OWNER_NAMES)
@@ -121,28 +97,7 @@ def test_bdpt_maps_is_the_single_object_owner(name: str):
     owner = getattr(maps, name)
 
     assert owner.__module__ == maps.__name__
-    assert getattr(ops, name) is owner
     assert not hasattr(kernels, name)
-
-
-def test_bdpt_maps_preserves_all_frozen_body_contracts():
-    manifest = migration.load_manifest(MANIFEST_PATH)
-    contracts = {entry["id"]: entry for entry in manifest["contracts"]}
-    prefix = f"{maps.__name__}."
-    definitions = [
-        item
-        for item in migration.scan_definitions(REPOSITORY_ROOT)
-        if item.qualified_name.startswith(prefix)
-    ]
-
-    assert {definition.terminal_name for definition in definitions} == set(
-        _MAP_OWNER_NAMES
-    )
-    for definition in definitions:
-        contract = contracts[definition.terminal_name]
-        assert definition.signature == contract["signature"]
-        assert definition.body_sha256 == contract["body_sha256"]
-        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
 
 
 def test_bdpt_maps_uses_canonical_runtime_dependencies():
@@ -156,59 +111,7 @@ def test_bdpt_zero_matrix_has_one_neutral_owner():
 
     assert owner.__module__ == native_buffers.__name__
     assert maps.bdpt_zero_matrix is owner
-    assert ops.bdpt_zero_matrix is owner
     assert core_scene.bdpt_zero_matrix is owner
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
-            "from witwin.channel_native.runtime import native_buffers"
-        ),
-        (
-            "from witwin.channel_native.runtime import native_buffers; "
-            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
-            "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.core import scene as core_scene"
-        ),
-        (
-            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.runtime import native_buffers; "
-            "from witwin.channel_native.core.kernels import ops"
-        ),
-    ),
-)
-def test_bdpt_zero_matrix_import_order_preserves_identity(imports: str):
-    code = (
-        f"{imports}; "
-        "owner=native_buffers.bdpt_zero_matrix; "
-        "assert maps.bdpt_zero_matrix is owner; "
-        "assert ops.bdpt_zero_matrix is owner; "
-        "assert core_scene.bdpt_zero_matrix is owner"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (source_root, environment.get("PYTHONPATH"))
-        if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr
 
 
 @pytest.mark.parametrize("name", _SAMPLING_OWNER_NAMES)
@@ -216,28 +119,7 @@ def test_bdpt_sampling_is_the_single_object_owner(name: str):
     owner = getattr(sampling, name)
 
     assert owner.__module__ == sampling.__name__
-    assert getattr(ops, name) is owner
     assert not hasattr(kernels, name)
-
-
-def test_bdpt_sampling_preserves_all_frozen_body_contracts():
-    manifest = migration.load_manifest(MANIFEST_PATH)
-    contracts = {entry["id"]: entry for entry in manifest["contracts"]}
-    prefix = f"{sampling.__name__}."
-    definitions = [
-        item
-        for item in migration.scan_definitions(REPOSITORY_ROOT)
-        if item.qualified_name.startswith(prefix)
-    ]
-
-    assert {definition.terminal_name for definition in definitions} == set(
-        _SAMPLING_OWNER_NAMES
-    )
-    for definition in definitions:
-        contract = contracts[definition.terminal_name]
-        assert definition.signature == contract["signature"]
-        assert definition.body_sha256 == contract["body_sha256"]
-        assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
 
 
 def test_bdpt_sampling_uses_canonical_runtime_dependencies():
@@ -305,34 +187,6 @@ def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
     assert completed.returncode == 0, completed.stderr
 
 
-def test_core_kernels_from_import_preserves_ops_module_identity():
-    code = (
-        "import importlib; "
-        "from witwin.channel_native.core import kernels; "
-        "from witwin.channel_native.core.kernels import ops; "
-        "canonical=importlib.import_module('witwin.channel_native.core.kernels.ops'); "
-        "assert ops is canonical; assert kernels.ops is canonical"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (source_root, environment.get("PYTHONPATH"))
-        if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-
-
 def test_bdpt_topology_options_preserves_path_depth_cap():
     with pytest.raises(
         RuntimeError,
@@ -348,123 +202,3 @@ def test_bdpt_topology_options_preserves_path_depth_cap():
         components=frozenset({"diffraction"}),
     )
     assert options.max_depth == 6
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.montecarlo.bdpt.kernels import paths"
-        ),
-        (
-            "from witwin.channel_native.montecarlo.bdpt.kernels import paths; "
-            "from witwin.channel_native.core.kernels import ops"
-        ),
-    ),
-)
-def test_bdpt_paths_import_order_preserves_facade_identity(imports: str):
-    names = repr(_OWNER_NAMES)
-    code = (
-        f"{imports}; "
-        f"names={names}; "
-        "assert all(getattr(ops, name) is getattr(paths, name) for name in names)"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (source_root, environment.get("PYTHONPATH"))
-        if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.montecarlo.bdpt.kernels import maps"
-        ),
-        (
-            "from witwin.channel_native.montecarlo.bdpt.kernels import maps; "
-            "from witwin.channel_native.core.kernels import ops"
-        ),
-    ),
-)
-def test_bdpt_maps_import_order_preserves_facade_identity(imports: str):
-    names = repr(_MAP_OWNER_NAMES)
-    code = (
-        f"{imports}; "
-        f"names={names}; "
-        "assert all(getattr(ops, name) is getattr(maps, name) for name in names)"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (source_root, environment.get("PYTHONPATH"))
-        if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.montecarlo.bdpt.kernels import sampling"
-        ),
-        (
-            "from witwin.channel_native.montecarlo.bdpt.kernels import sampling; "
-            "from witwin.channel_native.core.kernels import ops"
-        ),
-    ),
-)
-def test_bdpt_sampling_import_order_preserves_facade_identity(imports: str):
-    names = repr(_SAMPLING_OWNER_NAMES)
-    code = (
-        f"{imports}; "
-        f"names={names}; "
-        "assert all(getattr(ops, name) is getattr(sampling, name) for name in names)"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (source_root, environment.get("PYTHONPATH"))
-        if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr

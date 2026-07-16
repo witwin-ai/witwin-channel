@@ -2,7 +2,10 @@ import pytest
 import torch
 import math
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel_native.montecarlo.bdpt.kernels import maps as bdpt_maps
+from witwin.channel_native.runtime import symbols as runtime_symbols
 from witwin.channel_native.montecarlo.bdpt.kernels import paths
 from witwin.channel_native.runtime import symbols
 
@@ -673,7 +676,7 @@ def test_legacy_bdpt_matrix_export_facades_are_not_public():
         assert not hasattr(ops, name)
 
     try:
-        native = ops.native_extension()
+        native = runtime_symbols.native_extension()
     except ModuleNotFoundError:
         native = None
     if native is not None:
@@ -1055,7 +1058,7 @@ def test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout():
 
     los = torch.arange(6, device="cuda", dtype=torch.float32).reshape(1, 6).contiguous()
 
-    maps = ops.bdpt_los_component_maps_from_matrix(los, rows=2, cols=3)
+    maps = bdpt_maps.bdpt_los_component_maps_from_matrix(los, rows=2, cols=3)
 
     assert maps.shape == (1, 3, 2)
     expected = torch.tensor([[[0.0, 3.0], [1.0, 4.0], [2.0, 5.0]]], device="cuda")
@@ -1066,7 +1069,7 @@ def test_bdpt_face_material_tensors_from_host_expands_on_cuda():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT material tensors")
 
-    result = ops.bdpt_face_material_tensors_from_host(
+    result = material_functional.bdpt_face_material_tensors_from_host(
         (2.0, 5.0),
         (0.1, 0.2),
         (1.0, 1.5),
@@ -1088,4 +1091,4 @@ def test_bdpt_face_material_tensors_from_host_has_no_python_fallback(monkeypatch
     monkeypatch.setattr(symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_face_material_tensors_from_host CUDA kernel is required"):
-        ops.bdpt_face_material_tensors_from_host((2.0,), (0.1,), (1.0,), (0,))
+        material_functional.bdpt_face_material_tensors_from_host((2.0,), (0.1,), (1.0,), (0,))

@@ -19,7 +19,12 @@ from tests.ad._reference_fields import (
     transmission_sequence_reference,
 )
 from tests.ad._tolerances import ABS_TOL, REL_TOL_PATH
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.fields.kernels import (
+    autograd as field_autograd,
+)
+from witwin.channel_native.propagation.fields.kernels import (
+    functional as field_functional,
+)
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for field EM AD"
@@ -164,7 +169,7 @@ def _reference_inputs(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]
 
 def test_free_space_forward_parity_vs_reference():
     batch = _free_space_batch()
-    native = ops.field_free_space(*batch.values(), frequency_hz=_FREQUENCY_HZ)
+    native = field_functional.field_free_space(*batch.values(), frequency_hz=_FREQUENCY_HZ)
     reference = free_space_reference(
         **_reference_inputs(batch),
         frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
@@ -178,7 +183,7 @@ def test_free_space_forward_parity_vs_reference():
 
 def test_reflection_forward_parity_vs_reference():
     batch = _reflection_batch(depth=2)
-    native = ops.field_reflection_sequence(*batch.values(), frequency_hz=_FREQUENCY_HZ)
+    native = field_functional.field_reflection_sequence(*batch.values(), frequency_hz=_FREQUENCY_HZ)
     reference = reflection_sequence_reference(
         **_reference_inputs(batch),
         frequency=torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda"),
@@ -192,7 +197,7 @@ def test_reflection_forward_parity_vs_reference():
 
 def test_transmission_forward_parity_vs_reference():
     batch = _transmission_batch()
-    native = ops.field_transmission_sequence(*batch.values(), frequency_hz=_FREQUENCY_HZ)
+    native = field_functional.field_transmission_sequence(*batch.values(), frequency_hz=_FREQUENCY_HZ)
     reference_batch = _reference_inputs(batch)
     del reference_batch["interaction_positions"]
     reference = transmission_sequence_reference(
@@ -219,7 +224,7 @@ def test_free_space_frequency_vjp_matches_reference_oracle():
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float32, device="cuda", requires_grad=True
     )
-    out = ops.field_free_space_ad(*batch.values(), frequency=frequency)
+    out = field_autograd.field_free_space_ad(*batch.values(), frequency=frequency)
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
     loss.backward()
     assert frequency.grad is not None
@@ -238,7 +243,7 @@ def test_free_space_frequency_vjp_matches_reference_oracle():
 
 def test_free_space_jvp_matches_reference_oracle():
     batch = _free_space_batch()
-    tangents = ops.field_free_space_jvp(
+    tangents = field_functional.field_free_space_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, tangent_frequency=1.0
     )
     reference_frequency = torch.tensor(
@@ -284,7 +289,7 @@ def test_reflection_material_vjp_matches_reference_oracle(depth):
     for name in ("eps_r", "sigma_e", "gain", "thickness"):
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
     loss.backward()
 
@@ -313,7 +318,7 @@ def test_reflection_frequency_vjp_matches_reference_oracle():
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    out = ops.field_reflection_sequence_ad(*batch.values(), frequency=frequency)
+    out = field_autograd.field_reflection_sequence_ad(*batch.values(), frequency=frequency)
     loss = _real_pair_loss(out["coefficient"], weights)
     loss.backward()
     assert frequency.grad is not None
@@ -338,7 +343,7 @@ def test_transmission_layer_vjp_matches_reference_oracle():
     for name in ("layer_thickness_m", "layer_eps_r", "layer_sigma_e"):
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
@@ -370,7 +375,7 @@ def test_transmission_frequency_vjp_matches_reference_oracle():
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float32, device="cuda", requires_grad=True
     )
-    out = ops.field_transmission_sequence_ad(*batch.values(), frequency=frequency)
+    out = field_autograd.field_transmission_sequence_ad(*batch.values(), frequency=frequency)
     loss = _real_pair_loss(out["coefficient"], weights)
     loss.backward()
     assert frequency.grad is not None
@@ -405,7 +410,7 @@ def test_reflection_sigma_zero_boundary_grad_matches_oracle():
     sigma = batch["sigma_e"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["sigma_e"] = sigma
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
     loss.backward()
     assert sigma.grad is not None
@@ -431,7 +436,7 @@ def test_transmission_sigma_zero_boundary_grad_matches_oracle():
     sigma = batch["layer_sigma_e"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["layer_sigma_e"] = sigma
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
@@ -461,7 +466,7 @@ def test_transmission_thickness_zero_boundary_grads():
     thickness = batch["layer_thickness_m"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["layer_thickness_m"] = thickness
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     loss = _real_pair_loss(out["coefficient"], weights)
@@ -488,13 +493,13 @@ def test_transmission_thickness_zero_boundary_grads():
     # backward through the inner-product duality on a thickness-only seed.
     generator = torch.Generator(device="cpu").manual_seed(67)
     v_thickness = torch.randn(3, generator=generator).to("cuda") * 0.01
-    tangents = ops.field_transmission_sequence_jvp(
+    tangents = field_functional.field_transmission_sequence_jvp(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         tangent_layer_thickness_m=v_thickness,
     )
     lhs = _real_pair_loss(tangents["coefficient"], weights).double()
-    grads = ops.field_transmission_sequence_backward(
+    grads = field_functional.field_transmission_sequence_backward(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         grad_coefficient=weights,
@@ -522,7 +527,7 @@ def test_jvp_vjp_inner_product_duality_reflection():
     v_gain = torch.randn(3, 2, generator=generator).to("cuda") * 0.01
     v_frequency = 1.0e6
 
-    tangents = ops.field_reflection_sequence_jvp(
+    tangents = field_functional.field_reflection_sequence_jvp(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         tangent_eps_r=v_eps,
@@ -534,7 +539,7 @@ def test_jvp_vjp_inner_product_duality_reflection():
     lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
     lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
 
-    grads = ops.field_reflection_sequence_backward(
+    grads = field_functional.field_reflection_sequence_backward(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         grad_coefficient=u_coefficient,
@@ -563,7 +568,7 @@ def test_jvp_vjp_inner_product_duality_transmission():
     v_sigma = torch.randn(3, generator=generator).to("cuda") * 0.01
     v_frequency = 1.0e6
 
-    tangents = ops.field_transmission_sequence_jvp(
+    tangents = field_functional.field_transmission_sequence_jvp(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         tangent_layer_thickness_m=v_thickness,
@@ -574,7 +579,7 @@ def test_jvp_vjp_inner_product_duality_transmission():
     lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
     lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
 
-    grads = ops.field_transmission_sequence_backward(
+    grads = field_functional.field_transmission_sequence_backward(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         grad_coefficient=u_coefficient,
@@ -593,7 +598,7 @@ def test_reflection_gain_jvp_matches_fd():
     batch = _reflection_batch(depth=2)
     generator = torch.Generator(device="cpu").manual_seed(47)
     v_gain = torch.randn(3, 2, generator=generator).to("cuda") * 0.1
-    tangents = ops.field_reflection_sequence_jvp(
+    tangents = field_functional.field_reflection_sequence_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, tangent_gain=v_gain
     )
     assert float(tangents["coefficient"].abs().max()) > 0.0
@@ -601,7 +606,7 @@ def test_reflection_gain_jvp_matches_fd():
     def evaluate(gain: torch.Tensor) -> torch.Tensor:
         fd_batch = dict(batch)
         fd_batch["gain"] = gain
-        return ops.field_reflection_sequence(
+        return field_functional.field_reflection_sequence(
             *fd_batch.values(), frequency_hz=_FREQUENCY_HZ
         )["coefficient"]
 
@@ -617,10 +622,10 @@ def test_reflection_gain_jvp_matches_fd():
 def test_free_space_vjp_matches_sum_of_jvp():
     batch = _free_space_batch()
     ones = torch.ones(4, device="cuda")
-    grads = ops.field_free_space_backward(
+    grads = field_functional.field_free_space_backward(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, grad_path_gain=ones
     )
-    tangents = ops.field_free_space_jvp(
+    tangents = field_functional.field_free_space_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, tangent_frequency=1.0
     )
     assert (
@@ -640,7 +645,7 @@ def test_free_space_gradcheck_strict_float64():
     batch = _free_space_batch(dtype=torch.float64)
 
     def func(scale: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        out = ops.field_free_space_ad(*batch.values(), frequency=scale * _FREQUENCY_HZ)
+        out = field_autograd.field_free_space_ad(*batch.values(), frequency=scale * _FREQUENCY_HZ)
         return out["coefficient"], out["path_gain"]
 
     scale = torch.tensor(1.0, dtype=torch.float64, device="cuda", requires_grad=True)
@@ -667,7 +672,7 @@ def test_reflection_gradcheck_float32_relaxed():
     def func(eps_r: torch.Tensor) -> torch.Tensor:
         ad_batch = dict(batch)
         ad_batch["eps_r"] = eps_r
-        return ops.field_reflection_sequence_ad(
+        return field_autograd.field_reflection_sequence_ad(
             *ad_batch.values(), frequency=_FREQUENCY_HZ
         )["coefficient"]
 
@@ -683,7 +688,7 @@ def test_transmission_gradcheck_float32_relaxed():
     def func(layer_eps_r: torch.Tensor) -> torch.Tensor:
         ad_batch = dict(batch)
         ad_batch["layer_eps_r"] = layer_eps_r
-        return ops.field_transmission_sequence_ad(
+        return field_autograd.field_transmission_sequence_ad(
             *ad_batch.values(), frequency=_FREQUENCY_HZ
         )["coefficient"]
 
@@ -703,14 +708,14 @@ def test_functorch_jvp_reflection_matches_native():
     generator = torch.Generator(device="cpu").manual_seed(41)
     tangent = torch.randn(3, 1, generator=generator).to("cuda")
 
-    expected = ops.field_reflection_sequence_jvp(
+    expected = field_functional.field_reflection_sequence_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, tangent_eps_r=tangent
     )
 
     def f(eps_r: torch.Tensor) -> torch.Tensor:
         ad_batch = dict(batch)
         ad_batch["eps_r"] = eps_r
-        return ops.field_reflection_sequence_ad(
+        return field_autograd.field_reflection_sequence_ad(
             *ad_batch.values(), frequency=_FREQUENCY_HZ
         )["coefficient"]
 
@@ -724,7 +729,7 @@ def test_functorch_jvp_reflection_matches_native():
 
 def test_forward_dual_free_space_matches_native_jvp():
     batch = _free_space_batch()
-    expected = ops.field_free_space_jvp(
+    expected = field_functional.field_free_space_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, tangent_frequency=1.0e6
     )
     with torch.autograd.forward_ad.dual_level():
@@ -732,7 +737,7 @@ def test_forward_dual_free_space_matches_native_jvp():
             torch.tensor(_FREQUENCY_HZ, device="cuda"),
             torch.tensor(1.0e6, device="cuda"),
         )
-        out = ops.field_free_space_ad(*batch.values(), frequency=frequency)
+        out = field_autograd.field_free_space_ad(*batch.values(), frequency=frequency)
         tangent = torch.autograd.forward_ad.unpack_dual(out["coefficient"]).tangent
     assert tangent is not None
     assert (
@@ -751,7 +756,7 @@ def test_fixed_inputs_fail_loudly():
 
     batch = _free_space_batch()
     tx_power = batch["tx_power"].clone().requires_grad_(True)
-    out = ops.field_free_space_ad(
+    out = field_autograd.field_free_space_ad(
         batch["source"],
         batch["target"],
         tx_power,
@@ -766,7 +771,7 @@ def test_fixed_inputs_fail_loudly():
     tx_pol = reflection["tx_polarization"].clone().requires_grad_(True)
     ad_batch = dict(reflection)
     ad_batch["tx_polarization"] = tx_pol
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     with pytest.raises(NotImplementedError, match="tx_polarization"):
         out["coefficient"].real.sum().backward()
 
@@ -774,7 +779,7 @@ def test_fixed_inputs_fail_loudly():
     rx_pol = transmission["rx_polarization"].clone().requires_grad_(True)
     ad_batch = dict(transmission)
     ad_batch["rx_polarization"] = rx_pol
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     with pytest.raises(NotImplementedError, match="rx_polarization"):
@@ -786,7 +791,7 @@ def test_mu_r_gradients_fail_loudly():
     mu_r = batch["mu_r"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["mu_r"] = mu_r
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     with pytest.raises(NotImplementedError, match="mu_r"):
         out["coefficient"].real.sum().backward()
 
@@ -794,7 +799,7 @@ def test_mu_r_gradients_fail_loudly():
     layer_mu_r = transmission["layer_mu_r"].clone().requires_grad_(True)
     ad_batch = dict(transmission)
     ad_batch["layer_mu_r"] = layer_mu_r
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     with pytest.raises(NotImplementedError, match="layer_mu_r"):
@@ -806,7 +811,7 @@ def test_non_differentiable_outputs_stay_detached():
     eps_r = batch["eps_r"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["eps_r"] = eps_r
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     assert out["coefficient"].requires_grad
     assert out["path_gain"].requires_grad
     for name in ("path_length_m", "delay_s", "direction"):
@@ -819,7 +824,7 @@ def test_double_backward_raises():
     eps_r = batch["eps_r"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["eps_r"] = eps_r
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     (grad,) = torch.autograd.grad(
         out["path_gain"].sum(), eps_r, create_graph=True
     )
@@ -835,7 +840,7 @@ def test_composed_functorch_transforms_raise():
     def scalar(eps_r: torch.Tensor) -> torch.Tensor:
         ad_batch = dict(batch)
         ad_batch["eps_r"] = eps_r
-        return ops.field_reflection_sequence_ad(
+        return field_autograd.field_reflection_sequence_ad(
             *ad_batch.values(), frequency=_FREQUENCY_HZ
         )["path_gain"].sum()
 
@@ -885,7 +890,7 @@ def test_free_space_geometry_vjp_matches_reference_oracle():
     for name in _FREE_SPACE_GEOMETRY:
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_free_space_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_free_space_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
     loss.backward()
 
@@ -917,7 +922,7 @@ def test_reflection_geometry_vjp_matches_reference_oracle(depth):
     for name in _REFLECTION_GEOMETRY:
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
     loss.backward()
 
@@ -952,7 +957,7 @@ def test_transmission_geometry_vjp_matches_reference_oracle():
     # gradient is exactly zero (delivered as None by the Function).
     positions = batch["interaction_positions"].clone().requires_grad_(True)
     ad_batch["interaction_positions"] = positions
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     loss = _real_pair_loss(out["coefficient"], weights) + out["path_gain"].sum()
@@ -984,7 +989,7 @@ def test_free_space_geometry_jvp_matches_reference_oracle():
     generator = torch.Generator(device="cpu").manual_seed(83)
     v_source = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
     v_target = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
-    tangents = ops.field_free_space_jvp(
+    tangents = field_functional.field_free_space_jvp(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         tangent_frequency=0.0,
@@ -1029,7 +1034,7 @@ def test_reflection_geometry_jvp_matches_reference_oracle(depth):
             torch.randn(3, depth, 3, generator=generator) * 0.01
         ).cuda(),
     }
-    tangents = ops.field_reflection_sequence_jvp(
+    tangents = field_functional.field_reflection_sequence_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
     )
     assert float(tangents["coefficient"].abs().max()) > 0.0
@@ -1088,7 +1093,7 @@ def test_transmission_geometry_jvp_matches_reference_oracle():
             torch.randn(2, 2, 3, generator=generator) * 0.01
         ).cuda(),
     }
-    tangents = ops.field_transmission_sequence_jvp(
+    tangents = field_functional.field_transmission_sequence_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
     )
     lhs = _real_pair_loss(tangents["coefficient"], weights).double()
@@ -1127,7 +1132,7 @@ def test_jvp_vjp_inner_product_duality_geometry_free_space():
     v_source = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
     v_target = (torch.randn(4, 3, generator=generator) * 0.01).cuda()
 
-    tangents = ops.field_free_space_jvp(
+    tangents = field_functional.field_free_space_jvp(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         tangent_frequency=0.0,
@@ -1138,7 +1143,7 @@ def test_jvp_vjp_inner_product_duality_geometry_free_space():
     lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
     lhs = lhs + (tangents["path_length_m"].double() * u_length.double()).sum()
 
-    grads = ops.field_free_space_backward(
+    grads = field_functional.field_free_space_backward(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         grad_coefficient=u_coefficient,
@@ -1169,14 +1174,14 @@ def test_jvp_vjp_inner_product_duality_geometry_reflection():
         ).cuda(),
     }
 
-    tangents = ops.field_reflection_sequence_jvp(
+    tangents = field_functional.field_reflection_sequence_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
     )
     lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
     lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
     lhs = lhs + (tangents["path_length_m"].double() * u_length.double()).sum()
 
-    grads = ops.field_reflection_sequence_backward(
+    grads = field_functional.field_reflection_sequence_backward(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         grad_coefficient=u_coefficient,
@@ -1216,14 +1221,14 @@ def test_jvp_vjp_inner_product_duality_geometry_transmission():
         ).cuda(),
     }
 
-    tangents = ops.field_transmission_sequence_jvp(
+    tangents = field_functional.field_transmission_sequence_jvp(
         *batch.values(), frequency_hz=_FREQUENCY_HZ, **seeds
     )
     lhs = _real_pair_loss(tangents["coefficient"], u_coefficient).double()
     lhs = lhs + (tangents["path_gain"].double() * u_gain.double()).sum()
     lhs = lhs + (tangents["path_length_m"].double() * u_length.double()).sum()
 
-    grads = ops.field_transmission_sequence_backward(
+    grads = field_functional.field_transmission_sequence_backward(
         *batch.values(),
         frequency_hz=_FREQUENCY_HZ,
         grad_coefficient=u_coefficient,
@@ -1251,7 +1256,7 @@ def test_free_space_path_length_grads_match_reference():
     for name in _FREE_SPACE_GEOMETRY:
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_free_space_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_free_space_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     assert out["path_length_m"].requires_grad
     assert out["delay_s"].requires_grad
     loss = out["path_length_m"].sum() + out["delay_s"].sum() * 2.99792458e8
@@ -1276,7 +1281,7 @@ def test_reflection_path_length_grads_match_reference():
     for name in ("source", "target", "interaction_positions"):
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     assert out["path_length_m"].requires_grad
     out["path_length_m"].sum().backward()
 
@@ -1299,7 +1304,7 @@ def test_reflection_path_length_grads_match_reference():
     material_batch = dict(batch)
     material_batch["eps_r"] = eps_r
     material_batch["source"] = batch["source"].clone().requires_grad_(True)
-    out = ops.field_reflection_sequence_ad(
+    out = field_autograd.field_reflection_sequence_ad(
         *material_batch.values(), frequency=_FREQUENCY_HZ
     )
     (grad_eps,) = torch.autograd.grad(
@@ -1315,7 +1320,7 @@ def test_transmission_path_length_grads_match_reference():
     for name in ("source", "target"):
         leaves[name] = batch[name].clone().requires_grad_(True)
         ad_batch[name] = leaves[name]
-    out = ops.field_transmission_sequence_ad(
+    out = field_autograd.field_transmission_sequence_ad(
         *ad_batch.values(), frequency=_FREQUENCY_HZ
     )
     assert out["path_length_m"].requires_grad
@@ -1340,7 +1345,7 @@ def test_path_outputs_differentiable_only_with_geometry():
     source = batch["source"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["source"] = source
-    out = ops.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
+    out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
     assert out["path_length_m"].requires_grad
     assert out["delay_s"].requires_grad
     assert not out["direction"].requires_grad

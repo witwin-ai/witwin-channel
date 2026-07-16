@@ -7,7 +7,8 @@ import inspect
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import metadata, ops
+from witwin.channel_native.core.kernels import metadata
+from witwin.channel_native.montecarlo.bdpt.kernels import paths
 from witwin.channel_native.runtime import tensor_contracts
 
 
@@ -24,9 +25,8 @@ def _body_hash(function: object) -> str:
 
 
 def test_validate_cuda_tensor_has_one_canonical_owner_and_preserved_body():
-    assert ops.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
     assert (
-        ops.bdpt_launch_state.__globals__["validate_cuda_tensor"]
+        paths.bdpt_launch_state.__globals__["validate_cuda_tensor"]
         is tensor_contracts.validate_cuda_tensor
     )
     assert (
@@ -61,7 +61,6 @@ def test_validate_cuda_tensor_preserves_exact_error_order_and_text():
 
 
 def test_noop_metadata_has_one_canonical_owner_and_preserved_body():
-    assert ops.noop_metadata is metadata.noop_metadata
     assert (
         metadata.noop_metadata.__module__
         == "witwin.channel_native.core.kernels.metadata"

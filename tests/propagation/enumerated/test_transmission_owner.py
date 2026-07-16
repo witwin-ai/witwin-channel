@@ -1,15 +1,9 @@
 from __future__ import annotations
 
 import ast
-import os
 from pathlib import Path
-import subprocess
-import sys
-
-import pytest
 
 from ci import check_import_graph as graph
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import engine, transmission
 from witwin.channel_native.propagation.geometry import (
     transmission as geometry_transmission,
@@ -25,7 +19,6 @@ PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
 
 def test_transmission_typed_boundaries_preserve_canonical_identity():
     owner = transmission._transmission_topology
-    assert legacy._transmission_topology is owner
     assert owner.__module__ == transmission.__name__
     assert (
         transmission.TransmissionClosestHitQuery
@@ -128,49 +121,6 @@ def test_los_only_fast_path_remains_before_general_concat():
     )
     assert los_call.lineno < fast_path.lineno < concat_call.lineno
     assert any(isinstance(node, ast.Return) for node in fast_path.body)
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.propagation.enumerated import transmission; "
-            "from witwin.channel_native.propagation.geometry import transmission as geometry_transmission; "
-            "from witwin.channel_native.propagation.topology.discovery import transmission as discovery_transmission; "
-            "from witwin.channel_native.core import path_topology as legacy"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.topology.discovery import transmission as discovery_transmission; "
-            "from witwin.channel_native.propagation.geometry import transmission as geometry_transmission; "
-            "from witwin.channel_native.propagation.enumerated import transmission"
-        ),
-    ),
-)
-def test_fresh_process_import_order_preserves_transmission_identity(imports: str):
-    code = (
-        f"{imports}; "
-        "assert legacy._transmission_topology is transmission._transmission_topology; "
-        "assert transmission.query_transmission_closest_hit is geometry_transmission.query_transmission_closest_hit; "
-        "assert transmission.prepare_transmission_pair_plan is discovery_transmission.prepare_transmission_pair_plan"
-    )
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (
-            str(REPOSITORY_ROOT / "src"),
-            environment.get("PYTHONPATH"),
-        )
-        if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 def test_transmission_owner_has_no_core_path_dependency_or_scc():

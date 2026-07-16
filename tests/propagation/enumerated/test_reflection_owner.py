@@ -2,15 +2,9 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import os
 from pathlib import Path
-import subprocess
-import sys
-
-import pytest
 
 from ci import check_import_graph as graph
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import reflection
 from witwin.channel_native.propagation.geometry import (
     reflection as geometry_reflection,
@@ -46,16 +40,12 @@ def _digest(module, name: str) -> str:
 
 
 def test_reflection_owners_and_discovery_constants_preserve_identity():
-    assert legacy._reflection_topology_order1 is reflection._reflection_topology_order1
-    assert legacy._discovered_group_chains is reflection._discovered_group_chains
     assert (
-        legacy._face_sequence_count
-        is reflection._face_sequence_count
+        reflection._face_sequence_count
         is discovery._face_sequence_count
     )
     assert (
-        legacy._face_sequence_chunks
-        is reflection._face_sequence_chunks
+        reflection._face_sequence_chunks
         is discovery._face_sequence_chunks
     )
     assert discovery._face_sequence_count.__module__ == discovery.__name__
@@ -63,25 +53,6 @@ def test_reflection_owners_and_discovery_constants_preserve_identity():
     globals_ = reflection._reflection_topology_multibounce.__globals__
     assert globals_["_face_sequence_count"] is discovery._face_sequence_count
     assert globals_["_face_sequence_chunks"] is discovery._face_sequence_chunks
-    assert (
-        legacy._reflection_topology_multibounce
-        is reflection._reflection_topology_multibounce
-    )
-    assert (
-        legacy._MAX_MULTIBOUNCE_FACE_SEQUENCES
-        is discovery._MAX_MULTIBOUNCE_FACE_SEQUENCES
-    )
-    assert (
-        legacy._MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
-        is discovery._MULTIBOUNCE_SEQUENCE_CHUNK_SIZE
-    )
-    assert legacy._ORDER1_EXHAUSTIVE_GROUP_LIMIT is (
-        discovery._ORDER1_EXHAUSTIVE_GROUP_LIMIT
-    )
-    assert legacy._MULTIBOUNCE_PAIR_CHUNK_SIZE is (
-        discovery._MULTIBOUNCE_PAIR_CHUNK_SIZE
-    )
-    assert legacy._MULTIBOUNCE_DISCOVERY_RAYS is (discovery._MULTIBOUNCE_DISCOVERY_RAYS)
     assert discovery._ORDER1_EXHAUSTIVE_GROUP_LIMIT == 4096
     assert discovery._MULTIBOUNCE_PAIR_CHUNK_SIZE == 4_194_304
     assert discovery._MULTIBOUNCE_DISCOVERY_RAYS == 262_144
@@ -99,7 +70,6 @@ def test_reflection_owners_and_discovery_constants_preserve_identity():
     )
     assert reflection.ReflectionEpcQuery is geometry_reflection.ReflectionEpcQuery
     assert reflection.query_reflection_epc is geometry_reflection.query_reflection_epc
-    assert legacy._reflect_points is reevaluate._reflect_points
     assert reevaluate._reflect_points.__module__ == reevaluate.__name__
 
 
@@ -157,56 +127,6 @@ def test_reflection_consumers_use_only_named_epc_geometry():
         }
 
 
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.propagation.enumerated import reflection; "
-            "from witwin.channel_native.core import path_topology as legacy"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.enumerated import reflection"
-        ),
-    ),
-)
-def test_fresh_process_import_order_preserves_owner_identity(imports: str):
-    code = (
-        f"{imports}; from witwin.channel_native.propagation.topology.discovery "
-        "import reflection as discovery; "
-        "from witwin.channel_native.propagation.geometry import "
-        "reflection as geometry_reflection; "
-        "from witwin.channel_native.propagation.geometry import reevaluate; "
-        "assert legacy._reflection_topology_order1 is "
-        "reflection._reflection_topology_order1; "
-        "assert legacy._discovered_group_chains is reflection._discovered_group_chains; "
-        "assert legacy._face_sequence_count is reflection._face_sequence_count "
-        "is discovery._face_sequence_count; "
-        "assert legacy._face_sequence_chunks is reflection._face_sequence_chunks "
-        "is discovery._face_sequence_chunks; "
-        "assert legacy._reflection_topology_multibounce is "
-        "reflection._reflection_topology_multibounce; "
-        "assert reflection.ReflectionEpcQuery is "
-        "geometry_reflection.ReflectionEpcQuery; "
-        "assert reflection.query_reflection_epc is "
-        "geometry_reflection.query_reflection_epc; "
-        "assert legacy._reflect_points is reevaluate._reflect_points"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value for value in (source_root, environment.get("PYTHONPATH")) if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
 def test_reflection_owner_has_no_core_path_dependency_or_scc():
     edges = graph.collect_import_edges(PACKAGE_ROOT)
     owner = "witwin.channel_native.propagation.enumerated.reflection"
@@ -245,5 +165,5 @@ def test_enumerated_public_all_is_unchanged_and_discovery_init_is_empty():
     import witwin.channel_native.propagation.enumerated as enumerated
     import witwin.channel_native.propagation.topology.discovery as package
 
-    assert enumerated.__all__ == ["append_scattering_paths"]
+    assert enumerated.__all__ == []
     assert not hasattr(package, "_reflection_topology_order1")

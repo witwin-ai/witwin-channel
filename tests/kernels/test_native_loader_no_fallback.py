@@ -2,7 +2,7 @@ import inspect
 from pathlib import Path
 
 from witwin.channel_native.core.kernels import extension
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.geometry.kernels import bridge as ops
 from witwin.channel_native.core.runtime import raydn as raydn_runtime
 from witwin.channel_native.runtime import symbols
 from witwin.channel_native.scene.kernels import rayd_scene
@@ -178,9 +178,6 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
         repo / "src" / "witwin" / "channel_native" / "montecarlo" / "basic",
         repo / "src" / "witwin" / "channel_native" / "montecarlo" / "bdpt",
     )
-    extra_files = (
-        repo / "src" / "witwin" / "channel_native" / "core" / "kernels" / "ops.py",
-    )
     forbidden = (".contiguous(", ".reshape(")
 
     offenders: list[str] = []
@@ -190,11 +187,6 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
             for token in forbidden:
                 if token in source:
                     offenders.append(f"{path.relative_to(repo)}: {token}")
-    for path in extra_files:
-        source = path.read_text()
-        for token in forbidden:
-            if token in source:
-                offenders.append(f"{path.relative_to(repo)}: {token}")
     assert offenders == []
 
 

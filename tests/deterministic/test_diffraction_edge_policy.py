@@ -4,7 +4,7 @@ import torch
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config
-from witwin.channel_native.core.path_topology import export_topology
+from witwin.channel_native.propagation.enumerated.engine import evaluate_enumerated_paths
 
 
 def test_diffraction_topology_uses_selected_edge_ids():
@@ -14,10 +14,11 @@ def test_diffraction_topology_uses_selected_edge_ids():
         pytest.skip("RayDN native diffraction is not built")
 
     scene = wedge_diffraction_scene()
-    topology = export_topology(scene, Config(components={"diffraction"}))
+    paths, _ = evaluate_enumerated_paths(scene, Config(components={"diffraction"}))
+    topology = paths.topology
 
     assert topology.valid.numel() >= 1
     assert torch.all(topology.component_id == 2)
     assert torch.all(topology.edge_id >= 0)
-    assert torch.any(topology.interaction_position.abs() > 0.0)
+    assert torch.any(paths.geometry.interaction_position.abs() > 0.0)
     assert int(torch.unique(topology.edge_id).numel()) <= scene.diffraction_edge_count()

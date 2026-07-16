@@ -154,7 +154,9 @@ def test_bdpt_intersect_forward_uses_native_raydn_scene_bridge_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN native intersection")
 
-    from witwin.channel_native.core.kernels.ops import bdpt_intersect_forward
+    from witwin.channel_native.propagation.geometry.kernels.bridge import (
+        bdpt_intersect_forward,
+    )
 
     if not _source_linked_rayd_available():
         pytest.skip("RayDN native extension is not built")

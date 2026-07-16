@@ -12,7 +12,6 @@ from .schema import RaggedPathSoA
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.path_topology import TopologyBatch
     from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 
 
@@ -676,36 +675,9 @@ def from_evaluated_paths(
     )
 
 
-def from_topology_result(
-    paths: "TopologyBatch",
-    *,
-    num_rx: int,
-    num_tx: int,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    metadata: dict[str, Any] | None = None,
-) -> PathResult:
-    """Pack a legacy mixed topology table through the split row contracts."""
-
-    from witwin.channel_native.propagation.models.adapters import (
-        evaluated_paths_from_topology_batch,
-    )
-
-    evaluated, _ = evaluated_paths_from_topology_batch(paths)
-    return from_evaluated_paths(
-        evaluated,
-        num_rx=num_rx,
-        num_tx=num_tx,
-        tx_positions=tx_positions,
-        rx_positions=rx_positions,
-        metadata=metadata,
-    )
-
-
 __all__ = [
     "InteractionType",
     "PathResult",
     "endpoint_angles",
     "from_evaluated_paths",
-    "from_topology_result",
 ]

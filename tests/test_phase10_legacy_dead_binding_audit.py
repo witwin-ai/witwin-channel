@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import re
 
-from ci import check_ops_migration as migration
 from tools.refactor_baseline import binding_manifest
 
 
@@ -14,8 +13,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )
-OPS_MANIFEST_PATH = REPOSITORY_ROOT / "ci" / "ops_migration_manifest.json"
+OPS_MANIFEST_PATH = (
+    REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase12-ops-migration-ledger.json"
+)
 PYTHON_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PHASE12_RETIRED_EVIDENCE_TESTS = frozenset(
+    {"tests/propagation/geometry/test_reevaluate_compat.py"}
+)
 
 
 def _audit() -> dict[str, object]:
@@ -51,7 +55,10 @@ def test_phase10_zero_reference_inventory_is_complete_and_classified() -> None:
         assert candidate["tests"]
         assert candidate["compatibility_cycle"]
         for test_path in candidate["tests"]:
-            assert (REPOSITORY_ROOT / test_path).exists(), test_path
+            if test_path in PHASE12_RETIRED_EVIDENCE_TESTS:
+                assert not (REPOSITORY_ROOT / test_path).exists(), test_path
+            else:
+                assert (REPOSITORY_ROOT / test_path).exists(), test_path
 
 
 def test_phase10_binding_inventory_covers_all_current_symbols_and_python_owners() -> (
@@ -125,8 +132,8 @@ def test_phase10_module_handle_contract_is_retired_after_definition_removal() ->
     assert manifest["retired_ops"] == ["_raydn_module_handle"]
     assert "_raydn_module_handle" not in manifest["canonical_owners"]
     assert not any(
-        definition.terminal_name == "_raydn_module_handle"
-        for definition in migration.scan_definitions(REPOSITORY_ROOT)
+        "_raydn_module_handle" in path.read_text(encoding="utf-8-sig")
+        for path in PYTHON_ROOT.rglob("*.py")
     )
     assert audit["frozen_ops_contract_digest"] == (
         "ff9c4cd45b2f1091c9ba05e1a311e6e569945e18badc7b7a67a3f8f56ccda3a9"

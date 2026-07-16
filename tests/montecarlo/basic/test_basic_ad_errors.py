@@ -40,7 +40,9 @@ def test_basic_ad_solve_rejects_reflection_depth_over_ad_cap(ad_mode, monkeypatc
     # the native kernels; the solver must name that cap and reject the
     # configuration at solve() time, before any forward launch (not
     # mid-backward). The monkeypatched trace entry proves no forward ran.
-    from witwin.channel_native.core.kernels.ops import mc_reflection_ad_max_depth
+    from witwin.channel_native.montecarlo.basic.kernels.maps import (
+        mc_reflection_ad_max_depth,
+    )
     from witwin.channel_native.propagation.geometry.kernels import (
         bridge as geometry_bridge,
     )

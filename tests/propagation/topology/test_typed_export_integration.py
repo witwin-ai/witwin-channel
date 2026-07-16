@@ -3,9 +3,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from witwin.channel_native.core import path_topology as legacy
+import torch
+
+from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
 from witwin.channel_native.deterministic import solver as deterministic_solver
 from witwin.channel_native.deterministic import pipeline as deterministic_pipeline
+from witwin.channel_native.montecarlo.bdpt import pipeline as bdpt_pipeline
 from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
 from witwin.channel_native.path import solver as path_solver
 from witwin.channel_native.path import pipeline as path_pipeline
@@ -86,14 +89,35 @@ def test_typed_engine_remains_before_optional_scattering_append():
         assert "export_evaluated_rows" not in call_names
 
 
-def test_bdpt_keeps_the_legacy_compatibility_export_seam():
-    assert bdpt_solver.export_topology is legacy.export_topology
-    tree = ast.parse(Path(bdpt_solver.__file__).read_text(encoding="utf-8"))
+def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():
+    assert not hasattr(bdpt_solver, "export_topology")
+    tree = ast.parse(Path(bdpt_pipeline.__file__).read_text(encoding="utf-8"))
     imported_modules = {
         node.module
         for node in tree.body
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert "witwin.channel_native.core.path_topology" in imported_modules
+    assert "witwin.channel_native.propagation" in imported_modules
     assert "witwin.channel_native.propagation.enumerated.engine" not in imported_modules
+    assert "witwin.channel_native.propagation.topology.export" not in imported_modules
+
+
+def test_bdpt_connection_samples_read_typed_domains_exactly():
+    paths, _ = _evaluated_paths_fixture()
+    selected = torch.tensor([1, 4], dtype=torch.int64)
+
+    samples = bdpt_pipeline._evaluated_connection_samples(
+        paths, selected, component_out=2
+    )
+
+    assert samples is not None
+    torch.testing.assert_close(samples["tx_id"], paths.topology.tx_id[selected])
+    torch.testing.assert_close(samples["rx_id"], paths.topology.rx_id[selected])
+    torch.testing.assert_close(
+        samples["contribution"], paths.fields.path_gain[selected]
+    )
+    torch.testing.assert_close(
+        samples["path_length_m"], paths.geometry.path_length_m[selected]
+    )
+    assert samples["component_id"].tolist() == [2, 2]

@@ -5,7 +5,6 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel_native.core.path_topology import TopologyBatch
 from witwin.channel_native.propagation import (
     EvaluatedPaths,
     PathFields,
@@ -100,7 +99,6 @@ def test_contracts_are_frozen_slotted_and_resource_free():
         "workspace",
     }
 
-    assert PathTopology is not TopologyBatch
     for contract in (topology, geometry, path_fields, evaluated):
         assert not hasattr(contract, "__dict__")
         contract_fields = fields(contract)

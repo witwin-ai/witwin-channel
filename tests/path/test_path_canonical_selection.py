@@ -1,7 +1,8 @@
 import pytest
 import torch
 
-from witwin.channel_native.core import path_topology
+from witwin.channel_native.propagation.topology import concatenate
+from witwin.channel_native.propagation.topology.export import evaluated_paths_from_block
 
 
 pytestmark = pytest.mark.skipif(
@@ -60,20 +61,23 @@ def _permute(block: dict[str, torch.Tensor], order: torch.Tensor) -> dict[str, t
 
 
 def _identity(result) -> torch.Tensor:
+    topology = result.topology
     block = {
-        "valid": result.valid,
-        "tx_id": result.tx_id,
-        "rx_id": result.rx_id,
-        "depth": result.depth,
-        "component_id": result.component_id,
-        "primitive_sequence": result.primitive_sequence,
-        "edge_id": result.edge_id,
+        "valid": topology.valid,
+        "tx_id": topology.tx_id,
+        "rx_id": topology.rx_id,
+        "depth": topology.depth,
+        "component_id": topology.component_id,
+        "primitive_sequence": topology.primitive_sequence,
+        "edge_id": topology.edge_id,
     }
-    return path_topology.canonical_sequence_key(block).reshape(result.valid.numel(), -1)
+    return concatenate.canonical_sequence_key(block).reshape(
+        topology.valid.numel(), -1
+    )
 
 
 def _select(block, *, max_paths=None):
-    return path_topology._from_path_block(
+    evaluated, _ = evaluated_paths_from_block(
         block,
         max_paths=max_paths,
         max_paths_scope="per_pair",
@@ -81,6 +85,7 @@ def _select(block, *, max_paths=None):
         max_depth=2,
         launch_count=0,
     )
+    return evaluated
 
 
 def test_mixed_component_order_and_dedup_are_invariant_to_input_shuffle():
@@ -90,23 +95,28 @@ def test_mixed_component_order_and_dedup_are_invariant_to_input_shuffle():
     shuffled = _select(_permute(block, permutation))
 
     torch.testing.assert_close(_identity(shuffled), _identity(baseline))
-    torch.testing.assert_close(shuffled.path_length_m, baseline.path_length_m)
-    assert int(baseline.valid.numel()) == 7
+    torch.testing.assert_close(
+        shuffled.geometry.path_length_m, baseline.geometry.path_length_m
+    )
+    assert int(baseline.topology.valid.numel()) == 7
 
 
 def test_coupled_edge_id_is_part_of_identity_and_dedup_precedes_pair_cap():
     selected = _select(_mixed_block(), max_paths=5)
     identity = _identity(selected)
 
-    pair0 = selected.rx_id == 0
+    topology = selected.topology
+    pair0 = topology.rx_id == 0
     assert int(pair0.sum()) == 5
     assert torch.unique(identity[pair0], dim=0).shape[0] == 5
-    coupled_edges = selected.edge_id[pair0 & (selected.component_id == 3)]
+    coupled_edges = topology.edge_id[pair0 & (topology.component_id == 3)]
     assert coupled_edges.tolist() == [7, 8]
 
 
 def test_per_pair_cap_is_independent_at_pair_boundary():
     selected = _select(_mixed_block(), max_paths=2)
-    assert selected.rx_id.tolist() == [0, 0, 1, 1]
-    endpoint_identity = torch.cat((selected.rx_id[:, None], _identity(selected)), dim=1)
+    assert selected.topology.rx_id.tolist() == [0, 0, 1, 1]
+    endpoint_identity = torch.cat(
+        (selected.topology.rx_id[:, None], _identity(selected)), dim=1
+    )
     assert torch.unique(endpoint_identity, dim=0).shape[0] == 4

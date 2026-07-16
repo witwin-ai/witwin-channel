@@ -1,22 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import fields
 from types import SimpleNamespace
 
 import torch
 
-from tests.propagation.test_topology_batch_adapter import (
-    _GEOMETRY_FIELDS,
-    _PATH_FIELDS,
-    _TOPOLOGY_FIELDS,
-    _assert_exact_tensor,
-    _batch,
-)
-from witwin.channel_native.core.path_topology import TopologyBatch
+from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
 from witwin.channel_native.propagation.fields import evaluation
-from witwin.channel_native.propagation.topology.export import (
-    export_evaluated_rows,
-)
+from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel_native.propagation.models.fields import PathFields
+from witwin.channel_native.propagation.models.geometry import PathGeometry
+from witwin.channel_native.propagation.models.topology import PathTopology
 
 
 def _patch_field_stages(monkeypatch, events: list[str]) -> None:
@@ -73,20 +66,50 @@ def _patch_field_stages(monkeypatch, events: list[str]) -> None:
     monkeypatch.setattr(evaluation, "_evaluate_coupled_fields", fake_coupled)
 
 
-def _typed_tensors(paths) -> dict[str, torch.Tensor]:
-    return {
-        name: getattr(contract, name)
-        for contract, names in (
-            (paths.topology, _TOPOLOGY_FIELDS),
-            (paths.geometry, _GEOMETRY_FIELDS),
-            (paths.fields, _PATH_FIELDS),
-        )
-        for name in names
-    }
+def _assert_exact_tensor(observed: torch.Tensor, expected: torch.Tensor) -> None:
+    assert observed is expected
+    assert observed.untyped_storage()._cdata == expected.untyped_storage()._cdata
 
 
-def test_typed_and_legacy_field_seams_are_exact_and_preserve_aliases(monkeypatch):
-    source = _batch()
+def _empty_paths(paths: EvaluatedPaths) -> EvaluatedPaths:
+    old_topology = paths.topology
+    topology = PathTopology(
+        valid=old_topology.valid[:0],
+        tx_id=old_topology.tx_id[:0],
+        rx_id=old_topology.rx_id[:0],
+        depth=old_topology.depth[:0],
+        component_id=old_topology.component_id[:0],
+        primitive_id=old_topology.primitive_id[:0],
+        edge_id=old_topology.edge_id[:0],
+        material_id=old_topology.material_id[:0],
+        primitive_sequence=old_topology.primitive_sequence[:0],
+        material_sequence=old_topology.material_sequence[:0],
+        interaction_type=old_topology.interaction_type[:0],
+    )
+    old_geometry = paths.geometry
+    geometry = PathGeometry(
+        row_identity=topology.row_identity,
+        path_length_m=old_geometry.path_length_m[:0],
+        delay_s=old_geometry.delay_s[:0],
+        field_direction=old_geometry.field_direction[:0],
+        interaction_position=old_geometry.interaction_position[:0],
+        interaction_normal=old_geometry.interaction_normal[:0],
+        interaction_positions=old_geometry.interaction_positions[:0],
+        interaction_normals=old_geometry.interaction_normals[:0],
+    )
+    old_fields = paths.fields
+    fields = PathFields(
+        row_identity=topology.row_identity,
+        path_gain=old_fields.path_gain[:0],
+        path_field=old_fields.path_field[:0],
+        field_xyz=old_fields.field_xyz[:0],
+        coefficient=old_fields.coefficient[:0],
+    )
+    return EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
+
+
+def test_typed_field_seam_preserves_order_values_and_alias_contracts(monkeypatch):
+    paths, sidecars = _evaluated_paths_fixture()
     scene = SimpleNamespace(frequency=3.0e9)
     compiled = object()
     tx_positions = torch.arange(36, dtype=torch.float32).reshape(12, 3)
@@ -95,27 +118,6 @@ def test_typed_and_legacy_field_seams_are_exact_and_preserve_aliases(monkeypatch
     events: list[str] = []
     _patch_field_stages(monkeypatch, events)
 
-    legacy_result = evaluation._evaluate_shared_fields(
-        scene,
-        compiled,
-        source,
-        tx_positions,
-        tx_power,
-        rx_positions,
-        components={"los", "reflection", "transmission", "diffraction"},
-        ad_mode="vjp",
-        frequency_value=3.0e9,
-    )
-    assert events == [
-        "los",
-        "reflection",
-        "transmission",
-        "diffraction",
-        "coupled",
-    ]
-
-    events.clear()
-    paths, sidecars = export_evaluated_rows(source)
     typed_result, execution = evaluation.evaluate_path_fields(
         scene,
         compiled,
@@ -128,23 +130,12 @@ def test_typed_and_legacy_field_seams_are_exact_and_preserve_aliases(monkeypatch
         ad_mode="vjp",
         frequency_value=3.0e9,
     )
-    assert events == [
-        "los",
-        "reflection",
-        "transmission",
-        "diffraction",
-        "coupled",
-    ]
-
-    legacy_typed, legacy_sidecars = export_evaluated_rows(legacy_result)
-    for name, tensor in _typed_tensors(typed_result).items():
-        assert torch.equal(tensor, _typed_tensors(legacy_typed)[name])
-    assert execution == legacy_sidecars.execution
-    assert execution.launch_count == 16
-    assert execution.ad_companion_launches == 21
-    assert execution.ad_tape_bytes == 24
-
+    assert events == ["los", "reflection", "transmission", "diffraction", "coupled"]
+    assert execution.launch_count == 96
+    assert execution.ad_companion_launches == 101
+    assert execution.ad_tape_bytes == 104
     assert typed_result.topology is paths.topology
+
     for name in (
         "interaction_position",
         "interaction_normal",
@@ -173,25 +164,10 @@ def test_typed_and_legacy_field_seams_are_exact_and_preserve_aliases(monkeypatch
         assert observed.device == original.device
         assert observed.requires_grad == original.requires_grad
 
-    changed_tensor_fields = {
-        "path_length_m",
-        "delay_s",
-        "path_gain",
-        "path_field",
-        "field_xyz",
-        "coefficient",
-        "field_direction",
-    }
-    for item in fields(TopologyBatch):
-        original = getattr(source, item.name)
-        observed = getattr(legacy_result, item.name)
-        if isinstance(original, torch.Tensor) and item.name not in changed_tensor_fields:
-            _assert_exact_tensor(observed, original)
 
-
-def test_empty_typed_and_legacy_field_seams_preserve_input_identity():
-    source = _batch(rows=0, width=2)
-    paths, sidecars = export_evaluated_rows(source)
+def test_empty_typed_field_seam_preserves_input_identity():
+    source, sidecars = _evaluated_paths_fixture()
+    paths = _empty_paths(source)
 
     typed_result, execution = evaluation.evaluate_path_fields(
         object(),
@@ -202,15 +178,6 @@ def test_empty_typed_and_legacy_field_seams_preserve_input_identity():
         torch.empty((0,)),
         torch.empty((0, 3)),
     )
-    legacy_result = evaluation._evaluate_shared_fields(
-        object(),
-        object(),
-        source,
-        torch.empty((0, 3)),
-        torch.empty((0,)),
-        torch.empty((0, 3)),
-    )
 
     assert typed_result is paths
     assert execution is sidecars.execution
-    assert legacy_result is source

@@ -3,7 +3,6 @@ from __future__ import annotations
 import torch as torch
 
 from witwin.channel_native import build_info
-from witwin.channel_native.core.path_topology import export_topology as export_topology
 from witwin.channel_native.montecarlo.bdpt.kernels.maps import (
     bdpt_component_map_buffer as bdpt_component_map_buffer,
     bdpt_store_component_map as bdpt_store_component_map,
@@ -51,7 +50,6 @@ __all__ = [
     "bdpt_selected_edge_indices",
     "bdpt_store_component_map",
     "build_info",
-    "export_topology",
     "solve",
     "torch",
     "transmitter_tensors",

@@ -11,7 +11,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel_native.materials.kernels import functional as material_functional
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
@@ -182,7 +183,7 @@ def test_lossy_wall_scales_throughput_by_sqrt_power_transmittance():
         **_csr(materials),
         frequency_hz=frequency,
     )
-    stack = ops.em_layer_stack_eval(
+    stack = material_functional.em_layer_stack_eval(
         torch.tensor([1.0], device="cuda", dtype=torch.float32),
         torch.tensor([0], device="cuda", dtype=torch.int32),
         **_csr(materials),

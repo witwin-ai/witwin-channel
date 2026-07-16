@@ -8,7 +8,9 @@ from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.propagation.fields.kernels import (
     deterministic as deterministic_fields,
 )
-from witwin.channel_native.core import path_topology as topology
+from witwin.channel_native.propagation.enumerated import reflection as topology
+from witwin.channel_native.propagation.geometry import reevaluate as topology_geometry
+from witwin.channel_native.propagation.topology.export import evaluated_paths_from_block
 from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.path import solve as solve_paths
 
@@ -53,7 +55,7 @@ def test_multibounce_sort_order_uses_full_primitive_sequence():
         ),
     }
 
-    sorted_batch = topology._from_path_block(
+    sorted_paths, _ = evaluated_paths_from_block(
         block,
         max_paths=None,
         max_paths_scope="global",
@@ -63,11 +65,11 @@ def test_multibounce_sort_order_uses_full_primitive_sequence():
     )
 
     torch.testing.assert_close(
-        sorted_batch.primitive_sequence,
+        sorted_paths.topology.primitive_sequence,
         torch.tensor([[3, 9], [4, 1], [4, 2]], device=device, dtype=torch.int32),
     )
     torch.testing.assert_close(
-        sorted_batch.path_length_m,
+        sorted_paths.geometry.path_length_m,
         torch.tensor([39.0, 41.0, 42.0], device=device, dtype=torch.float32),
     )
 
@@ -100,7 +102,7 @@ def test_multibounce_grouping_splits_non_coplanar_faces_with_same_surface_id():
     )
     same_surface = torch.full((faces.shape[0],), 7, device=device, dtype=torch.long)
 
-    groups = topology._coplanar_face_groups(tri_a, normals, same_surface)
+    groups = topology_geometry._coplanar_face_groups(tri_a, normals, same_surface)
 
     assert int(groups["group_count"]) == 2
     torch.testing.assert_close(

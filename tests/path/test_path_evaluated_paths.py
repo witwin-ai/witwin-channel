@@ -1,25 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import fields
-
 import torch
 
-from witwin.channel_native.core.path_topology import TopologyBatch
-from witwin.channel_native.path.config import Config
-from witwin.channel_native.path.result import (
-    InteractionType,
-    PathResult,
-    from_evaluated_paths,
-    from_topology_result,
-)
 from witwin.channel_native.path import solver as path_solver
-from witwin.channel_native.propagation.models.adapters import (
-    evaluated_paths_from_topology_batch,
-)
+from witwin.channel_native.path.config import Config
+from witwin.channel_native.path.result import InteractionType, from_evaluated_paths
 from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel_native.propagation.models.fields import PathFields
+from witwin.channel_native.propagation.models.geometry import PathGeometry
+from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.propagation.topology.export import (
+    EvaluatedPathSidecars,
+    PathExecutionStats,
+)
 
 
-def _mixed_topology_batch() -> TopologyBatch:
+def _evaluated_paths_fixture() -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     component_id = torch.tensor([0, 1, 2, 5, 3, 4, 6], dtype=torch.int32)
     depth = torch.tensor([0, 1, 1, 1, 2, 2, 1], dtype=torch.int32)
     rows = int(component_id.numel())
@@ -61,7 +57,7 @@ def _mixed_topology_batch() -> TopologyBatch:
         torch.zeros((rows, 3), dtype=torch.float32),
     )
     coefficient = torch.complex(value, -value)
-    return TopologyBatch(
+    topology = PathTopology(
         valid=torch.ones(rows, dtype=torch.bool),
         tx_id=torch.zeros(rows, dtype=torch.int32),
         rx_id=torch.zeros(rows, dtype=torch.int32),
@@ -69,36 +65,47 @@ def _mixed_topology_batch() -> TopologyBatch:
         component_id=component_id,
         primitive_id=primitive_sequence[:, 0].clone(),
         edge_id=torch.tensor([-1, -1, 42, -1, 43, 44, -1], dtype=torch.int32),
-        path_length_m=value * 3.0,
-        delay_s=value * 1.0e-9,
-        path_gain=value.square(),
-        path_field=coefficient * 2.0,
-        field_xyz=field_xyz,
-        coefficient=coefficient,
-        field_direction=torch.nn.functional.normalize(field_xyz.real, dim=-1),
-        interaction_position=interaction_positions[:, 0],
-        interaction_normal=interaction_normals[:, 0],
         material_id=material_sequence[:, 0],
         primitive_sequence=primitive_sequence,
         material_sequence=material_sequence,
         interaction_type=interaction_type,
+    )
+    geometry = PathGeometry(
+        row_identity=topology.row_identity,
+        path_length_m=value * 3.0,
+        delay_s=value * 1.0e-9,
+        field_direction=torch.nn.functional.normalize(field_xyz.real, dim=-1),
+        interaction_position=interaction_positions[:, 0],
+        interaction_normal=interaction_normals[:, 0],
         interaction_positions=interaction_positions,
         interaction_normals=interaction_normals,
-        launch_count=91,
-        visibility_rejection_count=92,
-        selected_edge_count=93,
-        candidate_count=94,
-        guardrail_count=95,
-        diffraction_vector_field=field_xyz * 3.0,
-        ad_companion_launches=96,
-        ad_tape_bytes=97,
     )
+    fields = PathFields(
+        row_identity=topology.row_identity,
+        path_gain=value.square(),
+        path_field=coefficient * 2.0,
+        field_xyz=field_xyz,
+        coefficient=coefficient,
+    )
+    evaluated = EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
+    sidecars = EvaluatedPathSidecars(
+        execution=PathExecutionStats(
+            launch_count=91,
+            visibility_rejection_count=92,
+            selected_edge_count=93,
+            candidate_count=94,
+            guardrail_count=95,
+            ad_companion_launches=96,
+            ad_tape_bytes=97,
+        ),
+        diffraction_vector_field=field_xyz * 3.0,
+    )
+    return evaluated, sidecars
 
 
-def _pack_evaluated(batch: TopologyBatch) -> PathResult:
-    evaluated, _ = evaluated_paths_from_topology_batch(batch)
+def _pack_evaluated(paths: EvaluatedPaths):
     return from_evaluated_paths(
-        evaluated,
+        paths,
         num_rx=1,
         num_tx=1,
         tx_positions=torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32),
@@ -107,38 +114,25 @@ def _pack_evaluated(batch: TopologyBatch) -> PathResult:
     )
 
 
-def _assert_path_results_exact(observed: PathResult, expected: PathResult) -> None:
-    for item in fields(PathResult):
-        observed_value = getattr(observed, item.name)
-        expected_value = getattr(expected, item.name)
-        if isinstance(expected_value, torch.Tensor):
-            torch.testing.assert_close(
-                observed_value,
-                expected_value,
-                rtol=0.0,
-                atol=0.0,
-                equal_nan=True,
-            )
-        else:
-            assert observed_value == expected_value
+def test_canonical_packer_preserves_component_rows_and_metadata_exactly():
+    paths, _ = _evaluated_paths_fixture()
+    topology = paths.topology
+    geometry = paths.geometry
+    fields = paths.fields
 
-
-def test_canonical_packer_preserves_mixed_component_rows_and_metadata_exactly():
-    batch = _mixed_topology_batch()
-
-    result = _pack_evaluated(batch)
+    result = _pack_evaluated(paths)
 
     row = (0, 0, 0, 0)
     assert result.num_paths[row] == 7
-    torch.testing.assert_close(result.a[row].squeeze(-1), batch.coefficient)
-    torch.testing.assert_close(result.tau[row], batch.delay_s)
-    torch.testing.assert_close(result.interaction_type[row], batch.interaction_type)
-    torch.testing.assert_close(result.material_id[row], batch.material_sequence)
-    torch.testing.assert_close(result.position[row], batch.interaction_positions)
-    torch.testing.assert_close(result.field_xyz[row], batch.field_xyz)
-    torch.testing.assert_close(result.field_direction[row], batch.field_direction)
-    assert result.primitive_id[row][2, 0] == batch.edge_id[2]
-    assert result.primitive_id[row][4, 0] == batch.primitive_sequence[4, 0]
+    torch.testing.assert_close(result.a[row].squeeze(-1), fields.coefficient)
+    torch.testing.assert_close(result.tau[row], geometry.delay_s)
+    torch.testing.assert_close(result.interaction_type[row], topology.interaction_type)
+    torch.testing.assert_close(result.material_id[row], topology.material_sequence)
+    torch.testing.assert_close(result.position[row], geometry.interaction_positions)
+    torch.testing.assert_close(result.field_xyz[row], fields.field_xyz)
+    torch.testing.assert_close(result.field_direction[row], geometry.field_direction)
+    assert result.primitive_id[row][2, 0] == topology.edge_id[2]
+    assert result.primitive_id[row][4, 0] == topology.primitive_sequence[4, 0]
     assert result.normal[row][2, 0].equal(torch.zeros(3))
     assert result.normal[row][4, 1].equal(torch.zeros(3))
     assert result.normal[row][5, 0].equal(torch.zeros(3))
@@ -147,31 +141,9 @@ def test_canonical_packer_preserves_mixed_component_rows_and_metadata_exactly():
     assert result.metadata["coefficient_semantics"].startswith("unit_excitation")
 
 
-def test_legacy_topology_wrapper_is_bit_exact_with_canonical_packer():
-    batch = _mixed_topology_batch()
-    expected = _pack_evaluated(batch)
-
-    observed = from_topology_result(
-        batch,
-        num_rx=1,
-        num_tx=1,
-        tx_positions=torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32),
-        rx_positions=torch.tensor([[30.0, 20.0, 10.0]], dtype=torch.float32),
-        metadata={"fixture": "mixed-components"},
-    )
-
-    _assert_path_results_exact(observed, expected)
-
-
-def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
-    monkeypatch,
-):
-    initial = _mixed_topology_batch()
-    appended = _mixed_topology_batch()
-    initial_evaluated, initial_sidecars = evaluated_paths_from_topology_batch(initial)
-    appended_evaluated, appended_sidecars = evaluated_paths_from_topology_batch(
-        appended
-    )
+def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
+    initial, initial_sidecars = _evaluated_paths_fixture()
+    appended, appended_sidecars = _evaluated_paths_fixture()
     sentinel = object()
     calls: list[str] = []
     captured_metadata: dict[str, object] = {}
@@ -182,17 +154,13 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
 
     def fake_engine(_scene, _config):
         calls.append("engine")
-        return initial_evaluated, initial_sidecars
+        return initial, initial_sidecars
 
     def fake_append(_scene, _config, evaluated, sidecars):
-        assert evaluated is initial_evaluated
+        assert evaluated is initial
         assert sidecars is initial_sidecars
         calls.append("append")
-        return (
-            appended_evaluated,
-            appended_sidecars,
-            {"path_count": appended.valid.numel()},
-        )
+        return appended, appended_sidecars, {"path_count": appended.row_count}
 
     def fake_metadata(**kwargs):
         calls.append("metadata")
@@ -201,18 +169,13 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
 
     def fake_pack(paths, **kwargs):
         calls.append("pack")
-        assert isinstance(paths, EvaluatedPaths)
-        assert paths.topology.valid is appended.valid
+        assert paths is appended
         assert not hasattr(paths, "diffraction_vector_field")
         assert kwargs["metadata"]["kernel"]["launch_count"] == 1
         return sentinel
 
     monkeypatch.setattr(path_solver, "evaluate_enumerated_paths", fake_engine)
-    monkeypatch.setattr(
-        path_solver,
-        "append_scattering_evaluated_paths",
-        fake_append,
-    )
+    monkeypatch.setattr(path_solver, "append_scattering_evaluated_paths", fake_append)
     monkeypatch.setattr(path_solver, "_metadata", fake_metadata)
     monkeypatch.setattr(path_solver, "from_evaluated_paths", fake_pack)
     monkeypatch.setattr(
@@ -230,7 +193,7 @@ def test_solver_adapts_after_scattering_and_passes_only_execution_ad_sidecars(
 
     assert result is sentinel
     assert calls == ["engine", "append", "metadata", "pack"]
-    assert captured_metadata["path_count"] == appended.valid.numel()
+    assert captured_metadata["path_count"] == appended.row_count
     assert captured_metadata["ad_companion_launches"] == 96
     assert captured_metadata["ad_tape_bytes"] == 97
     assert captured_metadata["transmission_path_count"] == 1

@@ -2,15 +2,9 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import os
 from pathlib import Path
-import subprocess
-import sys
-
-import pytest
 
 from ci import check_import_graph as graph
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import diffraction
 from witwin.channel_native.propagation.geometry import (
     diffraction as geometry_diffraction,
@@ -40,17 +34,12 @@ def _digest(module, name: str) -> str:
 
 
 def test_diffraction_owner_identity_module_and_constant():
-    assert legacy._deterministic_diffraction_states is (
-        diffraction._deterministic_diffraction_states
-    )
-    assert legacy._diffraction_topology_order1 is diffraction._diffraction_topology_order1
     assert diffraction._deterministic_diffraction_states.__module__ == (
         diffraction.__name__
     )
     assert diffraction._diffraction_topology_order1.__module__ == diffraction.__name__
     assert (
-        legacy._tx_visible_diffraction_states
-        is diffraction._tx_visible_diffraction_states
+        diffraction._tx_visible_diffraction_states
         is geometry_diffraction._tx_visible_diffraction_states
     )
     assert geometry_diffraction._tx_visible_diffraction_states.__module__ == (
@@ -61,8 +50,7 @@ def test_diffraction_owner_identity_module_and_constant():
         == _DIGESTS["_tx_visible_diffraction_states"]
     )
     assert (
-        legacy._DIFFRACTION_PREFILTER_EDGE_FRACTIONS
-        is diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS
+        diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS
         is geometry_diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS
     )
     assert geometry_diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS == (
@@ -147,52 +135,6 @@ def test_diffraction_consumers_use_named_geometry_and_canonical_event_order():
         and isinstance(node.value, ast.Name)
         and node.value.id == "out"
         for node in ast.walk(owner)
-    )
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.propagation.enumerated import diffraction; "
-            "from witwin.channel_native.core import path_topology as legacy"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.enumerated import diffraction"
-        ),
-    ),
-)
-def test_fresh_process_import_order_preserves_diffraction_identity(imports):
-    code = (
-        f"{imports}; "
-        "from witwin.channel_native.propagation.geometry import "
-        "diffraction as geometry_diffraction; "
-        "from witwin.channel_native.propagation.topology.discovery import "
-        "diffraction as discovery; "
-        "assert legacy._deterministic_diffraction_states is "
-        "diffraction._deterministic_diffraction_states; "
-        "assert legacy._diffraction_topology_order1 is "
-        "diffraction._diffraction_topology_order1; "
-        "assert legacy._tx_visible_diffraction_states is "
-        "diffraction._tx_visible_diffraction_states is "
-        "geometry_diffraction._tx_visible_diffraction_states; "
-        "assert diffraction.prepare_diffraction_order1_plan is "
-        "discovery.prepare_diffraction_order1_plan"
-    )
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (str(REPOSITORY_ROOT / "src"), environment.get("PYTHONPATH"))
-        if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
     )
 
 

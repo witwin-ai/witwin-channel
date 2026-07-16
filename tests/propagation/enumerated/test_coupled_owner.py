@@ -2,15 +2,9 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import os
 from pathlib import Path
-import subprocess
-import sys
-
-import pytest
 
 from ci import check_import_graph as graph
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.propagation.enumerated import coupled, engine
 from witwin.channel_native.propagation.geometry import coupled as geometry_coupled
 from witwin.channel_native.propagation.topology.discovery import (
@@ -37,13 +31,8 @@ def _digest(module, name: str) -> str:
 
 def test_coupled_owner_preserves_function_and_constant_identity():
     owner = coupled._coupled_reflection_diffraction_topology_order2
-    assert legacy._coupled_reflection_diffraction_topology_order2 is owner
     assert owner.__module__ == coupled.__name__
     assert _digest(coupled, owner.__name__) == _COUPLED_DIGEST
-    assert legacy._COUPLED_CANDIDATE_CHUNK_SIZE is (
-        coupled._COUPLED_CANDIDATE_CHUNK_SIZE
-    )
-    assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES
     assert coupled._COUPLED_CANDIDATE_CHUNK_SIZE == 65_536
     assert coupled._MAX_COUPLED_CANDIDATES == 1_000_000
     assert coupled._COUPLED_CANDIDATE_CHUNK_SIZE is (
@@ -114,56 +103,6 @@ def test_export_component_stage_order_remains_canonical():
     )
 
 
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.propagation.enumerated import coupled; "
-            "from witwin.channel_native.core import path_topology as legacy"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.enumerated import coupled"
-        ),
-    ),
-)
-def test_fresh_process_import_order_preserves_coupled_identity(imports: str):
-    code = (
-        f"{imports}; "
-        "from witwin.channel_native.propagation.geometry import coupled as geometry_coupled; "
-        "from witwin.channel_native.propagation.topology.discovery import "
-        "coupled as discovery_coupled; "
-        "assert legacy._coupled_reflection_diffraction_topology_order2 is "
-        "coupled._coupled_reflection_diffraction_topology_order2; "
-        "assert legacy._COUPLED_CANDIDATE_CHUNK_SIZE is "
-        "coupled._COUPLED_CANDIDATE_CHUNK_SIZE; "
-        "assert legacy._MAX_COUPLED_CANDIDATES is coupled._MAX_COUPLED_CANDIDATES; "
-        "assert coupled.prepare_coupled_candidate_plan is "
-        "discovery_coupled.prepare_coupled_candidate_plan; "
-        "assert coupled.iter_coupled_candidate_requests is "
-        "discovery_coupled.iter_coupled_candidate_requests; "
-        "assert coupled.CoupledGeometryQuery is geometry_coupled.CoupledGeometryQuery; "
-        "assert coupled.query_coupled_geometry is geometry_coupled.query_coupled_geometry"
-    )
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (
-            str(REPOSITORY_ROOT / "src"),
-            environment.get("PYTHONPATH"),
-        )
-        if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
 def test_coupled_owner_has_no_core_path_dependency_or_scc():
     owner = "witwin.channel_native.propagation.enumerated.coupled"
     core = "witwin.channel_native.core.path_topology"
@@ -186,4 +125,4 @@ def test_coupled_owner_has_no_core_path_dependency_or_scc():
 def test_enumerated_public_all_is_unchanged():
     import witwin.channel_native.propagation.enumerated as enumerated
 
-    assert enumerated.__all__ == ["append_scattering_paths"]
+    assert enumerated.__all__ == []

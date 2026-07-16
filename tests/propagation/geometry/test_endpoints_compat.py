@@ -1,22 +1,15 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
-import subprocess
-import sys
 from types import SimpleNamespace
 
 import pytest
 import torch
 
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.core.objects import ReceiverGrid
 from witwin.channel_native.deterministic import accumulation, solver
 from witwin.channel_native.propagation.enumerated import scattering as enumerated
 from witwin.channel_native.propagation.geometry import endpoints
 
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 _ENDPOINT_NAMES = (
     "ReceiverLayout",
@@ -26,12 +19,11 @@ _ENDPOINT_NAMES = (
 )
 
 
-def test_endpoint_helpers_are_same_object_compatibility_exports():
+def test_endpoint_helpers_have_canonical_owners():
     for name in _ENDPOINT_NAMES:
         owner = getattr(endpoints, name)
 
         assert owner.__module__ == endpoints.__name__
-        assert getattr(legacy, name) is owner
 
     assert accumulation.ReceiverLayout is endpoints.ReceiverLayout
     assert accumulation.apply_receiver_layout is endpoints.apply_receiver_layout
@@ -44,67 +36,6 @@ def test_endpoint_helpers_are_same_object_compatibility_exports():
         enumerated.receiver_positions_and_layout
         is endpoints.receiver_positions_and_layout
     )
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.propagation.geometry import endpoints; "
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.deterministic import accumulation, solver; "
-            "from witwin.channel_native.propagation.enumerated import "
-            "scattering as enumerated"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.enumerated import "
-            "scattering as enumerated; "
-            "from witwin.channel_native.deterministic import accumulation, solver; "
-            "from witwin.channel_native.propagation.geometry import endpoints"
-        ),
-        (
-            "from witwin.channel_native.deterministic import accumulation, solver; "
-            "from witwin.channel_native.propagation.enumerated import "
-            "scattering as enumerated; "
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.propagation.geometry import endpoints"
-        ),
-    ),
-)
-def test_endpoint_import_order_preserves_facade_identity(imports: str):
-    names = repr(_ENDPOINT_NAMES)
-    code = (
-        f"{imports}; "
-        f"names={names}; "
-        "assert all(getattr(legacy, name) is getattr(endpoints, name) "
-        "for name in names); "
-        "assert accumulation.ReceiverLayout is endpoints.ReceiverLayout; "
-        "assert accumulation.apply_receiver_layout is "
-        "endpoints.apply_receiver_layout; "
-        "assert solver.apply_receiver_layout is endpoints.apply_receiver_layout; "
-        "assert solver.receiver_positions_and_layout is "
-        "endpoints.receiver_positions_and_layout; "
-        "assert enumerated.transmitter_tensors is endpoints.transmitter_tensors; "
-        "assert enumerated.receiver_positions_and_layout is "
-        "endpoints.receiver_positions_and_layout"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value for value in (source_root, environment.get("PYTHONPATH")) if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr
 
 
 def test_receiver_layout_preserves_point_and_grid_storage_contracts():

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.core.path_topology import ReceiverLayout
+from witwin.channel_native.propagation.geometry.endpoints import ReceiverLayout
 from witwin.channel_native.deterministic import accumulation
 from witwin.channel_native.propagation.models import (
     EvaluatedPaths,
@@ -80,4 +80,3 @@ def test_accumulation_consumes_split_evaluated_path_contract(monkeypatch):
     assert captured["component_id"] is paths.topology.component_id
     assert captured["path_gain"] is paths.fields.path_gain
     assert captured["path_field"] is paths.fields.path_field
-

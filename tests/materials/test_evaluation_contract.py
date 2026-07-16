@@ -2,21 +2,15 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import os
 from pathlib import Path
-import pickle
-import subprocess
-import sys
 from types import SimpleNamespace
 
 import pytest
 import torch
 
 from witwin.channel_native import materials as materials_package
-from witwin.channel_native.core import path_topology as legacy
 from witwin.channel_native.materials import evaluation
 from witwin.channel_native.montecarlo.basic import solver as mc_solver
-from witwin.channel_native.propagation.geometry import reevaluate
 from witwin.channel_native.runtime import autograd_contracts
 
 
@@ -43,62 +37,17 @@ def _function_digest(module, name: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def test_frequency_and_material_guards_have_canonical_owners_and_legacy_identity():
+def test_frequency_and_material_guards_have_canonical_owners():
     frequency_guard = autograd_contracts._frequency_participates_in_ad
     material_guard = evaluation._require_frequency_ad_constant_materials
 
-    assert legacy._frequency_participates_in_ad is frequency_guard
-    assert legacy._require_frequency_ad_constant_materials is material_guard
     assert mc_solver._require_frequency_ad_constant_materials is material_guard
     assert frequency_guard.__module__ == autograd_contracts.__name__
     assert material_guard.__module__ == evaluation.__name__
     assert (
         autograd_contracts._participates_in_ad is autograd_contracts._ad_geometry_live
     )
-    assert legacy._participates_in_ad is reevaluate._participates_in_ad
     assert "_require_frequency_ad_constant_materials" not in materials_package.__all__
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.runtime import autograd_contracts; "
-            "from witwin.channel_native.materials import evaluation; "
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.montecarlo.basic import solver as mc_solver"
-        ),
-        (
-            "from witwin.channel_native.core import path_topology as legacy; "
-            "from witwin.channel_native.montecarlo.basic import solver as mc_solver; "
-            "from witwin.channel_native.materials import evaluation; "
-            "from witwin.channel_native.runtime import autograd_contracts"
-        ),
-    ),
-)
-def test_import_order_preserves_frequency_and_material_guard_identity(imports: str):
-    code = (
-        f"{imports}; "
-        "assert legacy._frequency_participates_in_ad is "
-        "autograd_contracts._frequency_participates_in_ad; "
-        "assert legacy._require_frequency_ad_constant_materials is "
-        "evaluation._require_frequency_ad_constant_materials; "
-        "assert mc_solver._require_frequency_ad_constant_materials is "
-        "evaluation._require_frequency_ad_constant_materials"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value for value in (source_root, environment.get("PYTHONPATH")) if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 def test_moved_function_bodies_and_signatures_are_exact():
@@ -110,25 +59,6 @@ def test_moved_function_bodies_and_signatures_are_exact():
         _function_digest(evaluation, "_require_frequency_ad_constant_materials")
         == _FUNCTION_DIGESTS["_require_frequency_ad_constant_materials"]
     )
-
-
-@pytest.mark.parametrize(
-    ("payload", "owner"),
-    (
-        (
-            b"cwitwin.channel_native.core.path_topology\n"
-            b"_frequency_participates_in_ad\n.",
-            autograd_contracts._frequency_participates_in_ad,
-        ),
-        (
-            b"cwitwin.channel_native.core.path_topology\n"
-            b"_require_frequency_ad_constant_materials\n.",
-            evaluation._require_frequency_ad_constant_materials,
-        ),
-    ),
-)
-def test_legacy_pickle_payload_replays_to_canonical_owner(payload: bytes, owner):
-    assert pickle.loads(payload) is owner
 
 
 def test_frequency_participation_detects_reverse_and_forward_mode():

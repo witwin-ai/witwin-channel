@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 
 import pytest
 
-from ci import check_ops_migration as migration
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.geometry.kernels import autograd as ops
 from witwin.channel_native.propagation.geometry import kernels
 from witwin.channel_native.propagation.geometry.kernels import autograd, primitives
 from witwin.channel_native.runtime import (
@@ -17,9 +15,6 @@ from witwin.channel_native.runtime import (
 )
 from witwin.channel_native.runtime import torch_compat
 
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-MANIFEST_PATH = REPOSITORY_ROOT / "ci" / "ops_migration_manifest.json"
 
 _OWNER_NAMES = (
     "_RaydnFaceNormalsAdFunction",
@@ -50,36 +45,6 @@ def test_geometry_autograd_is_the_single_object_owner(name: str):
     assert owner.__module__ == autograd.__name__
     assert getattr(kernels, name) is owner
     assert getattr(ops, name) is owner
-
-
-def test_geometry_autograd_preserves_all_frozen_body_contracts():
-    manifest = migration.load_manifest(MANIFEST_PATH)
-    contracts = {entry["id"]: entry for entry in manifest["contracts"]}
-    projections = {
-        entry["id"]: entry for entry in manifest["approved_body_projections"]
-    }
-    prefix = f"{autograd.__name__}."
-    definitions = [
-        item
-        for item in migration.scan_definitions(REPOSITORY_ROOT)
-        if item.qualified_name.startswith(prefix)
-    ]
-
-    assert len(definitions) == 30
-    for definition in definitions:
-        contract = contracts[definition.terminal_name]
-        assert definition.signature == contract["signature"]
-        projection = projections.get(definition.terminal_name)
-        if projection is None:
-            assert definition.body_sha256 == contract["body_sha256"]
-            assert definition.normalized_ast_sha256 == contract["normalized_ast_sha256"]
-        else:
-            assert definition.projected_native_symbol == projection["native_symbol"]
-            assert definition.projected_body_sha256 == contract["body_sha256"]
-            assert (
-                definition.projected_normalized_ast_sha256
-                == contract["normalized_ast_sha256"]
-            )
 
 
 def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():

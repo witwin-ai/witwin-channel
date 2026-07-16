@@ -1,14 +1,14 @@
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.runtime import symbols as ops
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
 from witwin.channel_native.propagation.fields.kernels import (
     deterministic as deterministic_fields,
 )
-from witwin.channel_native.core import path_topology as topology
+from witwin.channel_native.propagation.enumerated import reflection as topology
 from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.path import solve as solve_paths
 

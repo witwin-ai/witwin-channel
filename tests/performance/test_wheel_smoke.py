@@ -104,3 +104,18 @@ def test_smoke_program_contains_strict_isolation_and_native_checks(tmp_path: Pat
     assert 'find_spec("witwin.channel_native._channel_native")' in code
     assert 'build_info.get("uses_dr_jit") is not False' in code
     assert 'build_info.get("uses_raydn_native") is not True' in code
+def test_resolve_wheel_accepts_one_file_or_one_wheel_directory(tmp_path: Path):
+    wheel = tmp_path / "package.whl"
+    wheel.write_bytes(b"wheel")
+
+    assert wheel_smoke._resolve_wheel(wheel) == wheel.resolve()
+    assert wheel_smoke._resolve_wheel(tmp_path) == wheel.resolve()
+
+
+def test_resolve_wheel_rejects_empty_or_ambiguous_directory(tmp_path: Path):
+    with pytest.raises(ValueError, match="exactly one"):
+        wheel_smoke._resolve_wheel(tmp_path)
+    (tmp_path / "one.whl").write_bytes(b"one")
+    (tmp_path / "two.whl").write_bytes(b"two")
+    with pytest.raises(ValueError, match="found 2"):
+        wheel_smoke._resolve_wheel(tmp_path)

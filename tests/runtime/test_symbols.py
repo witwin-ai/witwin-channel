@@ -3,20 +3,12 @@ from __future__ import annotations
 import ast
 import hashlib
 import inspect
-import os
-from pathlib import Path
-import subprocess
-import sys
 from types import SimpleNamespace
 
 import pytest
 
 from witwin.channel_native.core.kernels import extension as compatibility_extension
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.runtime import extension, symbols
-
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _body_hash(function: object) -> str:
@@ -41,56 +33,17 @@ def _isolated_loader_state():
 def test_compatibility_exports_share_the_runtime_symbol_owner():
     assert compatibility_extension.native_extension is symbols.native_extension
     assert extension.native_extension is symbols.native_extension
-    assert ops.native_extension is symbols.native_extension
 
 
-def test_ops_required_native_op_has_one_body_preserving_runtime_owner():
+def test_required_native_op_has_one_body_preserving_runtime_owner():
     function = symbols._required_native_op
 
-    assert ops._required_native_op is function
     assert function.__module__ == "witwin.channel_native.runtime.symbols"
     assert "_required_native_op" not in symbols.__all__
     assert function.__globals__["_native_symbols"] is symbols
     assert _body_hash(function) == (
         "f60ee207119d675d9a7b6b9982131fbc44b1238eb3ce8274b1607136fbfc490d"
     )
-
-
-@pytest.mark.parametrize(
-    "imports",
-    (
-        (
-            "from witwin.channel_native.core.kernels import ops; "
-            "from witwin.channel_native.runtime import symbols"
-        ),
-        (
-            "from witwin.channel_native.runtime import symbols; "
-            "from witwin.channel_native.core.kernels import ops"
-        ),
-    ),
-)
-def test_required_native_op_import_order_preserves_facade_identity(imports: str):
-    code = (
-        f"{imports}; "
-        "assert ops._required_native_op is symbols._required_native_op; "
-        "assert symbols._required_native_op.__globals__['_native_symbols'] is symbols"
-    )
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value for value in (source_root, environment.get("PYTHONPATH")) if value
-    )
-
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, completed.stderr
 
 
 def test_native_extension_preserves_loader_cache(monkeypatch: pytest.MonkeyPatch):
@@ -196,7 +149,7 @@ def test_symbol_lookups_preserve_loader_errors(monkeypatch: pytest.MonkeyPatch, 
     assert captured.value is error
 
 
-def test_ops_required_symbol_preserves_runtime_monkeypatch_and_call_count(
+def test_required_native_op_preserves_runtime_monkeypatch_and_call_count(
     monkeypatch: pytest.MonkeyPatch,
 ):
     kernel = object()
@@ -208,11 +161,11 @@ def test_ops_required_symbol_preserves_runtime_monkeypatch_and_call_count(
 
     monkeypatch.setattr(symbols, "native_extension", load)
 
-    assert ops._required_native_op("kernel") is kernel
+    assert symbols._required_native_op("kernel") is kernel
     assert loads == [None]
 
 
-def test_ops_required_symbol_preserves_missing_kernel_text(
+def test_required_native_op_preserves_missing_kernel_text(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(symbols, "native_extension", lambda: None)
@@ -221,4 +174,4 @@ def test_ops_required_symbol_preserves_missing_kernel_text(
         symbols.NativeSymbolError,
         match=r"^_channel_native\.kernel CUDA kernel is required$",
     ):
-        ops._required_native_op("kernel")
+        symbols._required_native_op("kernel")

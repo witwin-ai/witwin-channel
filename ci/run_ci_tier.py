@@ -31,11 +31,9 @@ QUICK_GATES = (
             "-q",
             "tests/test_public_api_snapshot.py",
             "tests/test_binding_manifest_contract.py",
-            "tests/test_ops_migration_contract.py",
             "tests/test_phase10_legacy_dead_binding_audit.py",
         ),
     ),
-    Gate("quick.ops-migration-manifest", ("ci/check_ops_migration.py",)),
     Gate("quick.production-dependencies", ("ci/check_production_dependencies.py",)),
     Gate("quick.repository-hygiene", ("ci/check_repository_hygiene.py",)),
     Gate("quick.maintenance-budgets", ("ci/check_maintenance_budgets.py",)),
@@ -168,11 +166,7 @@ NIGHTLY_GATES = (
     ),
     Gate(
         "nightly.wheel-smoke-py311-cu128-win-x64",
-        (
-            "ci/wheel_smoke.py",
-            "artifacts/nightly/wheel/"
-            "witwin_channel_native-0.1.0-cp311-cp311-win_amd64.whl",
-        ),
+        ("ci/wheel_smoke.py", "artifacts/nightly/wheel"),
     ),
 )
 
@@ -182,7 +176,7 @@ RELEASE_GATES = (
         (
             "benchmarks/bench_phase_e_acceptance.py",
             "--profile",
-            "reduced",
+            "full",
             "--fail-on-gate",
             "--output",
             "artifacts/release/phase-e-acceptance.v1.json",
@@ -239,11 +233,7 @@ RELEASE_GATES = (
     ),
     Gate(
         "release.fresh-checkout-wheel-smoke",
-        (
-            "ci/wheel_smoke.py",
-            "artifacts/release/wheel/"
-            "witwin_channel_native-0.1.0-cp311-cp311-win_amd64.whl",
-        ),
+        ("ci/wheel_smoke.py", "artifacts/release/wheel"),
     ),
     Gate(
         "release.rayd-lock-build-identity",

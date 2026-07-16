@@ -589,7 +589,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
     single-lane FD (measured ~10-15% per lane at the converged step).
     """
 
-    from witwin.channel_native.core.kernels import ops as _ops
+    from witwin.channel_native.montecarlo.basic.kernels import maps as _ops
 
     base = torch.tensor([0.0, -1.0, 0.5])
     args = _captured_diffraction_tape(monkeypatch, base)

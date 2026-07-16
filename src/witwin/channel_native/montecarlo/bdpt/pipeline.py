@@ -20,8 +20,7 @@ from witwin.channel_native.core.memory_budget import (
 from witwin.channel_native.core.receiver_geometry import (
     first_receiver_grid,
 )
-from witwin.channel_native.core.path_topology import export_topology
-
+from witwin.channel_native.propagation import EvaluatedPaths, evaluate_enumerated_paths
 from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
     bdpt_diffraction_state_pack,
     bdpt_reflection_launch_inputs,
@@ -427,18 +426,18 @@ def _native_diffraction_point_connection_samples(
             yield bdpt_filter_connection_samples(filtered, visible_target)
 
 
-def _topology_connection_samples(
-    topology: Any,
-    selected: torch.Tensor,
-    *,
-    component_out: int,
+def _evaluated_connection_samples(
+    paths: EvaluatedPaths, selected: torch.Tensor, *, component_out: int
 ) -> dict[str, torch.Tensor] | None:
     if int(selected.numel()) == 0:
         return None
+    topology = paths.topology
+    geometry = paths.geometry
+    fields = paths.fields
     tx_id = topology.tx_id.index_select(0, selected).to(torch.int32)
     rx_id = topology.rx_id.index_select(0, selected).to(torch.int32)
     depth = topology.depth.index_select(0, selected).to(torch.int32)
-    contribution = topology.path_gain.index_select(0, selected)
+    contribution = fields.path_gain.index_select(0, selected)
     count = int(selected.numel())
     component_id = torch.full_like(tx_id, int(component_out))
     one = torch.ones((count,), device=tx_id.device, dtype=torch.float32)
@@ -456,7 +455,7 @@ def _topology_connection_samples(
         "grid_linear_id": rx_id.clone(),
         "light_depth": depth,
         "sensor_depth": zero_depth,
-        "path_length_m": topology.path_length_m.index_select(0, selected),
+        "path_length_m": geometry.path_length_m.index_select(0, selected),
     }
 
 
@@ -465,15 +464,15 @@ def _reflection_discrete_connection_samples(
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate delta-specular paths with unit forward/reverse discrete mass."""
 
-    topology = export_topology(
+    paths, _ = evaluate_enumerated_paths(
         scene,
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
             components=frozenset({"reflection"}),
         ),
     )
-    selected = torch.nonzero(topology.component_id == 1, as_tuple=False).flatten()
-    return _topology_connection_samples(topology, selected, component_out=1)
+    selected = torch.nonzero(paths.topology.component_id == 1, as_tuple=False).flatten()
+    return _evaluated_connection_samples(paths, selected, component_out=1)
 
 
 def _coupled_discrete_connection_samples(
@@ -481,7 +480,7 @@ def _coupled_discrete_connection_samples(
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate mixed delta/UTD paths with unit bidirectional discrete mass."""
 
-    topology = export_topology(
+    paths, _ = evaluate_enumerated_paths(
         scene,
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
@@ -490,8 +489,8 @@ def _coupled_discrete_connection_samples(
             coupled_candidate_limit=int(config.coupled_candidate_limit),
         ),
     )
-    selected = torch.nonzero(topology.component_id >= 3, as_tuple=False).flatten()
-    return _topology_connection_samples(topology, selected, component_out=2)
+    selected = torch.nonzero(paths.topology.component_id >= 3, as_tuple=False).flatten()
+    return _evaluated_connection_samples(paths, selected, component_out=2)
 
 
 _TRANSMISSION_COMPONENT_ID = 5

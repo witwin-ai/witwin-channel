@@ -10,7 +10,7 @@ import weakref
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.runtime import native_handles as ops
 from witwin.channel_native.core import scene as core_scene
 from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled
 from witwin.channel_native.core.runtime import raydn as legacy_raydn

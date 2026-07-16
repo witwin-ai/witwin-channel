@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
 from witwin.channel_native.montecarlo.bdpt.kernels import paths
 
 

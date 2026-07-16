@@ -1,35 +1,6 @@
 {
   "schema_version": 1,
   "debts": {
-    "direct_core_kernels_ops": {
-      "baseline": [
-        {"id": "ops-001", "path": "src/witwin/channel_native/core/diffraction_geometry.py", "line": 6, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.core.diffraction_geometry", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-002", "path": "src/witwin/channel_native/core/material_runtime.py", "line": 6, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.core.material_runtime", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-003", "path": "src/witwin/channel_native/core/path_topology.py", "line": 13, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.core.path_topology", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-004", "path": "src/witwin/channel_native/core/runtime/raydn.py", "line": 7, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.core.runtime.raydn", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-005", "path": "src/witwin/channel_native/core/scene.py", "line": 17, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.core.scene", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-006", "path": "src/witwin/channel_native/core/scene_tensors.py", "line": 6, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.core.scene_tensors", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-007", "path": "src/witwin/channel_native/deterministic/accumulation.py", "line": 7, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.deterministic.accumulation", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-008", "path": "src/witwin/channel_native/deterministic/field.py", "line": 5, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.deterministic.field", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-009", "path": "src/witwin/channel_native/deterministic/solver.py", "line": 18, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.deterministic.solver", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-010", "path": "src/witwin/channel_native/montecarlo/basic/backend.py", "line": 10, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.basic.backend", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-011", "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py", "line": 10, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.basic.raydn_components", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-012", "path": "src/witwin/channel_native/montecarlo/basic/solver.py", "line": 20, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.basic.solver", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-013", "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py", "line": 6, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.bdpt.connections", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-014", "path": "src/witwin/channel_native/montecarlo/bdpt/mis.py", "line": 5, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.bdpt.mis", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-015", "path": "src/witwin/channel_native/montecarlo/bdpt/sampling.py", "line": 5, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.bdpt.sampling", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-016", "path": "src/witwin/channel_native/montecarlo/bdpt/solver.py", "line": 28, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.bdpt.solver", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-017", "path": "src/witwin/channel_native/montecarlo/bdpt/subpaths.py", "line": 7, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.bdpt.subpaths", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-018", "path": "src/witwin/channel_native/montecarlo/scattering_events.py", "line": 78, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.scattering_events", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-019", "path": "src/witwin/channel_native/montecarlo/transmission.py", "line": 24, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.montecarlo.transmission", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-020", "path": "src/witwin/channel_native/propagation/enumerated.py", "line": 77, "column": 0, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.propagation.enumerated", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-021", "path": "src/witwin/channel_native/scattering/tables.py", "line": 499, "column": 4, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.scattering.tables", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-022", "path": "src/witwin/channel_native/scattering/tables.py", "line": 521, "column": 4, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.scattering.tables", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-023", "path": "src/witwin/channel_native/scattering/tables.py", "line": 542, "column": 4, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.scattering.tables", "target": "witwin.channel_native.core.kernels.ops"},
-        {"id": "ops-024", "path": "src/witwin/channel_native/scattering/tables.py", "line": 557, "column": 4, "rule": "direct_core_kernels_ops", "source": "witwin.channel_native.scattering.tables", "target": "witwin.channel_native.core.kernels.ops"}
-      ],
-      "allowed": []
-    },
     "existing_boundary": {
       "baseline": [
         {"id": "boundary-001", "path": "src/witwin/channel_native/__init__.py", "line": 3, "column": 0, "rule": "public_init_internal", "source": "witwin.channel_native", "target": "witwin.channel_native.core.kernels.extension"},
