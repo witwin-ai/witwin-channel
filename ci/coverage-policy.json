@@ -30,9 +30,9 @@
   ],
   "accepted_observation": {
     "captured_on": "2026-07-16",
-    "tests": "1725 passed, 1 skipped, 1 xfailed; six architecture failures fixed before acceptance",
-    "statement_percent": 85.35073409461664,
-    "branch_percent": 64.63744588744589,
+    "tests": "1751 passed, 1 skipped, 1 xfailed",
+    "statement_percent": 85.73409461663948,
+    "branch_percent": 66.09848484848484,
     "core_aggregate_statement_percent": 90.05576208178438
   }
 }

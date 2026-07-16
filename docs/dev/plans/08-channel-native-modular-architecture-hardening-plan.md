@@ -1,6 +1,6 @@
 # Channel Native 模块化架构与代码治理修理计划
 
-**状态：** Proposed（实施前必须先完成 Phase 0 基线冻结）
+**状态：** Phase 0-11 completed；Phase 12 in progress（用户于 2026-07-16 明确取消向后兼容要求）
 
 **计划日期：** 2026-07-14
 
