@@ -4,7 +4,6 @@ from pathlib import Path
 from witwin.channel_native.core.kernels import extension, raydn_backend
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.runtime import raydn as raydn_runtime
-from witwin.channel_native.montecarlo.basic import solver as mc_basic_solver
 from witwin.channel_native.scene.kernels import rayd_scene
 
 
@@ -250,8 +249,10 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
 
 
 def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
-    solve_source = inspect.getsource(mc_basic_solver.solve)
-    module_source = inspect.getsource(mc_basic_solver)
+    from witwin.channel_native.montecarlo.basic import pipeline as mc_basic_pipeline
+
+    solve_source = inspect.getsource(mc_basic_pipeline.solve_pipeline)
+    module_source = inspect.getsource(mc_basic_pipeline)
 
     # Plan 07 AD-3: materials come from the compiled store in BOTH
     # ad_mode="none" and the AD modes (one source, same values); the old
