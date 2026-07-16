@@ -21,7 +21,6 @@ from witwin.channel_native.scene.kernels import rayd_scene
 
 
 _SCENE_KERNEL_NAMES = (
-    "_raydn_module_handle",
     "_raydn_scene_handle_id",
     "raydn_scene_create",
     "raydn_scene_edge_records",

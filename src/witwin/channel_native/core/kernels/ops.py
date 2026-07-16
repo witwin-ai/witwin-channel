@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from witwin.channel_native.core.rayd_native_handles import (  # noqa: F401
-    _raydn_module_handle,
-    _raydn_scene_handle_id,
-)
+from witwin.channel_native.scene.native_handles import _raydn_scene_handle_id  # noqa: F401
 from witwin.channel_native.propagation.topology.kernels.blocks import (  # noqa: F401
     _DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA,
     _PATH_BLOCK_SCHEMA,

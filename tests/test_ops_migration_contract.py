@@ -133,8 +133,8 @@ def test_current_manifest_covers_every_movable_ops_body():
     assert migration.check_manifest(REPOSITORY_ROOT, manifest) == []
     assert len(manifest["contracts"]) == 282
     assert len(manifest["active_ops"]) == 0
-    assert len(manifest["canonical_owners"]) == 282
-    assert manifest["retired_ops"] == []
+    assert len(manifest["canonical_owners"]) == 281
+    assert manifest["retired_ops"] == ["_raydn_module_handle"]
     assert len(manifest["approved_body_projections"]) == 25
     assert migration.contract_digest(manifest) == migration.FROZEN_CONTRACT_DIGEST
     assert migration.BOOTSTRAP_CANONICAL_OWNERS.items() <= (

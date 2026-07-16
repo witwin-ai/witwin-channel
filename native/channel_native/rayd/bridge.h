@@ -339,27 +339,27 @@ using DiffractionAccumulationForwardFn = int64_t (*)(
     at::Tensor *,
     int64_t);
 
-VisibilityForwardFn raydn_visibility_forward_fn(std::uintptr_t module_handle);
-SceneCreateFn raydn_scene_create_fn(std::uintptr_t module_handle);
-SceneDestroyFn raydn_scene_destroy_fn(std::uintptr_t module_handle);
-SceneEdgeRecordsFn raydn_scene_edge_records_fn(std::uintptr_t module_handle);
-IntersectForwardFn raydn_intersect_forward_fn(std::uintptr_t module_handle);
-TraceReflectionsForwardFn raydn_trace_reflections_forward_fn(std::uintptr_t module_handle);
-ReflectionEpcPathsForwardFn raydn_reflection_epc_paths_forward_fn(std::uintptr_t module_handle);
-ReflectionAccumulationForwardFn raydn_reflection_accumulation_forward_fn(std::uintptr_t module_handle);
-IntersectBackwardFn raydn_intersect_backward_fn(std::uintptr_t module_handle);
-IntersectJvpFn raydn_intersect_jvp_fn(std::uintptr_t module_handle);
-TraceReflectionsForwardFn raydn_trace_reflections_forward_tape_fn(std::uintptr_t module_handle);
-TraceReflectionsBackwardFn raydn_trace_reflections_backward_fn(std::uintptr_t module_handle);
-TraceReflectionsJvpFn raydn_trace_reflections_jvp_fn(std::uintptr_t module_handle);
-ReflectionEpcPathsBackwardFn raydn_reflection_epc_paths_backward_fn(std::uintptr_t module_handle);
-ReflectionEpcPathsJvpFn raydn_reflection_epc_paths_jvp_fn(std::uintptr_t module_handle);
-SceneFaceNormalsBackwardFn raydn_scene_face_normals_backward_fn(std::uintptr_t module_handle);
-SceneFaceNormalsJvpFn raydn_scene_face_normals_jvp_fn(std::uintptr_t module_handle);
-DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn(std::uintptr_t module_handle);
-DiffractionDiscoverEdgesCountedFn raydn_diffraction_discover_edges_counted_fn(std::uintptr_t module_handle);
-DiffractionPathsOrder1ForwardFn raydn_diffraction_paths_order1_forward_fn(std::uintptr_t module_handle);
-DiffractionAccumulationForwardFn raydn_diffraction_accumulation_forward_fn(std::uintptr_t module_handle);
+VisibilityForwardFn raydn_visibility_forward_fn();
+SceneCreateFn raydn_scene_create_fn();
+SceneDestroyFn raydn_scene_destroy_fn();
+SceneEdgeRecordsFn raydn_scene_edge_records_fn();
+IntersectForwardFn raydn_intersect_forward_fn();
+TraceReflectionsForwardFn raydn_trace_reflections_forward_fn();
+ReflectionEpcPathsForwardFn raydn_reflection_epc_paths_forward_fn();
+ReflectionAccumulationForwardFn raydn_reflection_accumulation_forward_fn();
+IntersectBackwardFn raydn_intersect_backward_fn();
+IntersectJvpFn raydn_intersect_jvp_fn();
+TraceReflectionsForwardFn raydn_trace_reflections_forward_tape_fn();
+TraceReflectionsBackwardFn raydn_trace_reflections_backward_fn();
+TraceReflectionsJvpFn raydn_trace_reflections_jvp_fn();
+ReflectionEpcPathsBackwardFn raydn_reflection_epc_paths_backward_fn();
+ReflectionEpcPathsJvpFn raydn_reflection_epc_paths_jvp_fn();
+SceneFaceNormalsBackwardFn raydn_scene_face_normals_backward_fn();
+SceneFaceNormalsJvpFn raydn_scene_face_normals_jvp_fn();
+DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn();
+DiffractionDiscoverEdgesCountedFn raydn_diffraction_discover_edges_counted_fn();
+DiffractionPathsOrder1ForwardFn raydn_diffraction_paths_order1_forward_fn();
+DiffractionAccumulationForwardFn raydn_diffraction_accumulation_forward_fn();
 
 const at::Tensor *optional_tensor(pybind11::object value, at::Tensor &storage);
 pybind11::object tensor_or_none(const at::Tensor &tensor);

@@ -44,7 +44,7 @@ def test_bdpt_intersection_uses_channel_native_bridge():
     assert "torch.ops" not in source
     assert "_required_native_op" in source
     assert "bdpt_intersect_forward" in source
-    assert "return 0" in inspect.getsource(ops._raydn_module_handle)
+    assert "_raydn_module_handle" not in ops.__dict__
 
 
 def test_bdpt_reflection_accumulation_uses_channel_native_bridge():
@@ -306,12 +306,10 @@ def test_rayd_bridge_is_source_linked_without_dso_lookup():
     bridge_root = repo / "native" / "channel_native" / "rayd"
     bridge_paths = [bridge_root / "bridge.h", *sorted(bridge_root.glob("*.cpp"))]
     bridge_source = "\n".join(path.read_text() for path in bridge_paths)
-    ops_source = inspect.getsource(ops._raydn_module_handle)
 
     assert "LoadLibrary" not in bridge_source
     assert "dlopen" not in bridge_source
     assert "GetProcAddress" not in bridge_source
     assert "dlsym" not in bridge_source
-    assert "__file__" not in ops_source
-    assert "return 0" in ops_source
+    assert "module_handle" not in bridge_source
     assert "rayd_torch_native_scene_create" in bridge_source

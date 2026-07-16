@@ -13,7 +13,6 @@ using channel_native::rayd_bridge::raydn_scene_edge_records_fn;
 
 struct RaydnSceneOwner {
     int64_t scene_handle = 0;
-    std::uintptr_t module_handle = 0;
 };
 
 void destroy_raydn_scene_capsule(PyObject *capsule) {
@@ -23,7 +22,7 @@ void destroy_raydn_scene_capsule(PyObject *capsule) {
         return;
     try {
         if (owner->scene_handle != 0)
-            raydn_scene_destroy_fn(owner->module_handle)(owner->scene_handle);
+            raydn_scene_destroy_fn()(owner->scene_handle);
     } catch (...) {
     }
     delete owner;
@@ -50,7 +49,7 @@ pybind11::tuple cn_raydn_scene_create(
         mesh_flags.size() != mesh_count) {
         throw std::runtime_error("raydn_scene_create input lists must have the same length");
     }
-    int64_t scene_handle = raydn_scene_create_fn(0)(
+    int64_t scene_handle = raydn_scene_create_fn()(
         vertices.data(),
         faces.data(),
         uv.data(),
@@ -59,7 +58,7 @@ pybind11::tuple cn_raydn_scene_create(
         to_world_right.data(),
         mesh_flags.data(),
         static_cast<int64_t>(mesh_count));
-    auto *owner = new RaydnSceneOwner{scene_handle, 0};
+    auto *owner = new RaydnSceneOwner{scene_handle};
     pybind11::capsule capsule(owner, "channel_native.raydn_scene", destroy_raydn_scene_capsule);
     return pybind11::make_tuple(scene_handle, capsule);
 }
@@ -67,7 +66,7 @@ pybind11::tuple cn_raydn_scene_create(
 pybind11::tuple cn_raydn_scene_edge_records(int64_t scene_handle) {
     constexpr int64_t kOutputCount = 12;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_scene_edge_records_fn(0)(
+    int64_t output_count = raydn_scene_edge_records_fn()(
         scene_handle,
         outputs.data(),
         kOutputCount);

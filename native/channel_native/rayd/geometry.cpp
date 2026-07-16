@@ -54,7 +54,7 @@ pybind11::tuple cn_bdpt_intersect_forward(
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     constexpr int64_t kOutputCount = 10;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_forward_fn(0)(
+    int64_t output_count = raydn_intersect_forward_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -81,7 +81,7 @@ pybind11::tuple cn_bdpt_visibility_forward(
     at::Tensor visible;
     at::Tensor blocker_prim;
     at::Tensor tape_t;
-    raydn_visibility_forward_fn(0)(
+    raydn_visibility_forward_fn()(
         scene_handle,
         &start,
         &end,
@@ -128,7 +128,7 @@ pybind11::tuple cn_raydn_intersect_backward(
         optional_tensor(std::move(grad_barycentric), grad_barycentric_storage);
     constexpr int64_t kOutputCount = 4;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_backward_fn(0)(
+    int64_t output_count = raydn_intersect_backward_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -180,7 +180,7 @@ pybind11::tuple cn_raydn_intersect_jvp(
         optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
     constexpr int64_t kOutputCount = 6;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_jvp_fn(0)(
+    int64_t output_count = raydn_intersect_jvp_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -265,7 +265,7 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
 
     constexpr int64_t kEpcOutputCount = 6;
     std::array<at::Tensor, static_cast<size_t>(kEpcOutputCount)> epc;
-    const int64_t epc_output_count = raydn_reflection_epc_paths_forward_fn(0)(
+    const int64_t epc_output_count = raydn_reflection_epc_paths_forward_fn()(
         scene_handle,
         &epc_source,
         &diffraction_point,
@@ -288,7 +288,7 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     at::Tensor suffix_visible;
     at::Tensor suffix_blocker;
     at::Tensor suffix_tape_t;
-    raydn_visibility_forward_fn(0)(
+    raydn_visibility_forward_fn()(
         scene_handle,
         &diffraction_point,
         &epc_receiver,

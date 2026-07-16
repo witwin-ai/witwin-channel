@@ -40,9 +40,6 @@ APPROVED_OWNER_ROOTS = (
     f"{PACKAGE}.montecarlo",
 )
 BOOTSTRAP_CANONICAL_OWNERS = {
-    "_raydn_module_handle": (
-        f"{PACKAGE}.scene.kernels.rayd_scene._raydn_module_handle"
-    ),
     "_raydn_scene_handle_id": (
         f"{PACKAGE}.scene.kernels.rayd_scene._raydn_scene_handle_id"
     ),

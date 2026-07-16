@@ -647,6 +647,8 @@
   "dummy_parameter_projection": {
     "parameter_name": "raydn_module_handle",
     "status": "removed",
+    "python_symbol_status": "retired",
+    "selector_parameter_status": "removed",
     "allowed_transition": "remove_from_all_listed_bindings_only",
     "bindings": [
       "bdpt_diffraction_accumulation_forward",
@@ -679,6 +681,18 @@
     ]
   },
   "legacy_decisions": {
+    "raydn_module_handle": {
+      "definition": "src/witwin/channel_native/scene/kernels/rayd_scene.py",
+      "classification": "dead",
+      "decision": "retired",
+      "compatibility_reexports": "removed",
+      "internal_selector_parameter": "removed",
+      "tests": [
+        "tests/test_ops_migration_contract.py",
+        "tests/test_phase10_legacy_dead_binding_audit.py",
+        "tests/kernels/test_native_loader_no_fallback.py"
+      ]
+    },
     "raydn_backend": {
       "definition": "src/witwin/channel_native/core/kernels/raydn_backend.py",
       "classification": "dead",

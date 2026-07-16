@@ -16,108 +16,87 @@ extern "C" void channel_native_diffraction_discover_edges_counted(
 
 namespace channel_native::rayd_bridge {
 
-VisibilityForwardFn raydn_visibility_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+VisibilityForwardFn raydn_visibility_forward_fn() {
     return &rayd_torch_native_visibility_forward;
 }
 
-SceneCreateFn raydn_scene_create_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+SceneCreateFn raydn_scene_create_fn() {
     return &rayd_torch_native_scene_create;
 }
 
-SceneDestroyFn raydn_scene_destroy_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+SceneDestroyFn raydn_scene_destroy_fn() {
     return &rayd_torch_native_scene_destroy;
 }
 
-SceneEdgeRecordsFn raydn_scene_edge_records_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+SceneEdgeRecordsFn raydn_scene_edge_records_fn() {
     return &rayd_torch_native_scene_edge_records;
 }
 
-IntersectForwardFn raydn_intersect_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+IntersectForwardFn raydn_intersect_forward_fn() {
     return &rayd_torch_native_intersect_forward;
 }
 
-TraceReflectionsForwardFn raydn_trace_reflections_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+TraceReflectionsForwardFn raydn_trace_reflections_forward_fn() {
     return &rayd_torch_native_trace_reflections_forward;
 }
 
-ReflectionEpcPathsForwardFn raydn_reflection_epc_paths_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+ReflectionEpcPathsForwardFn raydn_reflection_epc_paths_forward_fn() {
     return &rayd_torch_native_reflection_epc_paths_forward;
 }
 
-ReflectionAccumulationForwardFn raydn_reflection_accumulation_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+ReflectionAccumulationForwardFn raydn_reflection_accumulation_forward_fn() {
     return &rayd_torch_native_reflection_accumulation_forward;
 }
 
-IntersectBackwardFn raydn_intersect_backward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+IntersectBackwardFn raydn_intersect_backward_fn() {
     return &rayd_torch_native_intersect_backward;
 }
 
-IntersectJvpFn raydn_intersect_jvp_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+IntersectJvpFn raydn_intersect_jvp_fn() {
     return &rayd_torch_native_intersect_jvp;
 }
 
-TraceReflectionsForwardFn raydn_trace_reflections_forward_tape_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+TraceReflectionsForwardFn raydn_trace_reflections_forward_tape_fn() {
     return &rayd_torch_native_trace_reflections_forward_tape;
 }
 
-TraceReflectionsBackwardFn raydn_trace_reflections_backward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+TraceReflectionsBackwardFn raydn_trace_reflections_backward_fn() {
     return &rayd_torch_native_trace_reflections_backward;
 }
 
-TraceReflectionsJvpFn raydn_trace_reflections_jvp_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+TraceReflectionsJvpFn raydn_trace_reflections_jvp_fn() {
     return &rayd_torch_native_trace_reflections_jvp;
 }
 
-ReflectionEpcPathsBackwardFn raydn_reflection_epc_paths_backward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+ReflectionEpcPathsBackwardFn raydn_reflection_epc_paths_backward_fn() {
     return &rayd_torch_native_reflection_epc_paths_backward;
 }
 
-ReflectionEpcPathsJvpFn raydn_reflection_epc_paths_jvp_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+ReflectionEpcPathsJvpFn raydn_reflection_epc_paths_jvp_fn() {
     return &rayd_torch_native_reflection_epc_paths_jvp;
 }
 
-SceneFaceNormalsBackwardFn raydn_scene_face_normals_backward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+SceneFaceNormalsBackwardFn raydn_scene_face_normals_backward_fn() {
     return &rayd_torch_native_scene_face_normals_backward;
 }
 
-SceneFaceNormalsJvpFn raydn_scene_face_normals_jvp_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+SceneFaceNormalsJvpFn raydn_scene_face_normals_jvp_fn() {
     return &rayd_torch_native_scene_face_normals_jvp;
 }
 
-DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+DiffractionDiscoverEdgesFn raydn_diffraction_discover_edges_fn() {
     return &channel_native_diffraction_discover_edges;
 }
 
-DiffractionDiscoverEdgesCountedFn raydn_diffraction_discover_edges_counted_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+DiffractionDiscoverEdgesCountedFn raydn_diffraction_discover_edges_counted_fn() {
     return &channel_native_diffraction_discover_edges_counted;
 }
 
-DiffractionPathsOrder1ForwardFn raydn_diffraction_paths_order1_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+DiffractionPathsOrder1ForwardFn raydn_diffraction_paths_order1_forward_fn() {
     return &rayd_torch_native_diffraction_paths_order1_forward;
 }
 
-DiffractionAccumulationForwardFn raydn_diffraction_accumulation_forward_fn(std::uintptr_t module_handle) {
-    (void) module_handle;
+DiffractionAccumulationForwardFn raydn_diffraction_accumulation_forward_fn() {
     return &rayd_torch_native_diffraction_accumulation_forward;
 }
 

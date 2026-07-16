@@ -8,13 +8,6 @@ from witwin.channel_native.runtime.native_buffers import mc_pack_vec3
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 
 
-def _raydn_module_handle() -> int:
-    # Kept temporarily in the internal call signature while the C++ bridge is
-    # converted to direct linkage. RayD no longer has a separately loaded
-    # Python extension, so there is no OS module handle to pass.
-    return 0
-
-
 def _raydn_scene_handle_id(handle: object) -> int:
     if isinstance(handle, int):
         return handle
@@ -232,7 +225,6 @@ __all__ = [
     "RayDNScene",
     "_empty_tensor",
     "_mesh_flags",
-    "_raydn_module_handle",
     "_raydn_scene_handle_id",
     "build_scene_from_structures",
     "raydn_scene_create",

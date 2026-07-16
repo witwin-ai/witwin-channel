@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from ci import check_ops_migration as migration
-from witwin.channel_native.core import rayd_native_handles
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.propagation.topology import kernels
 from witwin.channel_native.propagation.topology.kernels import blocks, candidates
@@ -71,22 +70,13 @@ def test_topology_candidates_use_only_canonical_dependencies():
         is blocks._validate_path_reflection_candidates
     )
     assert "_raydn_module_handle" not in candidates.__dict__
-    assert (
-        candidates._raydn_scene_handle_id is rayd_native_handles._raydn_scene_handle_id
-    )
+    assert candidates._raydn_scene_handle_id is native_handles._raydn_scene_handle_id
     for name in _OWNER_NAMES:
         assert getattr(candidates, name).__globals__ is candidates.__dict__
     assert "ops" not in candidates.__dict__
 
 
-def test_core_rayd_handle_bridge_is_a_same_object_reexport():
-    assert rayd_native_handles.__all__ == [
-        "_raydn_module_handle",
-        "_raydn_scene_handle_id",
-    ]
-    for name in rayd_native_handles.__all__:
-        bridged = getattr(rayd_native_handles, name)
-
-        assert bridged is getattr(ops, name)
-        assert bridged is getattr(native_handles, name)
-        assert bridged is getattr(rayd_scene, name)
+def test_scene_handle_normalizer_is_a_same_object_reexport():
+    assert native_handles.__all__ == ["_raydn_scene_handle_id"]
+    assert ops._raydn_scene_handle_id is native_handles._raydn_scene_handle_id
+    assert rayd_scene._raydn_scene_handle_id is native_handles._raydn_scene_handle_id

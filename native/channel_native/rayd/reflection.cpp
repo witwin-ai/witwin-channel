@@ -32,7 +32,7 @@ pybind11::tuple cn_raydn_trace_reflections_forward(
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     constexpr int64_t kOutputCount = 3;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_forward_fn(0)(
+    int64_t output_count = raydn_trace_reflections_forward_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -66,7 +66,7 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     constexpr int64_t kOutputCount = 6;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_epc_paths_forward_fn(0)(
+    int64_t output_count = raydn_reflection_epc_paths_forward_fn()(
         scene_handle,
         &source,
         &receiver,
@@ -101,7 +101,7 @@ pybind11::tuple cn_raydn_trace_reflections_forward_tape(
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     constexpr int64_t kOutputCount = 9;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_forward_tape_fn(0)(
+    int64_t output_count = raydn_trace_reflections_forward_tape_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -140,7 +140,7 @@ pybind11::tuple cn_raydn_trace_reflections_backward(
         optional_tensor(std::move(grad_image_sources), grad_image_sources_storage);
     constexpr int64_t kOutputCount = 4;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_backward_fn(0)(
+    int64_t output_count = raydn_trace_reflections_backward_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -189,7 +189,7 @@ pybind11::tuple cn_raydn_trace_reflections_jvp(
         optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
     constexpr int64_t kOutputCount = 2;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_jvp_fn(0)(
+    int64_t output_count = raydn_trace_reflections_jvp_fn()(
         scene_handle,
         &ray_o,
         &ray_d,
@@ -238,7 +238,7 @@ pybind11::tuple cn_raydn_reflection_epc_paths_backward(
         optional_tensor(std::move(grad_path_length), grad_path_length_storage);
     constexpr int64_t kOutputCount = 3;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_epc_paths_backward_fn(0)(
+    int64_t output_count = raydn_reflection_epc_paths_backward_fn()(
         scene_handle,
         &source,
         &receiver,
@@ -286,7 +286,7 @@ pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
         optional_tensor(std::move(tangent_receiver), tangent_receiver_storage);
     constexpr int64_t kOutputCount = 3;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_epc_paths_jvp_fn(0)(
+    int64_t output_count = raydn_reflection_epc_paths_jvp_fn()(
         scene_handle,
         &source,
         &receiver,
@@ -313,7 +313,7 @@ at::Tensor cn_raydn_scene_face_normals_backward(
     torch::Tensor grad_face_normals) {
     constexpr int64_t kOutputCount = 1;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_scene_face_normals_backward_fn(0)(
+    int64_t output_count = raydn_scene_face_normals_backward_fn()(
         scene_handle,
         &grad_face_normals,
         outputs.data(),
@@ -328,7 +328,7 @@ at::Tensor cn_raydn_scene_face_normals_jvp(
     torch::Tensor tangent_vertices) {
     constexpr int64_t kOutputCount = 1;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_scene_face_normals_jvp_fn(0)(
+    int64_t output_count = raydn_scene_face_normals_jvp_fn()(
         scene_handle,
         &tangent_vertices,
         outputs.data(),
@@ -409,7 +409,7 @@ pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     }
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_accumulation_forward_fn(0)(
+    int64_t output_count = raydn_reflection_accumulation_forward_fn()(
         scene_handle,
         &ray_o,
         &ray_d,

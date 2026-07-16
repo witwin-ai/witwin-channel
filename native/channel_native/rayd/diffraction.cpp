@@ -78,7 +78,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges(
     torch::Tensor edge_line_max,
     torch::Tensor edge_adjacent_face1) {
     at::Tensor out;
-    raydn_diffraction_discover_edges_fn(0)(
+    raydn_diffraction_discover_edges_fn()(
         &tx_pos,
         &ray_dir,
         &prim_index,
@@ -116,7 +116,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
     torch::Tensor edge_line_max,
     torch::Tensor edge_adjacent_face1) {
     at::Tensor out;
-    raydn_diffraction_discover_edges_counted_fn(0)(
+    raydn_diffraction_discover_edges_counted_fn()(
         &tx_pos,
         &ray_dir,
         &prim_index,
@@ -169,7 +169,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
         tx_pol.select(1, 2).fill_(1.0);
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_diffraction_paths_order1_forward_fn(0)(
+    int64_t output_count = raydn_diffraction_paths_order1_forward_fn()(
         scene_handle,
         &tx_pos,
         &tx_pol,
@@ -306,7 +306,7 @@ pybind11::dict cn_path_diffraction_paths_order1(
         const int64_t state_limit = states[0].size(0);
         const int64_t capacity = rx_positions.size(0) * state_limit;
         std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-        const int64_t output_count = raydn_diffraction_paths_order1_forward_fn(0)(
+        const int64_t output_count = raydn_diffraction_paths_order1_forward_fn()(
             scene_handle,
             &tx_view,
             &tx_pol,
@@ -469,7 +469,7 @@ pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
 
     constexpr int64_t kOutputCount = 19;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_diffraction_accumulation_forward_fn(0)(
+    int64_t output_count = raydn_diffraction_accumulation_forward_fn()(
         scene_handle,
         active_ptr,
         &state_edge_index,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .kernels.rayd_scene import _raydn_module_handle, _raydn_scene_handle_id
+from .kernels.rayd_scene import _raydn_scene_handle_id
 
 
-__all__ = ["_raydn_module_handle", "_raydn_scene_handle_id"]
+__all__ = ["_raydn_scene_handle_id"]

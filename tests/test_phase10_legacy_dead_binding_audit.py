@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 
+from ci import check_ops_migration as migration
 from tools.refactor_baseline import binding_manifest
 
 
@@ -90,6 +91,8 @@ def test_phase10_dummy_projection_is_exact_and_removed() -> None:
     }
 
     assert projection["status"] == "removed"
+    assert projection["python_symbol_status"] == "retired"
+    assert projection["selector_parameter_status"] == "removed"
     assert projection["allowed_transition"] == ("remove_from_all_listed_bindings_only")
     assert len(projection["bindings"]) == len(set(projection["bindings"])) == 22
     assert current_bindings == set()
@@ -112,12 +115,16 @@ def test_phase10_python_call_projection_matches_the_ops_ledger() -> None:
     )
 
 
-def test_phase10_retirement_ledger_is_empty_until_the_definition_is_removed() -> None:
+def test_phase10_module_handle_contract_is_retired_after_definition_removal() -> None:
     manifest = json.loads(OPS_MANIFEST_PATH.read_text(encoding="utf-8"))
     audit = _audit()
 
-    assert manifest["retired_ops"] == []
-    assert "_raydn_module_handle" in manifest["canonical_owners"]
+    assert manifest["retired_ops"] == ["_raydn_module_handle"]
+    assert "_raydn_module_handle" not in manifest["canonical_owners"]
+    assert not any(
+        definition.terminal_name == "_raydn_module_handle"
+        for definition in migration.scan_definitions(REPOSITORY_ROOT)
+    )
     assert audit["frozen_ops_contract_digest"] == (
         "ff9c4cd45b2f1091c9ba05e1a311e6e569945e18badc7b7a67a3f8f56ccda3a9"
     )

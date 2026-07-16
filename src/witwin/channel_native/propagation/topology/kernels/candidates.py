@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.core.rayd_native_handles import _raydn_scene_handle_id
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
+from witwin.channel_native.scene.native_handles import _raydn_scene_handle_id
 
 from .blocks import _validate_path_block, _validate_path_reflection_candidates
 
