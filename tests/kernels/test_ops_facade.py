@@ -4,10 +4,10 @@ import pytest
 import torch
 
 from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.core.kernels import raydn_backend
 from witwin.channel_native.propagation.fields.kernels import (
     deterministic as deterministic_fields,
 )
+from witwin.channel_native.runtime import symbols
 from witwin.channel_native.materials.kernels import functional as material_functional
 from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
 from witwin.channel_native.montecarlo.basic.kernels import maps as mc_maps
@@ -1909,7 +1909,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN counted diffraction edge discovery")
 
-    raydn_backend.require_native_extension()
+    symbols.native_extension()
     tx_pos = torch.tensor([0.0, 0.0, 0.0], device="cuda", dtype=torch.float32)
     ray_dir = torch.tensor(
         [

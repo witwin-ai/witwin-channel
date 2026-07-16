@@ -1,9 +1,10 @@
 import inspect
 from pathlib import Path
 
-from witwin.channel_native.core.kernels import extension, raydn_backend
+from witwin.channel_native.core.kernels import extension
 from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.runtime import raydn as raydn_runtime
+from witwin.channel_native.runtime import symbols
 from witwin.channel_native.scene.kernels import rayd_scene
 
 
@@ -16,16 +17,13 @@ def test_channel_native_extension_loader_has_no_artifact_fallback():
     assert "return None" not in source
 
 
-def test_raydn_extension_loader_has_no_artifact_fallback():
-    source = inspect.getsource(raydn_backend.native_extension)
+def test_rayd_uses_the_validated_fail_loud_native_loader():
+    source = inspect.getsource(symbols.native_extension)
 
-    assert "artifacts" not in source
-    assert "rglob" not in source
-    assert "spec_from_file_location" not in source
-    assert "sys.path" not in source
-    assert "ModuleNotFoundError" not in source
-    assert "import_module" not in source
-    assert "return None" in source
+    assert extension.native_extension is symbols.native_extension
+    assert "_load_native_extension" in source
+    assert "return None" not in source
+    assert symbols.native_extension() is not None
 
 
 def test_bdpt_visibility_uses_channel_native_bridge():

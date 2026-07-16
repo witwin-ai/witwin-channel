@@ -128,3 +128,24 @@ def test_phase10_module_handle_contract_is_retired_after_definition_removal() ->
     assert audit["frozen_ops_contract_digest"] == (
         "ff9c4cd45b2f1091c9ba05e1a311e6e569945e18badc7b7a67a3f8f56ccda3a9"
     )
+
+
+def test_phase10_raydn_backend_shim_is_removed_without_a_production_replacement() -> (
+    None
+):
+    audit = _audit()
+    decision = audit["legacy_decisions"]["raydn_backend"]
+    shim_path = REPOSITORY_ROOT / decision["definition"]
+    production_references = [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in PYTHON_ROOT.rglob("*.py")
+        if "raydn_backend" in path.read_text(encoding="utf-8-sig")
+    ]
+
+    assert decision["classification"] == "dead"
+    assert decision["decision"] == decision["status"] == "removed"
+    assert decision["replacement"] == (
+        "witwin.channel_native.runtime.symbols.native_extension"
+    )
+    assert not shim_path.exists()
+    assert production_references == []

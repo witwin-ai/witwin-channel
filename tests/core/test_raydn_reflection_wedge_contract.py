@@ -2,13 +2,13 @@ import pytest
 import torch
 
 from witwin.channel_native import Scene, Structure
-from witwin.channel_native.core.kernels import ops, raydn_backend
+from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.materials import PerfectConductor
+from witwin.channel_native.runtime import symbols
 
 
 def _native_single_triangle_scene():
-    raydn_backend.require_native_extension()
-    device = torch.device("cuda")
+    symbols.native_extension()
     scene = Scene(
         structures=[Structure(
             vertices=torch.tensor(

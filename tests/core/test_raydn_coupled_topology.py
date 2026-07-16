@@ -5,8 +5,9 @@ import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel_native import Scene, Structure
-from witwin.channel_native.core.kernels import ops, raydn_backend
+from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.materials import PerfectConductor
+from witwin.channel_native.runtime import symbols
 
 
 def _wall_and_wedge_scene():
@@ -40,7 +41,7 @@ def _coupled_inputs(*, edge_id: int, reverse_endpoints: bool = False):
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_reflection_diffraction_geometry_matches_image_solution():
-    raydn_backend.require_native_extension()
+    symbols.native_extension()
     scene = _wall_and_wedge_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
@@ -95,7 +96,7 @@ def test_coupled_reflection_diffraction_geometry_matches_image_solution():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_diffraction_reflection_is_reciprocal_geometry():
-    raydn_backend.require_native_extension()
+    symbols.native_extension()
     scene = _wall_and_wedge_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
@@ -130,7 +131,7 @@ def test_coupled_diffraction_reflection_is_reciprocal_geometry():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_geometry_rejects_stationary_point_outside_edge_bounds():
-    raydn_backend.require_native_extension()
+    symbols.native_extension()
     scene = _wall_and_wedge_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
@@ -147,7 +148,7 @@ def test_coupled_geometry_rejects_stationary_point_outside_edge_bounds():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_geometry_rejects_blocked_secondary_segment():
-    raydn_backend.require_native_extension()
+    symbols.native_extension()
     base = coupled_wall_wedge_scene()
     blocker = Structure(
         vertices=torch.tensor(

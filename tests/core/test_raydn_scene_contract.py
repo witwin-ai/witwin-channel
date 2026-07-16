@@ -3,6 +3,7 @@ import sys
 import pytest
 import torch
 
+from witwin.channel_native.runtime import symbols
 from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
 from witwin.channel_native.core.materials import Dielectric
 
@@ -34,12 +35,10 @@ def test_raydn_scene_exposes_opaque_handle():
     assert scene.handle is handle
 
 
-def test_raydn_backend_loader_does_not_import_python_raydn():
+def test_validated_native_loader_does_not_import_python_raydn():
     sys.modules.pop("raydn", None)
 
-    from witwin.channel_native.core.kernels import raydn_backend
-
-    raydn_backend.native_extension()
+    symbols.native_extension()
 
     assert "raydn" not in sys.modules
 

@@ -696,9 +696,17 @@
     "raydn_backend": {
       "definition": "src/witwin/channel_native/core/kernels/raydn_backend.py",
       "classification": "dead",
-      "decision": "delete_in_phase10",
+      "decision": "removed",
+      "status": "removed",
       "public_api_evidence": "Absent from curated API manifest and core.kernels.__all__.",
-      "compatibility_cycle": "not_required"
+      "compatibility_cycle": "not_required",
+      "replacement": "witwin.channel_native.runtime.symbols.native_extension",
+      "tests": [
+        "tests/test_phase10_legacy_dead_binding_audit.py",
+        "tests/kernels/test_native_loader_no_fallback.py",
+        "tests/kernels/test_extension_loading.py",
+        "tests/runtime/test_symbols.py"
+      ]
     },
     "global_extension_fallback": {
       "classification": "resolved",
