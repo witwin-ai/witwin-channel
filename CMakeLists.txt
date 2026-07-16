@@ -471,7 +471,10 @@ Python_add_library(
     native/channel_native/rayd/diffraction.cpp
     native/channel_native/kernels/accum.cu
     native/channel_native/kernels/bdpt_accum.cu
-    native/channel_native/kernels/bdpt_connect.cu
+    native/channel_native/kernels/bdpt_connect_mis.cu
+    native/channel_native/kernels/bdpt_connect_samples.cu
+    native/channel_native/kernels/bdpt_connect_visibility.cu
+    native/channel_native/kernels/bdpt_connect_accumulation.cu
     native/channel_native/kernels/bdpt_sampling.cu
     native/channel_native/kernels/bdpt_subpaths.cu
     native/channel_native/kernels/coupled_topology.cu
