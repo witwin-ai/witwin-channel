@@ -95,7 +95,7 @@ from witwin.channel_native.propagation.topology.kernels.sampling import (
 from witwin.channel_native.runtime.autograd_contracts import (
     _frequency_participates_in_ad,  # noqa: F401 - compatibility re-export
 )
-from witwin.channel_native.core.material_runtime import (  # noqa: F401
+from witwin.channel_native.materials.encoding import (  # noqa: F401
     face_material_tensors,
 )
 from witwin.channel_native.scene.tensors import (

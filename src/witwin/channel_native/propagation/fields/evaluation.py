@@ -18,7 +18,7 @@ from witwin.channel_native.core.field_state import (
     transmitter_polarizations,
 )
 from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
-from witwin.channel_native.core.material_runtime import (
+from witwin.channel_native.materials.encoding import (
     face_material_field_bundle,
     face_material_tensors,
 )

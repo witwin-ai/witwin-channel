@@ -82,7 +82,7 @@ from witwin.channel_native.scattering.kernels.functional import (
 from witwin.channel_native.materials.models import Roughness
 from witwin.channel_native.scattering import tables as kirchhoff_tables
 
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 
 from .transmission import (

@@ -14,7 +14,7 @@ from witwin.channel_native.core.field_state import (
     transmitter_polarizations,
 )
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.core.memory_budget import (
     MemoryEstimate,
     enforce_memory_budget,

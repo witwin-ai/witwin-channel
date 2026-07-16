@@ -8,7 +8,7 @@ from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
 from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.core.memory_budget import (
     enforce_memory_budget,
     estimate_monte_carlo_memory,

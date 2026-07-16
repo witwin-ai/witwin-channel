@@ -39,7 +39,7 @@ from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
 )
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
+from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
 from witwin.channel_native.montecarlo.scattering_events import scattering_map_matrix
 from witwin.channel_native.montecarlo.transmission import (
