@@ -1,5 +1,7 @@
 #include <torch/extension.h>
 
+#include "registry.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -1557,8 +1559,7 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
 pybind11::dict cn_deterministic_component_counts(torch::Tensor component_id);
 int64_t cn_deterministic_selected_edge_count(torch::Tensor edge_id);
 
-PYBIND11_MODULE(_channel_native, module) {
-    module.doc() = "Channel Native Torch/CUDA extension.";
+void register_all(pybind11::module_ &module) {
     module.def("build_info", &cn_build_info, "Return Channel Native build metadata.");
     module.def(
         "bdpt_launch_state",
