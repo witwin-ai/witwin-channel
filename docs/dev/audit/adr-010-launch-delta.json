@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "adr": "docs/dev/standards/adr-010-native-scattering-kernels.md",
+  "baseline": "docs/dev/baselines/d2ba6979e41bc74766a21aa92293e3fb78444c46/runtime/extended-launch-ledger.json",
+  "semantics": "Per-cell result.metadata.kernel aggregates for every extended-profile cell whose hash changed under the ADR-010 migration; 'before' is the frozen pre-change ledger, 'after' the post-migration measurement on the same scenes. The ledger counts REGISTERED solver launches and AD companions, not raw CUDA launches: the +1 forward/backward/jvp on rough-reflection cells is the new field_rough_reflection_scale op (whose Torch predecessor was untracked elementwise math spanning roughly a dozen CUDA launches per depth batch); the ensemble and patch-integral ops replace Torch physics inside the scattering stage that was likewise never part of this counter, so those aggregates are unchanged while the raw CUDA launch count drops from hundreds of small Torch kernels (and, for realization mode, one host Python loop iteration per patch) to one fused launch per (tx, rx-chunk) and one fused launch plus one deterministic reduce per (tx, rx, structure). Unchanged cells are bitwise identical to the frozen baseline including their ledgers.",
+  "cells": {
+    "rough-reflection-cr/path/jvp": {
+      "before": {
+        "accumulation_strategy": "none",
+        "ad_status": "jvp",
+        "backward_launch_count": 0,
+        "forward_launch_count": 1,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 1,
+        "launch_count": 2,
+        "peak_memory_bytes": 0,
+        "primitive": "path_solver",
+        "scheduling_strategy": "native_cuda",
+        "tape_bytes": 0
+      },
+      "after": {
+        "primitive": "path_solver",
+        "launch_count": 3,
+        "forward_launch_count": 1,
+        "backward_launch_count": 0,
+        "jvp_launch_count": 2,
+        "fused_stages": 0,
+        "tape_bytes": 0,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "none",
+        "scheduling_strategy": "native_cuda",
+        "ad_status": "jvp",
+        "peak_memory_bytes": 0
+      }
+    },
+    "rough-reflection-cr/path/vjp": {
+      "before": {
+        "accumulation_strategy": "none",
+        "ad_status": "vjp",
+        "backward_launch_count": 1,
+        "forward_launch_count": 1,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 0,
+        "launch_count": 2,
+        "peak_memory_bytes": 0,
+        "primitive": "path_solver",
+        "scheduling_strategy": "native_cuda",
+        "tape_bytes": 96
+      },
+      "after": {
+        "primitive": "path_solver",
+        "launch_count": 3,
+        "forward_launch_count": 1,
+        "backward_launch_count": 2,
+        "jvp_launch_count": 0,
+        "fused_stages": 0,
+        "tape_bytes": 182,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "none",
+        "scheduling_strategy": "native_cuda",
+        "ad_status": "vjp",
+        "peak_memory_bytes": 0
+      }
+    },
+    "rough-reflection-cr/deterministic/none": {
+      "before": {
+        "accumulation_strategy": "atomic_add",
+        "ad_status": "none",
+        "backward_launch_count": 0,
+        "forward_launch_count": 2,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 0,
+        "launch_count": 2,
+        "peak_memory_bytes": 0,
+        "primitive": "deterministic_solver",
+        "scheduling_strategy": "native_fused",
+        "tape_bytes": 0
+      },
+      "after": {
+        "primitive": "deterministic_solver",
+        "launch_count": 3,
+        "forward_launch_count": 3,
+        "backward_launch_count": 0,
+        "jvp_launch_count": 0,
+        "fused_stages": 0,
+        "tape_bytes": 0,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "atomic_add",
+        "scheduling_strategy": "native_fused",
+        "ad_status": "none",
+        "peak_memory_bytes": 0
+      }
+    },
+    "rough-reflection-cr/deterministic/jvp": {
+      "before": {
+        "accumulation_strategy": "atomic_add",
+        "ad_status": "jvp",
+        "backward_launch_count": 0,
+        "forward_launch_count": 2,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 1,
+        "launch_count": 3,
+        "peak_memory_bytes": 0,
+        "primitive": "deterministic_solver",
+        "scheduling_strategy": "native_fused",
+        "tape_bytes": 0
+      },
+      "after": {
+        "primitive": "deterministic_solver",
+        "launch_count": 5,
+        "forward_launch_count": 3,
+        "backward_launch_count": 0,
+        "jvp_launch_count": 2,
+        "fused_stages": 0,
+        "tape_bytes": 0,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "atomic_add",
+        "scheduling_strategy": "native_fused",
+        "ad_status": "jvp",
+        "peak_memory_bytes": 0
+      }
+    },
+    "rough-reflection-cr/deterministic/vjp": {
+      "before": {
+        "accumulation_strategy": "atomic_add",
+        "ad_status": "vjp",
+        "backward_launch_count": 1,
+        "forward_launch_count": 2,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 0,
+        "launch_count": 3,
+        "peak_memory_bytes": 0,
+        "primitive": "deterministic_solver",
+        "scheduling_strategy": "native_fused",
+        "tape_bytes": 96
+      },
+      "after": {
+        "primitive": "deterministic_solver",
+        "launch_count": 5,
+        "forward_launch_count": 3,
+        "backward_launch_count": 2,
+        "jvp_launch_count": 0,
+        "fused_stages": 0,
+        "tape_bytes": 182,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "atomic_add",
+        "scheduling_strategy": "native_fused",
+        "ad_status": "vjp",
+        "peak_memory_bytes": 0
+      }
+    },
+    "rough-scattering-ensemble/path/none": {
+      "before": {
+        "accumulation_strategy": "none",
+        "ad_status": "none",
+        "backward_launch_count": 0,
+        "forward_launch_count": 1,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 0,
+        "launch_count": 1,
+        "peak_memory_bytes": 0,
+        "primitive": "path_solver",
+        "scheduling_strategy": "native_cuda",
+        "tape_bytes": 0
+      },
+      "after": {
+        "primitive": "path_solver",
+        "launch_count": 1,
+        "forward_launch_count": 1,
+        "backward_launch_count": 0,
+        "jvp_launch_count": 0,
+        "fused_stages": 0,
+        "tape_bytes": 0,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "none",
+        "scheduling_strategy": "native_cuda",
+        "ad_status": "none",
+        "peak_memory_bytes": 0
+      }
+    },
+    "rough-scattering-realization/deterministic/none": {
+      "before": {
+        "accumulation_strategy": "atomic_add",
+        "ad_status": "none",
+        "backward_launch_count": 0,
+        "forward_launch_count": 4,
+        "fused_stages": 0,
+        "intermediate_bytes": 0,
+        "jvp_launch_count": 0,
+        "launch_count": 4,
+        "peak_memory_bytes": 0,
+        "primitive": "deterministic_solver",
+        "scheduling_strategy": "native_fused",
+        "tape_bytes": 0
+      },
+      "after": {
+        "primitive": "deterministic_solver",
+        "launch_count": 5,
+        "forward_launch_count": 5,
+        "backward_launch_count": 0,
+        "jvp_launch_count": 0,
+        "fused_stages": 0,
+        "tape_bytes": 0,
+        "intermediate_bytes": 0,
+        "accumulation_strategy": "atomic_add",
+        "scheduling_strategy": "native_fused",
+        "ad_status": "none",
+        "peak_memory_bytes": 0
+      }
+    }
+  },
+  "unchanged_cells": "all 31 other frozen cells: hash-identical, ledger-identical",
+  "excluded_cell": {
+    "cell": "rough-scattering-ensemble/deterministic/none",
+    "status": "still excluded (result hash differs across independent processes); the instability the baseline flagged is the Torch power-domain row-sum accumulation, which ADR-010 deliberately leaves Torch. The new fixed-order ensemble kernel did not change this cell's cross-process behavior."
+  }
+}

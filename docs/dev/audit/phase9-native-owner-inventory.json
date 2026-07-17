@@ -1,6 +1,6 @@
 {
   "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
-  "manifest_sha256": "546186d1c8658f449797f89c583c0bafbb7d57d408250dd14734dc850bdac022",
+  "manifest_sha256": "9c5af92a833519d48f9313ec035cdfdf8b291c0deab75c578250dd1f8e122d64",
   "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
   "owners": [
     {
@@ -1934,6 +1934,167 @@
       ],
       "source_level_launches": [],
       "tape_lifetime": "DualLC carries primal value and tangent in register-local paired LegacySlabComplex values."
+    },
+    {
+      "abi_owner": [
+        "cn_field_rough_reflection_scale",
+        "cn_field_rough_reflection_scale_backward",
+        "cn_field_rough_reflection_scale_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_rough_scale.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "ec695c6979bd7957e3758c3d4ebbb97941474716ddb263f2c04f53ad72d5f4ed",
+          "name": "rough_bounces",
+          "signature_sha256": "6ebaaf6fab5050052e1b80c920be7e571c92c9fac4987995d3cfa87a664b403b",
+          "token_count": 489
+        },
+        {
+          "body_sha256": "4b36d9b4fa5f9a2739300b5341b6171b10ed44dff92797b5987dfc5a844cc810",
+          "name": "rough_scale_forward_kernel",
+          "signature_sha256": "bb2523870908f9a6eaf2f40523d07334c4abbac461efe69738cd7567801348fa",
+          "token_count": 224
+        },
+        {
+          "body_sha256": "0261d033c192588a1804bdfb3dfe5e0c246a0a4f61c1c6499c866860d9ef77d2",
+          "name": "rough_scale_backward_kernel",
+          "signature_sha256": "222f7602d01787c67f9871c31d1f42ea7fcc6f4dc3529ce8c94193aac2e3a439",
+          "token_count": 1169
+        },
+        {
+          "body_sha256": "c94a3c15a0b8bb528948d653e2d5555c692c74a207e31a85c416464c3d10a809",
+          "name": "rough_scale_jvp_kernel",
+          "signature_sha256": "014734067bd14e5e06f42ef90f705ade3dbbedc1d44a65a9e478daf47f7ed553",
+          "token_count": 837
+        },
+        {
+          "body_sha256": "6750faaf8b9f532ecb77859a8767cedb4fd05f5577fdc8772e04f949823c3467",
+          "name": "cn_field_rough_reflection_scale",
+          "signature_sha256": "92388d720312d6a2e3606c94d799be0e2d59ae20a0a2e75debb7af7d225c5411",
+          "token_count": 346
+        },
+        {
+          "body_sha256": "48b17b8bf85b9e7c451c69bffb229e8ac1805f0a7efd930afdf7093a7d7479c0",
+          "name": "cn_field_rough_reflection_scale_backward",
+          "signature_sha256": "81f0ec0f5c1708f495154bd105d48abd454961ad3828985908a2ba2c4b83d12b",
+          "token_count": 879
+        },
+        {
+          "body_sha256": "c4f1b04879505113530e309a6c8d2d922894755766a12172c96608eff4867dc2",
+          "name": "cn_field_rough_reflection_scale_jvp",
+          "signature_sha256": "3e8a1d65a56b42bedd39ced57dba60f39524573a67e20a426c46efa3e24e0c46",
+          "token_count": 652
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and the one-launch forward/backward/jvp contract remain exact.",
+      "fusion_boundary": "C_r factor recomputation and its application onto all four reflection field outputs are fused per row in one launch per mode.",
+      "id": "field_transport.rough_scale",
+      "intermediate_storage": [
+        "none beyond the four scaled output tensors and the per-row factor"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_field_rough_reflection_scale.py"
+      ],
+      "non_split_reason": "Splitting factor computation from the output scaling would add an intermediate factor round-trip and a second launch per depth batch.",
+      "semantic_surface": [
+        "Rough-surface coherent C_r attenuation of specular reflection rows (ADR-010 op 3), with frequency and hit-geometry adjoints"
+      ],
+      "source_level_launches": [
+        "rough_scale_forward_kernel",
+        "rough_scale_backward_kernel",
+        "rough_scale_jvp_kernel"
+      ],
+      "tape_lifetime": "No persistent tape; backward/jvp recompute the per-bounce attenuation from the saved primal inputs."
+    },
+    {
+      "abi_owner": [
+        "cn_scattering_ensemble_eval"
+      ],
+      "baseline_source": "native/channel_native/kernels/scattering_ensemble.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "1bef2ea288e8a6a5c8a9665c98d4dac37f62a6e899fb82181198f687b604c54e",
+          "name": "ensemble_eval_kernel",
+          "signature_sha256": "0b0be25829f757cc720f79e524409dec2899ee7026d34b9f179d4f6b4c1c4201",
+          "token_count": 591
+        },
+        {
+          "body_sha256": "4339267a52878c4dad94ac4d79543a0cacb6f213c624c147abac1a2a05f87275",
+          "name": "cn_scattering_ensemble_eval",
+          "signature_sha256": "fce18566d73ed42c87a94bbb20cd7ff35276959b4399ac753d74e563bd83fef1",
+          "token_count": 889
+        },
+        {
+          "body_sha256": "650f97839e80a488d96f3bb2f303734f97790d6889f24d56056f74c588a4c8c1",
+          "name": "eval_te_tm",
+          "signature_sha256": "0057a85f808b3cc054f7c05788c309ea74ad28712f35c52d68008caf5825c21c",
+          "token_count": 255
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and the one-launch-per-(tx, rx-chunk) contract remain exact.",
+      "fusion_boundary": "wo_local frame projection, stacked Kirchhoff table lookup, outgoing s/p basis, receiver projections and radiometric gain are fused per surviving row.",
+      "id": "scattering.ensemble_eval",
+      "intermediate_storage": [
+        "per-row gain/amplitude/length/keep outputs only"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_scattering_ensemble_eval.py"
+      ],
+      "non_split_reason": "The shared table interpolation (scattering_table.cuh) is a device header reused by scattering_table_eval; splitting the row physics would reintroduce per-material Python loops.",
+      "semantic_surface": [
+        "Kirchhoff ensemble scattering row physics after RayD visibility (ADR-010 op 1)"
+      ],
+      "source_level_launches": [
+        "ensemble_eval_kernel"
+      ],
+      "tape_lifetime": "No tape; the op is primal-only (scattering is refused in AD mode by every differentiable solver)."
+    },
+    {
+      "abi_owner": [
+        "cn_scattering_patch_integral_eval"
+      ],
+      "baseline_source": "native/channel_native/kernels/scattering_patch_integral.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "c6d9d489a09ace50d73593aec8e7d003a707de9f2c9df99948753060d2026250",
+          "name": "patch_integral_rows_kernel",
+          "signature_sha256": "e9b3880059dbb0b27e5e0bb553be0a8e9360339d54a62d30abefdc5a308ef9c2",
+          "token_count": 1211
+        },
+        {
+          "body_sha256": "1da4a5ebfd313f2258fa8cc065087af6e4bc703b7342d208c37215999d972a68",
+          "name": "patch_integral_total_kernel",
+          "signature_sha256": "4c238e7696c3ca793d3b80d18c8e2c46859ad30f659750758acb55ebf620c79e",
+          "token_count": 174
+        },
+        {
+          "body_sha256": "e05c29877d2cf3cb99dd12fc03dd00f2587eeeff238a59b4695fb484467a52e4",
+          "name": "cn_scattering_patch_integral_eval",
+          "signature_sha256": "67d41c340fa140172b2123f52d8e4b0c234fee9a0e3ed063b2f35c8922f80bb6",
+          "token_count": 869
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and the fixed-order two-stage reduction contract remain exact.",
+      "fusion_boundary": "Duffy-mapped 16x16 Gauss-Legendre phase-screen quadrature, jones/prefactor/carrier assembly and the deterministic total reduction are fused into one row launch plus one reduce launch.",
+      "id": "scattering.patch_integral",
+      "intermediate_storage": [
+        "per-row integral and row_value buffers (also returned for tests)"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_scattering_patch_integral_eval.py"
+      ],
+      "non_split_reason": "A separate quadrature op would round-trip 256 phasor terms per patch through global memory and reintroduce the host per-patch loop.",
+      "semantic_surface": [
+        "Realization-coherent phase-screen Kirchhoff patch integral per (tx, rx, structure) (ADR-010 op 2)"
+      ],
+      "source_level_launches": [
+        "patch_integral_rows_kernel",
+        "patch_integral_total_kernel"
+      ],
+      "tape_lifetime": "No tape; the op is primal-only (realization scattering is refused in AD mode)."
     }
   ],
   "schema_version": 1,

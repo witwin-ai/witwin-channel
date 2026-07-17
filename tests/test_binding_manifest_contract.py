@@ -8,16 +8,13 @@ from tools.refactor_baseline import binding_manifest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-BASELINE_PATH = (
-    REPOSITORY_ROOT
-    / "docs"
-    / "dev"
-    / "baselines"
-    / "0892d855b27ee851521a181f5158b0bf41091eda"
-    / "static"
-    / "bindings.json"
-)
-EXPECTED_BINDING_COUNT = 174
+# Canonical live binding manifest. The phase-0 copy under
+# docs/dev/baselines/0892d855.../static/bindings.json is an immutable
+# historical artifact and must never be rewritten; symbol additions are
+# re-frozen HERE, with the delta explained in the introducing change
+# (ADR-010 added the 5 scattering/rough-reflection kernels: 174 -> 179).
+BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
+EXPECTED_BINDING_COUNT = 179
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )

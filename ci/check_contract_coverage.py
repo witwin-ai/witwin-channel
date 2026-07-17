@@ -20,14 +20,14 @@ from tools.refactor_baseline import binding_manifest  # noqa: E402
 
 DEFAULT_MANIFEST_PATH = Path("ci/contract-coverage-manifest.json")
 PUBLIC_SNAPSHOT_PATH = Path("ci/public-api-snapshot.json")
-BINDING_BASELINE_PATH = Path(
-    "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/"
-    "static/bindings.json"
-)
+# Live canonical manifest; the phase-0 copy under docs/dev/baselines/
+# 0892d855.../static/ is immutable history and is never rewritten.
+BINDING_BASELINE_PATH = Path("ci/native-binding-manifest.json")
 PHASE10_AUDIT_PATH = Path("docs/dev/audit/phase10-legacy-dead-binding.json")
 PYTHON_PACKAGE_PATH = Path("src/witwin/channel_native")
 EXPECTED_PUBLIC_EXPORT_COUNT = 37
-EXPECTED_NATIVE_BINDING_COUNT = 174
+# 174 phase-0 symbols + 5 ADR-010 native scattering/rough-reflection kernels.
+EXPECTED_NATIVE_BINDING_COUNT = 179
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",

@@ -797,6 +797,183 @@ def field_diffraction_wedge(
     return out
 
 
+_ROUGH_SCALE_OUTPUT_FIELDS = (
+    "field_vector",
+    "coefficient",
+    "path_field",
+    "path_gain",
+)
+_ROUGH_SCALE_TANGENT_FIELDS = tuple(
+    f"tangent_{name}" for name in _ROUGH_SCALE_OUTPUT_FIELDS
+)
+
+
+def field_rough_reflection_scale(
+    field_vector: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    positions: torch.Tensor,
+    normals: torch.Tensor,
+    source: torch.Tensor,
+    sigma_b: torch.Tensor,
+    rough_b: torch.Tensor,
+    replaced: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    """Native rough-surface C_r factor applied to the reflection outputs.
+
+    Computes ``C_r = prod_b exp(-2*(k0*cos_b*sigma_b)^2)`` on rough bounces
+    (``1`` otherwise), zeroes rows flagged ``replaced``, and scales the four
+    field outputs (``path_gain`` by ``C_r^2``). Returns the scaled outputs plus
+    the real ``factor`` per row.
+    """
+
+    validate_cuda_tensor("field_vector", field_vector, dtype=torch.complex64, ndim=2)
+    validate_cuda_tensor("coefficient", coefficient, dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("path_field", path_field, dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("positions", positions, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("normals", normals, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("sigma_b", sigma_b, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("rough_b", rough_b, dtype=torch.bool, ndim=2)
+    validate_cuda_tensor("replaced", replaced, dtype=torch.bool, ndim=1)
+    out = _required_native_op("field_rough_reflection_scale")(
+        field_vector,
+        coefficient,
+        path_field,
+        path_gain,
+        positions,
+        normals,
+        source,
+        sigma_b,
+        rough_b,
+        replaced,
+        float(frequency_hz),
+    )
+    expected = {*_ROUGH_SCALE_OUTPUT_FIELDS, "factor"}
+    if not isinstance(out, dict) or set(out) != expected:
+        raise TypeError(
+            "_channel_native.field_rough_reflection_scale returned invalid fields"
+        )
+    return out
+
+
+def field_rough_reflection_scale_backward(
+    field_vector: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    positions: torch.Tensor,
+    normals: torch.Tensor,
+    source: torch.Tensor,
+    sigma_b: torch.Tensor,
+    rough_b: torch.Tensor,
+    replaced: torch.Tensor,
+    *,
+    frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None,
+    grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None,
+    grad_path_gain: torch.Tensor | None = None,
+    need_field: bool = True,
+    need_geometry: bool = False,
+    need_frequency: bool = True,
+) -> dict[str, torch.Tensor | None]:
+    """VJP of :func:`field_rough_reflection_scale` (frequency and geometry)."""
+
+    out = _required_native_op("field_rough_reflection_scale_backward")(
+        field_vector,
+        coefficient,
+        path_field,
+        path_gain,
+        positions,
+        normals,
+        source,
+        sigma_b,
+        rough_b,
+        replaced,
+        float(frequency_hz),
+        grad_field_vector,
+        grad_coefficient,
+        grad_path_field,
+        grad_path_gain,
+        bool(need_field),
+        bool(need_geometry),
+        bool(need_frequency),
+    )
+    expected = {
+        "grad_field_vector",
+        "grad_coefficient",
+        "grad_path_field",
+        "grad_path_gain",
+        "grad_positions",
+        "grad_normals",
+        "grad_source",
+        "grad_frequency",
+    }
+    if not isinstance(out, dict) or set(out) != expected:
+        raise TypeError(
+            "_channel_native.field_rough_reflection_scale_backward returned"
+            " invalid fields"
+        )
+    return out
+
+
+def field_rough_reflection_scale_jvp(
+    field_vector: torch.Tensor,
+    coefficient: torch.Tensor,
+    path_field: torch.Tensor,
+    path_gain: torch.Tensor,
+    positions: torch.Tensor,
+    normals: torch.Tensor,
+    source: torch.Tensor,
+    sigma_b: torch.Tensor,
+    rough_b: torch.Tensor,
+    replaced: torch.Tensor,
+    *,
+    frequency_hz: float,
+    tangent_field_vector: torch.Tensor | None = None,
+    tangent_coefficient: torch.Tensor | None = None,
+    tangent_path_field: torch.Tensor | None = None,
+    tangent_path_gain: torch.Tensor | None = None,
+    tangent_positions: torch.Tensor | None = None,
+    tangent_normals: torch.Tensor | None = None,
+    tangent_source: torch.Tensor | None = None,
+    tangent_frequency: float = 0.0,
+) -> dict[str, torch.Tensor]:
+    """JVP of :func:`field_rough_reflection_scale` (frequency and geometry)."""
+
+    out = _required_native_op("field_rough_reflection_scale_jvp")(
+        field_vector,
+        coefficient,
+        path_field,
+        path_gain,
+        positions,
+        normals,
+        source,
+        sigma_b,
+        rough_b,
+        replaced,
+        float(frequency_hz),
+        tangent_field_vector,
+        tangent_coefficient,
+        tangent_path_field,
+        tangent_path_gain,
+        tangent_positions,
+        tangent_normals,
+        tangent_source,
+        float(tangent_frequency),
+    )
+    if not isinstance(out, dict) or set(out) != set(_ROUGH_SCALE_TANGENT_FIELDS):
+        raise TypeError(
+            "_channel_native.field_rough_reflection_scale_jvp returned invalid fields"
+        )
+    return out
+
+
 __all__ = [
     "field_coupled_rd",
     "field_diffraction_wedge",
@@ -807,6 +984,9 @@ __all__ = [
     "field_reflection_sequence",
     "field_reflection_sequence_backward",
     "field_reflection_sequence_jvp",
+    "field_rough_reflection_scale",
+    "field_rough_reflection_scale_backward",
+    "field_rough_reflection_scale_jvp",
     "field_transmission_sequence",
     "field_transmission_sequence_backward",
     "field_transmission_sequence_jvp",

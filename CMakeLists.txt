@@ -483,6 +483,7 @@ Python_add_library(
     native/channel_native/kernels/field_transport_free_space.cu
     native/channel_native/kernels/field_transport_reflection.cu
     native/channel_native/kernels/field_transport_transmission.cu
+    native/channel_native/kernels/field_rough_scale.cu
     native/channel_native/kernels/field_wedge_ad_diffraction.cu
     native/channel_native/kernels/field_wedge_ad_coupled.cu
     native/channel_native/kernels/field_wedge_ad_project.cu
@@ -498,6 +499,8 @@ Python_add_library(
     native/channel_native/kernels/path_trace.cu
     native/channel_native/kernels/reflection.cu
     native/channel_native/kernels/scattering.cu
+    native/channel_native/kernels/scattering_ensemble.cu
+    native/channel_native/kernels/scattering_patch_integral.cu
     native/channel_native/kernels/sampling.cu
     native/channel_native/montecarlo_basic.cpp
     native/channel_native/path_solver.cpp
@@ -515,6 +518,14 @@ if(WIN32)
 endif()
 
 target_compile_features(_channel_native PRIVATE cxx_std_17)
+# ADR-010 lockstep kernels replicate Torch per-op float rounding. Implicit
+# fma contraction would change the rounding of their mul/add chains, so it is
+# disabled for these TUs (explicit fmaf calls, e.g. the shared table
+# interpolation, are unaffected).
+set_source_files_properties(
+    native/channel_native/kernels/scattering_ensemble.cu
+    native/channel_native/kernels/scattering_patch_integral.cu
+    PROPERTIES COMPILE_OPTIONS "--fmad=false")
 if(MSVC)
     # RayD's extern "C" integration entries raise std::runtime_error on
     # invalid inputs by contract. MSVC's default /EHc (part of /EHsc) assumes
