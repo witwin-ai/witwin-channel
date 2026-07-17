@@ -305,10 +305,36 @@ truncation — and the full-wave reference contradicts its strength:
 | T_mono = clamp(1−|tail_lo|−|tail_hi|, 0, 1) | **−1.11 / −4.64 / +4.45 dB** |
 
 Fix: the even (smooth background) part multiplies the monotone real
-T_mono; the odd/γ machinery is unchanged; MC path unchanged. Residual
-−1.1 dB median (slightly dark: the true corner waves carry some energy) —
-an explicit vertex-diffraction term with correct (sub-PO) amplitude
-remains the recorded refinement.
+T_mono; the odd/γ machinery is unchanged; MC path unchanged.
+
+**Correction (G1a verification):** even-part T_mono alone moved the
+shadow by only ~2% — the offline V2 experiment had implicitly rescaled
+the odd part too. The visible shadow is transition(odd)-dominated
+(~12.5:1; kL≈40 → ~23° transition width spans the whole shadow wedge),
+so the finite-edge truncation must also act on the odd part away from
+the boundary.
+
+### F5f (G2): boundary-distance blended odd truncation
+
+```
+t_used = (t − odd_w)·T_mono + odd_w·γ(u)·B(δ)
+B(δ)   = wb + (1 − wb)·T_mono,  wb = exp(−(δ/δ_b)²),
+δ_b    = C_BLEND·sqrt(2π/kL),   C_BLEND = 0.35
+```
+
+B(0)=1 exactly (GO step preserved; <1% at half-cell distance in the
+shadow regime), B→T_mono deep in the transition. C_BLEND calibrated by
+a four-point sweep against the Maxwell reference (monotone dose-response;
+0.35 = sweep floor and |median| minimizer): shadow gap median
++3.6 → **+1.36 dB** (p10 −4.3 / p90 +4.4), NMSE 0.0428 → **0.0358**,
+magnitude correlation 0.874, coherence 0.890, ISB/RSB p95 excess
+−0.73/−0.19 dB, ISB toggle median 1.09, extension line 0.68 dB, all
+continuity tests green, MC bit-identical (B≡1 on that path). The
+extrapolated zero-gap optimum lies below the sanctioned sweep floor
+(C≈0.06–0.2) but near-boundary undershoot grows as C shrinks — the
+residual ±4 dB spread is the single-variable stand-in's limit; the
+complex-pole truncated transition integral (generalized Fresnel /
+two-variable corner transition) remains the recorded refinement.
 
 ## Known collateral
 
