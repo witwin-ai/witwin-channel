@@ -17,10 +17,10 @@ from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
 from witwin.channel_native.scene.models import Scene
 
 from .config import Config
-from .connections import transmitter_tensors as transmitter_tensors
+from .connections import _diffraction_sample_split as _diffraction_sample_split
+from .endpoints import transmitter_tensors as transmitter_tensors
 from .pipeline import (
     _BDPTTopologyOptions as _BDPTTopologyOptions,
-    _diffraction_sample_split as _diffraction_sample_split,
     _estimate_workspace_bytes as _estimate_workspace_bytes,
     solve as _solve_pipeline,
 )

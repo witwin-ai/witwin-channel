@@ -6,12 +6,6 @@
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel_native/montecarlo/bdpt/pipeline.py": {
-      "ceiling": 1440,
-      "expires_on": "2027-01-31",
-      "owner": "montecarlo/bdpt maintainers",
-      "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
-    },
     "src/witwin/channel_native/propagation/fields/kernels/autograd.py": {
       "ceiling": 1835,
       "expires_on": "2027-01-31",
@@ -86,11 +80,17 @@
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel_native/montecarlo/bdpt/pipeline.py::solve": {
-      "ceiling": 78,
+    "src/witwin/channel_native/montecarlo/bdpt/pipeline.py::_collect_connection_samples": {
+      "ceiling": 38,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
+    },
+    "src/witwin/channel_native/montecarlo/bdpt/pipeline.py::_prepare_workspace_and_capabilities": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/bdpt maintainers",
+      "reason": "Workspace-sizing and native-capability validation stage extracted verbatim from the former solve() monolith."
     },
     "src/witwin/channel_native/path/arrays.py::pack_synthetic_arrays": {
       "ceiling": 16,

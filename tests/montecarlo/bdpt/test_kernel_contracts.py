@@ -9,7 +9,7 @@ import pytest
 
 from witwin.channel_native.core import scene as core_scene
 from witwin.channel_native.materials.kernels import contracts as material_contracts
-from witwin.channel_native.montecarlo.bdpt import connections
+from witwin.channel_native.montecarlo.bdpt import endpoints
 from witwin.channel_native.montecarlo.bdpt import kernels
 from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
 from witwin.channel_native.montecarlo.bdpt.kernels import maps, paths, sampling
@@ -147,9 +147,9 @@ def test_bdpt_host_vec3_resolves_canonical_transmitter_helper():
 
 
 def test_bdpt_callers_use_canonical_map_owners():
-    assert connections.bdpt_host_vec3_tensor is maps.bdpt_host_vec3_tensor
-    assert connections.bdpt_receiver_grid_points is maps.bdpt_receiver_grid_points
-    assert connections.bdpt_transmitter_tensors is maps.bdpt_transmitter_tensors
+    assert endpoints.bdpt_host_vec3_tensor is maps.bdpt_host_vec3_tensor
+    assert endpoints.bdpt_receiver_grid_points is maps.bdpt_receiver_grid_points
+    assert endpoints.bdpt_transmitter_tensors is maps.bdpt_transmitter_tensors
     assert bdpt_solver.bdpt_component_map_buffer is maps.bdpt_component_map_buffer
     assert bdpt_solver.bdpt_store_component_map is maps.bdpt_store_component_map
     assert "mc_component_map_buffer" not in bdpt_solver.__dict__
