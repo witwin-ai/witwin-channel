@@ -731,6 +731,835 @@ def collect_reduced(
     }
 
 
+# ---------------------------------------------------------------------------
+# Extended G0 backfill profile (Plan 08 section 9). The reduced profile above
+# freezes only LoS and single-reflection with ad_mode=none. The extended
+# profile appends the section-9 component/scene/AD dimensions that a later
+# numerical PR (ADR-010: native Kirchhoff scattering + rough-reflection C_r
+# kernels) will touch, so every affected public output has a pre-change exact
+# hash. Every construction below reuses the canonical scene builders and
+# solver configs of the existing acceptance/AD tests; no new physics config is
+# invented here.
+# ---------------------------------------------------------------------------
+
+EXTENDED_PROFILE_NAME = "extended"
+_EXTENDED_FREQUENCY_HZ = 3.0e9
+
+# Forward (ad_mode=none) scenario -> solvers that carry the component. Cells
+# for solvers that reject a component (capabilities.py) are declared in
+# ``_EXTENDED_UNSUPPORTED`` and never attempted.
+_EXTENDED_FORWARD_SOLVERS: dict[str, tuple[str, ...]] = {
+    "thin-wall-transmission": SOLVERS,
+    "single-wedge-diffraction": SOLVERS,
+    # Reflection-diffraction coupling is a path/BDPT capability only.
+    "coupled-reflection-diffraction": ("path", "montecarlo-bdpt"),
+    "multibounce-reflection": SOLVERS,
+    "rough-scattering-ensemble": SOLVERS,
+    # realization_coherent phase screens have a canonical fixture only on the
+    # deterministic solver (tests/deterministic/test_scattering.py).
+    "rough-scattering-realization": ("deterministic",),
+    "rough-reflection-cr": SOLVERS,
+}
+
+# AD is a fixed-topology jvp/vjp capability of path and deterministic only
+# (capabilities.ad_contract.differentiable_solvers; BDPT is ad_modes=[none]).
+# MC-basic AD is exercised by tests/ad/test_mc_basic_ad.py and stays out of
+# this exact-hash backfill. The scattering component is refused in AD mode by
+# every differentiable solver, so no scattering AD cell is attempted.
+_EXTENDED_AD_SOLVERS = ("path", "deterministic")
+_EXTENDED_AD_MODES = ("jvp", "vjp")
+_EXTENDED_AD_SCENARIOS = (
+    "single-reflection",
+    "thin-wall-transmission",
+    "single-wedge-diffraction",
+    "rough-reflection-cr",
+)
+# Differentiable seed per (scenario, mode). eps_r/layer_eps_r duals mirror the
+# AD-1/AD-4 material cells; the rough-reflection vjp uses frequency so the
+# derivative flows through the C_r coherent attenuation (dC_r/df), the exact
+# quantity ADR-010 op 3 must reproduce.
+_EXTENDED_AD_SEEDS: dict[tuple[str, str], str] = {
+    ("single-reflection", "jvp"): "material_eps_r",
+    ("single-reflection", "vjp"): "material_eps_r",
+    ("thin-wall-transmission", "jvp"): "material_layer_eps_r",
+    ("thin-wall-transmission", "vjp"): "material_layer_eps_r",
+    ("single-wedge-diffraction", "jvp"): "material_eps_r",
+    ("single-wedge-diffraction", "vjp"): "material_eps_r",
+    ("rough-reflection-cr", "jvp"): "material_layer_eps_r",
+    ("rough-reflection-cr", "vjp"): "frequency",
+}
+_EXTENDED_MC_SEEDS: dict[str, int] = {
+    "thin-wall-transmission": 3,
+    "single-wedge-diffraction": 7,
+    "coupled-reflection-diffraction": 11,
+    "multibounce-reflection": 5,
+    "rough-scattering-ensemble": 5,
+    "rough-scattering-realization": 5,
+    "rough-reflection-cr": 9,
+}
+_EXTENDED_MC_SOLVERS = ("montecarlo-basic", "montecarlo-bdpt")
+
+# Documented section-9 combinations that are intentionally NOT frozen here,
+# with the reason. These are covered by their own gates, not the runtime
+# exact-hash profile.
+_EXTENDED_UNSUPPORTED: tuple[dict[str, object], ...] = (
+    {
+        "dimension": "coupled-reflection-diffraction",
+        "solvers": ["deterministic", "montecarlo-basic"],
+        "reason": (
+            "capabilities.solvers.*.supports_reflection_diffraction_coupling is "
+            "False for deterministic and montecarlo_basic"
+        ),
+    },
+    {
+        "dimension": "rough-scattering-realization",
+        "solvers": ["path", "montecarlo-basic", "montecarlo-bdpt"],
+        "reason": (
+            "realization_coherent phase-screen solve has a canonical fixture "
+            "only on the deterministic solver"
+        ),
+    },
+    {
+        "dimension": "ad-jvp-vjp",
+        "solvers": ["montecarlo-basic", "montecarlo-bdpt"],
+        "reason": (
+            "BDPT is ad_modes=[none]; MC-basic AD is covered by "
+            "tests/ad/test_mc_basic_ad.py rather than the exact-hash backfill"
+        ),
+    },
+    {
+        "dimension": "ad-scattering",
+        "solvers": ["path", "deterministic", "montecarlo-basic"],
+        "reason": (
+            "capabilities.ad_excluded lists scattering for every differentiable "
+            "solver (fail-loud refusal before launch)"
+        ),
+    },
+    {
+        "dimension": "munich-reduced-full-smoke, wheel/release matrix, "
+        "device/build matrix",
+        "solvers": ["all"],
+        "reason": (
+            "covered by golden/parity/nightly gates (deterministic Munich "
+            "parity, BDPT Munich parity, wheel and release CI tiers), not the "
+            "runtime exact-hash profile"
+        ),
+    },
+)
+
+
+def extended_cells() -> tuple[tuple[str, str, str], ...]:
+    """Enumerate every (scenario, solver, ad_mode) cell in the extended matrix."""
+
+    cells: list[tuple[str, str, str]] = []
+    for scenario, solvers in _EXTENDED_FORWARD_SOLVERS.items():
+        for solver in solvers:
+            cells.append((scenario, solver, "none"))
+    for scenario in _EXTENDED_AD_SCENARIOS:
+        for solver in _EXTENDED_AD_SOLVERS:
+            for mode in _EXTENDED_AD_MODES:
+                cells.append((scenario, solver, mode))
+    return tuple(cells)
+
+
+@dataclasses.dataclass(frozen=True)
+class _GradientCapture:
+    """Capturable AD output: exact gradient tensors plus solve accounting.
+
+    ``metadata`` is the full public solver metadata dict, so
+    :func:`result_manifest` strips only the allowlisted timing fields and
+    :func:`launch_ledger` reads the same aggregate launch/tape counters as a
+    forward result. The gradient tensor is hashed by the forward tensor scheme.
+    """
+
+    mode: str
+    seed: str
+    gradient: object
+    gradient_is_nonzero: bool
+    metadata: dict[str, object]
+
+
+def _extended_receiver_grid(origin, u_axis, v_axis, shape, spacing):
+    import torch
+
+    from witwin.channel_native import ReceiverGrid
+
+    return ReceiverGrid(
+        origin=torch.tensor(origin),
+        x_axis=torch.tensor(u_axis),
+        y_axis=torch.tensor(v_axis),
+        shape=shape,
+        spacing=spacing,
+    )
+
+
+def _extended_transmission_material():
+    from witwin.channel_native.core.materials import Layer, PhysicalSurface
+
+    return PhysicalSurface(
+        layers=(
+            Layer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
+            Layer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
+        ),
+        name="extended-thin-sheet",
+    )
+
+
+def _extended_scene_and_config(solver: str, scenario: str):
+    """Build the forward (ad_mode=none) scene, config, and solve for a cell."""
+
+    import torch
+
+    from tests.support.scenes import (
+        coupled_wall_wedge_scene,
+        rough_wall_structure,
+        transmission_wall_structure,
+        wedge_diffraction_scene,
+    )
+    from witwin.channel_native import (
+        ReceiverPoint,
+        Scene,
+        Transmitter,
+    )
+    from witwin.channel_native.core.materials import (
+        Dielectric,
+        PhaseScreen,
+        Roughness,
+    )
+
+    seed = _EXTENDED_MC_SEEDS.get(scenario, 0)
+
+    def _mc_basic(components, *, max_depth, samples):
+        from witwin.channel_native.montecarlo.basic import Config, solve
+
+        return Config(
+            samples=samples,
+            seed=seed,
+            max_depth=max_depth,
+            components=components,
+            diagnostics=True,
+        ), solve
+
+    def _mc_bdpt(components, *, max_depth, samples, receiver_strategy, coupled=False):
+        from witwin.channel_native.montecarlo.bdpt import Config, solve
+
+        return Config(
+            samples=samples,
+            seed=seed,
+            max_depth=max_depth,
+            components=components,
+            coupled_paths=coupled,
+            receiver_strategy=receiver_strategy,
+            diagnostics=True,
+        ), solve
+
+    def _path(components, *, max_depth, coupled=False, **extra):
+        from witwin.channel_native.path import Config, solve
+
+        return Config(
+            max_depth=max_depth, components=components, coupled_paths=coupled, **extra
+        ), solve
+
+    def _deterministic(components, *, max_depth, **extra):
+        from witwin.channel_native.deterministic import Config, solve
+
+        return Config(
+            max_depth=max_depth,
+            components=components,
+            export_paths=True,
+            diagnostics=True,
+            **extra,
+        ), solve
+
+    if scenario == "thin-wall-transmission":
+        material = _extended_transmission_material()
+        wall = transmission_wall_structure(3.0, material)
+        tx = Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))
+        components = {"transmission"}
+        if solver == "montecarlo-basic":
+            grid = _extended_receiver_grid(
+                [6.0, -0.5, -0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
+            )
+            scene = Scene(
+                structures=[wall], transmitters=[tx], receivers=[grid],
+                frequency=_EXTENDED_FREQUENCY_HZ,
+            )
+            config, solve = _mc_basic(components, max_depth=1, samples=1024)
+            return scene, config, solve
+        rx = ReceiverPoint(position=torch.tensor([6.0, 0.4, 0.2]))
+        scene = Scene(
+            structures=[wall], transmitters=[tx], receivers=[rx],
+            frequency=_EXTENDED_FREQUENCY_HZ,
+        )
+        if solver == "path":
+            config, solve = _path(components, max_depth=1)
+        elif solver == "deterministic":
+            config, solve = _deterministic(components, max_depth=1)
+        else:
+            config, solve = _mc_bdpt(
+                components, max_depth=1, samples=1024, receiver_strategy="point_sphere"
+            )
+        return scene, config, solve
+
+    if scenario == "single-wedge-diffraction":
+        base = wedge_diffraction_scene(Dielectric(eps_r=4.0, sigma_e=0.02))
+        components = {"diffraction"}
+        if solver in _EXTENDED_MC_SOLVERS:
+            grid = _extended_receiver_grid(
+                [3.0, 0.5, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
+            )
+            scene = Scene(
+                structures=list(base.structures),
+                transmitters=list(base.transmitters),
+                receivers=[grid],
+                frequency=base.frequency,
+            )
+            if solver == "montecarlo-basic":
+                config, solve = _mc_basic(components, max_depth=1, samples=1024)
+            else:
+                config, solve = _mc_bdpt(
+                    components, max_depth=1, samples=512, receiver_strategy="grid_area"
+                )
+            return scene, config, solve
+        if solver == "path":
+            config, solve = _path(components, max_depth=1)
+        else:
+            config, solve = _deterministic(
+                components, max_depth=1, coherent=False, return_field=False
+            )
+        return base, config, solve
+
+    if scenario == "coupled-reflection-diffraction":
+        scene = coupled_wall_wedge_scene()
+        components = {"reflection", "diffraction"}
+        if solver == "path":
+            config, solve = _path(components, max_depth=2, coupled=True)
+        else:  # montecarlo-bdpt
+            config, solve = _mc_bdpt(
+                components,
+                max_depth=2,
+                samples=256,
+                receiver_strategy="point_sphere",
+                coupled=True,
+            )
+        return scene, config, solve
+
+    if scenario == "multibounce-reflection":
+        from tests.deterministic.test_reflection_multibounce import (
+            two_wall_multibounce_scene,
+        )
+
+        scene = two_wall_multibounce_scene()
+        components = {"reflection"}
+        if solver == "path":
+            config, solve = _path(components, max_depth=2)
+        elif solver == "deterministic":
+            config, solve = _deterministic(components, max_depth=2)
+        elif solver == "montecarlo-basic":
+            config, solve = _mc_basic(components, max_depth=2, samples=1024)
+        else:
+            config, solve = _mc_bdpt(
+                components, max_depth=2, samples=1024, receiver_strategy="point_sphere"
+            )
+        return scene, config, solve
+
+    if scenario == "rough-scattering-ensemble":
+        wall = rough_wall_structure(
+            2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=2.0
+        )
+        tx = Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))
+        if solver == "montecarlo-basic":
+            grid = _extended_receiver_grid(
+                [0.0, 0.5, -0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
+            )
+            scene = Scene(
+                structures=[wall], transmitters=[tx], receivers=[grid],
+                frequency=_EXTENDED_FREQUENCY_HZ,
+            )
+            config, solve = _mc_basic({"scattering"}, max_depth=1, samples=4096)
+            return scene, config, solve
+        rx = ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))
+        scene = Scene(
+            structures=[wall], transmitters=[tx], receivers=[rx],
+            frequency=_EXTENDED_FREQUENCY_HZ,
+        )
+        if solver == "path":
+            config, solve = _path(
+                {"los", "reflection", "scattering"},
+                max_depth=1,
+                scattering_samples_per_m2=16.0,
+            )
+        elif solver == "deterministic":
+            config, solve = _deterministic(
+                {"reflection", "scattering"},
+                max_depth=1,
+                scattering_samples_per_m2=16.0,
+            )
+        else:
+            config, solve = _mc_bdpt(
+                {"scattering"}, max_depth=2, samples=4096,
+                receiver_strategy="point_sphere",
+            )
+        return scene, config, solve
+
+    if scenario == "rough-scattering-realization":
+        from witwin.channel_native.scattering import (
+            generate_gaussian_realization,
+            realization_seed,
+        )
+
+        height = generate_gaussian_realization(
+            Roughness(rms_height_m=0.008, corr_length_x_m=0.15, corr_length_y_m=0.15),
+            extent_m=2.0,
+            resolution=128,
+            seed=realization_seed(0, 1, 1),
+            device="cpu",
+        )
+        screen = PhaseScreen(
+            height=height,
+            height_scale_m=1.0,
+            realization_id=1,
+            mode="realization_coherent",
+        )
+        wall = rough_wall_structure(
+            2.5,
+            rms_height_m=0.008,
+            corr_length_m=0.15,
+            half_size=1.0,
+            phase_screen=screen,
+            with_uv=True,
+        )
+        scene = Scene(
+            structures=[wall],
+            transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
+            receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
+            frequency=_EXTENDED_FREQUENCY_HZ,
+        )
+        config, solve = _deterministic(
+            {"reflection", "scattering"}, max_depth=1, scattering_samples_per_m2=32.0
+        )
+        return scene, config, solve
+
+    if scenario == "rough-reflection-cr":
+        wall = rough_wall_structure(
+            2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=2.0
+        )
+        tx = Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))
+        components = {"reflection"}
+        if solver == "montecarlo-basic":
+            grid = _extended_receiver_grid(
+                [0.0, 0.5, -0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
+            )
+            scene = Scene(
+                structures=[wall], transmitters=[tx], receivers=[grid],
+                frequency=_EXTENDED_FREQUENCY_HZ,
+            )
+            config, solve = _mc_basic(components, max_depth=1, samples=2048)
+            return scene, config, solve
+        rx = ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))
+        scene = Scene(
+            structures=[wall], transmitters=[tx], receivers=[rx],
+            frequency=_EXTENDED_FREQUENCY_HZ,
+        )
+        if solver == "path":
+            config, solve = _path(components, max_depth=1)
+        elif solver == "deterministic":
+            config, solve = _deterministic(components, max_depth=1)
+        else:
+            config, solve = _mc_bdpt(
+                components, max_depth=2, samples=2048, receiver_strategy="point_sphere"
+            )
+        return scene, config, solve
+
+    raise RuntimeBaselineError(f"unknown extended scenario: {scenario}")
+
+
+def _extended_ad_coefficient(result: object, solver: str):
+    if solver == "path":
+        return result.a
+    return result.paths.coefficient
+
+
+def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
+    """Build the AD scene, config, differentiable leaf, and solve for a cell."""
+
+    import torch
+
+    from tests.support.scenes import (
+        rough_wall_structure,
+        same_side_wall_reflection_scene,
+        transmission_wall_structure,
+        wedge_diffraction_scene,
+    )
+    from witwin.channel_native import ReceiverPoint, Scene, Transmitter
+    from witwin.channel_native.core.materials import Dielectric
+
+    seed = _EXTENDED_AD_SEEDS[(scenario, ad_mode)]
+
+    def _frequency_leaf():
+        return torch.tensor(
+            _EXTENDED_FREQUENCY_HZ,
+            dtype=torch.float64,
+            device="cuda",
+            requires_grad=True,
+        )
+
+    if scenario == "single-reflection":
+        scene = same_side_wall_reflection_scene()
+        components = {"reflection"}
+        max_depth = 1
+    elif scenario == "thin-wall-transmission":
+        scene = Scene(
+            structures=[transmission_wall_structure(3.0, _extended_transmission_material())],
+            transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
+            receivers=[ReceiverPoint(position=torch.tensor([6.0, 0.4, 0.2]))],
+            frequency=_EXTENDED_FREQUENCY_HZ,
+        )
+        components = {"transmission"}
+        max_depth = 1
+    elif scenario == "single-wedge-diffraction":
+        scene = wedge_diffraction_scene(Dielectric(eps_r=4.0, sigma_e=0.02))
+        components = {"diffraction"}
+        max_depth = 1
+    elif scenario == "rough-reflection-cr":
+        frequency: object = _EXTENDED_FREQUENCY_HZ if seed != "frequency" else _frequency_leaf()
+        wall = rough_wall_structure(
+            2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=2.0
+        )
+        scene = Scene(
+            structures=[wall],
+            transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
+            receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
+            frequency=frequency,
+        )
+        components = {"reflection"}
+        max_depth = 1
+    else:
+        raise RuntimeBaselineError(f"unknown extended AD scenario: {scenario}")
+
+    if seed == "frequency" and scenario != "rough-reflection-cr":
+        # Frequency leaves need a requires_grad scene frequency; only the
+        # rough-reflection cell uses this seed.
+        raise RuntimeBaselineError("frequency AD seed is only wired for rough-reflection-cr")
+
+    if solver == "path":
+        from witwin.channel_native.path import Config, solve
+
+        config = Config(max_depth=max_depth, components=components, ad_mode=ad_mode)
+    else:
+        from witwin.channel_native.deterministic import Config, solve
+
+        config = Config(
+            max_depth=max_depth,
+            components=components,
+            export_paths=True,
+            ad_mode=ad_mode,
+        )
+    return scene, config, solve, seed
+
+
+def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
+    """Return an idempotent AD operation closure and its capturable output."""
+
+    import torch
+
+    def _loss(result):
+        coefficient = _extended_ad_coefficient(result, solver)
+        return coefficient.real.sum() + 0.5 * coefficient.imag.sum()
+
+    if seed == "frequency":
+        leaf = scene.frequency
+
+        def operation():
+            if leaf.grad is not None:
+                leaf.grad = None
+            result = solve(scene, config)
+            _loss(result).backward()
+            grad = leaf.grad.detach().clone()
+            return _GradientCapture(
+                mode=ad_mode,
+                seed=seed,
+                gradient={seed: grad},
+                gradient_is_nonzero=bool(grad.abs().max() > 0.0),
+                metadata=dict(result.metadata),
+            )
+
+        return operation
+
+    leaf_attr = "eps_r" if seed == "material_eps_r" else "layer_eps_r"
+    compiled = scene.compile()
+    base = getattr(compiled.materials, leaf_attr)
+
+    if ad_mode == "vjp":
+        base.requires_grad_(True)
+
+        def operation():
+            if base.grad is not None:
+                base.grad = None
+            result = solve(scene, config)
+            _loss(result).backward()
+            grad = base.grad.detach().clone()
+            return _GradientCapture(
+                mode=ad_mode,
+                seed=seed,
+                gradient={seed: grad},
+                gradient_is_nonzero=bool(grad.abs().max() > 0.0),
+                metadata=dict(result.metadata),
+            )
+
+        return operation
+
+    tangent = torch.ones_like(base)
+
+    def operation():
+        with torch.autograd.forward_ad.dual_level():
+            dual = torch.autograd.forward_ad.make_dual(base.detach().clone(), tangent)
+            object.__setattr__(compiled.materials, leaf_attr, dual)
+            try:
+                result = solve(scene, config)
+                coefficient = _extended_ad_coefficient(result, solver)
+                tangent_out = torch.autograd.forward_ad.unpack_dual(coefficient).tangent
+            finally:
+                object.__setattr__(compiled.materials, leaf_attr, base)
+        grad = tangent_out.detach().clone()
+        return _GradientCapture(
+            mode=ad_mode,
+            seed=seed,
+            gradient={seed: grad},
+            gradient_is_nonzero=bool(grad.abs().max() > 0.0),
+            metadata=dict(result.metadata),
+        )
+
+    return operation
+
+
+def _load_extended_case(solver: str, scenario: str, ad_mode: str):
+    """Return (scene, config, operation, seed) for one extended cell."""
+
+    if solver not in SOLVERS:
+        raise RuntimeBaselineError(f"unknown solver: {solver}")
+    if ad_mode == "none":
+        scene, config, solve = _extended_scene_and_config(solver, scenario)
+
+        def operation():
+            return solve(scene, config)
+
+        return scene, config, operation, None
+    if ad_mode not in _EXTENDED_AD_MODES:
+        raise RuntimeBaselineError(f"unknown ad_mode: {ad_mode}")
+    if solver not in _EXTENDED_AD_SOLVERS:
+        raise RuntimeBaselineError(f"{solver} does not support ad_mode {ad_mode}")
+    scene, config, solve, seed = _extended_ad_scene_config(solver, scenario, ad_mode)
+    operation = _extended_ad_operation(solver, scene, config, solve, seed, ad_mode)
+    return scene, config, operation, seed
+
+
+def run_extended_child(
+    *,
+    repo: Path,
+    solver: str,
+    scenario: str,
+    ad_mode: str,
+    process_index: int,
+    warmup: int,
+    repeats: int,
+) -> dict[str, object]:
+    validate_measurement_policy(MIN_PROCESSES, warmup, repeats)
+    sys.path[:0] = [str(repo / "src"), str(repo)]
+    from tests.support.native_ext import inject_native_paths
+
+    if not inject_native_paths():
+        raise RuntimeBaselineError("compiled _channel_native extension was not found")
+    import torch
+
+    if not torch.cuda.is_available():
+        raise RuntimeBaselineError("runtime baseline requires CUDA")
+    from benchmarks.harness import benchmark_operation
+
+    scene, config, operation, seed = _load_extended_case(solver, scenario, ad_mode)
+    scene_input = value_manifest(scene)
+    captured, measurement = benchmark_operation(
+        operation, warmup=warmup, repeats=repeats
+    )
+    return {
+        "schema": {"name": SCHEMA_NAME, "version": SCHEMA_VERSION},
+        "git_sha": _git_sha(repo),
+        "profile": EXTENDED_PROFILE_NAME,
+        "solver": solver,
+        "scenario": scenario,
+        "ad_mode": ad_mode,
+        "seed": seed,
+        "process_index": process_index,
+        "config": _plain_config(config),
+        "scene_input_fingerprint": scene_input["fingerprint"],
+        "scene_input": scene_input["snapshot"],
+        "result": result_manifest(captured),
+        "launch_ledger": launch_ledger(captured),
+        "performance": measurement.as_dict(),
+        "environment": _child_environment(torch),
+        "capture_note": (
+            "Tensor D2H copies and hashing occur only after benchmark timing and "
+            "are excluded from all wall/CUDA samples. AD cells hash the gradient "
+            "tensor(s) and the solve launch/tape ledger."
+        ),
+    }
+
+
+def _aggregate_extended_case(rows: Sequence[dict[str, object]]) -> dict[str, object]:
+    aggregate = aggregate_case(rows)
+    aggregate["ad_mode"] = rows[0]["ad_mode"]
+    aggregate["seed"] = rows[0].get("seed")
+    return aggregate
+
+
+def _extended_child_command(
+    script: Path,
+    *,
+    solver: str,
+    scenario: str,
+    ad_mode: str,
+    process_index: int,
+    warmup: int,
+    repeats: int,
+) -> list[str]:
+    return [
+        sys.executable,
+        str(script),
+        "--profile",
+        EXTENDED_PROFILE_NAME,
+        "--child",
+        "--solver",
+        solver,
+        "--scenario",
+        scenario,
+        "--ad-mode",
+        ad_mode,
+        "--process-index",
+        str(process_index),
+        "--warmup",
+        str(warmup),
+        "--repeats",
+        str(repeats),
+    ]
+
+
+def collect_extended(
+    repo: Path,
+    *,
+    cells: Sequence[tuple[str, str, str]],
+    processes: int,
+    warmup: int,
+    repeats: int,
+    timeout_seconds: int,
+) -> dict[str, object]:
+    """Freeze the extended profile, excluding non-reproducible/rejected cells.
+
+    Every kept cell is verified bitwise exact across ``processes`` independent
+    processes by :func:`aggregate_case`. A cell whose child rejects the
+    combination (capability refusal) or whose hashes differ across processes is
+    recorded in ``excluded`` with the exact error rather than aborting the run.
+    """
+
+    validate_measurement_policy(processes, warmup, repeats)
+    script = Path(__file__).resolve()
+    cases: list[dict[str, object]] = []
+    excluded: list[dict[str, object]] = []
+    for scenario, solver, ad_mode in cells:
+        rows: list[dict[str, object]] = []
+        detail = None
+        for process_index in range(processes):
+            command = _extended_child_command(
+                script,
+                solver=solver,
+                scenario=scenario,
+                ad_mode=ad_mode,
+                process_index=process_index,
+                warmup=warmup,
+                repeats=repeats,
+            )
+            env = os.environ.copy()
+            env["PYTHONDONTWRITEBYTECODE"] = "1"
+            completed = subprocess.run(
+                command,
+                cwd=repo,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout_seconds,
+            )
+            if completed.returncode:
+                detail = (completed.stderr or completed.stdout).strip().splitlines()[-1:]
+                detail = detail[0] if detail else "child failed with no diagnostic"
+                break
+            rows.append(_parse_child_stdout(completed.stdout))
+        if detail is not None:
+            excluded.append(
+                {
+                    "scenario": scenario,
+                    "solver": solver,
+                    "ad_mode": ad_mode,
+                    "reason": "child_rejected",
+                    "detail": detail,
+                }
+            )
+            continue
+        try:
+            cases.append(_aggregate_extended_case(rows))
+        except RuntimeBaselineError as error:
+            excluded.append(
+                {
+                    "scenario": scenario,
+                    "solver": solver,
+                    "ad_mode": ad_mode,
+                    "reason": "not_exact_across_processes",
+                    "detail": str(error),
+                    "result_fingerprints": sorted(
+                        {
+                            str(row["result"]["result_fingerprint"])  # type: ignore[index]
+                            for row in rows
+                        }
+                    ),
+                }
+            )
+    ad_modes = sorted({cell[2] for cell in cells})
+    return {
+        "schema": {"name": SCHEMA_NAME, "version": SCHEMA_VERSION},
+        "git_sha": _git_sha(repo),
+        "profile": EXTENDED_PROFILE_NAME,
+        "measurement_policy": {
+            "independent_processes": processes,
+            "warmup_per_process": warmup,
+            "steady_repeats_per_process": repeats,
+            "minimums_enforced": {
+                "independent_processes": MIN_PROCESSES,
+                "warmup_per_process": MIN_WARMUP,
+                "steady_repeats_per_process": MIN_REPEATS,
+            },
+        },
+        "coverage": {
+            "solvers": list(SOLVERS),
+            "forward_scenarios": sorted(_EXTENDED_FORWARD_SOLVERS),
+            "ad_scenarios": list(_EXTENDED_AD_SCENARIOS),
+            "ad_solvers": list(_EXTENDED_AD_SOLVERS),
+            "ad_modes": ad_modes,
+            "ad_seeds": {
+                f"{scenario}:{mode}": name
+                for (scenario, mode), name in _EXTENDED_AD_SEEDS.items()
+            },
+            "mc_seeds": dict(_EXTENDED_MC_SEEDS),
+            "frozen_cell_count": len(cases),
+            "excluded_cell_count": len(excluded),
+            "status": "extended-g0-backfill",
+            "unsupported_dimensions": list(_EXTENDED_UNSUPPORTED),
+        },
+        "cases": cases,
+        "excluded": excluded,
+    }
+
+
 def _project_runtime_report(report: dict[str, object]) -> dict[str, dict[str, object]]:
     common = {
         "schema": report["schema"],
@@ -851,6 +1680,148 @@ def write_immutable_report(report: dict[str, object], output_root: Path) -> Path
     return directory / "reduced.json"
 
 
+def _project_extended_report(report: dict[str, object]) -> dict[str, dict[str, object]]:
+    common = {
+        "schema": report["schema"],
+        "git_sha": report["git_sha"],
+        "profile": report["profile"],
+        "measurement_policy": report["measurement_policy"],
+        "coverage": report["coverage"],
+        "excluded": report["excluded"],
+    }
+    solver_cases = []
+    launch_cases = []
+    performance_cases = []
+    for case in report["cases"]:
+        case_common = {
+            "solver": case["solver"],
+            "scenario": case["scenario"],
+            "ad_mode": case["ad_mode"],
+            "seed": case["seed"],
+            "config": case["config"],
+            "scene_input_fingerprint": case["scene_input_fingerprint"],
+            "result_fingerprint": case["result_fingerprint"],
+            "metadata_fingerprint": case["metadata_fingerprint"],
+            "exact_across_processes": case["exact_across_processes"],
+        }
+        solver_cases.append(
+            {
+                **case_common,
+                "processes": [
+                    {
+                        "process_index": row["process_index"],
+                        "scene_input": row["scene_input"],
+                        "result": row["result"],
+                    }
+                    for row in case["processes"]
+                ],
+            }
+        )
+        launch_cases.append(
+            {
+                **case_common,
+                "processes": [
+                    {
+                        "process_index": row["process_index"],
+                        "launch_ledger": row["launch_ledger"],
+                    }
+                    for row in case["processes"]
+                ],
+            }
+        )
+        performance_cases.append(
+            {
+                "solver": case["solver"],
+                "scenario": case["scenario"],
+                "ad_mode": case["ad_mode"],
+                "seed": case["seed"],
+                "config": case["config"],
+                "distribution": case["performance_distribution"],
+                "processes": [
+                    {
+                        "process_index": row["process_index"],
+                        "environment": row["environment"],
+                        "performance": row["performance"],
+                    }
+                    for row in case["processes"]
+                ],
+            }
+        )
+    return {
+        "extended-solver-results.json": {
+            **common,
+            "kind": "solver-results",
+            "cases": solver_cases,
+        },
+        "extended-launch-ledger.json": {
+            **common,
+            "kind": "launch-ledger",
+            "cases": launch_cases,
+        },
+        "extended-performance.json": {
+            **common,
+            "kind": "performance",
+            "cases": performance_cases,
+        },
+    }
+
+
+def write_extended_report(report: dict[str, object], baselines_root: Path) -> Path:
+    """Freeze the extended profile under ``<sha>/runtime/extended.json``.
+
+    The reduced writer owns a whole fresh ``<sha>`` directory; the extended
+    profile is a runtime backfill that lands in the ``runtime`` subdirectory of
+    the commit's baseline directory, so only the ``extended-*`` artifacts are
+    written and an existing sibling static/reduced baseline is preserved. The
+    extended index itself is immutable: refreeze against a new commit instead.
+    """
+
+    sha = str(report["git_sha"])
+    baselines_root = baselines_root.resolve()
+    runtime_dir = baselines_root / sha / "runtime"
+    index_path = runtime_dir / "extended.json"
+    if index_path.exists():
+        raise RuntimeBaselineError(
+            f"immutable extended runtime baseline already exists: {index_path}"
+        )
+    projections = _project_extended_report(report)
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    artifact_index = {}
+    written: list[Path] = []
+    try:
+        for filename, payload in projections.items():
+            content = _canonical_bytes(payload)
+            target = runtime_dir / filename
+            if target.exists():
+                raise RuntimeBaselineError(
+                    f"immutable extended runtime artifact already exists: {target}"
+                )
+            target.write_bytes(content)
+            written.append(target)
+            artifact_index[filename] = {
+                "kind": payload["kind"],
+                "sha256": _sha256(content),
+            }
+        index = {
+            "schema": report["schema"],
+            "git_sha": report["git_sha"],
+            "profile": report["profile"],
+            "measurement_policy": report["measurement_policy"],
+            "coverage": report["coverage"],
+            "excluded": report["excluded"],
+            "artifacts": artifact_index,
+        }
+        index_path.write_bytes(_canonical_bytes(index))
+    except BaseException:
+        for target in written:
+            if target.exists():
+                target.unlink()
+        if index_path.exists():
+            index_path.unlink()
+        raise
+    return index_path
+
+
 def _comma_values(value: str) -> tuple[str, ...]:
     values = tuple(item.strip() for item in value.split(",") if item.strip())
     if not values:
@@ -864,8 +1835,16 @@ def _parser() -> argparse.ArgumentParser:
         "--repo", type=Path, default=Path(__file__).resolve().parents[1]
     )
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--profile",
+        choices=("reduced", EXTENDED_PROFILE_NAME),
+        default="reduced",
+    )
     parser.add_argument("--solver", choices=SOLVERS, help=argparse.SUPPRESS)
-    parser.add_argument("--scenario", choices=REDUCED_SCENARIOS, help=argparse.SUPPRESS)
+    # The reduced profile validates the scenario against REDUCED_SCENARIOS and
+    # the extended profile against its own matrix, so the CLI accepts any name.
+    parser.add_argument("--scenario", help=argparse.SUPPRESS)
+    parser.add_argument("--ad-mode", default="none", help=argparse.SUPPRESS)
     parser.add_argument("--process-index", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--solvers", type=_comma_values, default=SOLVERS)
     parser.add_argument("--scenarios", type=_comma_values, default=REDUCED_SCENARIOS)
@@ -876,7 +1855,15 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-root",
         type=Path,
-        help="defaults to REPO/artifacts/refactor_runtime_baseline",
+        help="reduced profile: defaults to REPO/artifacts/refactor_runtime_baseline",
+    )
+    parser.add_argument(
+        "--baselines-root",
+        type=Path,
+        help=(
+            "extended profile output root; defaults to REPO/docs/dev/baselines "
+            "and writes <sha>/runtime/extended.json"
+        ),
     )
     return parser
 
@@ -890,15 +1877,43 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise RuntimeBaselineError(
                     "child mode requires --solver and --scenario"
                 )
-            report = run_child(
-                repo=repo,
-                solver=args.solver,
-                scenario=args.scenario,
-                process_index=args.process_index,
+            if args.profile == EXTENDED_PROFILE_NAME:
+                report = run_extended_child(
+                    repo=repo,
+                    solver=args.solver,
+                    scenario=args.scenario,
+                    ad_mode=args.ad_mode,
+                    process_index=args.process_index,
+                    warmup=args.warmup,
+                    repeats=args.repeats,
+                )
+            else:
+                report = run_child(
+                    repo=repo,
+                    solver=args.solver,
+                    scenario=args.scenario,
+                    process_index=args.process_index,
+                    warmup=args.warmup,
+                    repeats=args.repeats,
+                )
+            print(json.dumps(report, sort_keys=True, separators=(",", ":")))
+            return 0
+        if args.profile == EXTENDED_PROFILE_NAME:
+            report = collect_extended(
+                repo,
+                cells=extended_cells(),
+                processes=args.processes,
                 warmup=args.warmup,
                 repeats=args.repeats,
+                timeout_seconds=args.timeout_seconds,
             )
-            print(json.dumps(report, sort_keys=True, separators=(",", ":")))
+            baselines_root = (
+                args.baselines_root
+                if args.baselines_root is not None
+                else repo / "docs" / "dev" / "baselines"
+            )
+            destination = write_extended_report(report, baselines_root)
+            print(destination)
             return 0
         report = collect_reduced(
             repo,
