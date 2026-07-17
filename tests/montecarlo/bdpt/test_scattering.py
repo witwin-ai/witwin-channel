@@ -22,7 +22,7 @@ from witwin.channel_native import (
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Layer, PhysicalSurface, Roughness
 from witwin.channel_native.montecarlo.bdpt import Config, solve
-from witwin.channel_native.montecarlo.scattering_events import (
+from witwin.channel_native.montecarlo.events.scattering import (
     sample_scatter_directions,
     scatter_direction_uniforms,
 )

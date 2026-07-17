@@ -1,7 +1,7 @@
 """Shared Kirchhoff rough-surface scattering helpers for the MC solvers.
 
 Extends the wave-2 two-way {reflect, transmit} event machinery
-(:mod:`witwin.channel_native.montecarlo.transmission`) to the three-way
+(:mod:`witwin.channel_native.montecarlo.events.transmission`) to the three-way
 {reflect, scatter, transmit} selection of plan section 7.1 at hits on rough
 faces (``scatter_model_id == 1``), and hosts the pure-torch pieces both MC
 solvers share: local roughness frames, TE/TM incident power decomposition,
@@ -149,7 +149,7 @@ def scatter_direction_uniforms(
 
     Derived like the wave-2 event-selection seeds but salted into a distinct
     stream, so the selection uniforms of
-    :func:`witwin.channel_native.montecarlo.transmission.event_uniforms`
+    :func:`witwin.channel_native.montecarlo.events.transmission.event_uniforms`
     are untouched (bit-identical smooth-face behavior).
     """
 

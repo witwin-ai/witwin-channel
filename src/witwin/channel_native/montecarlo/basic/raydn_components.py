@@ -41,8 +41,8 @@ from witwin.channel_native.core.receiver_geometry import (
 )
 from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
-from witwin.channel_native.montecarlo.scattering_events import scattering_map_matrix
-from witwin.channel_native.montecarlo.transmission import (
+from witwin.channel_native.montecarlo.events.scattering import scattering_map_matrix
+from witwin.channel_native.montecarlo.events.transmission import (
     layer_csr_view,
     scene_diagonal_m,
     straight_transmission_chains,
@@ -290,7 +290,7 @@ def scattering_component_map(
     """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
 
     Thin grid wrapper around
-    :func:`witwin.channel_native.montecarlo.scattering_events.scattering_map_matrix`
+    :func:`witwin.channel_native.montecarlo.events.scattering.scattering_map_matrix`
     (which documents the estimator and its v1 simplifications): the matrix
     holds the per-cell scattering PATH GAIN at the cell center times the
     transmitter power, mirroring the LoS / transmission map conventions, so

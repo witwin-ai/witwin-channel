@@ -888,14 +888,14 @@ def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatc
     materials_by_index = kirchhoff_resources.materials
     assert compiled.rough_material_runtimes is materials_by_index
     assert materials_by_index[0].table is table_resource
-    from witwin.channel_native.montecarlo import scattering_events
+    from witwin.channel_native.montecarlo.events import scattering as scattering_events
 
     assert scattering_events.RoughMaterialRuntime is (
         scattering_resources.RoughMaterialRuntime
     )
     assert pickle.loads(
         _pickle_global(
-            "witwin.channel_native.montecarlo.scattering_events",
+            "witwin.channel_native.montecarlo.events.scattering",
             "RoughMaterialRuntime",
         )
     ) is scattering_resources.RoughMaterialRuntime

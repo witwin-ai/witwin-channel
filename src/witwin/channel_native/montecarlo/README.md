@@ -13,8 +13,9 @@ contracts they share. It is not itself a solver API: callers select either
 - `bdpt/` owns bidirectional path tracing, including subpaths, connections,
   MIS, optional path-sample export, accumulation, and its solver-local kernel
   facades. Its package loads `solve` lazily to keep the public import light.
-- `transmission.py` and `scattering_events.py` own only event rules genuinely
-  shared by both solvers. They must not become a second solver pipeline.
+- `events/` (`transmission.py`, `scattering.py`) owns only event rules
+  genuinely shared by both solvers. It must not become a second solver
+  pipeline.
 - Scene compilation, material encoding, propagation primitives, and native
   symbol loading remain owned by their respective top-level domains.
 
@@ -30,8 +31,9 @@ The stable, snapshotted entry points are:
 - `witwin.channel_native.montecarlo.bdpt.Result`
 - `witwin.channel_native.montecarlo.bdpt.solve(scene, config)`
 
-`pipeline.py`, `backend.py`, `connections.py`, `subpaths.py`, `mis.py`,
-`sampling.py`, and each `kernels/` package are internal entry points. Their
+`pipeline.py`, `backend.py`, `endpoints.py`, `connections.py`,
+`accumulation.py`, `subpaths.py`, `mis.py`, `sampling.py`, and each `kernels/`
+package are internal entry points. Their
 names may be used by focused contract tests, but are not compatibility
 promises. The parent `montecarlo` package exports no solver symbols.
 

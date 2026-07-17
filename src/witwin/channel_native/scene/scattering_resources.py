@@ -115,5 +115,7 @@ def build_phase_screen_resources(
     return PhaseScreenRuntimeResources(key=key, runtimes=runtimes)
 
 
-# Preserve the pre-migration import/pickle owner exposed by the MC module.
-RoughMaterialRuntime.__module__ = "witwin.channel_native.montecarlo.scattering_events"
+# Preserve the import/pickle owner exposed by the MC events module.
+RoughMaterialRuntime.__module__ = (
+    "witwin.channel_native.montecarlo.events.scattering"
+)
