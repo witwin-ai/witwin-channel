@@ -37,6 +37,7 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
     tx_positions = torch.zeros((2, 3), dtype=torch.float32)
     tx_power = torch.ones((2,), dtype=torch.float32)
     rx_positions = torch.ones((2, 3), dtype=torch.float32)
+    tx_polarizations = torch.zeros((2, 3), dtype=torch.float32)
     start = tx_positions.clone()
     end = rx_positions.clone()
     active = torch.tensor([True, True])
@@ -46,12 +47,13 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
 
     def fake_export(*args, **kwargs):
         events.append("export")
-        assert len(args) == 3
+        # R5: path_los_export now also takes the per-transmitter polarization.
+        assert len(args) == 4
         assert all(
             actual is expected
             for actual, expected in zip(
                 args,
-                (tx_positions, tx_power, rx_positions),
+                (tx_positions, tx_power, rx_positions, tx_polarizations),
                 strict=True,
             )
         )
@@ -118,6 +120,7 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
         tx_positions,
         tx_power,
         rx_positions,
+        tx_polarizations,
         frequency_hz=3.0e9,
         sequence_width=2,
     )
@@ -168,6 +171,7 @@ def test_los_topology_skips_visibility_for_structure_free_scene(monkeypatch):
         SimpleNamespace(raydn=object()),
         torch.zeros((2, 3), dtype=torch.float32),
         torch.ones((2,), dtype=torch.float32),
+        torch.ones((2, 3), dtype=torch.float32),
         torch.ones((2, 3), dtype=torch.float32),
         frequency_hz=3.0e9,
         sequence_width=0,

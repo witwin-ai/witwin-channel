@@ -95,11 +95,15 @@ def test_path_los_export_returns_cuda_path_tensors_when_available():
     tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[3.0, 4.0, 0.0]], device="cuda", dtype=torch.float32)
+    # R5: vertical polarization; k_hat lies in the xy-plane so sin^2(theta) = 1
+    # (path_gain unchanged for this in-plane geometry).
+    tx_polarizations = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
 
     result = topology_blocks.path_los_export(
         tx_positions,
         tx_power,
         rx_positions,
+        tx_polarizations,
         frequency_hz=3.0e9,
     )
 
@@ -117,10 +121,13 @@ def test_path_los_export_requires_native_cuda_kernel(monkeypatch):
     tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
+    tx_polarizations = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
     monkeypatch.setattr(runtime_symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="path_los_export CUDA kernel is required"):
-        topology_blocks.path_los_export(tx_positions, tx_power, rx_positions, frequency_hz=3.0e9)
+        topology_blocks.path_los_export(
+            tx_positions, tx_power, rx_positions, tx_polarizations, frequency_hz=3.0e9
+        )
 
 
 def test_path_reflection_candidates_generate_native_segments():
@@ -1296,6 +1303,11 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     )
     power_tangent = torch.tensor([0.25, -0.5], device="cuda", dtype=torch.float32)
     tx_tangent = torch.zeros_like(tx_positions)
+    # R5: distinct per-transmitter polarizations exercise a non-trivial dipole
+    # sin^2(theta) pattern (and its transverse-projection position derivative).
+    tx_polarizations = torch.tensor(
+        [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32
+    )
 
     frequency_hz = 3.0e9
     frequency_tangent = 2.5e5
@@ -1304,6 +1316,7 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
         tx_power,
         rx_positions,
         grad_output,
+        tx_polarizations,
         frequency_hz=frequency_hz,
     )
     jvp = mc_maps.mc_los_path_gain_jvp(
@@ -1316,6 +1329,7 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
         False,
         True,
         True,
+        tx_polarizations,
         frequency_hz=frequency_hz,
         frequency_tangent=frequency_tangent,
     )
@@ -1325,19 +1339,35 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     diff = tx_positions[:, None, :] - rx_positions[None, :, :]
     distance_sq = (diff * diff).sum(dim=-1)
     inv_d2 = 1.0 / distance_sq
-    expected_grad_power = (grad_output * scale * inv_d2).sum(dim=1)
+    inv_d = inv_d2.sqrt()
+    # R5 dipole factor sin2 = |p|^2 - (p . k_hat)^2 and the transverse projection
+    # p_t = p - (p . k_hat) k_hat, k_hat = (tx - rx)/d.
+    pol = tx_polarizations
+    pol_dot = (pol[:, None, :] * diff).sum(dim=-1) * inv_d
+    pol_mag2 = (pol * pol).sum(dim=-1)
+    pattern = (pol_mag2[:, None] - pol_dot ** 2).clamp_min(0.0)
+    p_t = pol[:, None, :] - pol_dot[:, :, None] * diff * inv_d[:, :, None]
+    expected_grad_power = (grad_output * scale * inv_d2 * pattern).sum(dim=1)
     expected_grad_frequency = (
-        grad_output * tx_power[:, None] * scale_dfreq * inv_d2
+        grad_output * tx_power[:, None] * scale_dfreq * inv_d2 * pattern
     ).sum()
-    coeff = grad_output * 2.0 * tx_power[:, None] * scale * inv_d2 * inv_d2
-    expected_grad_rx = (coeff[:, :, None] * diff).sum(dim=0)
-    expected_grad_tx = -(coeff[:, :, None] * diff).sum(dim=1)
-    expected_jvp = power_tangent[:, None] * scale * inv_d2
-    expected_jvp = expected_jvp + 2.0 * tx_power[:, None] * scale * inv_d2 * inv_d2 * (
-        diff * rx_tangent[None, :, :]
-    ).sum(dim=-1)
+    # d(gain)/dr = 2 P S ( sin2 * r / d^4 + c * p_t / d^3 ); grad_tx = -grad_rx.
+    base = grad_output * 2.0 * tx_power[:, None] * scale * inv_d2
+    contrib = base[:, :, None] * (
+        pattern[:, :, None] * diff * inv_d2[:, :, None]
+        + pol_dot[:, :, None] * p_t * inv_d[:, :, None]
+    )
+    expected_grad_rx = contrib.sum(dim=0)
+    expected_grad_tx = -contrib.sum(dim=1)
+    base_jvp = 2.0 * tx_power[:, None] * scale * inv_d2
+    diff_dot_rxt = (diff * rx_tangent[None, :, :]).sum(dim=-1)
+    pt_dot_rxt = (p_t * rx_tangent[None, :, :]).sum(dim=-1)
+    expected_jvp = power_tangent[:, None] * scale * inv_d2 * pattern
+    expected_jvp = expected_jvp + base_jvp * (
+        pattern * diff_dot_rxt * inv_d2 + pol_dot * pt_dot_rxt * inv_d
+    )
     expected_jvp = expected_jvp + (
-        tx_power[:, None] * scale_dfreq * frequency_tangent * inv_d2
+        tx_power[:, None] * scale_dfreq * frequency_tangent * inv_d2 * pattern
     )
 
     torch.testing.assert_close(grad_tx, expected_grad_tx, rtol=1e-6, atol=1e-9)
@@ -1356,6 +1386,7 @@ def test_mc_los_path_gain_ad_kernels_require_native_cuda_kernel(monkeypatch):
     tx_positions = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     tx_power = torch.ones((1,), device="cuda", dtype=torch.float32)
     rx_positions = torch.ones((1, 3), device="cuda", dtype=torch.float32)
+    tx_polarizations = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     grad_output = torch.ones((1, 1), device="cuda", dtype=torch.float32)
     monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
@@ -1365,6 +1396,7 @@ def test_mc_los_path_gain_ad_kernels_require_native_cuda_kernel(monkeypatch):
             tx_power,
             rx_positions,
             grad_output,
+            tx_polarizations,
             frequency_hz=3.0e9,
         )
     with pytest.raises(RuntimeError, match="mc_los_path_gain_jvp CUDA kernel is required"):
@@ -1378,6 +1410,7 @@ def test_mc_los_path_gain_ad_kernels_require_native_cuda_kernel(monkeypatch):
             False,
             False,
             False,
+            tx_polarizations,
             frequency_hz=3.0e9,
         )
 

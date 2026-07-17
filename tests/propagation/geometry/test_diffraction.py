@@ -187,9 +187,11 @@ def test_order1_query_consumes_raw_native_tuple_and_preserves_state_identity(
         "raydn_diffraction_paths_order1_forward",
         fake_forward,
     )
+    tx_polarization = torch.tensor([[0.0, 0.0, 1.0]])
     query = diffraction.DiffractionOrder1Query(
         handle=31,
         tx_position=torch.zeros((1, 3)),
+        tx_polarization=tx_polarization,
         rx_positions=rx_positions,
         active=None,
         states=states,
@@ -206,11 +208,14 @@ def test_order1_query_consumes_raw_native_tuple_and_preserves_state_identity(
     result = diffraction.query_diffraction_order1(query)
 
     assert len(calls) == 1
-    assert calls[0][4] is states.edge_index
-    assert calls[0][5] is states.edge_position
-    assert calls[0][15] is states.source_power
-    assert calls[0][2] is rx_positions
-    assert calls[0][2].stride() == rx_positions.stride()
+    # tx_polarization is threaded in as argument index 2 (R5 fix), shifting the
+    # state and receiver arguments down by one slot.
+    assert calls[0][2] is tx_polarization
+    assert calls[0][5] is states.edge_index
+    assert calls[0][6] is states.edge_position
+    assert calls[0][16] is states.source_power
+    assert calls[0][3] is rx_positions
+    assert calls[0][3].stride() == rx_positions.stride()
     assert result.valid is raw[1]
     assert result.rx_id is raw[3]
     assert result.depth is raw[4]

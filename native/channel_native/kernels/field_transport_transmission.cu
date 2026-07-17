@@ -51,8 +51,9 @@ __device__ void transmission_chain_eval(
     chain.total_length = field::safe_length(offset);
     chain.direction = field::safe_normalize(
         offset, field::make_f3(0.0f, 0.0f, 1.0f));
-    const field::float3a tx_axis = field::stable_perp_basis(
-        chain.direction, load3f(tx_polarization, index));
+    // F1: unnormalized transverse projection of the transmit polarization.
+    const field::float3a tx_axis = field::project_to_wedge_plane(
+        load3f(tx_polarization, index), chain.direction);
     field::Complex3 value = field::cplx_scale_real(tx_axis, field::cplx(1.0f, 0.0f));
     float carrier_length = chain.total_length;
     chain.path_valid = true;
@@ -106,8 +107,9 @@ __device__ void transmission_chain_eval(
             transport::precise_neg_kd(wave_number, carrier_length)),
         amplitude);
     chain.value_chain = value;
-    chain.rx_axis = field::stable_perp_basis(
-        chain.direction, load3f(rx_polarization, index));
+    // F1: receiver scalar = p_rx . E via the unnormalized transverse of p_rx.
+    chain.rx_axis = field::project_to_wedge_plane(
+        load3f(rx_polarization, index), chain.direction);
     chain.propagation = propagation;
     chain.carrier_length = carrier_length;
     // dP/df = P * (-1/k - j*carrier) * (2*pi/c); the amplitude spreads over
@@ -260,7 +262,7 @@ __global__ void transmission_sequence_backward_kernel(
                 field::cplx_adj_dot(g_scalar, value_final.y),
                 field::cplx_adj_dot(g_scalar, value_final.z));
             field::float3a g_pol_dump = field::f3_zero();
-            field::adj_stable_perp_basis(
+            ad::adj_transverse_project(
                 chain.direction, load3f(rx_polarization, index), g_rx_axis,
                 g_direction, g_pol_dump);
         }
@@ -370,7 +372,7 @@ __global__ void transmission_sequence_backward_kernel(
         const field::float3a g_tx_axis = field::make_f3(
             g_chain.x.re, g_chain.y.re, g_chain.z.re);
         field::float3a g_pol_dump = field::f3_zero();
-        field::adj_stable_perp_basis(
+        ad::adj_transverse_project(
             chain.direction, load3f(tx_polarization, index), g_tx_axis,
             g_direction, g_pol_dump);
         const field::float3a offset = field::f3_sub(
@@ -466,9 +468,9 @@ __global__ void transmission_sequence_jvp_kernel(
             load_dual3f(source, tangent_source, index));
         const ad::DualF total_length = ad::dual_safe_length(offset);
         const ad::DualF3 direction = ad::dual_safe_normalize(offset, e_z);
-        const ad::DualF3 tx_axis = ad::dual_stable_perp_basis(
+        const ad::DualF3 tx_axis = ad::dual_transverse_project(
             direction, ad::df3_const(load3f(tx_polarization, index)));
-        const ad::DualF3 rx_axis = ad::dual_stable_perp_basis(
+        const ad::DualF3 rx_axis = ad::dual_transverse_project(
             direction, ad::df3_const(load3f(rx_polarization, index)));
         field::Complex3 d_value = field::cplx_scale_real(
             tx_axis.d, field::cplx(1.0f, 0.0f));

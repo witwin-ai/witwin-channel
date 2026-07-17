@@ -540,6 +540,20 @@ if(WIN32)
     target_link_directories(_channel_native PRIVATE "${CHANNEL_NATIVE_PYTHON_LIBRARY_DIR}")
 endif()
 target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYD=1 CHANNEL_NATIVE_WITH_OPTIX=1)
+# RayD's order-1 diffraction path export (paths_optix.cu) is compiled to OptiX
+# PTX with --use_fast_math (RAYD_TORCH_OPTIX_FAST_MATH). The wedge-diffraction AD
+# kernel re-evaluates that SAME shared UTD math (rayd/shared/utd/utd_math.h) and
+# is pinned to the raygen export by the forward-parity tests. Compiling it with
+# the default precise div/sqrt/trig instead diverges from the raygen by ~1e-5 in
+# the edge angles (atan2/acos/sqrt/division): invisible on smooth edges, but
+# amplified where the receiver rides a UTD shadow boundary and the isolated
+# diffracted field is steep. Match the raygen's math mode so the re-evaluation
+# reproduces the export. Only this kernel re-evaluates the fast-math raygen; the
+# coupled/LoS/reflection/transmission AD kernels reproduce channel_native's own
+# precise-math field kernels and must stay precise (matching their primals).
+set_source_files_properties(
+    native/channel_native/kernels/field_wedge_ad_diffraction.cu
+    PROPERTIES COMPILE_OPTIONS "--use_fast_math")
 set_source_files_properties(
     native/channel_native/build_info.cpp
     PROPERTIES

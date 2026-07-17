@@ -39,7 +39,18 @@ _SOLVERS = ("deterministic", "path")
 _FREQUENCY_HZ = 3.0e9
 _WEDGE_MATERIAL = {"eps_r": 4.0, "sigma_e": 0.02}
 _WEDGE_TX = (0.0, -1.0, 0.5)
-_WEDGE_RX = (3.0, 1.0, 0.5)
+# RX must NOT sit mirror-symmetric to TX about the thin-screen plane y = 0.
+# With RX_y = +1.0 it did (|TX_y| = |RX_y| = 1, equal z), placing the
+# observation exactly on the reflection shadow boundary phi + phi' = 2*n*pi of
+# the screen edge (edge_id 2, exterior angle 2*pi). That is a branch cut, and
+# the wedge Fermat point falls OFF the physical edge (param = -0.5) there, so
+# the near-null diffracted field (~100x below the dominant paths) flickers
+# between branches under codegen differences (OptiX fast-math raygen vs the CUDA
+# AD kernel) and central differences of the primal never converge. Perturbing
+# RX_y off the exact symmetry (1.0 -> 1.07) takes the observation off the branch
+# cut and puts every path in a well-conditioned regime; the wedge stays welded
+# and all previously exercised code paths still fire.
+_WEDGE_RX = (3.0, 1.07, 0.5)
 # Off the scene's x = 0 symmetry axis: exactly on it, the ground specular
 # point and the wedge stationary points ride degenerate loci where tiny
 # endpoint perturbations flip discrete winners, so a central difference of
@@ -55,8 +66,13 @@ def _wedge_scene(
     tx: torch.Tensor | None = None,
     rx: torch.Tensor | None = None,
 ) -> Scene:
+    # Route through the module TX/RX (perturbed off the y = 0 mirror plane, see
+    # _WEDGE_RX) rather than the shared scenes.py defaults, which are still on it.
     return wedge_diffraction_scene(
-        Dielectric(**_WEDGE_MATERIAL), tx=tx, rx=rx, frequency=frequency
+        Dielectric(**_WEDGE_MATERIAL),
+        tx=torch.tensor(_WEDGE_TX) if tx is None else tx,
+        rx=torch.tensor(_WEDGE_RX) if rx is None else rx,
+        frequency=frequency,
     )
 
 
@@ -155,7 +171,11 @@ def _solve_coupled_adapter(scene: Scene, solver: str, ad_mode: str):
 @pytest.mark.parametrize("material", ("dielectric", "pec"))
 def test_wedge_reevaluation_forward_parity(solver, material):
     scene = (
-        _wedge_scene() if material == "dielectric" else wedge_diffraction_scene()
+        _wedge_scene()
+        if material == "dielectric"
+        else wedge_diffraction_scene(
+            tx=torch.tensor(_WEDGE_TX), rx=torch.tensor(_WEDGE_RX)
+        )
     )
     primal = _solve_wedge(scene, solver, "none")
     reevaluated = _solve_wedge(scene, solver, "vjp")
@@ -266,7 +286,10 @@ def test_wedge_endpoint_position_grad_matches_fd(solver, endpoint):
 # tests need welded topology so that one live vertex table drives both wedge
 # faces. The two-structure fixture above duplicates the edge vertices, and a
 # per-copy FD probe would split the wedge (a topology change outside the
-# fixed-winner contract).
+# fixed-winner contract). This fixture drives the wedge with _WEDGE_TX/_WEDGE_RX,
+# whose RX is deliberately off the y = 0 mirror plane (see _WEDGE_RX): on the
+# plane the screen-edge observation lands on the RSB branch cut with an off-edge
+# Fermat point, which is what made the vertex parity/FD gates flake.
 _WELDED_WEDGE_VERTICES = (
     (2.0, 0.0, -1.0),
     (2.0, 0.0, 2.0),

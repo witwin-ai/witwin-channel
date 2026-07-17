@@ -16,6 +16,7 @@ from witwin.channel_native.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
     receiver_grid_points,
     receiver_positions,
+    transmitter_polarizations,
     transmitter_positions,
 )
 
@@ -44,6 +45,9 @@ def los_path_gain(
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
     if tx_pos.shape[0] == 0 or rx_pos.shape[0] == 0:
         return mc_zero_matrix(tx_pos, rows=tx_pos.shape[0], cols=rx_pos.shape[0])
+    # R5: the true per-transmitter polarization drives the LoS dipole sin^2
+    # pattern (frozen winner of AD; the pattern moves through the endpoints).
+    tx_pol = transmitter_polarizations(scene, device=device)
 
     if ad:
         # Plan 07 AD-3: swap the host-float endpoint tensors for the live
@@ -55,12 +59,13 @@ def los_path_gain(
         if ledger is not None:
             ledger.add(tx_live, tx_power, rx_live)
         return mc_los_path_gain_ad(
-            tx_live, tx_power, rx_live, frequency=scene.frequency
+            tx_live, tx_power, rx_live, tx_pol, frequency=scene.frequency
         )
     exported = path_los_export(
         tx_pos,
         tx_power,
         rx_pos,
+        tx_pol,
         frequency_hz=float(scene.frequency),
     )
     return exported["path_gain_matrix"]

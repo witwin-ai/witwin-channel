@@ -228,6 +228,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
 pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     int64_t scene_handle,
     torch::Tensor tx_pos,
+    torch::Tensor tx_pol,
     torch::Tensor rx_pos,
     pybind11::object active,
     torch::Tensor state_edge_index,

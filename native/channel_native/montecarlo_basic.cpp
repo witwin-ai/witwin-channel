@@ -30,7 +30,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_b
     at::Tensor tx_power,
     at::Tensor rx_positions,
     at::Tensor grad_output,
-    double frequency_hz);
+    double frequency_hz,
+    at::Tensor tx_pol);
 at::Tensor cn_mc_los_path_gain_jvp_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
@@ -42,7 +43,8 @@ at::Tensor cn_mc_los_path_gain_jvp_cuda(
     bool has_power_tangent,
     bool has_rx_tangent,
     double frequency_hz,
-    double frequency_tangent);
+    double frequency_tangent,
+    at::Tensor tx_pol);
 at::Tensor cn_mc_los_component_maps_adjoint_cuda(
     at::Tensor grad_maps,
     at::Tensor visible);
@@ -85,7 +87,7 @@ at::Tensor cn_mc_sionna_reflection_accumulate_cuda(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area);
+    double solid_angle_per_ray, double cell_area, at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_mc_sionna_reflection_accumulate_backward_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
@@ -96,7 +98,8 @@ cn_mc_sionna_reflection_accumulate_backward_cuda(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_dfreq);
+    double solid_angle_per_ray, double cell_area, double wavelength_dfreq,
+    at::Tensor tx_pol);
 at::Tensor cn_mc_sionna_reflection_accumulate_jvp_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
@@ -108,7 +111,8 @@ at::Tensor cn_mc_sionna_reflection_accumulate_jvp_cuda(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_tangent);
+    double solid_angle_per_ray, double cell_area, double wavelength_tangent,
+    at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_face_material_tensors_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
@@ -119,7 +123,7 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,int64_t,double,double,double,double,double,
-    int64_t,int64_t,double,double,int64_t,double);
+    int64_t,int64_t,double,double,int64_t,double,at::Tensor);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
@@ -132,7 +136,7 @@ cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_dfreq);
+    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol);
 at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
@@ -146,7 +150,7 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_tangent);
+    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol);
 at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected);
 std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
@@ -248,14 +252,16 @@ pybind11::tuple cn_mc_los_path_gain_backward(
     torch::Tensor tx_power,
     torch::Tensor rx_positions,
     torch::Tensor grad_output,
-    double frequency_hz) {
+    double frequency_hz,
+    torch::Tensor tx_pol) {
     auto [grad_tx, grad_power, grad_rx, grad_frequency] =
         cn_mc_los_path_gain_backward_cuda(
             tx_positions,
             tx_power,
             rx_positions,
             grad_output,
-            frequency_hz);
+            frequency_hz,
+            tx_pol);
     pybind11::tuple out(4);
     out[0] = grad_tx;
     out[1] = grad_power;
@@ -275,7 +281,8 @@ torch::Tensor cn_mc_los_path_gain_jvp(
     bool has_power_tangent,
     bool has_rx_tangent,
     double frequency_hz,
-    double frequency_tangent) {
+    double frequency_tangent,
+    torch::Tensor tx_pol) {
     return cn_mc_los_path_gain_jvp_cuda(
         tx_positions,
         tx_power,
@@ -287,7 +294,8 @@ torch::Tensor cn_mc_los_path_gain_jvp(
         has_power_tangent,
         has_rx_tangent,
         frequency_hz,
-        frequency_tangent);
+        frequency_tangent,
+        tx_pol);
 }
 
 torch::Tensor cn_mc_los_component_maps_adjoint(
@@ -369,7 +377,7 @@ torch::Tensor cn_mc_sionna_reflection_accumulate(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area) {
+    double solid_angle_per_ray, double cell_area, torch::Tensor tx_pol) {
     TORCH_CHECK(ray_o.is_cuda() && ray_d.is_cuda(), "reflection rays must be CUDA tensors");
     TORCH_CHECK(ray_o.scalar_type() == at::kFloat && ray_d.scalar_type() == at::kFloat,
                 "reflection rays must be float32");
@@ -391,12 +399,15 @@ torch::Tensor cn_mc_sionna_reflection_accumulate(
     TORCH_CHECK(axis >= 0 && axis <= 2, "axis must be 0, 1, or 2");
     TORCH_CHECK(resolution0 > 0 && resolution1 > 0, "grid resolution must be positive");
     TORCH_CHECK(wavelength > 0.0 && cell_area > 0.0, "wavelength and cell_area must be positive");
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
     return cn_mc_sionna_reflection_accumulate_cuda(
         ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(), trace_t.contiguous(),
         trace_prim.contiguous(), face_normals.contiguous(), eta_r.contiguous(), sigma.contiguous(),
         gain.contiguous(), material_valid.contiguous(), thickness.contiguous(), contribution_depth,
         axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max,
-        resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area);
+        resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
+        tx_pol.contiguous());
 }
 
 pybind11::tuple cn_mc_sionna_reflection_accumulate_backward(
@@ -409,7 +420,10 @@ pybind11::tuple cn_mc_sionna_reflection_accumulate_backward(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_dfreq) {
+    double solid_angle_per_ray, double cell_area, double wavelength_dfreq,
+    torch::Tensor tx_pol) {
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
     auto [grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_frequency] =
         cn_mc_sionna_reflection_accumulate_backward_cuda(
             ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(),
@@ -419,7 +433,7 @@ pybind11::tuple cn_mc_sionna_reflection_accumulate_backward(
             need_materials, need_frequency, contribution_depth, axis, plane_position,
             coord0_min, coord0_max, coord1_min, coord1_max,
             resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
-            wavelength_dfreq);
+            wavelength_dfreq, tx_pol.contiguous());
     pybind11::tuple out(5);
     out[0] = grad_eta_r;
     out[1] = grad_sigma;
@@ -441,7 +455,10 @@ torch::Tensor cn_mc_sionna_reflection_accumulate_jvp(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_tangent) {
+    double solid_angle_per_ray, double cell_area, double wavelength_tangent,
+    torch::Tensor tx_pol) {
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
     return cn_mc_sionna_reflection_accumulate_jvp_cuda(
         ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(),
         trace_t.contiguous(), trace_prim.contiguous(), face_normals.contiguous(),
@@ -455,7 +472,7 @@ torch::Tensor cn_mc_sionna_reflection_accumulate_jvp(
         has_tangent_thickness, contribution_depth, axis, plane_position,
         coord0_min, coord0_max, coord1_min, coord1_max,
         resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
-        wavelength_tangent);
+        wavelength_tangent, tx_pol.contiguous());
 }
 
 torch::Tensor cn_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src) {
@@ -469,11 +486,14 @@ torch::Tensor cn_mc_sionna_diffraction_tape_accumulate(
     torch::Tensor exterior_angle,torch::Tensor source,torch::Tensor source_power,
     torch::Tensor eta_r,torch::Tensor sigma,torch::Tensor mu_r,torch::Tensor gain,
     torch::Tensor material_valid,torch::Tensor thickness,int64_t axis,double plane,double c0min,double c0max,
-    double c1min,double c1max,int64_t r0,int64_t r1,double wavelength,double cell_area,int64_t seed,double total_edge_length) {
+    double c1min,double c1max,int64_t r0,int64_t r1,double wavelength,double cell_area,int64_t seed,double total_edge_length,
+    torch::Tensor tx_pol) {
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
     return cn_mc_sionna_diffraction_tape_accumulate_cuda(
         tape_active,tape_state,tape_cell,tape_u,edge_pos,edge_dir,t_min,t_max,n0,nn,prim0,prim1,
         exterior_angle,source,source_power,eta_r,sigma,mu_r,gain,material_valid,thickness,axis,plane,
-        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length);
+        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length,tx_pol.contiguous());
 }
 
 pybind11::tuple cn_mc_sionna_diffraction_tape_accumulate_backward(
@@ -488,13 +508,16 @@ pybind11::tuple cn_mc_sionna_diffraction_tape_accumulate_backward(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_dfreq) {
+    double wavelength_dfreq, torch::Tensor tx_pol) {
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
     auto gradients = cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
         tape_active, tape_state, tape_cell, tape_u, edge_pos, edge_dir, t_min,
         t_max, n0, nn, prim0, prim1, exterior_angle, source, source_power,
         eta_r, sigma, mu_r, gain, material_valid, thickness, grad_output,
         need_materials, need_source, need_frequency, axis, plane, r0, r1,
-        wavelength, cell_area, seed, total_edge_length, wavelength_dfreq);
+        wavelength, cell_area, seed, total_edge_length, wavelength_dfreq,
+        tx_pol.contiguous());
     return pybind11::make_tuple(
         std::get<0>(gradients), std::get<1>(gradients), std::get<2>(gradients),
         std::get<3>(gradients), std::get<4>(gradients), std::get<5>(gradients));
@@ -515,7 +538,9 @@ torch::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_tangent) {
+    double wavelength_tangent, torch::Tensor tx_pol) {
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
     return cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
         tape_active, tape_state, tape_cell, tape_u, edge_pos, edge_dir, t_min,
         t_max, n0, nn, prim0, prim1, exterior_angle, source, source_power,
@@ -523,7 +548,8 @@ torch::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp(
         tangent_sigma, tangent_gain, tangent_thickness, tangent_source,
         has_tangent_eta_r, has_tangent_sigma, has_tangent_gain,
         has_tangent_thickness, has_tangent_source, axis, plane, r0, r1,
-        wavelength, cell_area, seed, total_edge_length, wavelength_tangent);
+        wavelength, cell_area, seed, total_edge_length, wavelength_tangent,
+        tx_pol.contiguous());
 }
 
 torch::Tensor cn_mc_selected_edge_indices(torch::Tensor selected) {

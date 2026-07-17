@@ -132,10 +132,10 @@ __global__ void free_space_backward_kernel(
         const ad::Vec3<T> offset =
             ad::v3_sub(ad::v3_load(target, index), ad::v3_load(source, index));
         ad::Vec3<T> g_direction = {T(0), T(0), T(0)};
-        ad::adj_v3_stable_perp_basis(
+        ad::adj_v3_transverse_project(
             eval.direction, ad::v3_load(tx_polarization, index), g_tx_axis,
             g_direction);
-        ad::adj_v3_stable_perp_basis(
+        ad::adj_v3_transverse_project(
             eval.direction, ad::v3_load(rx_polarization, index), g_rx_axis,
             g_direction);
         ad::Vec3<T> g_offset = {T(0), T(0), T(0)};
@@ -197,9 +197,9 @@ __global__ void free_space_jvp_kernel(
         (void)ad::dual_v3_length(offset, d_distance);
         const ad::DualV3<T> direction = ad::dual_v3_safe_normalize(
             offset, ad::dv3_const(ad::Vec3<T>{T(0), T(0), T(1)}));
-        const ad::DualV3<T> tx_axis = ad::dual_v3_stable_perp_basis(
+        const ad::DualV3<T> tx_axis = ad::dual_v3_transverse_project(
             direction, ad::v3_load(tx_polarization, index));
-        const ad::DualV3<T> rx_axis = ad::dual_v3_stable_perp_basis(
+        const ad::DualV3<T> rx_axis = ad::dual_v3_transverse_project(
             direction, ad::v3_load(rx_polarization, index));
         const c10::complex<T> d_carrier =
             eval.carrier_dfreq * tangent_frequency +

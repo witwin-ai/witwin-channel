@@ -138,8 +138,10 @@ __global__ void reflection_sequence_kernel(
             interaction_positions, index, 0, depth);
         field::float3a incident = field::safe_normalize(
             field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
-        field::float3a tx_axis = field::stable_perp_basis(
-            incident, load3(tx_polarization, index));
+        // F1: unnormalized transverse projection of the transmit polarization
+        // (short-dipole sin(theta) weight); the Jones s/p bases stay orthonormal.
+        field::float3a tx_axis = field::project_to_wedge_plane(
+            load3(tx_polarization, index), incident);
         field::Complex3 value = field::cplx_scale_real(
             tx_axis, field::cplx(1.0f, 0.0f));
         float total_length = 0.0f;
@@ -251,8 +253,9 @@ __global__ void transmission_sequence_kernel(
         const float total_length = field::safe_length(offset);
         const field::float3a direction = field::safe_normalize(
             offset, field::make_f3(0.0f, 0.0f, 1.0f));
-        const field::float3a tx_axis = field::stable_perp_basis(
-            direction, load3(tx_polarization, index));
+        // F1: unnormalized transverse projection of the transmit polarization.
+        const field::float3a tx_axis = field::project_to_wedge_plane(
+            load3(tx_polarization, index), direction);
         field::Complex3 value = field::cplx_scale_real(
             tx_axis, field::cplx(1.0f, 0.0f));
         float carrier_length = total_length;
@@ -416,8 +419,9 @@ __global__ void coupled_rd_field_kernel(
         } else {
             const field::float3a source_to_hit = field::safe_normalize(
                 field::f3_sub(hit, src), incident_direction);
-            const field::float3a tx_axis = field::stable_perp_basis(
-                source_to_hit, load3(tx_polarization, index));
+            // F1: unnormalized transverse projection of the transmit polarization.
+            const field::float3a tx_axis = field::project_to_wedge_plane(
+                load3(tx_polarization, index), source_to_hit);
             field::float3a reflected_direction;
             field::Complex3 reflected = transport::reflect_complex3(
                 field::cplx_scale_real(tx_axis, field::cplx(1.0f, 0.0f)),

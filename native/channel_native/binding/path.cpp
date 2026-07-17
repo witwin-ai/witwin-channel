@@ -22,6 +22,7 @@ int64_t cn_core_diffraction_edge_count(
 pybind11::dict cn_path_diffraction_paths_order1(
     int64_t scene_handle,
     torch::Tensor tx_positions,
+    torch::Tensor tx_polarizations,
     torch::Tensor tx_power,
     torch::Tensor rx_positions,
     torch::Tensor selected,
@@ -72,7 +73,8 @@ pybind11::dict cn_path_los_export(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
     torch::Tensor rx_positions,
-    double frequency_hz);
+    double frequency_hz,
+    torch::Tensor tx_pol);
 torch::Tensor cn_path_concat_vec3(pybind11::sequence blocks);
 pybind11::dict cn_path_los_visibility_inputs(
     torch::Tensor tx_positions,

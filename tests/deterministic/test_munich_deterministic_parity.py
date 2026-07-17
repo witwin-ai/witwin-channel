@@ -63,16 +63,30 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     )
     assert saved["delta"]["max_abs_delta_db"] < 250.0
     assert saved["delta"]["median_abs_delta_db"] < 20.0
-    assert saved["component_delta"]["los"]["max_abs_delta_db"] < 1.0e-3
+    # F1/R5 (utd-continuity-fix-design): native LoS now carries the short-dipole
+    # sin(theta) pattern of the default z-hat source polarization, while the
+    # legacy Channel oracle uses a world-X source. The bulk of the grid still
+    # matches exactly (median ~0 dB), but steep near-axis links diverge by the
+    # pattern ratio (max ~9.8 dB), so the former max < 1e-3 exactness now only
+    # holds for the median.
+    assert saved["component_delta"]["los"]["median_abs_delta_db"] < 1.0e-3
+    assert saved["component_delta"]["los"]["max_abs_delta_db"] < 12.0
     assert saved["component_delta"]["reflection"]["median_abs_delta_db"] < 1.0
-    # Native uses Sionna's default vertical source polarization while the
-    # legacy Channel oracle uses world-X. Geometry and K-P UTD still remain
-    # close after that intentional convention change.
-    assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 2.0
+    # Native uses Sionna's default vertical source polarization while the legacy
+    # Channel oracle uses world-X. Geometry and K-P UTD still remain close after
+    # that intentional convention change; F1's dipole pattern plus the F5
+    # finite-edge truncation lift the median diffraction delta to ~3.1 dB (was
+    # < 2.0 before the continuity fixes).
+    assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 4.0
     assert saved["native"]["metadata"]["kernel"]["launch_count"] <= 12
+    # Gross-regression guardrail, not an A/B race: on this 32x32 scene the
+    # native and legacy-oracle times are both ~25 ms and dominated by launch
+    # overhead, and the F5 finite-edge mend legitimately adds ~2 ms of
+    # coefficient work, so a strict `native < original` pin flakes on wall
+    # clock (it already failed ~1/3 of runs before the continuity fixes).
     assert (
         saved["performance"]["native_solve_time_ms"]
-        < saved["performance"]["original_solve_time_ms"]
+        < 1.5 * saved["performance"]["original_solve_time_ms"]
     )
     assert saved["performance"]["original_solve_time_ms"] > 0.0
     assert saved["native"]["path_count_histogram"]["los"] > 0

@@ -47,8 +47,9 @@ __device__ void reflection_chain_eval(
         interaction_positions, index, 0, depth);
     field::float3a incident = field::safe_normalize(
         field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
-    const field::float3a tx_axis = field::stable_perp_basis(
-        incident, load3f(tx_polarization, index));
+    // F1: unnormalized transverse projection of the transmit polarization.
+    const field::float3a tx_axis = field::project_to_wedge_plane(
+        load3f(tx_polarization, index), incident);
     field::Complex3 value = field::cplx_scale_real(tx_axis, field::cplx(1.0f, 0.0f));
     float total_length = 0.0f;
     field::float3a outgoing = incident;
@@ -101,8 +102,9 @@ __device__ void reflection_chain_eval(
             transport::precise_neg_kd(wave_number, total_length)),
         amplitude);
     chain.value_chain = value;
-    chain.rx_axis = field::stable_perp_basis(
-        final_direction, load3f(rx_polarization, index));
+    // F1: receiver scalar = p_rx . E via the unnormalized transverse of p_rx.
+    chain.rx_axis = field::project_to_wedge_plane(
+        load3f(rx_polarization, index), final_direction);
     chain.propagation = propagation;
     // dP/df = P * (-1/k - j*L) * (2*pi/c); the phase term uses the raw length
     // (fmod has unit slope) and the amplitude term has no length dependence.
@@ -219,7 +221,7 @@ __global__ void reflection_sequence_backward_kernel(
                 final_offset, outgoing_last);
             field::float3a g_final_direction = field::f3_zero();
             field::float3a g_pol_dump = field::f3_zero();
-            field::adj_stable_perp_basis(
+            ad::adj_transverse_project(
                 final_direction, load3f(rx_polarization, index), g_rx_axis,
                 g_final_direction, g_pol_dump);
             field::float3a g_final_offset = field::f3_zero();
@@ -402,7 +404,7 @@ __global__ void reflection_sequence_backward_kernel(
             g_chain.x.re, g_chain.y.re, g_chain.z.re);
         field::float3a g_incident_pre = g_outgoing;
         field::float3a g_pol_dump = field::f3_zero();
-        field::adj_stable_perp_basis(
+        ad::adj_transverse_project(
             incident_pre, load3f(tx_polarization, index), g_tx_axis,
             g_incident_pre, g_pol_dump);
         field::float3a g_segment_pre = field::f3_zero();
@@ -468,7 +470,7 @@ __global__ void reflection_sequence_jvp_kernel(
             interaction_positions, tangent_positions, index, 0, depth);
         const ad::DualF3 incident_pre = ad::dual_safe_normalize(
             ad::df3_sub(first_hit, previous), e_z);
-        const ad::DualF3 tx_axis = ad::dual_stable_perp_basis(
+        const ad::DualF3 tx_axis = ad::dual_transverse_project(
             incident_pre, ad::df3_const(load3f(tx_polarization, index)));
         field::Complex3 value = field::cplx_scale_real(
             tx_axis.v, field::cplx(1.0f, 0.0f));
@@ -570,7 +572,7 @@ __global__ void reflection_sequence_jvp_kernel(
         const field::Complex d_propagation = field::cplx_add(
             field::cplx_mul_real(propagation_dfreq, tangent_frequency),
             field::cplx_mul_real(propagation_dlength, total_length.d));
-        const ad::DualF3 rx_axis = ad::dual_stable_perp_basis(
+        const ad::DualF3 rx_axis = ad::dual_transverse_project(
             final_direction, ad::df3_const(load3f(rx_polarization, index)));
         const field::Complex3 value_final = field::c3_scale(value, propagation);
         const field::Complex3 d_final = field::c3_add(

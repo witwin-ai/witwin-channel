@@ -102,6 +102,27 @@ priority `scattering > diffraction > transmission > reflection > los`.
   and `solve-tidy3d` requires either downloaded simulation data or an explicit
   `--submit` flag.
 
+## Field continuity and polarization consistency (2026-07 UTD fixes)
+
+- The deterministic coherent field is polarization-consistent across all
+  components: LoS/reflection/transmission/diffraction transport the true
+  transmitter polarization as an unnormalized transverse projection
+  (short-dipole sin θ pattern), and the exported scalar is the
+  receiver-polarization projection `p̂_rx·E⃗` — the same physical observable
+  as a full-wave `Ez` monitor. The MC-basic estimator uses the same
+  transmitter-polarization conventions.
+- Finite-edge UTD diffraction is continuous through shadow boundaries,
+  edge-endpoint/vertex regions, and the edges' extension planes: the
+  Kouyoumjian–Pathak coefficient's GO-compensating (odd) component enters
+  exactly where GO toggles and is suppressed beyond the edge ends, while the
+  smooth background carries a normalized Fresnel endpoint truncation
+  (`docs/dev/audit/utd-continuity-fix-design.md`, F1–F6). The legacy 5 cm
+  UTD distance gate, the endpoint-continuation branch, and the `exp(-u²)`
+  completion taper are removed. Continuity is pinned by
+  `tests/deterministic/test_field_continuity.py`; against the recorded
+  Maxwell reference the single-cube ISB p95 excess jump moved from +6.96 dB
+  to -0.10 dB and envelope NMSE from 0.217 to 0.044.
+
 ## Differentiable solving (fixed topology, plan 07 AD-1 through AD-4)
 
 - `deterministic`, `path` and `montecarlo.basic` accept

@@ -599,6 +599,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
     material_mu_r, material_valid = args[21], args[22]
     materials = [args[index].detach() for index in (1, 2, 3, 4)]
     kernel_kwargs = {
+        "tx_pol": params["tx_pol"],
         "grid_axis": params["grid_axis"],
         "grid_position": params["grid_position"],
         "grid_resolution0": params["grid_resolution0"],
@@ -639,6 +640,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
                 params["grid_cell_area"],
                 params["seed"],
                 params["total_edge_length"],
+                params["tx_pol"],
             ).sum()
         )
 

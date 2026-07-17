@@ -10,6 +10,7 @@ def path_los_export(
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
     rx_positions: torch.Tensor,
+    tx_polarizations: torch.Tensor,
     *,
     frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
@@ -20,13 +21,22 @@ def path_los_export(
     validate_cuda_tensor(
         "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
+    validate_cuda_tensor(
+        "tx_polarizations",
+        tx_polarizations,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
     if tx_power.shape[0] != tx_positions.shape[0]:
         raise ValueError("tx_power must have one value per transmitter")
+    if tx_polarizations.shape != tx_positions.shape:
+        raise ValueError("tx_polarizations must match tx_positions shape")
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
     exported = _required_native_op("path_los_export")(
-        tx_positions, tx_power, rx_positions, float(frequency_hz)
+        tx_positions, tx_power, rx_positions, float(frequency_hz), tx_polarizations
     )
     if not isinstance(exported, dict):
         raise TypeError("_channel_native.path_los_export must return a dict")

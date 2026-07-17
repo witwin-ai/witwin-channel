@@ -153,26 +153,37 @@ scene, excluding the nominal cube footprint from the calibration mask:
 s_empty = sqrt(sum(|Ez_empty|^2) / sum(|h_empty|^2))
 ```
 
-That scale is frozen and applied to the PEC cube without refitting. The final
-`z=0.42 m` run produced:
+That scale is frozen and applied to the PEC cube without refitting.
 
-| Metric | Value |
-| --- | ---: |
-| Empty-space amplitude scale | 39.569651 |
-| Maxwell / deterministic energy after calibration | 0.971982 |
-| PEC envelope NMSE | 0.217382 |
-| PEC magnitude correlation | 0.447111 |
-| PEC magnitude RMSE | 5.063745 dB |
-| PEC complex coherence | `2.0069e-5` |
-| ISB p95 excess jump | 6.956465 dB |
-| RSB p95 excess jump | 1.266233 dB |
+**Observable semantics (since the 2026-07 UTD continuity fixes):** the
+deterministic export is now the receiver-polarization projection of the
+coherent field vector (`p̂_rx·E⃗`, i.e. `Ez` for the ẑ-polarized benchmark
+receivers), and every component transports the transmitter polarization as an
+unnormalized transverse projection (short-dipole sin θ pattern). The exported
+scalar is therefore the *same physical observable* as Maxwell `Ez`, including
+the axial dipole null; the old "scalar 1/r envelope" caveats below no longer
+apply, and the empty-scene scale must be re-derived whenever the observable
+changes (the sin θ pattern lowers `|h_empty|`, raising `s_empty`).
 
-The dark Maxwell region around the transmitter's x/y projection is expected.
-The source is above the analysis plane, and a z-directed electric dipole has an
-axial radiation null in `Ez`. The deterministic plot is a scalar `1/r` channel
-envelope, so it is brighter near the same projection. A phase-valid comparison
-requires a common antenna pattern and the same vector-field projection; source
-normalization alone cannot remove this difference.
+Recorded metrics, original code vs the post-fix solver (see
+`docs/dev/audit/utd-continuity-fix-design.md` for the fix inventory; the
+before column is reproduced from the recorded run to full precision):
+
+| Metric | Original | Post-fix |
+| --- | ---: | ---: |
+| Empty-space amplitude scale | 39.569651 | 62.2108 |
+| PEC envelope NMSE | 0.217382 | 0.04352 |
+| PEC magnitude correlation | 0.447111 | 0.8456 |
+| PEC magnitude RMSE | 5.063745 dB | 2.8733 dB |
+| PEC complex coherence (after one global phase) | 0.8074 | 0.8849 |
+| ISB p95 excess jump | +6.956 dB | **-0.099 dB** |
+| RSB p95 excess jump | +1.266 dB | +0.157 dB |
+| Deterministic max adjacent jump | 156.9 dB | 29.8 dB (physical null) |
+
+The historically quoted complex coherence `2.0069e-5` used the naive phase
+convention; under the conjugate convention with a single global phase removed
+the original map already scored 0.8074. Continuity regression tests live in
+`tests/deterministic/test_field_continuity.py`.
 
 ## Workflow
 

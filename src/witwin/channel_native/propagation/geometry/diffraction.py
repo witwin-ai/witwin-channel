@@ -132,6 +132,7 @@ def _tx_visible_diffraction_states(
 class DiffractionOrder1Query:
     handle: object
     tx_position: torch.Tensor
+    tx_polarization: torch.Tensor
     rx_positions: torch.Tensor
     active: torch.Tensor | None
     states: DiffractionStateGeometry
@@ -168,6 +169,7 @@ def query_diffraction_order1(
     raw = geometry_bridge.raydn_diffraction_paths_order1_forward(
         query.handle,
         query.tx_position,
+        query.tx_polarization,
         query.rx_positions,
         query.active,
         states.edge_index,

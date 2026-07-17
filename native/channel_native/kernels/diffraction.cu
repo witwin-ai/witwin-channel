@@ -120,6 +120,7 @@ struct TapeRowContext {
     float eps0, mu0, sigma0, gain0, thick0;
     float eps1, mu1, sigma1, gain1, thick1;
     utd::float3a src;
+    utd::float3a tx_pol;
     float src_power;
     float u;
     float azimuth_sa;
@@ -156,7 +157,8 @@ __device__ __forceinline__ TapeRowContext load_tape_row(
     const float *eta_r, const float *sigma, const float *mu_r,
     const float *gain, const float *thickness, const bool *material_valid,
     int64_t sample_count, int axis, float plane, float wavelength,
-    float cell_area, int seed, float total_edge_length) {
+    float cell_area, int seed, float total_edge_length,
+    const float *tx_pol) {
     TapeRowContext c;
     c.edge_pos = load_utd3(edge_pos, sidx);
     c.edge_dir_raw = load_utd3(edge_dir, sidx);
@@ -180,6 +182,10 @@ __device__ __forceinline__ TapeRowContext load_tape_row(
     c.gain1 = c.valid1 ? gain[c.prim1] : 1.f;
     c.thick1 = c.valid1 ? thickness[c.prim1] : 0.f;
     c.src = load_utd3(source, sidx);
+    // R5: the true per-transmitter polarization (launch-wide constant vector),
+    // fed into direct_source_vector's incident basis in place of the fabricated
+    // (0, 0, 1). All states in one launch share the same transmitter.
+    c.tx_pol = utd::make_f3(tx_pol[0], tx_pol[1], tx_pol[2]);
     c.src_power = source_power[sidx];
     c.u = tape_u[lane];
     sincosf(
@@ -252,9 +258,9 @@ __device__ bool tape_row_value(
     mat.sigma = T(0.f);
     mat.gain = T(1.f);
     mat.omega = 2.0f * utd::UTD_PI * 299792458.0f / wavelength;
-    mat.txPolX = T(0.f);
-    mat.txPolY = T(0.f);
-    mat.txPolZ = T(1.0f);
+    mat.txPolX = T(c.tx_pol.x);
+    mat.txPolY = T(c.tx_pol.y);
+    mat.txPolZ = T(c.tx_pol.z);
     const utd::Vec3T<T> pol =
         utd::stable_perp_basis(incident, utd::v3_const<T>(0, 0, 1));
     p.incidentBasis =
@@ -320,7 +326,7 @@ __device__ bool tape_row_value(
     freeze_complex_tangent<T>(finite_factor);
     const utd::Complex3T<T> vector_field = utd::compute_pair_vector_at_angles(
         p, target, k, mat, gphi, gphi_p, gs, gs_p, gsb, in_edge, out_edge,
-        finite_factor, false);
+        finite_factor);
     const T field_power = utd::cplx_abs_sqr(vector_field.x) +
                           utd::cplx_abs_sqr(vector_field.y) +
                           utd::cplx_abs_sqr(vector_field.z);
@@ -373,7 +379,8 @@ __global__ void sionna_diffraction_tape_accumulate_kernel(
     const float *eta_r, const float *sigma, const float *mu_r, const float *gain, const float *thickness,
     const bool *material_valid, float *output, int64_t sample_count, int state_count,
     int axis, float plane, float c0min, float c0max, float c1min, float c1max,
-    int r0, int r1, float wavelength, float cell_area, int seed, float total_edge_length) {
+    int r0, int r1, float wavelength, float cell_area, int seed, float total_edge_length,
+    const float *tx_pol) {
     (void)c0min; (void)c0max; (void)c1min; (void)c1max;
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
@@ -383,7 +390,7 @@ __global__ void sionna_diffraction_tape_accumulate_kernel(
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
-            wavelength, cell_area, seed, total_edge_length);
+            wavelength, cell_area, seed, total_edge_length, tx_pol);
         float value = 0.0f;
         if (tape_row_value<float>(row, tape_seeds_zero(), value)) {
             atomicAdd(output + cell, value);
@@ -403,7 +410,8 @@ __global__ void sionna_diffraction_tape_accumulate_backward_kernel(
     int64_t sample_count, int state_count,
     int axis, float plane, int r0, int r1, float wavelength, float cell_area,
     int seed, float total_edge_length, float wavelength_dfreq,
-    int64_t grad_stride0, int64_t grad_stride1) {
+    int64_t grad_stride0, int64_t grad_stride1,
+    const float *tx_pol) {
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
@@ -416,7 +424,7 @@ __global__ void sionna_diffraction_tape_accumulate_backward_kernel(
         if (cotangent == 0.0f) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
-            wavelength, cell_area, seed, total_edge_length);
+            wavelength, cell_area, seed, total_edge_length, tx_pol);
         TapeRowSeeds seeds = tape_seeds_zero();
         utd::Dual value;
         if (grad_source != nullptr) {
@@ -481,7 +489,8 @@ __global__ void sionna_diffraction_tape_accumulate_jvp_kernel(
     float *output_tangent,
     int64_t sample_count, int state_count,
     int axis, float plane, int r0, int r1, float wavelength, float cell_area,
-    int seed, float total_edge_length) {
+    int seed, float total_edge_length,
+    const float *tx_pol) {
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
@@ -490,7 +499,7 @@ __global__ void sionna_diffraction_tape_accumulate_jvp_kernel(
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
-            wavelength, cell_area, seed, total_edge_length);
+            wavelength, cell_area, seed, total_edge_length, tx_pol);
         TapeRowSeeds seeds = tape_seeds_zero();
         if (tangent_source != nullptr) {
             seeds.src = utd::make_f3(
@@ -1693,7 +1702,8 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
     at::Tensor eta_r, at::Tensor sigma, at::Tensor mu_r, at::Tensor gain,
     at::Tensor material_valid, at::Tensor thickness, int64_t axis, double plane,
     double c0min, double c0max, double c1min, double c1max,
-    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed, double total_edge_length) {
+    int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed, double total_edge_length,
+    at::Tensor tx_pol) {
     auto output=at::empty({r1,r0},source.options());
     const auto stream=at::cuda::getCurrentCUDAStream();
     C10_CUDA_CHECK(cudaMemsetAsync(
@@ -1710,7 +1720,8 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_cuda(
         material_valid.data_ptr<bool>(),output.data_ptr<float>(),samples,static_cast<int>(edge_pos.size(0)),
         static_cast<int>(axis),static_cast<float>(plane),static_cast<float>(c0min),static_cast<float>(c0max),
         static_cast<float>(c1min),static_cast<float>(c1max),static_cast<int>(r0),static_cast<int>(r1),
-        static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length));
+        static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length),
+        tx_pol.data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output;
 }
@@ -1748,7 +1759,7 @@ cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_dfreq) {
+    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol) {
     TORCH_CHECK(grad_output.is_cuda(), "grad_output must be a CUDA tensor");
     TORCH_CHECK(grad_output.scalar_type() == at::kFloat, "grad_output must be float32");
     TORCH_CHECK(grad_output.dim() == 2, "grad_output must have 2 dimensions");
@@ -1794,7 +1805,8 @@ cn_mc_sionna_diffraction_tape_accumulate_backward_cuda(
         static_cast<float>(wavelength), static_cast<float>(cell_area),
         static_cast<int>(seed), static_cast<float>(total_edge_length),
         static_cast<float>(wavelength_dfreq),
-        grad_output.stride(0), grad_output.stride(1));
+        grad_output.stride(0), grad_output.stride(1),
+        tx_pol.data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_source,
             grad_frequency};
@@ -1813,7 +1825,7 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_tangent) {
+    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol) {
     auto output_tangent = diffraction_zero_filled({r1, r0}, source.options());
     const int64_t samples = tape_active.numel();
     if (samples == 0) return output_tangent;
@@ -1842,7 +1854,8 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
         static_cast<int>(axis), static_cast<float>(plane),
         static_cast<int>(r0), static_cast<int>(r1),
         static_cast<float>(wavelength), static_cast<float>(cell_area),
-        static_cast<int>(seed), static_cast<float>(total_edge_length));
+        static_cast<int>(seed), static_cast<float>(total_edge_length),
+        tx_pol.data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output_tangent;
 }

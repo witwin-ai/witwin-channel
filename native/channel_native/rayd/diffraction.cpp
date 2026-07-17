@@ -140,6 +140,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
 pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     int64_t scene_handle,
     torch::Tensor tx_pos,
+    torch::Tensor tx_pol,
     torch::Tensor rx_pos,
     pybind11::object active,
     torch::Tensor state_edge_index,
@@ -164,9 +165,11 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     double wavelength) {
     at::Tensor active_storage;
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    at::Tensor tx_pol = at::zeros_like(tx_pos);
-    if (tx_pol.numel() != 0)
-        tx_pol.select(1, 2).fill_(1.0);
+    // tx_pol is the scene transmitter polarization threaded from the caller
+    // (R5 fix). The RayD UTD op consumes it as the incident field basis.
+    TORCH_CHECK(
+        tx_pol.sizes() == tx_pos.sizes(),
+        "tx_pol must match tx_pos shape (N, 3)");
     constexpr int64_t kOutputCount = 18;
     std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
     int64_t output_count = raydn_diffraction_paths_order1_forward_fn()(
@@ -208,6 +211,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
 pybind11::dict cn_path_diffraction_paths_order1(
     int64_t scene_handle,
     torch::Tensor tx_positions,
+    torch::Tensor tx_polarizations,
     torch::Tensor tx_power,
     torch::Tensor rx_positions,
     torch::Tensor selected,
@@ -227,6 +231,10 @@ pybind11::dict cn_path_diffraction_paths_order1(
     torch::Tensor material_valid,
     double wavelength) {
     check_vec3_table(tx_positions, "tx_positions");
+    check_vec3_table(tx_polarizations, "tx_polarizations");
+    TORCH_CHECK(
+        tx_polarizations.sizes() == tx_positions.sizes(),
+        "tx_polarizations must match tx_positions shape (N, 3)");
     check_flat_tensor(tx_power, "tx_power", at::kFloat);
     check_vec3_table(rx_positions, "rx_positions");
     check_flat_tensor(selected, "selected", at::kBool);
@@ -300,9 +308,9 @@ pybind11::dict cn_path_diffraction_paths_order1(
         TORCH_CHECK(states.size() == 12, "diffraction state pack must return 12 tensors");
 
         at::Tensor tx_view = tx_positions.narrow(0, tx_index, 1);
-        at::Tensor tx_pol = at::zeros_like(tx_view);
-        if (tx_pol.numel() != 0)
-            tx_pol.select(1, 2).fill_(1.0);
+        // R5 fix: use the scene transmitter polarization threaded from the
+        // caller instead of a fabricated z-axis vector.
+        at::Tensor tx_pol = tx_polarizations.narrow(0, tx_index, 1);
         const int64_t state_limit = states[0].size(0);
         const int64_t capacity = rx_positions.size(0) * state_limit;
         std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;

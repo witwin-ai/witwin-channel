@@ -585,6 +585,18 @@ __device__ __forceinline__ Vec3<T> v3_stable_perp_basis(
     return v3_safe_normalize(proj, alt_proj);
 }
 
+// F1 unnormalized transverse projection of the TX/RX FIELD axis:
+//   t = preferred - ray_dir * (preferred . ray_dir)   (project_to_wedge_plane
+// without the safe_normalize). This carries the short-dipole sin(theta)
+// pattern weight of the polarization and is exactly zero at the axial null
+// (no fallback), which is the correct physics. Only the polarization field
+// axes use this; the Jones s/p bases stay orthonormal (v3_stable_perp_basis).
+template <typename T>
+__device__ __forceinline__ Vec3<T> v3_transverse_project(
+    Vec3<T> ray_dir, Vec3<T> preferred) {
+    return v3_sub(preferred, v3_scale(ray_dir, v3_dot(preferred, ray_dir)));
+}
+
 constexpr float kSpeedOfLight = transport::kSpeedOfLight;
 
 // Fixed free-space carrier evaluation plus its frequency and distance
@@ -620,8 +632,11 @@ __device__ __forceinline__ FreeSpaceEval<T> free_space_eval(
     const Vec3<T> offset = v3_sub(target, source);
     out.distance = v3_length(offset);
     out.direction = v3_safe_normalize(offset, Vec3<T>{T(0), T(0), T(1)});
-    out.tx_axis = v3_stable_perp_basis(out.direction, tx_polarization);
-    out.rx_axis = v3_stable_perp_basis(out.direction, rx_polarization);
+    // F1: the exported field is the unnormalized transverse projection of the
+    // transmit polarization (short-dipole sin(theta) weight); the receiver
+    // scalar is p_rx . E, so the rx axis is the same unnormalized projection.
+    out.tx_axis = v3_transverse_project(out.direction, tx_polarization);
+    out.rx_axis = v3_transverse_project(out.direction, rx_polarization);
     out.amplitude_scale = sqrt(tx_power > T(0) ? tx_power : T(0));
     out.projection = v3_dot(out.tx_axis, out.rx_axis);
     const T wave_number =
@@ -797,6 +812,31 @@ __device__ __forceinline__ void adj_v3_stable_perp_basis(
     g_ray_dir = v3_sub(g_ray_dir, v3_scale(alt_axis, v3_dot(g_alt_proj, ray_dir)));
 }
 
+// Dual of v3_transverse_project (preferred is a constant of the
+// differentiation): the proj branch of dual_v3_stable_perp_basis with the
+// safe_normalize removed.
+template <typename T>
+__device__ __forceinline__ DualV3<T> dual_v3_transverse_project(
+    DualV3<T> ray_dir, Vec3<T> preferred) {
+    const T proj_dot = v3_dot(preferred, ray_dir.v);
+    const T d_proj_dot = v3_dot(preferred, ray_dir.d);
+    DualV3<T> out;
+    out.v = v3_sub(preferred, v3_scale(ray_dir.v, proj_dot));
+    out.d = v3_neg(v3_add(
+        v3_scale(ray_dir.d, proj_dot), v3_scale(ray_dir.v, d_proj_dot)));
+    return out;
+}
+
+// Adjoint of v3_transverse_project into the ray direction:
+//   g_dir += -(preferred . ray_dir) g_out - (g_out . ray_dir) preferred.
+template <typename T>
+__device__ __forceinline__ void adj_v3_transverse_project(
+    Vec3<T> ray_dir, Vec3<T> preferred, Vec3<T> g_out, Vec3<T>& g_ray_dir) {
+    const T proj_dot = v3_dot(preferred, ray_dir);
+    g_ray_dir = v3_sub(g_ray_dir, v3_scale(g_out, proj_dot));
+    g_ray_dir = v3_sub(g_ray_dir, v3_scale(preferred, v3_dot(g_out, ray_dir)));
+}
+
 // ---------------------------------------------------------------------------
 // float3a forward-mode duals of the utd vector helpers plus dual and adjoint
 // interaction frames (plan 07 AD-2). The .v computations replay
@@ -899,6 +939,36 @@ __device__ __forceinline__ DualF3 dual_stable_perp_basis(
             utd::f3_mul(ray_dir.d, alt_dot),
             utd::f3_mul(ray_dir.v, d_alt_dot)))};
     return dual_safe_normalize(proj, alt_proj);
+}
+
+// F1 unnormalized transverse projection on utd::float3a (dual + adjoint). The
+// TX/RX FIELD axis carries the sin(theta) dipole weight; the primal is
+// utd::project_to_wedge_plane(preferred, ray_dir). Zero at the axial null is
+// correct physics (no fallback axis).
+__device__ __forceinline__ DualF3 dual_transverse_project(
+    DualF3 ray_dir, DualF3 preferred) {
+    const DualF proj_dot = df3_dot(preferred, ray_dir);
+    return DualF3{
+        utd::f3_sub(preferred.v, utd::f3_mul(ray_dir.v, proj_dot.v)),
+        utd::f3_sub(
+            preferred.d,
+            utd::f3_add(
+                utd::f3_mul(ray_dir.d, proj_dot.v),
+                utd::f3_mul(ray_dir.v, proj_dot.d)))};
+}
+
+// Adjoint of the float3a transverse projection into ray_dir and preferred
+// (callers discard the preferred cotangent; the polarization is fixed).
+__device__ __forceinline__ void adj_transverse_project(
+    utd::float3a ray_dir, utd::float3a preferred, utd::float3a g_out,
+    utd::float3a& g_ray_dir, utd::float3a& g_preferred) {
+    const float proj_dot = utd::f3_dot(preferred, ray_dir);
+    g_ray_dir = utd::f3_sub(g_ray_dir, utd::f3_mul(g_out, proj_dot));
+    g_ray_dir = utd::f3_sub(
+        g_ray_dir, utd::f3_mul(preferred, utd::f3_dot(g_out, ray_dir)));
+    g_preferred = utd::f3_add(
+        g_preferred,
+        utd::f3_sub(g_out, utd::f3_mul(ray_dir, utd::f3_dot(g_out, ray_dir))));
 }
 
 // ---------------------------------------------------------------------------

@@ -49,6 +49,7 @@ from witwin.channel_native.montecarlo.events.transmission import (
 )
 
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
+from witwin.channel_native.scene.tensors import transmitter_polarizations
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
@@ -354,6 +355,9 @@ def reflection_component_maps_with_wedges(
     tx_live = (
         transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     )
+    # R5: per-transmitter polarization seeds the reflection field's unnormalized
+    # transverse projection (short-dipole sin(theta) pattern).
+    tx_pol = transmitter_polarizations(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
     (
         material_eta_r,
@@ -419,6 +423,7 @@ def reflection_component_maps_with_wedges(
                 trace[2],
                 face_normals,
                 material_valid,
+                tx_pol=tx_pol[tx_index],
                 contribution_depth=int(max_depth),
                 grid_axis=int(spec.axis),
                 grid_position=float(spec.position),
@@ -446,6 +451,7 @@ def reflection_component_maps_with_wedges(
                 material_gain,
                 material_valid,
                 material_thickness,
+                tx_pol=tx_pol[tx_index],
                 contribution_depth=int(max_depth),
                 grid_axis=int(spec.axis),
                 grid_position=float(spec.position),
@@ -689,6 +695,9 @@ def diffraction_component_map(
     tx_live = (
         transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     )
+    # R5: per-transmitter polarization fed into direct_source_vector's incident
+    # basis (replaces the fabricated z-axis).
+    tx_pol = transmitter_polarizations(scene, device=device)
     (
         material_eta_r,
         material_sigma,
@@ -835,6 +844,7 @@ def diffraction_component_map(
                 state_tensors,
                 material_mu_r,
                 material_valid,
+                tx_pol=tx_pol[tx_index],
                 grid_axis=int(spec.axis),
                 grid_position=float(spec.position),
                 grid_coord0_min=float(spec.coord0_min),
@@ -858,6 +868,7 @@ def diffraction_component_map(
             int(spec.axis), float(spec.position), float(spec.coord0_min), float(spec.coord0_max),
             float(spec.coord1_min), float(spec.coord1_max), int(spec.resolution0),
             int(spec.resolution1), float(wavelength), float(spec.cell_area), int(seed), total_edge_length,
+            tx_pol[tx_index],
         )
         mc_store_component_map(maps, diffraction_map, tx_index=tx_index)
     if ad:

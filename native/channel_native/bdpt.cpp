@@ -403,7 +403,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     at::Tensor tx_positions,
     at::Tensor tx_power,
     at::Tensor rx_positions,
-    double frequency_hz);
+    double frequency_hz,
+    at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
@@ -1088,9 +1089,10 @@ pybind11::dict cn_bdpt_los_export(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
     torch::Tensor rx_positions,
-    double frequency_hz) {
+    double frequency_hz,
+    torch::Tensor tx_pol) {
     auto [tx_id, rx_id, path_length, delay, path_gain, path_gain_matrix] =
-        cn_bdpt_los_export_cuda(tx_positions, tx_power, rx_positions, frequency_hz);
+        cn_bdpt_los_export_cuda(tx_positions, tx_power, rx_positions, frequency_hz, tx_pol);
 
     pybind11::dict out;
     out["tx_id"] = tx_id;

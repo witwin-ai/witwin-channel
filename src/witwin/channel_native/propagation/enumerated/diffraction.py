@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from witwin.channel_native.core.field_state import transmitter_polarizations
 from witwin.channel_native.materials.encoding import face_material_tensors
 from witwin.channel_native.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
@@ -118,6 +119,10 @@ def _diffraction_topology_order1(
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (
         face_material_tensors(compiled, device=device)
     )
+    # Per-transmitter polarization threaded into the RayD UTD op (R5 fix): the
+    # incident field basis must use the real scene polarization, not a
+    # fabricated z-axis vector.
+    tx_polarizations = transmitter_polarizations(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
     handle = raydn.require_handle()
     blocks: list[dict[str, torch.Tensor]] = []
@@ -164,6 +169,9 @@ def _diffraction_topology_order1(
                 DiffractionOrder1Query(
                     handle=handle,
                     tx_position=tx.reshape(1, 3).contiguous(),
+                    tx_polarization=tx_polarizations[tx_index]
+                    .reshape(1, 3)
+                    .contiguous(),
                     rx_positions=rx_chunk,
                     active=None,
                     states=named_states,

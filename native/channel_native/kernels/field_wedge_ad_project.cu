@@ -4,7 +4,8 @@ namespace {
 
 // ---------------------------------------------------------------------------
 // field_project_complex3 companions: coefficient = <field, axis(direction)>
-// with axis = stable_perp_basis(direction, rx_pol); path_gain = |coeff|^2.
+// with axis = project_to_wedge_plane(rx_pol, direction) (F1 unnormalized
+// transverse of p_rx); path_gain = |coeff|^2.
 // Linear in the field vector; direction feeds the axis.
 // ---------------------------------------------------------------------------
 
@@ -28,7 +29,8 @@ __global__ void project_complex3_backward_kernel(
         };
         const field::float3a dir = load3f(direction, index);
         const field::float3a pol = load3f(rx_polarization, index);
-        const field::float3a axis = field::stable_perp_basis(dir, pol);
+        // F1: coefficient = p_rx . E via the unnormalized transverse of p_rx.
+        const field::float3a axis = field::project_to_wedge_plane(pol, dir);
         const field::Complex coefficient = transport::complex3_dot_real(value, axis);
         field::Complex g_coeff = field::cplx_zero();
         if (grad_coefficient != nullptr)
@@ -49,7 +51,7 @@ __global__ void project_complex3_backward_kernel(
         if (grad_direction != nullptr) {
             field::float3a g_dir = field::f3_zero();
             field::float3a g_pol = field::f3_zero();
-            field::adj_stable_perp_basis(dir, pol, g_axis, g_dir, g_pol);
+            ad::adj_transverse_project(dir, pol, g_axis, g_dir, g_pol);
             grad_direction[base] = g_dir.x;
             grad_direction[base + 1] = g_dir.y;
             grad_direction[base + 2] = g_dir.z;
@@ -81,7 +83,7 @@ __global__ void project_complex3_jvp_kernel(
             dir,
             tangent_direction != nullptr ? load3f(tangent_direction, index)
                                          : field::f3_zero()};
-        const ad::DualF3 axis = ad::dual_stable_perp_basis(
+        const ad::DualF3 axis = ad::dual_transverse_project(
             dir_dual, ad::df3_const(pol));
         const field::Complex3 t_value = {
             tangent_field_vector != nullptr ? from_c10(tangent_field_vector[base])

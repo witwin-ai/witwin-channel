@@ -115,6 +115,29 @@ def transmitter_positions(
     return exported["positions"], exported["power"]
 
 
+def transmitter_polarizations(
+    scene: object, *, device: torch.device
+) -> torch.Tensor:
+    """Per-transmitter polarization unit vectors as a (N, 3) CUDA tensor.
+
+    Row order matches :func:`transmitter_positions`. The transmitter model
+    already normalizes and orients ``.polarization`` in ``__post_init__``, so
+    this is a straight device upload of the fixed physical vectors (frozen
+    winners of AD; the dipole sin^2 pattern they induce is differentiated
+    through the endpoint geometry, not through the polarization itself).
+    """
+
+    del device
+    if not scene.transmitters:
+        return host_vec3_tensor(())
+    flat = tuple(
+        component
+        for transmitter in scene.transmitters
+        for component in vector3_tuple(transmitter.polarization)
+    )
+    return host_vec3_tensor(flat)
+
+
 # Keep the long-standing compatibility and pickle paths stable while this
 # module becomes the canonical implementation owner.
 _frequency_scalar.__module__ = "witwin.channel_native.core.scene_tensors"
@@ -122,3 +145,4 @@ receiver_grid_points.__module__ = "witwin.channel_native.core.scene_tensors"
 host_vec3_tensor.__module__ = "witwin.channel_native.core.scene_tensors"
 receiver_positions.__module__ = "witwin.channel_native.core.scene_tensors"
 transmitter_positions.__module__ = "witwin.channel_native.core.scene_tensors"
+transmitter_polarizations.__module__ = "witwin.channel_native.core.scene_tensors"

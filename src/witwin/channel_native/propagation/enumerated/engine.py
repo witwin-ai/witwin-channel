@@ -44,7 +44,10 @@ from witwin.channel_native.propagation.topology.export import (
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
-from witwin.channel_native.scene.tensors import _frequency_scalar
+from witwin.channel_native.scene.tensors import (
+    _frequency_scalar,
+    transmitter_polarizations,
+)
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
@@ -75,6 +78,7 @@ def evaluate_enumerated_paths(
 
     device = torch.device("cuda")
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
+    tx_polarizations = transmitter_polarizations(scene, device=device)
     rx_positions, _ = receiver_positions_and_layout(scene, device=device)
     compiled = scene.compile()
     # One host read of a tensor frequency for the whole export: discovery and
@@ -104,6 +108,7 @@ def evaluate_enumerated_paths(
                 tx_positions,
                 tx_power,
                 rx_positions,
+                tx_polarizations,
                 frequency_hz=frequency_hz,
                 sequence_width=sequence_width,
             )

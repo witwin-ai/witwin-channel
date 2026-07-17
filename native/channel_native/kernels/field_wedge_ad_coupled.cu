@@ -194,8 +194,8 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
         const Dual distance = field::safe_length(offset);
         const DualV3 direction = field::safe_normalize(
             offset, field::v3_const<Dual>(0.f, 0.f, 1.f));
-        const DualV3 axis = field::stable_perp_basis(
-            direction, field::dual_const3(in.tx_pol));
+        const DualV3 axis = field::project_to_wedge_plane(
+            field::dual_const3(in.tx_pol), direction);
         const Dual amplitude =
             1.0f / (2.0f * field::fmaxf(wave_number, Dual(field::UTD_SMALL_EPS)) *
                     field::fmaxf(distance, Dual(field::UTD_EPS)));
@@ -206,8 +206,8 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
     } else {
         const DualV3 source_to_hit = field::safe_normalize(
             field::f3_sub(hit, src), incident_direction);
-        const DualV3 tx_axis = field::stable_perp_basis(
-            source_to_hit, field::dual_const3(in.tx_pol));
+        const DualV3 tx_axis = field::project_to_wedge_plane(
+            field::dual_const3(in.tx_pol), source_to_hit);
         DualV3 reflected_direction;
         const DualC3 reflected = reflect_complex3_dual(
             field::cplx_scale_real(tx_axis, field::c_const<Dual>(1.f, 0.f)),
@@ -294,7 +294,7 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
         finite_factor.im.d = 0.f;
         value = field::compute_pair_vector_at_angles(
             pair, diffraction_target, wave_number, material, phi, phi_p, s, s_p,
-            sb, input_edge_basis, output_edge_basis, finite_factor, false);
+            sb, input_edge_basis, output_edge_basis, finite_factor);
     }
 
     DualV3 final_direction = outgoing_direction;
@@ -312,8 +312,8 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
             final_direction);
     }
 
-    const DualV3 rx_axis = field::stable_perp_basis(
-        final_direction, field::dual_const3(in.rx_pol));
+    const DualV3 rx_axis = field::project_to_wedge_plane(
+        field::dual_const3(in.rx_pol), final_direction);
     const DualCx coefficient = field::cplx_dot_real(value, rx_axis);
     const float amplitude_scale = sqrtf(fmaxf(in.tx_power, 0.f));
     const DualCx path_field = field::cplx_mul_real(coefficient, amplitude_scale);

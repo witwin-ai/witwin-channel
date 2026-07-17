@@ -29,14 +29,18 @@ def _los_topology(
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
     rx_positions: torch.Tensor,
+    tx_polarizations: torch.Tensor,
     *,
     frequency_hz: float,
     sequence_width: int,
 ) -> tuple[dict[str, torch.Tensor], int, int, int]:
+    # R5: the per-transmitter polarization (threaded from the caller) drives the
+    # LoS dipole sin^2 pattern in path_los_export.
     exported = topology_blocks.path_los_export(
         tx_positions,
         tx_power,
         rx_positions,
+        tx_polarizations,
         frequency_hz=frequency_hz,
     )
     launch_count = 1

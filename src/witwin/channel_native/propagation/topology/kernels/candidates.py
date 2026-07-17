@@ -60,6 +60,7 @@ def path_reflection_candidates(
 def path_diffraction_paths_order1(
     scene_handle: object,
     tx_positions: torch.Tensor,
+    tx_polarizations: torch.Tensor,
     tx_power: torch.Tensor,
     rx_positions: torch.Tensor,
     edge_geometry: tuple[torch.Tensor, ...],
@@ -114,6 +115,15 @@ def path_diffraction_paths_order1(
     validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_gain", material_gain, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_valid", material_valid, dtype=torch.bool, ndim=1)
+    validate_cuda_tensor(
+        "tx_polarizations",
+        tx_polarizations,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    if tx_polarizations.shape != tx_positions.shape:
+        raise ValueError("tx_polarizations must match tx_positions")
     if tx_power.shape[0] != tx_positions.shape[0]:
         raise ValueError("tx_power must match tx_positions")
     if wavelength <= 0.0:
@@ -121,6 +131,7 @@ def path_diffraction_paths_order1(
     out = _required_native_op("path_diffraction_paths_order1")(
         _raydn_scene_handle_id(scene_handle),
         tx_positions,
+        tx_polarizations,
         tx_power,
         rx_positions,
         selected,

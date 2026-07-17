@@ -112,6 +112,32 @@ def test_inner_corner_double_reflection_within_one_structure():
     assert bool((result.paths.depth == 2).any())
 
 
+# F1/R5 (utd-continuity-fix-design): the reflected field carries the
+# unnormalized transverse (short-dipole sin(theta)) projection of the default
+# z-hat transmit polarization and is projected onto the z-hat receiver
+# polarization, so path_gain = |E|^2 for |R| = 1 is the Friis free-space gain
+# times sin^2(theta_tx) * sin^2(theta_rx) about the launch/arrival directions.
+_REFLECT_TX = torch.tensor([0.0, -1.0, 0.0])
+_REFLECT_RX = torch.tensor([0.0, 1.0, 2.0])
+_REFLECT_WALL_X = 2.5
+
+
+def _specular_dipole_factor() -> float:
+    zhat = torch.tensor([0.0, 0.0, 1.0])
+    image_rx = _REFLECT_RX.clone()
+    image_rx[0] = 2.0 * _REFLECT_WALL_X - _REFLECT_RX[0]
+    image_tx = _REFLECT_TX.clone()
+    image_tx[0] = 2.0 * _REFLECT_WALL_X - _REFLECT_TX[0]
+    launch = image_rx - _REFLECT_TX  # TX -> specular point direction
+    arrival = _REFLECT_RX - image_tx  # specular point -> RX direction
+
+    def _sin2(direction: torch.Tensor) -> float:
+        unit = direction / direction.norm()
+        return 1.0 - float(zhat @ unit) ** 2
+
+    return _sin2(launch) * _sin2(arrival)
+
+
 def test_conductor_skew_reflection_preserves_friis_amplitude():
     """|R| = 1 for a near-perfect conductor at skew incidence (audit D-4).
 
@@ -149,7 +175,10 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
     wavelength = 299_792_458.0 / scene.frequency
     unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
     expected_length = float(unfolded.norm())
-    expected_gain = (wavelength / (4.0 * torch.pi * expected_length)) ** 2
+    # F1/R5: multiply the Friis free-space gain by the z-hat dipole coupling.
+    expected_gain = (
+        wavelength / (4.0 * torch.pi * expected_length)
+    ) ** 2 * _specular_dipole_factor()
     torch.testing.assert_close(
         result.paths.path_length_m.cpu(),
         torch.tensor([expected_length]),
@@ -198,7 +227,10 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
     assert int(result.paths.valid.numel()) == 1
     wavelength = 299_792_458.0 / scene.frequency
     unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
-    expected_gain = (wavelength / (4.0 * torch.pi * float(unfolded.norm()))) ** 2
+    # F1/R5: multiply the Friis free-space gain by the z-hat dipole coupling.
+    expected_gain = (
+        wavelength / (4.0 * torch.pi * float(unfolded.norm()))
+    ) ** 2 * _specular_dipole_factor()
     torch.testing.assert_close(
         result.paths.path_gain.cpu(),
         torch.tensor([expected_gain], dtype=torch.float32),

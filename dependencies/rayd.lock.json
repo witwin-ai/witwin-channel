@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "repository_url": "https://github.com/Asixa/RayD.git",
-  "commit": "6047089cc7a41661402a02d40c96b9117e03a135",
+  "commit": "a940f89e164b8746510d624280106e146466c6b3",
   "integration_abi": {
     "kind": "source-header-sha256",
     "path": "backends/torch/include/rayd/torch/integration.h",

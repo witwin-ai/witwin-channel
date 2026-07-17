@@ -44,6 +44,20 @@ def _stable_perp_basis(ray_dir: torch.Tensor, preferred: torch.Tensor) -> torch.
     return _safe_normalize(proj, alt_proj)
 
 
+def _transverse_project(
+    ray_dir: torch.Tensor, preferred: torch.Tensor
+) -> torch.Tensor:
+    """F1 unnormalized transverse projection of the TX/RX FIELD axis.
+
+    Mirror of utd::project_to_wedge_plane(preferred, ray_dir): the short-dipole
+    sin(theta) pattern weight is preserved (no safe_normalize) and the axis is
+    exactly zero at the axial null. Only the polarization field axes use this;
+    the Jones s/p bases keep the orthonormal _stable_perp_basis fallback.
+    """
+
+    return preferred - ray_dir * (preferred * ray_dir).sum(-1, keepdim=True)
+
+
 def _dot(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     return (a * b).sum(-1)
 
@@ -82,8 +96,8 @@ def free_space_reference(
     distance = torch.linalg.vector_norm(offset, dim=-1)
     e_z = torch.tensor([0.0, 0.0, 1.0], dtype=source.dtype, device=source.device)
     direction = _safe_normalize(offset, e_z.expand_as(offset))
-    tx_axis = _stable_perp_basis(direction, tx_polarization)
-    rx_axis = _stable_perp_basis(direction, rx_polarization)
+    tx_axis = _transverse_project(direction, tx_polarization)
+    rx_axis = _transverse_project(direction, rx_polarization)
     wave_number = 2.0 * torch.pi * frequency / SPEED_OF_LIGHT
     amplitude = 1.0 / (
         2.0 * wave_number.clamp_min(_SMALL_EPS) * distance.clamp_min(_EPS)
@@ -154,7 +168,7 @@ def reflection_sequence_reference(
     incident = _safe_normalize(
         interaction_positions[:, 0] - previous, e_z.expand_as(source)
     )
-    tx_axis = _stable_perp_basis(incident, tx_polarization)
+    tx_axis = _transverse_project(incident, tx_polarization)
     value = tx_axis.to(torch.complex128)
     total_length = torch.zeros_like(tx_power).to(torch.float64)
     outgoing = incident
@@ -207,7 +221,7 @@ def reflection_sequence_reference(
     amplitude = 1.0 / (2.0 * wave_number * total_length.clamp_min(_EPS))
     propagation = amplitude * torch.exp(-1.0j * wave_number * total_length)
     value = value * propagation.unsqueeze(-1)
-    rx_axis = _stable_perp_basis(final_direction, rx_polarization)
+    rx_axis = _transverse_project(final_direction, rx_polarization)
     return _outputs(value, rx_axis, tx_power)
 
 
@@ -320,8 +334,8 @@ def transmission_sequence_reference(
     offset = target - source
     total_length = torch.linalg.vector_norm(offset, dim=-1)
     direction = _safe_normalize(offset, e_z.expand_as(source))
-    tx_axis = _stable_perp_basis(direction, tx_polarization)
-    rx_axis = _stable_perp_basis(direction, rx_polarization)
+    tx_axis = _transverse_project(direction, tx_polarization)
+    rx_axis = _transverse_project(direction, rx_polarization)
     rows = []
     for index in range(count):
         value = tx_axis[index].to(torch.complex128)

@@ -221,10 +221,22 @@ def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
     assert result.component_maps["los"].shape == (1, 3, 2)
 
     tx = scene.transmitters[0].position.to(device=result.path_gain.device)
+    pol = scene.transmitters[0].polarization.to(device=result.path_gain.device)
     points = grid.points().reshape(*grid.shape, 3).transpose(0, 1).reshape(-1, 3).to(device=result.path_gain.device)
-    distance = torch.linalg.vector_norm(tx[None, :] - points, dim=1).clamp_min(1.0e-6)
+    diff = tx[None, :] - points
+    distance = torch.linalg.vector_norm(diff, dim=1).clamp_min(1.0e-6)
     wavelength = 299_792_458.0 / scene.frequency
-    expected = scene.transmitters[0].power_w / ((4.0 * torch.pi * distance / wavelength) ** 2)
+    # R5 polarization consistency: the LoS deposit now carries the short-dipole
+    # sin^2(theta) pattern |p_t|^2 = |pol|^2 - (pol . k_hat)^2 (transverse
+    # projection of the TX polarization onto the tx->rx direction), matching the
+    # reflection/diffraction seed conventions. Fold it into the Friis expectation.
+    k_hat = diff / distance[:, None]
+    pattern = (pol.square().sum() - (k_hat @ pol) ** 2).clamp_min(0.0)
+    expected = (
+        scene.transmitters[0].power_w
+        / ((4.0 * torch.pi * distance / wavelength) ** 2)
+        * pattern
+    )
 
     torch.testing.assert_close(
         result.component_maps["los"].reshape(1, -1),

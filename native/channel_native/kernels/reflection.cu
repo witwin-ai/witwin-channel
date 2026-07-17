@@ -124,17 +124,21 @@ __global__ void sionna_reflection_accumulate_kernel(
     int resolution1,
     float wavelength,
     float solid_angle_per_ray,
-    float cell_area) {
+    float cell_area,
+    const float *__restrict__ tx_pol) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
         float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
         float3 vertical = f3(0.0f, 0.0f, 1.0f);
-        float3 initial = add3(vertical, scale3(direction, -dot3(vertical, direction)));
-        if (dot3(initial, initial) < 1.0e-12f)
-            initial = f3(1.0f, 0.0f, 0.0f);
-        initial = normalize3(initial);
+        // R5 polarization consistency: seed the transported field with the
+        // UNNORMALIZED transverse projection of the true TX polarization onto
+        // the launch direction (short-dipole sin(theta) pattern). No axial-null
+        // special case: a zero here is the correct physical null, and |field|^2
+        // carries the sin^2(theta) weight to match LoS/diffraction.
+        float3 initial = add3(tx_polarization, scale3(direction, -dot3(tx_polarization, direction)));
         Complex3 field = {c_make(initial.x, 0.0f), c_make(initial.y, 0.0f), c_make(initial.z, 0.0f)};
 
         for (int depth = 0; depth < contribution_depth; ++depth) {
@@ -280,21 +284,24 @@ __global__ void sionna_reflection_accumulate_backward_kernel(
     float cell_area,
     float wavelength_dfreq,
     int64_t grad_stride0,
-    int64_t grad_stride1) {
+    int64_t grad_stride1,
+    const float *__restrict__ tx_pol) {
     const bool need_materials = grad_eta_r != nullptr;
     const bool need_frequency = grad_frequency != nullptr;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
         // Forward replay of sionna_reflection_accumulate_kernel, recording the
         // per-bounce state the reverse sweep needs.
         float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
-        float3 vertical = f3(0.0f, 0.0f, 1.0f);
-        float3 initial = add3(vertical, scale3(direction, -dot3(vertical, direction)));
-        if (dot3(initial, initial) < 1.0e-12f)
-            initial = f3(1.0f, 0.0f, 0.0f);
-        initial = normalize3(initial);
+        // R5: unnormalized transverse projection of the true TX polarization
+        // (see the forward kernel). The seed field is a frozen winner of the
+        // material/frequency differentiation, but its sin^2(theta) magnitude
+        // scales every deposit and hence every gradient, so it must match the
+        // forward exactly.
+        float3 initial = add3(tx_polarization, scale3(direction, -dot3(tx_polarization, direction)));
         const Complex3 initial_field = {
             c_make(initial.x, 0.0f), c_make(initial.y, 0.0f), c_make(initial.z, 0.0f)};
         Complex3 field = initial_field;
@@ -486,17 +493,19 @@ __global__ void sionna_reflection_accumulate_jvp_kernel(
     float wavelength,
     float solid_angle_per_ray,
     float cell_area,
-    float wavelength_tangent) {
+    float wavelength_tangent,
+    const float *__restrict__ tx_pol) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
         float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
-        float3 vertical = f3(0.0f, 0.0f, 1.0f);
-        float3 initial = add3(vertical, scale3(direction, -dot3(vertical, direction)));
-        if (dot3(initial, initial) < 1.0e-12f)
-            initial = f3(1.0f, 0.0f, 0.0f);
-        initial = normalize3(initial);
+        // R5: unnormalized transverse projection of the true TX polarization
+        // (see the forward kernel). The seed field carries no material/frequency
+        // tangent, so d_field starts at zero, but its sin^2(theta) magnitude
+        // must match the forward.
+        float3 initial = add3(tx_polarization, scale3(direction, -dot3(tx_polarization, direction)));
         Complex3 field = {c_make(initial.x, 0.0f), c_make(initial.y, 0.0f), c_make(initial.z, 0.0f)};
         Complex3 d_field = {c_make(0.0f, 0.0f), c_make(0.0f, 0.0f), c_make(0.0f, 0.0f)};
 
@@ -651,7 +660,7 @@ at::Tensor cn_mc_sionna_reflection_accumulate_cuda(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area) {
+    double solid_angle_per_ray, double cell_area, at::Tensor tx_pol) {
     const int64_t ray_count = ray_o.size(0);
     const int trace_depth = static_cast<int>(trace_valid.size(1));
     auto output = at::empty({resolution1, resolution0}, ray_o.options());
@@ -669,7 +678,8 @@ at::Tensor cn_mc_sionna_reflection_accumulate_cuda(
         static_cast<float>(plane_position), static_cast<float>(coord0_min), static_cast<float>(coord0_max),
         static_cast<float>(coord1_min), static_cast<float>(coord1_max), static_cast<int>(resolution0),
         static_cast<int>(resolution1), static_cast<float>(wavelength),
-        static_cast<float>(solid_angle_per_ray), static_cast<float>(cell_area));
+        static_cast<float>(solid_angle_per_ray), static_cast<float>(cell_area),
+        tx_pol.data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output;
 }
@@ -712,7 +722,8 @@ cn_mc_sionna_reflection_accumulate_backward_cuda(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_dfreq) {
+    double solid_angle_per_ray, double cell_area, double wavelength_dfreq,
+    at::Tensor tx_pol) {
     TORCH_CHECK(
         contribution_depth <= kReflectionAdMaxDepth,
         "reflection AD companions support contribution_depth <= ",
@@ -756,7 +767,8 @@ cn_mc_sionna_reflection_accumulate_backward_cuda(
         static_cast<int>(resolution1), static_cast<float>(wavelength),
         static_cast<float>(solid_angle_per_ray), static_cast<float>(cell_area),
         static_cast<float>(wavelength_dfreq),
-        grad_output.stride(0), grad_output.stride(1));
+        grad_output.stride(0), grad_output.stride(1),
+        tx_pol.data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_frequency};
 }
@@ -772,7 +784,8 @@ at::Tensor cn_mc_sionna_reflection_accumulate_jvp_cuda(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_tangent) {
+    double solid_angle_per_ray, double cell_area, double wavelength_tangent,
+    at::Tensor tx_pol) {
     TORCH_CHECK(
         contribution_depth <= kReflectionAdMaxDepth,
         "reflection AD companions support contribution_depth <= ",
@@ -801,7 +814,8 @@ at::Tensor cn_mc_sionna_reflection_accumulate_jvp_cuda(
         static_cast<float>(coord1_max), static_cast<int>(resolution0),
         static_cast<int>(resolution1), static_cast<float>(wavelength),
         static_cast<float>(solid_angle_per_ray), static_cast<float>(cell_area),
-        static_cast<float>(wavelength_tangent));
+        static_cast<float>(wavelength_tangent),
+        tx_pol.data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output_tangent;
 }

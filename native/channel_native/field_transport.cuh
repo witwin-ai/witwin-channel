@@ -23,7 +23,9 @@ __device__ __forceinline__ utd::Complex3 free_space_complex3(
     const float distance = utd::safe_length(offset);
     const utd::float3a direction = utd::safe_normalize(
         offset, utd::make_f3(0.0f, 0.0f, 1.0f));
-    const utd::float3a axis = utd::stable_perp_basis(direction, polarization);
+    // F1: unnormalized transverse projection carries the short-dipole
+    // sin(theta) pattern weight (zero at the axial null); do NOT normalize.
+    const utd::float3a axis = utd::project_to_wedge_plane(polarization, direction);
     const float amplitude = 1.0f /
                             (2.0f * fmaxf(wave_number, utd::UTD_SMALL_EPS) *
                              fmaxf(distance, utd::UTD_EPS));
@@ -36,7 +38,10 @@ __device__ __forceinline__ utd::Complex project_receiver(
     utd::Complex3 value,
     utd::float3a direction,
     utd::float3a polarization) {
-    const utd::float3a axis = utd::stable_perp_basis(direction, polarization);
+    // F1: coherent receiver scalar = p_rx . E. E is transverse, so projecting
+    // onto the unnormalized transverse of p_rx equals the raw dot with p_rx
+    // and keeps the receiver-side sin(theta) pattern weight.
+    const utd::float3a axis = utd::project_to_wedge_plane(polarization, direction);
     return utd::cplx_add(
         utd::cplx_add(
             utd::cplx_mul_real(value.x, axis.x),

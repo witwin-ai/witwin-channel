@@ -23,26 +23,36 @@ def test_single_wedge_diffraction_matches_path_reference():
     torch.testing.assert_close(result.paths.edge_id, reference.primitive_id[reference.valid, 0])
     # Real UTD paths (audit DF-1): one merged record for the shared wedge
     # edge (audit D-6), Keller stationary-point delays, and K-P amplitudes.
+    # F2 (utd-continuity-fix-design): removing the 5 cm UTD_MIN_DISTANCE gate
+    # admits the previously-suppressed weak edge 4, so the record count is 5
+    # (edge ids 0, 1, 2, 4, 5) instead of 4; the deterministic and path solvers
+    # still agree edge-for-edge.
     torch.testing.assert_close(
         result.paths.edge_id,
-        torch.tensor([0, 1, 2, 5], device=result.paths.edge_id.device, dtype=torch.int32),
+        torch.tensor([0, 1, 2, 4, 5], device=result.paths.edge_id.device, dtype=torch.int32),
     )
     expected_length = torch.tensor(
         [
             3.650281668,
             4.744879723,
             3.768759727,
+            4.754135132,
             4.046976566,
         ],
         device=result.paths.path_length_m.device,
         dtype=torch.float32,
     )
+    # F1/R5 + F5: the diffracted field now carries the z-hat short-dipole sin
+    # pattern (projected onto the rx polarization) and the finite-edge Fresnel
+    # truncation factor, which reshape the per-edge gains; edges 0/1/4 fall to
+    # near-null (below the atol floor) while edges 2/5 stay dominant.
     expected_gain = torch.tensor(
         [
-            6.07583245937e-08,
-            2.18809947938e-09,
-            2.81490724063e-08,
-            1.28271135935e-08,
+            4.778779977e-18,
+            6.261990926e-11,
+            2.245883479e-08,
+            1.333220535e-12,
+            9.513346555e-09,
         ],
         device=result.paths.path_gain.device,
         dtype=torch.float32,
@@ -81,7 +91,11 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
         wedge_diffraction_scene(),
         Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False),
     )
-    assert int(baseline.paths.valid.numel()) == 4
+    # F2 (utd-continuity-fix-design): the 5 cm UTD_MIN_DISTANCE gate removal
+    # admits one extra weak (horizontal) edge, so the unfiltered baseline now
+    # emits 5 paths; vertical_only still keeps 3 because the new edge is
+    # horizontal and filtered out.
+    assert int(baseline.paths.valid.numel()) == 5
 
 
 def test_diffraction_path_field_export_uses_native_complex_fields():

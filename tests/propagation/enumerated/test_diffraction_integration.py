@@ -44,6 +44,9 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
     scene = SimpleNamespace(
         structures=[object()],
         metadata={"mitsuba": {"merge_shapes": True}},
+        # F1/R5: order-1 diffraction now threads the real transmitter
+        # polarization (transmitter_polarizations reads scene.transmitters).
+        transmitters=[SimpleNamespace(polarization=torch.tensor([0.0, 0.0, 1.0]))],
     )
     compiled = SimpleNamespace(raydn=raydn)
 

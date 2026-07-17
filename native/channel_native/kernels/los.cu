@@ -61,7 +61,8 @@ __global__ void path_los_export_kernel(
     float *__restrict__ path_gain_matrix,
     int64_t tx_count,
     int64_t rx_count,
-    float wavelength) {
+    float wavelength,
+    const float *__restrict__ tx_pol) {
     const int64_t path_count = tx_count * rx_count;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t path = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -76,12 +77,26 @@ __global__ void path_los_export_kernel(
         const float dz = tx_p[2] - rx_p[2];
         const float distance = fmaxf(sqrtf(dx * dx + dy * dy + dz * dz), 1.0e-6f);
         const float gain_base = wavelength / (12.566370614359172f * distance);
+        // R5 polarization consistency: short-dipole sin^2(theta) pattern via the
+        // squared transverse projection |p_t|^2 = |tx_pol|^2 - (tx_pol . k_hat)^2
+        // of the true TX polarization onto the tx->rx direction. Matches the
+        // reflection/diffraction seed conventions (and the deterministic field
+        // export). tx_pol is unit, so this is exactly sin^2(theta).
+        const float *tx_pol_p = tx_pol + static_cast<int64_t>(tx) * 3;
+        const float inv_distance = 1.0f / distance;
+        const float khx = dx * inv_distance;
+        const float khy = dy * inv_distance;
+        const float khz = dz * inv_distance;
+        const float pol_dot = tx_pol_p[0] * khx + tx_pol_p[1] * khy + tx_pol_p[2] * khz;
+        const float pol_mag2 =
+            tx_pol_p[0] * tx_pol_p[0] + tx_pol_p[1] * tx_pol_p[1] + tx_pol_p[2] * tx_pol_p[2];
+        const float pattern = fmaxf(pol_mag2 - pol_dot * pol_dot, 0.0f);
 
         tx_id[path] = tx;
         rx_id[path] = rx;
         path_length[path] = distance;
         delay[path] = distance / static_cast<float>(kLightSpeedMetersPerSecond);
-        const float gain = tx_power[tx] * gain_base * gain_base;
+        const float gain = tx_power[tx] * gain_base * gain_base * pattern;
         path_gain[path] = gain;
         path_gain_matrix[static_cast<int64_t>(tx) * rx_count + rx] = gain;
     }
@@ -101,7 +116,8 @@ __global__ void los_path_gain_backward_kernel(
     int64_t grad_stride0,
     int64_t grad_stride1,
     float gain_scale,
-    float gain_scale_dfreq) {
+    float gain_scale_dfreq,
+    const float *__restrict__ tx_pol) {
     const int64_t pair_count = tx_count * rx_count;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -112,27 +128,43 @@ __global__ void los_path_gain_backward_kernel(
         const float go = grad_output[tx * grad_stride0 + rx * grad_stride1];
         const float *tx_p = tx_positions + tx * 3;
         const float *rx_p = rx_positions + rx * 3;
+        const float *tx_pol_p = tx_pol + tx * 3;
         const float dx = tx_p[0] - rx_p[0];
         const float dy = tx_p[1] - rx_p[1];
         const float dz = tx_p[2] - rx_p[2];
         const float distance_sq = dx * dx + dy * dy + dz * dz;
         const float distance = sqrtf(distance_sq);
         const float safe_distance = fmaxf(distance, 1.0e-6f);
-        const float inv_d2 = 1.0f / (safe_distance * safe_distance);
-        atomicAdd(grad_power + tx, go * gain_scale * inv_d2);
+        const float inv_distance = 1.0f / safe_distance;
+        const float inv_d2 = inv_distance * inv_distance;
+        // R5 dipole pattern: gain = P * gain_scale(f) / d^2 * sin2, with
+        // sin2 = |p|^2 - (p . k_hat)^2 and k_hat = (tx - rx)/d.
+        const float pol_dot =
+            (tx_pol_p[0] * dx + tx_pol_p[1] * dy + tx_pol_p[2] * dz) * inv_distance;
+        const float pol_mag2 = tx_pol_p[0] * tx_pol_p[0] +
+                               tx_pol_p[1] * tx_pol_p[1] + tx_pol_p[2] * tx_pol_p[2];
+        const float pattern = fmaxf(pol_mag2 - pol_dot * pol_dot, 0.0f);
+        atomicAdd(grad_power + tx, go * gain_scale * inv_d2 * pattern);
         if (grad_frequency != nullptr) {
-            // gain = P * gain_scale(f) / d^2; only gain_scale carries f.
-            atomicAdd(grad_frequency, go * tx_power[tx] * gain_scale_dfreq * inv_d2);
+            // gain = P * gain_scale(f) / d^2 * sin2; only gain_scale carries f.
+            atomicAdd(
+                grad_frequency,
+                go * tx_power[tx] * gain_scale_dfreq * inv_d2 * pattern);
         }
         // Position gradients follow the clamp_min pass-through convention
         // (>= keeps the boundary subgradient, matching the tests/ad oracle).
         if (distance < 1.0e-6f) {
             continue;
         }
-        const float coeff = go * 2.0f * tx_power[tx] * gain_scale * inv_d2 * inv_d2;
-        const float gx = coeff * dx;
-        const float gy = coeff * dy;
-        const float gz = coeff * dz;
+        // d(gain)/drx = 2 P S ( sin2 * r / d^4 + c * p_t / d^3 ), with
+        // p_t = p - c*k_hat the transverse projection; grad_tx = -grad_rx.
+        const float ptx = tx_pol_p[0] - pol_dot * dx * inv_distance;
+        const float pty = tx_pol_p[1] - pol_dot * dy * inv_distance;
+        const float ptz = tx_pol_p[2] - pol_dot * dz * inv_distance;
+        const float base = go * 2.0f * tx_power[tx] * gain_scale * inv_d2;
+        const float gx = base * (pattern * dx * inv_d2 + pol_dot * ptx * inv_distance);
+        const float gy = base * (pattern * dy * inv_d2 + pol_dot * pty * inv_distance);
+        const float gz = base * (pattern * dz * inv_d2 + pol_dot * ptz * inv_distance);
         atomicAdd(grad_rx + rx * 3 + 0, gx);
         atomicAdd(grad_rx + rx * 3 + 1, gy);
         atomicAdd(grad_rx + rx * 3 + 2, gz);
@@ -156,7 +188,8 @@ __global__ void los_path_gain_jvp_kernel(
     bool has_power_tangent,
     bool has_rx_tangent,
     float gain_scale,
-    float gain_scale_dfreq_tangent) {
+    float gain_scale_dfreq_tangent,
+    const float *__restrict__ tx_pol) {
     const int64_t pair_count = tx_count * rx_count;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -166,29 +199,45 @@ __global__ void los_path_gain_jvp_kernel(
         const int64_t rx = pair - tx * rx_count;
         const float *tx_p = tx_positions + tx * 3;
         const float *rx_p = rx_positions + rx * 3;
+        const float *tx_pol_p = tx_pol + tx * 3;
         const float dx = tx_p[0] - rx_p[0];
         const float dy = tx_p[1] - rx_p[1];
         const float dz = tx_p[2] - rx_p[2];
         const float distance_sq = dx * dx + dy * dy + dz * dz;
         const float distance = sqrtf(distance_sq);
         const float safe_distance = fmaxf(distance, 1.0e-6f);
-        const float inv_d2 = 1.0f / (safe_distance * safe_distance);
+        const float inv_distance = 1.0f / safe_distance;
+        const float inv_d2 = inv_distance * inv_distance;
+        // R5 dipole pattern sin2 = |p|^2 - (p . k_hat)^2, k_hat = (tx - rx)/d.
+        const float pol_dot =
+            (tx_pol_p[0] * dx + tx_pol_p[1] * dy + tx_pol_p[2] * dz) * inv_distance;
+        const float pol_mag2 = tx_pol_p[0] * tx_pol_p[0] +
+                               tx_pol_p[1] * tx_pol_p[1] + tx_pol_p[2] * tx_pol_p[2];
+        const float pattern = fmaxf(pol_mag2 - pol_dot * pol_dot, 0.0f);
         float tangent = 0.0f;
         if (has_power_tangent) {
-            tangent += power_tangent[tx] * gain_scale * inv_d2;
+            tangent += power_tangent[tx] * gain_scale * inv_d2 * pattern;
         }
         // Frequency tangent, pre-folded on the host into
         // d(gain_scale)/df * t_f so a zero tangent costs one fma.
-        tangent += tx_power[tx] * gain_scale_dfreq_tangent * inv_d2;
+        tangent += tx_power[tx] * gain_scale_dfreq_tangent * inv_d2 * pattern;
         if (distance >= 1.0e-6f) {
-            const float coeff = 2.0f * tx_power[tx] * gain_scale * inv_d2 * inv_d2;
+            // d(gain)/dr . t = 2 P S ( sin2 * (r . t) / d^4 + c * (p_t . t) / d^3 ).
+            const float ptx = tx_pol_p[0] - pol_dot * dx * inv_distance;
+            const float pty = tx_pol_p[1] - pol_dot * dy * inv_distance;
+            const float ptz = tx_pol_p[2] - pol_dot * dz * inv_distance;
+            const float base = 2.0f * tx_power[tx] * gain_scale * inv_d2;
             if (has_rx_tangent) {
                 const float *rx_t = rx_tangent + rx * 3;
-                tangent += coeff * (dx * rx_t[0] + dy * rx_t[1] + dz * rx_t[2]);
+                const float r_dot = dx * rx_t[0] + dy * rx_t[1] + dz * rx_t[2];
+                const float p_dot = ptx * rx_t[0] + pty * rx_t[1] + ptz * rx_t[2];
+                tangent += base * (pattern * r_dot * inv_d2 + pol_dot * p_dot * inv_distance);
             }
             if (has_tx_tangent) {
                 const float *tx_t = tx_tangent + tx * 3;
-                tangent -= coeff * (dx * tx_t[0] + dy * tx_t[1] + dz * tx_t[2]);
+                const float r_dot = dx * tx_t[0] + dy * tx_t[1] + dz * tx_t[2];
+                const float p_dot = ptx * tx_t[0] + pty * tx_t[1] + ptz * tx_t[2];
+                tangent -= base * (pattern * r_dot * inv_d2 + pol_dot * p_dot * inv_distance);
             }
         }
         out[tx * rx_count + rx] = tangent;
@@ -372,13 +421,18 @@ LosExport los_export_cuda_impl(
     at::Tensor tx_positions,
     at::Tensor tx_power,
     at::Tensor rx_positions,
-    double frequency_hz) {
+    double frequency_hz,
+    at::Tensor tx_pol) {
     check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
     check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
     check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    check_cuda_tensor(tx_pol, "tx_pol", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
+    TORCH_CHECK(
+        tx_pol.sizes() == tx_positions.sizes(),
+        "tx_pol must match tx_positions shape (N, 3)");
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
 
     const int64_t tx_count = tx_positions.size(0);
@@ -409,7 +463,8 @@ LosExport los_export_cuda_impl(
             path_gain_matrix.data_ptr<float>(),
             tx_count,
             rx_count,
-            wavelength);
+            wavelength,
+            tx_pol.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
@@ -575,8 +630,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     at::Tensor tx_positions,
     at::Tensor tx_power,
     at::Tensor rx_positions,
-    double frequency_hz) {
-    return los_export_cuda_impl(tx_positions, tx_power, rx_positions, frequency_hz);
+    double frequency_hz,
+    at::Tensor tx_pol) {
+    return los_export_cuda_impl(tx_positions, tx_power, rx_positions, frequency_hz, tx_pol);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda(
@@ -584,14 +640,17 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_b
     at::Tensor tx_power,
     at::Tensor rx_positions,
     at::Tensor grad_output,
-    double frequency_hz) {
+    double frequency_hz,
+    at::Tensor tx_pol) {
     check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
     check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
     check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    check_cuda_tensor(tx_pol, "tx_pol", at::kFloat, 2);
     check_cuda_tensor_rank(grad_output, "grad_output", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
+    TORCH_CHECK(tx_pol.sizes() == tx_positions.sizes(), "tx_pol must match tx_positions shape");
     TORCH_CHECK(grad_output.size(0) == tx_positions.size(0), "grad_output tx dimension mismatch");
     TORCH_CHECK(grad_output.size(1) == rx_positions.size(0), "grad_output rx dimension mismatch");
     TORCH_CHECK(tx_power.get_device() == tx_positions.get_device(), "tx_power must be on tx_positions device");
@@ -633,7 +692,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_b
             grad_output.stride(0),
             grad_output.stride(1),
             los_gain_scale(frequency_hz),
-            los_gain_scale_dfreq(frequency_hz));
+            los_gain_scale_dfreq(frequency_hz),
+            tx_pol.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return {grad_tx, grad_power, grad_rx, grad_frequency};
@@ -650,13 +710,16 @@ at::Tensor cn_mc_los_path_gain_jvp_cuda(
     bool has_power_tangent,
     bool has_rx_tangent,
     double frequency_hz,
-    double frequency_tangent) {
+    double frequency_tangent,
+    at::Tensor tx_pol) {
     check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
     check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
     check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    check_cuda_tensor(tx_pol, "tx_pol", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
+    TORCH_CHECK(tx_pol.sizes() == tx_positions.sizes(), "tx_pol must match tx_positions shape");
     TORCH_CHECK(tx_power.get_device() == tx_positions.get_device(), "tx_power must be on tx_positions device");
     TORCH_CHECK(rx_positions.get_device() == tx_positions.get_device(), "rx_positions must be on tx_positions device");
     if (has_tx_tangent) {
@@ -698,7 +761,8 @@ at::Tensor cn_mc_los_path_gain_jvp_cuda(
             los_gain_scale(frequency_hz),
             static_cast<float>(
                 static_cast<double>(los_gain_scale_dfreq(frequency_hz)) *
-                frequency_tangent));
+                frequency_tangent),
+            tx_pol.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return out;
@@ -837,8 +901,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     at::Tensor tx_positions,
     at::Tensor tx_power,
     at::Tensor rx_positions,
-    double frequency_hz) {
-    return los_export_cuda_impl(tx_positions, tx_power, rx_positions, frequency_hz);
+    double frequency_hz,
+    at::Tensor tx_pol) {
+    return los_export_cuda_impl(tx_positions, tx_power, rx_positions, frequency_hz, tx_pol);
 }
 
 at::Tensor cn_bdpt_los_component_maps_cuda(at::Tensor los) {

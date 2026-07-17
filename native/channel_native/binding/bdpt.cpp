@@ -128,7 +128,8 @@ pybind11::dict cn_bdpt_los_export(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
     torch::Tensor rx_positions,
-    double frequency_hz);
+    double frequency_hz,
+    torch::Tensor tx_pol);
 pybind11::dict cn_bdpt_finalize_component_maps(
     torch::Tensor los,
     torch::Tensor reflection,
