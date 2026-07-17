@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+from types import SimpleNamespace
 from collections.abc import Mapping
 from dataclasses import MISSING, fields, is_dataclass, replace
 import os
@@ -855,7 +856,12 @@ def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatc
         structure_phase_screens={0: screen},
     )
     compiled = replace(base, materials=materials, assignments=assignments)
-    table_resource = object()
+    # The resource build also derives the ADR-010 KirchhoffTableStack from
+    # each table's f_te/f_tm, so the sentinel must carry real tensors.
+    table_resource = SimpleNamespace(
+        f_te=torch.zeros((2, 2, 2, 2), dtype=torch.float32),
+        f_tm=torch.zeros((2, 2, 2, 2), dtype=torch.float32),
+    )
     screen_resource = object()
     events: list[str] = []
 
@@ -943,7 +949,10 @@ def test_compiled_scattering_resource_failures_are_retryable(monkeypatch):
         table_calls += 1
         if table_calls == 1:
             raise RuntimeError("table build failed")
-        return object()
+        return SimpleNamespace(
+            f_te=torch.zeros((2, 2, 2, 2), dtype=torch.float32),
+            f_tm=torch.zeros((2, 2, 2, 2), dtype=torch.float32),
+        )
 
     def build_screen(*args, **kwargs):
         nonlocal screen_calls
