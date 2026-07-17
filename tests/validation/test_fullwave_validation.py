@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -20,6 +22,7 @@ from benchmarks.fullwave_validation.scenarios import (
     build_channel_scene,
     load_case,
     load_manifest,
+    observation_valid_mask,
 )
 from witwin.channel_native import PerfectConductor
 from witwin.channel_native.core.materials import PhysicalSurface
@@ -114,6 +117,30 @@ def test_fullwave_analysis_source_and_geometry_are_outside_pml():
         assert all(lo < value < hi for value, (lo, hi) in zip(spec.tx_position, interior, strict=True))
 
 
+def test_three_cube_pec_observation_mask_is_union_and_plane_aware():
+    spec = load_case("three_cube", "metal")
+    x = np.linspace(-0.5, 0.5, 81)
+    y = np.linspace(-0.6, 0.6, 97)
+    actual = observation_valid_mask(spec, x, y)
+
+    expected = np.ones((y.size, x.size), dtype=bool)
+    half_size = spec.cube_size_m / 2.0
+    for center_x, center_y, _center_z in spec.cube_centers:
+        expected &= ~(
+            (np.abs(x[None, :] - center_x) <= half_size)
+            & (np.abs(y[:, None] - center_y) <= half_size)
+        )
+    np.testing.assert_array_equal(actual, expected)
+
+    top_surface = replace(spec, plane_z=spec.cube_centers[0][2] + half_size)
+    np.testing.assert_array_equal(
+        observation_valid_mask(top_surface, x, y),
+        expected,
+    )
+    above_cubes = replace(spec, plane_z=spec.cube_centers[0][2] + half_size + 1.0e-4)
+    assert observation_valid_mask(above_cubes, x, y).all()
+
+
 def test_tidy3d_extraction_returns_meter_coordinates_and_yx_layout():
     xr = pytest.importorskip("xarray")
     spec = load_case("single_cube", "metal")
@@ -150,6 +177,47 @@ def test_field_map_npz_round_trip(tmp_path):
         restored.components["los"], original.components["los"]
     )
     assert restored.metadata == original.metadata
+
+
+def test_three_cube_deterministic_plot_draws_scene_and_writes_png(tmp_path):
+    pytest.importorskip("matplotlib")
+    from benchmarks.fullwave_validation.experiments.plot_three_cube_deterministic import (
+        _add_scene_overlay,
+        plot_three_cube_deterministic,
+    )
+    import matplotlib.pyplot as plt
+
+    spec = load_case("three_cube", "metal")
+    x = np.linspace(-1.0, 1.0, 21)
+    y = np.linspace(-1.0, 1.0, 19)
+    yy, xx = np.meshgrid(y, x, indexing="ij")
+    base = (1.0 + 0.2 * xx - 0.1 * yy) * np.exp(1j * (0.3 * xx + 0.4 * yy))
+    field_map = FieldMap(
+        x=x,
+        y=y,
+        field=base,
+        components={
+            "los": 0.6 * base,
+            "reflection": 0.3j * base,
+            "diffraction": 0.1 * base,
+        },
+        metadata={
+            "backend": "deterministic",
+            "case_id": spec.case_id,
+            "case_fingerprint": spec.fingerprint,
+            "frequency_hz": spec.frequency_hz,
+        },
+    )
+
+    output = plot_three_cube_deterministic(field_map, tmp_path / "three-cube.png")
+
+    assert output.is_file()
+    assert output.stat().st_size > 0
+    figure, axis = plt.subplots()
+    _add_scene_overlay(axis, spec)
+    assert len(axis.patches) == 3
+    assert len(axis.collections) == 1
+    plt.close(figure)
 
 
 def test_complex_calibration_removes_source_amplitude_and_phase_offset():

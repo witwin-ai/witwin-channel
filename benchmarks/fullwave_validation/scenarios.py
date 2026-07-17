@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from witwin.channel_native import (
@@ -152,3 +153,30 @@ def build_channel_scene(spec: CaseSpec) -> Scene:
             "fullwave_validation_fingerprint": spec.fingerprint,
         },
     )
+
+
+def observation_valid_mask(
+    spec: CaseSpec,
+    x: np.ndarray,
+    y: np.ndarray,
+) -> np.ndarray:
+    """Return valid observation samples, excluding PEC volume intersections."""
+    x_values = np.asarray(x, dtype=np.float64)
+    y_values = np.asarray(y, dtype=np.float64)
+    if x_values.ndim != 1 or y_values.ndim != 1:
+        raise ValueError("x and y must be one-dimensional")
+
+    valid = np.ones((y_values.size, x_values.size), dtype=bool)
+    if spec.material.kind != "metal":
+        return valid
+
+    half_size = spec.cube_size_m / 2.0
+    for center_x, center_y, center_z in spec.cube_centers:
+        if not center_z - half_size <= spec.plane_z <= center_z + half_size:
+            continue
+        footprint = (
+            (np.abs(x_values[None, :] - center_x) <= half_size)
+            & (np.abs(y_values[:, None] - center_y) <= half_size)
+        )
+        valid &= ~footprint
+    return valid

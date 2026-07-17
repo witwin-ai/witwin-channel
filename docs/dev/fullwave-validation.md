@@ -26,6 +26,22 @@ not be computed from a half-cell-interpolated field. The scale, grid, PML, and
 source layout are part of the case fingerprint, so a result from a different
 electrical problem cannot be compared silently.
 
+For `three_cube`, "from the original channel example" describes geometry
+provenance only: the bounds, transmitter, cube centres, observation height, and
+cube size are scaled by 0.1 from
+`channel/examples/deterministic_radiomap_three_cubes.py`. The validation case
+uses a 5 GHz z-polarized source and PEC cubes, whereas the original example uses
+1 GHz and a high-permittivity material. It is therefore not an
+electromagnetically similar reproduction of the original example.
+
+The current `three_cube` receiver grid retains the original field example's
+256 by 256 sampling over a 2 m span, so its 7.8125 mm pitch does **not**
+coincide with the configured 6.25 mm full-wave Yee grid. The deterministic-only
+visualization below is valid, but a future cell-aligned three-cube full-wave
+jump benchmark must first use a versioned 320 by 320 case (or otherwise revise
+the manifest and fingerprint); it must not silently interpolate this case and
+claim grid-coincident jump statistics.
+
 The scenario model rejects analysis bounds, transmitters, monitor planes, or
 cube geometry that overlap the configured PML. For metal cases, receiver cells
 inside the PEC volume are invalid observation points and must be excluded from
@@ -234,6 +250,50 @@ python -m benchmarks.fullwave_validation compare `
 ```
 
 Repeat the same commands for `three_cube` and/or `dielectric`.
+
+### Three-cube deterministic visualization
+
+There is currently no reviewed, fixed `three_cube` full-wave reference in this
+worktree. The following commands generate and plot only the deterministic
+`three_cube` / `metal` result; the plotting script neither loads nor creates a
+full-wave result:
+
+```powershell
+conda run -n witwin2 python -m benchmarks.fullwave_validation solve-deterministic `
+  --scenario three_cube --material metal `
+  --output artifacts/fullwave/three-cube-metal/deterministic.npz
+
+conda run -n witwin2 python `
+  benchmarks/fullwave_validation/experiments/plot_three_cube_deterministic.py `
+  --deterministic artifacts/fullwave/three-cube-metal/deterministic.npz `
+  --output artifacts/fullwave/three-cube-metal/three-cube-deterministic-components.png
+```
+
+The four panels share the total-field peak and a `[-60, 0]` dB display range.
+Receiver samples inside any PEC cube are masked, and all three cube outlines and
+the transmitter marker are derived from the versioned case specification.
+
+This figure also exposes a current deterministic-solver limitation that the
+single-cube continuity case does not exercise. The public deterministic config
+does not support coupled reflection-diffraction paths, and its native
+accumulator deliberately drops coupled component IDs 3/4. Near the projected
+north-east edge of the third cube (`y=0.45703125 m`, `x=0.0488 -> 0.0489 m`), a
+reflected path from cube 2 becomes visible around cube 3 and the deterministic
+total has a 35.99 dB step even at 0.1 mm sampling. A diagnostic evaluation
+through the shared enumerated engine with the missing 1R+1D path included
+reduces the same pair to 1.16 dB.
+
+A 1 micrometre scan also separates an earlier finite-amplitude birth of direct
+diffraction paths as their edge-to-receiver segments clear cube 3. That second
+topology boundary needs D-to-D or another uniform higher-order continuation;
+the current solver supports diffraction order 1 only. Enabling 1R+1D alone is
+not a grid-scale fix either: the unpruned three-cube 256 by 256 candidate space
+would contain 84,934,656 bidirectional rows, while the current native guard is
+1,000,000. A production fix therefore needs an accepted numerical ADR, native
+candidate pruning/streaming, coherent accumulation of coupled IDs, and a
+higher-order visibility-boundary treatment. Consequently this plot records
+current behavior; it is not evidence that multi-object RSB continuity is
+solved or that the three-cube case is ready for full-wave acceptance.
 
 ## Metrics and jump checks
 
