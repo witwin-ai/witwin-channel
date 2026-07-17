@@ -769,6 +769,12 @@ def diffraction_component_map(
                 ad_maps.append(zero_map())
             continue
         edge_lengths = (states[4] - states[3]).clamp_min(0.0)
+        # One intentional device-to-host sync per transmitter. The host scalar
+        # gates the per-tx early-out below and sets the float32 edge-weight
+        # fill through a float64 divide (total_edge_length / samples). Keeping
+        # the reduction on the host preserves that double-rounded fill value; a
+        # GPU float32 scalar divide would single-round and is not bitwise
+        # identical, so this sync is deliberate rather than an oversight.
         total_edge_length = float(edge_lengths.sum().item())
         if not total_edge_length > 0.0:
             if ad:

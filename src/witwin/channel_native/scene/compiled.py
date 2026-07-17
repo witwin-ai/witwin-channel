@@ -92,7 +92,7 @@ class CompiledScene:
         return self.kirchhoff_resources.materials
 
     def _scattering_resource_key(self) -> ScatteringResourceKey:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda")
         return ScatteringResourceKey(
             material_cache_token=self.materials.cache_token,
             assignment_version=self.assignment_version,
