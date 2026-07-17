@@ -1,19 +1,23 @@
-"""Locate the compiled ``_channel_native`` extension for tests and benchmarks.
+"""Select an explicit development extension for tests and benchmarks.
 
 The extensions live in out-of-tree CMake build directories under
-``artifacts/cmake-*``. This helper prepends the newest build that matches the
-running interpreter to ``sys.path`` so bare ``import _channel_native`` works
-without an externally managed PYTHONPATH.
+``artifacts/cmake-*``. This helper configures the production loader with the
+newest extension matching the running interpreter. It never makes a bare
+``_channel_native`` module globally importable.
 """
 
 from __future__ import annotations
 
 import importlib.machinery
 import importlib.util
-import sys
+import os
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_ENABLE_ENV = "WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE"
+_PATH_ENV = "WITWIN_CHANNEL_NATIVE_EXTENSION_PATH"
+_FINGERPRINT_ENV = "WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT"
+_FINGERPRINT_FILE = "_channel_native.build-fingerprint"
 
 
 def _importable(module_name: str) -> bool:
@@ -23,7 +27,7 @@ def _importable(module_name: str) -> bool:
         return False
 
 
-def _candidate_build_dirs() -> list[Path]:
+def _candidate_extensions() -> list[Path]:
     artifacts = _REPO_ROOT / "artifacts"
     if not artifacts.is_dir():
         return []
@@ -32,34 +36,58 @@ def _candidate_build_dirs() -> list[Path]:
         for suffix in importlib.machinery.EXTENSION_SUFFIXES:
             pyd = build_dir / f"_channel_native{suffix}"
             if pyd.is_file():
-                candidates.append((pyd.stat().st_mtime, build_dir))
+                candidates.append((pyd.stat().st_mtime, pyd.resolve()))
                 break
     candidates.sort(key=lambda item: item[0], reverse=True)
-    return [build_dir for _mtime, build_dir in candidates]
+    return [extension for _mtime, extension in candidates]
 
 
 def native_extensions_available() -> bool:
-    return _importable("_channel_native")
+    if _importable("witwin.channel_native._channel_native"):
+        return True
+    configured = os.environ.get(_PATH_ENV)
+    fingerprint = os.environ.get(_FINGERPRINT_ENV)
+    return (
+        os.environ.get(_ENABLE_ENV) == "1"
+        and configured is not None
+        and Path(configured).is_absolute()
+        and Path(configured).is_file()
+        and fingerprint is not None
+        and len(fingerprint) == 64
+        and all(character in "0123456789abcdef" for character in fingerprint)
+    )
 
 
 def inject_native_paths() -> bool:
-    """Make the native extensions importable; return True on success."""
+    """Configure an explicit extension path; return ``True`` on success."""
 
     if native_extensions_available():
         return True
-    for build_dir in _candidate_build_dirs():
-        paths = [build_dir]
-        inserted = [str(path) for path in paths if path.is_dir()]
-        sys.path[:0] = inserted
-        if native_extensions_available():
-            return True
-        for path in inserted:
-            sys.path.remove(path)
+    if any(
+        os.environ.get(name) is not None
+        for name in (_ENABLE_ENV, _PATH_ENV, _FINGERPRINT_ENV)
+    ):
+        return False
+    candidates = _candidate_extensions()
+    for candidate in candidates:
+        sidecar = candidate.with_name(_FINGERPRINT_FILE)
+        if not sidecar.is_file():
+            continue
+        fingerprint = sidecar.read_text(encoding="ascii").strip()
+        if len(fingerprint) != 64 or any(
+            character not in "0123456789abcdef" for character in fingerprint
+        ):
+            continue
+        os.environ[_ENABLE_ENV] = "1"
+        os.environ[_PATH_ENV] = str(candidate)
+        os.environ[_FINGERPRINT_ENV] = fingerprint
+        return True
     return False
 
 
 BUILD_GUIDANCE = (
-    "The compiled _channel_native extension was not found. "
-    "Build them into artifacts/cmake-<name> (see docs/dev/plans/00-channel-native-greenfield-plan.md) "
-    "or set PYTHONPATH to a directory containing the built pyds."
+    "A compiled _channel_native extension with its build-fingerprint sidecar "
+    "was not found. Build into artifacts/cmake-<name> (see "
+    "docs/dev/plans/00-channel-native-greenfield-plan.md), or configure the "
+    "three WITWIN_CHANNEL_NATIVE developer loader variables explicitly."
 )

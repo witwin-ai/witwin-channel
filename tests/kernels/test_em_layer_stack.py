@@ -13,7 +13,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.materials.kernels import functional as ops
 
 EPS0 = 8.8541878128e-12
 MU0 = 1.25663706212e-6

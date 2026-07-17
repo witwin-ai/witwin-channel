@@ -16,10 +16,6 @@ from __future__ import annotations
 import pytest
 import torch
 
-pytestmark = pytest.mark.skipif(
-    not torch.cuda.is_available(), reason="CUDA is required for Munich AD smoke"
-)
-
 from tests.support.bin.benchmark_munich_deterministic_native_vs_original import (
     DEFAULT_MUNICH_XML,
     _load_scene,
@@ -27,6 +23,10 @@ from tests.support.bin.benchmark_munich_deterministic_native_vs_original import 
 )
 from witwin.channel_native import Scene, Transmitter
 from witwin.channel_native.deterministic import Config, solve
+
+pytestmark = pytest.mark.skipif(
+    not torch.cuda.is_available(), reason="CUDA is required for Munich AD smoke"
+)
 
 _GRID_SIZE = 16
 

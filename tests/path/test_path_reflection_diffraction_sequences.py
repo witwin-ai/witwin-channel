@@ -2,11 +2,11 @@ import pytest
 import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene, wedge_diffraction_scene
-from witwin.channel_native.core.kernels import ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config as DeterministicConfig
 from witwin.channel_native.deterministic import solve as solve_deterministic
 from witwin.channel_native.path import Config, solve
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 
 
 def _require_native() -> None:
@@ -105,7 +105,7 @@ def test_flat_solve_exports_finite_coupled_power():
 def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypatch):
     _require_native()
     monkeypatch.setattr(
-        ops,
+        geometry_bridge,
         "raydn_coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail("coupled kernel launched before guard"),
     )

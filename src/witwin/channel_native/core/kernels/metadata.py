@@ -111,6 +111,17 @@ def make_metadata(
     return metadata
 
 
+def noop_metadata(
+    *, accumulation_strategy: str = "none"
+) -> dict[str, bool | float | int | str]:
+    return make_metadata(
+        primitive="noop_metadata",
+        accumulation_strategy=accumulation_strategy,
+        scheduling_strategy="none",
+        ad_status="none",
+    )
+
+
 def validate_metadata(metadata: Mapping[str, object]) -> None:
     for field in REQUIRED_METADATA_FIELDS:
         if field not in metadata:

@@ -1,11 +1,14 @@
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.runtime import symbols as ops
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.deterministic import Config, solve
-from witwin.channel_native.core import path_topology as topology
+from witwin.channel_native.propagation.fields.kernels import (
+    deterministic as deterministic_fields,
+)
+from witwin.channel_native.propagation.enumerated import reflection as topology
 from witwin.channel_native.path import Config as PathConfig
 from witwin.channel_native.path import solve as solve_paths
 
@@ -96,14 +99,16 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
         pytest.skip("native deterministic reflection field kernel is not built")
 
     calls = 0
-    native_field = ops.deterministic_reflection_field
+    native_field = deterministic_fields.deterministic_reflection_field
 
     def count_native_call(**kwargs):
         nonlocal calls
         calls += 1
         return native_field(**kwargs)
 
-    monkeypatch.setattr(ops, "deterministic_reflection_field", count_native_call)
+    monkeypatch.setattr(
+        deterministic_fields, "deterministic_reflection_field", count_native_call
+    )
     result = solve(
         same_side_wall_reflection_scene(),
         Config(components={"reflection"}, coherent=True, export_paths=True),
@@ -145,7 +150,9 @@ def test_reflection_solver_requires_native_field_kernel(monkeypatch):
             "_channel_native.deterministic_reflection_field CUDA kernel is required"
         )
 
-    monkeypatch.setattr(ops, "deterministic_reflection_field", fail_native_kernel)
+    monkeypatch.setattr(
+        deterministic_fields, "deterministic_reflection_field", fail_native_kernel
+    )
     with pytest.raises(
         RuntimeError, match="deterministic_reflection_field CUDA kernel is required"
     ):

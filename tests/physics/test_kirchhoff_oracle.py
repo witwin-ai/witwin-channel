@@ -135,7 +135,9 @@ def test_phase_screen_sinusoidal_grating_orders(order):
     k_s = K0 * np.array([sin_s, 0.0, np.sqrt(1.0 - sin_s * sin_s)])
     q_n = (k_s - k_i)[2]
     amplitude = 0.0096
-    height_fn = lambda u, v: amplitude * np.sin(kappa * u * size_x)
+    def height_fn(u, v):
+        return amplitude * np.sin(kappa * u * size_x)
+
     integral = phase_screen_patch_integral(
         height_fn, corners, k_i, k_s, F0, n_quad=(512, 4)
     )
@@ -151,7 +153,8 @@ def test_phase_screen_quadrature_convergence():
     theta_i = np.deg2rad(25.0)
     k_i = K0 * np.array([np.sin(theta_i), 0.0, -np.cos(theta_i)])
     k_s = K0 * np.array([0.3, 0.17, np.sqrt(1.0 - 0.09 - 0.17 ** 2)])
-    height_fn = lambda u, v: 0.002 * np.sin(3.0 * u + 1.0) * np.cos(2.0 * v + 0.5)
+    def height_fn(u, v):
+        return 0.002 * np.sin(3.0 * u + 1.0) * np.cos(2.0 * v + 0.5)
 
     def integral(n):
         return phase_screen_patch_integral(height_fn, corners, k_i, k_s, F0, n_quad=n)

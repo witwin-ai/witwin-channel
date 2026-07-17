@@ -3,8 +3,40 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.core.kernels import raydn_backend
+from witwin.channel_native.core.kernels import metadata as kernel_metadata
+from witwin.channel_native.deterministic.kernels import (
+    accumulation as deterministic_accumulation,
+)
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.geometry.kernels import (
+    primitives as geometry_primitives,
+)
+from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel_native.propagation.topology.kernels import (
+    candidates as topology_candidates,
+)
+from witwin.channel_native.propagation.topology.kernels import (
+    compaction as topology_compaction,
+)
+from witwin.channel_native.propagation.topology.kernels import (
+    construction as topology_construction,
+)
+from witwin.channel_native.runtime import tensor_contracts
+from witwin.channel_native.propagation.fields.kernels import (
+    deterministic as deterministic_fields,
+)
+from witwin.channel_native.runtime import symbols
+from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
+from witwin.channel_native.montecarlo.basic.kernels import maps as mc_maps
+from witwin.channel_native.runtime import native_buffers
+from witwin.channel_native.runtime import symbols as runtime_symbols
+from witwin.channel_native.propagation.topology.kernels import (
+    primitives as topology_primitives,
+)
+from witwin.channel_native.propagation.topology.kernels import (
+    sampling as topology_sampling,
+)
 
 
 def test_validate_cuda_tensor_accepts_matching_cuda_tensor_when_available():
@@ -13,7 +45,7 @@ def test_validate_cuda_tensor_accepts_matching_cuda_tensor_when_available():
 
     tensor = torch.zeros((2, 3), device="cuda", dtype=torch.float32)
 
-    assert ops.validate_cuda_tensor(
+    assert tensor_contracts.validate_cuda_tensor(
         "points", tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     ) is tensor
 
@@ -22,7 +54,7 @@ def test_validate_cuda_tensor_rejects_cpu_tensor():
     tensor = torch.zeros((2, 3), dtype=torch.float32)
 
     with pytest.raises(ValueError, match="points must be a CUDA tensor"):
-        ops.validate_cuda_tensor(
+        tensor_contracts.validate_cuda_tensor(
             "points", tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,)
         )
 
@@ -31,7 +63,7 @@ def test_validate_cuda_tensor_rejects_wrong_dtype_before_shape():
     tensor = torch.zeros((2, 3), dtype=torch.float64)
 
     with pytest.raises(TypeError, match="points must have dtype torch.float32"):
-        ops.validate_cuda_tensor(
+        tensor_contracts.validate_cuda_tensor(
             "points", tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,)
         )
 
@@ -43,17 +75,17 @@ def test_validate_cuda_tensor_rejects_trailing_shape():
     tensor = torch.zeros((2, 2), device="cuda", dtype=torch.float32)
 
     with pytest.raises(ValueError, match="points must end with shape"):
-        ops.validate_cuda_tensor(
+        tensor_contracts.validate_cuda_tensor(
             "points", tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,)
         )
 
 
 def test_noop_metadata_reports_valid_schema():
-    metadata = ops.noop_metadata(accumulation_strategy="atomic_add")
+    metadata = kernel_metadata.noop_metadata(accumulation_strategy="atomic_add")
 
     assert metadata["primitive"] == "noop_metadata"
     assert metadata["accumulation_strategy"] == "atomic_add"
-    ops.validate_metadata(metadata)
+    kernel_metadata.validate_metadata(metadata)
 
 
 def test_path_los_export_returns_cuda_path_tensors_when_available():
@@ -64,7 +96,7 @@ def test_path_los_export_returns_cuda_path_tensors_when_available():
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[3.0, 4.0, 0.0]], device="cuda", dtype=torch.float32)
 
-    result = ops.path_los_export(
+    result = topology_blocks.path_los_export(
         tx_positions,
         tx_power,
         rx_positions,
@@ -85,10 +117,10 @@ def test_path_los_export_requires_native_cuda_kernel(monkeypatch):
     tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime_symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="path_los_export CUDA kernel is required"):
-        ops.path_los_export(tx_positions, tx_power, rx_positions, frequency_hz=3.0e9)
+        topology_blocks.path_los_export(tx_positions, tx_power, rx_positions, frequency_hz=3.0e9)
 
 
 def test_path_reflection_candidates_generate_native_segments():
@@ -107,7 +139,7 @@ def test_path_reflection_candidates_generate_native_segments():
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
 
-    candidates = ops.path_reflection_candidates(
+    candidates = topology_candidates.path_reflection_candidates(
         vertices,
         faces,
         face_normals,
@@ -157,8 +189,8 @@ def test_path_diffraction_block_and_merge_use_native_compaction():
         torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
     )
 
-    block = ops.path_diffraction_block(out, tx_index=2)
-    merged = ops.path_merge_blocks([block], tx_count=3, max_depth=1)
+    block = topology_blocks.path_diffraction_block(out, tx_index=2)
+    merged = topology_blocks.path_merge_blocks([block], tx_count=3, max_depth=1)
 
     assert block["valid"].shape == (2,)
     torch.testing.assert_close(block["tx_id"], torch.tensor([2, 2], device="cuda", dtype=torch.int32))
@@ -180,7 +212,7 @@ def test_deterministic_los_field_matches_python_reference():
     path_gain = torch.tensor([1.0e-4, 2.5e-5, 0.0], device="cuda", dtype=torch.float32)
     path_length = torch.tensor([1.0, 3.25, 9.5], device="cuda", dtype=torch.float32)
 
-    result = ops.deterministic_los_field(
+    result = deterministic_fields.deterministic_los_field(
         path_gain=path_gain,
         path_length_m=path_length,
         frequency_hz=3.0e9,
@@ -203,7 +235,7 @@ def test_deterministic_los_topology_block_compacts_and_fills_extended_fields():
     path_gain = torch.tensor([1.0e-4, 2.0e-4, 3.0e-4], device="cuda", dtype=torch.float32)
     visible = torch.tensor([True, False, True], device="cuda", dtype=torch.bool)
 
-    block = ops.deterministic_los_topology_block(
+    block = topology_construction.deterministic_los_topology_block(
         tx_id,
         rx_id,
         path_length,
@@ -244,7 +276,7 @@ def test_deterministic_los_topology_block_all_visible_does_not_require_python_ma
     delay = path_length / 299_792_458.0
     path_gain = torch.tensor([4.0e-4, 5.0e-4], device="cuda", dtype=torch.float32)
 
-    block = ops.deterministic_los_topology_block(
+    block = topology_construction.deterministic_los_topology_block(
         tx_id,
         rx_id,
         path_length,
@@ -269,7 +301,7 @@ def test_deterministic_selected_edge_count_uses_native_unique_count():
 
     edge_id = torch.tensor([-1, 7, 11, 7, -1, 11], device="cuda", dtype=torch.int32)
 
-    assert ops.deterministic_selected_edge_count(edge_id) == 2
+    assert topology_primitives.deterministic_selected_edge_count(edge_id) == 2
 
 
 def test_deterministic_zero_field_phase_uses_native_storage_fill():
@@ -278,7 +310,7 @@ def test_deterministic_zero_field_phase_uses_native_storage_fill():
 
     reference = torch.tensor([1.0, 2.0, 3.0], device="cuda", dtype=torch.float32)
 
-    exported = ops.deterministic_zero_field_phase(reference)
+    exported = deterministic_fields.deterministic_zero_field_phase(reference)
 
     assert exported["path_field"].is_cuda
     assert exported["path_field"].dtype == torch.complex64
@@ -296,7 +328,7 @@ def test_deterministic_topology_default_fields_uses_native_fill():
 
     reference = torch.tensor([1.0, 2.0], device="cuda", dtype=torch.float32)
 
-    exported = ops.deterministic_topology_default_fields(reference)
+    exported = topology_construction.deterministic_topology_default_fields(reference)
 
     assert exported["interaction_position"].shape == (2, 3)
     assert exported["interaction_normal"].shape == (2, 3)
@@ -348,7 +380,7 @@ def test_deterministic_pad_topology_sequences_uses_native_defaults_and_copy():
     empty_i32 = torch.empty((3, 0), device="cuda", dtype=torch.int32)
     empty_vec = torch.empty((3, 0, 3), device="cuda", dtype=torch.float32)
 
-    defaults = ops.deterministic_pad_topology_sequences(
+    defaults = topology_construction.deterministic_pad_topology_sequences(
         depth=depth,
         primitive_id=primitive_id,
         material_id=material_id,
@@ -378,7 +410,7 @@ def test_deterministic_pad_topology_sequences_uses_native_defaults_and_copy():
         device="cuda",
         dtype=torch.float32,
     )
-    copied = ops.deterministic_pad_topology_sequences(
+    copied = topology_construction.deterministic_pad_topology_sequences(
         depth=depth,
         primitive_id=primitive_id,
         material_id=material_id,
@@ -410,7 +442,7 @@ def test_deterministic_topology_base_fields_fill_constants_and_sources():
     primitive_source = torch.tensor([7, 8], device="cuda", dtype=torch.int32)
     empty_i32 = torch.empty((0,), device="cuda", dtype=torch.int32)
 
-    block = ops.deterministic_topology_base_fields(
+    block = topology_construction.deterministic_topology_base_fields(
         rx_id=rx_id,
         path_length_m=path_length,
         delay_s=delay,
@@ -443,7 +475,7 @@ def test_deterministic_repeat_range_generates_native_repeated_indices():
 
     reference = torch.empty((1,), device="cuda", dtype=torch.float32)
 
-    repeated = ops.deterministic_repeat_range(reference, start=4, end=7, repeats=2)
+    repeated = topology_construction.deterministic_repeat_range(reference, start=4, end=7, repeats=2)
 
     torch.testing.assert_close(
         repeated,
@@ -480,7 +512,7 @@ def test_deterministic_reflection_epc_input_batch_generates_native_pairs():
         dtype=torch.float32,
     )
 
-    batch = ops.deterministic_reflection_epc_input_batch(
+    batch = topology_construction.deterministic_reflection_epc_input_batch(
         tx=tx,
         rx_positions=rx_positions,
         sequences=sequences,
@@ -523,7 +555,7 @@ def test_deterministic_face_anchor_points_gathers_first_vertices_native():
         dtype=torch.int32,
     )
 
-    anchors = ops.deterministic_face_anchor_points(vertices, faces)
+    anchors = topology_construction.deterministic_face_anchor_points(vertices, faces)
 
     expected = torch.tensor(
         [
@@ -543,7 +575,7 @@ def test_deterministic_face_sequence_chunk_generates_base_digits():
 
     reference = torch.empty((1,), device="cuda", dtype=torch.float32)
 
-    sequences = ops.deterministic_face_sequence_chunk(
+    sequences = topology_construction.deterministic_face_sequence_chunk(
         reference,
         face_count=3,
         depth=2,
@@ -565,7 +597,7 @@ def test_deterministic_mapped_face_sequence_chunk_maps_digits_to_face_ids():
 
     face_ids = torch.tensor([4, 7, 9], device="cuda", dtype=torch.int64)
 
-    sequences = ops.deterministic_mapped_face_sequence_chunk(
+    sequences = topology_construction.deterministic_mapped_face_sequence_chunk(
         face_ids,
         depth=2,
         start=1,
@@ -586,7 +618,7 @@ def test_deterministic_mapped_face_sequence_chunk_can_skip_adjacent_repeats():
 
     face_ids = torch.tensor([4, 7, 9], device="cuda", dtype=torch.int64)
 
-    sequences = ops.deterministic_mapped_face_sequence_chunk(
+    sequences = topology_construction.deterministic_mapped_face_sequence_chunk(
         face_ids,
         depth=2,
         start=0,
@@ -640,7 +672,7 @@ def test_deterministic_reflection_order1_compact_selects_visible_material_inputs
     face_gain = face_eps_r + 300.0
     face_material_id = torch.tensor([3, 4, 5], device="cuda", dtype=torch.int32)
 
-    compacted = ops.deterministic_reflection_order1_compact(
+    compacted = topology_compaction.deterministic_reflection_order1_compact(
         visible=visible,
         epc_faces=epc_faces,
         epc_hits=epc_hits,
@@ -710,7 +742,7 @@ def test_deterministic_reflection_sequence_compact_selects_visible_sequences_wit
     face_gain = face_eps_r + 300.0
     face_material_id = torch.tensor([3, 4, 5], device="cuda", dtype=torch.int32)
 
-    compacted = ops.deterministic_reflection_sequence_compact(
+    compacted = topology_compaction.deterministic_reflection_sequence_compact(
         visible=visible,
         epc_sequences=epc_sequences,
         epc_hits=epc_hits,
@@ -752,7 +784,7 @@ def test_deterministic_normalize_vec3_normalizes_rows_with_native_kernel():
 
     values = torch.tensor([[3.0, 4.0, 0.0], [0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
 
-    normalized = ops.deterministic_normalize_vec3(values, eps=1.0e-6)
+    normalized = geometry_primitives.deterministic_normalize_vec3(values, eps=1.0e-6)
 
     expected = torch.tensor([[0.6, 0.8, 0.0], [0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     torch.testing.assert_close(normalized, expected)
@@ -766,7 +798,7 @@ def test_deterministic_reflect_points_reflects_about_planes_with_native_kernel()
     plane_points = torch.tensor([[0.0, 0.0, 0.0], [1.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
     normals = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32)
 
-    reflected = ops.deterministic_reflect_points(points, plane_points, normals)
+    reflected = geometry_primitives.deterministic_reflect_points(points, plane_points, normals)
 
     expected = torch.tensor([[-1.0, 2.0, 3.0], [2.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
     torch.testing.assert_close(reflected, expected)
@@ -800,7 +832,7 @@ def test_deterministic_face_groups_matches_canonical_plane_keys():
     )
     surface_ids = torch.tensor([1, 1, 1, 2, 1], device="cuda", dtype=torch.int64)
 
-    groups = ops.deterministic_face_groups(tri_a, normals, surface_ids, quantization=1.0e-4)
+    groups = geometry_primitives.deterministic_face_groups(tri_a, normals, surface_ids, quantization=1.0e-4)
 
     assert groups["group_count"] == 4
     torch.testing.assert_close(
@@ -827,7 +859,7 @@ def test_deterministic_surface_face_groups_groups_by_surface_id_only():
 
     surface_ids = torch.tensor([3, 3, 2, 3, 2], device="cuda", dtype=torch.int64)
 
-    groups = ops.deterministic_surface_face_groups(surface_ids)
+    groups = geometry_primitives.deterministic_surface_face_groups(surface_ids)
 
     assert groups["group_count"] == 2
     torch.testing.assert_close(
@@ -891,7 +923,7 @@ def test_deterministic_concat_topology_blocks_concatenates_full_schema():
     block0 = make_block(0, 2)
     block1 = make_block(10, 1)
 
-    out = ops.deterministic_concat_topology_blocks([block0, block1], sequence_width=2)
+    out = topology_blocks.deterministic_concat_topology_blocks([block0, block1], sequence_width=2)
 
     for key, tensor in block0.items():
         expected = torch.cat((tensor, block1[key]), dim=0).contiguous()
@@ -925,7 +957,7 @@ def test_deterministic_concat_topology_blocks_concatenates_unpadded_schema():
     block0 = make_block(0, 2)
     block1 = make_block(10, 1)
 
-    out = ops.deterministic_concat_topology_blocks([block0, block1], sequence_width=0)
+    out = topology_blocks.deterministic_concat_topology_blocks([block0, block1], sequence_width=0)
 
     assert "primitive_sequence" not in out
     assert "material_sequence" not in out
@@ -977,7 +1009,7 @@ def test_deterministic_gather_topology_block_orders_and_truncates_full_schema():
     }
     order = torch.tensor([2, 0, 3], device="cuda", dtype=torch.long)
 
-    out = ops.deterministic_gather_topology_block(block, order, max_count=2, sequence_width=2)
+    out = topology_blocks.deterministic_gather_topology_block(block, order, max_count=2, sequence_width=2)
 
     expected_order = order[:2]
     for key, tensor in block.items():
@@ -1001,7 +1033,7 @@ def test_deterministic_sort_order_matches_topology_key_priority():
         dtype=torch.int32,
     )
 
-    order = ops.deterministic_sort_order(
+    order = topology_compaction.deterministic_sort_order(
         valid,
         tx_id,
         rx_id,
@@ -1041,7 +1073,7 @@ def test_deterministic_diffraction_order1_compact_selects_valid_raydn_rows():
         dtype=torch.float32,
     )
 
-    compacted = ops.deterministic_diffraction_order1_compact(
+    compacted = topology_compaction.deterministic_diffraction_order1_compact(
         valid=valid,
         rx_id=rx_id,
         depth=depth,
@@ -1082,7 +1114,7 @@ def test_deterministic_diffraction_vector_field_matches_python_reference():
     z_re = torch.tensor([0.125, -0.25, 0.0], device="cuda", dtype=torch.float32)
     z_im = torch.tensor([0.0625, -0.5, 0.0], device="cuda", dtype=torch.float32)
 
-    result = ops.deterministic_diffraction_vector_field(
+    result = deterministic_fields.deterministic_diffraction_vector_field(
         x_re=x_re,
         x_im=x_im,
         y_re=y_re,
@@ -1100,7 +1132,7 @@ def test_deterministic_diffraction_vector_field_matches_python_reference():
 def test_deterministic_reflection_field_returns_native_complex_field():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection field")
-    native = ops.native_extension()
+    native = runtime_symbols.native_extension()
     if native is None or not hasattr(native, "deterministic_reflection_field"):
         pytest.skip("native deterministic reflection field kernel is not built")
 
@@ -1112,7 +1144,7 @@ def test_deterministic_reflection_field_returns_native_complex_field():
     eps_r = torch.full((1,), 4.0, device="cuda", dtype=torch.float32)
     sigma_e = torch.zeros((1,), device="cuda", dtype=torch.float32)
 
-    result = ops.deterministic_reflection_field(
+    result = deterministic_fields.deterministic_reflection_field(
         tx_position=tx_position,
         rx_position=rx_position,
         hit_position=hit_position,
@@ -1144,10 +1176,10 @@ def test_deterministic_reflection_field_requires_native_cuda_kernel(monkeypatch)
 
     tensor = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     one = torch.ones((1,), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(deterministic_fields, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="deterministic_reflection_field CUDA kernel is required"):
-        ops.deterministic_reflection_field(
+        deterministic_fields.deterministic_reflection_field(
             tx_position=tensor,
             rx_position=tensor,
             hit_position=tensor,
@@ -1191,7 +1223,7 @@ def test_deterministic_reflection_sequence_field_matches_python_reference():
     mu_r = torch.ones((2, 2), device="cuda", dtype=torch.float32)
     gain = torch.ones((2, 2), device="cuda", dtype=torch.float32)
 
-    result = ops.deterministic_reflection_sequence_field(
+    result = deterministic_fields.deterministic_reflection_sequence_field(
         tx_position=tx_position,
         rx_position=rx_position,
         hit_positions=hit_positions,
@@ -1231,12 +1263,12 @@ def test_deterministic_reflection_sequence_field_matches_python_reference():
 def test_deterministic_delay_to_path_length_uses_native_kernel():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic delay conversion")
-    native = ops.native_extension()
+    native = runtime_symbols.native_extension()
     if native is None or not hasattr(native, "deterministic_delay_to_path_length"):
         pytest.skip("native deterministic delay conversion kernel is not built")
 
     delay = torch.tensor([0.0, 1.0e-9, 2.5e-9], device="cuda", dtype=torch.float32)
-    result = ops.deterministic_delay_to_path_length(delay)
+    result = deterministic_fields.deterministic_delay_to_path_length(delay)
     expected = torch.tensor([0.0, 0.2997924685, 0.7494811416], device="cuda", dtype=torch.float32)
     torch.testing.assert_close(result, expected, rtol=2.0e-6, atol=1.0e-7)
 
@@ -1267,14 +1299,14 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
 
     frequency_hz = 3.0e9
     frequency_tangent = 2.5e5
-    grad_tx, grad_power, grad_rx, grad_frequency = ops.mc_los_path_gain_backward(
+    grad_tx, grad_power, grad_rx, grad_frequency = mc_maps.mc_los_path_gain_backward(
         tx_positions,
         tx_power,
         rx_positions,
         grad_output,
         frequency_hz=frequency_hz,
     )
-    jvp = ops.mc_los_path_gain_jvp(
+    jvp = mc_maps.mc_los_path_gain_jvp(
         tx_positions,
         tx_power,
         rx_positions,
@@ -1325,10 +1357,10 @@ def test_mc_los_path_gain_ad_kernels_require_native_cuda_kernel(monkeypatch):
     tx_power = torch.ones((1,), device="cuda", dtype=torch.float32)
     rx_positions = torch.ones((1, 3), device="cuda", dtype=torch.float32)
     grad_output = torch.ones((1, 1), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_los_path_gain_backward CUDA kernel is required"):
-        ops.mc_los_path_gain_backward(
+        mc_maps.mc_los_path_gain_backward(
             tx_positions,
             tx_power,
             rx_positions,
@@ -1336,7 +1368,7 @@ def test_mc_los_path_gain_ad_kernels_require_native_cuda_kernel(monkeypatch):
             frequency_hz=3.0e9,
         )
     with pytest.raises(RuntimeError, match="mc_los_path_gain_jvp CUDA kernel is required"):
-        ops.mc_los_path_gain_jvp(
+        mc_maps.mc_los_path_gain_jvp(
             tx_positions,
             tx_power,
             rx_positions,
@@ -1360,7 +1392,7 @@ def test_mc_finalize_component_maps_fuses_total_and_power_reductions():
     transmission = torch.tensor([[[0.1, 0.2], [0.3, 0.4]]], device="cuda", dtype=torch.float32)
     scattering = torch.tensor([[[0.05, 0.1], [0.15, 0.2]]], device="cuda", dtype=torch.float32)
 
-    result = ops.mc_finalize_component_maps(
+    result = mc_maps.mc_finalize_component_maps(
         los, reflection, diffraction, transmission, scattering
     )
 
@@ -1384,10 +1416,10 @@ def test_mc_finalize_component_maps_requires_native_cuda_kernel(monkeypatch):
     diffraction = torch.zeros_like(los)
     transmission = torch.zeros_like(los)
     scattering = torch.zeros_like(los)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_finalize_component_maps CUDA kernel is required"):
-        ops.mc_finalize_component_maps(
+        mc_maps.mc_finalize_component_maps(
             los, reflection, diffraction, transmission, scattering
         )
 
@@ -1397,12 +1429,12 @@ def test_mc_component_map_buffer_and_store_kernels_write_tx_slots():
         pytest.skip("CUDA is required for MC component map stores")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    maps = ops.mc_component_map_buffer(reference, tx_count=2, dim0=2, dim1=2)
+    maps = mc_maps.mc_component_map_buffer(reference, tx_count=2, dim0=2, dim1=2)
     source = torch.tensor([[1.0, 2.0], [3.0, 4.0]], device="cuda", dtype=torch.float32)
     scale = torch.tensor([10.0, 0.5], device="cuda", dtype=torch.float32)
 
-    ops.mc_store_component_map(maps, source, tx_index=0)
-    ops.mc_store_scaled_component_map(maps, source, scale, tx_index=1, scale_index=1)
+    mc_maps.mc_store_component_map(maps, source, tx_index=0)
+    mc_maps.mc_store_scaled_component_map(maps, source, scale, tx_index=1, scale_index=1)
 
     expected = torch.stack((source, source * 0.5), dim=0)
     torch.testing.assert_close(maps, expected)
@@ -1414,10 +1446,10 @@ def test_mc_component_map_store_requires_native_cuda_kernel(monkeypatch):
 
     maps = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
     source = torch.ones((2, 2), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_store_component_map CUDA kernel is required"):
-        ops.mc_store_component_map(maps, source, tx_index=0)
+        mc_maps.mc_store_component_map(maps, source, tx_index=0)
 
 
 def test_mc_sample_directions_matches_golden_ratio_sequence():
@@ -1425,7 +1457,7 @@ def test_mc_sample_directions_matches_golden_ratio_sequence():
         pytest.skip("CUDA is required for MC sample directions")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    directions = ops.mc_sample_directions(5, reference)
+    directions = topology_sampling.mc_sample_directions(5, reference)
     indices = torch.arange(5, device="cuda", dtype=torch.float64)
     golden_ratio = (1.0 + 5.0**0.5) / 2.0
     azimuth_u = torch.frac(indices / golden_ratio)
@@ -1445,17 +1477,17 @@ def test_mc_sample_directions_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC sample directions")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(topology_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_sample_directions CUDA kernel is required"):
-        ops.mc_sample_directions(1, reference)
+        topology_sampling.mc_sample_directions(1, reference)
 
 
 def test_mc_transmitter_tensors_creates_cuda_positions_and_power():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC transmitter tensors")
 
-    result = ops.mc_transmitter_tensors(
+    result = native_buffers.mc_transmitter_tensors(
         (1.0, 2.0, 3.0, 4.0, 5.0, 6.0),
         (0.5, 2.0),
     )
@@ -1471,10 +1503,10 @@ def test_mc_transmitter_tensors_creates_cuda_positions_and_power():
 
 
 def test_mc_transmitter_tensors_requires_native_cuda_helper(monkeypatch):
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(native_buffers, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_transmitter_tensors CUDA helper is required"):
-        ops.mc_transmitter_tensors((0.0, 0.0, 0.0), (1.0,))
+        native_buffers.mc_transmitter_tensors((0.0, 0.0, 0.0), (1.0,))
 
 
 def test_mc_pack_vec3_interleaves_cuda_vectors():
@@ -1485,7 +1517,7 @@ def test_mc_pack_vec3_interleaves_cuda_vectors():
     y = torch.tensor([3.0, 4.0], device="cuda", dtype=torch.float32)
     z = torch.tensor([5.0, 6.0], device="cuda", dtype=torch.float32)
 
-    packed = ops.mc_pack_vec3(x, y, z)
+    packed = native_buffers.mc_pack_vec3(x, y, z)
 
     expected = torch.tensor(
         [[1.0, 3.0, 5.0], [2.0, 4.0, 6.0]],
@@ -1500,10 +1532,10 @@ def test_mc_pack_vec3_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC vec3 packing")
 
     x = torch.zeros((1,), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(native_buffers, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_pack_vec3 CUDA kernel is required"):
-        ops.mc_pack_vec3(x, x, x)
+        native_buffers.mc_pack_vec3(x, x, x)
 
 
 def test_mc_los_component_maps_converts_to_public_grid_layout():
@@ -1519,7 +1551,7 @@ def test_mc_los_component_maps_converts_to_public_grid_layout():
         dtype=torch.float32,
     )
 
-    maps = ops.mc_los_component_maps(los)
+    maps = mc_maps.mc_los_component_maps(los)
 
     torch.testing.assert_close(maps, los.transpose(1, 2).contiguous())
 
@@ -1530,7 +1562,7 @@ def test_mc_los_component_maps_from_matrix_uses_native_grid_layout():
 
     los = torch.arange(6, device="cuda", dtype=torch.float32).reshape(1, 6).contiguous()
 
-    maps = ops.mc_los_component_maps_from_matrix(los, rows=2, cols=3)
+    maps = mc_maps.mc_los_component_maps_from_matrix(los, rows=2, cols=3)
 
     assert maps.shape == (1, 3, 2)
     expected = torch.tensor([[[0.0, 3.0], [1.0, 4.0], [2.0, 5.0]]], device="cuda")
@@ -1542,10 +1574,10 @@ def test_mc_apply_los_visibility_masks_one_transmitter_in_public_layout():
         pytest.skip("CUDA is required for MC LoS visibility")
 
     los = torch.tensor([[1.0, 2.0, 3.0, 4.0]], device="cuda", dtype=torch.float32)
-    maps = ops.mc_los_component_maps_from_matrix(los, rows=2, cols=2)
+    maps = mc_maps.mc_los_component_maps_from_matrix(los, rows=2, cols=2)
     visible = torch.tensor([True, False, False, True], device="cuda", dtype=torch.bool)
 
-    out = ops.mc_apply_los_visibility(maps, los, visible, tx_index=0)
+    out = mc_maps.mc_apply_los_visibility(maps, los, visible, tx_index=0)
 
     expected = torch.tensor([[[1.0, 0.0], [0.0, 4.0]]], device="cuda", dtype=torch.float32)
     torch.testing.assert_close(out, expected)
@@ -1558,10 +1590,10 @@ def test_mc_apply_los_visibility_requires_native_cuda_kernel(monkeypatch):
     los = torch.zeros((1, 4), device="cuda", dtype=torch.float32)
     maps = torch.zeros((1, 2, 2), device="cuda", dtype=torch.float32)
     visible = torch.ones((4,), device="cuda", dtype=torch.bool)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_apply_los_visibility CUDA kernel is required"):
-        ops.mc_apply_los_visibility(maps, los, visible, tx_index=0)
+        mc_maps.mc_apply_los_visibility(maps, los, visible, tx_index=0)
 
 
 def test_mc_los_visibility_inputs_fill_start_and_active():
@@ -1574,7 +1606,7 @@ def test_mc_los_visibility_inputs_fill_start_and_active():
         dtype=torch.float32,
     )
 
-    result = ops.mc_los_visibility_inputs(tx_positions, tx_index=1, rx_count=4)
+    result = mc_maps.mc_los_visibility_inputs(tx_positions, tx_index=1, rx_count=4)
 
     expected_start = tx_positions[1].expand(4, 3).contiguous()
     torch.testing.assert_close(result["start"], expected_start)
@@ -1587,10 +1619,10 @@ def test_mc_los_visibility_inputs_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC LoS visibility inputs")
 
     tx_positions = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_maps, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_los_visibility_inputs CUDA kernel is required"):
-        ops.mc_los_visibility_inputs(tx_positions, tx_index=0, rx_count=1)
+        mc_maps.mc_los_visibility_inputs(tx_positions, tx_index=0, rx_count=1)
 
 
 def test_mc_receiver_grid_points_matches_receiver_grid_order():
@@ -1599,7 +1631,7 @@ def test_mc_receiver_grid_points_matches_receiver_grid_order():
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
 
-    points = ops.mc_receiver_grid_points(
+    points = native_buffers.mc_receiver_grid_points(
         reference,
         origin=(1.0, 2.0, 3.0),
         x_axis=(1.0, 0.0, 0.0),
@@ -1628,10 +1660,10 @@ def test_mc_receiver_grid_points_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC receiver grid points")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(native_buffers, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_receiver_grid_points CUDA kernel is required"):
-        ops.mc_receiver_grid_points(
+        native_buffers.mc_receiver_grid_points(
             reference,
             origin=(0.0, 0.0, 0.0),
             x_axis=(1.0, 0.0, 0.0),
@@ -1651,7 +1683,7 @@ def test_mc_reflection_launch_inputs_fill_ray_origin_active_and_polarization():
         dtype=torch.float32,
     )
 
-    result = ops.mc_reflection_launch_inputs(tx_positions, tx_index=1, sample_count=4)
+    result = mc_sampling.mc_reflection_launch_inputs(tx_positions, tx_index=1, sample_count=4)
 
     torch.testing.assert_close(result["ray_o"], tx_positions[1].expand(4, 3).contiguous())
     assert result["ray_tmax"].shape == (0,)
@@ -1667,10 +1699,10 @@ def test_mc_reflection_launch_inputs_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC reflection launch inputs")
 
     tx_positions = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_reflection_launch_inputs CUDA kernel is required"):
-        ops.mc_reflection_launch_inputs(tx_positions, tx_index=0, sample_count=1)
+        mc_sampling.mc_reflection_launch_inputs(tx_positions, tx_index=0, sample_count=1)
 
 
 def test_mc_diffraction_state_wi_matches_normalized_edge_to_source_direction():
@@ -1688,7 +1720,7 @@ def test_mc_diffraction_state_wi_matches_normalized_edge_to_source_direction():
         dtype=torch.float32,
     )
 
-    state_wi = ops.mc_diffraction_state_wi(edge_pos, src)
+    state_wi = mc_sampling.mc_diffraction_state_wi(edge_pos, src)
 
     expected = torch.nn.functional.normalize(edge_pos - src, dim=1, eps=1.0e-6)
     torch.testing.assert_close(state_wi, expected, rtol=1e-6, atol=1e-6)
@@ -1700,10 +1732,10 @@ def test_mc_diffraction_state_wi_requires_native_cuda_kernel(monkeypatch):
 
     edge_pos = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     src = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_diffraction_state_wi CUDA kernel is required"):
-        ops.mc_diffraction_state_wi(edge_pos, src)
+        mc_sampling.mc_diffraction_state_wi(edge_pos, src)
 
 
 def test_mc_selected_edge_indices_compacts_bool_mask_in_edge_order():
@@ -1712,7 +1744,7 @@ def test_mc_selected_edge_indices_compacts_bool_mask_in_edge_order():
 
     selected = torch.tensor([False, True, True, False, True], device="cuda", dtype=torch.bool)
 
-    indices = ops.mc_selected_edge_indices(selected)
+    indices = topology_primitives.mc_selected_edge_indices(selected)
 
     expected = torch.tensor([1, 2, 4], device="cuda", dtype=torch.int32)
     torch.testing.assert_close(indices, expected)
@@ -1723,10 +1755,10 @@ def test_mc_selected_edge_indices_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC selected edge compaction")
 
     selected = torch.ones((1,), device="cuda", dtype=torch.bool)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(topology_primitives, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_selected_edge_indices CUDA kernel is required"):
-        ops.mc_selected_edge_indices(selected)
+        topology_primitives.mc_selected_edge_indices(selected)
 
 
 def test_mc_diffraction_state_pack_gathers_edge_state_tensors():
@@ -1750,7 +1782,7 @@ def test_mc_diffraction_state_pack_gathers_edge_state_tensors():
     tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor(4.0, device="cuda", dtype=torch.float32)
 
-    states = ops.mc_diffraction_state_pack(
+    states = mc_sampling.mc_diffraction_state_pack(
         edge_indices,
         edge_pos,
         edge_dir,
@@ -1797,7 +1829,7 @@ def test_deterministic_diffraction_state_pack_reads_power_by_native_index():
     tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([2.0, 4.0, 8.0], device="cuda", dtype=torch.float32)
 
-    states = ops.deterministic_diffraction_state_pack(
+    states = topology_primitives.deterministic_diffraction_state_pack(
         edge_indices,
         edge_pos,
         edge_dir,
@@ -1840,7 +1872,7 @@ def test_deterministic_diffraction_state_pack_selected_keeps_device_sized_capaci
     tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([4.0, 6.0], device="cuda", dtype=torch.float32)
 
-    states = ops.deterministic_diffraction_state_pack_selected(
+    states = topology_primitives.deterministic_diffraction_state_pack_selected(
         selected,
         edge_pos,
         edge_dir,
@@ -1872,10 +1904,10 @@ def test_mc_diffraction_state_pack_requires_native_cuda_kernel(monkeypatch):
     face = torch.zeros((1,), device="cuda", dtype=torch.int32)
     tx = torch.zeros((3,), device="cuda", dtype=torch.float32)
     tx_power = torch.tensor(1.0, device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(mc_sampling, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_diffraction_state_pack CUDA kernel is required"):
-        ops.mc_diffraction_state_pack(
+        mc_sampling.mc_diffraction_state_pack(
             edge_indices,
             edge_pos,
             edge_pos,
@@ -1895,7 +1927,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayDN counted diffraction edge discovery")
 
-    raydn_backend.require_native_extension()
+    symbols.native_extension()
     tx_pos = torch.tensor([0.0, 0.0, 0.0], device="cuda", dtype=torch.float32)
     ray_dir = torch.tensor(
         [
@@ -1931,7 +1963,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
     line_max = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     face1 = torch.tensor([-1], device="cuda", dtype=torch.int32)
 
-    sliced = ops.raydn_diffraction_discover_edges(
+    sliced = geometry_bridge.raydn_diffraction_discover_edges(
         tx_pos,
         ray_dir[:2].contiguous(),
         prim_index[:2].contiguous(),
@@ -1948,7 +1980,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
         line_max,
         face1,
     )
-    counted = ops.raydn_diffraction_discover_edges_counted(
+    counted = geometry_bridge.raydn_diffraction_discover_edges_counted(
         tx_pos,
         ray_dir,
         prim_index,
@@ -1979,7 +2011,7 @@ def test_mc_face_material_tensors_expands_material_ids():
     mu_r = torch.tensor([1.0, 1.5], device="cuda", dtype=torch.float32)
     face_material_id = torch.tensor([1, 0, 1], device="cuda", dtype=torch.int32)
 
-    result = ops.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)
+    result = material_functional.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)
 
     torch.testing.assert_close(result["eps_r"], torch.tensor([4.0, 1.0, 4.0], device="cuda"))
     torch.testing.assert_close(result["sigma_e"], torch.tensor([0.2, 0.0, 0.2], device="cuda"))
@@ -1997,10 +2029,10 @@ def test_mc_face_material_tensors_requires_native_cuda_kernel(monkeypatch):
     sigma_e = torch.zeros((1,), device="cuda", dtype=torch.float32)
     mu_r = torch.ones((1,), device="cuda", dtype=torch.float32)
     face_material_id = torch.zeros((1,), device="cuda", dtype=torch.int32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(material_functional, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_face_material_tensors CUDA kernel is required"):
-        ops.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)
+        material_functional.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)
 
 
 def test_deterministic_accumulate_flat_matches_torch_reference():
@@ -2023,7 +2055,7 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
     )
     slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4}
 
-    result = ops.deterministic_accumulate_flat(
+    result = deterministic_accumulation.deterministic_accumulate_flat(
         tx_id,
         rx_id,
         component_id,
@@ -2068,7 +2100,7 @@ def test_deterministic_accumulate_flat_incoherent_sums_power():
     field_real = torch.tensor([2.0, 3.0], device="cuda", dtype=torch.float32)
     field_imag = torch.zeros((2,), device="cuda", dtype=torch.float32)
 
-    result = ops.deterministic_accumulate_flat(
+    result = deterministic_accumulation.deterministic_accumulate_flat(
         tx_id,
         rx_id,
         component_id,

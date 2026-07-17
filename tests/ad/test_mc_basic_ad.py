@@ -546,16 +546,18 @@ def test_diffraction_frequency_grad_matches_fd():
 def _captured_diffraction_tape(monkeypatch, tx: torch.Tensor) -> tuple:
     """Solve once in vjp mode and capture the tape-accumulate Function args."""
 
-    from witwin.channel_native.core.kernels import ops as _ops
+    from witwin.channel_native.montecarlo.basic.kernels import maps as _maps
 
     captured: dict[str, tuple] = {}
-    original = _ops._McDiffractionMapAdFunction.forward
+    original = _maps._McDiffractionMapAdFunction.forward
 
     def spy(*args):
         captured["args"] = args
         return original(*args)
 
-    monkeypatch.setattr(_ops._McDiffractionMapAdFunction, "forward", staticmethod(spy))
+    monkeypatch.setattr(
+        _maps._McDiffractionMapAdFunction, "forward", staticmethod(spy)
+    )
     leaf = tx.clone().cuda().requires_grad_(True)
     scene = _diffraction_scene(tx=leaf)
     _loss(_solve_diffraction(scene, "vjp")).backward()
@@ -587,7 +589,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
     single-lane FD (measured ~10-15% per lane at the converged step).
     """
 
-    from witwin.channel_native.core.kernels import ops as _ops
+    from witwin.channel_native.montecarlo.basic.kernels import maps as _ops
 
     base = torch.tensor([0.0, -1.0, 0.5])
     args = _captured_diffraction_tape(monkeypatch, base)

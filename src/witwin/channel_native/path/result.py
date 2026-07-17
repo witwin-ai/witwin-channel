@@ -12,7 +12,7 @@ from .schema import RaggedPathSoA
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 if TYPE_CHECKING:
-    from witwin.channel_native.core.path_topology import TopologyBatch
+    from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 
 
 def _validate_tensor_predicate(predicate: torch.Tensor, message: str) -> None:
@@ -582,8 +582,8 @@ def endpoint_angles(direction: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor
     return theta.to(torch.float32), phi.to(torch.float32)
 
 
-def from_topology_result(
-    paths: "TopologyBatch",
+def from_evaluated_paths(
+    paths: "EvaluatedPaths",
     *,
     num_rx: int,
     num_tx: int,
@@ -591,21 +591,24 @@ def from_topology_result(
     rx_positions: torch.Tensor,
     metadata: dict[str, Any] | None = None,
 ) -> PathResult:
-    """Pack the shared canonical topology without losing event sequences."""
+    """Pack evaluated propagation rows without losing event sequences."""
 
-    count = int(paths.delay_s.numel())
-    tx_id = paths.tx_id.to(dtype=torch.int32)
-    rx_id = paths.rx_id.to(dtype=torch.int32)
+    topology = paths.topology
+    geometry = paths.geometry
+    fields = paths.fields
+    count = paths.row_count
+    tx_id = topology.tx_id.to(dtype=torch.int32)
+    rx_id = topology.rx_id.to(dtype=torch.int32)
     tx_for_path = tx_positions[tx_id.to(dtype=torch.int64)]
     rx_for_path = rx_positions[rx_id.to(dtype=torch.int64)]
     direct = rx_for_path - tx_for_path
-    width = int(paths.interaction_type.shape[1])
+    width = int(topology.interaction_type.shape[1])
     if width:
-        first = paths.interaction_positions[:, 0]
-        last_index = torch.clamp(paths.depth.to(dtype=torch.int64) - 1, min=0)
-        row = torch.arange(count, device=paths.delay_s.device)
-        last = paths.interaction_positions[row, last_index]
-        has_interaction = paths.depth > 0
+        first = geometry.interaction_positions[:, 0]
+        last_index = torch.clamp(topology.depth.to(dtype=torch.int64) - 1, min=0)
+        row = torch.arange(count, device=geometry.delay_s.device)
+        last = geometry.interaction_positions[row, last_index]
+        has_interaction = topology.depth > 0
         departure = torch.where(has_interaction[:, None], first - tx_for_path, direct)
         arrival = torch.where(has_interaction[:, None], rx_for_path - last, direct)
     else:
@@ -614,12 +617,12 @@ def from_topology_result(
     theta_t, phi_t = endpoint_angles(departure)
     theta_r, phi_r = endpoint_angles(-arrival)
 
-    object_sequence = paths.primitive_sequence.clone()
+    object_sequence = topology.primitive_sequence.clone()
     if width:
-        diffraction = (paths.component_id == 2) & (paths.depth > 0)
-        object_sequence[diffraction, 0] = paths.edge_id[diffraction]
-    interaction_normals = paths.interaction_normals
-    diffraction = paths.interaction_type == int(InteractionType.DIFFRACTION)
+        diffraction = (topology.component_id == 2) & (topology.depth > 0)
+        object_sequence[diffraction, 0] = topology.edge_id[diffraction]
+    interaction_normals = geometry.interaction_normals
+    diffraction = topology.interaction_type == int(InteractionType.DIFFRACTION)
     interaction_normals = torch.where(
         diffraction.unsqueeze(-1) & ~torch.isfinite(interaction_normals),
         torch.zeros_like(interaction_normals),
@@ -632,16 +635,16 @@ def from_topology_result(
         num_tx_ant=1,
         rx_id=rx_id,
         tx_id=tx_id,
-        field=paths.coefficient.unsqueeze(-1),
-        delay_s=paths.delay_s,
+        field=fields.coefficient.unsqueeze(-1),
+        delay_s=geometry.delay_s,
         theta_t=theta_t,
         phi_t=phi_t,
         theta_r=theta_r,
         phi_r=phi_r,
-        interaction_type=paths.interaction_type,
+        interaction_type=topology.interaction_type,
         primitive_id=object_sequence,
-        material_id=paths.material_sequence,
-        position=paths.interaction_positions,
+        material_id=topology.material_sequence,
+        position=geometry.interaction_positions,
         normal=interaction_normals,
     )
     result_metadata = dict(metadata or {})
@@ -663,8 +666,8 @@ def from_topology_result(
         device=result.a.device,
         dtype=torch.float32,
     )
-    field_xyz[result.valid] = paths.field_xyz
-    field_direction[result.valid] = paths.field_direction
+    field_xyz[result.valid] = fields.field_xyz
+    field_direction[result.valid] = geometry.field_direction
     return replace(
         result,
         field_xyz=field_xyz,
@@ -676,5 +679,5 @@ __all__ = [
     "InteractionType",
     "PathResult",
     "endpoint_angles",
-    "from_topology_result",
+    "from_evaluated_paths",
 ]

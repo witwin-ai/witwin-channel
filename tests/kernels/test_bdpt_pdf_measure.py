@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.montecarlo.scattering_events import (
+from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel_native.montecarlo.events.scattering import (
     solid_angle_to_area_jacobian,
 )
 

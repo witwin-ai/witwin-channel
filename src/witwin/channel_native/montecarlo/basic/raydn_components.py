@@ -5,50 +5,53 @@ import math
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene
+from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
-from witwin.channel_native.core.kernels.ops import (
+from typing import TYPE_CHECKING
+from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
-    raydn_diffraction_accumulation_forward,
-    raydn_diffraction_discover_edges,
-    raydn_diffraction_discover_edges_counted,
-    raydn_trace_reflections_forward,
-    raydn_visibility_forward,
-    deterministic_diffraction_state_pack,
-    deterministic_diffraction_state_pack_selected,
-    mc_diffraction_state_wi,
     mc_los_component_maps_from_matrix,
     mc_los_grid_maps_ad,
     mc_los_visibility_inputs,
-    mc_reflection_launch_inputs,
-    mc_sionna_reflection_accumulate,
-    mc_sionna_reflection_accumulate_ad,
-    mc_sample_directions,
     mc_sionna_diffraction_tape_accumulate,
     mc_sionna_diffraction_tape_accumulate_ad,
+    mc_sionna_reflection_accumulate,
+    mc_sionna_reflection_accumulate_ad,
     mc_store_component_map,
     mc_store_scaled_component_map,
-    mc_surface_group_edge_candidates,
 )
+from witwin.channel_native.montecarlo.basic.kernels import sampling as sampling_kernels
 from witwin.channel_native.core.diffraction_geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
+from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.propagation.geometry.kernels import (
+    primitives as geometry_primitives,
+)
+from witwin.channel_native.propagation.topology.kernels.primitives import (
+    deterministic_diffraction_state_pack,
+    deterministic_diffraction_state_pack_selected,
+)
+
 from witwin.channel_native.core.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
 )
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
-from witwin.channel_native.core.runtime.raydn import RayDNScene
-from witwin.channel_native.montecarlo.scattering_events import scattering_map_matrix
-from witwin.channel_native.montecarlo.transmission import (
+from witwin.channel_native.materials.encoding import face_material_field_bundle
+from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
+from witwin.channel_native.montecarlo.events.scattering import scattering_map_matrix
+from witwin.channel_native.montecarlo.events.transmission import (
     layer_csr_view,
     scene_diagonal_m,
     straight_transmission_chains,
 )
 
 from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
+
+if TYPE_CHECKING:
+    from witwin.channel_native.scene.models import Scene
 
 __all__ = ["_diffraction_edge_geometry"]
 
@@ -102,6 +105,8 @@ def _grid_los_matrix(
     ad: bool = False,
     ledger: object | None = None,
 ) -> torch.Tensor:
+    from witwin.channel_native.scene.models import Scene
+
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los
     grid_scene = Scene(
@@ -128,7 +133,9 @@ def _grid_visibility_masks(
     for tx_index in range(tx_pos.shape[0]):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
         masks.append(
-            raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0]
+            geometry_bridge.raydn_visibility_forward(
+                handle, inputs["start"], rx_pos, inputs["active"]
+            )[0]
         )
     return torch.stack(masks, dim=0)
 
@@ -167,13 +174,15 @@ def los_component_map(
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     for tx_index in range(tx_pos.shape[0]):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
-        visible = raydn_visibility_forward(handle, inputs["start"], rx_pos, inputs["active"])[0]
+        visible = geometry_bridge.raydn_visibility_forward(
+            handle, inputs["start"], rx_pos, inputs["active"]
+        )[0]
         mc_apply_los_visibility(maps, los, visible, tx_index=tx_index)
     return maps
 
 
 def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
-    return mc_sample_directions(count, reference)
+    return sampling_kernels.mc_sample_directions(count, reference)
 
 
 def transmission_component_map(
@@ -281,7 +290,7 @@ def scattering_component_map(
     """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
 
     Thin grid wrapper around
-    :func:`witwin.channel_native.montecarlo.scattering_events.scattering_map_matrix`
+    :func:`witwin.channel_native.montecarlo.events.scattering.scattering_map_matrix`
     (which documents the estimator and its v1 simplifications): the matrix
     holds the per-cell scattering PATH GAIN at the cell center times the
     transmitter power, mirroring the LoS / transmission map conventions, so
@@ -364,11 +373,13 @@ def reflection_component_maps_with_wedges(
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
         ray_d = _sample_directions(samples, reference=tx_pos)
-        launch_inputs = mc_reflection_launch_inputs(tx_pos, tx_index=tx_index, sample_count=samples)
+        launch_inputs = sampling_kernels.mc_reflection_launch_inputs(
+            tx_pos, tx_index=tx_index, sample_count=samples
+        )
         ray_o = launch_inputs["ray_o"]
         ray_tmax = launch_inputs["ray_tmax"]
         active = launch_inputs["active"]
-        trace = raydn_trace_reflections_forward(
+        trace = geometry_bridge.raydn_trace_reflections_forward(
             handle,
             ray_o,
             ray_d,
@@ -486,7 +497,7 @@ def reflection_component_maps_with_wedges(
 
 
 def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    return mc_surface_group_edge_candidates(
+    return geometry_primitives.mc_surface_group_edge_candidates(
         records.vertices,
         records.faces,
         records.face_normals,
@@ -538,7 +549,7 @@ def _discover_diffraction_edges_from_wedges(
         edge_candidates = _cached_primitive_edge_candidates(raydn, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
     if wedges.event_count is not None:
-        return raydn_diffraction_discover_edges_counted(
+        return geometry_bridge.raydn_diffraction_discover_edges_counted(
             wedges.tx_pos,
             wedges.ray_dir,
             wedges.prim_id,
@@ -556,7 +567,7 @@ def _discover_diffraction_edges_from_wedges(
             line_max,
             face1,
         )
-    return raydn_diffraction_discover_edges(
+    return geometry_bridge.raydn_diffraction_discover_edges(
         wedges.tx_pos,
         wedges.ray_dir,
         wedges.prim_id,
@@ -758,6 +769,12 @@ def diffraction_component_map(
                 ad_maps.append(zero_map())
             continue
         edge_lengths = (states[4] - states[3]).clamp_min(0.0)
+        # One intentional device-to-host sync per transmitter. The host scalar
+        # gates the per-tx early-out below and sets the float32 edge-weight
+        # fill through a float64 divide (total_edge_length / samples). Keeping
+        # the reduction on the host preserves that double-rounded fill value; a
+        # GPU float32 scalar divide would single-round and is not bitwise
+        # identical, so this sync is deliberate rather than an oversight.
         total_edge_length = float(edge_lengths.sum().item())
         if not total_edge_length > 0.0:
             if ad:
@@ -777,8 +794,8 @@ def diffraction_component_map(
             device=device,
             dtype=torch.float32,
         )
-        state_wi = mc_diffraction_state_wi(states[1], states[10])
-        sampled = raydn_diffraction_accumulation_forward(
+        state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
+        sampled = geometry_bridge.raydn_diffraction_accumulation_forward(
             handle, None, *states, state_wi, state_wi,
             material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
             state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),

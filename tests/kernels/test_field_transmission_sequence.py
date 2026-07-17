@@ -10,7 +10,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.fields.kernels import functional as ops
+from witwin.channel_native.materials.kernels import functional as material_functional
 
 C0 = 299792458.0
 
@@ -125,7 +126,7 @@ def test_lossy_wall_attenuates_consistently_with_layer_stack_eval():
         source, target, [0.0, 0.0, 1.0], [0.0, 0.0, 0.0], polarization, lossy, frequency
     )
     free = _free_space(source, target, polarization, frequency)
-    stack = ops.em_layer_stack_eval(
+    stack = material_functional.em_layer_stack_eval(
         torch.tensor([1.0], device="cuda", dtype=torch.float32),
         torch.tensor([0], device="cuda", dtype=torch.int32),
         **_csr(lossy),

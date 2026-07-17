@@ -4,10 +4,16 @@ from .core.kernels.extension import build_info
 from .deployment import pipeline_cache_key, runtime_diagnostics
 from .capabilities import capabilities
 from .core.antenna import AntennaArray, AntennaPattern
-from .core.objects import ReceiverGrid, ReceiverPoint, Structure, Transmitter
+from .scene.models import ReceiverGrid, ReceiverPoint, Structure, Transmitter
 from .core.field_state import Complex3State, JonesState
 from .core.scene import Scene
-from .core.materials import Dielectric, DispersiveMaterial, ITUMaterial, LossyDielectric, PerfectConductor
+from .materials.models import (
+    Dielectric,
+    DispersiveMaterial,
+    ITUMaterial,
+    LossyDielectric,
+    PerfectConductor,
+)
 
 __all__ = [
     "AntennaArray",

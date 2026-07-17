@@ -12,7 +12,7 @@ import torch
 
 from tests.support.scenes import transmission_wall_structure
 from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.materials.kernels import functional as ops
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import (
     Layer,

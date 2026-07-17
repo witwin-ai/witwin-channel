@@ -7,7 +7,8 @@ import sys
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "tests" / "support" / "bin"))
 
-from benchmark_munich_deterministic_native_vs_original import main as parity_main
+# The support script directory must be available before importing the parity entry point.
+from benchmark_munich_deterministic_native_vs_original import main as parity_main  # noqa: E402
 
 
 def main() -> None:

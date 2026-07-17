@@ -1,0 +1,167 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+import torch
+
+from witwin.channel_native.propagation.enumerated import coupled
+from witwin.channel_native.propagation.topology.discovery import (
+    coupled as discovery_coupled,
+)
+
+
+def _fake_coupled_inputs(monkeypatch):
+    records = SimpleNamespace(
+        faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
+        vertices=torch.tensor([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+        face_normals=torch.tensor([[0.0, 0.0, 1.0]]),
+    )
+    handle = object()
+    handle_calls: list[object] = []
+
+    def require_handle():
+        handle_calls.append(handle)
+        return handle
+
+    raydn = SimpleNamespace(
+        available=True,
+        edge_records=lambda: records,
+        require_handle=require_handle,
+    )
+    compiled = SimpleNamespace(
+        raydn=raydn,
+        geometry=SimpleNamespace(face_surface_id=torch.tensor([0])),
+        assignments=SimpleNamespace(
+            face_material_id=torch.tensor([41], dtype=torch.int32)
+        ),
+    )
+    scene = SimpleNamespace(structures=[object()], metadata={})
+    monkeypatch.setattr(
+        coupled.geometry_primitives,
+        "deterministic_normalize_vec3",
+        lambda values, *, eps: values,
+    )
+    monkeypatch.setattr(
+        coupled.topology_construction,
+        "deterministic_face_anchor_points",
+        lambda vertices, faces: vertices[faces[:, 0].to(dtype=torch.int64)],
+    )
+    monkeypatch.setattr(coupled, "_ensure_topology_fields", lambda block: block)
+    monkeypatch.setattr(
+        coupled,
+        "concatenate_path_blocks",
+        lambda _blocks, *, device: {
+            "valid": torch.empty((0,), device=device, dtype=torch.bool)
+        },
+    )
+    groups = {
+        "representative_faces": torch.tensor([0], dtype=torch.int32),
+        "surface_group_id": torch.tensor([0], dtype=torch.int32),
+        "surface_group_size": torch.tensor([1], dtype=torch.int32),
+        "surface_group_members": torch.tensor([0], dtype=torch.int32),
+    }
+    monkeypatch.setattr(coupled, "_cached_coplanar_face_groups", lambda *_args: groups)
+    edge_position = torch.tensor([[2.0, 0.0, 0.0], [3.0, 0.0, 0.0]])
+    edge_direction = torch.tensor([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+    edge_scalar = torch.tensor([0.0, 0.0])
+    monkeypatch.setattr(
+        coupled,
+        "_cached_diffraction_edge_geometry",
+        lambda _raydn: (
+            torch.tensor([True, True]),
+            edge_position,
+            edge_direction,
+            edge_scalar,
+            edge_scalar,
+            torch.tensor([1.0, 1.0]),
+            edge_direction,
+            edge_direction,
+            torch.tensor([0, 0], dtype=torch.int32),
+            torch.tensor([0, 0], dtype=torch.int32),
+            edge_scalar,
+        ),
+    )
+    monkeypatch.setattr(
+        coupled.topology_primitives,
+        "mc_selected_edge_indices",
+        lambda _selected: torch.tensor([0, 1], dtype=torch.int32),
+    )
+    tx_positions = torch.tensor([[0.0, -2.0, 1.0], [1.0, -2.0, 1.0]])
+    rx_positions = torch.tensor([[0.0, 2.0, 5.0], [1.0, 2.0, 5.0]])
+    return scene, compiled, tx_positions, rx_positions, handle_calls
+
+
+def test_consumer_uses_lazy_chunk_requests_and_preserves_launch_accounting(monkeypatch):
+    scene, compiled, tx_positions, rx_positions, handle_calls = _fake_coupled_inputs(
+        monkeypatch
+    )
+    prepare = discovery_coupled.prepare_coupled_candidate_plan
+    monkeypatch.setattr(
+        coupled,
+        "prepare_coupled_candidate_plan",
+        lambda **kwargs: prepare(**kwargs, chunk_size=3),
+    )
+    queries = []
+
+    def query_geometry(query):
+        queries.append(query)
+        return SimpleNamespace(
+            valid=torch.zeros((query.face_id.shape[0],), dtype=torch.bool)
+        )
+
+    monkeypatch.setattr(coupled, "query_coupled_geometry", query_geometry)
+
+    block, launch_count, candidate_count = (
+        coupled._coupled_reflection_diffraction_topology_order2(
+            scene,
+            compiled,
+            tx_positions,
+            rx_positions,
+            candidate_limit=16,
+        )
+    )
+
+    assert launch_count == 6
+    assert candidate_count == 16
+    assert len(handle_calls) == 3
+    assert [query.reverse for query in queries] == [False, True] * 3
+    assert [int(query.face_id.shape[0]) for query in queries] == [3, 3, 3, 3, 2, 2]
+    assert int(torch.count_nonzero(block["valid"])) == 0
+    for offset in range(0, len(queries), 2):
+        rd = queries[offset]
+        dr = queries[offset + 1]
+        for name in ("source", "receiver", "face_id", "edge_id"):
+            rd_tensor = getattr(rd, name)
+            dr_tensor = getattr(dr, name)
+            assert dr_tensor is rd_tensor
+            assert dr_tensor.data_ptr() == rd_tensor.data_ptr()
+            assert dr_tensor.stride() == rd_tensor.stride()
+
+
+def test_consumer_candidate_guard_precedes_handle_and_geometry_launch(monkeypatch):
+    scene, compiled, tx_positions, rx_positions, _handle_calls = _fake_coupled_inputs(
+        monkeypatch
+    )
+    monkeypatch.setattr(
+        compiled.raydn,
+        "require_handle",
+        lambda: pytest.fail("native handle requested before candidate guard"),
+    )
+    monkeypatch.setattr(
+        coupled,
+        "query_coupled_geometry",
+        lambda _query: pytest.fail("geometry launched before candidate guard"),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="requires 16 candidates, exceeding coupled_candidate_limit=15",
+    ):
+        coupled._coupled_reflection_diffraction_topology_order2(
+            scene,
+            compiled,
+            tx_positions,
+            rx_positions,
+            candidate_limit=15,
+        )

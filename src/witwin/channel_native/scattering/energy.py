@@ -5,7 +5,7 @@ probabilities: coherent specular reflection ``R_coh_q = R_bar_q * C_r^2``
 (with ``C_r = exp(-2*(k0*cos_theta_i*sigma_h)^2)``), diffuse reflection
 ``R_diff_q = max(0, R_bar_q - R_coh_q)``, smooth-stack transmission
 ``T_bar_q`` (no diffuse transmission in v1) and absorption ``A_q``. The
-oracle values are computed once on the Kirchhoff table's incidence grid
+Production values are computed once on the Kirchhoff table's incidence grid
 (32 cell centers uniform in cos) and linearly interpolated at the runtime
 angles, so budgets and tables share one discretization.
 """
@@ -18,7 +18,8 @@ from typing import Sequence
 import numpy as np
 import torch
 
-from witwin.channel_native.physics.oracle import C0, layer_stack_rt
+from witwin.channel_native.materials.evaluation import layer_stack_rt
+from witwin.channel_native.physics.conventions import C0
 
 from .tables import N_COS_THETA_I, _cos_centers
 
@@ -35,11 +36,11 @@ def event_budget(
 ) -> dict[str, torch.Tensor]:
     """Event energy budgets at batched incidence cosines (torch, on device).
 
-    ``layers`` is the oracle layer list ``[(thickness_m, eps_r, sigma_e,
+    ``layers`` is the production layer list ``[(thickness_m, eps_r, sigma_e,
     mu_r), ...]``; ``roughness`` is a ``Roughness`` or ``None`` (smooth:
     ``C_r = 1`` and ``R_diff = 0`` exactly). Returns per-pol tensors
     (``*_te``/``*_tm``) plus unpolarized means, all shaped like
-    ``cos_theta_i`` on its device. Raises when the oracle stack violates
+    ``cos_theta_i`` on its device. Raises when the production stack violates
     passivity ``R + T + A <= 1 + 1e-4`` at any grid angle.
     """
 

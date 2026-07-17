@@ -1,0 +1,55 @@
+# Propagation owner contract
+
+## Ownership
+
+This package owns row-aligned topology, continuous geometry, RF fields, and
+the enumerated propagation stages shared by Path and Deterministic solvers.
+`EvaluatedPaths` is the internal composition boundary; solver accumulation and
+public result types remain solver-owned.
+
+## Public entry points
+
+There are no root public API exports. The internal package export surface is
+`PathTopology`, `PathGeometry`, `PathFields`, and `EvaluatedPaths`.
+`propagation.enumerated` owns shared component stages; solver-specific result
+conversion stays outside.
+
+## Dependency rules
+
+Topology cannot depend on scene, continuous fields, geometry, or solver policy.
+Geometry cannot choose winners; geometry kernel modules depend on runtime, not
+scene. Fields cannot discover topology. Enumerated propagation serves Path and
+Deterministic; Monte Carlo sampling, MIS, solver results, and deterministic
+accumulation remain outside this package.
+
+Raw native tuples may exist only inside domain `kernels` modules. A kernel
+façade must validate and convert them to a named internal contract before any
+solver or propagation pipeline can observe the result.
+
+## Numerical and AD contract
+
+Contract construction is metadata-only and zero-copy. Row order, row identity,
+tensor object/storage aliasing, stride, dtype, device, and `requires_grad` must
+remain exact. Topology IDs and winners are discrete; geometry and fields use SI
+units and the package complex-phase convention.
+
+### AD contract
+
+Fixed-topology reevaluation cannot change winner selection or conceal a detach
+boundary. Continuous endpoint, vertex, material, frequency, and field leaves
+use explicit native backward/JVP companions. Unsupported tangents and
+higher-order derivatives fail before returning a partial result.
+
+## Forbidden fallback
+
+Propagation code must fail loudly when a required native capability or contract
+is missing. It cannot recompute geometry on CPU/Torch, load a global extension,
+return a zero result, or silently switch algorithms.
+
+## Maintenance
+
+New internal exports or owner moves require a migration note and contract
+tests. The completed kernel migration ledger is archived at
+`docs/dev/audit/phase12-ops-migration-ledger.json`; dependency changes must pass
+the import graph. A new root or solver public export also updates
+`ci/public-api-snapshot.json`.

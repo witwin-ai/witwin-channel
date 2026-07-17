@@ -1,0 +1,1475 @@
+{
+  "auto_seed": {
+    "matched_regions": 0,
+    "note": "Primal and AD kernels share device primitives through included headers, so no >=100-token region spans a primal/_ad file pair; every region below is hand-curated.",
+    "rule": "occurrences pairing a primal native file with its _ad counterpart are seeded numeric_sensitive_exempt"
+  },
+  "baseline": {
+    "combined_duplicate_lines": 6479,
+    "combined_total_lines": 63448,
+    "coverage_percent": 10.211512,
+    "git_sha": "4c9f3ec961157c4e410a9ce5981c41a677ec6bb6",
+    "region_count": 121,
+    "report": "docs/dev/baselines/4c9f3ec961157c4e410a9ce5981c41a677ec6bb6/static/duplication.json"
+  },
+  "categories": [
+    "host_check",
+    "indexing_packing",
+    "numeric_sensitive_exempt",
+    "fixture_boilerplate",
+    "other"
+  ],
+  "generated_by": "tools/duplication_report.py with hand curation",
+  "metric": "exact-token-duplicate-regions",
+  "min_tokens": 100,
+  "regions": {
+    "016da97ced65aee8": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_diffraction.cu",
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 300
+    },
+    "06342d7e5a635ad3": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_visibility.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 118
+    },
+    "0856d52ffda63e53": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "fields.cpp"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 145
+    },
+    "08e995cd62aad4d1": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_visibility.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 174
+    },
+    "0c0107d82028ece4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 134
+    },
+    "0c15425799261dd5": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 110
+    },
+    "0ecf372b6f3684da": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 151
+    },
+    "1024cd0b4a266a0c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport_free_space.cu"
+      ],
+      "owner": "field_transport_free_space",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 114
+    },
+    "1448a12824b7d62c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 135
+    },
+    "15144b1272a834bb": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 116
+    },
+    "1621deeef77b0d42": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "candidates.py",
+        "primitives.py",
+        "sampling.py"
+      ],
+      "owner": "candidates",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 304
+    },
+    "18ccbc6a61c763d8": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "paths.py"
+      ],
+      "owner": "paths",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 161
+    },
+    "190b2f1a5403dd8b": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 184
+    },
+    "1cdcaaca7932bf99": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_subpaths.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 587
+    },
+    "1d255af1d01dc7a7": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "functional",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 122
+    },
+    "1dd686c2d6766794": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 103
+    },
+    "1ec83ce5841f084b": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_visibility.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 240
+    },
+    "20469b8ba1e2057d": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_field.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_deterministic_accum_ad.py"
+      ],
+      "owner": "deterministic-field",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 157
+    },
+    "224ad0c4836925fc": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "functional",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python facade signature and argument plumbing.",
+      "token_count": 126
+    },
+    "2452c606f1151c92": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/test_bdpt_native_boundaries.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Deterministic double-precision accumulation; reduction order must not change.",
+      "token_count": 102
+    },
+    "2647871bf1914a66": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "rayd.cpp",
+        "reflection.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 123
+    },
+    "29591dce40e20e3c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_project.cu"
+      ],
+      "owner": "field_wedge_ad_project",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 117
+    },
+    "29a332634beff929": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "deterministic_topology.cu",
+        "path_trace.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Shared translation-unit include prologue.",
+      "token_count": 135
+    },
+    "2bd5a62aa6e943ab": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "maps.py",
+        "native_buffers.py"
+      ],
+      "owner": "maps",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python-side tensor validation before the native call.",
+      "token_count": 121
+    },
+    "2f5e4651ce09bac9": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "diffraction.cu"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 396
+    },
+    "2f7a18e890358ba8": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 288
+    },
+    "30703f9b3d6b0d0c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 101
+    },
+    "31d668c835805b7b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 368
+    },
+    "3242436a74c0e86c": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "compaction.py"
+      ],
+      "owner": "compaction",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 167
+    },
+    "3b374aa97121b317": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_samples.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 167
+    },
+    "3bf29855db49aec7": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "deterministic.py"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 124
+    },
+    "3da511e52cacd4b7": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "accum.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 135
+    },
+    "42d3dfefb13c0fce": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_reflection.cu",
+        "field_transport_transmission.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 297
+    },
+    "4888c0cae87b4acb": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 239
+    },
+    "49a43dea8b880914": {
+      "category": "indexing_packing",
+      "corpus": "python",
+      "files": [
+        "accumulation.py"
+      ],
+      "owner": "accumulation",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 125
+    },
+    "49b8802b51890c79": {
+      "category": "indexing_packing",
+      "corpus": "python",
+      "files": [
+        "reflection.py"
+      ],
+      "owner": "reflection",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 119
+    },
+    "4a4f58ac213e92a5": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_transmission.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 206
+    },
+    "4bc5cc61cfa99fc6": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport_reflection.cu",
+        "field_transport_transmission.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_field_em_ad.py",
+        "tests/kernels/test_field_transport.py"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 205
+    },
+    "52e8af17d440a0a5": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 177
+    },
+    "5a869cd26cfde7b0": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction_discovery.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_solver_diffraction_coupled_ad.py"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 115
+    },
+    "5b13f8cb8d030e64": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "accum.cu",
+        "bdpt_accum.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 142
+    },
+    "5b46cc78aedcd003": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 104
+    },
+    "5d78a718c5126f67": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport_reflection.cu",
+        "field_transport_transmission.cu"
+      ],
+      "owner": "field_transport_reflection",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 225
+    },
+    "5d93b5ac5a1765cd": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bridge.h",
+        "common.cpp"
+      ],
+      "owner": "rayd-bridge",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 103
+    },
+    "5ed4360463420a7b": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "primitives.py"
+      ],
+      "owner": "primitives",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 217
+    },
+    "600d5db5bbda0ae8": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "deterministic_topology.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 885
+    },
+    "602f99c2329c2122": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "models.py"
+      ],
+      "owner": "models",
+      "provenance": "hand-curated",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 135
+    },
+    "60fcd47087ddd4ff": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_compaction_common.cuh"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 172
+    },
+    "61155589c4b1479d": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "primitives.py",
+        "sampling.py"
+      ],
+      "owner": "primitives",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 267
+    },
+    "622329f8a478cc73": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_transmission.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 127
+    },
+    "6295de755885f51c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "path_solver.cpp",
+        "path_trace.cu"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 179
+    },
+    "63472b1e830460ad": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 365
+    },
+    "6476d3cb1932d22c": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python facade signature and argument plumbing.",
+      "token_count": 127
+    },
+    "651981f0dc7ee1d9": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_visibility.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 122
+    },
+    "68eb65eef2af709c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 201
+    },
+    "6a6cd66ce1fb7900": {
+      "category": "host_check",
+      "owner": "propagation/fields/kernels rough_scale",
+      "reason": "backward and jvp host entry points repeat the tensor-contract validation preamble; reducible by a shared host helper in a follow-up dedup change"
+    },
+    "6ed62094d3b7940f": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "geometry.cpp",
+        "reflection.cpp"
+      ],
+      "owner": "rayd-bridge",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 102
+    },
+    "70363529ade759ad": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 211
+    },
+    "704e20e8bd10c483": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 140
+    },
+    "72818521aea3834c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 111
+    },
+    "736226ef21ad004d": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_field_em_ad.py",
+        "tests/kernels/test_field_transport.py"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 109
+    },
+    "73e9347304ea8676": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport_free_space.cu",
+        "field_transport_reflection.cu",
+        "field_transport_transmission.cu"
+      ],
+      "owner": "field_transport_free_space",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 204
+    },
+    "7628230603aa65f6": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "deterministic_accum.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 160
+    },
+    "77167f8aa1ace8da": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "functional",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 100
+    },
+    "7cbdfdef8c6a096d": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 141
+    },
+    "7da298b872725188": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 258
+    },
+    "822986c52ce94201": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "python",
+      "files": [
+        "oracle.py",
+        "tables.py"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_em_layer_stack.py",
+        "tests/kernels/test_scattering_kernels.py"
+      ],
+      "owner": "materials-oracle",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 237
+    },
+    "85faad32c57fe131": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_mc_basic_ad.py"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 113
+    },
+    "86d5ad1f52ad5c35": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "maps.py"
+      ],
+      "owner": "maps",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 120
+    },
+    "885d871c81128e0f": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 465
+    },
+    "8a9d6ca55a021baf": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_samples.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 128
+    },
+    "8cd88c46a7d8ec3c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 177
+    },
+    "8d99010ad7c7ff84": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "deterministic_topology.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 125
+    },
+    "8d9d9183e90b55c6": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bridge.h"
+      ],
+      "owner": "rayd-bridge",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 140
+    },
+    "8f52521f454c3a8f": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python facade signature and argument plumbing.",
+      "token_count": 108
+    },
+    "9075cec2a19027b9": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "python",
+      "files": [
+        "evaluation.py",
+        "oracle.py"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_em_layer_stack.py",
+        "tests/kernels/test_scattering_kernels.py"
+      ],
+      "owner": "materials-evaluation",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 273
+    },
+    "90ca5db1b2431d26": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "primitives.py"
+      ],
+      "owner": "primitives",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 121
+    },
+    "9113ddc6192ba484": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_free_space.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 156
+    },
+    "92db3c4752ca2477": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction_discovery.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 120
+    },
+    "962312f518345be4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 127
+    },
+    "9694e29e51052cb8": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo_basic.cpp",
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 131
+    },
+    "9cac2e5d2f6db482": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt_sampling.cu",
+        "bdpt_subpaths.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 110
+    },
+    "a091f9d45593019f": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "maps.py",
+        "native_buffers.py"
+      ],
+      "owner": "maps",
+      "provenance": "hand-curated",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 116
+    },
+    "a10e3b1ea01ebf41": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "maps.py"
+      ],
+      "owner": "maps",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 123
+    },
+    "a1280c3b7f87cac6": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 128
+    },
+    "a17935e1ad7fbb2a": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "raydn_components.py"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated native-op keyword argument plumbing for the diffraction grid spec.",
+      "token_count": 101
+    },
+    "a1a46b4d20910899": {
+      "category": "numeric_sensitive_exempt",
+      "lockstep_tests": [
+        "tests/kernels/test_field_rough_reflection_scale.py",
+        "tests/ad/test_solver_rough_reflection_ad.py",
+        "tests/ad/test_deterministic_accum_ad.py",
+        "tests/ad/test_field_em_ad.py"
+      ],
+      "owner": "native AD kernels (field_transport/wedge/deterministic_accum/rough_scale)",
+      "reason": "float-faithful per-TU device math primitives (rn-qualified dot/segment helpers) mirrored across AD translation units; per-TU copies preserve fmad and rounding configuration per ADR-009/ADR-010, consolidation into an owned header is a follow-up dedup PR"
+    },
+    "a34b1b0e14359094": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 135
+    },
+    "a3d071f1519ab151": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 111
+    },
+    "a6bb7f491c236ca3": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "deterministic.py"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 100
+    },
+    "a81c3138c5e0c778": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 134
+    },
+    "aa1a1f0135d6dcd3": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_visibility.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 117
+    },
+    "ab2fbf32bbed57d6": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 124
+    },
+    "b0a73040392baa4b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 142
+    },
+    "b475dbf93c651169": {
+      "category": "numeric_sensitive_exempt",
+      "lockstep_tests": [
+        "tests/kernels/test_field_rough_reflection_scale.py",
+        "tests/ad/test_solver_rough_reflection_ad.py"
+      ],
+      "owner": "propagation/fields/kernels rough_scale",
+      "reason": "primal, backward, and jvp kernels repeat the C_r attenuation expression block; expression-order equality across the three entry points is the AD contract (plan G3, ADR-010 op 3) and must not be abstracted"
+    },
+    "b62eda431fcd1344": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 153
+    },
+    "b642ee6e6c5248f3": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "python",
+      "files": [
+        "tables.py"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_scattering_kernels.py"
+      ],
+      "owner": "scattering-tables",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 101
+    },
+    "bbc3f98551f23d7a": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 183
+    },
+    "bc5f7c8117cbef85": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "concatenate.py",
+        "diffraction.py",
+        "reflection.py"
+      ],
+      "owner": "concatenate",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python facade signature and argument plumbing.",
+      "token_count": 284
+    },
+    "c054ffde843f8e08": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_mc_basic_ad.py"
+      ],
+      "owner": "montecarlo-basic-reflection",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 312
+    },
+    "c4735bb3b408816b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 101
+    },
+    "cb6b4edbee6eabc8": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "blocks.py",
+        "maps.py"
+      ],
+      "owner": "blocks",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 132
+    },
+    "cb8a35f2d5c3d45f": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "metadata.py",
+        "pipeline.py"
+      ],
+      "owner": "metadata",
+      "provenance": "hand-curated",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 102
+    },
+    "cd8f4c416d0170b4": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "primitives.py"
+      ],
+      "owner": "primitives",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 241
+    },
+    "d11a824d77939ed5": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 213
+    },
+    "d3fc20b351a2eca6": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 110
+    },
+    "d6538cb05b5ced4e": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 131
+    },
+    "dfbd316a356c80ae": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_field_em_ad.py",
+        "tests/kernels/test_field_transport.py"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 128
+    },
+    "e15a6c3ca8b4bf99": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python facade signature and argument plumbing.",
+      "token_count": 123
+    },
+    "e17f003d27d57878": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport_reflection.cu",
+        "field_transport_transmission.cu"
+      ],
+      "owner": "field_transport_reflection",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 133
+    },
+    "e19c2341dd990fc4": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 164
+    },
+    "e1a50386e879093e": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "deterministic_field.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 150
+    },
+    "e3baf626b3c6e751": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 127
+    },
+    "e8af5708739b8969": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 150
+    },
+    "e8b79b659e5cd11d": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 113
+    },
+    "eb11754503d51afc": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 227
+    },
+    "ed6ac289285f13e1": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 117
+    },
+    "edf2e4d1b98e3f59": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 141
+    },
+    "f1d8fdd528ee096b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 109
+    },
+    "f434a45f5cb4b0a1": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo_basic.cpp",
+        "reflection.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 131
+    },
+    "f8fede21dbaef0e9": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "python",
+      "files": [
+        "evaluation.py",
+        "oracle.py"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_em_layer_stack.py",
+        "tests/kernels/test_scattering_kernels.py"
+      ],
+      "owner": "materials-evaluation",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 151
+    },
+    "fce60ebaf4025545": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_samples.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 334
+    }
+  },
+  "schema_version": 1
+}

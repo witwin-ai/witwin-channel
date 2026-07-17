@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "git_sha": "0892d855b27ee851521a181f5158b0bf41091eda",
+  "static_manifest_complete": true,
+  "tests": {
+    "collection_count": 967,
+    "full": {
+      "passed": 965,
+      "skipped": 1,
+      "xfailed": 1,
+      "warnings": 21,
+      "duration_seconds": 238.74
+    },
+    "ad": {
+      "passed": 199,
+      "xfailed": 1,
+      "warnings": 21,
+      "duration_seconds": 88.24
+    },
+    "acceptance_performance": {
+      "passed": 74,
+      "duration_seconds": 71.96
+    },
+    "coverage": {
+      "passed": 937,
+      "skipped": 1,
+      "xfailed": 1,
+      "warnings": 21,
+      "duration_seconds": 240.77,
+      "excluded_from_instrumented_run": [
+        "tests/performance",
+        "tests/montecarlo/bdpt/test_munich_bdpt_parity.py::test_reduced_munich_native_vs_original_strict_parity_gate"
+      ]
+    }
+  },
+  "coverage": {
+    "statements": 10528,
+    "covered_lines": 8734,
+    "missing_lines": 1794,
+    "statement_percent": 82.959726443769,
+    "branches": 3550,
+    "covered_branches": 2288,
+    "missing_branches": 1262,
+    "branch_percent": 64.45070422535211,
+    "combined_percent": 78.29237107543685
+  },
+  "runtime": {
+    "profile": "reduced",
+    "solvers": [
+      "path",
+      "deterministic",
+      "montecarlo-basic",
+      "montecarlo-bdpt"
+    ],
+    "scenarios": [
+      "empty-los",
+      "single-reflection"
+    ],
+    "independent_processes": 2,
+    "warmup_per_process": 1,
+    "steady_repeats_per_process": 7,
+    "cases_exact_across_processes": 8
+  },
+  "contracts": {
+    "production_dependencies": "passed",
+    "ruff_error_count": 38,
+    "ruff_scope": "tests-and-benchmarks-only"
+  },
+  "expected_outcomes": {
+    "xfail": "tests/ad/test_solver_geometry_ad.py::test_mesh_vertex_coupled_grad_exists",
+    "skip": "tests/deterministic/test_solver_cuda_requirement.py"
+  }
+}

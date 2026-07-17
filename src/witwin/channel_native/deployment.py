@@ -5,13 +5,20 @@ import importlib.metadata
 import json
 import platform
 import sys
-from typing import Any
+from collections.abc import Callable
+from types import ModuleType
+from typing import Any, cast
 
 
 DEPLOYMENT_ABI = "witwin.channel_native.deployment.v1"
 PIPELINE_CACHE_ABI = "witwin.channel_native.pipeline-cache.v1"
 DECLARED_SM_ARCHITECTURES = (75, 80, 86, 89, 120)
+VERIFIED_SM_ARCHITECTURES = (120,)
 PTX_FORWARD_COMPATIBILITY_SM = 120
+SM120_EVIDENCE = (
+    "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/"
+    "static/environment.json"
+)
 PIPELINE_CACHE_IMPLEMENTED = False
 WHEEL_SMOKE_VERIFIED = False
 
@@ -26,12 +33,19 @@ def _package_version() -> str:
 def sm_support(sm: int) -> dict[str, Any]:
     sm = int(sm)
     declared = sm in DECLARED_SM_ARCHITECTURES
+    verified = sm in VERIFIED_SM_ARCHITECTURES
     return {
         "sm": sm,
         "declared_supported": declared,
-        "runtime_verified": False,
-        "status": "declared_unverified" if declared else "not_declared",
-        "evidence": [],
+        "runtime_verified": verified,
+        "status": (
+            "runtime_verified"
+            if verified
+            else "declared_unverified"
+            if declared
+            else "not_declared"
+        ),
+        "evidence": [SM120_EVIDENCE] if verified else [],
         "mode": (
             "sass+ptx"
             if sm == PTX_FORWARD_COMPATIBILITY_SM
@@ -40,6 +54,43 @@ def sm_support(sm: int) -> dict[str, Any]:
             else "not_available"
         ),
     }
+
+
+def _import_torch() -> ModuleType:
+    import torch
+
+    return cast(ModuleType, torch)
+
+
+def _torch_runtime_diagnostics(torch: ModuleType) -> dict[str, Any]:
+    cuda_available = torch.cuda.is_available()
+    info: dict[str, Any] = {
+        "torch": torch.__version__,
+        "cuda_runtime": torch.version.cuda,
+        "cuda_available": cuda_available,
+    }
+    if cuda_available:
+        major, minor = torch.cuda.get_device_capability(0)
+        sm = major * 10 + minor
+        support = sm_support(sm)
+        info["device"] = {
+            "name": torch.cuda.get_device_name(0),
+            "sm": sm,
+            "total_memory_bytes": int(torch.cuda.get_device_properties(0).total_memory),
+            **support,
+        }
+        info["sm_matrix_status"] = support["status"]
+    return info
+
+
+def _import_native_build_info() -> Callable[[], dict[str, object]]:
+    from .runtime.extension import build_info
+
+    return cast(Callable[[], dict[str, object]], build_info)
+
+
+def _import_error(component: str, exc: ImportError | OSError) -> str:
+    return f"{component} import failed ({type(exc).__name__}): {exc}"
 
 
 def runtime_diagnostics() -> dict[str, Any]:
@@ -66,38 +117,23 @@ def runtime_diagnostics() -> dict[str, Any]:
         "errors": [],
     }
     try:
-        import torch
-
-        diagnostics.update(
-            {
-                "torch": torch.__version__,
-                "cuda_runtime": torch.version.cuda,
-                "cuda_available": torch.cuda.is_available(),
-            }
-        )
-        if torch.cuda.is_available():
-            major, minor = torch.cuda.get_device_capability(0)
-            sm = major * 10 + minor
-            diagnostics["device"] = {
-                "name": torch.cuda.get_device_name(0),
-                "sm": sm,
-                "total_memory_bytes": int(
-                    torch.cuda.get_device_properties(0).total_memory
-                ),
-                **sm_support(sm),
-            }
-    except Exception as exc:
-        diagnostics["errors"].append(f"PyTorch diagnostics failed: {exc}")
+        torch = _import_torch()
+    except (ImportError, OSError) as exc:
+        diagnostics["errors"].append(_import_error("PyTorch", exc))
+    else:
+        diagnostics.update(_torch_runtime_diagnostics(torch))
 
     try:
-        from .core.kernels.extension import build_info
-
-        diagnostics["native_build"] = build_info()
-    except Exception as exc:
+        build_info = _import_native_build_info()
+        native_build = build_info()
+    except (ImportError, OSError) as exc:
         diagnostics["errors"].append(
             "native extension import failed; install a matching Channel Native "
-            f"wheel or add its build directory to PYTHONPATH: {exc}"
+            "wheel or configure the explicit developer extension override; "
+            f"reason ({type(exc).__name__}): {exc}"
         )
+    else:
+        diagnostics["native_build"] = native_build
     return diagnostics
 
 
@@ -114,7 +150,9 @@ def require_supported_runtime() -> dict[str, Any]:
             f"{list(DECLARED_SM_ARCHITECTURES)}"
         )
     if errors:
-        raise RuntimeError("Channel Native runtime requirements failed: " + "; ".join(errors))
+        raise RuntimeError(
+            "Channel Native runtime requirements failed: " + "; ".join(errors)
+        )
     return diagnostics
 
 

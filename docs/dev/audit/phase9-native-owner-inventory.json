@@ -1,0 +1,2536 @@
+{
+  "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
+  "manifest_sha256": "9c5af92a833519d48f9313ec035cdfdf8b291c0deab75c578250dd1f8e122d64",
+  "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
+  "owners": [
+    {
+      "abi_owner": [
+        "cn_path_concat_vec3_cuda",
+        "cn_path_los_visibility_inputs_cuda",
+        "cn_path_filter_los_cuda",
+        "cn_path_filter_block_cuda",
+        "cn_path_diffraction_block_cuda",
+        "cn_path_finalize_blocks_cuda"
+      ],
+      "baseline_source": "native/channel_native/kernels/path_trace.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "83d35af4fc3cb48b0fcee9cc8ea59927c96316b5642c2b81ed12887431d2b359",
+          "name": "path_concat_vec3_kernel",
+          "signature_sha256": "1446639636acce634f0f79f3c8f592ec1dc855f972e2a7c7c17d9a8100b84d92",
+          "token_count": 113
+        },
+        {
+          "body_sha256": "230e060680dcb62de4cf6ceffdf5c5e35d5a8099f7488c259dd1d2ab0e459527",
+          "name": "path_los_visibility_inputs_kernel",
+          "signature_sha256": "5dfea402d145331307b6c79459f5b417c0456aef514864c540d4750fee4f35a6",
+          "token_count": 190
+        },
+        {
+          "body_sha256": "a7e3c29961d50d479774ca2e24e0183bbaf39695055dcdcf5300f0bb5f1b45ff",
+          "name": "path_visibility_flags_kernel",
+          "signature_sha256": "fc0325da76e7faad8130412cf4b96f0b3f2fc0fda1ccf9b0a7cc6c4526dafd02",
+          "token_count": 65
+        },
+        {
+          "body_sha256": "f84d3215259f85dc2cb47b6831ee9fc7d70ad5d81e84ddf05a79c96394ef3613",
+          "name": "path_los_compact_kernel",
+          "signature_sha256": "6d6a45554825fdb29f1514d85102e1c157fbdf4057f2305be49e729d7a385e94",
+          "token_count": 160
+        },
+        {
+          "body_sha256": "6ee03639955567f4f38a66add6f795f5d190fae0c9985ce4ccf3cbfa97bf7ea3",
+          "name": "path_block_flags_kernel",
+          "signature_sha256": "52fd5c300b9d81ee92faf8743f233b070ab892b42d5bde5cd832f8e9d3e6f3e2",
+          "token_count": 77
+        },
+        {
+          "body_sha256": "3d2e6290b2baeefd31f274d9f91bb3ca2a78db447af30d6d3949ed1f5efa123f",
+          "name": "path_block_compact_kernel",
+          "signature_sha256": "0fca4ec3472ef88d1e4214c64b7389fd31cec87ab8517c80fb8ae955bbc87544",
+          "token_count": 173
+        },
+        {
+          "body_sha256": "84e7f09e0e0b4047ff59064a50f1a271a77cc4f541d33ff261044e5621b4b2a6",
+          "name": "path_diffraction_compact_kernel",
+          "signature_sha256": "e281e1050ae33a7dc26b45c9c4148792e4c7deac2a97a96848560f9cd4387c68",
+          "token_count": 246
+        },
+        {
+          "body_sha256": "59cf1b93129c39a56e358c9ac92ceb97f7ea727efea806c480fe9564536e48fd",
+          "name": "path_copy_block_kernel",
+          "signature_sha256": "742320f5874ccddc6ad511f888a3265c98399a8408b5cc35afdfda222d789aa5",
+          "token_count": 159
+        },
+        {
+          "body_sha256": "97d5ae2be8a1ac43ac529b8e4d16074d942882c300ed7f6ada9991d64b66542b",
+          "name": "path_sort_key_kernel",
+          "signature_sha256": "9d245e1bf2f90f7b8479f03b73e2ba7a4aa125faee32903de7af538cfcf14c3f",
+          "token_count": 153
+        },
+        {
+          "body_sha256": "045014c69781d7e8f66b3e89f427db7ad97ac3a97058cc001e5613416830233f",
+          "name": "path_gather_kernel",
+          "signature_sha256": "833d1ccf58f80a2d05795aa9a7a1b375127fa7d907e8bed2c8bd86bc37fb1f25",
+          "token_count": 160
+        },
+        {
+          "body_sha256": "8b787e47b2a1cb5d248544a38a0e7de22d76cf56c7cb1aba0be8b5156cb18c3e",
+          "name": "empty_path_block_from",
+          "signature_sha256": "a4a4dec3ea4e8cf67974142a6632f806f36d9fee679da3efeef17f6188ad4b35",
+          "token_count": 162
+        },
+        {
+          "body_sha256": "7439cebe5145504dd7c39a6aa863a4634ad366585ddc5c31f210dc989355c8e6",
+          "name": "cn_path_concat_vec3_cuda",
+          "signature_sha256": "3713d6ff317629b5bb557386e922432bc926b6888d195ccfb04b07b49a52b94c",
+          "token_count": 235
+        },
+        {
+          "body_sha256": "daaa7e228d0446fb954d47de45146ae3b881c37f9892cef66e32eda969d079c6",
+          "name": "cn_path_los_visibility_inputs_cuda",
+          "signature_sha256": "e9b8c3a32cf6fdcf733ea949863190874e27377028c744ca23396ab9abb61cd3",
+          "token_count": 329
+        },
+        {
+          "body_sha256": "1fdf71160609a46449836b1e5c15882da2cd2a7df83fe825726f5ffe7be7eff2",
+          "name": "cn_path_filter_los_cuda",
+          "signature_sha256": "c60a41597a1d7dbc6cf90af1326136064286881f77dff7a91d460862ce91f3b3",
+          "token_count": 835
+        },
+        {
+          "body_sha256": "f1d24e6201b92bc2cd742f1e43ca11d9cbce61cb4c257f4a075e6d6c0f1d096f",
+          "name": "cn_path_filter_block_cuda",
+          "signature_sha256": "21240aee8079aa3eb762bfec5575b99d3626c280998a00ff03b2ddba8f9b81b3",
+          "token_count": 827
+        },
+        {
+          "body_sha256": "59c35686258db6f18bbad637d10f42a79b38f6b69b47b539e57fb3dd9a9f5ad8",
+          "name": "cn_path_diffraction_block_cuda",
+          "signature_sha256": "e5ef1e3364883c3fa53c9a5bffdc60414829df8650330333ac5ab7d22ed24f66",
+          "token_count": 973
+        },
+        {
+          "body_sha256": "c6e3de4bff6a35feac71d13cb0330898f367e253de8a8f96c323d8480defec38",
+          "name": "cn_path_finalize_blocks_cuda",
+          "signature_sha256": "dea4cb930f6d8ab407fa0df45b348432efec49bf57f8a895241e2e0e87b2b010",
+          "token_count": 1402
+        }
+      ],
+      "expiry_condition": "May split into a dedicated TU once the complete scan/compact call chain moves with identical launches, sync sites, and body hashes.",
+      "fusion_boundary": "Scan, host-visible compacted count, and gather are one packing transaction.",
+      "id": "path.compaction",
+      "intermediate_storage": [
+        "flags/offsets for Thrust scans",
+        "temporary concatenated path columns",
+        "stable-sort keys and row order"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "Phase 0 exact solver/runtime and launch baselines"
+      ],
+      "non_split_reason": "Splitting inside scan/compact would add materialization or another host synchronization; move complete host entries and their kernels together.",
+      "semantic_surface": [
+        "deterministic block compaction",
+        "path block filtering/finalization"
+      ],
+      "source_level_launches": [
+        "path_concat_vec3_kernel",
+        "path_los_visibility_inputs_kernel",
+        "path_visibility_flags_kernel",
+        "path_los_compact_kernel",
+        "path_block_flags_kernel",
+        "path_block_compact_kernel",
+        "path_diffraction_compact_kernel",
+        "path_copy_block_kernel",
+        "path_sort_key_kernel",
+        "path_gather_kernel"
+      ],
+      "tape_lifetime": "No differentiable tape; flags, prefix offsets, sort keys, and gather order live only for the current ABI call."
+    },
+    {
+      "abi_owner": [
+        "cn_deterministic_* topology and grouping entries"
+      ],
+      "baseline_source": "native/channel_native/kernels/path_trace.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "a19a3d46dad394a7227528baffa6bbb0b7b163edb98c7499d1a3ac2a85aed14c",
+          "name": "deterministic_los_topology_compact_kernel",
+          "signature_sha256": "6f30664d2ee06ef57451f8d77745ad1c1429146aef5f2e38c713d22d19312fc9",
+          "token_count": 388
+        },
+        {
+          "body_sha256": "0cf95f115099d3691cf8c78f46d9349ce7fb4d43a8b7669fce2319231a18e342",
+          "name": "deterministic_los_topology_all_kernel",
+          "signature_sha256": "0a5eb9cd81e3a96e8313ba9dd2a768deebf97c0b8eb37550370e44d73685af35",
+          "token_count": 354
+        },
+        {
+          "body_sha256": "a37600bbc61f1a44ed76bbb081239b11a434421ed5ced25660a8b41f8293b1fe",
+          "name": "deterministic_topology_default_fields_kernel",
+          "signature_sha256": "04a64c4df66a3a96c41a1605d0035bb63d47291d05aab2b496a45ea513131e21",
+          "token_count": 118
+        },
+        {
+          "body_sha256": "877b4070800019be36c80a7d3e52a7ee620915390e08d568308c7228e614484c",
+          "name": "deterministic_pad_topology_sequences_kernel",
+          "signature_sha256": "9e9d28b12bb5d8ea5ed0c20846181f81e7c6dc3bb08f55155777c0d8ff389a56",
+          "token_count": 350
+        },
+        {
+          "body_sha256": "44c5acf4760724bfd385841c008e5a1d9b1a5609b620d68f103250380685ad49",
+          "name": "deterministic_topology_base_fields_kernel",
+          "signature_sha256": "9bfb8e42193bfc8918e15ff47d52ad88e70d954cf46d3f940ce660001bcc8956",
+          "token_count": 160
+        },
+        {
+          "body_sha256": "4eb7fe55ec6538f9d90287810d084e6b79d4985245e6deda0c981bebc1039c59",
+          "name": "deterministic_repeat_range_kernel",
+          "signature_sha256": "2d1d2dca7eb57ee59bbef56288d085583c4c9943e85a74b3f44719ef9c8c4aa6",
+          "token_count": 68
+        },
+        {
+          "body_sha256": "a2d77e62faf5d5842721846b01c8d6344f31c1061eb41cdf2ae8aaecc7dc1709",
+          "name": "deterministic_face_anchor_points_kernel",
+          "signature_sha256": "1697a760fcf15bbd5060453bd2b93ace198294a4b8713fe04f1875281573529a",
+          "token_count": 126
+        },
+        {
+          "body_sha256": "e62eba985c5bee181467d7d0df23057b1a38101ba6137f3d54b84c6069abafd2",
+          "name": "deterministic_reflection_epc_input_batch_kernel",
+          "signature_sha256": "c67ab15bb3bd472609da46ed2b04ce9cc50c4d84243774ebf4fe9e80f590fa62",
+          "token_count": 278
+        },
+        {
+          "body_sha256": "38d866cf861934006e3038e0e50ada308e6b41406cf32d23b5e7f2017ffc4c91",
+          "name": "deterministic_face_sequence_chunk_kernel",
+          "signature_sha256": "9f4c9ccb2aaedfdde529b955eda7bcd8cfb36115d35c303fb8acccee6afb6c4e",
+          "token_count": 278
+        },
+        {
+          "body_sha256": "ac847e7e10aa4a936bcda7e767b4dc862da28924f0ae63648ff42d2738a9b1e8",
+          "name": "deterministic_reflection_order1_compact_kernel",
+          "signature_sha256": "cff237ed5253990b15c6e1f781d2ea854720d70f2fa8b6cd2e2646572f17fe7e",
+          "token_count": 278
+        },
+        {
+          "body_sha256": "37059b7e1be5fc6ed0fa496795621929301a3c4a733d4c6c333aaaa78722943e",
+          "name": "deterministic_reflection_sequence_compact_kernel",
+          "signature_sha256": "6c5c241e6cb6e995bacaa67282dc2e6a2bf6cd3a39ce1ab38d762afa77c0c245",
+          "token_count": 413
+        },
+        {
+          "body_sha256": "932361108e8af71f4aee0e5b9e548eda660b7307a352d97f30a8abefab5d60bb",
+          "name": "deterministic_diffraction_order1_compact_kernel",
+          "signature_sha256": "d4a3c6c1476f023896c8a7776399af47640b64f699c79181e8863772707a99b7",
+          "token_count": 237
+        },
+        {
+          "body_sha256": "34eb371e837546653ff5411a24d586a8e01dfd3b72c183964835b759d9879690",
+          "name": "deterministic_normalize_vec3_kernel",
+          "signature_sha256": "7ca47abfc6d38aaf9935f9181f48e09a76cfdeb6bc3399c5f1a76e42b1767ca0",
+          "token_count": 149
+        },
+        {
+          "body_sha256": "07e3affe7197575f2fd9f9f3ac6ef688cb9f0abf89e12bf6897ef4096a789222",
+          "name": "deterministic_reflect_points_kernel",
+          "signature_sha256": "5872763ee33a8868970a92f57a19141ef26c91b769b9471b43679c13fe86d210",
+          "token_count": 222
+        },
+        {
+          "body_sha256": "443cca7e019b2120aafb32eb904166bd387c117bd4c3099879a1396efd92bf74",
+          "name": "deterministic_order_init_kernel",
+          "signature_sha256": "dd518057d1d2401c29b776a7c3dc715e57c182b51751f21fa3b6043184c24a9e",
+          "token_count": 58
+        },
+        {
+          "body_sha256": "13d654d52dd3a78be26113cf6192611dff48b558e7c34c0b45447bd483039d20",
+          "name": "deterministic_sort_key_1d_kernel",
+          "signature_sha256": "0d21412e9472d7545f21235d3463293422ee2510ef7c11faa3caca7006524f44",
+          "token_count": 70
+        },
+        {
+          "body_sha256": "6804e8ee30b47582049590bbf54d8c45c2ec51dbef991f325d0c9e34cdf62e47",
+          "name": "deterministic_sort_key_sequence_kernel",
+          "signature_sha256": "ad4b402df32655f21c178b919c4f38bfa238d58ebcb90b3a98e8486069eb2679",
+          "token_count": 74
+        },
+        {
+          "body_sha256": "333b2f8f2b86d2f24074c129da3297decb9af3f2da723ee719816d39120446f4",
+          "name": "deterministic_face_group_keys_kernel",
+          "signature_sha256": "45fb56989ac17b380a5b772dfbe101ba1dd9576cfb391cd8f71fcd5c70793b08",
+          "token_count": 367
+        },
+        {
+          "body_sha256": "a1bdddbba12077d83fb0a114bdf194d905d6ccadec4676c07922f38f9fc6ec9c",
+          "name": "deterministic_surface_group_keys_kernel",
+          "signature_sha256": "7c02fc9f21ec29ba1c5bcc1b39bf66a2b47e9d40fe7435e34a982b8159405f68",
+          "token_count": 107
+        },
+        {
+          "body_sha256": "a5f6cc89bb10bbf556a88cc361de62b27a259add1530c2dd19536497acbf9353",
+          "name": "deterministic_face_group_sort_key_kernel",
+          "signature_sha256": "885cfd9ed2b04c01074a09ee9f43a248dce5f5077348a2de88ef2ad9dfb09c1d",
+          "token_count": 68
+        },
+        {
+          "body_sha256": "d692247a32e872bcf0eb2b13ba84c965504c218c5bd5f81c957bc9ebf9df7773",
+          "name": "deterministic_face_group_flags_kernel",
+          "signature_sha256": "cb2c08f8d404bfec47142515cacd14ac16c4a22f15c82bca430a8b85fb7bfdba",
+          "token_count": 140
+        },
+        {
+          "body_sha256": "fb0d4d99c3b41543beadfc832b8a7d1da471f08b47c6e2bc4db5049d99556a7d",
+          "name": "deterministic_face_group_assign_kernel",
+          "signature_sha256": "d1d510157c09484099431bde5f5187d57af38f481961586352c569ad0042a08f",
+          "token_count": 110
+        },
+        {
+          "body_sha256": "a2e2776e8142b1273f9f1ccbaedbb79994da3c7f96c45ceee73070f414c9a582",
+          "name": "deterministic_face_group_members_kernel",
+          "signature_sha256": "beb5a5b6b56481720bbccad80274ece747f26ba3b14ad6c9c44a51a815b331b3",
+          "token_count": 106
+        },
+        {
+          "body_sha256": "ecbebc772b6212812e506072fbb862a3ff473da87cec1de6d7f4dfa1ef7e83e4",
+          "name": "empty_deterministic_los_topology_block_from",
+          "signature_sha256": "8ac065dedb89dbd34e9446e7c9c22438b87e4f145f78dbd41fd2badfc0c324ef",
+          "token_count": 376
+        },
+        {
+          "body_sha256": "87331e0578e9ba8d89464ae13f49084afba78ffd366fae1917d57ad19e2b63ff",
+          "name": "cn_deterministic_los_topology_block",
+          "signature_sha256": "640f0bf5295511af1a6b5d39858609a0b6cd647092f1933fb1feb8c3377b1e37",
+          "token_count": 1269
+        },
+        {
+          "body_sha256": "2b6a422eaf9b9c01948fd03a41b684a89ccde73166740942b8df78ab5a4ddaf8",
+          "name": "cn_deterministic_los_topology_block_all_visible",
+          "signature_sha256": "e629f9bda27df53e161411d3f70bc5aa1a2e6661949d2209a989d9fa05a097fb",
+          "token_count": 960
+        },
+        {
+          "body_sha256": "a9c43660326de05e3058d59ee2ac791a971207d67364674994ad8fc0df8eb9b3",
+          "name": "cn_deterministic_topology_default_fields",
+          "signature_sha256": "7dce3de85762aa97b4268ec643c8293f6b50ff44897500ff9f75f36662f0f252",
+          "token_count": 265
+        },
+        {
+          "body_sha256": "7d5ff2db4b61bb5a67c58321c3bdec0b4468fb65ccdd5728aeeedc5539afb663",
+          "name": "cn_deterministic_pad_topology_sequences",
+          "signature_sha256": "4ff186f2dcc42b6dd0b941360dc76aa8565e055c3e99896b2e9db0e016293578",
+          "token_count": 723
+        },
+        {
+          "body_sha256": "3dbde0e58e2a344297aa8d85bca65c9bb58b9cadfda9b2056ed42968b4caa30c",
+          "name": "cn_deterministic_topology_base_fields",
+          "signature_sha256": "81df839404eab9110c80d76f2bcfdeae317afe7ffc67fc3bdf09155f68f32038",
+          "token_count": 852
+        },
+        {
+          "body_sha256": "519b244fef63e48288f405a66bccfffe6b05fc4cbd9220bdebe6d62d99f4ce26",
+          "name": "cn_deterministic_repeat_range",
+          "signature_sha256": "8f49d14fa12ed89155467ae66d4aa3fc6a05c7f23b039d1e5aa1b9cc00c5862e",
+          "token_count": 157
+        },
+        {
+          "body_sha256": "00fe8774f49194298f93e731cb00e6b30c2f87673757d661634d6b8a9c392437",
+          "name": "cn_deterministic_face_anchor_points",
+          "signature_sha256": "4293c539b61eec5dcab770f4e69b3c64b1b383bb2ab6acbc42503d9751cc6b67",
+          "token_count": 176
+        },
+        {
+          "body_sha256": "8b28f9a0a685a60a16121e94e7f82c9c0d1555217d6285ffc89898289d5bb242",
+          "name": "cn_deterministic_reflection_epc_input_batch",
+          "signature_sha256": "946371967f3b77ddd9f83c8fa134449708e7649cc61d484d2303324433357fd2",
+          "token_count": 886
+        },
+        {
+          "body_sha256": "4553d126013092e4b4eed7c5e1de4eccd0a4bba707b77d01b920610b0558220d",
+          "name": "cn_deterministic_face_sequence_chunk",
+          "signature_sha256": "58fb0b2d79c9c1a6a00f9e6c66b079036d784fa72754563ec761d8b4b8216f91",
+          "token_count": 255
+        },
+        {
+          "body_sha256": "80dc413bb63e0ae95e91ea6a6d62ce46788421be8c75a2a8a1e9ee26c2dc457b",
+          "name": "cn_deterministic_mapped_face_sequence_chunk",
+          "signature_sha256": "028858a50ed1407058699ea3301a137f47432fc811909e90280ab0c8fffd506c",
+          "token_count": 393
+        },
+        {
+          "body_sha256": "d77cfab9f2bea3d13f3183e6149bb04fea9edab46e8760ca39c551bbe0b9f506",
+          "name": "cn_deterministic_reflection_order1_compact",
+          "signature_sha256": "9383d1c77b03d354ee36ab0231115d501254d44013d5bd1f5c60b171f623fe19",
+          "token_count": 2318
+        },
+        {
+          "body_sha256": "8934c8d00dfd5217ef14551365b97db9dc74d1c75fbf7fa09c932699091e35c5",
+          "name": "cn_deterministic_reflection_sequence_compact",
+          "signature_sha256": "52eaa30e3a00fdf74c6d381ff6572cd891f52a96534da2a5fe07347e411fc038",
+          "token_count": 2594
+        },
+        {
+          "body_sha256": "c0873e4b416f635aec16952143301592e64a6d925896300bb2c6e788ac870130",
+          "name": "cn_deterministic_diffraction_order1_compact",
+          "signature_sha256": "21910bc8559d0bba191ff946fc97d62bf4d9b105d73efa53be1559f4ea9372af",
+          "token_count": 1374
+        },
+        {
+          "body_sha256": "9a9fd191a066e28ee020e1c356c4ff2ba8cdcbf4c922d7a791cc3a7f5f0edb16",
+          "name": "cn_deterministic_normalize_vec3",
+          "signature_sha256": "ec03b0a13966329733e56a95f61082378af9b90f6f596c5b24f0e484922056bc",
+          "token_count": 123
+        },
+        {
+          "body_sha256": "b9a0726436789d1c0a4b37fe64efb15d9e5798fcc09d37bc8ed98455240c92b8",
+          "name": "cn_deterministic_reflect_points",
+          "signature_sha256": "eea65d7169caa185628801443ffe108e2a9bcf117860b0ecb6a78ae65310061a",
+          "token_count": 206
+        },
+        {
+          "body_sha256": "88644a25c06cfd2b53f416addf57d59c1af3137b7e0dcf248ee87fe0674b2052",
+          "name": "block_tensor",
+          "signature_sha256": "c575caa2fbf1d437fbf41fafdab1a86f6afd74a64a60aae1de906612a8747033",
+          "token_count": 30
+        },
+        {
+          "body_sha256": "5ea26d628b611a603b5344d2fac89e6e86f85297f7733a481070da34d7b9d05f",
+          "name": "block_has_field",
+          "signature_sha256": "55daf52712f2d1b3bb2b77cae523d0cb20bbe0150a413b9219b4db6ced22a734",
+          "token_count": 8
+        },
+        {
+          "body_sha256": "fa043cfda5d23955a28193b67ecce70e7ec6b1b810738869f91972edaf7d4db7",
+          "name": "check_optional_field_presence",
+          "signature_sha256": "7d5fd1e1c3bbbb5a1ee1cd563ebc24854c5f3c4d013e147b5000ad692438bfe7",
+          "token_count": 22
+        },
+        {
+          "body_sha256": "d10e7e790fb17730b9720c01193516132ecd0bb8f870c1fd87e24222ff0dff46",
+          "name": "check_topology_concat_schema",
+          "signature_sha256": "710af074b48cd0519ad6e66c99d531b1c3516d32a3eaf3d086a407c8484ccc9e",
+          "token_count": 915
+        },
+        {
+          "body_sha256": "26ccddc0c080eaa84ba98e80b1020e143d53029a491124e0752010a9b1feb300",
+          "name": "copy_tensor_rows",
+          "signature_sha256": "93302fad30519124b9189fdfbd4350b19c9d2da26ec2f65aad048a5e22edab3d",
+          "token_count": 73
+        },
+        {
+          "body_sha256": "2f002cbdf50a00dcd998d4de6b8b0d38b9e8d7a6c02d2f1f62716dbf0d903df6",
+          "name": "deterministic_gather_rows_kernel",
+          "signature_sha256": "2b1caf3d7484bb429e9666985cf6065e9525526355d3c0ab04da972137fd8599",
+          "token_count": 100
+        },
+        {
+          "body_sha256": "c94fef8bd7c2649f036adc9c4443ce7647325125c999eb9b350f8f3afda19483",
+          "name": "gather_tensor_rows",
+          "signature_sha256": "77b424341040b29388a219c19bc1d00ea42ab08c797b9304ab7b7664c986970f",
+          "token_count": 77
+        },
+        {
+          "body_sha256": "144032ced266adfbc3a1a207593826615eed4e26ee3fed99e45ab1db071f647c",
+          "name": "cn_deterministic_concat_topology_blocks",
+          "signature_sha256": "7603e25298499e75147c85ef7c865c689be913e963486199a858493794beeef1",
+          "token_count": 1555
+        },
+        {
+          "body_sha256": "b55a8bea10b6399c283ed20f4816f6ed8d12741cea9926bf29294efc71338f2d",
+          "name": "cn_deterministic_gather_topology_block",
+          "signature_sha256": "ecd49d66416fd7b935bbaaea14c0c25ec6a0ff465ffd9b684f34c433a298e53f",
+          "token_count": 1518
+        },
+        {
+          "body_sha256": "6a187a7e03f8005e680e14987eac33e2fbb3b505517e202dc1955a265379476d",
+          "name": "cn_deterministic_face_groups",
+          "signature_sha256": "e3867bd698be7958223424a8e1ab5b55e96c70b0f32f5063486060b342113082",
+          "token_count": 1271
+        },
+        {
+          "body_sha256": "e0f88565f23b309e734b25b528779cd36ae47a56793cbb6486061f01142e865e",
+          "name": "cn_deterministic_surface_face_groups",
+          "signature_sha256": "03fa387129054bfcd17b33ef0e56dc5a0c2b4338df1118d18a310b95e409f47b",
+          "token_count": 1150
+        },
+        {
+          "body_sha256": "d9faacd56de113dd7d91aadc9d464a6864927c71701d713de84b57cf6bd08d3d",
+          "name": "cn_deterministic_sort_order",
+          "signature_sha256": "343f9ae326da4448e0b1b1676aad2b99092a6ec48e8ddcbb11e5c045ed1553bd",
+          "token_count": 697
+        }
+      ],
+      "expiry_condition": "Can be separated by ABI operation after complete functions move and the exact topology/order/body-hash gates remain unchanged.",
+      "fusion_boundary": "Discrete topology and deterministic ordering are one owner even when consumed by several Python solver stages.",
+      "id": "path.topology",
+      "intermediate_storage": [
+        "topology field columns",
+        "sequence padding/concat buffers",
+        "face group keys, flags, offsets, members, and sort order"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "topology exact/schema/runtime baselines"
+      ],
+      "non_split_reason": "Mirroring Python packages would duplicate packing/order code and obscure the canonical row order.",
+      "semantic_surface": [
+        "deterministic LOS/reflection/diffraction topology",
+        "face/surface grouping",
+        "topology concat/gather/sort"
+      ],
+      "source_level_launches": [
+        "path_visibility_flags_kernel",
+        "deterministic_los_topology_compact_kernel",
+        "deterministic_los_topology_all_kernel",
+        "deterministic_topology_default_fields_kernel",
+        "deterministic_pad_topology_sequences_kernel",
+        "deterministic_topology_base_fields_kernel",
+        "deterministic_repeat_range_kernel",
+        "deterministic_face_anchor_points_kernel",
+        "deterministic_reflection_epc_input_batch_kernel",
+        "deterministic_face_sequence_chunk_kernel",
+        "deterministic_reflection_order1_compact_kernel",
+        "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_diffraction_order1_compact_kernel",
+        "deterministic_normalize_vec3_kernel",
+        "deterministic_reflect_points_kernel",
+        "deterministic_gather_rows_kernel",
+        "deterministic_face_group_keys_kernel",
+        "deterministic_surface_group_keys_kernel",
+        "deterministic_order_init_kernel",
+        "deterministic_face_group_sort_key_kernel",
+        "deterministic_face_group_flags_kernel",
+        "deterministic_face_group_assign_kernel",
+        "deterministic_face_group_members_kernel",
+        "deterministic_sort_key_1d_kernel",
+        "deterministic_sort_key_sequence_kernel"
+      ],
+      "tape_lifetime": "No AD tape; topology tensors and winner/order buffers are fixed discrete state owned by the ABI result."
+    },
+    {
+      "abi_owner": [
+        "cn_path_reflection_candidates_cuda",
+        "translation-unit common primitives"
+      ],
+      "baseline_source": "native/channel_native/kernels/path_trace.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "3b409a12602d26bb1d696f211332c0d80bd9f82cbf3ebb7e38c55f9e04c11dab",
+          "name": "check_cuda_tensor",
+          "signature_sha256": "5bff77488fc75850ac7b03a42ce3256fd7fc8911300b82096fe9340d59bd0ace",
+          "token_count": 56
+        },
+        {
+          "body_sha256": "b06a92f0c5835ec288cbb4f7bffc80fa726433cbce8c58a35cabc9e502ccde08",
+          "name": "check_vec3_table",
+          "signature_sha256": "0af37763bd9f51244e54b91fb8180f1a74270af85f6aeb82fd7e17ef65502407",
+          "token_count": 29
+        },
+        {
+          "body_sha256": "425638af8583c2d44784a4b3ce89872ab20688dbdce7c48285b02a83b6cfe1bd",
+          "name": "check_path_block_shapes",
+          "signature_sha256": "2fc94d92e8ffcf63035d706b5e029fc6cbd436f47b1aeb8d6e5a17252748c3bc",
+          "token_count": 267
+        },
+        {
+          "body_sha256": "f9581893c35b702096fca49b66f3df8a9e30e8f0fd7fa1ab79b6e31a1014d089",
+          "name": "launch_blocks",
+          "signature_sha256": "10bc7268138e270ed5b9e926081fa7a73cd36b929a03882b137ef91f5ea93301",
+          "token_count": 11
+        },
+        {
+          "body_sha256": "cd0b6125f8e1f0651b5f0b425b19f76d9d4d36fcd91925a92a6ed9f1388c21e4",
+          "name": "cn_neg_kd_phase",
+          "signature_sha256": "26ced200475d8ef5bafe48ffdd088fc6fcd8b087b10949303fcfb8ba700259ab",
+          "token_count": 35
+        },
+        {
+          "body_sha256": "ac6fec66b4f2171c00eb6fe9012abb2086d349752a046d03320081af75181211",
+          "name": "dot3",
+          "signature_sha256": "c498693ee9551a8beea598d561b7c01ce19092a5e4555ff5abf62082fa4919ca",
+          "token_count": 31
+        },
+        {
+          "body_sha256": "70be950c92e8334a009c7f44d20f141660eb67d86ff4d662780315e567ff854b",
+          "name": "norm3",
+          "signature_sha256": "3a80c60ecddf95393cd96f9789a3f3a6f942ed6e81d5a6b2778e2222d0f16275",
+          "token_count": 16
+        },
+        {
+          "body_sha256": "7d5f2480f629cfa903649849700402159a0a7979a04e0741579da9a7d6b3e69b",
+          "name": "inside_triangle3",
+          "signature_sha256": "037b37247923fa3223329505ada0e239f3967f178d716248fde4c7a357c346e7",
+          "token_count": 316
+        },
+        {
+          "body_sha256": "5e8dcca757e0c7bf7c40d87ead049099e060f5e3948e6525dc5e7ea0d40cdc73",
+          "name": "path_reflection_candidates_kernel",
+          "signature_sha256": "e91859b46135ffefe92036299672d60c9020a966969094d7812667f870762cd0",
+          "token_count": 1089
+        },
+        {
+          "body_sha256": "6aa0c67eb3c231cda553f809861e2978d6f6b61ecb05176d46f690ecff3307cf",
+          "name": "cn_path_reflection_candidates_cuda",
+          "signature_sha256": "509ea12653967ea04c9f8961fb914488680ab115027aa8d369a8f8c52802583c",
+          "token_count": 758
+        }
+      ],
+      "expiry_condition": "Revisit only in an independent numerical-kernel change with exact output, PTX/SASS, and performance evidence.",
+      "fusion_boundary": "Triangle predicate, reflection candidate generation, and its ABI packing retain current evaluation order.",
+      "id": "path.core",
+      "intermediate_storage": [
+        "candidate path columns and segment endpoints"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "reflection candidate exact baselines"
+      ],
+      "non_split_reason": "Device geometry expressions are numerical code and are not deduplicated during host/TU migration.",
+      "semantic_surface": [
+        "shared tensor validation",
+        "reflection candidate geometry and field seed generation"
+      ],
+      "source_level_launches": [
+        "path_reflection_candidates_kernel"
+      ],
+      "tape_lifetime": "No tape; candidate tensors are ABI outputs and geometric predicates are register-local."
+    },
+    {
+      "abi_owner": [
+        "cn_field_free_space_fwd64",
+        "cn_field_free_space_backward",
+        "cn_field_free_space_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_transport_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "f4ecff694405573d38ea55ae36e88199eb47eb09e1a5a5cf391140aee6347839",
+          "name": "load3f",
+          "signature_sha256": "88700db83db596dd579cc24bce71fe583bb2788c59169c6615ee89cc2f4d267d",
+          "token_count": 33
+        },
+        {
+          "body_sha256": "72be619d183bbb2482ebb3c927fe64107dc7396680aeb478a8eb9cd699027181",
+          "name": "load_sequence3f",
+          "signature_sha256": "8211986c0d757d18a194d483f36a360be11b2c7cf501912bcb54d7443e3fc84b",
+          "token_count": 39
+        },
+        {
+          "body_sha256": "d9995bb29f4a6df8d36119d4a0622ac1bdb2079e7378ca3d233ec310be9dc52d",
+          "name": "complex_of",
+          "signature_sha256": "1449932cbd50d46682926860817f1eb4351b98dd72c607d0d442a58e2ca4e56b",
+          "token_count": 18
+        },
+        {
+          "body_sha256": "95a9740caef1a0de5621f2b77d490a73c47d123c1a783a19d08aa0c93ef204f9",
+          "name": "to_c10",
+          "signature_sha256": "603335d54afcc32ecdc511bcbd557a1cc9c3ef7aea506657d73e527207688424",
+          "token_count": 17
+        },
+        {
+          "body_sha256": "3dcfa11e35a32673dda99ec6956182f3e1064f0b81b6a28c9a66de346d32a49b",
+          "name": "fold_output_cotangents",
+          "signature_sha256": "e183ddaadbd34a377450726aeda25285f9e4d4024b33eb81b3c352b1320a1dd7",
+          "token_count": 249
+        },
+        {
+          "body_sha256": "91f2a90d220d03da83b0a468acdd6f3dfed8e92771155675f65036f5deb7ab20",
+          "name": "write_output_tangents",
+          "signature_sha256": "30e8ea97dd96bad2ce1b8bd931bf4bd104a59fce9f9c3f043aae54c057e5cf02",
+          "token_count": 185
+        },
+        {
+          "body_sha256": "39a2b22b25d45e7d2dbf2f0a4e2efb912dfe57737a91a7d7f218ab95fff390b8",
+          "name": "free_space_fwd_kernel",
+          "signature_sha256": "19c5101a2fb073924f8ad242da7dc39a512c528a4cd2d69b80c02f978d54bcbd",
+          "token_count": 299
+        },
+        {
+          "body_sha256": "ecb5b0ca355560ef32bdfd137085778a7ba216864510be15118cf3c2c761f054",
+          "name": "free_space_backward_kernel",
+          "signature_sha256": "3a61f6c8c815838d230c1b9246d96d642b2decd756213b473e3cf493f87b48da",
+          "token_count": 928
+        },
+        {
+          "body_sha256": "e6dbd3199d60fbed6242a3528820d013f020ad3395dc12aed5eb71b0507f88d0",
+          "name": "free_space_jvp_kernel",
+          "signature_sha256": "b6aff5a450b9e4e20a7411af5666305e7a72443f390e2932e38d87a9164e50b0",
+          "token_count": 596
+        },
+        {
+          "body_sha256": "50b03192998f90b46169a99b9b7e7c27c2dd748a7e42e59a701c499dd0c3c52f",
+          "name": "launch_blocks",
+          "signature_sha256": "9554885e5f6262b2eb4478e4050469b1ea84317b244ffc1e6a7111f2e6cb4237",
+          "token_count": 17
+        },
+        {
+          "body_sha256": "90acbc7b55cfa61f4f98061b60d3e920548cab0570c08ae9b7a16275b5fa9fae",
+          "name": "zero_filled",
+          "signature_sha256": "da02a56891c28db58a0b5ad92ae9f2f64930bff6c8596746defc7628d7aeddb8",
+          "token_count": 81
+        },
+        {
+          "body_sha256": "8acc5fc0b689e34bf01cd991ba47f01916d2be5b52f046c4ccebb442690aca5e",
+          "name": "optional_grad",
+          "signature_sha256": "8f7d342e09295e536aae87530036ec0879e75fd5b419c64943be8f7133a7271f",
+          "token_count": 94
+        },
+        {
+          "body_sha256": "2bc2233581c223c32075aac0a2bc014c8e2ca2e7bcd4fcddd627ee1f09c461c6",
+          "name": "grad_ptr",
+          "signature_sha256": "7b128d9aef1ff0b5c6121e2ff0ce82e21afafce60f3fa00ba8fced82fb5f1c3d",
+          "token_count": 16
+        },
+        {
+          "body_sha256": "247dc3c8c97bf565fd71421b29193be7962a9a3c3b445dc8e7aea00b8e36b44a",
+          "name": "check_free_space_primal",
+          "signature_sha256": "bc1a129902cb510a356c39d83e05fa7c6a0e331a7d30290fea36edf02518d3bd",
+          "token_count": 163
+        },
+        {
+          "body_sha256": "d4e7534f48883a30bf98ebbec2f55c0a59e92cd4e829e210d458c752c8f42cd5",
+          "name": "cn_field_free_space_fwd64",
+          "signature_sha256": "b195a15eb382c9d3625c0feca3ce750265a6a17c9fb516c5b72738dbdfa99ead",
+          "token_count": 371
+        },
+        {
+          "body_sha256": "a2cf6546428a2633170ead7c2ff8d5b8ffbaaf67b8d64d9848f52083e563a32b",
+          "name": "cn_field_free_space_backward",
+          "signature_sha256": "d719d3c5909a691947262777c4c6ee1ff5267c4614a16d97661b736648627d4a",
+          "token_count": 941
+        },
+        {
+          "body_sha256": "c3c96ac98d7eca0b8af577196ccc776cc5b18344ebdb63dcafc34a555a52cf3b",
+          "name": "cn_field_free_space_jvp",
+          "signature_sha256": "b4a5de74cb0aa675f23a1556378c12a77b1ac286a001d7a2ba70ec9268957143",
+          "token_count": 674
+        }
+      ],
+      "expiry_condition": "Extract host plumbing with unchanged launches first; numerical row expressions remain fused until an exact/performance kernel change.",
+      "fusion_boundary": "Each AD mode is one fused row kernel followed by ABI packing.",
+      "id": "field_transport.free_space",
+      "intermediate_storage": [
+        "zero-filled optional gradient tensors",
+        "folded output cotangents/tangents"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "free-space forward/JVP/VJP exact and launch gates"
+      ],
+      "non_split_reason": "Splitting scalar output folding from row evaluation would add tensor materialization or launches.",
+      "semantic_surface": [
+        "free-space field forward64",
+        "free-space VJP/JVP",
+        "shared host validation/allocation"
+      ],
+      "source_level_launches": [
+        "free_space_fwd_kernel",
+        "free_space_backward_kernel",
+        "free_space_jvp_kernel"
+      ],
+      "tape_lifetime": "Backward/JVP recompute the fixed-topology primal chain; no persistent native tape escapes the ABI call."
+    },
+    {
+      "abi_owner": [
+        "cn_field_reflection_sequence_backward",
+        "cn_field_reflection_sequence_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_transport_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "b4c5ae9c3fd0563f68f4ad92508f2c7398fa8d3c147e0cd49f8dc5c85ec061e1",
+          "name": "reflection_chain_eval",
+          "signature_sha256": "bafc78e2b3759b1a52ea056c58ea7c5072c7950c86b2f4c6bf57eb792598502f",
+          "token_count": 665
+        },
+        {
+          "body_sha256": "49f356521cf7c27e4ff09efe85a4b850f1d37d4632a522f79e37d0e56238bd1e",
+          "name": "reflection_sequence_backward_kernel",
+          "signature_sha256": "3b237d348b9af7e8d7838722714ccbcfb954e4c641b575526f4da623910d1dfc",
+          "token_count": 2056
+        },
+        {
+          "body_sha256": "7baac0bf1960ec8aae4ed2523885f66e0fc3af3a78f031a54b9a12b452677543",
+          "name": "load_dual3f",
+          "signature_sha256": "b64999d04ece64a030fa473d84b9f9c79891be027425d39c696da1b0c9a5696f",
+          "token_count": 27
+        },
+        {
+          "body_sha256": "0a4f27b3d67a952eab9c5fe08f94fd87fad49cf48c1ac1f86ce7346755d00904",
+          "name": "load_dual_sequence3f",
+          "signature_sha256": "576a93d01eb4fe7e315c10e61c04b48c1f7392b048e1ec83f6c9c5b80b1c4764",
+          "token_count": 35
+        },
+        {
+          "body_sha256": "64aa57a98f10b51dfeb0424c01b48233d843a45274404c7fdddc04b7961fde4f",
+          "name": "reflection_sequence_jvp_kernel",
+          "signature_sha256": "0d7514ff4c6a7358ab7c5f61533f595264503a733d26c9f6884b45a5fb8f26ce",
+          "token_count": 1163
+        },
+        {
+          "body_sha256": "ccc57518087e370a4f15b2b37ba7e2580a94a26345ecd2b98166ac04fb5b56de",
+          "name": "check_reflection_primal",
+          "signature_sha256": "7cc167b7bfa9b9c8c53f939f5f8ca6d0060fecd996d116b0a7f63c54677b6c5e",
+          "token_count": 271
+        },
+        {
+          "body_sha256": "dca9fdfe347ee817c3729235912be39da8f87523db05a1dff499b16c5629223e",
+          "name": "cn_field_reflection_sequence_backward",
+          "signature_sha256": "78fec0568239a24bf578ccea75eead1ca35d99f9d23b5b16aaf48def56c697ba",
+          "token_count": 1105
+        },
+        {
+          "body_sha256": "827e7273d9712673a2c2a1ce044c268c89ee171b102909673d928e6c487dfd57",
+          "name": "cn_field_reflection_sequence_jvp",
+          "signature_sha256": "d3c566e0043479c038ebfda67a29c1080e1fe2f8e32f43e102dcee7820089327",
+          "token_count": 823
+        }
+      ],
+      "expiry_condition": "Only split host validation/packing or a complete row kernel; numerical duplication stays until a dedicated exact/SASS-gated change.",
+      "fusion_boundary": "Chain evaluation, slab response, geometry, and output folding remain one row kernel per AD mode.",
+      "id": "field_transport.reflection_sequence",
+      "intermediate_storage": [
+        "per-bounce material gradients",
+        "geometry and polarization adjoints"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "reflection AD exact/duality/launch gates"
+      ],
+      "non_split_reason": "Separating the chain would materialize per-bounce state and change launch count/evaluation order.",
+      "semantic_surface": [
+        "fixed-topology reflection sequence VJP/JVP"
+      ],
+      "source_level_launches": [
+        "reflection_sequence_backward_kernel",
+        "reflection_sequence_jvp_kernel"
+      ],
+      "tape_lifetime": "The reflection chain is recomputed per row; cotangents/tangents and per-bounce material accumulators live for one call."
+    },
+    {
+      "abi_owner": [
+        "cn_field_transmission_sequence_backward",
+        "cn_field_transmission_sequence_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_transport_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "df87bf1db3418af3d4e900f196746ef95ef324f78198ee497fbb2f3f483aa7bf",
+          "name": "transmission_chain_eval",
+          "signature_sha256": "7e61a9e0dc3ceef7defbdc0a36d440d990556b6f32caf5158e3dc7fefa538851",
+          "token_count": 749
+        },
+        {
+          "body_sha256": "145c94ee3189c7511bd233235dcb33750cb6aec1670b8301448299e7b3358e68",
+          "name": "operator",
+          "signature_sha256": "bd059a80d639cce94a4b3a42d96d79e4ac80e7fd0cd18c91d0ebe0142e30a8d5",
+          "token_count": 9
+        },
+        {
+          "body_sha256": "e90314ea09c90ec9f47900403034b01cfd5b6ca214979d88ad73d900b5ca6b2b",
+          "name": "operator",
+          "signature_sha256": "2f710ae020d65991fc3d07e596decc56ccb8cfc03c45a8308ac9f97c677b494e",
+          "token_count": 55
+        },
+        {
+          "body_sha256": "5d117f5876687b655999f407f0c2a654a6751e9404899258513406f0815e02c7",
+          "name": "operator",
+          "signature_sha256": "2f710ae020d65991fc3d07e596decc56ccb8cfc03c45a8308ac9f97c677b494e",
+          "token_count": 36
+        },
+        {
+          "body_sha256": "7be698e5fa9b2b3a3ffcd69726e578b055b73521e7e50190983d91063b5e2d41",
+          "name": "transmission_sequence_backward_kernel",
+          "signature_sha256": "082fc621f6b557ad9e7f8e2cb1c6336f2cc592caf35b5c84841ad766385aed8a",
+          "token_count": 1541
+        },
+        {
+          "body_sha256": "b20d690bc487a9c7a047b662c55ca99cdc7dcdfce9ad1a519184932737e7a4d0",
+          "name": "transmission_sequence_jvp_kernel",
+          "signature_sha256": "53a89f1e70d317242f005a3cb79b93d4d1f7e61e6f8374ae8437ab8b58f86e89",
+          "token_count": 1036
+        },
+        {
+          "body_sha256": "41c911f87712c8ea5efa226620c183ff4d873170f099e0824ab32994702bbb70",
+          "name": "cn_field_transmission_sequence_backward",
+          "signature_sha256": "4cce9017deb64e3fe6eaa617292a028a9423d8e33e3e11f8e0a553b738bd8d8d",
+          "token_count": 1043
+        },
+        {
+          "body_sha256": "f7149697c4f8a188ebc7ba79a00a8b7d8ee194e0aad726870947b1d5101d1d8c",
+          "name": "cn_field_transmission_sequence_jvp",
+          "signature_sha256": "baff4f19bf6743a2edceaf47edd89b7b5d534b0b6dbdea17b53d02a681f66892",
+          "token_count": 800
+        }
+      ],
+      "expiry_condition": "Retain until a dedicated layer-tape design passes exact, launch, memory, and performance gates.",
+      "fusion_boundary": "Layer-stack traversal and AD accumulation are fused per row to avoid storing the layer tape.",
+      "id": "field_transport.transmission_sequence",
+      "intermediate_storage": [
+        "CSR layer state",
+        "atomic eps/sigma/thickness gradients",
+        "geometry adjoints"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "transmission AD exact/duality/launch gates"
+      ],
+      "non_split_reason": "A split would materialize layer state or add launches/atomics and can alter floating-point accumulation order.",
+      "semantic_surface": [
+        "CSR layer transmission sequence VJP/JVP"
+      ],
+      "source_level_launches": [
+        "transmission_sequence_backward_kernel",
+        "transmission_sequence_jvp_kernel"
+      ],
+      "tape_lifetime": "The CSR layer chain is recomputed; shared layer gradients are atomic call-local accumulators."
+    },
+    {
+      "abi_owner": [
+        "cn_field_diffraction_wedge",
+        "cn_field_diffraction_wedge_backward",
+        "cn_field_diffraction_wedge_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_wedge_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "f4ecff694405573d38ea55ae36e88199eb47eb09e1a5a5cf391140aee6347839",
+          "name": "load3f",
+          "signature_sha256": "88700db83db596dd579cc24bce71fe583bb2788c59169c6615ee89cc2f4d267d",
+          "token_count": 33
+        },
+        {
+          "body_sha256": "95a9740caef1a0de5621f2b77d490a73c47d123c1a783a19d08aa0c93ef204f9",
+          "name": "to_c10",
+          "signature_sha256": "603335d54afcc32ecdc511bcbd557a1cc9c3ef7aea506657d73e527207688424",
+          "token_count": 17
+        },
+        {
+          "body_sha256": "d9995bb29f4a6df8d36119d4a0622ac1bdb2079e7378ca3d233ec310be9dc52d",
+          "name": "from_c10",
+          "signature_sha256": "5f380aac899092560ec7ce1a8fb906905144b5e76e323e3ab3b0077d5a31aab2",
+          "token_count": 18
+        },
+        {
+          "body_sha256": "9a35d9a46e84afa2f048ebfff156a19c7500f1b1415e74da15ffed093874df05",
+          "name": "from_dualf3",
+          "signature_sha256": "212fbc43a467c6a22ecfe69297d6e929595a67aae77d38ea2e6c78a411f4033b",
+          "token_count": 14
+        },
+        {
+          "body_sha256": "db677e34f63c392862f351d9ddb0b09f34520873f4c3ad64d5f7810adede5a04",
+          "name": "to_dualf3",
+          "signature_sha256": "6e06c71719fc2f6d457a90c3b63b76177fd94f6acbda563e40e76f4e53be2b4f",
+          "token_count": 49
+        },
+        {
+          "body_sha256": "5ecdaa6e81fc93f5113c98bdffa535aea2cd85bb9e128877f45804d50868a178",
+          "name": "precise_neg_kd_dual",
+          "signature_sha256": "a372cfecb581289093c6ffe0bafb21cbdee46e5f6cfd8860af17f7e776d98483",
+          "token_count": 35
+        },
+        {
+          "body_sha256": "9ec4d75eacfd425735d4ac18ad1f39b621a1dc1e187de73f8669869077bd7c3d",
+          "name": "reflect_complex3_dual",
+          "signature_sha256": "7551b00bfc49ccc7482d6893c79d47d6d26404767efc0a1eda8a6e99866fc2d7",
+          "token_count": 166
+        },
+        {
+          "body_sha256": "3b927142dda284ec9ebec16f5be5a184b4717dd1c36b09b1c790ed2047dbabb3",
+          "name": "wedge_seeds_zero",
+          "signature_sha256": "a149126cf1ed8b922240300c1a76a941dd92572c5f3989827d4944f1ba4fd3f4",
+          "token_count": 108
+        },
+        {
+          "body_sha256": "213f330e2f0b1a7b2f7ce1a23fd93c1fe1b660a683031d6eb0984f75ec14dbba",
+          "name": "wedge_acos",
+          "signature_sha256": "6a3bf299257c3da1321d53be304d2c41742d1dc8a6047e9104b76f72cf2399f2",
+          "token_count": 29
+        },
+        {
+          "body_sha256": "d00ee7f54088aed44c0bfee1fc6eb60f2ab64ee877e99908cb20e1566e512814",
+          "name": "primal3",
+          "signature_sha256": "dc6b3ee987518dc443c1bafcce8c5ce097b36490010e69041d3500f634a8bc72",
+          "token_count": 33
+        },
+        {
+          "body_sha256": "7512fabea5a8f664836d6f95798eb96ea46ddc6dc96fb752a3f25befba9039c4",
+          "name": "wedge_edge_tables_from_vertices",
+          "signature_sha256": "b8ade5a32075ce7fe7046a422ae6ae77320696a84608679b572a205f21830094",
+          "token_count": 556
+        },
+        {
+          "body_sha256": "f9c19f747b3c7854e5da127adfe8ee0f8abe6b3e2ee110a8aabbabc416a343b9",
+          "name": "wedge_face_material",
+          "signature_sha256": "9855841b90020b7547403ab356b62e88b582838104bbb18c15c1a2f929de66ca",
+          "token_count": 62
+        },
+        {
+          "body_sha256": "3a2a0ecebfa3d797929a111256dd810953831ae1b6fcd177d1651de078ddd057",
+          "name": "wedge_row_eval",
+          "signature_sha256": "eebcfc55403a0d9c73a824f557b15ef52218955daf3bde3ce44aac86eaae4485",
+          "token_count": 741
+        },
+        {
+          "body_sha256": "618aee89cffce5cda02da3fc904897c29c678a939a9978f667eefdde34ae3f55",
+          "name": "load_wedge_row",
+          "signature_sha256": "603ef7f9d84b22b86274ede6719645a7c6731a42dfc901caa085a1127aff5779",
+          "token_count": 322
+        },
+        {
+          "body_sha256": "7deeb4ded7817c6a6e95d7130f909c2547d7d866095dba515bd55e6be47c1286",
+          "name": "diffraction_wedge_forward_kernel",
+          "signature_sha256": "3b6b878f07a947203cfb5013164ae5a190b1d8f99bd96f1bc12ee8d5fe452cb3",
+          "token_count": 167
+        },
+        {
+          "body_sha256": "566f08a0523c6fbc023091c707f877d097eaf7da16fa2fc8fc17f083bc57af6b",
+          "name": "wedge_contract",
+          "signature_sha256": "46507750e363cb10a0efb033105eda7d5cfd4e2bfacb28bf5201b5ec55f84870",
+          "token_count": 157
+        },
+        {
+          "body_sha256": "632a488649c5e7ade9abab3ede15ce91df53fd34863ed6beea064cb9db472a1e",
+          "name": "diffraction_wedge_backward_kernel",
+          "signature_sha256": "be272f0018592ab92b6d158e4be9b7753fc2c72b230374127b49e017ae0e65e8",
+          "token_count": 694
+        },
+        {
+          "body_sha256": "5598c64cd07c5d88d807ef09e8403ca12b2851e2107fcaea2ed11730696e8151",
+          "name": "diffraction_wedge_jvp_kernel",
+          "signature_sha256": "0190aac0e29e77e3dc68e81b254f1bb1e64edf9aa870cc951296b3a97602cf29",
+          "token_count": 385
+        },
+        {
+          "body_sha256": "50b03192998f90b46169a99b9b7e7c27c2dd748a7e42e59a701c499dd0c3c52f",
+          "name": "launch_blocks",
+          "signature_sha256": "9554885e5f6262b2eb4478e4050469b1ea84317b244ffc1e6a7111f2e6cb4237",
+          "token_count": 17
+        },
+        {
+          "body_sha256": "6f5183d69513129c6110fbea0dda11caa8ef16d8cfe364115758c4f9506f4e4e",
+          "name": "zero_scalar",
+          "signature_sha256": "5914a25f0642e88737f1629381125513cd101b434d555af8b12ed578a7551a7e",
+          "token_count": 59
+        },
+        {
+          "body_sha256": "8acc5fc0b689e34bf01cd991ba47f01916d2be5b52f046c4ccebb442690aca5e",
+          "name": "optional_tensor_arg",
+          "signature_sha256": "62ed844157cd021e61a6c8a9fb9e9f2795bf3477c1423e3175b16c3daba3a396",
+          "token_count": 94
+        },
+        {
+          "body_sha256": "2bc2233581c223c32075aac0a2bc014c8e2ca2e7bcd4fcddd627ee1f09c461c6",
+          "name": "opt_ptr",
+          "signature_sha256": "0b2a09520826e684d272e8417e815fd6747f2e77a4804632c005dbcf7586537e",
+          "token_count": 16
+        },
+        {
+          "body_sha256": "2bc2233581c223c32075aac0a2bc014c8e2ca2e7bcd4fcddd627ee1f09c461c6",
+          "name": "opt_mut_ptr",
+          "signature_sha256": "e7c6b4fadfd1bd5969d173c774a4fc3d9f4da394bffe68483094117a5b262521",
+          "token_count": 16
+        },
+        {
+          "body_sha256": "56ad519db7910ada20ff04ba06ecc34679df9c8e923fc4428ea0e68d2f27d9d9",
+          "name": "check_wedge_primal",
+          "signature_sha256": "39a2db69a32f68733a3153ec4c2e3f09b18f4deeea778da09008b77fadca541e",
+          "token_count": 312
+        },
+        {
+          "body_sha256": "2e1947b0d17b4d169bbb18d9cf1e2f1d40c1a7ff9c23e4a1f1892d178820f201",
+          "name": "resolve_wedge_vertices",
+          "signature_sha256": "33d16b51bffd8ebd7f3f9097b2fcb37bb5c6319e217eaef43771c8cdc88ab1d5",
+          "token_count": 259
+        },
+        {
+          "body_sha256": "c5d257682b148e3abbaf71ed254d081ab24939365d6ae758a861e618f598d9eb",
+          "name": "cn_field_diffraction_wedge",
+          "signature_sha256": "a308eddc9dbf7bc063542e3d0697e3b9faa529b0fb40034e1a827fca4a01fb15",
+          "token_count": 247
+        },
+        {
+          "body_sha256": "e584db67ef5f8c8e8d02a29fbf8fc11d1f15749edc349cdbf14e854943549f66",
+          "name": "cn_field_diffraction_wedge_backward",
+          "signature_sha256": "ff96ce4190c067f801639eb392e3e315064b15de57060369d5edf1d02ad2026f",
+          "token_count": 1205
+        },
+        {
+          "body_sha256": "744f1ca42788f6c3262ced6f84aadaaa3c5dce0bf04e42213b9172c05176a85e",
+          "name": "cn_field_diffraction_wedge_jvp",
+          "signature_sha256": "5b6c962befd6fd303ed24653141da4e832d4f70f278bf6a7a1cd8e6f76509ed8",
+          "token_count": 808
+        }
+      ],
+      "expiry_condition": "Move complete kernels and ABI entries only; revisit math only with forward parity, duality, SASS, and performance gates.",
+      "fusion_boundary": "RayD templated pair evaluation and edge/material reconstruction are fused per row.",
+      "id": "field_wedge.diffraction",
+      "intermediate_storage": [
+        "optional winner-vertex tensors",
+        "per-row dual seeds and cotangent contractions"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "wedge forward parity and VJP/JVP lockstep tests"
+      ],
+      "non_split_reason": "Splitting reconstruction from pair math would materialize edge tables or change RayD call/evaluation order.",
+      "semantic_surface": [
+        "RayD order-1 wedge forward",
+        "wedge VJP/JVP",
+        "shared wedge host plumbing"
+      ],
+      "source_level_launches": [
+        "diffraction_wedge_forward_kernel",
+        "diffraction_wedge_backward_kernel",
+        "diffraction_wedge_jvp_kernel"
+      ],
+      "tape_lifetime": "Frozen winner topology is input; primal/dual pair math is recomputed and no native tape persists."
+    },
+    {
+      "abi_owner": [
+        "cn_field_coupled_rd_backward",
+        "cn_field_coupled_rd_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_wedge_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "e8a31a1f1bf8b779ce7cff1f00b60577632f01f2fda832356adc8b366dd0956e",
+          "name": "coupled_seeds_zero",
+          "signature_sha256": "1618efa6e8b91d55f2948ed55037edc87461718edd85d744b6d6101575e09172",
+          "token_count": 124
+        },
+        {
+          "body_sha256": "94db65b4af96186ab4aed7b9e050b8eae3d53ec2eea4ab5c2d92e47d75bb13aa",
+          "name": "reflect_point_dual",
+          "signature_sha256": "46f7a388b94a62341d636f89917a6de80c5f1b6757c987f10183b4f608839367",
+          "token_count": 58
+        },
+        {
+          "body_sha256": "ae820b6cb9570012f8da3691582c440879b9c864b3123230a00a3f1f15f9fb8c",
+          "name": "coupled_rd_row_dual",
+          "signature_sha256": "8098a15cdcbb5307bcb50f6ff13caf0ad88c49229dd4fa5ebee6937b64ca5b11",
+          "token_count": 1369
+        },
+        {
+          "body_sha256": "3a365b07d1a7f261bb84d476cebe8a44a9036fa48d4a27b133bfb06d5187b484",
+          "name": "load_coupled_row",
+          "signature_sha256": "4c4904e466c4ee04f5116b626ca877a7086dcdc3c5df44e04be7a9f552c3944f",
+          "token_count": 281
+        },
+        {
+          "body_sha256": "6d0f873a6c4961bfbafd965117e9b8832455dedbbcc7b6012a62ee0e3ad84a2b",
+          "name": "coupled_contract",
+          "signature_sha256": "104b700ce5686665a710912e40535e2c4053441d3d407ba31123d7ee8ac37042",
+          "token_count": 158
+        },
+        {
+          "body_sha256": "b141dd6f3fe4fd841763deef863b65fc33ff45d0164d8c6f7c085883efe47724",
+          "name": "coupled_rd_backward_kernel",
+          "signature_sha256": "cc414a2b47462f3497dea3c7dc8899544bd1fb91e3693978b6fa6510b7dc18dc",
+          "token_count": 570
+        },
+        {
+          "body_sha256": "dd86dfdb34552e0a845534ed3b8afa2f0364158832fc0f9a0fb0d15d582c1a17",
+          "name": "coupled_rd_jvp_kernel",
+          "signature_sha256": "b1746dec69823a93495d7d86abea8170b7379ffb310eab45c2d2928ab2eb4838",
+          "token_count": 392
+        },
+        {
+          "body_sha256": "24c4dd1b0356bd17e2317009cd4fd8eb579485ef23279d4cd16eed3eb6b624e2",
+          "name": "check_coupled_primal_rows",
+          "signature_sha256": "32c93c456d2b85b5426ff53e51fa3ceaa0d96fa796d1e97e4845735f81dd34b9",
+          "token_count": 124
+        },
+        {
+          "body_sha256": "a32c0683365287894641bba0b223e0fc5f15a237b3d1c8444b0d388dbf327464",
+          "name": "cn_field_coupled_rd_backward",
+          "signature_sha256": "e4ea4b939449166aa27748d9a3ead664c77f1ab6e04ce6b4122170f0861a776b",
+          "token_count": 868
+        },
+        {
+          "body_sha256": "dbb05c497b87371ed4c0e8197eea15bf06c8119b70c569f92dc0b2410c2fac6e",
+          "name": "cn_field_coupled_rd_jvp",
+          "signature_sha256": "15b9142bc05bf096693a0af2566177755a08dc941a25e64a4e1dbcf174ee3a11",
+          "token_count": 613
+        }
+      ],
+      "expiry_condition": "Retain until a complete coupled tape design proves exact forward/JVP/VJP, launch, memory, and performance parity.",
+      "fusion_boundary": "Reflection slab legs and RayD diffraction pair share one row evaluation and one truncation policy.",
+      "id": "field_wedge.coupled_rd",
+      "intermediate_storage": [
+        "coupled row dual seeds",
+        "slab leg/material and endpoint gradients"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "coupled reflection-diffraction exact/duality tests"
+      ],
+      "non_split_reason": "A split would materialize coupled row state and risks drifting the primal/dual lockstep or pseudo-infinite-edge policy.",
+      "semantic_surface": [
+        "coupled reflection-diffraction VJP/JVP"
+      ],
+      "source_level_launches": [
+        "coupled_rd_backward_kernel",
+        "coupled_rd_jvp_kernel"
+      ],
+      "tape_lifetime": "Fixed coupled winner rows are recomputed; truncation factor is deliberately frozen as a differentiable constant."
+    },
+    {
+      "abi_owner": [
+        "cn_field_project_complex3_backward",
+        "cn_field_project_complex3_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_wedge_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "c8d4866aff298432c8c18f0ad1a5a9b8b054ddbc6ff6e07a1b59d399693cc7d2",
+          "name": "project_complex3_backward_kernel",
+          "signature_sha256": "3958529346188495d368ef94a1669cacd1559d12b135f668bf7a0c5fb98a35e7",
+          "token_count": 375
+        },
+        {
+          "body_sha256": "3a44f3f058c8e45100b03c10ef7f7f2560cfee6b5b01b9fcd8f2110a07d3f28f",
+          "name": "project_complex3_jvp_kernel",
+          "signature_sha256": "583eca5d6cef94f150b1db7296f1e2eeff75a3bb8a6a5baa529e96865ea46264",
+          "token_count": 314
+        },
+        {
+          "body_sha256": "b07b417863b0e4ce752eaebda2ea04e14cc3ce70a5902f0c82eee2778d351774",
+          "name": "cn_field_project_complex3_backward",
+          "signature_sha256": "b2dcbf04d8452451ab5e8f68de5342f587ea1705b0c4fdbebce8db952721764a",
+          "token_count": 468
+        },
+        {
+          "body_sha256": "bfb40a908e6045d275e86f1e21e163de5ef132731fde7cfdf10f5efbec62aa1b",
+          "name": "cn_field_project_complex3_jvp",
+          "signature_sha256": "efc04d8b1942379b983dc80a04f4b946ac731113ad56909da4b1ff31cb956109",
+          "token_count": 347
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and one-launch-per-mode contract remain exact.",
+      "fusion_boundary": "Projection and scalar gain/coefficient output chain are fused per row.",
+      "id": "field_wedge.project_complex3",
+      "intermediate_storage": [
+        "field-vector and direction gradients/tangents"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "Complex3 projection JVP/VJP tests"
+      ],
+      "non_split_reason": "Separating the scalar chain would add intermediate tensors without an independent ABI owner.",
+      "semantic_surface": [
+        "Complex3 receiver projection VJP/JVP"
+      ],
+      "source_level_launches": [
+        "project_complex3_backward_kernel",
+        "project_complex3_jvp_kernel"
+      ],
+      "tape_lifetime": "No persistent tape; projection axis is recomputed from frozen direction and polarization."
+    },
+    {
+      "abi_owner": [
+        "cn_coupled_rd_prepare_backward",
+        "cn_coupled_rd_prepare_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_wedge_ad.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "d4605d4d8077a370e266fc49cfdb3c5026c0addbdaad7974e66da9e35969faf6",
+          "name": "load_prepare_row",
+          "signature_sha256": "c788f153871e2e6e0bab25f56b1f4180279eb677e9e88c27e088974e6efdda8e",
+          "token_count": 177
+        },
+        {
+          "body_sha256": "d11cebba8b9ac1e995fc784702457f6ecbe79df17c7018605b9d6a0dda8c9e52",
+          "name": "prepare_row_dual",
+          "signature_sha256": "9ef18ab39bef58a2807cd5bb4f7c63f81d5b2466759f975274f1a37f05f1d4a7",
+          "token_count": 225
+        },
+        {
+          "body_sha256": "1a95a91ee54c1dd43bb76f172e9a4fd1e7d8271f44da2c58a2845cc76403de60",
+          "name": "coupled_prepare_backward_kernel",
+          "signature_sha256": "9257fe71a28d545556098b82178bd0561aa1d26b3310fb3c07de18532699b6f4",
+          "token_count": 345
+        },
+        {
+          "body_sha256": "d58f6e69cb141045cf52b2c6acfcdcbb020ec1bf26eb8d4b93203e4327ec986f",
+          "name": "coupled_prepare_jvp_kernel",
+          "signature_sha256": "40c42c1a5e7ef1e4f8296e91beef90259efd4f2720366ff7e4fed63d321a0a0b",
+          "token_count": 215
+        },
+        {
+          "body_sha256": "c21e43c1d375a14bbe5f16f538325ebb3aefd2ef3e7d46c70a68251a77d3e28a",
+          "name": "check_prepare_rows",
+          "signature_sha256": "5db3fcb1357d016fc2babf5c981cf497fc6bfd37876199c722531f532c8f07f5",
+          "token_count": 140
+        },
+        {
+          "body_sha256": "65bb2ad64ea15d45a8592e6c2f8de099cfad25cad3563cff994e9a0d6e4eaade",
+          "name": "cn_coupled_rd_prepare_backward",
+          "signature_sha256": "9d800939ed0c49c26f508afd225ee83a306519757a7083a78116dd67ad2dac94",
+          "token_count": 439
+        },
+        {
+          "body_sha256": "5138e58ee9d7accd2e59dc19bbcd74cfb579a2cc50db0af45e7abc125e7db5ed",
+          "name": "cn_coupled_rd_prepare_jvp",
+          "signature_sha256": "3ee89d5f831ed90414b6202d2eae2d5b5112a32d5f4ea773998c547be1533b7b",
+          "token_count": 318
+        }
+      ],
+      "expiry_condition": "Can move as a complete owner after exact geometry and duality gates; do not refactor row math during the move.",
+      "fusion_boundary": "Stationary edge and wall point solve is one row operation per AD mode.",
+      "id": "field_wedge.coupled_prepare",
+      "intermediate_storage": [
+        "endpoint and stationary-point gradients/tangents"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "coupled prepare exact/duality tests"
+      ],
+      "non_split_reason": "Splitting the solve would materialize intermediate points and could select/reorder stationary operations.",
+      "semantic_surface": [
+        "coupled stationary geometry prepare VJP/JVP"
+      ],
+      "source_level_launches": [
+        "coupled_prepare_backward_kernel",
+        "coupled_prepare_jvp_kernel"
+      ],
+      "tape_lifetime": "Winner plane/edge are frozen inputs; stationary reflection/diffraction points are recomputed for one call."
+    },
+    {
+      "abi_owner": [
+        "cn_bdpt_mis_weights_cuda"
+      ],
+      "baseline_source": "native/channel_native/kernels/bdpt_connect.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "61e07fc6a64caeb6844fcdabfcdc0ed27afca8ed889b5e15fdc60a02d65fc8e8",
+          "name": "bdpt_component_from_mask",
+          "signature_sha256": "47834b0e2c55c954d2d63d994ecf8b0957d6c1c263c441049a5a1f273cb3755d",
+          "token_count": 47
+        },
+        {
+          "body_sha256": "c11e60eaf7947a4bc700d42cd1c674d11400f81a55301a0733a762c1c17d40d7",
+          "name": "bdpt_component_accumulable",
+          "signature_sha256": "fdd10c48cacece6783af93c30328137d06ae29de26b9dc2228d6dcfcc5bc4705",
+          "token_count": 21
+        },
+        {
+          "body_sha256": "55c55df8585edd4b09a922f9326568f5c31df7943189dc63754c2ad68015773a",
+          "name": "bdpt_splitmix64",
+          "signature_sha256": "5ec9989bbfbc9420d54e0aff654eb168a9ae801a2384dfbae2c18288408da810",
+          "token_count": 53
+        },
+        {
+          "body_sha256": "66302863fd5c5cc7b7aaa781abd208662220f47d8fde5d470409bce608ab1896",
+          "name": "bdpt_uniform01_from_u64",
+          "signature_sha256": "87bbdc5971b85d92943d990f745d60607c5685a816648e4c8ecaf36590f3ad04",
+          "token_count": 17
+        },
+        {
+          "body_sha256": "6e9edd8d43f3cf27855c8c05fc91a81d2c7a189175f24a2e141fec5ed36173a8",
+          "name": "check_float_cuda",
+          "signature_sha256": "903dcba6e6d91b2c9acf98b256bd06271d1e5ff10a394bc01c0e7c3f5e6d69b1",
+          "token_count": 58
+        },
+        {
+          "body_sha256": "2986f00be8bb8f2d796848526f57a1c55aa7bbadc79edfe02be261300464043f",
+          "name": "check_int_cuda",
+          "signature_sha256": "3dead0433e890d05ded35f7db6aaea0c487cfb04efc59e5e069e52afe7c66a7e",
+          "token_count": 58
+        },
+        {
+          "body_sha256": "d0d96844ad3d3dd6e4b99a8c8b0d79b9c1becff45a76cdc687a185d12455878d",
+          "name": "check_bool_cuda",
+          "signature_sha256": "67bd097eecd1436741cb3082055eeaadca1dd3dc862756c3ca1531838606df5d",
+          "token_count": 58
+        },
+        {
+          "body_sha256": "5574b60ec645f17aca24598ae163c8b40bac0f696d390bdb7edaa6127e5ac72d",
+          "name": "check_vec3_cuda",
+          "signature_sha256": "b5d0337f6c347269dd6e776ef727d59e3381e5bccf16f10cfa764435e7eb0b45",
+          "token_count": 25
+        },
+        {
+          "body_sha256": "a990076541312b6689bb7bffe39601f99e2777e69c1f19d867d4ed79ae7bb070",
+          "name": "check_same_device",
+          "signature_sha256": "5f187544f0189014e2d3bd6f9d8b77c1175a902507a1b8181bbd3c7c0cd80717",
+          "token_count": 19
+        },
+        {
+          "body_sha256": "44ba8bbef7ae8dbd73df254b9fb7e2973cc1ac1c394dc70382b931f5b8fa4b8c",
+          "name": "check_mis_args",
+          "signature_sha256": "54352ae41dced538658ac75f44068481e6b28c9acae2c1bd293f8dd4cd93ee17",
+          "token_count": 22
+        },
+        {
+          "body_sha256": "1662dea83dc0719f642187f849d909ae1debfa5ed3ff9866e574615a3e46a76e",
+          "name": "check_diffraction_mis_args",
+          "signature_sha256": "42893ecf04e441321790859f996fdbcb4e4ecb6f86f674741720f4f169e9b5fb",
+          "token_count": 53
+        },
+        {
+          "body_sha256": "c395dc5cc6d48be06c42230bff492fd8b7376d4c3d96ee954296e5f58ee946c4",
+          "name": "bdpt_connection_mis_weight_from_sums",
+          "signature_sha256": "adec76bbb8e8ca976d4a6d965dce4775438fec379ffd2d06a6931311c22f8fd1",
+          "token_count": 55
+        },
+        {
+          "body_sha256": "feb7c1429cb94b0e50f13aded1bf411a1ecf0a0fa8b8e4616d9ce9a2761bda46",
+          "name": "bdpt_single_strategy_mis_weight",
+          "signature_sha256": "1a002892b8a39a9eb7dac937aa94c8f802fcac6f8dc76065dc1af5eb77914d96",
+          "token_count": 19
+        },
+        {
+          "body_sha256": "18757532b218208a0ab52f4f44ac018f38e6c9deaeb489bf4436c47aa452eb9a",
+          "name": "bdpt_diffraction_strategy_mis_weight",
+          "signature_sha256": "89dabfe3e52a34d1322150d00206b6eef01369309bc23ac783cd9a58d080d82c",
+          "token_count": 78
+        },
+        {
+          "body_sha256": "68010241deec763536fdc70243de596b78907127f1680b5fa04629ee84a7c96a",
+          "name": "bdpt_free_space_gain",
+          "signature_sha256": "b1506f3c7e69da8d2716d60af149b855f03bc362b5a1d76189bcbd05cdde3f02",
+          "token_count": 42
+        },
+        {
+          "body_sha256": "0ad5694ab39d3b19ac23de6344a0ba0fc1ac281d1d4fab9ffde088f09e28fb70",
+          "name": "bdpt_make_float3",
+          "signature_sha256": "343b84c6f008b628939a07567827d92e2c0d8270f35111799bf44b73f516c24d",
+          "token_count": 24
+        },
+        {
+          "body_sha256": "6e5c6548dacaa766eb9b31a78567dc5e08b6a66df0223d5bdb49f61748535acd",
+          "name": "bdpt_add3",
+          "signature_sha256": "e0dd512e14ddb35ef8f5bda07cd17dd24013ba8277bfee50191362d305cff66c",
+          "token_count": 28
+        },
+        {
+          "body_sha256": "1a56400368d672fb48939f679725545d26c920f46a21616449b5049cca8ff68e",
+          "name": "bdpt_sub3",
+          "signature_sha256": "7ff635b6b18e85f2b418f483dcc7ea9bba58f5ae3ea9d2cbc50cb3e097d45fad",
+          "token_count": 28
+        },
+        {
+          "body_sha256": "de86f9ca59061ad150cc14e8101ab2fe5d3a77b4c6c536a2e6f5683a9c385729",
+          "name": "bdpt_scale3",
+          "signature_sha256": "63218b2d541fecf4208c613b8cf5486aa58da551659aea2763d2c206a73333da",
+          "token_count": 22
+        },
+        {
+          "body_sha256": "551df86a00cf443e0bbd4b185d02697b7a71a3d333cd34546bbc0d6a19e551fe",
+          "name": "bdpt_norm3",
+          "signature_sha256": "ec35888425520e610085b5679041300dd95a9aa03c2026d829d2d2cc9a473096",
+          "token_count": 28
+        },
+        {
+          "body_sha256": "addb9f3bf19cff2ef7828fa3248a3cd35483a27abdb4a3eef5813be394d8027e",
+          "name": "bdpt_normalize3",
+          "signature_sha256": "951256a56c769a180885b8dd04c35eb9aa34120be316a7201a8538adafd1fcef",
+          "token_count": 24
+        },
+        {
+          "body_sha256": "914308c867ef1acb4beb9a0247d3360e10e0e7012f66e6e14b3093151f3b9651",
+          "name": "bdpt_vec3_at",
+          "signature_sha256": "c6c45aa8cbd52cf6c9468b119c79622de5e6f90367595a79ebe415a55f05db88",
+          "token_count": 36
+        },
+        {
+          "body_sha256": "7831a389c5d90ed1004e5f1d60e8a39335499e16f99bfb7e844bd298143da6cd",
+          "name": "bdpt_grid_cell_center",
+          "signature_sha256": "20c1065e77af3b129f19d9d81194d6fef2dc43f27fcedc24b2d594c40160c5ba",
+          "token_count": 136
+        },
+        {
+          "body_sha256": "6ba7b9ad09cd6f8d14fc6c4d1fe798c1c3638297669725fbb9f7ecb4d890d97d",
+          "name": "bdpt_diffraction_contribution",
+          "signature_sha256": "f95a33e6fb6554ce82b2867cccc33d0980c6124d43cb264458f284fe623c8cef",
+          "token_count": 108
+        },
+        {
+          "body_sha256": "b10cf4753fd78f867cb16880e699c48e0f163f8737cc039b934f13b6b518f9dd",
+          "name": "bdpt_mis_weights_kernel",
+          "signature_sha256": "2456245dc26338e0f9ae22dcc52547ea54e770742490f3b8feaea1f428992086",
+          "token_count": 128
+        },
+        {
+          "body_sha256": "58cd7770742aa482bbb1f7878230d301c8ab918e6ec842b8e039809e6a4579fd",
+          "name": "cn_bdpt_mis_weights_cuda",
+          "signature_sha256": "53df41e18acbbb5221231d76fca7d596502239432cbf3e705d8a889333a339f3",
+          "token_count": 178
+        }
+      ],
+      "expiry_condition": "Move helpers only with proven single ownership; revisit MIS math in an independent exact numerical change.",
+      "fusion_boundary": "Strategy sum and power/balance heuristic remain a single row kernel.",
+      "id": "bdpt.mis",
+      "intermediate_storage": [
+        "MIS output weights"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "BDPT MIS exact/runtime gates"
+      ],
+      "non_split_reason": "Common helpers stay local until complete ABI owners move; numerical MIS expressions are not deduplicated in a TU migration.",
+      "semantic_surface": [
+        "BDPT strategy MIS",
+        "translation-unit validation/random/vector primitives"
+      ],
+      "source_level_launches": [
+        "bdpt_mis_weights_kernel"
+      ],
+      "tape_lifetime": "No tape; PDFs and strategy sums are ABI inputs and weights are ABI outputs."
+    },
+    {
+      "abi_owner": [
+        "cn_bdpt_endpoint_connection_samples_cuda",
+        "cn_bdpt_endpoint_connection_visibility_inputs_cuda"
+      ],
+      "baseline_source": "native/channel_native/kernels/bdpt_connect.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "7968dd6d7c4283e545ffc61786b9b002542357d93767e441137f40a1a9c45136",
+          "name": "bdpt_endpoint_connection_samples_kernel",
+          "signature_sha256": "40cbc31beacad684e31a13cd1ebeb2fe90d25ec52a5bf1c7178a09f19c817e7e",
+          "token_count": 763
+        },
+        {
+          "body_sha256": "de0d254f51f2a1070a7d750c4138133aadf5ecc05b6394064ab325f80083ba69",
+          "name": "bdpt_endpoint_connection_visibility_inputs_kernel",
+          "signature_sha256": "4545ffbb9c1eb88592e0fd6e51c4697a8a27a9b445764a0edd30f7c0abaa315a",
+          "token_count": 180
+        },
+        {
+          "body_sha256": "0775dff3a7b6cf06e1deca2ae4b0cce67779c81db5031e20048515b0c069d476",
+          "name": "allocate_connection_samples",
+          "signature_sha256": "bd37310108839c98d0dbcadfecd353c091b17635754d2dcf35cd0d50ea6123d8",
+          "token_count": 186
+        },
+        {
+          "body_sha256": "3001be2e33488ccad369fe34b1659d8d0cd85ad663228b4c787482ba749418eb",
+          "name": "zero_double_tensor",
+          "signature_sha256": "a62233ee29c1ec233b286a56e93c37d015c47c7d09f8feaf367b607ef4ad0807",
+          "token_count": 64
+        },
+        {
+          "body_sha256": "e6fb15f0efa18d6417da8cf1b52372beafe62d4c52fca64c8dd6016fd7f0fe9f",
+          "name": "zero_int_tensor",
+          "signature_sha256": "cd33f6483491a0aed95d24bc9d06ac55a447530aa95eecff88113c79d0e52489",
+          "token_count": 64
+        },
+        {
+          "body_sha256": "bb29d7d1113860c68401a638d0324ab5923ad144f1ee861b15f40026dbbefa78",
+          "name": "zero_float_tensor",
+          "signature_sha256": "c63758495867323ece26aec3885ac580ab2f70bdd6fd16bed706eccdccdde5be",
+          "token_count": 64
+        },
+        {
+          "body_sha256": "91e903cc55429f5906d405fa4003da349afe919bd22882ff144ad2510da9d303",
+          "name": "cn_bdpt_endpoint_connection_samples_cuda",
+          "signature_sha256": "b815e695dac011dd4156527fc2c6451bdba7d08be41629ea328e98d8bba8a7ee",
+          "token_count": 1172
+        },
+        {
+          "body_sha256": "492c523a038763621d7ca5e1b5ae661c70e4df8969356bd82d60b8dff473ae4e",
+          "name": "cn_bdpt_endpoint_connection_visibility_inputs_cuda",
+          "signature_sha256": "fafd9f6fce0f332b5802db62eede99b2206ea364aa1c71c34e5c548d4b2c3dd7",
+          "token_count": 436
+        }
+      ],
+      "expiry_condition": "Move each complete ABI operation; retain ConnectionSample row identity and launch count exactly.",
+      "fusion_boundary": "Sample construction and its component/PDF/field columns are one row kernel; visibility packing is a second explicit ABI operation.",
+      "id": "bdpt.endpoint_connection",
+      "intermediate_storage": [
+        "ConnectionSample column tensors",
+        "segment start/end visibility tensors"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "BDPT endpoint/visibility schema and exact gates"
+      ],
+      "non_split_reason": "Splitting sample columns would add launches/materialization and risk column misalignment.",
+      "semantic_surface": [
+        "endpoint connection samples",
+        "connection visibility input packing"
+      ],
+      "source_level_launches": [
+        "bdpt_endpoint_connection_samples_kernel",
+        "bdpt_endpoint_connection_visibility_inputs_kernel"
+      ],
+      "tape_lifetime": "ConnectionSample tensors are the call result/tape consumed by later visibility/accumulation; storage persists only through Python ownership."
+    },
+    {
+      "abi_owner": [
+        "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
+        "cn_bdpt_diffraction_point_connection_samples_cuda"
+      ],
+      "baseline_source": "native/channel_native/kernels/bdpt_connect.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1",
+          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+          "token_count": 656
+        },
+        {
+          "body_sha256": "e59bbc0f522b41d301bd6c27596e6b93021b70d91077d4d706e89f7218496a73",
+          "name": "bdpt_diffraction_point_connection_samples_kernel",
+          "signature_sha256": "ba55d4768e923178326ac6e990475c2773a0a212e77d812087e375faca340195",
+          "token_count": 943
+        },
+        {
+          "body_sha256": "cdc2d5d1ea4eae7254c43d9a30cc11d299514910d4d5492238f214e59230fa90",
+          "name": "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
+          "signature_sha256": "d7db6402a4550f7e83ed8df859823a3710945bd3c43e1d4f57597c7a3bbe3698",
+          "token_count": 1150
+        },
+        {
+          "body_sha256": "aca1c567d6f426d2b4928845dbd957a7ae5f9b79fc833dfd48b35aba59baa95b",
+          "name": "cn_bdpt_diffraction_point_connection_samples_cuda",
+          "signature_sha256": "9e38a2fe15edb0d87ba2ff720a9c003e2a141025482f40692765433e04787d05",
+          "token_count": 1154
+        }
+      ],
+      "expiry_condition": "Retain until a complete connection-tape design passes exact, launch, memory, and performance gates.",
+      "fusion_boundary": "Geometry, contribution, PDFs/MIS, and sample column writes are fused per connection row.",
+      "id": "bdpt.diffraction_connection",
+      "intermediate_storage": [
+        "ConnectionSample columns",
+        "diffraction grid cell and contribution registers"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "BDPT diffraction connection exact/runtime gates"
+      ],
+      "non_split_reason": "Separating field/PDF computation would materialize per-connection state and change launches/evaluation order.",
+      "semantic_surface": [
+        "diffraction connections from tape",
+        "diffraction point connections"
+      ],
+      "source_level_launches": [
+        "bdpt_diffraction_connection_samples_from_tape_kernel",
+        "bdpt_diffraction_point_connection_samples_kernel"
+      ],
+      "tape_lifetime": "Frozen diffraction tape or point/grid inputs produce aligned ConnectionSample columns for the caller."
+    },
+    {
+      "abi_owner": [
+        "cn_bdpt_accumulate_connection_samples_cuda",
+        "cn_bdpt_filter_connection_samples_cuda",
+        "cn_bdpt_count_valid_connection_samples_cuda",
+        "cn_bdpt_compact_connection_samples_cuda",
+        "cn_bdpt_concat_connection_samples_cuda",
+        "cn_bdpt_connection_variance_cuda"
+      ],
+      "baseline_source": "native/channel_native/kernels/bdpt_connect.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "520b1f4153dfe69d61ad8795ec08e2f36d33bf65c93beead9fda615ef5c4d47c",
+          "name": "bdpt_accumulate_connection_samples_double_kernel",
+          "signature_sha256": "7ef482f0be62302a6275e95f7d7724968a382450a2c22390e834730cb2476ba6",
+          "token_count": 232
+        },
+        {
+          "body_sha256": "7a6e2f8908f0d2c523611721d2527aab4e373811fb32548e73043ac0245b48bf",
+          "name": "bdpt_filter_connection_samples_kernel",
+          "signature_sha256": "1c469b437b7e28a84340e253e07ad603a786408c36d02e86fb45fed5c43e42d9",
+          "token_count": 80
+        },
+        {
+          "body_sha256": "3cb0b1fa2cba8141e22b1d9d9c9049c4bd06f5c8ac21807d4da9e6a6e0cee748",
+          "name": "bdpt_compact_connection_samples_kernel",
+          "signature_sha256": "61ef6460d9cd1efe17695d3db9fea93324b26ae5d0506153b9510cfd1015dc1c",
+          "token_count": 253
+        },
+        {
+          "body_sha256": "5ff1962d17ac195d69d2bd99f111872d22aa3d8d9797def7c521c11c273e5c26",
+          "name": "bdpt_copy_connection_samples_kernel",
+          "signature_sha256": "7dc4ab05b21b5c29e08babd687af135c3bae8914d4c039efffb9dcb7bf7fd0f4",
+          "token_count": 221
+        },
+        {
+          "body_sha256": "7331851391778b9d2d0238a47ed251a5f53798fb026ccc7ddafa453f50e29821",
+          "name": "bdpt_count_valid_connection_samples_kernel",
+          "signature_sha256": "a9d4aeefc4cf067231f5674777b7468d3ba02c36b6372ae8d1496a3e8f3d43b7",
+          "token_count": 44
+        },
+        {
+          "body_sha256": "ed7a9555579fdb568f334c38f3598b7daf0aaae5b902708db401db75a8dae7ce",
+          "name": "bdpt_compact_valid_connection_indices_kernel",
+          "signature_sha256": "8c53a23cd26bd2ac0b23625edda1de9d0ea10e0aedd8115af58487a90f5c5b79",
+          "token_count": 116
+        },
+        {
+          "body_sha256": "bcf5d15c6a5dbbb6f1d17e4784b10bf2dc45f66de073cf82cb4906927a351839",
+          "name": "bdpt_accumulate_connection_samples_compacted_kernel",
+          "signature_sha256": "a2a56662bc8f90249df8fdd80db81031ed3de5c60efbaa3357d9520e2db93784",
+          "token_count": 208
+        },
+        {
+          "body_sha256": "3e52aa60dd6b983c2a72489ce65d8e402b330e5102e4ad289205bf156c332a0b",
+          "name": "bdpt_accumulate_connection_samples_staged_kernel",
+          "signature_sha256": "417fc35fcb301e078577bd7ac5ecd440664562347e374dd82a1510cdaed04507",
+          "token_count": 332
+        },
+        {
+          "body_sha256": "7b9ef10045d884b6eebd7aaf28eae88a2684eedf877f6541625afed665f0184b",
+          "name": "bdpt_cast_connection_accumulation_kernel",
+          "signature_sha256": "d1bdd50e7811232340e35ad587275c942ac8b2f6c6aa3ec7a29e5451b2fa1904",
+          "token_count": 127
+        },
+        {
+          "body_sha256": "333b2f1f542aba4a80d1ba1ccb3f5dfd3a58a13ebbd10bec3ece7c042f0b7743",
+          "name": "bdpt_connection_variance_accum_double_kernel",
+          "signature_sha256": "96039b1b72b3eb311ce963b72524c151fef922cf598ab98a406b6f327144c094",
+          "token_count": 152
+        },
+        {
+          "body_sha256": "f52d68b6f2b06fdb8c7e5064df10ab54576a5b264e4c2b81af8aab6e0d7e2532",
+          "name": "bdpt_connection_variance_finalize_double_kernel",
+          "signature_sha256": "046dd51968e95c519aeab7ee052893f7d6df5762deaad85a065d640bcab6969a",
+          "token_count": 117
+        },
+        {
+          "body_sha256": "c549e363744a2d689d69dbb9c7843b1b5864971d4d48ca8bf776c754b100f08b",
+          "name": "cn_bdpt_accumulate_connection_samples_cuda",
+          "signature_sha256": "d4e7074191591e72f887e47d66b042fb6d1dd69aa61cf473df1d8f483dc61998",
+          "token_count": 1442
+        },
+        {
+          "body_sha256": "873c48e125a4ab0d3c05693e0ac72e211341c89c75c2340ed892402e06d44d43",
+          "name": "cn_bdpt_filter_connection_samples_cuda",
+          "signature_sha256": "2d1b1b82dea15d7c27aecfb97784a2996cf918460fb5e6f9b89ebdd8bed4e31e",
+          "token_count": 278
+        },
+        {
+          "body_sha256": "c16e8b8ad5d9c0b6a8233e2d653ac9de124cc145f0c7058a0de25034dd84bbae",
+          "name": "cn_bdpt_count_valid_connection_samples_cuda",
+          "signature_sha256": "6220d7552dfb66e8698447417c97b06fbc0d595ffd1e8eeca43fdc5c20b4e596",
+          "token_count": 189
+        },
+        {
+          "body_sha256": "9923aac65a6d2aea3abfd39cc0dd18f91e92a662c1123179bd90c22287f79aaf",
+          "name": "cn_bdpt_compact_connection_samples_cuda",
+          "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
+          "token_count": 1010
+        },
+        {
+          "body_sha256": "37dd23e42f3810ac8e391dfb0c614a0bcfd1819c1a46a7494aef2ba3eeae4700",
+          "name": "cn_bdpt_concat_connection_samples_cuda",
+          "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
+          "token_count": 1200
+        },
+        {
+          "body_sha256": "dce9c19678b7331d529c4ede750bca998ee14393c42be0067062c4a0cbae891c",
+          "name": "cn_bdpt_connection_variance_cuda",
+          "signature_sha256": "73b4c1ba4e3277f5156102aca8cc3df5b6adce33db4062f5c42732107ba4bd10",
+          "token_count": 591
+        }
+      ],
+      "expiry_condition": "Split only along complete ABI operations with schema, launch, synchronization, precision, and body-hash parity.",
+      "fusion_boundary": "Aligned-column packing and deterministic accumulation precision/order define this storage owner.",
+      "id": "bdpt.connection_storage",
+      "intermediate_storage": [
+        "valid indices and compact offsets",
+        "staged/double accumulation",
+        "concatenated aligned columns",
+        "variance sum/sum-square buffers"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "ConnectionSample schema/accumulation/variance exact gates"
+      ],
+      "non_split_reason": "Splitting individual columns or accumulation stages would add launches/materialization or alter reduction order.",
+      "semantic_surface": [
+        "ConnectionSample accumulate/filter/count/compact/concat",
+        "connection variance"
+      ],
+      "source_level_launches": [
+        "bdpt_accumulate_connection_samples_staged_kernel",
+        "bdpt_compact_valid_connection_indices_kernel",
+        "bdpt_accumulate_connection_samples_compacted_kernel",
+        "bdpt_accumulate_connection_samples_double_kernel",
+        "bdpt_cast_connection_accumulation_kernel",
+        "bdpt_filter_connection_samples_kernel",
+        "bdpt_count_valid_connection_samples_kernel",
+        "bdpt_compact_connection_samples_kernel",
+        "bdpt_copy_connection_samples_kernel",
+        "bdpt_connection_variance_accum_double_kernel",
+        "bdpt_connection_variance_finalize_double_kernel"
+      ],
+      "tape_lifetime": "ConnectionSample columns are a shallow aligned tape; temporary indices, staging, double accumulators, and variance buffers are call-local."
+    },
+    {
+      "abi_owner": [
+        "legacy_interface_fresnel",
+        "legacy_sionna_slab_fresnel"
+      ],
+      "baseline_source": "native/channel_native/field_transport.cuh",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "d0d22f3046a2182ec921a0b9c67807f5cae23551132240fe40d11352b7774120",
+          "name": "legacy_add",
+          "signature_sha256": "b47eb81386480eae6a8b0a0a5496b14b110f08892f4d08e9bfcce0fb9a4a9ac7",
+          "token_count": 19
+        },
+        {
+          "body_sha256": "6e6ad0d4dc6e0879d2c364a6d2b94618bccc3b0a8e5cfd023ffde440866fa263",
+          "name": "legacy_sub",
+          "signature_sha256": "6fc5a295c04c76caeda50bafaaa11a191db6eea9e00a484a1c175c572ebb37b3",
+          "token_count": 19
+        },
+        {
+          "body_sha256": "f8835b07803fccee7b171d8fe42dd360db1d624b885fb97c72ab67881be47416",
+          "name": "legacy_mul",
+          "signature_sha256": "5065ffe6ad33c58a0c195e6dc25f4b83015b9885ebfa5965e1b92687a76212a0",
+          "token_count": 35
+        },
+        {
+          "body_sha256": "dcdf72a3f8412047491720804b0ea90f04a535adbea425c2103ca5adffbc5d84",
+          "name": "legacy_scale",
+          "signature_sha256": "019d36b71db32806515f91a0151dc98ab44dabecd3aafe0da5ba50eaf5da8ab3",
+          "token_count": 15
+        },
+        {
+          "body_sha256": "daf06092b1f1360af8e4b8a575cacaa9bd06837a7690f3a0e6f3fd1df750729a",
+          "name": "legacy_div",
+          "signature_sha256": "c1a755fb048e1ff14f60c7a0227250ebc5f9eb47693105f93c7392ee72bdaa5d",
+          "token_count": 68
+        },
+        {
+          "body_sha256": "9092337aab9d177fcc7c2932fad76680eb72968dd828792398bd27f9bf839b4b",
+          "name": "legacy_div_floor",
+          "signature_sha256": "986fbbbbdab33a495b47c40ebae1fd0e67a03962b574a2e7c3e1b0ec532a9f02",
+          "token_count": 68
+        },
+        {
+          "body_sha256": "3dded7023a4f68bde90150028d002f6f06593d8fccfb6572d08d49842dbd8cc5",
+          "name": "legacy_sqrt",
+          "signature_sha256": "877dad44857d87bce786dfddb4bd5eec1c9af49a0e77c487c26efdf1f9587987",
+          "token_count": 73
+        },
+        {
+          "body_sha256": "a2e7639876f8e5d302ade1f394606be43784b1839e5bece0985ffc8e7f755668",
+          "name": "legacy_interface_sqrt",
+          "signature_sha256": "afa3d60a35d960e6a41b9bb9b4bde07bcced6efe8a1c4ff3d8a3a36c1b558f6e",
+          "token_count": 83
+        },
+        {
+          "body_sha256": "a742c4f8298e50013b3262d4fb032ab0324672ce5679b0a52ae7025b45330ecf",
+          "name": "legacy_interface_fresnel",
+          "signature_sha256": "ea052aec3c75d7a69d947c2d610005dbd3238cf5501aadb00a2150e1966baee1",
+          "token_count": 170
+        },
+        {
+          "body_sha256": "e41285ac832d174fbddd5d4abb98b52f146370fbd859243fa481fe0894951d55",
+          "name": "legacy_exp_neg_2i",
+          "signature_sha256": "7a9937061fe6bc3a004c04c8975dc6df705dc00e1eeba870b6133baec565d520",
+          "token_count": 51
+        },
+        {
+          "body_sha256": "c9cd0be01a95967efab64ffc85004aa459ce37ac935560b991123f185039fff6",
+          "name": "legacy_sionna_slab_fresnel",
+          "signature_sha256": "9d7bb17cda78996cbae3928c4cf0dabbe208429b2ceb56b4e82c94a8463055d1",
+          "token_count": 332
+        }
+      ],
+      "expiry_condition": "May be templated only in a dedicated numerical change proving primal bit-exactness, primal/dual lockstep, SASS equivalence, and no performance regression.",
+      "fusion_boundary": "Hand-written primal operations preserve historical float evaluation order and branch/floor/clamp behavior.",
+      "id": "legacy_slab.primal",
+      "intermediate_storage": [
+        "register-local complex intermediates"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "LegacySlab primal/dual lockstep runtime tests required before numerical edits"
+      ],
+      "non_split_reason": "Template/complex replacement is forbidden here because exact/SASS/performance parity has not been established.",
+      "semantic_surface": [
+        "LegacySlabComplex primal interface and Sionna slab Fresnel"
+      ],
+      "source_level_launches": [],
+      "tape_lifetime": "Register-local LegacySlabComplex values only; no persistent tape."
+    },
+    {
+      "abi_owner": [
+        "legacy_sionna_slab_fresnel_dual"
+      ],
+      "baseline_source": "native/channel_native/field_transport_ad.cuh",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "34258cb9c4dfc6aa004daac912a8cd6f2d725809b6e2dffd122a718f9a533729",
+          "name": "dlc_const",
+          "signature_sha256": "d7a9771bd2b1a1e04e7ad728e8e460329920962ad964265a1eb975c70bb3b2f1",
+          "token_count": 15
+        },
+        {
+          "body_sha256": "1db2023c639bf43976f698c471c8c084c8eeff058bb529b10a4eecfc6bb4faf2",
+          "name": "dlc_make",
+          "signature_sha256": "c3f12e72e39fb405f37470e191d4ebaccbb3f7af2aa815d44d06c7e2432e698f",
+          "token_count": 15
+        },
+        {
+          "body_sha256": "9f4ea2743602e873114a40d4f43d9df8086947ca4159f37693aec4a8d39fc3bb",
+          "name": "dlc_add",
+          "signature_sha256": "eb0c849fe7dfb3f27b50b46b6a12986affeb33c84b0735910798fb081d28a1d8",
+          "token_count": 29
+        },
+        {
+          "body_sha256": "992f6ec5ceb33a8063e0b4b8982a463faf8ad29a4ca31f776b2fc815f035336c",
+          "name": "dlc_sub",
+          "signature_sha256": "c308a43bc0d88acb6fb30a5f3db9baf2d5c440ce3596ff10d3356f3270f27254",
+          "token_count": 29
+        },
+        {
+          "body_sha256": "bd98c786324306f88ec56879f2eeb4bbaf37a750562180c23f66962e64f1947b",
+          "name": "dlc_mul",
+          "signature_sha256": "e02906b8da9c76632181ee287b89769ba0d47761f0e3dfda639d2640a2e9ef42",
+          "token_count": 47
+        },
+        {
+          "body_sha256": "152d8bfecb71401f27a901c75e82d146d27cd7e45e4dc759b4f5ee98ab3575c2",
+          "name": "dlc_scale_dual",
+          "signature_sha256": "9574b7b3c044562552cacb568854dd51ba0616f5de57c98f3f1fbae652745cb8",
+          "token_count": 47
+        },
+        {
+          "body_sha256": "4068dc59d550ce72058b7be845688dd3368717b27a4a253e16b66cb04d3f5e53",
+          "name": "dlc_div",
+          "signature_sha256": "188141e8ac169fc3383ca792007a2a7950b6c0c35e1ca2e6d32a0a69678bae7d",
+          "token_count": 197
+        },
+        {
+          "body_sha256": "cae8e025b4024b342feaf5767f701570d04ce75cde79d9906dc5bd91d7367b29",
+          "name": "dlc_sqrt",
+          "signature_sha256": "a04cd1b061db7ff79d7277ed4120c1a18c1f9100dd131f5eeb72997e6babb92f",
+          "token_count": 146
+        },
+        {
+          "body_sha256": "a648d9d062e768b5152a2c64f5fa3b744c76e87340a648fc9360fe6bd258dcf1",
+          "name": "dlc_exp_neg_2i",
+          "signature_sha256": "9a4d5cacd0f6db8cde838391d1233faec22e0456f87f78570e9f3007ef95de6d",
+          "token_count": 131
+        },
+        {
+          "body_sha256": "a2869629125cea3e050edb1b2bdd8789058bb52fb961daa22a28fd7540b086f7",
+          "name": "legacy_sionna_slab_fresnel_dual",
+          "signature_sha256": "e484e1b309567f92ee0da437641f920bc5d1930a7c679f777e37b97368683743",
+          "token_count": 531
+        }
+      ],
+      "expiry_condition": "May change only with dedicated primal/dual exact, duality, SASS, and performance evidence; otherwise remain duplicated in lockstep.",
+      "fusion_boundary": "The dual mirror intentionally calls primal legacy operations for value components and preserves branch/floor/clamp policy.",
+      "id": "legacy_slab.dual",
+      "intermediate_storage": [
+        "register-local primal/tangent complex pairs"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "LegacySlab primal/dual lockstep runtime tests required before numerical edits"
+      ],
+      "non_split_reason": "Generic algebra cleanup can change primal evaluation order or derivative behavior at floors/clamps.",
+      "semantic_surface": [
+        "DualLC derivative mirror of LegacySlabComplex Sionna slab Fresnel"
+      ],
+      "source_level_launches": [],
+      "tape_lifetime": "DualLC carries primal value and tangent in register-local paired LegacySlabComplex values."
+    },
+    {
+      "abi_owner": [
+        "cn_field_rough_reflection_scale",
+        "cn_field_rough_reflection_scale_backward",
+        "cn_field_rough_reflection_scale_jvp"
+      ],
+      "baseline_source": "native/channel_native/kernels/field_rough_scale.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "ec695c6979bd7957e3758c3d4ebbb97941474716ddb263f2c04f53ad72d5f4ed",
+          "name": "rough_bounces",
+          "signature_sha256": "6ebaaf6fab5050052e1b80c920be7e571c92c9fac4987995d3cfa87a664b403b",
+          "token_count": 489
+        },
+        {
+          "body_sha256": "4b36d9b4fa5f9a2739300b5341b6171b10ed44dff92797b5987dfc5a844cc810",
+          "name": "rough_scale_forward_kernel",
+          "signature_sha256": "bb2523870908f9a6eaf2f40523d07334c4abbac461efe69738cd7567801348fa",
+          "token_count": 224
+        },
+        {
+          "body_sha256": "0261d033c192588a1804bdfb3dfe5e0c246a0a4f61c1c6499c866860d9ef77d2",
+          "name": "rough_scale_backward_kernel",
+          "signature_sha256": "222f7602d01787c67f9871c31d1f42ea7fcc6f4dc3529ce8c94193aac2e3a439",
+          "token_count": 1169
+        },
+        {
+          "body_sha256": "c94a3c15a0b8bb528948d653e2d5555c692c74a207e31a85c416464c3d10a809",
+          "name": "rough_scale_jvp_kernel",
+          "signature_sha256": "014734067bd14e5e06f42ef90f705ade3dbbedc1d44a65a9e478daf47f7ed553",
+          "token_count": 837
+        },
+        {
+          "body_sha256": "6750faaf8b9f532ecb77859a8767cedb4fd05f5577fdc8772e04f949823c3467",
+          "name": "cn_field_rough_reflection_scale",
+          "signature_sha256": "92388d720312d6a2e3606c94d799be0e2d59ae20a0a2e75debb7af7d225c5411",
+          "token_count": 346
+        },
+        {
+          "body_sha256": "48b17b8bf85b9e7c451c69bffb229e8ac1805f0a7efd930afdf7093a7d7479c0",
+          "name": "cn_field_rough_reflection_scale_backward",
+          "signature_sha256": "81f0ec0f5c1708f495154bd105d48abd454961ad3828985908a2ba2c4b83d12b",
+          "token_count": 879
+        },
+        {
+          "body_sha256": "c4f1b04879505113530e309a6c8d2d922894755766a12172c96608eff4867dc2",
+          "name": "cn_field_rough_reflection_scale_jvp",
+          "signature_sha256": "3e8a1d65a56b42bedd39ced57dba60f39524573a67e20a426c46efa3e24e0c46",
+          "token_count": 652
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and the one-launch forward/backward/jvp contract remain exact.",
+      "fusion_boundary": "C_r factor recomputation and its application onto all four reflection field outputs are fused per row in one launch per mode.",
+      "id": "field_transport.rough_scale",
+      "intermediate_storage": [
+        "none beyond the four scaled output tensors and the per-row factor"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_field_rough_reflection_scale.py"
+      ],
+      "non_split_reason": "Splitting factor computation from the output scaling would add an intermediate factor round-trip and a second launch per depth batch.",
+      "semantic_surface": [
+        "Rough-surface coherent C_r attenuation of specular reflection rows (ADR-010 op 3), with frequency and hit-geometry adjoints"
+      ],
+      "source_level_launches": [
+        "rough_scale_forward_kernel",
+        "rough_scale_backward_kernel",
+        "rough_scale_jvp_kernel"
+      ],
+      "tape_lifetime": "No persistent tape; backward/jvp recompute the per-bounce attenuation from the saved primal inputs."
+    },
+    {
+      "abi_owner": [
+        "cn_scattering_ensemble_eval"
+      ],
+      "baseline_source": "native/channel_native/kernels/scattering_ensemble.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "1bef2ea288e8a6a5c8a9665c98d4dac37f62a6e899fb82181198f687b604c54e",
+          "name": "ensemble_eval_kernel",
+          "signature_sha256": "0b0be25829f757cc720f79e524409dec2899ee7026d34b9f179d4f6b4c1c4201",
+          "token_count": 591
+        },
+        {
+          "body_sha256": "4339267a52878c4dad94ac4d79543a0cacb6f213c624c147abac1a2a05f87275",
+          "name": "cn_scattering_ensemble_eval",
+          "signature_sha256": "fce18566d73ed42c87a94bbb20cd7ff35276959b4399ac753d74e563bd83fef1",
+          "token_count": 889
+        },
+        {
+          "body_sha256": "650f97839e80a488d96f3bb2f303734f97790d6889f24d56056f74c588a4c8c1",
+          "name": "eval_te_tm",
+          "signature_sha256": "0057a85f808b3cc054f7c05788c309ea74ad28712f35c52d68008caf5825c21c",
+          "token_count": 255
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and the one-launch-per-(tx, rx-chunk) contract remain exact.",
+      "fusion_boundary": "wo_local frame projection, stacked Kirchhoff table lookup, outgoing s/p basis, receiver projections and radiometric gain are fused per surviving row.",
+      "id": "scattering.ensemble_eval",
+      "intermediate_storage": [
+        "per-row gain/amplitude/length/keep outputs only"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_scattering_ensemble_eval.py"
+      ],
+      "non_split_reason": "The shared table interpolation (scattering_table.cuh) is a device header reused by scattering_table_eval; splitting the row physics would reintroduce per-material Python loops.",
+      "semantic_surface": [
+        "Kirchhoff ensemble scattering row physics after RayD visibility (ADR-010 op 1)"
+      ],
+      "source_level_launches": [
+        "ensemble_eval_kernel"
+      ],
+      "tape_lifetime": "No tape; the op is primal-only (scattering is refused in AD mode by every differentiable solver)."
+    },
+    {
+      "abi_owner": [
+        "cn_scattering_patch_integral_eval"
+      ],
+      "baseline_source": "native/channel_native/kernels/scattering_patch_integral.cu",
+      "cpp_body_hash_multiset": [
+        {
+          "body_sha256": "c6d9d489a09ace50d73593aec8e7d003a707de9f2c9df99948753060d2026250",
+          "name": "patch_integral_rows_kernel",
+          "signature_sha256": "e9b3880059dbb0b27e5e0bb553be0a8e9360339d54a62d30abefdc5a308ef9c2",
+          "token_count": 1211
+        },
+        {
+          "body_sha256": "1da4a5ebfd313f2258fa8cc065087af6e4bc703b7342d208c37215999d972a68",
+          "name": "patch_integral_total_kernel",
+          "signature_sha256": "4c238e7696c3ca793d3b80d18c8e2c46859ad30f659750758acb55ebf620c79e",
+          "token_count": 174
+        },
+        {
+          "body_sha256": "e05c29877d2cf3cb99dd12fc03dd00f2587eeeff238a59b4695fb484467a52e4",
+          "name": "cn_scattering_patch_integral_eval",
+          "signature_sha256": "67d41c340fa140172b2123f52d8e4b0c234fee9a0e3ed063b2f35c8922f80bb6",
+          "token_count": 869
+        }
+      ],
+      "expiry_condition": "Can move as a complete ABI owner once body hashes and the fixed-order two-stage reduction contract remain exact.",
+      "fusion_boundary": "Duffy-mapped 16x16 Gauss-Legendre phase-screen quadrature, jones/prefactor/carrier assembly and the deterministic total reduction are fused into one row launch plus one reduce launch.",
+      "id": "scattering.patch_integral",
+      "intermediate_storage": [
+        "per-row integral and row_value buffers (also returned for tests)"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_scattering_patch_integral_eval.py"
+      ],
+      "non_split_reason": "A separate quadrature op would round-trip 256 phasor terms per patch through global memory and reintroduce the host per-patch loop.",
+      "semantic_surface": [
+        "Realization-coherent phase-screen Kirchhoff patch integral per (tx, rx, structure) (ADR-010 op 2)"
+      ],
+      "source_level_launches": [
+        "patch_integral_rows_kernel",
+        "patch_integral_total_kernel"
+      ],
+      "tape_lifetime": "No tape; the op is primal-only (realization scattering is refused in AD mode)."
+    }
+  ],
+  "schema_version": 1,
+  "source_evidence": [
+    {
+      "explicit_sync_sites": [
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 1567
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 1681
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 2419
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 2636
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 2832
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 3492
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 3520
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 3623
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 3651
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 3927
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 4047
+        }
+      ],
+      "kernel_launch_sites": [
+        {
+          "kernel": "path_concat_vec3_kernel",
+          "line": 1466
+        },
+        {
+          "kernel": "path_los_visibility_inputs_kernel",
+          "line": 1498
+        },
+        {
+          "kernel": "path_visibility_flags_kernel",
+          "line": 1541
+        },
+        {
+          "kernel": "path_los_compact_kernel",
+          "line": 1585
+        },
+        {
+          "kernel": "path_visibility_flags_kernel",
+          "line": 1655
+        },
+        {
+          "kernel": "deterministic_los_topology_compact_kernel",
+          "line": 1708
+        },
+        {
+          "kernel": "deterministic_los_topology_all_kernel",
+          "line": 1813
+        },
+        {
+          "kernel": "deterministic_topology_default_fields_kernel",
+          "line": 1876
+        },
+        {
+          "kernel": "deterministic_pad_topology_sequences_kernel",
+          "line": 1943
+        },
+        {
+          "kernel": "deterministic_topology_base_fields_kernel",
+          "line": 2024
+        },
+        {
+          "kernel": "deterministic_repeat_range_kernel",
+          "line": 2077
+        },
+        {
+          "kernel": "deterministic_face_anchor_points_kernel",
+          "line": 2096
+        },
+        {
+          "kernel": "deterministic_reflection_epc_input_batch_kernel",
+          "line": 2153
+        },
+        {
+          "kernel": "deterministic_reflection_epc_input_batch_kernel",
+          "line": 2174
+        },
+        {
+          "kernel": "deterministic_face_sequence_chunk_kernel",
+          "line": 2227
+        },
+        {
+          "kernel": "deterministic_face_sequence_chunk_kernel",
+          "line": 2275
+        },
+        {
+          "kernel": "deterministic_face_sequence_chunk_kernel",
+          "line": 2288
+        },
+        {
+          "kernel": "path_visibility_flags_kernel",
+          "line": 2395
+        },
+        {
+          "kernel": "deterministic_reflection_order1_compact_kernel",
+          "line": 2440
+        },
+        {
+          "kernel": "deterministic_reflection_order1_compact_kernel",
+          "line": 2479
+        },
+        {
+          "kernel": "path_visibility_flags_kernel",
+          "line": 2612
+        },
+        {
+          "kernel": "deterministic_reflection_sequence_compact_kernel",
+          "line": 2662
+        },
+        {
+          "kernel": "deterministic_reflection_sequence_compact_kernel",
+          "line": 2702
+        },
+        {
+          "kernel": "path_visibility_flags_kernel",
+          "line": 2808
+        },
+        {
+          "kernel": "deterministic_diffraction_order1_compact_kernel",
+          "line": 2850
+        },
+        {
+          "kernel": "deterministic_normalize_vec3_kernel",
+          "line": 2887
+        },
+        {
+          "kernel": "deterministic_reflect_points_kernel",
+          "line": 2912
+        },
+        {
+          "kernel": "deterministic_gather_rows_kernel",
+          "line": 3106
+        },
+        {
+          "kernel": "deterministic_face_group_keys_kernel",
+          "line": 3436
+        },
+        {
+          "kernel": "deterministic_order_init_kernel",
+          "line": 3444
+        },
+        {
+          "kernel": "deterministic_face_group_sort_key_kernel",
+          "line": 3450
+        },
+        {
+          "kernel": "deterministic_face_group_flags_kernel",
+          "line": 3466
+        },
+        {
+          "kernel": "deterministic_face_group_assign_kernel",
+          "line": 3499
+        },
+        {
+          "kernel": "deterministic_face_group_members_kernel",
+          "line": 3530
+        },
+        {
+          "kernel": "deterministic_surface_group_keys_kernel",
+          "line": 3570
+        },
+        {
+          "kernel": "deterministic_order_init_kernel",
+          "line": 3575
+        },
+        {
+          "kernel": "deterministic_face_group_sort_key_kernel",
+          "line": 3581
+        },
+        {
+          "kernel": "deterministic_face_group_flags_kernel",
+          "line": 3597
+        },
+        {
+          "kernel": "deterministic_face_group_assign_kernel",
+          "line": 3630
+        },
+        {
+          "kernel": "deterministic_face_group_members_kernel",
+          "line": 3661
+        },
+        {
+          "kernel": "deterministic_order_init_kernel",
+          "line": 3720
+        },
+        {
+          "kernel": "deterministic_sort_key_1d_kernel",
+          "line": 3733
+        },
+        {
+          "kernel": "deterministic_sort_key_sequence_kernel",
+          "line": 3746
+        },
+        {
+          "kernel": "path_reflection_candidates_kernel",
+          "line": 3825
+        },
+        {
+          "kernel": "path_block_flags_kernel",
+          "line": 3900
+        },
+        {
+          "kernel": "path_block_compact_kernel",
+          "line": 3945
+        },
+        {
+          "kernel": "path_visibility_flags_kernel",
+          "line": 4022
+        },
+        {
+          "kernel": "path_diffraction_compact_kernel",
+          "line": 4065
+        },
+        {
+          "kernel": "path_copy_block_kernel",
+          "line": 4175
+        },
+        {
+          "kernel": "path_sort_key_kernel",
+          "line": 4205
+        },
+        {
+          "kernel": "path_gather_kernel",
+          "line": 4234
+        }
+      ],
+      "line_count": 4270,
+      "path": "native/channel_native/kernels/path_trace.cu"
+    },
+    {
+      "explicit_sync_sites": [],
+      "kernel_launch_sites": [
+        {
+          "kernel": "free_space_fwd_kernel",
+          "line": 1600
+        },
+        {
+          "kernel": "free_space_backward_kernel",
+          "line": 1701
+        },
+        {
+          "kernel": "free_space_backward_kernel",
+          "line": 1721
+        },
+        {
+          "kernel": "free_space_jvp_kernel",
+          "line": 1795
+        },
+        {
+          "kernel": "free_space_jvp_kernel",
+          "line": 1814
+        },
+        {
+          "kernel": "reflection_sequence_backward_kernel",
+          "line": 1981
+        },
+        {
+          "kernel": "reflection_sequence_jvp_kernel",
+          "line": 2115
+        },
+        {
+          "kernel": "transmission_sequence_backward_kernel",
+          "line": 2316
+        },
+        {
+          "kernel": "transmission_sequence_jvp_kernel",
+          "line": 2454
+        }
+      ],
+      "line_count": 2496,
+      "path": "native/channel_native/kernels/field_transport_ad.cu"
+    },
+    {
+      "explicit_sync_sites": [],
+      "kernel_launch_sites": [
+        {
+          "kernel": "diffraction_wedge_forward_kernel",
+          "line": 1639
+        },
+        {
+          "kernel": "diffraction_wedge_backward_kernel",
+          "line": 1751
+        },
+        {
+          "kernel": "diffraction_wedge_jvp_kernel",
+          "line": 1922
+        },
+        {
+          "kernel": "coupled_rd_backward_kernel",
+          "line": 2112
+        },
+        {
+          "kernel": "coupled_rd_jvp_kernel",
+          "line": 2198
+        },
+        {
+          "kernel": "project_complex3_backward_kernel",
+          "line": 2263
+        },
+        {
+          "kernel": "project_complex3_jvp_kernel",
+          "line": 2315
+        },
+        {
+          "kernel": "coupled_prepare_backward_kernel",
+          "line": 2399
+        },
+        {
+          "kernel": "coupled_prepare_jvp_kernel",
+          "line": 2454
+        }
+      ],
+      "line_count": 2473,
+      "path": "native/channel_native/kernels/field_wedge_ad.cu"
+    },
+    {
+      "explicit_sync_sites": [
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 1982
+        },
+        {
+          "call": "cudaStreamSynchronize",
+          "line": 2064
+        }
+      ],
+      "kernel_launch_sites": [
+        {
+          "kernel": "bdpt_mis_weights_kernel",
+          "line": 1174
+        },
+        {
+          "kernel": "bdpt_endpoint_connection_samples_kernel",
+          "line": 1299
+        },
+        {
+          "kernel": "bdpt_diffraction_connection_samples_from_tape_kernel",
+          "line": 1470
+        },
+        {
+          "kernel": "bdpt_diffraction_point_connection_samples_kernel",
+          "line": 1640
+        },
+        {
+          "kernel": "bdpt_endpoint_connection_visibility_inputs_kernel",
+          "line": 1742
+        },
+        {
+          "kernel": "bdpt_accumulate_connection_samples_staged_kernel",
+          "line": 1802
+        },
+        {
+          "kernel": "bdpt_compact_valid_connection_indices_kernel",
+          "line": 1837
+        },
+        {
+          "kernel": "bdpt_accumulate_connection_samples_compacted_kernel",
+          "line": 1848
+        },
+        {
+          "kernel": "bdpt_accumulate_connection_samples_double_kernel",
+          "line": 1885
+        },
+        {
+          "kernel": "bdpt_cast_connection_accumulation_kernel",
+          "line": 1907
+        },
+        {
+          "kernel": "bdpt_filter_connection_samples_kernel",
+          "line": 1950
+        },
+        {
+          "kernel": "bdpt_count_valid_connection_samples_kernel",
+          "line": 1971
+        },
+        {
+          "kernel": "bdpt_count_valid_connection_samples_kernel",
+          "line": 2053
+        },
+        {
+          "kernel": "bdpt_compact_connection_samples_kernel",
+          "line": 2088
+        },
+        {
+          "kernel": "bdpt_copy_connection_samples_kernel",
+          "line": 2242
+        },
+        {
+          "kernel": "bdpt_connection_variance_accum_double_kernel",
+          "line": 2327
+        },
+        {
+          "kernel": "bdpt_connection_variance_finalize_double_kernel",
+          "line": 2346
+        }
+      ],
+      "line_count": 2356,
+      "path": "native/channel_native/kernels/bdpt_connect.cu"
+    }
+  ],
+  "translation_unit_policy": {
+    "allowlists_must_equal_current_violations": true,
+    "hard_limit_debt_allowlist": {},
+    "hard_limit_lines": 3000,
+    "planned_owner_debt": {},
+    "recommended_limit_lines": 2000
+  }
+}

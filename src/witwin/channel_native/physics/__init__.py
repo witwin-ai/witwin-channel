@@ -1,11 +1,10 @@
 """CPU complex128 electromagnetic oracle (numpy-only reference math).
 
-Public re-exports of :mod:`witwin.channel_native.physics.oracle`. This
-package is the ground truth for the torch/CUDA production EM code and must
-never import torch.
+Public re-exports of the canonical
+:mod:`witwin.channel_native.physics.reference.oracle` implementation.
 """
 
-from witwin.channel_native.physics.oracle import (
+from witwin.channel_native.physics.reference.oracle import (
     C0,
     EPS0,
     ETA0,

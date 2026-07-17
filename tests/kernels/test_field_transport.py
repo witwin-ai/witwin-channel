@@ -4,7 +4,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import ops
+from witwin.channel_native.propagation.fields.kernels import functional as ops
 
 
 def _slab_coefficient(

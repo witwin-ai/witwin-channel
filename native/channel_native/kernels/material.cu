@@ -70,9 +70,10 @@ __global__ void face_material_tensors_kernel(
     }
 }
 
-}  // namespace
+using FaceMaterialTensors =
+    std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_face_material_tensors_cuda(
+FaceMaterialTensors face_material_tensors_cuda_impl(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
     at::Tensor material_mu_r,
@@ -111,43 +112,30 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_fac
     return {face_eps_r, face_sigma_e, face_mu_r, face_gain, face_valid};
 }
 
+}  // namespace
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_face_material_tensors_cuda(
+    at::Tensor material_eps_r,
+    at::Tensor material_sigma_e,
+    at::Tensor material_mu_r,
+    at::Tensor face_material_id) {
+    return face_material_tensors_cuda_impl(
+        material_eps_r,
+        material_sigma_e,
+        material_mu_r,
+        face_material_id);
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_face_material_tensors_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
     at::Tensor material_mu_r,
     at::Tensor face_material_id) {
-    check_tensor(material_eps_r, "material_eps_r", at::kFloat, 1);
-    check_tensor(material_sigma_e, "material_sigma_e", at::kFloat, 1);
-    check_tensor(material_mu_r, "material_mu_r", at::kFloat, 1);
-    check_tensor(face_material_id, "face_material_id", at::kInt, 1);
-    TORCH_CHECK(material_sigma_e.size(0) == material_eps_r.size(0), "material_sigma_e must match material_eps_r");
-    TORCH_CHECK(material_mu_r.size(0) == material_eps_r.size(0), "material_mu_r must match material_eps_r");
-
-    const int64_t face_count = face_material_id.size(0);
-    auto face_eps_r = at::empty({face_count}, material_eps_r.options());
-    auto face_sigma_e = at::empty({face_count}, material_eps_r.options());
-    auto face_mu_r = at::empty({face_count}, material_eps_r.options());
-    auto face_gain = at::empty({face_count}, material_eps_r.options());
-    auto face_valid = at::empty({face_count}, face_material_id.options().dtype(at::kBool));
-
-    if (face_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(material_eps_r.get_device()).stream();
-        const int block_count = static_cast<int>((face_count + kMaterialBlockSize - 1) / kMaterialBlockSize);
-        face_material_tensors_kernel<<<block_count, kMaterialBlockSize, 0, stream>>>(
-            material_eps_r.data_ptr<float>(),
-            material_sigma_e.data_ptr<float>(),
-            material_mu_r.data_ptr<float>(),
-            face_material_id.data_ptr<int>(),
-            face_eps_r.data_ptr<float>(),
-            face_sigma_e.data_ptr<float>(),
-            face_mu_r.data_ptr<float>(),
-            face_gain.data_ptr<float>(),
-            face_valid.data_ptr<bool>(),
-            face_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    return {face_eps_r, face_sigma_e, face_mu_r, face_gain, face_valid};
+    return face_material_tensors_cuda_impl(
+        material_eps_r,
+        material_sigma_e,
+        material_mu_r,
+        face_material_id);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>

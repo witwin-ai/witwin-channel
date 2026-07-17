@@ -1,8 +1,70 @@
+# Python bytecode and package metadata
 __pycache__/
 *.py[cod]
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Python environments and tool caches
+.venv/
+venv/
 .pytest_cache/
+.hypothesis/
+.mypy_cache/
+.nox/
+.ruff_cache/
+.tox/
+
+# Coverage and benchmark run output
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.benchmarks/
 artifacts/
+
+# CMake, Ninja, and packaging build trees
 build/
 build-*/
+cmake-build-*/
 dist/
-*.egg-info/
+CMakeFiles/
+CMakeCache.txt
+CTestTestfile.cmake
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+build.ninja
+.ninja_deps
+.ninja_log
+
+# Native compiler and linker output (CUDA/MSVC included)
+*.a
+*.dll
+*.dylib
+*.exe
+*.exp
+*.idb
+*.ilk
+*.lib
+*.o
+*.obj
+*.pdb
+*.pyd
+*.so
+*.tlog
+*.lastbuildstate
+*.recipe
+
+# Editor and transient files
+*.bak
+*.temp
+*.tmp
+*~
+
+# Repository-local agent and test scratch directories
+.pytest_tmp/
+.codex_tmp/
+.codex-tmp/
+.test-tmp/
+.tmp/

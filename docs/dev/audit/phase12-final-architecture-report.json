@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "phase": 12,
+  "status": "closed_by_user_without_additional_retest",
+  "baseline_sha": "0892d855b27ee851521a181f5158b0bf41091eda",
+  "release_matrix_sha": "812e195ee79f1567ae93a0a3c69dd2a761570266",
+  "final_implementation_sha": "1a774d9ffed36240d320102316d2f587c7ab32b1",
+  "closure": {
+    "implementation_complete": true,
+    "release_tag_created": false,
+    "additional_retest_stopped_by_user": true,
+    "note": "The final SHA adds G7 import/duplication governance and body-preserving native host-wrapper deduplication after the complete 812e195 release matrix. A clean final Release build and targeted tests passed, but runtime, wheel, full pytest, and the complete manifest were not rebound to 1a774d9 because the user requested that further testing stop."
+  },
+  "architecture": {
+    "production_lines": {
+      "before": {"python_files": 73, "python_lines": 28416, "native_files": 34, "native_lines": 30480, "total_files": 107, "total_lines": 58896},
+      "after": {"python_files": 170, "python_lines": 32732, "native_files": 61, "native_lines": 30716, "total_files": 231, "total_lines": 63448},
+      "interpretation": "Domain ownership increased file count and total lines, while removing the two Python monoliths and splitting native translation units."
+    },
+    "largest_files": {
+      "python_before": {"path": "src/witwin/channel_native/core/kernels/ops.py", "lines": 11596},
+      "python_after": {"path": "src/witwin/channel_native/propagation/fields/kernels/autograd.py", "lines": 1835},
+      "native_before": {"path": "native/channel_native/kernels/path_trace.cu", "lines": 4270},
+      "native_after": {"path": "native/channel_native/kernels/diffraction.cu", "lines": 1848}
+    },
+    "python_functions": {
+      "span_at_least_100_lines": {"before": 37, "after": 41},
+      "complexity_at_least_15": {"before": 39, "after": 37},
+      "maximum_complexity": {"before": 78, "after": 78},
+      "note": "Large-file concentration improved substantially; long-function count and maximum complexity did not improve and remain governed by maintenance budgets and dated exemptions."
+    },
+    "imports": {
+      "core_kernels_ops_unique_fan_in": {"before": 17, "after": 0},
+      "core_path_topology_unique_fan_in": {"before": 7, "after": 0},
+      "solver_to_solver_edges": {"before": 2, "after": 0},
+      "global_max_unique_fan_in": {"before": 17, "after": 31, "after_owner": "witwin.channel_native.scene.models"},
+      "note": "The monolithic ops bottleneck and solver cross-imports are gone. High fan-in now lands on explicit typed model, symbol, and tensor-contract owners."
+    },
+    "duplication": {
+      "token_region_gate": "passed_at_1a774d9",
+      "classification_ledger": "docs/dev/audit/duplication-classification.json",
+      "native_whole_function_groups_at_least_100_tokens": {"at_812e195": 8, "at_1a774d9": 0},
+      "note": "The final native cleanup replaced 16 MC/BDPT ABI bodies with shared internal helpers and thin wrappers. Remaining token regions are classified by the committed gate; the gate passed after the cleanup."
+    },
+    "bindings": {
+      "exported_symbols": {"before": 174, "after": 174},
+      "duplicate_exported_names": {"before": 0, "after": 0},
+      "registry_owners": {"before": 1, "after": 7},
+      "root_binding_module_lines_after": 20
+    },
+    "repository": {
+      "tracked_files": {"before": 639, "after": 602},
+      "tracked_bytes": {"before": 221562641, "after": 10927408},
+      "tracked_size_reduction_percent": 95.07,
+      "build_witwin3": {"before_files": 316, "before_bytes": 217609196, "after_files": 0, "after_bytes": 0}
+    }
+  },
+  "acceptance": {
+    "release_matrix_812e195": {
+      "full_pytest": "1628 passed, 1 skipped, 1 xfailed",
+      "coverage": {"statement_percent": 85.51867219917013, "branch_percent": 66.01520086862106, "core_statement_percent": 90.08341056533827},
+      "runtime_exact_cases": 8,
+      "runtime_worst_wall_median_ratio": 0.3183393298525965,
+      "runtime_worst_wall_p95_ratio": 0.27043162170964946,
+      "runtime_worst_peak_allocated_ratio": 1.0,
+      "statistics": "3/3 cases passed, 16 seeds",
+      "phase_e_full": {"measurements": 35, "gate_checks": 385, "failed_checks": 0, "preflight_rejections": 8},
+      "wheel": {"bytes": 4841218, "sha256": "c38e07e2aacefb4895526c64c3dd40462d879354d61684693c27659dbd217203"},
+      "manifest": "docs/dev/baselines/812e195ee79f1567ae93a0a3c69dd2a761570266/manifest.json"
+    },
+    "final_implementation_1a774d9": {
+      "clean_release_build": true,
+      "build_fingerprint": "887ea73b1b9e49505a4a5d84dc900252941ed0a058f370be196f3f29cc73a414",
+      "build_type": "Release",
+      "cuda_architectures": ["120-real"],
+      "rayd_sha": "6047089cc7a41661402a02d40c96b9117e03a135",
+      "ctest": "1/1 passed",
+      "targeted_native_tests": "244 passed",
+      "binding_owner_tests": "16 passed",
+      "duplication_gate": "passed",
+      "contract_coverage": "37 public exports, 174 native bindings",
+      "full_pytest_rebound": false,
+      "runtime_rebound": false,
+      "wheel_rebuilt": false,
+      "complete_manifest_rebound": false
+    }
+  }
+}

@@ -41,17 +41,33 @@ def _native_imports() -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
     from witwin.channel_native import ReceiverGrid, Scene, Transmitter
-    from witwin.channel_native.core.kernels.ops import (
+    from witwin.channel_native.montecarlo.basic.kernels.maps import (
         mc_component_map_buffer,
         mc_finalize_component_maps,
-        mc_reflection_launch_inputs,
         mc_store_scaled_component_map,
+    )
+    from witwin.channel_native.montecarlo.basic.kernels.sampling import (
+        mc_reflection_launch_inputs,
     )
     from witwin.channel_native.core.material_runtime import face_material_tensors
     from witwin.channel_native.montecarlo.basic.backend import _LIGHT_SPEED_M_PER_S, transmitter_positions
     from witwin.channel_native.montecarlo.basic.raydn_components import _sample_directions, grid_spec
 
-    return locals()
+    return {
+        "torch": torch,
+        "ReceiverGrid": ReceiverGrid,
+        "Scene": Scene,
+        "Transmitter": Transmitter,
+        "mc_component_map_buffer": mc_component_map_buffer,
+        "mc_finalize_component_maps": mc_finalize_component_maps,
+        "mc_reflection_launch_inputs": mc_reflection_launch_inputs,
+        "mc_store_scaled_component_map": mc_store_scaled_component_map,
+        "face_material_tensors": face_material_tensors,
+        "_LIGHT_SPEED_M_PER_S": _LIGHT_SPEED_M_PER_S,
+        "transmitter_positions": transmitter_positions,
+        "_sample_directions": _sample_directions,
+        "grid_spec": grid_spec,
+    }
 
 
 def _build_scene(imports: dict[str, Any]) -> Any:
