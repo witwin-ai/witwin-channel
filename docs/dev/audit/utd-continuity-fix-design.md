@@ -287,6 +287,29 @@ a future refinement.
   truncation factor) must mirror every F2/F3/F5 change or primal/AD
   lockstep tests fail.
 
+### F5e (G1, 2026-07-17): monotone even-part truncation
+
+Post-F metrics against Maxwell exposed a systematic deep-shadow
+over-brightness: median +3.8 dB, p90 +7.7 dB over the 5856 shadow cells.
+Root cause (validated by a per-path dose-response experiment,
+`artifacts/fullwave-fix/final/fable_ripple_test.py`): the complex
+truncation factor T carries the finite-aperture Fresnel ripple
+(|T| ≈ 1.29, arg ≈ +14° at mid-edge for the 0.2 m ≈ 2-Fresnel-unit cube
+edges). That ripple is the PO/Kirchhoff corner-wave pair implied by sharp
+truncation — and the full-wave reference contradicts its strength:
+
+| even-part factor | shadow gap vs Maxwell (median / p10 / p90) |
+| --- | --- |
+| T (complex, rippled) | +3.54 / +1.66 / +7.96 dB |
+| 1 (no truncation) | +4.45 / −0.22 / +10.93 dB |
+| T_mono = clamp(1−|tail_lo|−|tail_hi|, 0, 1) | **−1.11 / −4.64 / +4.45 dB** |
+
+Fix: the even (smooth background) part multiplies the monotone real
+T_mono; the odd/γ machinery is unchanged; MC path unchanged. Residual
+−1.1 dB median (slightly dark: the true corner waves carry some energy) —
+an explicit vertex-diffraction term with correct (sub-PO) amplitude
+remains the recorded refinement.
+
 ## Known collateral
 
 - RayD `backends/drjit` consumes the same shared header with COMMITTED
