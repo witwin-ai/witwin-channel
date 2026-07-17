@@ -775,9 +775,11 @@ _EXTENDED_AD_SCENARIOS = (
     "rough-reflection-cr",
 )
 # Differentiable seed per (scenario, mode). eps_r/layer_eps_r duals mirror the
-# AD-1/AD-4 material cells; the rough-reflection vjp uses frequency so the
-# derivative flows through the C_r coherent attenuation (dC_r/df), the exact
-# quantity ADR-010 op 3 must reproduce.
+# AD-1/AD-4 material cells; both rough-reflection modes use frequency so the
+# derivative flows through the C_r coherent attenuation (dC_r/df in forward
+# and reverse mode), the exact quantity ADR-010 op 3 must reproduce. A
+# layer_eps_r dual produces no forward tangent on the rough-reflection rows,
+# so frequency is the canonical jvp seed there.
 _EXTENDED_AD_SEEDS: dict[tuple[str, str], str] = {
     ("single-reflection", "jvp"): "material_eps_r",
     ("single-reflection", "vjp"): "material_eps_r",
@@ -785,7 +787,7 @@ _EXTENDED_AD_SEEDS: dict[tuple[str, str], str] = {
     ("thin-wall-transmission", "vjp"): "material_layer_eps_r",
     ("single-wedge-diffraction", "jvp"): "material_eps_r",
     ("single-wedge-diffraction", "vjp"): "material_eps_r",
-    ("rough-reflection-cr", "jvp"): "material_layer_eps_r",
+    ("rough-reflection-cr", "jvp"): "frequency",
     ("rough-reflection-cr", "vjp"): "frequency",
 }
 _EXTENDED_MC_SEEDS: dict[str, int] = {
@@ -940,7 +942,15 @@ def _extended_scene_and_config(solver: str, scenario: str):
             diagnostics=True,
         ), solve
 
-    def _mc_bdpt(components, *, max_depth, samples, receiver_strategy, coupled=False):
+    def _mc_bdpt(
+        components,
+        *,
+        max_depth,
+        samples,
+        receiver_strategy,
+        coupled=False,
+        accumulation_strategy="auto",
+    ):
         from witwin.channel_native.montecarlo.bdpt import Config, solve
 
         return Config(
@@ -950,6 +960,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
             components=components,
             coupled_paths=coupled,
             receiver_strategy=receiver_strategy,
+            accumulation_strategy=accumulation_strategy,
             diagnostics=True,
         ), solve
 
@@ -1017,8 +1028,16 @@ def _extended_scene_and_config(solver: str, scenario: str):
             if solver == "montecarlo-basic":
                 config, solve = _mc_basic(components, max_depth=1, samples=1024)
             else:
+                # The default atomic grid accumulation of BDPT diffraction is
+                # not bitwise stable across processes; the staged (cell_reduce)
+                # strategy is a public config option with a fixed reduction
+                # order and freezes exactly.
                 config, solve = _mc_bdpt(
-                    components, max_depth=1, samples=512, receiver_strategy="grid_area"
+                    components,
+                    max_depth=1,
+                    samples=512,
+                    receiver_strategy="grid_area",
+                    accumulation_strategy="staged",
                 )
             return scene, config, solve
         if solver == "path":
@@ -1197,11 +1216,13 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
     seed = _EXTENDED_AD_SEEDS[(scenario, ad_mode)]
 
     def _frequency_leaf():
+        # vjp keeps a live requires_grad leaf; jvp swaps a forward dual onto
+        # the primal tensor per solve instead.
         return torch.tensor(
             _EXTENDED_FREQUENCY_HZ,
             dtype=torch.float64,
             device="cuda",
-            requires_grad=True,
+            requires_grad=ad_mode == "vjp",
         )
 
     if scenario == "single-reflection":
@@ -1270,12 +1291,42 @@ def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
     if seed == "frequency":
         leaf = scene.frequency
 
+        if ad_mode == "vjp":
+
+            def operation():
+                if leaf.grad is not None:
+                    leaf.grad = None
+                result = solve(scene, config)
+                _loss(result).backward()
+                grad = leaf.grad.detach().clone()
+                return _GradientCapture(
+                    mode=ad_mode,
+                    seed=seed,
+                    gradient={seed: grad},
+                    gradient_is_nonzero=bool(grad.abs().max() > 0.0),
+                    metadata=dict(result.metadata),
+                )
+
+            return operation
+
+        primal = leaf.detach().clone()
+        frequency_tangent = torch.ones_like(primal)
+
         def operation():
-            if leaf.grad is not None:
-                leaf.grad = None
-            result = solve(scene, config)
-            _loss(result).backward()
-            grad = leaf.grad.detach().clone()
+            with torch.autograd.forward_ad.dual_level():
+                dual = torch.autograd.forward_ad.make_dual(
+                    primal.clone(), frequency_tangent
+                )
+                object.__setattr__(scene, "frequency", dual)
+                try:
+                    result = solve(scene, config)
+                    coefficient = _extended_ad_coefficient(result, solver)
+                    tangent_out = torch.autograd.forward_ad.unpack_dual(
+                        coefficient
+                    ).tangent
+                finally:
+                    object.__setattr__(scene, "frequency", leaf)
+            grad = tangent_out.detach().clone()
             return _GradientCapture(
                 mode=ad_mode,
                 seed=seed,
