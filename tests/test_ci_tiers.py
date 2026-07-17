@@ -14,17 +14,27 @@ def _ids(tier: str) -> list[str]:
     return [gate.id for gate in tiers.TIER_GATES[tier]]
 
 
-def test_four_tiers_are_cumulative_and_gate_ids_are_unique() -> None:
+def _base_ids(tier: str) -> list[str]:
+    ids = _ids(tier)
+    assert ids[-1] == f"{tier}.repository-hygiene-final"
+    return ids[:-1]
+
+
+def test_four_tiers_are_cumulative_and_end_with_a_hygiene_recheck() -> None:
     assert tuple(tiers.TIER_GATES) == ("quick", "cuda", "nightly", "release")
-    quick = _ids("quick")
-    cuda = _ids("cuda")
-    nightly = _ids("nightly")
-    release = _ids("release")
+    quick = _base_ids("quick")
+    cuda = _base_ids("cuda")
+    nightly = _base_ids("nightly")
+    release = _base_ids("release")
 
     assert cuda[: len(quick)] == quick
     assert nightly[: len(cuda)] == cuda
     assert release[: len(nightly)] == nightly
-    assert len(release) == len(set(release))
+
+    for tier in tiers.TIER_GATES:
+        full = _ids(tier)
+        assert full[-1] == f"{tier}.repository-hygiene-final"
+        assert len(full) == len(set(full))
 
 
 def test_tiers_cover_the_required_gate_families() -> None:
@@ -36,6 +46,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "quick.public-api-binding-contract-manifests",
         "quick.production-dependencies",
         "quick.repository-hygiene",
+        "quick.secret-scan",
         "quick.maintenance-budgets",
         "quick.import-no-native",
         "quick.cpu-import-config",
@@ -55,6 +66,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "nightly.statistics-gate",
         "nightly.wheel-build-py311-cu128-win-x64",
         "nightly.wheel-smoke-py311-cu128-win-x64",
+        "nightly.duplication",
     } <= set(_ids("nightly"))
     assert {
         "release.performance",

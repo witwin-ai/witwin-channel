@@ -220,8 +220,14 @@
     },
     "function_complexity": {
       "recommended": 15
+    },
+    "native_file_lines": {
+      "hard": 3000,
+      "recommended": 2000
     }
   },
+  "native_file_exemptions": {},
+  "native_source_root": "native/channel_native",
   "schema_version": 1,
   "source_root": "src/witwin/channel_native"
 }

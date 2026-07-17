@@ -83,6 +83,39 @@ def test_current_baseline_is_exact_and_passes() -> None:
     }
 
 
+def test_native_translation_units_are_within_budget() -> None:
+    config = budgets.load_budgets(BUDGET_PATH)
+    native_files = budgets.measure_native_files(ROOT, config["native_source_root"])
+    recommended = config["limits"]["native_file_lines"]["recommended"]
+    hard = config["limits"]["native_file_lines"]["hard"]
+
+    assert native_files, "expected native translation units to be measured"
+    largest = max(native_files, key=lambda metric: metric.lines)
+    # The largest native unit stays below the recommendation, so no native
+    # waiver entry is required; keep the exemption map empty to prove it.
+    assert largest.lines < recommended
+    assert all(metric.lines <= hard for metric in native_files)
+    assert config["native_file_exemptions"] == {}
+
+
+def test_native_hard_limit_and_waiver_growth_are_enforced(tmp_path: Path) -> None:
+    native_dir = tmp_path / "native" / "channel_native"
+    native_dir.mkdir(parents=True)
+    unit = native_dir / "kernel.cu"
+    unit.write_text("\n".join(f"// line {index}" for index in range(9)), encoding="utf-8")
+
+    config = _config()
+    config["native_source_root"] = "native/channel_native"
+    config["limits"]["native_file_lines"] = {"recommended": 5, "hard": 7}
+    config["native_file_exemptions"] = {}
+
+    violations = budgets.check_budgets(tmp_path, config)
+    assert {(item.kind, item.subject) for item in violations} == {
+        ("unbudgeted-debt", "native/channel_native/kernel.cu"),
+        ("hard-limit", "native/channel_native/kernel.cu"),
+    }
+
+
 def test_ast_measurement_is_reproducible() -> None:
     first = budgets.measure_repository(ROOT, "src/witwin/channel_native")
     second = budgets.measure_repository(ROOT, "src/witwin/channel_native")

@@ -14,6 +14,7 @@ from typing import Any
 
 
 DEFAULT_BUDGET_PATH = Path("ci/maintenance-budgets.json")
+NATIVE_SUFFIXES = (".cpp", ".cu", ".cuh", ".h")
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -141,6 +142,30 @@ def measure_repository(
     if len(keys) != len(set(keys)):
         raise ValueError("function budget keys are not unique")
     return files, functions
+
+
+def measure_native_files(
+    root: Path, native_root: str, suffixes: tuple[str, ...] = NATIVE_SUFFIXES
+) -> list[FileMetric]:
+    """Line-count native translation units under ``native_root``.
+
+    Line counts use the same ``splitlines`` measure as Python sources so both
+    budgets stay comparable. Decoding tolerates non-UTF-8 bytes because native
+    sources may carry third-party edits; only the line count is needed here.
+    """
+
+    root = root.resolve()
+    source = root / native_root
+    files: list[FileMetric] = []
+    if not source.is_dir():
+        return files
+    for path in sorted(source.rglob("*")):
+        if path.suffix not in suffixes or not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+        display_path = path.relative_to(root).as_posix()
+        files.append(FileMetric(display_path, len(text.splitlines())))
+    return files
 
 
 def load_budgets(path: Path) -> dict[str, Any]:
@@ -292,7 +317,53 @@ def check_budgets(
             label="complexity",
         )
     )
+    violations.extend(
+        _check_native_budgets(root, config, today=check_date)
+    )
     return sorted(violations)
+
+
+def _check_native_budgets(
+    root: Path, config: dict[str, Any], *, today: date
+) -> list[Violation]:
+    native_source_root = config.get("native_source_root")
+    if native_source_root is None:
+        return []
+    if not isinstance(native_source_root, str) or not native_source_root:
+        raise ValueError("native_source_root must be a non-empty string")
+
+    native_recommended = _limit(config, "native_file_lines", "recommended")
+    native_hard = _limit(config, "native_file_lines", "hard")
+    if native_recommended >= native_hard:
+        raise ValueError(
+            "native file recommended limit must be below hard limit"
+        )
+    native_exemptions = _exemptions(config, "native_file_exemptions")
+    if any(item.ceiling > native_hard for item in native_exemptions.values()):
+        raise ValueError(
+            "native exemption ceilings cannot exceed the hard limit"
+        )
+
+    native_files = measure_native_files(root, native_source_root)
+    violations = [
+        Violation(
+            "hard-limit",
+            metric.path,
+            f"file lines {metric.lines} exceeds hard limit {native_hard}",
+        )
+        for metric in native_files
+        if metric.lines > native_hard
+    ]
+    violations.extend(
+        _check_debt(
+            values={metric.path: metric.lines for metric in native_files},
+            recommended=native_recommended,
+            exemptions=native_exemptions,
+            today=today,
+            label="file lines",
+        )
+    )
+    return violations
 
 
 def main(argv: list[str] | None = None) -> int:

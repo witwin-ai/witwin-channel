@@ -16,8 +16,8 @@ tests, matching G7's requirement that numeric primal/AD duplicates stay exempt
 only with lockstep coverage and owner comments.
 
 Run without arguments to gate; pass ``--print-current`` to print the current
-statistics for humans. This module is deliberately not wired into
-``ci/run_ci_tier.py`` yet.
+statistics for humans. The gate runs in the nightly tier of
+``ci/run_ci_tier.py`` (``nightly.duplication``).
 """
 
 from __future__ import annotations

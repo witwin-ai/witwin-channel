@@ -36,6 +36,7 @@ QUICK_GATES = (
     ),
     Gate("quick.production-dependencies", ("ci/check_production_dependencies.py",)),
     Gate("quick.repository-hygiene", ("ci/check_repository_hygiene.py",)),
+    Gate("quick.secret-scan", ("ci/check_secrets.py",)),
     Gate("quick.maintenance-budgets", ("ci/check_maintenance_budgets.py",)),
     Gate(
         "quick.import-no-native",
@@ -168,6 +169,7 @@ NIGHTLY_GATES = (
         "nightly.wheel-smoke-py311-cu128-win-x64",
         ("ci/wheel_smoke.py", "artifacts/nightly/wheel"),
     ),
+    Gate("nightly.duplication", ("ci/check_duplication.py",)),
 )
 
 RELEASE_GATES = (
@@ -249,11 +251,29 @@ RELEASE_GATES = (
     ),
 )
 
+def _tier(name: str, *gate_groups: tuple[Gate, ...]) -> tuple[Gate, ...]:
+    """Compose a tier and append a trailing repository-hygiene re-check.
+
+    The quick tier already runs ``repository-hygiene`` first, so the tree is
+    proven clean before the tests. Re-running the same check last makes any
+    test that dirties the worktree (a stray artifact, an unrestored fixture)
+    fail its tier instead of leaking state into the next gate.
+    """
+
+    gates = tuple(gate for group in gate_groups for gate in group)
+    trailing = Gate(
+        f"{name}.repository-hygiene-final", ("ci/check_repository_hygiene.py",)
+    )
+    return (*gates, trailing)
+
+
 TIER_GATES = {
-    "quick": QUICK_GATES,
-    "cuda": (*QUICK_GATES, *CUDA_GATES),
-    "nightly": (*QUICK_GATES, *CUDA_GATES, *NIGHTLY_GATES),
-    "release": (*QUICK_GATES, *CUDA_GATES, *NIGHTLY_GATES, *RELEASE_GATES),
+    "quick": _tier("quick", QUICK_GATES),
+    "cuda": _tier("cuda", QUICK_GATES, CUDA_GATES),
+    "nightly": _tier("nightly", QUICK_GATES, CUDA_GATES, NIGHTLY_GATES),
+    "release": _tier(
+        "release", QUICK_GATES, CUDA_GATES, NIGHTLY_GATES, RELEASE_GATES
+    ),
 }
 
 
