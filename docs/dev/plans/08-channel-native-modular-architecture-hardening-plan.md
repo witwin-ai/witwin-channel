@@ -1,6 +1,6 @@
 # Channel Native 模块化架构与代码治理修理计划
 
-**状态：** Phase 0-11 completed；Phase 12 in progress（用户于 2026-07-16 明确取消向后兼容要求）
+**状态：** Phase 0-12 implementation closed；完整 release matrix 已在 `812e195` 通过，最终 G7 收口为 `1a774d9`；用户于 2026-07-16 要求停止额外测试，因此未重绑最终 full/runtime/wheel/manifest，未创建 release tag
 
 **计划日期：** 2026-07-14
 
@@ -746,6 +746,13 @@ CI 分层：
 5. 创建 release tag 前冻结最终 manifest；任何差异必须逐项解释。
 
 最终验收：第 10 节 Definition of Done 全部满足。
+
+执行结果（2026-07-16）：
+
+- 用户明确取消 internal shim 的向后兼容要求；`core.kernels.ops`、`core.path_topology` 和旧 `TopologyBatch` 混合契约均已删除。
+- `812e195` 上完整 pytest、coverage、runtime exact/performance、统计、cold-start、scaling、peak-memory、wheel smoke 和 Phase-E full 均通过，并冻结完整 immutable manifest。
+- 后续 G7 收口加入可执行 import/duplication governance，并在 `1a774d9` 消除 8 组未登记的 >=100-token native 完整函数重复；clean Release、CTest、244 个定向 native/solver 测试和 binding owner 审计通过。
+- 用户随后要求“不需要再测了，准备收尾”；因此最终 SHA 的 full pytest、runtime、wheel、Phase-E 和完整 manifest 未重新绑定。详细证据和诚实边界见 [Phase 12 final architecture report](../audit/phase12-final-architecture-report.md)。在补齐这些 SHA-bound 证据前不创建 release tag。
 
 ## 8. Git 提交与 PR 纪律
 
