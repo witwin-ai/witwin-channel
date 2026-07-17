@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import torch
+
+from witwin.channel_native import (
+    PerfectConductor,
+    ReceiverGrid,
+    Scene,
+    Structure,
+    Transmitter,
+)
+from witwin.channel_native.core.materials import Layer, PhysicalSurface
+
+from .models import CaseSpec, MaterialSpec
+
+
+MANIFEST_PATH = Path(__file__).parents[1] / "scenarios" / "fullwave_validation.v1.json"
+SCENARIOS = ("single_cube", "three_cube")
+MATERIALS = ("metal", "dielectric")
+
+
+def load_manifest() -> dict[str, object]:
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+
+def load_case(scenario: str, material: str) -> CaseSpec:
+    manifest = load_manifest()
+    if scenario not in SCENARIOS:
+        raise ValueError(f"scenario must be one of {SCENARIOS}")
+    if material not in MATERIALS:
+        raise ValueError(f"material must be one of {MATERIALS}")
+    raw_scenario = manifest["scenarios"][scenario]  # type: ignore[index]
+    raw_material = manifest["materials"][material]  # type: ignore[index]
+    frequency_hz = manifest["electromagnetic_scaling"]["frequency_hz"]  # type: ignore[index]
+    return CaseSpec(
+        scenario=scenario,
+        material=MaterialSpec(
+            kind=material,
+            eps_r=float(raw_material["eps_r"]),
+            sigma_e=float(raw_material["sigma_e"]),
+        ),
+        frequency_hz=float(frequency_hz),
+        analysis_bounds_xy=tuple(
+            tuple(row) for row in raw_scenario["analysis_bounds_xy"]
+        ),
+        domain_bounds_xyz=tuple(
+            tuple(row) for row in raw_scenario["domain_bounds_xyz"]
+        ),
+        plane_z=float(raw_scenario["plane_z"]),
+        tx_position=tuple(raw_scenario["tx_position"]),
+        cube_centers=tuple(tuple(row) for row in raw_scenario["cube_centers"]),
+        cube_size_m=float(raw_scenario["cube_size_m"]),
+        receiver_shape=tuple(raw_scenario["receiver_shape"]),
+        fullwave_dl_m=float(raw_scenario["fullwave_dl_m"]),
+        fullwave_pml_layers=int(raw_scenario["fullwave_pml_layers"]),
+        max_depth=int(raw_scenario["max_depth"]),
+        source_layout=str(raw_scenario["source_layout"]),
+    )
+
+
+def _cube_mesh(
+    center: tuple[float, float, float], size: float
+) -> tuple[torch.Tensor, torch.Tensor]:
+    cx, cy, cz = center
+    half = size / 2.0
+    vertices = torch.tensor(
+        [
+            [cx - half, cy - half, cz - half],
+            [cx + half, cy - half, cz - half],
+            [cx + half, cy + half, cz - half],
+            [cx - half, cy + half, cz - half],
+            [cx - half, cy - half, cz + half],
+            [cx + half, cy - half, cz + half],
+            [cx + half, cy + half, cz + half],
+            [cx - half, cy + half, cz + half],
+        ],
+        dtype=torch.float32,
+    )
+    faces = torch.tensor(
+        [
+            [0, 2, 1],
+            [0, 3, 2],
+            [4, 5, 6],
+            [4, 6, 7],
+            [0, 1, 5],
+            [0, 5, 4],
+            [1, 2, 6],
+            [1, 6, 5],
+            [2, 3, 7],
+            [2, 7, 6],
+            [3, 0, 4],
+            [3, 4, 7],
+        ],
+        dtype=torch.int32,
+    )
+    return vertices, faces
+
+
+def build_channel_scene(spec: CaseSpec) -> Scene:
+    if spec.material.kind == "metal":
+        material = PerfectConductor(name="pec")
+    else:
+        material = PhysicalSurface(
+            layers=(
+                Layer(
+                    thickness_m=spec.cube_size_m / 2.0,
+                    eps_r=spec.material.eps_r,
+                    sigma_e=spec.material.sigma_e,
+                ),
+            ),
+            name="dielectric-volume-interface-approximation",
+        )
+    structures = []
+    for index, center in enumerate(spec.cube_centers, start=1):
+        vertices, faces = _cube_mesh(center, spec.cube_size_m)
+        structures.append(
+            Structure(
+                vertices=vertices,
+                faces=faces,
+                material=material,
+                name=f"cube-{index}",
+                surface_id=index,
+            )
+        )
+
+    x = spec.x
+    y = spec.y
+    return Scene(
+        structures=structures,
+        transmitters=[
+            Transmitter(
+                position=torch.tensor(spec.tx_position),
+                polarization=torch.tensor([0.0, 0.0, 1.0]),
+            )
+        ],
+        receivers=[
+            ReceiverGrid(
+                origin=torch.tensor([x[0], y[0], spec.plane_z]),
+                x_axis=torch.tensor([1.0, 0.0, 0.0]),
+                y_axis=torch.tensor([0.0, 1.0, 0.0]),
+                shape=(x.size, y.size),
+                spacing=(float(x[1] - x[0]), float(y[1] - y[0])),
+                polarization=torch.tensor([0.0, 0.0, 1.0]),
+            )
+        ],
+        frequency=spec.frequency_hz,
+        metadata={
+            "fullwave_validation_case": spec.case_id,
+            "fullwave_validation_fingerprint": spec.fingerprint,
+        },
+    )

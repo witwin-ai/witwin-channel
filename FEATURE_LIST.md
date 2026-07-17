@@ -90,6 +90,18 @@ priority `scattering > diffraction > transmission > reflection > los`.
   (`thin_sheet_straight_path_approximation`, geometric group delay), and
   event/sample diagnostics.
 
+## Full-wave validation workflow
+
+- `python -m benchmarks.fullwave_validation` provides versioned single-cube
+  and original-channel-layout three-cube cases for PEC and transmissive
+  dielectric materials. It writes deterministic and Tidy3D complex-field
+  references in one NPZ schema, supports same-observable complex calibration
+  and independent empty-scene magnitude calibration, and reports NMSE,
+  magnitude correlation, dB error, and ISB/RSB support-edge jump statistics.
+  Tidy3D cloud submission is never implicit: `prepare` only writes a simulation
+  and `solve-tidy3d` requires either downloaded simulation data or an explicit
+  `--submit` flag.
+
 ## Differentiable solving (fixed topology, plan 07 AD-1 through AD-4)
 
 - `deterministic`, `path` and `montecarlo.basic` accept

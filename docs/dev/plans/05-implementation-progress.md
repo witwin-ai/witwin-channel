@@ -104,8 +104,10 @@ Status log for `05-physical-scattering-transmission-plan.md` /
   commit also fails it ~1/3 of runs (native 164-229 ms, original swinging
   63-2219 ms single-shot) - failures of that assertion are environmental,
   not a plan-05 regression (verified by A/B: old pyd + old code vs new).
-- 11.4 external validation beyond the analytic/oracle tiers (measured
-  materials, full-wave references) remains future work per plan.
+- 11.4 now has a versioned Tidy3D comparison harness for scaled single- and
+  three-cube PEC/dielectric cases, including ISB/RSB jump diagnostics. Cloud
+  reference generation, grid-convergence review, frozen acceptance thresholds,
+  and measured-material validation remain future work.
 
 ## Known deviations from the plan narrative (documented choices)
 - Kirchhoff eval/sample/PDF and rough event budgets require dedicated native
