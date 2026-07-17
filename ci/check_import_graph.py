@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 from pathlib import Path
@@ -15,10 +15,12 @@ PACKAGE = "witwin.channel_native"
 DEFAULT_PACKAGE_PATH = Path("src/witwin/channel_native")
 DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 
-# This digest freezes the initial Phase 3 debt universe. Entries may be removed
-# from the active allowlist, but relocating or replacing an entry is rejected.
+# This digest freezes the debt universe. Entries may be removed from the active
+# allowlist, but relocating or replacing an entry is rejected. The universe was
+# extended once to admit the ADR-008 BDPT enumerated-oracle dependency that the
+# re-export canonicalization made visible.
 FROZEN_BASELINE_DIGEST = (
-    "daed11abc81eb111186aebc78826c52037b475f7682d68869bf85f0cac6d4e5a"
+    "0750e5bf8898eb03911bd15fe3bac1f7bc52082cea0f3cbf863fd52ad8677aba"
 )
 
 _DEBT_GROUP_BY_RULE = {
@@ -26,6 +28,7 @@ _DEBT_GROUP_BY_RULE = {
     "public_init_internal": "existing_boundary",
     "relative_cross_domain": "existing_boundary",
     "solver_raw_extension": "existing_boundary",
+    "mc_enumerated_dependency": "mc_enumerated_dependency",
 }
 _SOLVER_PREFIXES = (
     f"{PACKAGE}.path",
@@ -177,15 +180,102 @@ def _parse_file(
     return edges
 
 
+def _collect_module_info(
+    package_root: Path,
+) -> tuple[list[Path], frozenset[str], frozenset[str]]:
+    files = sorted(package_root.rglob("*.py"))
+    named = [_module_name(package_root, path) for path in files]
+    known_modules = frozenset(module for module, _ in named)
+    known_packages = frozenset(module for module, is_package in named if is_package)
+    return files, known_modules, known_packages
+
+
 def collect_import_edges(package_root: Path) -> list[ImportEdge]:
     package_root = package_root.resolve()
-    files = sorted(package_root.rglob("*.py"))
-    modules = frozenset(_module_name(package_root, path)[0] for path in files)
+    files, known_modules, _ = _collect_module_info(package_root)
     return sorted(
         edge
         for path in files
-        for edge in _parse_file(package_root, path, known_modules=modules)
+        for edge in _parse_file(package_root, path, known_modules=known_modules)
     )
+
+
+def build_reexport_map(package_root: Path) -> dict[tuple[str, str], str]:
+    """Map ``(package module, exposed symbol)`` to the submodule that defines it.
+
+    A package ``__init__`` that re-exports a symbol with ``from .sub import name``
+    (or the absolute equivalent) publishes ``name`` from its own namespace while
+    the object lives in a submodule. This map lets the classifier resolve such
+    re-exports back to the defining module, so a boundary that is bypassed
+    through a package facade stays visible instead of hiding behind the package.
+    """
+
+    package_root = package_root.resolve()
+    files, known_modules, _ = _collect_module_info(package_root)
+    reexports: dict[tuple[str, str], str] = {}
+    for path in files:
+        module, is_package = _module_name(package_root, path)
+        if not is_package:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            base = _resolve_from_module(
+                module, is_package=True, level=node.level, module=node.module
+            )
+            if not _matches(base, PACKAGE):
+                continue
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                exposed = alias.asname or alias.name
+                reexports[(module, exposed)] = _target_module(
+                    base, alias.name, known_modules
+                )
+    return reexports
+
+
+def _canonical_target(
+    target: str,
+    imported_name: str,
+    reexports: dict[tuple[str, str], str],
+    known_packages: frozenset[str],
+    *,
+    max_depth: int = 8,
+) -> str:
+    """Follow package re-exports until reaching the defining module.
+
+    Resolution stops at a private ``kernels`` module: publishing a kernel symbol
+    through a package ``__all__`` is the sanctioned seam for consumers, so those
+    edges stay recorded at the public package target and remain governed by the
+    domain-kernel boundary rules rather than being rewritten into a private
+    cross-domain kernel import.
+    """
+
+    seen = {target}
+    for _ in range(max_depth):
+        if target not in known_packages:
+            break
+        defining = reexports.get((target, imported_name))
+        if defining is None or defining in seen or _is_kernels_module(defining):
+            break
+        seen.add(defining)
+        target = defining
+    return target
+
+
+def _canonicalize_edge(
+    edge: ImportEdge,
+    reexports: dict[tuple[str, str], str],
+    known_packages: frozenset[str],
+) -> ImportEdge:
+    if edge.kind != "from" or edge.imported_name in {"", "*"}:
+        return edge
+    target = _canonical_target(
+        edge.target, edge.imported_name, reexports, known_packages
+    )
+    return edge if target == edge.target else replace(edge, target=target)
 
 
 def _is_solver_result(module: str) -> bool:
@@ -199,6 +289,12 @@ def _kernel_owner(module: str) -> str | None:
     if index < 0 or _matches(module, f"{PACKAGE}.core.kernels"):
         return None
     return module[:index]
+
+
+def _is_kernels_module(module: str) -> bool:
+    return (
+        _matches(module, f"{PACKAGE}.core.kernels") or _kernel_owner(module) is not None
+    )
 
 
 def _violation(edge: ImportEdge, rule: str) -> Violation:
@@ -237,7 +333,7 @@ def _basic_boundary_violations(edge: ImportEdge) -> list[Violation]:
     if target in deleted_modules or imported_target in deleted_modules:
         violations.append(_violation(edge, "deleted_module_dependency"))
     if source in _PUBLIC_INIT_MODULES and (
-        _matches(target, f"{PACKAGE}.core.kernels")
+        _is_kernels_module(target)
         or _matches(target, f"{PACKAGE}.runtime")
         or _matches(target, f"{PACKAGE}.propagation")
     ):
@@ -337,7 +433,10 @@ def _runtime_oracle_violations(edge: ImportEdge) -> list[Violation]:
     ):
         violations.append(_violation(edge, "runtime_forbidden_dependency"))
 
-    if source == f"{PACKAGE}.physics.oracle" and any(
+    if (
+        source == f"{PACKAGE}.physics.oracle"
+        or _matches(source, f"{PACKAGE}.physics.reference")
+    ) and any(
         _matches(target, prefix)
         for prefix in (
             "torch",
@@ -391,13 +490,15 @@ def classify_edge(edge: ImportEdge) -> list[Violation]:
 
 
 def scan_package(package_root: Path) -> list[Violation]:
-    return sorted(
-        {
-            violation
-            for edge in collect_import_edges(package_root)
-            for violation in classify_edge(edge)
-        }
+    package_root = package_root.resolve()
+    files, known_modules, known_packages = _collect_module_info(package_root)
+    reexports = build_reexport_map(package_root)
+    edges = (
+        _canonicalize_edge(edge, reexports, known_packages)
+        for path in files
+        for edge in _parse_file(package_root, path, known_modules=known_modules)
     )
+    return sorted({violation for edge in edges for violation in classify_edge(edge)})
 
 
 def _entry_key(entry: dict[str, Any]) -> tuple[str, int, int, str, str, str]:

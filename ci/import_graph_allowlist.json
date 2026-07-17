@@ -19,6 +19,12 @@
         {"id": "solver-001", "path": "src/witwin/channel_native/montecarlo/bdpt/solver.py", "line": 27, "column": 0, "rule": "solver_to_solver", "source": "witwin.channel_native.montecarlo.bdpt.solver", "target": "witwin.channel_native.path"}
       ],
       "allowed": []
+    },
+    "mc_enumerated_dependency": {
+      "baseline": [
+        {"id": "mc-enum-001", "path": "src/witwin/channel_native/montecarlo/bdpt/pipeline.py", "line": 23, "column": 0, "rule": "mc_enumerated_dependency", "source": "witwin.channel_native.montecarlo.bdpt.pipeline", "target": "witwin.channel_native.propagation.enumerated.engine", "adr": "ADR-008", "justification": "BDPT hybrid estimator consumes evaluate_enumerated_paths read-only as a black-box discrete-path oracle for delta-specular and coupled discrete connection samples; see docs/dev/standards/adr-008-enumerated-propagation.md. montecarlo.basic stays at zero enumerated dependency."}
+      ],
+      "allowed": ["mc-enum-001"]
     }
   }
 }

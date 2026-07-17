@@ -30,6 +30,7 @@ def test_current_import_debt_is_exact_and_allowlisted():
         graph._DEBT_GROUP_BY_RULE[violation.rule] for violation in violations
     ) == {
         "existing_boundary": 2,
+        "mc_enumerated_dependency": 1,
     }
 
 
@@ -235,6 +236,236 @@ def test_frozen_baseline_universe_cannot_change():
     issues = graph.check_allowlist(violations, changed)
 
     assert any("frozen import debt universe changed" in issue for issue in issues)
+
+
+def test_reexport_map_resolves_facade_symbols_to_defining_modules(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "propagation/__init__.py": (
+                "from .enumerated.engine import evaluate_enumerated_paths\n"
+                "from .models import EvaluatedPaths\n"
+            ),
+            "propagation/enumerated/__init__.py": "",
+            "propagation/enumerated/engine.py": "",
+            "propagation/models/__init__.py": (
+                "from .evaluated import EvaluatedPaths\n"
+            ),
+            "propagation/models/evaluated.py": "",
+            "propagation/topology/__init__.py": (
+                "from .kernels.sampling import mc_sample_directions\n"
+            ),
+            "propagation/topology/kernels/__init__.py": "",
+            "propagation/topology/kernels/sampling.py": "",
+        },
+    )
+
+    reexports = graph.build_reexport_map(package_root)
+    package = "witwin.channel_native"
+
+    assert reexports[(f"{package}.propagation", "evaluate_enumerated_paths")] == (
+        f"{package}.propagation.enumerated.engine"
+    )
+    # Re-export chains resolve recursively through nested package facades.
+    assert reexports[(f"{package}.propagation.models", "EvaluatedPaths")] == (
+        f"{package}.propagation.models.evaluated"
+    )
+    assert reexports[(f"{package}.propagation.topology", "mc_sample_directions")] == (
+        f"{package}.propagation.topology.kernels.sampling"
+    )
+
+
+def test_reexport_canonicalization_reveals_facade_dependency(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "propagation/__init__.py": (
+                "from .enumerated.engine import evaluate_enumerated_paths\n"
+                "from .models import EvaluatedPaths\n"
+            ),
+            "propagation/enumerated/__init__.py": "",
+            "propagation/enumerated/engine.py": "",
+            "propagation/models/__init__.py": "",
+            "propagation/topology/__init__.py": (
+                "from .kernels.sampling import mc_sample_directions\n"
+            ),
+            "propagation/topology/kernels/__init__.py": "",
+            "propagation/topology/kernels/sampling.py": "",
+            "montecarlo/__init__.py": "",
+            "montecarlo/bdpt/__init__.py": "",
+            "montecarlo/bdpt/pipeline.py": (
+                "from witwin.channel_native.propagation import "
+                "EvaluatedPaths, evaluate_enumerated_paths\n"
+            ),
+            "montecarlo/basic/__init__.py": "",
+            "montecarlo/basic/kernels/__init__.py": "",
+            "montecarlo/basic/kernels/sampling.py": (
+                "from witwin.channel_native.propagation.topology "
+                "import mc_sample_directions\n"
+            ),
+        },
+    )
+
+    rules = Counter(violation.rule for violation in graph.scan_package(package_root))
+
+    # The BDPT facade import of ``evaluate_enumerated_paths`` is canonicalized to
+    # ``propagation.enumerated.engine`` and fires. The ``EvaluatedPaths``
+    # re-export resolves to ``propagation.models`` (no rule), and the basic
+    # sampling seam stops at the private ``topology.kernels`` boundary so it does
+    # not become a cross-domain private kernel import.
+    assert rules == {"mc_enumerated_dependency": 1}
+
+
+def test_module_only_imports_are_not_canonicalized(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "propagation/__init__.py": (
+                "from .enumerated.engine import evaluate_enumerated_paths\n"
+            ),
+            "propagation/enumerated/__init__.py": "",
+            "propagation/enumerated/engine.py": "",
+            "montecarlo/__init__.py": "",
+            "montecarlo/bdpt/__init__.py": "",
+            "montecarlo/bdpt/pipeline.py": (
+                "import witwin.channel_native.propagation\n"
+            ),
+        },
+    )
+
+    # ``import package`` edges target the package itself and stay as-is, so the
+    # module-only dependency does not resolve into the enumerated engine.
+    assert not any(
+        violation.rule == "mc_enumerated_dependency"
+        for violation in graph.scan_package(package_root)
+    )
+
+
+def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
+    package = "witwin.channel_native"
+    reexports = graph.build_reexport_map(PACKAGE_ROOT)
+
+    assert reexports[(f"{package}.propagation", "evaluate_enumerated_paths")] == (
+        f"{package}.propagation.enumerated.engine"
+    )
+
+    # ``collect_import_edges`` keeps the raw facade target that owner and seam
+    # tests rely on ...
+    raw = graph.collect_import_edges(PACKAGE_ROOT)
+    assert any(
+        edge.source == f"{package}.montecarlo.bdpt.pipeline"
+        and edge.target == f"{package}.propagation"
+        and edge.imported_name == "evaluate_enumerated_paths"
+        for edge in raw
+    )
+
+    # ... while ``scan_package`` classifies the canonicalized edge.
+    violations = graph.scan_package(PACKAGE_ROOT)
+    enumerated = [
+        violation
+        for violation in violations
+        if violation.rule == "mc_enumerated_dependency"
+    ]
+    assert enumerated == [
+        graph.Violation(
+            "src/witwin/channel_native/montecarlo/bdpt/pipeline.py",
+            23,
+            0,
+            "mc_enumerated_dependency",
+            f"{package}.montecarlo.bdpt.pipeline",
+            f"{package}.propagation.enumerated.engine",
+        )
+    ]
+
+
+def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
+    allowlist = graph.load_allowlist(ALLOWLIST)
+    group = allowlist["debts"]["mc_enumerated_dependency"]
+
+    assert len(group["baseline"]) == 1
+    assert group["allowed"] == ["mc-enum-001"]
+
+    entry = group["baseline"][0]
+    assert entry["id"] == "mc-enum-001"
+    assert entry["rule"] == "mc_enumerated_dependency"
+    assert entry["source"] == "witwin.channel_native.montecarlo.bdpt.pipeline"
+    assert entry["target"] == "witwin.channel_native.propagation.enumerated.engine"
+    assert "ADR-008" in (entry.get("adr", "") + entry.get("justification", ""))
+
+    assert graph._DEBT_GROUP_BY_RULE["mc_enumerated_dependency"] == (
+        "mc_enumerated_dependency"
+    )
+
+    violations = graph.scan_package(PACKAGE_ROOT)
+    bound = [
+        violation
+        for violation in violations
+        if violation.rule == "mc_enumerated_dependency"
+    ]
+    assert len(bound) == 1
+    assert bound[0].source == "witwin.channel_native.montecarlo.bdpt.pipeline"
+
+
+def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": (
+                "from witwin.channel_native.materials.kernels import encoding\n"
+                "from witwin.channel_native.scattering.kernels import lobe\n"
+                "from witwin.channel_native.scene.kernels import handles\n"
+                "from witwin.channel_native.deterministic.kernels import accumulate\n"
+                "from witwin.channel_native.propagation.fields.kernels import transport\n"
+                "from witwin.channel_native.core.kernels import extension\n"
+            ),
+            "materials/kernels/encoding.py": "",
+            "scattering/kernels/lobe.py": "",
+            "scene/kernels/handles.py": "",
+            "deterministic/kernels/accumulate.py": "",
+            "propagation/fields/kernels/transport.py": "",
+            "core/kernels/extension.py": "",
+        },
+    )
+
+    rules = Counter(violation.rule for violation in graph.scan_package(package_root))
+
+    assert rules == {"public_init_internal": 6}
+
+
+def test_public_init_real_graph_only_admits_core_kernels_extension():
+    violations = graph.scan_package(PACKAGE_ROOT)
+    public_init_targets = {
+        violation.target
+        for violation in violations
+        if violation.rule == "public_init_internal"
+        and violation.source == "witwin.channel_native"
+    }
+
+    assert public_init_targets == {"witwin.channel_native.core.kernels.extension"}
+
+
+def test_reference_oracle_is_forbidden_from_production_dependencies(tmp_path: Path):
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "scattering/__init__.py": "",
+            "physics/oracle.py": "import torch\n",
+            "physics/reference/__init__.py": "",
+            "physics/reference/oracle.py": (
+                "import torch\nimport witwin.channel_native.scattering\n"
+            ),
+        },
+    )
+
+    rules = Counter(violation.rule for violation in graph.scan_package(package_root))
+
+    # Both the facade oracle and the reference implementation are held to the
+    # same production-dependency prohibition.
+    assert rules == {"oracle_production_dependency": 3}
 
 
 def test_cli_passes_with_repository_defaults(capsys):
