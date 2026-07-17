@@ -1,17 +1,37 @@
 from pathlib import Path
+import tomllib
 from types import SimpleNamespace
 
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 import pytest
 import torch
 
 from witwin.channel_native.runtime import torch_compat
 
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "src" / "witwin" / "channel_native"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PACKAGE_ROOT = REPO_ROOT / "src" / "witwin" / "channel_native"
+_INSTALLED_TORCH = torch.__version__.split("+", maxsplit=1)[0]
 
 
-def test_plain_tensor_and_cxx_abi_contract_on_supported_torch():
-    assert torch.__version__.split("+", maxsplit=1)[0] == "2.10.0"
+def _supported_torch_specs() -> list[str]:
+    with (REPO_ROOT / "ci" / "support-matrix.toml").open("rb") as stream:
+        runtimes = tomllib.load(stream)["runtime"]
+    return [runtime["torch_spec"] for runtime in runtimes]
+
+
+@pytest.mark.parametrize("installed_torch", [_INSTALLED_TORCH])
+def test_installed_torch_is_supported_and_cxx_abi_contract_holds(installed_torch):
+    # A single interpreter is validated here against the support matrix. The
+    # wheel-matrix tier re-runs this suite on every supported Torch build to
+    # provide the multi-version coverage that one installed environment cannot.
+    specs = _supported_torch_specs()
+    version = Version(installed_torch)
+    assert any(version in SpecifierSet(spec) for spec in specs), (
+        f"installed torch {installed_torch} is outside supported specs {specs}"
+    )
+
     value = torch.tensor([2.0])
 
     assert torch_compat.is_transform_wrapped_tensor(value) is False
