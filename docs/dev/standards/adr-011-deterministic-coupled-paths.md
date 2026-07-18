@@ -405,3 +405,22 @@ inside a coupled path rises above 1 (currently `max_reflections_in_coupled_path 
 1`); or (c) a TX face/edge visibility prefilter is added to bound the candidate
 count for city-scale grids. Each is an independent numerical/architecture change
 with its own evidence.
+
+## Revisit condition (c) evaluated 2026-07-18: TX-visibility prefilter — NEGATIVE
+
+Measured evidence (probes under `artifacts/ws2-perf/_cull_*.py`): a
+TX-visibility cull of the coupled candidate axes is NOT conservative — the
+shared (group, edge) candidate grid forces a symmetric shrink that removes
+geometrically-valid SECOND-leg paths (edges lit by the reflected field,
+groups lit by the diffracted field: exactly the compensator this ADR
+exists to add). On three_cube_320 it deletes 50/56/43% of valid cid-3/4/7
+rows and regresses the frozen P2 gates (RSB p95 excess +3.53 -> +5.22 dB,
+NMSE 0.0923 > coupled-OFF). And it does not achieve city feasibility:
+post-cull Munich/SF remain 30x/484x over the 1e6 per-receiver budget
+because the cid-7 D->D term is quadratic in edges and edge2 is not
+TX-prefilterable (a single receiver already exceeds the budget, so
+rx-streaming cannot rescue it). Conclusion: no TX-visibility prefilter
+ships. City-scale coupled requires a different candidate architecture -
+receiver-tile-local edge sets or edge2-aware (edge-to-edge visibility)
+pruning, and/or gating cid-7 at city scale - each its own numerical ADR
+with re-frozen evidence.
