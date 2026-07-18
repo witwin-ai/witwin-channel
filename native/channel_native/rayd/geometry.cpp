@@ -28,6 +28,25 @@ pybind11::dict cn_coupled_rd_finalize_cuda(
     at::Tensor receiver,
     bool reverse);
 at::Tensor cn_coupled_active_mask_cuda(at::Tensor lhs, at::Tensor rhs);
+std::vector<at::Tensor> cn_coupled_dd_prepare_cuda(
+    at::Tensor source,
+    at::Tensor receiver,
+    at::Tensor edge1_pos,
+    at::Tensor edge1_dir,
+    at::Tensor edge1_t_min,
+    at::Tensor edge1_t_max,
+    at::Tensor edge2_pos,
+    at::Tensor edge2_dir,
+    at::Tensor edge2_t_min,
+    at::Tensor edge2_t_max);
+pybind11::dict cn_coupled_dd_finalize_cuda(
+    at::Tensor prefix_active,
+    at::Tensor edge1_id,
+    at::Tensor edge2_id,
+    at::Tensor edge1_point,
+    at::Tensor edge2_point,
+    at::Tensor source,
+    at::Tensor receiver);
 
 namespace {
 
@@ -315,5 +334,93 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     out["virtual_source"] = prepared[2];
     out["predicted_reflection_position"] = prepared[3];
     out["suffix_blocker_primitive"] = suffix_blocker;
+    return out;
+}
+
+pybind11::dict cn_raydn_coupled_dd_geometry_forward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor edge1_id,
+    torch::Tensor edge1_pos,
+    torch::Tensor edge1_dir,
+    torch::Tensor edge1_t_min,
+    torch::Tensor edge1_t_max,
+    torch::Tensor edge2_id,
+    torch::Tensor edge2_pos,
+    torch::Tensor edge2_dir,
+    torch::Tensor edge2_t_min,
+    torch::Tensor edge2_t_max) {
+    check_vec3_table(source, "source");
+    check_vec3_table(receiver, "receiver");
+    check_flat_tensor(edge1_id, "edge1_id", at::kInt);
+    check_vec3_table(edge1_pos, "edge1_pos");
+    check_vec3_table(edge1_dir, "edge1_dir");
+    check_flat_tensor(edge1_t_min, "edge1_t_min", at::kFloat);
+    check_flat_tensor(edge1_t_max, "edge1_t_max", at::kFloat);
+    check_flat_tensor(edge2_id, "edge2_id", at::kInt);
+    check_vec3_table(edge2_pos, "edge2_pos");
+    check_vec3_table(edge2_dir, "edge2_dir");
+    check_flat_tensor(edge2_t_min, "edge2_t_min", at::kFloat);
+    check_flat_tensor(edge2_t_max, "edge2_t_max", at::kFloat);
+    const int64_t count = source.size(0);
+    TORCH_CHECK(receiver.size(0) == count, "receiver must match source rows");
+    TORCH_CHECK(edge1_id.size(0) == count && edge2_id.size(0) == count,
+                "edge ids must match source rows");
+    for (const auto &tensor : {edge1_pos, edge1_dir, edge2_pos, edge2_dir})
+        TORCH_CHECK(tensor.size(0) == count,
+                    "coupled double-diffraction vector tables must match source rows");
+    for (const auto &tensor : {edge1_t_min, edge1_t_max, edge2_t_min, edge2_t_max})
+        TORCH_CHECK(tensor.size(0) == count, "edge bounds must match source rows");
+
+    // Prepare the two-edge Fermat point pair (Q1 on e1, Q2 on e2).
+    std::vector<at::Tensor> prepared = cn_coupled_dd_prepare_cuda(
+        source,
+        receiver,
+        edge1_pos,
+        edge1_dir,
+        edge1_t_min,
+        edge1_t_max,
+        edge2_pos,
+        edge2_dir,
+        edge2_t_min,
+        edge2_t_max);
+    TORCH_CHECK(prepared.size() == 3,
+                "coupled D-D prepare returned an unexpected tensor count");
+    at::Tensor candidate_active = prepared[0];
+    at::Tensor q1 = prepared[1];
+    at::Tensor q2 = prepared[2];
+
+    // Three RayDN segment visibility queries (tx->Q1, Q1->Q2, Q2->rx), each
+    // gated by the candidate mask and ANDed into the row validity.
+    at::Tensor visible_leg1;
+    at::Tensor blocker_leg1;
+    at::Tensor tape_leg1;
+    raydn_visibility_forward_fn()(
+        scene_handle, &source, &q1, &candidate_active, &visible_leg1, &blocker_leg1, &tape_leg1);
+    at::Tensor visible_leg2;
+    at::Tensor blocker_leg2;
+    at::Tensor tape_leg2;
+    raydn_visibility_forward_fn()(
+        scene_handle, &q1, &q2, &candidate_active, &visible_leg2, &blocker_leg2, &tape_leg2);
+    at::Tensor visible_leg3;
+    at::Tensor blocker_leg3;
+    at::Tensor tape_leg3;
+    raydn_visibility_forward_fn()(
+        scene_handle, &q2, &receiver, &candidate_active, &visible_leg3, &blocker_leg3, &tape_leg3);
+
+    at::Tensor prefix_active = cn_coupled_active_mask_cuda(candidate_active, visible_leg1);
+    prefix_active = cn_coupled_active_mask_cuda(prefix_active, visible_leg2);
+    prefix_active = cn_coupled_active_mask_cuda(prefix_active, visible_leg3);
+
+    pybind11::dict out = cn_coupled_dd_finalize_cuda(
+        prefix_active,
+        edge1_id,
+        edge2_id,
+        q1,
+        q2,
+        source,
+        receiver);
+    out["candidate_active"] = candidate_active;
     return out;
 }

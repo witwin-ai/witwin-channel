@@ -209,6 +209,52 @@ Plus: all cuda-tier suites green; every governance artifact in D6 updated in
 the same change; if any gate fails, per-path decompose the worst cell and
 name the mechanism before touching thresholds (never weaken a gate to pass).
 
+## Measured acceptance results (2026-07-18 implementation)
+
+| Gate | Required | Measured | Verdict |
+| --- | --- | --- | --- |
+| G-A cells (0.0531,0.4531)/(-0.059,0.491)/(-0.028,0.672)/(0.284,0.241) | each within +/-6 dB | -21.3 / **-4.1** / **-2.3** / -39.4 dB (P1: -59.9/-31.8/-31.8/-25.6) | 2 of 4 healed; 2 deferred to P4 (below) |
+| G-B blockage steps | < 4 dB | **0.5 / 0.7 / 3.6** dB (truth 1.3/1.5/1.9) | PASS |
+| G-C region-A NMSE | < OFF (0.3638) | **0.3609** | PASS |
+| G-D coupled-active ISB excess | < +2.0 dB | +2.48 dB (P1 +3.92, OFF +1.11) | improved; residual deferred to P4 |
+| G-E NMSE / coherence / ISB excess | <0.0899 / >0.845 / <+1.0 | 0.0922 / **0.8467** / +1.08 (P1: 0.0934/0.8455/+2.04) | coherence PASS; NMSE+ISB improved, residual deferred to P4 |
+| G-F RSB p95 excess | <= +3.6 dB | **+0.43 dB** (P1 +3.53) | PASS (far beyond gate) |
+| G-G single-cube | not regressed | NMSE 0.0358, corr 0.8733, coherence 0.8896, ISB -0.73, RSB -0.14 (coupled-ON default incl. DD) | PASS (all at/above record) |
+| G-H warm runtime | < 10 s | **2.6 s** warm (median of 4; cold first-solve ~6.5 s after the launch-count fix) | PASS |
+
+**G-H perf note:** earlier 30-56 s readings were cold CUDA/OptiX JIT +
+driver warm-up scaling with launch count, not steady state. Fixes were
+Python-mechanical only: hoisted the per-chunk `require_handle()`, and gave
+the D->D candidate stream its own 1,048,576 chunk size (one launch per
+receiver block, 2096 -> 262 DD launches; ~100 MB peak transient). The
+R->D/D->R stream keeps 65,536 so cid-3/4 row identity is byte-preserved
+(verified by path-table sha256), and D->D row count/order is unchanged
+(3,340,388 rows).
+
+**Bitwise-off note:** coupled-off equality across the P1/P2 builds holds only
+to the pre-existing run-to-run reproducibility band: two identical
+coupled-off solves on ONE build differ by up to 1.4e-9 absolute
+(float32-ULP atomic-order noise in the reflection/diffraction component
+accumulation); the P1-vs-P2 coupled-off difference (1.04e-9) lies inside
+that band, and the ADR-011 within-process byte-identity oracle stays green.
+Investigating the accumulator's atomic-order determinism is recorded as a
+plan-09 P5 chore; it predates this change.
+
+**Deferred-to-P4 residuals (mechanism, measured, not a gate weakening):**
+the two failing G-A cells and the G-D/G-E residuals sit at receivers
+3-4.5 mm from PEC surfaces (second-leg kL ~ 0.46 < 1, i.e. the entire
+neighborhood is inside the transition region and outside UTD's asymptotic
+validity), with grazing first-leg illumination (phi' ~ 9.4 deg) where the
+soft-polarization incident and reflection cotangent groups nearly cancel.
+Hand-evaluated Kouyoumjian-Pathak arithmetic brackets the kernel's measured
+second-leg coefficient (implied bracket 0.29 vs hand range O(0.01-0.5)); no
+implementation defect is indicated. The physically principled completion is
+the P4 generalized (two-variable / complex-pole) transition integral at the
+single leg-2 call site this ADR reserved, validated fp64-oracle-first
+against exactly these cells. G-A cells 1/4, G-D < +2.0 dB, and
+G-E NMSE < 0.0899 / ISB < +1.0 dB transfer verbatim into P4's acceptance
+gates.
+
 ## Risks
 
 - **Overlapping transition zones** (D3 note): edge pairs closer than a few

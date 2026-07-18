@@ -568,7 +568,9 @@ def _evaluate_coupled_fields(
     launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     coupled_rows = torch.nonzero(
-        (topology.component_id == 3) | (topology.component_id == 4),
+        (topology.component_id == 3)
+        | (topology.component_id == 4)
+        | (topology.component_id == 7),
         as_tuple=False,
     ).reshape(-1)
     if int(coupled_rows.shape[0]) > 0:
@@ -592,17 +594,18 @@ def _evaluate_coupled_fields(
         edge_exterior = edge_geometry[10]
         coupled_geometry_ad = ad_enabled and geometry_ad
         if coupled_geometry_ad and _vertices_participate_in_ad(scene):
-            # The coupled chain consumes the wall plane and the edge tables
-            # through the stationary re-solve and the coupled field kernel,
+            # The coupled chain (cid 3/4 reflection-diffraction and cid 7 double
+            # diffraction, ADR-013) consumes the wall plane and the edge tables
+            # through the stationary re-solve and the coupled field kernels,
             # whose adjoints take them as frozen winners; a vertex gradient
             # through the coupled rows would therefore be silently
-            # incomplete. Fail loudly instead (plan 07 section 9.4).
+            # incomplete. Fail loudly instead (plan 07 section 9.4, ADR-013 D4).
             raise NotImplementedError(
-                "coupled reflection-diffraction paths do not support mesh "
-                "vertex gradients: the coupled stationary re-solve and the "
-                "coupled field adjoints treat the wall plane and the edge "
-                "tables as frozen winners, so d(coupled)/d(vertices) would "
-                "be silently missing. Drop the vertices requires_grad/"
+                "coupled reflection-diffraction and double-diffraction paths do "
+                "not support mesh vertex gradients: the coupled stationary "
+                "re-solve and the coupled field adjoints treat the wall plane "
+                "and the edge tables as frozen winners, so d(coupled)/d(vertices)"
+                " would be silently missing. Drop the vertices requires_grad/"
                 "tangent or disable coupled_paths."
             )
         if coupled_geometry_ad:
@@ -749,6 +752,127 @@ def _evaluate_coupled_fields(
             path_field.index_copy_(0, rows, evaluated["path_field"])
             path_gain.index_copy_(0, rows, evaluated["path_gain"])
             direction.index_copy_(0, rows, evaluated["direction"])
+            launch_count += 1
+
+        # ADR-013: coupled double diffraction (cid 7, TX->e1->e2->RX). Both
+        # interactions are diffraction (type 2), so both primitive_sequence
+        # slots carry edge ids; interaction_positions carry the frozen Fermat
+        # seeds [Q1, Q2]. The geometry is a pure addition to the coupled family
+        # and lands in the same coherent coupled slot as cid 3/4.
+        dd_rows = torch.nonzero(
+            topology.component_id == 7, as_tuple=False
+        ).reshape(-1)
+        if int(dd_rows.shape[0]) > 0:
+            edge1_id = topology.primitive_sequence[dd_rows, 0].to(dtype=torch.int64)
+            edge2_id = topology.primitive_sequence[dd_rows, 1].to(dtype=torch.int64)
+            q1 = geometry.interaction_positions[dd_rows, 0].contiguous()
+            q2 = geometry.interaction_positions[dd_rows, 1].contiguous()
+
+            def _dd_line_bounds(
+                edge_id: torch.Tensor, keller_point: torch.Tensor
+            ) -> tuple[torch.Tensor, torch.Tensor]:
+                # G4/ADR-013: edge-segment bounds relative to the passed Keller
+                # point along the normalized edge axis, so the native stationary
+                # machinery truncates and corner-mends each DD leg. Frozen
+                # (detached): DD rows carry no edge-geometry gradient; tx/rx
+                # gradient flows through source/target inside the native
+                # re-anchoring (same lookup path as the cid 3/4 single edge).
+                edge_ref = edge_geometry[1][edge_id]
+                edge_axis = edge_geometry[2][edge_id]
+                edge_axis = edge_axis / edge_axis.norm(
+                    dim=-1, keepdim=True
+                ).clamp_min(1.0e-12)
+                t_keller = (
+                    (keller_point.detach() - edge_ref) * edge_axis
+                ).sum(dim=-1)
+                line_min = (edge_geometry[4][edge_id] - t_keller).contiguous()
+                line_max = (edge_geometry[5][edge_id] - t_keller).contiguous()
+                return line_min, line_max
+
+            edge1_line_min, edge1_line_max = _dd_line_bounds(edge1_id, q1)
+            edge2_line_min, edge2_line_max = _dd_line_bounds(edge2_id, q2)
+
+            def _dd_wedge_faces(
+                edge_id: torch.Tensor,
+            ) -> tuple[torch.Tensor, torch.Tensor]:
+                face0 = edge_face0[edge_id]
+                raw_face1 = edge_face1[edge_id]
+                # Boundary edges have no second face; reuse face0 like cid 3/4.
+                face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
+                return face0, face1
+
+            edge1_face0, edge1_face1 = _dd_wedge_faces(edge1_id)
+            edge2_face0, edge2_face1 = _dd_wedge_faces(edge2_id)
+
+            def _dd_material_tuple(
+                face: torch.Tensor,
+            ) -> tuple[torch.Tensor, ...]:
+                return tuple(
+                    material[name][face].contiguous()
+                    for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
+                )
+
+            wedge1_material0 = _dd_material_tuple(edge1_face0)
+            wedge1_material1 = _dd_material_tuple(edge1_face1)
+            wedge2_material0 = _dd_material_tuple(edge2_face0)
+            wedge2_material1 = _dd_material_tuple(edge2_face1)
+
+            coupled_dd_field_op = (
+                partial(
+                    field_autograd.field_coupled_dd_ad,
+                    frequency=frequency,
+                    frequency_value=frequency_value,
+                )
+                if ad_enabled
+                else partial(
+                    field_functional.field_coupled_dd, frequency_hz=frequency
+                )
+            )
+            dd_args = (
+                source[dd_rows].contiguous(),
+                target[dd_rows].contiguous(),
+                q1,
+                edge_geometry[2][edge1_id].contiguous(),
+                edge_n0[edge1_id].contiguous(),
+                edge_n1[edge1_id].contiguous(),
+                edge_exterior[edge1_id].contiguous(),
+                q2,
+                edge_geometry[2][edge2_id].contiguous(),
+                edge_n0[edge2_id].contiguous(),
+                edge_n1[edge2_id].contiguous(),
+                edge_exterior[edge2_id].contiguous(),
+                source_power[dd_rows].contiguous(),
+                tx_pol[dd_rows].contiguous(),
+                rx_pol[dd_rows].contiguous(),
+            )
+            if ledger is not None:
+                ledger.add(
+                    *dd_args,
+                    *wedge1_material0,
+                    *wedge1_material1,
+                    *wedge2_material0,
+                    *wedge2_material1,
+                    edge1_line_min,
+                    edge1_line_max,
+                    edge2_line_min,
+                    edge2_line_max,
+                )
+            evaluated = coupled_dd_field_op(
+                *dd_args,
+                wedge1_material0,
+                wedge1_material1,
+                wedge2_material0,
+                wedge2_material1,
+                edge1_line_min,
+                edge1_line_max,
+                edge2_line_min,
+                edge2_line_max,
+            )
+            field_xyz.index_copy_(0, dd_rows, evaluated["field_vector"])
+            coefficient.index_copy_(0, dd_rows, evaluated["coefficient"])
+            path_field.index_copy_(0, dd_rows, evaluated["path_field"])
+            path_gain.index_copy_(0, dd_rows, evaluated["path_gain"])
+            direction.index_copy_(0, dd_rows, evaluated["direction"])
             launch_count += 1
     return material, launch_count
 

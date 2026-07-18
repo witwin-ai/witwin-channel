@@ -47,8 +47,16 @@ def test_coupled_owner_preserves_function_and_constant_identity():
     assert coupled.iter_coupled_candidate_requests is (
         discovery_coupled.iter_coupled_candidate_requests
     )
+    # ADR-013 cid 7: the D->D discovery/geometry symbols share the same owners.
+    assert coupled.iter_coupled_dd_candidate_requests is (
+        discovery_coupled.iter_coupled_dd_candidate_requests
+    )
     assert coupled.CoupledGeometryQuery is geometry_coupled.CoupledGeometryQuery
     assert coupled.query_coupled_geometry is geometry_coupled.query_coupled_geometry
+    assert coupled.CoupledDdGeometryQuery is geometry_coupled.CoupledDdGeometryQuery
+    assert coupled.query_coupled_dd_geometry is (
+        geometry_coupled.query_coupled_dd_geometry
+    )
 
 
 def test_enumerated_coupled_consumes_named_geometry_only():
@@ -77,6 +85,9 @@ def test_enumerated_coupled_consumes_named_geometry_only():
     }
     assert "prepare_coupled_candidate_plan" in call_names
     assert "iter_coupled_candidate_requests" in call_names
+    # ADR-013 cid 7: the D->D stream is consumed in the same block worker.
+    assert "iter_coupled_dd_candidate_requests" in call_names
+    assert "query_coupled_dd_geometry" in call_names
     assert "arange" not in call_names
 
 

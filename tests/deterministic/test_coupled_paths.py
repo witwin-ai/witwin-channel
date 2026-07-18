@@ -96,7 +96,10 @@ def test_coupled_on_exports_finite_nonzero_coupled_component():
         ),
     )
 
-    assert result.metadata["coupled_paths"]["geometry"] == "native_1r1d_reciprocal"
+    assert (
+        result.metadata["coupled_paths"]["geometry"]
+        == "native_1r1d_reciprocal_plus_dd"
+    )
     assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
     assert result.metadata["counts"]["components"].get("coupled", 0) > 0
 
@@ -171,3 +174,82 @@ def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
         solve(coupled_wall_wedge_scene(), config)
+
+
+def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
+    """The budget guard counts the D->D union and fires before any launch.
+
+    ADR-013 D1 folds the one-direction ordered edge-pair stream
+    (edges*(edges-1)) into the per-receiver candidate budget alongside the two
+    R->D / D->R directions. A one-candidate budget cannot fit that union, so the
+    shared plan raises before either the coupled R-D or the coupled D-D geometry
+    kernel launches; neither bridge may run as a reduced fallback.
+    """
+
+    _require_native()
+    monkeypatch.setattr(
+        geometry_bridge,
+        "raydn_coupled_rd_geometry_forward",
+        lambda *_args, **_kwargs: pytest.fail(
+            "coupled R-D kernel launched before the candidate guard"
+        ),
+    )
+    monkeypatch.setattr(
+        geometry_bridge,
+        "raydn_coupled_dd_geometry_forward",
+        lambda *_args, **_kwargs: pytest.fail(
+            "coupled D-D kernel launched before the candidate guard"
+        ),
+    )
+    config = Config(
+        components=_BASE_COMPONENTS,
+        max_depth=2,
+        coupled_paths=True,
+        coupled_candidate_limit=1,
+    )
+    with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
+        solve(coupled_wall_wedge_scene(), config)
+
+
+def test_coupled_on_double_diffraction_keeps_coupled_component_finite_nonzero():
+    """With D->D in the coupled union the coupled component stays finite/nonzero.
+
+    ADR-013 D5: cid 7 double-diffraction rows aggregate into the same coupled
+    slot as cid 3/4, and the path table keeps cid 7 distinct for audits. The
+    coupled component map must remain finite and non-zero, the coherent total
+    must still equal the sum of the coherent components, and any cid 7 rows the
+    scene produces must carry finite fields (never NaN, never a silent zero).
+    """
+
+    _require_native()
+    scene = coupled_wall_wedge_scene()
+    result = solve(
+        scene,
+        Config(
+            components=_BASE_COMPONENTS,
+            max_depth=2,
+            coupled_paths=True,
+            export_paths=True,
+        ),
+    )
+
+    assert "coupled" in result.component_fields
+    coupled_field = result.component_fields["coupled"]
+    assert torch.isfinite(coupled_field.real).all()
+    assert torch.isfinite(coupled_field.imag).all()
+    assert float(coupled_field.abs().sum()) > 0.0
+
+    assert result.paths is not None
+    cid = result.paths.component_id
+    # cid 7 is a distinct exported component id (kept separate from the
+    # aggregated coupled cids 3/4); when the scene produces such rows the
+    # exported field must be finite rather than a silent zero.
+    dd_rows = cid == 7
+    if bool(dd_rows.any()):
+        assert torch.isfinite(result.paths.field_real[dd_rows]).all()
+        assert torch.isfinite(result.paths.field_imag[dd_rows]).all()
+
+    component_sum = torch.zeros_like(result.field)
+    for tensor in result.component_fields.values():
+        component_sum = component_sum + tensor
+    torch.testing.assert_close(result.field, component_sum, rtol=1.0e-5, atol=1.0e-6)

@@ -309,7 +309,7 @@
     }
   ],
   "binding_ownership": {
-    "expected_count": 179,
+    "expected_count": 183,
     "baseline": "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/bindings.json",
     "evidence": {
       "kind": "python_source_reference",
@@ -413,6 +413,9 @@
       "em_layer_stack_backward",
       "em_layer_stack_eval",
       "em_layer_stack_jvp",
+      "field_coupled_dd",
+      "field_coupled_dd_backward",
+      "field_coupled_dd_jvp",
       "field_coupled_rd",
       "field_coupled_rd_backward",
       "field_coupled_rd_jvp",
@@ -476,6 +479,7 @@
       "path_los_visibility_inputs",
       "path_merge_blocks",
       "path_reflection_candidates",
+      "raydn_coupled_dd_geometry_forward",
       "raydn_coupled_rd_geometry_forward",
       "raydn_diffraction_paths_order1_forward",
       "raydn_intersect_backward",

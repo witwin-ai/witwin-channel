@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .autograd import (
     _CoupledRdPrepareAdFunction,
+    _FieldCoupledDdAdFunction,
     _FieldCoupledRdAdFunction,
     _FieldDiffractionWedgeAdFunction,
     _FieldFreeSpaceAdFunction,
@@ -9,6 +10,7 @@ from .autograd import (
     _FieldReflectionSequenceAdFunction,
     _FieldTransmissionSequenceAdFunction,
     coupled_rd_prepare_ad,
+    field_coupled_dd_ad,
     field_coupled_rd_ad,
     field_diffraction_wedge_ad,
     field_free_space_ad,
@@ -17,6 +19,7 @@ from .autograd import (
     field_transmission_sequence_ad,
 )
 from .functional import (
+    field_coupled_dd,
     field_coupled_rd,
     field_diffraction_wedge,
     field_free_space,
@@ -41,6 +44,7 @@ from .rough_scale import (
 
 __all__ = [
     "_CoupledRdPrepareAdFunction",
+    "_FieldCoupledDdAdFunction",
     "_FieldCoupledRdAdFunction",
     "_FieldDiffractionWedgeAdFunction",
     "_FieldFreeSpaceAdFunction",
@@ -49,6 +53,8 @@ __all__ = [
     "_FieldRoughReflectionScaleAdFunction",
     "_FieldTransmissionSequenceAdFunction",
     "coupled_rd_prepare_ad",
+    "field_coupled_dd",
+    "field_coupled_dd_ad",
     "field_coupled_rd",
     "field_coupled_rd_ad",
     "field_diffraction_wedge",

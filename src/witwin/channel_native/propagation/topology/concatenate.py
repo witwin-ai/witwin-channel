@@ -101,6 +101,12 @@ def _interaction_type_sequence(
         diffraction_reflection = (component_id == 4) & (depth >= 2)
         result[diffraction_reflection, 0] = 2
         result[diffraction_reflection, 1] = 1
+        # component_id 7 = double diffraction: two sequential edge (DIFFRACTION)
+        # events. Both slots carry the edge object ids in primitive_sequence, so
+        # the canonical dedup key keeps distinct edge pairs distinct.
+        double_diffraction = (component_id == 7) & (depth >= 2)
+        result[double_diffraction, 0] = 2
+        result[double_diffraction, 1] = 2
     return result.contiguous()
 
 

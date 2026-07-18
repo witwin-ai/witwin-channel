@@ -42,6 +42,13 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     )
     assert path["max_reflections_in_coupled_path"] == 1
     assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
+    # ADR-013 D5: coupled_paths=True now enables the uniform order-2
+    # compensator family including cid 7 double diffraction (D->D). The key is
+    # exposed on every solver block that declares coupling support.
+    assert path["coupled_double_diffraction"] is True
+    assert manifest["solvers"]["deterministic"]["coupled_double_diffraction"] is True
+    assert manifest["solvers"]["montecarlo_bdpt"]["coupled_double_diffraction"] is True
+    assert "coupled_double_diffraction" not in manifest["solvers"]["montecarlo_basic"]
     assert manifest["supports_ad"] is True
     materials = manifest["materials"]
     assert materials["abi_version"] == 3

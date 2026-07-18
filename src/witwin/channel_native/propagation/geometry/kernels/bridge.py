@@ -258,6 +258,68 @@ def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     return out
 
 
+def raydn_coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+    """Construct two-edge (double) diffraction geometry without a coefficient.
+
+    The native operation runs an alternating-projection Fermat solve for the
+    two-edge Keller point pair (Q1 on e1, Q2 on e2) and three RayDN segment
+    visibility queries (tx->Q1, Q1->Q2, Q2->rx). Both edge ids are recoverable
+    from ``edge_sequence`` (slot 0 = e1, slot 1 = e2); ``primitive_sequence`` is
+    fully ``-1`` because a double-diffraction row touches no face. The returned
+    dictionary intentionally carries no ``path_gain``/``field`` entry; complex
+    transport belongs to the unified field phase.
+    """
+
+    if not args:
+        raise TypeError(
+            "raydn_coupled_dd_geometry_forward requires a RayDN scene handle"
+        )
+    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    out = _required_native_op("raydn_coupled_dd_geometry_forward")(
+        *native_args,
+    )
+    if not isinstance(out, dict):
+        raise TypeError(
+            "_channel_native.raydn_coupled_dd_geometry_forward must return a dict"
+        )
+    required = {
+        "valid": (torch.bool, 1),
+        "interaction_type_sequence": (torch.int32, 2),
+        "primitive_sequence": (torch.int32, 2),
+        "edge_sequence": (torch.int32, 2),
+        "edge1_id": (torch.int32, 1),
+        "edge2_id": (torch.int32, 1),
+        "interaction_positions": (torch.float32, 3),
+        "interaction_normals": (torch.float32, 3),
+        "edge1_position": (torch.float32, 2),
+        "edge2_position": (torch.float32, 2),
+        "path_length_m": (torch.float32, 1),
+        "delay_s": (torch.float32, 1),
+    }
+    for name, (dtype, ndim) in required.items():
+        value = out.get(name)
+        if not isinstance(value, torch.Tensor):
+            raise TypeError(f"coupled DD geometry output {name!r} must be a tensor")
+        validate_cuda_tensor(name, value, dtype=dtype, ndim=ndim)
+    if "path_gain" in out or "field" in out or "path_field" in out:
+        raise ValueError(
+            "coupled DD geometry must not expose placeholder physical coefficients"
+        )
+    count = int(out["valid"].shape[0])
+    if out["interaction_type_sequence"].shape != (count, 2):
+        raise ValueError("interaction_type_sequence must have shape (N, 2)")
+    if out["primitive_sequence"].shape != (count, 2) or out["edge_sequence"].shape != (
+        count,
+        2,
+    ):
+        raise ValueError("coupled DD primitive/edge sequences must have shape (N, 2)")
+    if out["interaction_positions"].shape != (count, 2, 3):
+        raise ValueError("interaction_positions must have shape (N, 2, 3)")
+    if out["interaction_normals"].shape != (count, 2, 3):
+        raise ValueError("interaction_normals must have shape (N, 2, 3)")
+    return out
+
+
 def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
@@ -281,6 +343,7 @@ __all__ = [
     "bdpt_intersect_forward",
     "bdpt_reflection_accumulation_forward",
     "bdpt_visibility_forward",
+    "raydn_coupled_dd_geometry_forward",
     "raydn_coupled_rd_geometry_forward",
     "raydn_diffraction_accumulation_forward",
     "raydn_diffraction_discover_edges",

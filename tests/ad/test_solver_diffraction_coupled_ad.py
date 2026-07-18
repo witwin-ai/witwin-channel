@@ -475,3 +475,166 @@ def test_coupled_endpoint_position_grad_matches_fd(endpoint):
 
     expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
     assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+# ---------------------------------------------------------------------------
+# Coupled double diffraction (component 7, ADR-013 D4). The coupled fixture
+# (an off-mirror-symmetry box, _COUPLED_TX/_COUPLED_RX asymmetric, see the
+# _COUPLED_TX note and trap 8) produces cid-7 rows: both interactions along a
+# path are diffraction (type 2). These tests isolate the DD rows so the
+# cn_field_coupled_dd_backward / _jvp companions are exercised directly.
+# ---------------------------------------------------------------------------
+
+
+def _dd_mask(result) -> torch.Tensor:
+    # A DD (cid-7) path carries two diffraction (type 2) events and nothing
+    # else, so both interaction slots equal 2.
+    types = result.interaction_type
+    return (types == 2).sum(dim=-1) == 2
+
+
+def _assert_dd_rows(result) -> None:
+    assert bool(
+        _dd_mask(result).any()
+    ), "the coupled fixture no longer produces double-diffraction (cid 7) paths"
+
+
+def _dd_loss(result) -> torch.Tensor:
+    # Sum only the double-diffraction coefficients so the loss depends solely on
+    # the cid-7 rows (drops the trailing per-antenna singleton of result.a).
+    coefficient = result.a[..., 0][_dd_mask(result)]
+    return coefficient.real.sum() + 0.5 * coefficient.imag.sum()
+
+
+# Same box geometry as coupled_wall_wedge_scene, but with a live vertices leaf
+# so the coupled mesh-vertex refusal (ADR-013 D4) can be exercised. Kept off any
+# mirror symmetry via the asymmetric TX/RX (trap 8).
+_COUPLED_VERTICES = (
+    (-5.0, -5.0, 0.0),
+    (5.0, -5.0, 0.0),
+    (5.0, 5.0, 0.0),
+    (-5.0, 5.0, 0.0),
+    (2.0, -1.0, 2.0),
+    (2.0, 1.0, 2.0),
+    (4.0, -1.0, 2.0),
+    (4.0, 1.0, 2.0),
+    (2.0, -1.0, 4.0),
+    (2.0, 1.0, 4.0),
+)
+_COUPLED_FACES = (
+    [0, 1, 2],
+    [0, 2, 3],
+    [4, 6, 7],
+    [4, 7, 5],
+    [4, 5, 9],
+    [4, 9, 8],
+)
+
+
+def _coupled_vertex_scene(vertices: torch.Tensor) -> Scene:
+    structure = Structure(
+        vertices=vertices,
+        faces=torch.tensor(_COUPLED_FACES, dtype=torch.int32),
+        material=Dielectric(**_WEDGE_MATERIAL),
+        surface_id=0,
+    )
+    return Scene(
+        structures=[structure],
+        transmitters=[Transmitter(position=torch.tensor(_COUPLED_TX))],
+        receivers=[ReceiverPoint(position=torch.tensor(_COUPLED_RX))],
+        frequency=_FREQUENCY_HZ,
+    )
+
+
+@pytest.mark.parametrize("ad_mode", ("vjp", "jvp"))
+def test_coupled_dd_runs_under_ad_modes(ad_mode):
+    """The cid-7 field op dispatches through its AD Function in both AD modes."""
+
+    scene = _coupled_scene()
+    result = _solve_coupled(scene, ad_mode)
+    _assert_dd_rows(result)
+    assert bool(torch.isfinite(result.a).all())
+
+
+@pytest.mark.parametrize("endpoint", ("tx", "rx"))
+def test_coupled_dd_endpoint_position_grad_matches_fd(endpoint):
+    """DD-only endpoint (tx AND rx) grads vs central differences of the primal.
+
+    tx/rx gradients flow through the native per-leg re-anchoring inside the
+    coupled_dd field kernel; Q1/Q2 and the edge bounds are frozen (ADR-013 D4).
+    """
+
+    base = torch.tensor(
+        _COUPLED_TX if endpoint == "tx" else _COUPLED_RX, dtype=torch.float32
+    )
+    leaf = base.clone().cuda().requires_grad_(True)
+    scene = _coupled_scene(**{endpoint: leaf})
+    result = _solve_coupled(scene, "vjp")
+    _assert_dd_rows(result)
+    _dd_loss(result).backward()
+    assert leaf.grad is not None
+    assert float(leaf.grad.abs().max()) > 0.0
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        fd_scene = _coupled_scene(**{endpoint: values.clone()})
+        return _dd_loss(_solve_coupled(fd_scene, "none")).detach()
+
+    expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
+    assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+def test_coupled_dd_forward_mode_matches_reverse():
+    """JVP-vs-VJP inner-product duality on the wedge eps_r seed for cid-7 rows.
+
+    Fires cn_field_coupled_dd_jvp (forward dual) and cn_field_coupled_dd_backward
+    (reverse) and checks they agree on the DD-only loss.
+    """
+
+    scene = _coupled_scene()
+    compiled = scene.compile()
+    base = compiled.materials.eps_r
+    tangent = torch.ones_like(base)
+    with torch.autograd.forward_ad.dual_level():
+        dual = torch.autograd.forward_ad.make_dual(base.detach().clone(), tangent)
+        object.__setattr__(compiled.materials, "eps_r", dual)
+        try:
+            result = _solve_coupled(scene, "jvp")
+            _assert_dd_rows(result)
+            mask = _dd_mask(result)
+            tangent_a = torch.autograd.forward_ad.unpack_dual(
+                result.a[..., 0]
+            ).tangent
+        finally:
+            object.__setattr__(compiled.materials, "eps_r", base)
+    assert tangent_a is not None
+    tangent_dd = tangent_a[mask]
+    jvp = tangent_dd.real.sum() + 0.5 * tangent_dd.imag.sum()
+
+    base.requires_grad_(True)
+    try:
+        _dd_loss(_solve_coupled(scene, "vjp")).backward()
+        assert base.grad is not None
+        vjp = (base.grad * tangent).sum()
+    finally:
+        base.requires_grad_(False)
+        base.grad = None
+    assert float(jvp.abs()) > 0.0
+    assert relative_error(jvp, vjp, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+def test_coupled_dd_mesh_vertex_grad_raises_loudly():
+    """A live mesh-vertex leaf through the coupled family fails loudly (ADR-013 D4).
+
+    The coupled stationary re-solve and the coupled/DD field adjoints treat the
+    edge tables as frozen winners, so d(coupled)/d(vertices) would be silently
+    missing; evaluation.py refuses instead of returning an incomplete gradient.
+    """
+
+    vertices = (
+        torch.tensor(_COUPLED_VERTICES, dtype=torch.float32)
+        .cuda()
+        .requires_grad_(True)
+    )
+    scene = _coupled_vertex_scene(vertices)
+    with pytest.raises(NotImplementedError, match="double-diffraction"):
+        _solve_coupled(scene, "vjp")

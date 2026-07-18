@@ -68,3 +68,6 @@ build.ninja
 .codex-tmp/
 .test-tmp/
 .tmp/
+
+# git worktrees created by the /wtree skill
+.worktrees/

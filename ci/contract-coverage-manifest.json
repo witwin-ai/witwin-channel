@@ -40,7 +40,8 @@
     "native-scattering": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
     "native-field-rough-scale": "tests/kernels/test_field_rough_reflection_scale.py::test_rough_reflection_scale_contract_shapes_and_dtypes",
     "native-scattering-ensemble": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
-    "native-scattering-patch-integral": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes"
+    "native-scattering-patch-integral": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes",
+    "native-coupled-dd-geometry": "tests/propagation/geometry/test_coupled.py::test_coupled_dd_query_names_raw_geometry_and_preserves_identity"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -73,7 +74,8 @@
     "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive",
     "deterministic-rough-reflection-ad": "tests/ad/test_solver_rough_reflection_ad.py::test_rough_reflection_frequency_grad_matches_fd",
     "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
-    "deterministic-scattering-realization": "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection"
+    "deterministic-scattering-realization": "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection",
+    "deterministic-coupled": "tests/deterministic/test_coupled_paths.py::test_coupled_on_exports_finite_nonzero_coupled_component"
   },
   "public_exports": [
     [
@@ -1193,6 +1195,33 @@
       ]
     ],
     [
+      "field_coupled_dd",
+      "witwin.channel_native.propagation.fields.kernels.functional.field_coupled_dd",
+      "named_wrapper",
+      "native-field-coupled",
+      [
+        "deterministic-coupled"
+      ]
+    ],
+    [
+      "field_coupled_dd_backward",
+      "witwin.channel_native.propagation.fields.kernels.autograd._FieldCoupledDdAdFunction.backward",
+      "native_call_site",
+      "native-field-coupled",
+      [
+        "field-coupled"
+      ]
+    ],
+    [
+      "field_coupled_dd_jvp",
+      "witwin.channel_native.propagation.fields.kernels.autograd._FieldCoupledDdAdFunction.jvp",
+      "native_call_site",
+      "native-field-coupled",
+      [
+        "field-coupled"
+      ]
+    ],
+    [
       "field_coupled_rd",
       "witwin.channel_native.propagation.fields.kernels.functional.field_coupled_rd",
       "named_wrapper",
@@ -1758,6 +1787,15 @@
       "native-path-topology",
       [
         "path-reflection"
+      ]
+    ],
+    [
+      "raydn_coupled_dd_geometry_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_dd_geometry_forward",
+      "named_wrapper",
+      "native-coupled-dd-geometry",
+      [
+        "deterministic-coupled"
       ]
     ],
     [

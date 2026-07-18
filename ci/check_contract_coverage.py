@@ -26,8 +26,12 @@ BINDING_BASELINE_PATH = Path("ci/native-binding-manifest.json")
 PHASE10_AUDIT_PATH = Path("docs/dev/audit/phase10-legacy-dead-binding.json")
 PYTHON_PACKAGE_PATH = Path("src/witwin/channel_native")
 EXPECTED_PUBLIC_EXPORT_COUNT = 37
-# 174 phase-0 symbols + 5 ADR-010 native scattering/rough-reflection kernels.
-EXPECTED_NATIVE_BINDING_COUNT = 179
+# 174 phase-0 symbols + 5 ADR-010 native scattering/rough-reflection kernels
+# + 2 ADR-013 coupled double-diffraction forward symbols (field_coupled_dd,
+# raydn_coupled_dd_geometry_forward). The two AD companions
+# (field_coupled_dd_backward/jvp) land with the parallel AD change and bump
+# this to 183 together with their manifest, phase10, and coverage entries.
+EXPECTED_NATIVE_BINDING_COUNT = 183
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",

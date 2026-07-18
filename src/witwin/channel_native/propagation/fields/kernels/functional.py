@@ -377,6 +377,135 @@ def field_coupled_rd(
     return out
 
 
+def field_coupled_dd(
+    source: torch.Tensor,
+    target: torch.Tensor,
+    edge1_position: torch.Tensor,
+    edge1_direction: torch.Tensor,
+    edge1_n0: torch.Tensor,
+    edge1_n1: torch.Tensor,
+    edge1_exterior: torch.Tensor,
+    edge2_position: torch.Tensor,
+    edge2_direction: torch.Tensor,
+    edge2_n0: torch.Tensor,
+    edge2_n1: torch.Tensor,
+    edge2_exterior: torch.Tensor,
+    tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor,
+    wedge1_material0: tuple[torch.Tensor, ...],
+    wedge1_material1: tuple[torch.Tensor, ...],
+    wedge2_material0: tuple[torch.Tensor, ...],
+    wedge2_material1: tuple[torch.Tensor, ...],
+    edge1_line_min: torch.Tensor,
+    edge1_line_max: torch.Tensor,
+    edge2_line_min: torch.Tensor,
+    edge2_line_max: torch.Tensor,
+    *,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    """Coupled double-diffraction field (TX->e1->e2->RX), component id 7.
+
+    Two sequential wedge operators in one native launch (ADR-013 D3). Outputs
+    are identical in shape to :func:`field_coupled_rd`.
+    """
+
+    vectors = (
+        source,
+        target,
+        edge1_position,
+        edge1_direction,
+        edge1_n0,
+        edge1_n1,
+        edge2_position,
+        edge2_direction,
+        edge2_n0,
+        edge2_n1,
+        tx_polarization,
+        rx_polarization,
+    )
+    count = int(source.shape[0])
+    for value in vectors:
+        validate_cuda_tensor(
+            "coupled_dd_vector", value, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+        )
+        if value.shape != (count, 3):
+            raise ValueError("coupled dd field vector tensors must have shape (N, 3)")
+    if any(
+        len(bundle) != 5
+        for bundle in (
+            wedge1_material0,
+            wedge1_material1,
+            wedge2_material0,
+            wedge2_material1,
+        )
+    ):
+        raise ValueError(
+            "coupled dd material bundles must contain eps/sigma/mu/gain/thickness"
+        )
+    scalars = (
+        edge1_exterior,
+        edge2_exterior,
+        tx_power,
+        *wedge1_material0,
+        *wedge1_material1,
+        *wedge2_material0,
+        *wedge2_material1,
+        edge1_line_min,
+        edge1_line_max,
+        edge2_line_min,
+        edge2_line_max,
+    )
+    for value in scalars:
+        validate_cuda_tensor("coupled_dd_scalar", value, dtype=torch.float32, ndim=1)
+        if value.shape != (count,):
+            raise ValueError("coupled dd field scalar tensors must have shape (N,)")
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    out = _required_native_op("field_coupled_dd")(
+        source,
+        target,
+        edge1_position,
+        edge1_direction,
+        edge1_n0,
+        edge1_n1,
+        edge1_exterior,
+        edge2_position,
+        edge2_direction,
+        edge2_n0,
+        edge2_n1,
+        edge2_exterior,
+        tx_power,
+        tx_polarization,
+        rx_polarization,
+        *wedge1_material0,
+        *wedge1_material1,
+        *wedge2_material0,
+        *wedge2_material1,
+        edge1_line_min,
+        edge1_line_max,
+        edge2_line_min,
+        edge2_line_max,
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict):
+        raise TypeError("_channel_native.field_coupled_dd must return a dict")
+    schema = {
+        "field_vector": (torch.complex64, 2, (count, 3)),
+        "coefficient": (torch.complex64, 1, (count,)),
+        "path_field": (torch.complex64, 1, (count,)),
+        "path_gain": (torch.float32, 1, (count,)),
+        "direction": (torch.float32, 2, (count, 3)),
+    }
+    if set(out) != set(schema):
+        raise ValueError("field_coupled_dd returned unexpected fields")
+    for name, (dtype, ndim, shape) in schema.items():
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+        if tuple(out[name].shape) != shape:
+            raise ValueError(f"field_coupled_dd returned bad {name} shape")
+    return out
+
+
 _FIELD_AD_OUTPUT_FIELDS = (
     "field_vector",
     "coefficient",
@@ -981,6 +1110,7 @@ def field_rough_reflection_scale_jvp(
 
 
 __all__ = [
+    "field_coupled_dd",
     "field_coupled_rd",
     "field_diffraction_wedge",
     "field_free_space",

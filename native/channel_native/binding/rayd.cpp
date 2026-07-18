@@ -159,6 +159,20 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     torch::Tensor surface_group_size,
     torch::Tensor surface_group_members,
     bool reverse);
+pybind11::dict cn_raydn_coupled_dd_geometry_forward(
+    int64_t scene_handle,
+    torch::Tensor source,
+    torch::Tensor receiver,
+    torch::Tensor edge1_id,
+    torch::Tensor edge1_pos,
+    torch::Tensor edge1_dir,
+    torch::Tensor edge1_t_min,
+    torch::Tensor edge1_t_max,
+    torch::Tensor edge2_id,
+    torch::Tensor edge2_pos,
+    torch::Tensor edge2_dir,
+    torch::Tensor edge2_t_min,
+    torch::Tensor edge2_t_max);
 pybind11::tuple cn_bdpt_reflection_accumulation_forward(
     int64_t scene_handle,
     torch::Tensor ray_o,
@@ -370,6 +384,10 @@ void register_rayd_geometry(pybind11::module_ &module) {
         "raydn_coupled_rd_geometry_forward",
         &cn_raydn_coupled_rd_geometry_forward,
         "Construct one-reflection/one-diffraction geometry with RayDN EPC and visibility; no field coefficient is evaluated.");
+    module.def(
+        "raydn_coupled_dd_geometry_forward",
+        &cn_raydn_coupled_dd_geometry_forward,
+        "Construct two-edge (double) diffraction geometry with an alternating-projection Fermat solve and RayDN segment visibility; no field coefficient is evaluated.");
 }
 
 void register_rayd_accumulation(pybind11::module_ &module) {

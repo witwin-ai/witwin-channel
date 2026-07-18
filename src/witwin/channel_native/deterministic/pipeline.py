@@ -63,10 +63,15 @@ def _validate_requested_components(config: Config) -> None:
             )
 
 
-def _coupled_paths_metadata(config: Config) -> dict[str, Any]:
-    """Coupled reflection-diffraction metadata block (ADR-011).
+def _coupled_paths_metadata(
+    config: Config, component_counts: dict[str, int] | None = None
+) -> dict[str, Any]:
+    """Coupled higher-order compensator metadata block (ADR-011 + ADR-013).
 
-    Mirrors the path solver's coupled_paths block.
+    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
+    enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
+    (component id 7) member is reported as its own row count for audits while it
+    aggregates into the single coherent coupled slot.
     """
 
     if not config.coupled_paths:
@@ -75,10 +80,16 @@ def _coupled_paths_metadata(config: Config) -> dict[str, Any]:
             "geometry": "not_requested",
             "coefficient": "not_requested",
         }
+    counts = component_counts or {}
     return {
         "requested": True,
-        "geometry": "native_1r1d_reciprocal",
+        "geometry": "native_1r1d_reciprocal_plus_dd",
         "coefficient": "unified_complex3_jones",
+        "double_diffraction": {
+            "geometry": "native_dd_cascade",
+            "component_id": 7,
+            "row_count": int(counts.get("coupled_double_diffraction", 0)),
+        },
     }
 
 
@@ -88,17 +99,24 @@ def _register_coupled_component(
     component_counts: dict[str, int],
     extra_components: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Record the coupled component count and export name (ADR-011).
+    """Record the coupled component count and export name (ADR-011 + ADR-013).
 
-    Coupled rows carry component ids 3 (R->D) and 4 (D->R); both accumulate
-    into the single coupled slot. "coupled" is not a public component name, so
-    it is enabled by the coupled_paths gate rather than the components set.
+    Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, ADR-013);
+    all three accumulate into the single coupled slot. "coupled" is not a public
+    component name, so it is enabled by the coupled_paths gate rather than the
+    components set. The DD row count is recorded separately for audits.
     """
 
     if not config.coupled_paths:
         return extra_components
+    component_id = topology.component_id
     component_counts["coupled"] = int(
-        ((topology.component_id == 3) | (topology.component_id == 4)).sum().item()
+        (
+            (component_id == 3) | (component_id == 4) | (component_id == 7)
+        ).sum().item()
+    )
+    component_counts["coupled_double_diffraction"] = int(
+        (component_id == 7).sum().item()
     )
     return extra_components + ("coupled",)
 
@@ -199,9 +217,9 @@ def _metadata(
         "field_abi": "complex3_v1",
         "phase_convention": dict(PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
-        # Coupled reflection-diffraction compensator (ADR-011); mirrors the
-        # path solver's coupled_paths metadata block.
-        "coupled_paths": _coupled_paths_metadata(config),
+        # Coupled higher-order compensator family (ADR-011 R->D/D->R + ADR-013
+        # D->D); mirrors the path solver's coupled_paths metadata block.
+        "coupled_paths": _coupled_paths_metadata(config, component_counts),
     }
     if metadata_transmission is not None:
         metadata["transmission"] = metadata_transmission

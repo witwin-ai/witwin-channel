@@ -318,6 +318,15 @@ benchmark default (coupled ON): envelope NMSE < 0.12, magnitude correlation
 RSB p95 excess < 4.5 dB. Any tightening must come with a new recorded run;
 never weaken these to pass a change.
 
+**ADR-013 D->D update (2026-07-18):** with double diffraction in the
+coupled family the recorded coupled-ON numbers improve to envelope NMSE
+0.0922, coherence 0.8467, ISB p95 excess +1.08 dB, RSB p95 excess
+**+0.43 dB**, blockage-boundary steps 0.5/0.7/3.6 dB (truth 1.3/1.5/1.9),
+warm solve 2.6 s; the single-cube benchmark is unchanged-or-better (NMSE
+0.0358, coherence 0.8896). Full gate table and the lambda/20 near-field
+residuals deferred to P4 are recorded in ADR-013's measured-acceptance
+section.
+
 ### Three-cube deterministic visualization
 
 The following commands generate and plot only the deterministic legacy

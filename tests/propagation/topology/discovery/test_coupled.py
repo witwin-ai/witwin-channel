@@ -17,7 +17,7 @@ def test_prepare_coupled_candidate_plan_freezes_counts_and_tensor_identity():
         rx_count=3,
         representative_faces=representative_faces,
         selected_edges=selected_edges,
-        candidate_limit=100,
+        candidate_limit=200,
         chunk_size=5,
     )
 
@@ -28,17 +28,28 @@ def test_prepare_coupled_candidate_plan_freezes_counts_and_tensor_identity():
         "selected_edges",
         "edge_count",
         "candidates_per_pair",
+        "dd_candidates_per_pair",
         "base_candidate_count",
+        "dd_base_candidate_count",
         "theoretical_candidate_count",
         "chunk_size",
+        "dd_chunk_size",
     ]
     assert plan.representative_faces is representative_faces
     assert plan.selected_edges is selected_edges
     assert plan.edge_count == 3
     assert plan.candidates_per_pair == 6
+    # ADR-013 D1: cid-7 ordered edge pairs e1 != e2 -> edges*(edges-1).
+    assert plan.dd_candidates_per_pair == 6
     assert plan.base_candidate_count == 36
-    assert plan.theoretical_candidate_count == 72
+    assert plan.dd_base_candidate_count == 36
+    # Budget union: both R->D / D->R directions (x2) plus one-direction D->D.
+    assert plan.theoretical_candidate_count == 36 * 2 + 36
     assert plan.chunk_size == 5
+    # The D->D stream carries its own (larger) chunk so it collapses to one
+    # native launch per receiver block (ADR-013 G-H); the R->D / D->R stream
+    # stays at chunk_size, keeping cid-3/4 row identity byte-identical.
+    assert plan.dd_chunk_size == coupled._COUPLED_DD_CANDIDATE_CHUNK_SIZE
     with pytest.raises(FrozenInstanceError):
         plan.chunk_size = 6
 
@@ -64,7 +75,8 @@ def test_candidate_guard_runs_during_planning_before_iteration(
     )
     representative_faces = torch.tensor([5, 8], dtype=torch.int32)
     selected_edges = torch.tensor([7, 9, 11], dtype=torch.int32)
-    theoretical = tx_count * rx_count * 2 * 3 * 2
+    # Union budget: 2*groups*edges (R->D / D->R) + edges*(edges-1) (D->D).
+    theoretical = tx_count * rx_count * (2 * 2 * 3 + 3 * 2)
 
     with pytest.raises(
         RuntimeError,
@@ -90,7 +102,7 @@ def test_candidate_requests_are_lazy_chunked_and_rd_first(monkeypatch):
         rx_count=2,
         representative_faces=representative_faces,
         selected_edges=selected_edges,
-        candidate_limit=16,
+        candidate_limit=32,
         chunk_size=3,
     )
     arange = torch.arange
@@ -179,5 +191,118 @@ def test_zero_candidate_plan_yields_without_prefetch(
 
     assert plan.base_candidate_count == 0
     assert plan.theoretical_candidate_count == 0
+    with pytest.raises(StopIteration):
+        next(requests)
+
+
+def test_dd_candidate_requests_enumerate_ordered_pairs():
+    representative_faces = torch.tensor([5], dtype=torch.int32)
+    selected_edges = torch.tensor([7, 9, 11], dtype=torch.int32)
+    plan = coupled.prepare_coupled_candidate_plan(
+        tx_count=1,
+        rx_count=1,
+        representative_faces=representative_faces,
+        selected_edges=selected_edges,
+        candidate_limit=100,
+        chunk_size=100,
+    )
+
+    assert plan.dd_candidates_per_pair == 6
+    assert plan.dd_base_candidate_count == 6
+
+    requests = list(
+        coupled.iter_coupled_dd_candidate_requests(plan, device=torch.device("cpu"))
+    )
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.component_id == 7
+    assert (request.chunk_start, request.chunk_end, request.candidate_count) == (0, 6, 6)
+    # Ordered pairs (e1, e2) with e1 != e2 by index; the second index steps over
+    # its own position, so the diagonal is skipped.
+    torch.testing.assert_close(
+        request.edge1_id, torch.tensor([7, 7, 9, 9, 11, 11], dtype=torch.int32)
+    )
+    torch.testing.assert_close(
+        request.edge2_id, torch.tensor([9, 11, 7, 11, 7, 9], dtype=torch.int32)
+    )
+    assert bool((request.edge1_id != request.edge2_id).all())
+    torch.testing.assert_close(request.tx_slot, torch.zeros(6, dtype=torch.int64))
+    torch.testing.assert_close(request.rx_slot, torch.zeros(6, dtype=torch.int64))
+
+
+def test_dd_candidate_requests_decompose_tx_and_are_lazy(monkeypatch):
+    representative_faces = torch.tensor([5], dtype=torch.int32)
+    selected_edges = torch.tensor([7, 9], dtype=torch.int32)
+    plan = coupled.prepare_coupled_candidate_plan(
+        tx_count=2,
+        rx_count=1,
+        representative_faces=representative_faces,
+        selected_edges=selected_edges,
+        candidate_limit=100,
+        chunk_size=3,
+        # The D->D stream is chunked by dd_chunk_size (its own knob), not the
+        # R->D / D->R chunk_size; drive it small here to exercise laziness.
+        dd_chunk_size=3,
+    )
+    arange = torch.arange
+    calls: list[tuple[int, int]] = []
+
+    def recording_arange(start, end, **kwargs):
+        calls.append((start, end))
+        return arange(start, end, **kwargs)
+
+    monkeypatch.setattr(coupled.torch, "arange", recording_arange)
+    requests = coupled.iter_coupled_dd_candidate_requests(
+        plan, device=torch.device("cpu")
+    )
+
+    assert calls == []
+    first = next(requests)
+    assert calls == [(0, 3)]
+    assert first.component_id == 7
+    torch.testing.assert_close(first.tx_slot, torch.tensor([0, 0, 1]))
+    torch.testing.assert_close(first.rx_slot, torch.tensor([0, 0, 0]))
+    torch.testing.assert_close(
+        first.edge1_id, torch.tensor([7, 9, 7], dtype=torch.int32)
+    )
+    torch.testing.assert_close(
+        first.edge2_id, torch.tensor([9, 7, 9], dtype=torch.int32)
+    )
+    second = next(requests)
+    assert calls == [(0, 3), (3, 4)]
+    assert (second.chunk_start, second.chunk_end, second.candidate_count) == (3, 4, 1)
+    torch.testing.assert_close(second.tx_slot, torch.tensor([1]))
+    torch.testing.assert_close(
+        second.edge1_id, torch.tensor([9], dtype=torch.int32)
+    )
+    torch.testing.assert_close(
+        second.edge2_id, torch.tensor([7], dtype=torch.int32)
+    )
+    with pytest.raises(StopIteration):
+        next(requests)
+
+
+def test_dd_candidate_stream_is_empty_below_two_edges(monkeypatch):
+    representative_faces = torch.tensor([5], dtype=torch.int32)
+    selected_edges = torch.tensor([7], dtype=torch.int32)
+    plan = coupled.prepare_coupled_candidate_plan(
+        tx_count=3,
+        rx_count=4,
+        representative_faces=representative_faces,
+        selected_edges=selected_edges,
+        candidate_limit=1000,
+    )
+
+    assert plan.dd_candidates_per_pair == 0
+    assert plan.dd_base_candidate_count == 0
+
+    monkeypatch.setattr(
+        coupled.torch,
+        "arange",
+        lambda *_args, **_kwargs: pytest.fail("single-edge DD plan allocated a chunk"),
+    )
+    requests = coupled.iter_coupled_dd_candidate_requests(
+        plan, device=torch.device("cpu")
+    )
     with pytest.raises(StopIteration):
         next(requests)

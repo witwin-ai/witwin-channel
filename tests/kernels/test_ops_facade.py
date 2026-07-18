@@ -2072,19 +2072,20 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic accumulation")
 
-    # Component ids 0/1/2/5/6 map to slots 0/1/2/3/4 and 3/4 map to the coupled
-    # slot 5 (ADR-011). transmission (slot 3) and coupled (slot 5) join the
-    # coherent field sum; scattering (slot 4) folds into the totals in the
-    # power domain and keeps its field as a diagnostic. The last two rows are a
-    # coupled R->D (cid 3) and its reciprocal D->R (cid 4) colliding in cell
-    # (1, 0) so slot 5 exercises the coherent E_RD + E_DR sum.
-    tx_id = torch.tensor([0, 0, 0, 1, 0, 0, 1, 1], device="cuda", dtype=torch.int32)
-    rx_id = torch.tensor([0, 0, 1, 1, 1, 0, 0, 0], device="cuda", dtype=torch.int32)
+    # Component ids 0/1/2/5/6 map to slots 0/1/2/3/4 and 3/4/7 map to the coupled
+    # slot 5 (ADR-011 R->D/D->R + ADR-013 D->D). transmission (slot 3) and
+    # coupled (slot 5) join the coherent field sum; scattering (slot 4) folds
+    # into the totals in the power domain and keeps its field as a diagnostic.
+    # The last three rows are a coupled R->D (cid 3), its reciprocal D->R (cid 4)
+    # and a double diffraction D->D (cid 7) all colliding in cell (1, 0) so slot
+    # 5 exercises the coherent E_RD + E_DR + E_DD sum.
+    tx_id = torch.tensor([0, 0, 0, 1, 0, 0, 1, 1, 1], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, 0, 1, 1, 1, 0, 0, 0, 0], device="cuda", dtype=torch.int32)
     component_id = torch.tensor(
-        [0, 1, 1, 2, 5, 6, 3, 4], device="cuda", dtype=torch.int32
+        [0, 1, 1, 2, 5, 6, 3, 4, 7], device="cuda", dtype=torch.int32
     )
     path_gain = torch.tensor(
-        [1.0, 4.0, 9.0, 16.0, 25.0, 0.5, 2.0, 3.0],
+        [1.0, 4.0, 9.0, 16.0, 25.0, 0.5, 2.0, 3.0, 5.0],
         device="cuda",
         dtype=torch.float32,
     )
@@ -2098,11 +2099,12 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
             0.5 + 0.0j,
             1.0 + 1.0j,
             2.0 - 1.0j,
+            1.5 - 0.5j,
         ],
         device="cuda",
         dtype=torch.complex64,
     )
-    slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4, 3: 5, 4: 5}
+    slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4, 3: 5, 4: 5, 7: 5}
 
     result = deterministic_accumulation.deterministic_accumulate_flat(
         tx_id,

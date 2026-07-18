@@ -598,6 +598,498 @@ __global__ void coupled_rd_jvp_kernel(
     }
 }
 
+// ---------------------------------------------------------------------------
+// ADR-013 D4: coupled double-diffraction dual row (component 7). Mirrors
+// coupled_dd_field_kernel (field_transport.cu) step by step on RayD duals.
+//
+// Both legs run the stationary path so the truncation / corner-mend / boundary
+// blend derivatives flow through the dual in lockstep with the primal (the
+// dual calls compute_pair_vector_contribution directly, exactly like the
+// order-1 diffraction dual and the coupled R->D dual after ADR-012 G4-3). The
+// gradient contract (ADR-013 D4): tx (source) and rx (target) flow through the
+// live per-leg re-anchoring; Q1/Q2, the edge axes/normals/exterior, the edge
+// bounds and the polarizations are frozen seeds (detached), so they are loaded
+// as dual constants and carry no gradient. The wedge face materials and the
+// frequency are differentiable. This file is a PRECISE-math translation unit
+// (only field_wedge_ad_diffraction.cu is fast-math), matching the primal.
+// Edit coupled_dd_field_kernel and this mirror TOGETHER.
+// ---------------------------------------------------------------------------
+
+struct CoupledDdRowInputs {
+    field::float3a source;
+    field::float3a target;
+    field::float3a q1;
+    field::float3a q2;
+    field::float3a e1_dir_raw;
+    field::float3a e2_dir_raw;
+    field::float3a e1_n0, e1_n1;
+    field::float3a e2_n0, e2_n1;
+    float e1_exterior, e2_exterior;
+    float e1_line_min, e1_line_max;
+    float e2_line_min, e2_line_max;
+    field::float3a tx_pol;
+    field::float3a rx_pol;
+    float tx_power;
+    // wedge1 face0 (a) / face1 (b), wedge2 face0 (a) / face1 (b).
+    float w1a_eps, w1a_sigma, w1a_mu, w1a_gain, w1a_thickness;
+    float w1b_eps, w1b_sigma, w1b_mu, w1b_gain, w1b_thickness;
+    float w2a_eps, w2a_sigma, w2a_mu, w2a_gain, w2a_thickness;
+    float w2b_eps, w2b_sigma, w2b_mu, w2b_gain, w2b_thickness;
+    float frequency;
+};
+
+struct CoupledDdSeeds {
+    field::float3a source;
+    field::float3a target;
+    float w1a_eps, w1a_sigma, w1a_gain, w1a_thickness;
+    float w1b_eps, w1b_sigma, w1b_gain, w1b_thickness;
+    float w2a_eps, w2a_sigma, w2a_gain, w2a_thickness;
+    float w2b_eps, w2b_sigma, w2b_gain, w2b_thickness;
+    float frequency;
+};
+
+__device__ __forceinline__ CoupledDdSeeds coupled_dd_seeds_zero() {
+    CoupledDdSeeds seeds;
+    seeds.source = field::f3_zero();
+    seeds.target = field::f3_zero();
+    seeds.w1a_eps = 0.f; seeds.w1a_sigma = 0.f;
+    seeds.w1a_gain = 0.f; seeds.w1a_thickness = 0.f;
+    seeds.w1b_eps = 0.f; seeds.w1b_sigma = 0.f;
+    seeds.w1b_gain = 0.f; seeds.w1b_thickness = 0.f;
+    seeds.w2a_eps = 0.f; seeds.w2a_sigma = 0.f;
+    seeds.w2a_gain = 0.f; seeds.w2a_thickness = 0.f;
+    seeds.w2b_eps = 0.f; seeds.w2b_sigma = 0.f;
+    seeds.w2b_gain = 0.f; seeds.w2b_thickness = 0.f;
+    seeds.frequency = 0.f;
+    return seeds;
+}
+
+// Reuses CoupledRowTangents (identical output shape) and coupled_contract.
+__device__ CoupledRowTangents coupled_dd_row_dual(
+    const CoupledDdRowInputs& in, const CoupledDdSeeds& seeds) {
+    const DualV3 src = field::dual_seed(in.source, seeds.source);
+    const DualV3 dst = field::dual_seed(in.target, seeds.target);
+    // Q1/Q2 are the frozen discovery Fermat seeds (detached): dual constants.
+    const DualV3 q1 = field::dual_const3(in.q1);
+    const DualV3 q2 = field::dual_const3(in.q2);
+    const Dual frequency = {in.frequency, seeds.frequency};
+    const Dual wave_number =
+        2.0f * field::UTD_PI * frequency / transport::kSpeedOfLight;
+    const DualV3 e1_axis = field::safe_normalize(
+        field::dual_const3(in.e1_dir_raw), field::v3_const<Dual>(0.f, 0.f, 1.f));
+    const DualV3 e2_axis = field::safe_normalize(
+        field::dual_const3(in.e2_dir_raw), field::v3_const<Dual>(0.f, 0.f, 1.f));
+
+    // --- Leg 1: direct-source diffraction at e1, observed at frozen Q2 ---
+    const DualV3 incident_direction1 = field::safe_normalize(
+        field::f3_sub(q1, src), field::v3_const<Dual>(1.f, 0.f, 0.f));
+    const DualV3 outgoing_direction1 = field::safe_normalize(
+        field::f3_sub(q2, q1), field::v3_const<Dual>(1.f, 0.f, 0.f));
+    const field::Basis3T<Dual> input_edge_basis1 = field::diffraction_edge_basis(
+        field::f3_sub(q1, src), e1_axis, false);
+    const field::Basis3T<Dual> output_edge_basis1 = field::diffraction_edge_basis(
+        field::f3_sub(q2, q1), e1_axis, true);
+
+    field::PairInputsT<Dual> pair1{};
+    pair1.edgePos = q1;
+    pair1.edgeDir = e1_axis;
+    pair1.n0 = field::dual_const3(in.e1_n0);
+    pair1.nn = field::dual_const3(in.e1_n1);
+    pair1.wedgeN = Dual(in.e1_exterior / field::UTD_PI);
+    pair1.edgeLineMin = Dual(in.e1_line_min);
+    pair1.edgeLineMax = Dual(in.e1_line_max);
+    pair1.sourcePos = src;
+    // Direct-source path ignores incidentBasis/Jones; set them consistently.
+    pair1.incidentBasis = input_edge_basis1;
+    pair1.incidentJones = field::jones_zero<Dual>();
+    pair1.incidentDerivativeJones = field::jones_zero<Dual>();
+    pair1.face0Material.present = 1.0f;
+    pair1.face1Material.present = 1.0f;
+    pair1.face0Operator = slab_face_operator_dual(
+        field::fabsf(field::f3_dot(pair1.n0, incident_direction1)),
+        {in.w1a_eps, seeds.w1a_eps},
+        {in.w1a_sigma, seeds.w1a_sigma},
+        in.w1a_mu,
+        {in.w1a_gain, seeds.w1a_gain},
+        {in.w1a_thickness, seeds.w1a_thickness},
+        frequency,
+        pair1.n0,
+        incident_direction1,
+        outgoing_direction1,
+        input_edge_basis1,
+        output_edge_basis1);
+    pair1.face1Operator = slab_face_operator_dual(
+        field::fabsf(field::f3_dot(pair1.nn, incident_direction1)),
+        {in.w1b_eps, seeds.w1b_eps},
+        {in.w1b_sigma, seeds.w1b_sigma},
+        in.w1b_mu,
+        {in.w1b_gain, seeds.w1b_gain},
+        {in.w1b_thickness, seeds.w1b_thickness},
+        frequency,
+        pair1.nn,
+        incident_direction1,
+        outgoing_direction1,
+        input_edge_basis1,
+        output_edge_basis1);
+    pair1.selectStationaryPoint = 1.0f;
+    pair1.stationaryExternalIncident = 0.0f;
+    field::MaterialParamsT<Dual> material1{};
+    // omega < 0 keeps the stored (frozen-at-Keller) slab face operators; the
+    // direct incident spherical wave uses the (frozen) transmitter
+    // polarization, exactly like coupled_dd_field_kernel.
+    material1.omega = Dual(-1.0f);
+    material1.txPolX = Dual(in.tx_pol.x);
+    material1.txPolY = Dual(in.tx_pol.y);
+    material1.txPolZ = Dual(in.tx_pol.z);
+    const DualC3 leg1_field = field::compute_pair_vector_contribution(
+        pair1, q2, wave_number, material1);
+
+    // --- Leg 2: external-incident diffraction at e2, observed at rx ---
+    const DualV3 incident_direction2 = field::safe_normalize(
+        field::f3_sub(q2, q1), field::v3_const<Dual>(1.f, 0.f, 0.f));
+    const DualV3 outgoing_direction2 = field::safe_normalize(
+        field::f3_sub(dst, q2), field::v3_const<Dual>(1.f, 0.f, 0.f));
+    const field::Basis3T<Dual> input_edge_basis2 = field::diffraction_edge_basis(
+        field::f3_sub(q2, q1), e2_axis, false);
+    const field::Basis3T<Dual> output_edge_basis2 = field::diffraction_edge_basis(
+        field::f3_sub(dst, q2), e2_axis, true);
+
+    field::PairInputsT<Dual> pair2{};
+    pair2.edgePos = q2;
+    pair2.edgeDir = e2_axis;
+    pair2.n0 = field::dual_const3(in.e2_n0);
+    pair2.nn = field::dual_const3(in.e2_n1);
+    pair2.wedgeN = Dual(in.e2_exterior / field::UTD_PI);
+    pair2.edgeLineMin = Dual(in.e2_line_min);
+    pair2.edgeLineMax = Dual(in.e2_line_max);
+    pair2.sourcePos = q1;
+    pair2.incidentBasis = input_edge_basis2;
+    // Leg-1 diffracted field projected onto e2's incident basis at frozen Q2.
+    pair2.incidentJones = field::jones_from_vector(leg1_field, input_edge_basis2);
+    pair2.incidentDerivativeJones = field::jones_zero<Dual>();
+    pair2.face0Material.present = 1.0f;
+    pair2.face1Material.present = 1.0f;
+    pair2.face0Operator = slab_face_operator_dual(
+        field::fabsf(field::f3_dot(pair2.n0, incident_direction2)),
+        {in.w2a_eps, seeds.w2a_eps},
+        {in.w2a_sigma, seeds.w2a_sigma},
+        in.w2a_mu,
+        {in.w2a_gain, seeds.w2a_gain},
+        {in.w2a_thickness, seeds.w2a_thickness},
+        frequency,
+        pair2.n0,
+        incident_direction2,
+        outgoing_direction2,
+        input_edge_basis2,
+        output_edge_basis2);
+    pair2.face1Operator = slab_face_operator_dual(
+        field::fabsf(field::f3_dot(pair2.nn, incident_direction2)),
+        {in.w2b_eps, seeds.w2b_eps},
+        {in.w2b_sigma, seeds.w2b_sigma},
+        in.w2b_mu,
+        {in.w2b_gain, seeds.w2b_gain},
+        {in.w2b_thickness, seeds.w2b_thickness},
+        frequency,
+        pair2.nn,
+        incident_direction2,
+        outgoing_direction2,
+        input_edge_basis2,
+        output_edge_basis2);
+    pair2.selectStationaryPoint = 1.0f;
+    pair2.stationaryExternalIncident = 1.0f;
+    field::MaterialParamsT<Dual> material2{};
+    material2.omega = Dual(-1.0f);
+    const DualC3 value = field::compute_pair_vector_contribution(
+        pair2, dst, wave_number, material2);
+
+    const DualV3 final_direction = outgoing_direction2;
+    const DualV3 rx_axis = field::project_to_wedge_plane(
+        field::dual_const3(in.rx_pol), final_direction);
+    const DualCx coefficient = field::cplx_dot_real(value, rx_axis);
+    const float amplitude_scale = sqrtf(fmaxf(in.tx_power, 0.f));
+    const DualCx path_field = field::cplx_mul_real(coefficient, amplitude_scale);
+
+    CoupledRowTangents out;
+    out.field_vector = field::dual_tangent(value);
+    out.coefficient = field::dual_tangent(coefficient);
+    out.path_field = field::dual_tangent(path_field);
+    out.path_gain = 2.0f * (path_field.re.v * path_field.re.d +
+                            path_field.im.v * path_field.im.d);
+    return out;
+}
+
+__device__ __forceinline__ CoupledDdRowInputs load_coupled_dd_row(
+    int64_t index,
+    const float* source,
+    const float* target,
+    const float* edge1_position,
+    const float* edge1_direction,
+    const float* edge1_n0,
+    const float* edge1_n1,
+    const float* edge1_exterior,
+    const float* edge2_position,
+    const float* edge2_direction,
+    const float* edge2_n0,
+    const float* edge2_n1,
+    const float* edge2_exterior,
+    const float* tx_power,
+    const float* tx_polarization,
+    const float* rx_polarization,
+    const float* wedge1_eps_r0,
+    const float* wedge1_sigma_e0,
+    const float* wedge1_mu_r0,
+    const float* wedge1_gain0,
+    const float* wedge1_thickness0,
+    const float* wedge1_eps_r1,
+    const float* wedge1_sigma_e1,
+    const float* wedge1_mu_r1,
+    const float* wedge1_gain1,
+    const float* wedge1_thickness1,
+    const float* wedge2_eps_r0,
+    const float* wedge2_sigma_e0,
+    const float* wedge2_mu_r0,
+    const float* wedge2_gain0,
+    const float* wedge2_thickness0,
+    const float* wedge2_eps_r1,
+    const float* wedge2_sigma_e1,
+    const float* wedge2_mu_r1,
+    const float* wedge2_gain1,
+    const float* wedge2_thickness1,
+    const float* edge1_line_min,
+    const float* edge1_line_max,
+    const float* edge2_line_min,
+    const float* edge2_line_max,
+    float frequency_hz) {
+    CoupledDdRowInputs in;
+    in.source = load3f(source, index);
+    in.target = load3f(target, index);
+    in.q1 = load3f(edge1_position, index);
+    in.q2 = load3f(edge2_position, index);
+    in.e1_dir_raw = load3f(edge1_direction, index);
+    in.e2_dir_raw = load3f(edge2_direction, index);
+    in.e1_n0 = load3f(edge1_n0, index);
+    in.e1_n1 = load3f(edge1_n1, index);
+    in.e2_n0 = load3f(edge2_n0, index);
+    in.e2_n1 = load3f(edge2_n1, index);
+    in.e1_exterior = edge1_exterior[index];
+    in.e2_exterior = edge2_exterior[index];
+    in.e1_line_min = edge1_line_min[index];
+    in.e1_line_max = edge1_line_max[index];
+    in.e2_line_min = edge2_line_min[index];
+    in.e2_line_max = edge2_line_max[index];
+    in.tx_pol = load3f(tx_polarization, index);
+    in.rx_pol = load3f(rx_polarization, index);
+    in.tx_power = tx_power[index];
+    in.w1a_eps = wedge1_eps_r0[index];
+    in.w1a_sigma = wedge1_sigma_e0[index];
+    in.w1a_mu = wedge1_mu_r0[index];
+    in.w1a_gain = wedge1_gain0[index];
+    in.w1a_thickness = wedge1_thickness0[index];
+    in.w1b_eps = wedge1_eps_r1[index];
+    in.w1b_sigma = wedge1_sigma_e1[index];
+    in.w1b_mu = wedge1_mu_r1[index];
+    in.w1b_gain = wedge1_gain1[index];
+    in.w1b_thickness = wedge1_thickness1[index];
+    in.w2a_eps = wedge2_eps_r0[index];
+    in.w2a_sigma = wedge2_sigma_e0[index];
+    in.w2a_mu = wedge2_mu_r0[index];
+    in.w2a_gain = wedge2_gain0[index];
+    in.w2a_thickness = wedge2_thickness0[index];
+    in.w2b_eps = wedge2_eps_r1[index];
+    in.w2b_sigma = wedge2_sigma_e1[index];
+    in.w2b_mu = wedge2_mu_r1[index];
+    in.w2b_gain = wedge2_gain1[index];
+    in.w2b_thickness = wedge2_thickness1[index];
+    in.frequency = frequency_hz;
+    return in;
+}
+
+#define COUPLED_DD_ROW_PARAMS                                                  \
+    const float* source, const float* target,                                 \
+        const float* edge1_position, const float* edge1_direction,            \
+        const float* edge1_n0, const float* edge1_n1,                         \
+        const float* edge1_exterior, const float* edge2_position,             \
+        const float* edge2_direction, const float* edge2_n0,                  \
+        const float* edge2_n1, const float* edge2_exterior,                   \
+        const float* tx_power, const float* tx_polarization,                  \
+        const float* rx_polarization, const float* wedge1_eps_r0,             \
+        const float* wedge1_sigma_e0, const float* wedge1_mu_r0,              \
+        const float* wedge1_gain0, const float* wedge1_thickness0,            \
+        const float* wedge1_eps_r1, const float* wedge1_sigma_e1,             \
+        const float* wedge1_mu_r1, const float* wedge1_gain1,                 \
+        const float* wedge1_thickness1, const float* wedge2_eps_r0,           \
+        const float* wedge2_sigma_e0, const float* wedge2_mu_r0,              \
+        const float* wedge2_gain0, const float* wedge2_thickness0,            \
+        const float* wedge2_eps_r1, const float* wedge2_sigma_e1,             \
+        const float* wedge2_mu_r1, const float* wedge2_gain1,                 \
+        const float* wedge2_thickness1, const float* edge1_line_min,          \
+        const float* edge1_line_max, const float* edge2_line_min,             \
+        const float* edge2_line_max, float frequency_hz
+
+#define COUPLED_DD_ROW_ARGS(index)                                            \
+    index, source, target, edge1_position, edge1_direction, edge1_n0,         \
+        edge1_n1, edge1_exterior, edge2_position, edge2_direction, edge2_n0,  \
+        edge2_n1, edge2_exterior, tx_power, tx_polarization, rx_polarization, \
+        wedge1_eps_r0, wedge1_sigma_e0, wedge1_mu_r0, wedge1_gain0,           \
+        wedge1_thickness0, wedge1_eps_r1, wedge1_sigma_e1, wedge1_mu_r1,      \
+        wedge1_gain1, wedge1_thickness1, wedge2_eps_r0, wedge2_sigma_e0,      \
+        wedge2_mu_r0, wedge2_gain0, wedge2_thickness0, wedge2_eps_r1,         \
+        wedge2_sigma_e1, wedge2_mu_r1, wedge2_gain1, wedge2_thickness1,       \
+        edge1_line_min, edge1_line_max, edge2_line_min, edge2_line_max,       \
+        frequency_hz
+
+__global__ void coupled_dd_backward_kernel(
+    int64_t count,
+    COUPLED_DD_ROW_PARAMS,
+    const c10::complex<float>* grad_field_vector,
+    const c10::complex<float>* grad_coefficient,
+    const c10::complex<float>* grad_path_field,
+    const float* grad_path_gain,
+    float* grad_source,
+    float* grad_target,
+    float* grad_eps_r,        // (N, 4): wedge1 face0/face1, wedge2 face0/face1
+    float* grad_sigma_e,
+    float* grad_gain,
+    float* grad_thickness,
+    float* grad_frequency) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const CoupledDdRowInputs in = load_coupled_dd_row(COUPLED_DD_ROW_ARGS(index));
+        CoupledDdSeeds seeds = coupled_dd_seeds_zero();
+        const int64_t base = index * 3;
+        const int64_t mbase = index * 4;
+
+        struct VectorSlot {
+            field::float3a* seed;
+            float* grad;
+        };
+        VectorSlot vector_slots[2] = {
+            {&seeds.source, grad_source},
+            {&seeds.target, grad_target},
+        };
+        for (int slot = 0; slot < 2; ++slot) {
+            if (vector_slots[slot].grad == nullptr)
+                continue;
+            float* axes[3] = {
+                &vector_slots[slot].seed->x,
+                &vector_slots[slot].seed->y,
+                &vector_slots[slot].seed->z};
+            for (int axis = 0; axis < 3; ++axis) {
+                *axes[axis] = 1.f;
+                const CoupledRowTangents t = coupled_dd_row_dual(in, seeds);
+                *axes[axis] = 0.f;
+                vector_slots[slot].grad[base + axis] = coupled_contract(
+                    index, grad_field_vector, grad_coefficient, grad_path_field,
+                    grad_path_gain, t);
+            }
+        }
+
+        struct MaterialSlot {
+            float* seed;
+            float* grad;
+            int column;
+        };
+        MaterialSlot material_slots[16] = {
+            {&seeds.w1a_eps, grad_eps_r, 0},
+            {&seeds.w1b_eps, grad_eps_r, 1},
+            {&seeds.w2a_eps, grad_eps_r, 2},
+            {&seeds.w2b_eps, grad_eps_r, 3},
+            {&seeds.w1a_sigma, grad_sigma_e, 0},
+            {&seeds.w1b_sigma, grad_sigma_e, 1},
+            {&seeds.w2a_sigma, grad_sigma_e, 2},
+            {&seeds.w2b_sigma, grad_sigma_e, 3},
+            {&seeds.w1a_gain, grad_gain, 0},
+            {&seeds.w1b_gain, grad_gain, 1},
+            {&seeds.w2a_gain, grad_gain, 2},
+            {&seeds.w2b_gain, grad_gain, 3},
+            {&seeds.w1a_thickness, grad_thickness, 0},
+            {&seeds.w1b_thickness, grad_thickness, 1},
+            {&seeds.w2a_thickness, grad_thickness, 2},
+            {&seeds.w2b_thickness, grad_thickness, 3},
+        };
+        for (int slot = 0; slot < 16; ++slot) {
+            if (material_slots[slot].grad == nullptr)
+                continue;
+            *material_slots[slot].seed = 1.f;
+            const CoupledRowTangents t = coupled_dd_row_dual(in, seeds);
+            *material_slots[slot].seed = 0.f;
+            material_slots[slot].grad[mbase + material_slots[slot].column] =
+                coupled_contract(
+                    index, grad_field_vector, grad_coefficient, grad_path_field,
+                    grad_path_gain, t);
+        }
+        if (grad_frequency != nullptr) {
+            seeds.frequency = 1.f;
+            const CoupledRowTangents t = coupled_dd_row_dual(in, seeds);
+            seeds.frequency = 0.f;
+            atomicAdd(grad_frequency, coupled_contract(
+                index, grad_field_vector, grad_coefficient, grad_path_field,
+                grad_path_gain, t));
+        }
+    }
+}
+
+__global__ void coupled_dd_jvp_kernel(
+    int64_t count,
+    COUPLED_DD_ROW_PARAMS,
+    const float* tangent_source,
+    const float* tangent_target,
+    const float* tangent_eps_r,     // (N, 4): wedge1 face0/face1, wedge2 face0/face1
+    const float* tangent_sigma_e,
+    const float* tangent_gain,
+    const float* tangent_thickness,
+    float tangent_frequency,
+    c10::complex<float>* tangent_field_vector,
+    c10::complex<float>* tangent_coefficient,
+    c10::complex<float>* tangent_path_field,
+    float* tangent_path_gain) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const CoupledDdRowInputs in = load_coupled_dd_row(COUPLED_DD_ROW_ARGS(index));
+        CoupledDdSeeds seeds = coupled_dd_seeds_zero();
+        const int64_t base = index * 3;
+        const int64_t mbase = index * 4;
+        if (tangent_source != nullptr)
+            seeds.source = load3f(tangent_source, index);
+        if (tangent_target != nullptr)
+            seeds.target = load3f(tangent_target, index);
+        if (tangent_eps_r != nullptr) {
+            seeds.w1a_eps = tangent_eps_r[mbase];
+            seeds.w1b_eps = tangent_eps_r[mbase + 1];
+            seeds.w2a_eps = tangent_eps_r[mbase + 2];
+            seeds.w2b_eps = tangent_eps_r[mbase + 3];
+        }
+        if (tangent_sigma_e != nullptr) {
+            seeds.w1a_sigma = tangent_sigma_e[mbase];
+            seeds.w1b_sigma = tangent_sigma_e[mbase + 1];
+            seeds.w2a_sigma = tangent_sigma_e[mbase + 2];
+            seeds.w2b_sigma = tangent_sigma_e[mbase + 3];
+        }
+        if (tangent_gain != nullptr) {
+            seeds.w1a_gain = tangent_gain[mbase];
+            seeds.w1b_gain = tangent_gain[mbase + 1];
+            seeds.w2a_gain = tangent_gain[mbase + 2];
+            seeds.w2b_gain = tangent_gain[mbase + 3];
+        }
+        if (tangent_thickness != nullptr) {
+            seeds.w1a_thickness = tangent_thickness[mbase];
+            seeds.w1b_thickness = tangent_thickness[mbase + 1];
+            seeds.w2a_thickness = tangent_thickness[mbase + 2];
+            seeds.w2b_thickness = tangent_thickness[mbase + 3];
+        }
+        seeds.frequency = tangent_frequency;
+        const CoupledRowTangents t = coupled_dd_row_dual(in, seeds);
+        tangent_field_vector[base] = to_c10(t.field_vector.x);
+        tangent_field_vector[base + 1] = to_c10(t.field_vector.y);
+        tangent_field_vector[base + 2] = to_c10(t.field_vector.z);
+        tangent_coefficient[index] = to_c10(t.coefficient);
+        tangent_path_field[index] = to_c10(t.path_field);
+        tangent_path_gain[index] = t.path_gain;
+    }
+}
+
 
 }  // namespace
 
@@ -862,6 +1354,266 @@ pybind11::dict cn_field_coupled_rd_jvp(
             opt_ptr<float>(t_target),
             opt_ptr<float>(t_hit),
             opt_ptr<float>(t_edge),
+            opt_ptr<float>(t_eps),
+            opt_ptr<float>(t_sigma),
+            opt_ptr<float>(t_gain),
+            opt_ptr<float>(t_thickness),
+            static_cast<float>(tangent_frequency),
+            tangent_field_vector.data_ptr<c10::complex<float>>(),
+            tangent_coefficient.data_ptr<c10::complex<float>>(),
+            tangent_path_field.data_ptr<c10::complex<float>>(),
+            tangent_path_gain.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict out;
+    out["tangent_field_vector"] = tangent_field_vector;
+    out["tangent_coefficient"] = tangent_coefficient;
+    out["tangent_path_field"] = tangent_path_field;
+    out["tangent_path_gain"] = tangent_path_gain;
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// ADR-013 D4: coupled double-diffraction AD host companions. Twins of the RD
+// companions above (same output schema, same coupled_contract), driving the
+// coupled_dd_row_dual mirror. Q1/Q2/bounds/axes/normals/polarizations are
+// frozen (loaded as dual constants); tx/rx flow through live re-anchoring, the
+// four wedge faces carry material gradients, and frequency is differentiable.
+// ---------------------------------------------------------------------------
+
+#define COUPLED_DD_HOST_PARAMS                                                 \
+    at::Tensor source, at::Tensor target, at::Tensor edge1_position,          \
+        at::Tensor edge1_direction, at::Tensor edge1_n0, at::Tensor edge1_n1, \
+        at::Tensor edge1_exterior, at::Tensor edge2_position,                 \
+        at::Tensor edge2_direction, at::Tensor edge2_n0, at::Tensor edge2_n1, \
+        at::Tensor edge2_exterior, at::Tensor tx_power,                       \
+        at::Tensor tx_polarization, at::Tensor rx_polarization,               \
+        at::Tensor wedge1_eps_r0, at::Tensor wedge1_sigma_e0,                 \
+        at::Tensor wedge1_mu_r0, at::Tensor wedge1_gain0,                     \
+        at::Tensor wedge1_thickness0, at::Tensor wedge1_eps_r1,               \
+        at::Tensor wedge1_sigma_e1, at::Tensor wedge1_mu_r1,                  \
+        at::Tensor wedge1_gain1, at::Tensor wedge1_thickness1,               \
+        at::Tensor wedge2_eps_r0, at::Tensor wedge2_sigma_e0,                 \
+        at::Tensor wedge2_mu_r0, at::Tensor wedge2_gain0,                     \
+        at::Tensor wedge2_thickness0, at::Tensor wedge2_eps_r1,               \
+        at::Tensor wedge2_sigma_e1, at::Tensor wedge2_mu_r1,                  \
+        at::Tensor wedge2_gain1, at::Tensor wedge2_thickness1,               \
+        at::Tensor edge1_line_min, at::Tensor edge1_line_max,                 \
+        at::Tensor edge2_line_min, at::Tensor edge2_line_max,                 \
+        double frequency_hz
+
+#define COUPLED_DD_HOST_ARGS                                                   \
+    source.data_ptr<float>(), target.data_ptr<float>(),                       \
+        edge1_position.data_ptr<float>(), edge1_direction.data_ptr<float>(),  \
+        edge1_n0.data_ptr<float>(), edge1_n1.data_ptr<float>(),               \
+        edge1_exterior.data_ptr<float>(), edge2_position.data_ptr<float>(),   \
+        edge2_direction.data_ptr<float>(), edge2_n0.data_ptr<float>(),        \
+        edge2_n1.data_ptr<float>(), edge2_exterior.data_ptr<float>(),         \
+        tx_power.data_ptr<float>(), tx_polarization.data_ptr<float>(),        \
+        rx_polarization.data_ptr<float>(), wedge1_eps_r0.data_ptr<float>(),   \
+        wedge1_sigma_e0.data_ptr<float>(), wedge1_mu_r0.data_ptr<float>(),    \
+        wedge1_gain0.data_ptr<float>(), wedge1_thickness0.data_ptr<float>(),  \
+        wedge1_eps_r1.data_ptr<float>(), wedge1_sigma_e1.data_ptr<float>(),   \
+        wedge1_mu_r1.data_ptr<float>(), wedge1_gain1.data_ptr<float>(),       \
+        wedge1_thickness1.data_ptr<float>(), wedge2_eps_r0.data_ptr<float>(), \
+        wedge2_sigma_e0.data_ptr<float>(), wedge2_mu_r0.data_ptr<float>(),    \
+        wedge2_gain0.data_ptr<float>(), wedge2_thickness0.data_ptr<float>(),  \
+        wedge2_eps_r1.data_ptr<float>(), wedge2_sigma_e1.data_ptr<float>(),   \
+        wedge2_mu_r1.data_ptr<float>(), wedge2_gain1.data_ptr<float>(),       \
+        wedge2_thickness1.data_ptr<float>(), edge1_line_min.data_ptr<float>(),\
+        edge1_line_max.data_ptr<float>(), edge2_line_min.data_ptr<float>(),   \
+        edge2_line_max.data_ptr<float>(), static_cast<float>(frequency_hz)
+
+#define COUPLED_DD_CHECK_LISTS                                                 \
+    check_coupled_primal_rows(                                                 \
+        {{source, "source"},                                                  \
+         {target, "target"},                                                  \
+         {edge1_position, "edge1_position"},                                  \
+         {edge1_direction, "edge1_direction"},                                \
+         {edge1_n0, "edge1_n0"},                                              \
+         {edge1_n1, "edge1_n1"},                                              \
+         {edge2_position, "edge2_position"},                                  \
+         {edge2_direction, "edge2_direction"},                                \
+         {edge2_n0, "edge2_n0"},                                              \
+         {edge2_n1, "edge2_n1"},                                              \
+         {tx_polarization, "tx_polarization"},                                \
+         {rx_polarization, "rx_polarization"}},                               \
+        {{edge1_exterior, "edge1_exterior"},                                  \
+         {edge2_exterior, "edge2_exterior"},                                  \
+         {tx_power, "tx_power"},                                              \
+         {wedge1_eps_r0, "wedge1_eps_r0"},                                    \
+         {wedge1_sigma_e0, "wedge1_sigma_e0"},                                \
+         {wedge1_mu_r0, "wedge1_mu_r0"},                                      \
+         {wedge1_gain0, "wedge1_gain0"},                                      \
+         {wedge1_thickness0, "wedge1_thickness0"},                            \
+         {wedge1_eps_r1, "wedge1_eps_r1"},                                    \
+         {wedge1_sigma_e1, "wedge1_sigma_e1"},                                \
+         {wedge1_mu_r1, "wedge1_mu_r1"},                                      \
+         {wedge1_gain1, "wedge1_gain1"},                                      \
+         {wedge1_thickness1, "wedge1_thickness1"},                            \
+         {wedge2_eps_r0, "wedge2_eps_r0"},                                    \
+         {wedge2_sigma_e0, "wedge2_sigma_e0"},                                \
+         {wedge2_mu_r0, "wedge2_mu_r0"},                                      \
+         {wedge2_gain0, "wedge2_gain0"},                                      \
+         {wedge2_thickness0, "wedge2_thickness0"},                            \
+         {wedge2_eps_r1, "wedge2_eps_r1"},                                    \
+         {wedge2_sigma_e1, "wedge2_sigma_e1"},                                \
+         {wedge2_mu_r1, "wedge2_mu_r1"},                                      \
+         {wedge2_gain1, "wedge2_gain1"},                                      \
+         {wedge2_thickness1, "wedge2_thickness1"},                            \
+         {edge1_line_min, "edge1_line_min"},                                  \
+         {edge1_line_max, "edge1_line_max"},                                  \
+         {edge2_line_min, "edge2_line_min"},                                  \
+         {edge2_line_max, "edge2_line_max"}},                                 \
+        frequency_hz)
+
+pybind11::dict cn_field_coupled_dd_backward(
+    COUPLED_DD_HOST_PARAMS,
+    pybind11::object grad_field_vector,
+    pybind11::object grad_coefficient,
+    pybind11::object grad_path_field,
+    pybind11::object grad_path_gain,
+    bool need_grad_eps_r,
+    bool need_grad_sigma_e,
+    bool need_grad_gain,
+    bool need_grad_thickness,
+    bool need_grad_frequency,
+    bool need_grad_geometry) {
+    COUPLED_DD_CHECK_LISTS;
+    const int64_t count = source.size(0);
+    at::Tensor grad_storage[4];
+    const at::Tensor* g_field = optional_tensor_arg(
+        std::move(grad_field_vector), grad_storage[0], "grad_field_vector",
+        at::kComplexFloat, {count, 3}, source);
+    const at::Tensor* g_coefficient = optional_tensor_arg(
+        std::move(grad_coefficient), grad_storage[1], "grad_coefficient",
+        at::kComplexFloat, {count}, source);
+    const at::Tensor* g_path_field = optional_tensor_arg(
+        std::move(grad_path_field), grad_storage[2], "grad_path_field",
+        at::kComplexFloat, {count}, source);
+    const at::Tensor* g_path_gain = optional_tensor_arg(
+        std::move(grad_path_gain), grad_storage[3], "grad_path_gain",
+        at::kFloat, {count}, source);
+
+    const auto options = source.options();
+    at::Tensor grad_source, grad_target;
+    at::Tensor grad_eps, grad_sigma, grad_gain, grad_thickness, grad_frequency;
+    at::Tensor* grad_source_ptr = nullptr;
+    at::Tensor* grad_target_ptr = nullptr;
+    at::Tensor* grad_eps_ptr = nullptr;
+    at::Tensor* grad_sigma_ptr = nullptr;
+    at::Tensor* grad_gain_ptr = nullptr;
+    at::Tensor* grad_thickness_ptr = nullptr;
+    at::Tensor* grad_frequency_ptr = nullptr;
+    if (need_grad_geometry) {
+        grad_source = at::empty({count, 3}, options);
+        grad_target = at::empty({count, 3}, options);
+        grad_source_ptr = &grad_source;
+        grad_target_ptr = &grad_target;
+    }
+    if (need_grad_eps_r) {
+        grad_eps = at::empty({count, 4}, options);
+        grad_eps_ptr = &grad_eps;
+    }
+    if (need_grad_sigma_e) {
+        grad_sigma = at::empty({count, 4}, options);
+        grad_sigma_ptr = &grad_sigma;
+    }
+    if (need_grad_gain) {
+        grad_gain = at::empty({count, 4}, options);
+        grad_gain_ptr = &grad_gain;
+    }
+    if (need_grad_thickness) {
+        grad_thickness = at::empty({count, 4}, options);
+        grad_thickness_ptr = &grad_thickness;
+    }
+    if (need_grad_frequency) {
+        grad_frequency = zero_scalar(options);
+        grad_frequency_ptr = &grad_frequency;
+    }
+    const bool any_grad = g_field != nullptr || g_coefficient != nullptr ||
+                          g_path_field != nullptr || g_path_gain != nullptr;
+    if (count > 0 && any_grad) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+        coupled_dd_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            COUPLED_DD_HOST_ARGS,
+            opt_ptr<c10::complex<float>>(g_field),
+            opt_ptr<c10::complex<float>>(g_coefficient),
+            opt_ptr<c10::complex<float>>(g_path_field),
+            opt_ptr<float>(g_path_gain),
+            opt_mut_ptr<float>(grad_source_ptr),
+            opt_mut_ptr<float>(grad_target_ptr),
+            opt_mut_ptr<float>(grad_eps_ptr),
+            opt_mut_ptr<float>(grad_sigma_ptr),
+            opt_mut_ptr<float>(grad_gain_ptr),
+            opt_mut_ptr<float>(grad_thickness_ptr),
+            opt_mut_ptr<float>(grad_frequency_ptr));
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    } else {
+        for (at::Tensor* tensor :
+             {grad_source_ptr, grad_target_ptr, grad_eps_ptr, grad_sigma_ptr,
+              grad_gain_ptr, grad_thickness_ptr}) {
+            if (tensor != nullptr)
+                tensor->zero_();
+        }
+    }
+    auto pack = [](at::Tensor* tensor, const at::Tensor& value) {
+        return tensor != nullptr ? pybind11::cast(value)
+                                 : pybind11::object(pybind11::none());
+    };
+    pybind11::dict out;
+    out["grad_source"] = pack(grad_source_ptr, grad_source);
+    out["grad_target"] = pack(grad_target_ptr, grad_target);
+    out["grad_eps_r"] = pack(grad_eps_ptr, grad_eps);
+    out["grad_sigma_e"] = pack(grad_sigma_ptr, grad_sigma);
+    out["grad_gain"] = pack(grad_gain_ptr, grad_gain);
+    out["grad_thickness"] = pack(grad_thickness_ptr, grad_thickness);
+    out["grad_frequency"] = pack(grad_frequency_ptr, grad_frequency);
+    return out;
+}
+
+pybind11::dict cn_field_coupled_dd_jvp(
+    COUPLED_DD_HOST_PARAMS,
+    pybind11::object tangent_source,
+    pybind11::object tangent_target,
+    pybind11::object tangent_eps_r,
+    pybind11::object tangent_sigma_e,
+    pybind11::object tangent_gain,
+    pybind11::object tangent_thickness,
+    double tangent_frequency) {
+    COUPLED_DD_CHECK_LISTS;
+    const int64_t count = source.size(0);
+    at::Tensor storage[6];
+    const at::Tensor* t_source = optional_tensor_arg(
+        std::move(tangent_source), storage[0], "tangent_source", at::kFloat,
+        {count, 3}, source);
+    const at::Tensor* t_target = optional_tensor_arg(
+        std::move(tangent_target), storage[1], "tangent_target", at::kFloat,
+        {count, 3}, source);
+    const at::Tensor* t_eps = optional_tensor_arg(
+        std::move(tangent_eps_r), storage[2], "tangent_eps_r", at::kFloat,
+        {count, 4}, source);
+    const at::Tensor* t_sigma = optional_tensor_arg(
+        std::move(tangent_sigma_e), storage[3], "tangent_sigma_e", at::kFloat,
+        {count, 4}, source);
+    const at::Tensor* t_gain = optional_tensor_arg(
+        std::move(tangent_gain), storage[4], "tangent_gain", at::kFloat,
+        {count, 4}, source);
+    const at::Tensor* t_thickness = optional_tensor_arg(
+        std::move(tangent_thickness), storage[5], "tangent_thickness",
+        at::kFloat, {count, 4}, source);
+    auto tangent_field_vector = at::empty({count, 3}, source.options().dtype(at::kComplexFloat));
+    auto tangent_coefficient = at::empty({count}, source.options().dtype(at::kComplexFloat));
+    auto tangent_path_field = at::empty({count}, source.options().dtype(at::kComplexFloat));
+    auto tangent_path_gain = at::empty({count}, source.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+        coupled_dd_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            COUPLED_DD_HOST_ARGS,
+            opt_ptr<float>(t_source),
+            opt_ptr<float>(t_target),
             opt_ptr<float>(t_eps),
             opt_ptr<float>(t_sigma),
             opt_ptr<float>(t_gain),

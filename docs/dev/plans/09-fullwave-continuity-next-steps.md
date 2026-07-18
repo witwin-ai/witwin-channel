@@ -173,7 +173,28 @@ Steps:
 Acceptance: reference NPZs versioned + fingerprinted; a comparison table in
 the runbook; a decision paragraph in ADR-011 (default ON or OFF, with data).
 
-### P2 — D→D double diffraction (cheapest big win)
+### P2 — D→D double diffraction — **IMPLEMENTED 2026-07-18 (ADR-013)**
+
+Landed on `p2/double-diffraction`: cid-7 ordered-edge-pair discovery
+(channel-native two-edge Fermat + 3-segment visibility), one-launch two-leg
+field kernel (leg 2 = ADR-012 external-incident stationary machinery; single
+call site reserved for the P4 transition-integral swap), AD companions in
+lockstep, accumulation into coupled slot 5, governance at 183 bindings. No
+RayD change. Measured (table in ADR-013): blockage steps 11.7→0.7 dB
+(truth 1.5), **RSB p95 excess +3.53→+0.43 dB**, region-A NMSE flips below
+OFF, coherence 0.8467, single-cube all-green incl. DD; the anti-phase
+disease healed at the two UTD-valid cells (−31.8→−4.1/−2.3 dB); the two
+λ/20-near-wall cells (kL≈0.46, grazing soft-pol) remain and transfer to P4
+with the G-D/G-E residuals. Runtime: perf pass to <10 s (G-H) — see commit.
+
+**P3 decision (2026-07-18): SKIP.** P1's order-2 RSB motivation (+3.5 dB
+excess) is measured healed by P2 (+0.43 dB) — the plan's own build
+condition for P3 ("only if P1 shows the order-2 RSB boundaries matter vs
+truth") is no longer met. R→R→D stays a recorded extension (this section's
+original spec below) should a future scene class revive it; the budget goes
+to P4, which now owns every remaining measured residual.
+
+Original P2 spec (kept for reference):
 
 Goal: heal (a) pure-D blockage boundaries (diffracted ray occluded by
 another body), (b) the coupled component's sector edges from the R-leg's

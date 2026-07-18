@@ -112,6 +112,10 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_reflection_diffraction_coupling_geometry": True,
             "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
             "max_reflections_in_coupled_path": 1,
+            # ADR-013 D5: coupled_paths=True is the uniform order-2 compensator
+            # family {R->D, D->R, D->D}; cid 7 double diffraction shares the
+            # coupled gate, budget, and accumulator slot (no new Config field).
+            "coupled_double_diffraction": True,
             "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
@@ -134,6 +138,9 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_reflection_diffraction_coupling_geometry": True,
             "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
             "max_reflections_in_coupled_path": 1,
+            # ADR-013 D5: coupled_paths=True includes cid 7 double diffraction
+            # (D->D) on the grid solver, sharing the coupled gate and slot.
+            "coupled_double_diffraction": True,
             "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
@@ -158,6 +165,9 @@ _CAPABILITIES: dict[str, Any] = {
         "montecarlo_bdpt": {
             "max_diffraction_order": 1,
             "supports_reflection_diffraction_coupling": True,
+            # ADR-013 D5: BDPT reads the shared enumerated coupled union
+            # (ADR-008 opaque oracle), which now includes cid 7 D->D rows.
+            "coupled_double_diffraction": True,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
             "supports_arrays": False,

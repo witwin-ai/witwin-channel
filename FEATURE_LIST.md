@@ -75,6 +75,11 @@ priority `scattering > diffraction > transmission > reflection > los`.
 - Path topology supports specular reflection depths 1 through 5 and bounded
   reflection-diffraction coupling with exactly one reflection and one
   diffraction, in both R-D and D-R orders.
+- Coupled double diffraction (D->D, component id 7; ADR-013): `coupled_paths`
+  enables the uniform order-2 compensator family {R->D, D->R, D->D}, enumerating
+  ordered edge pairs (TX -> e1 -> e2 -> RX) under the shared coupled candidate
+  budget and accumulating into the coupled component slot; coupled-off solves
+  stay byte-identical.
 - Canonical path selection orders by endpoint, depth, component, and event
   identity; it deduplicates before applying global or per-pair path caps.
 

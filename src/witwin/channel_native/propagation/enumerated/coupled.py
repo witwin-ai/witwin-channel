@@ -12,7 +12,9 @@ from witwin.channel_native.core.diffraction_geometry import (
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel_native.propagation.geometry.coupled import (
+    CoupledDdGeometryQuery,
     CoupledGeometryQuery,
+    query_coupled_dd_geometry,
     query_coupled_geometry,
 )
 from witwin.channel_native.propagation.geometry.kernels import (
@@ -29,6 +31,7 @@ from witwin.channel_native.propagation.topology.discovery.coupled import (
     _COUPLED_CANDIDATE_CHUNK_SIZE,  # noqa: F401 - compatibility re-export
     _MAX_COUPLED_CANDIDATES,
     iter_coupled_candidate_requests,
+    iter_coupled_dd_candidate_requests,
     prepare_coupled_candidate_plan,
 )
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
@@ -291,6 +294,93 @@ def _coupled_topology_rx_block(
                 interaction_normals=exported.interaction_normals[kept],
             )
         )
+    # cid 7 (double diffraction) shares the same plan and receiver block. Its
+    # ordered edge-pair stream is emitted after the R->D / D->R rows so the
+    # concatenated per-block row order is deterministic. Each row is a two-edge
+    # cascade: both edge ids live in the object sequence, no face is touched.
+    # Hoist the native handle out of the chunk loop (mirrors the R->D/D->R
+    # common_args hoist above): it is a per-solve constant, not per-chunk work.
+    dd_raydn_handle = context.raydn.require_handle()
+    for dd_request in iter_coupled_dd_candidate_requests(plan, device=device):
+        edge1_index = dd_request.edge1_id.to(dtype=torch.int64)
+        edge2_index = dd_request.edge2_id.to(dtype=torch.int64)
+        dd_exported = query_coupled_dd_geometry(
+            CoupledDdGeometryQuery(
+                raydn_handle=dd_raydn_handle,
+                source=tx_positions[dd_request.tx_slot].contiguous(),
+                receiver=rx_positions[dd_request.rx_slot].contiguous(),
+                edge1_id=dd_request.edge1_id,
+                edge1_position=edge_pos[edge1_index].contiguous(),
+                edge1_direction=edge_dir[edge1_index].contiguous(),
+                edge1_t_min=edge_t_min[edge1_index].contiguous(),
+                edge1_t_max=edge_t_max[edge1_index].contiguous(),
+                edge2_id=dd_request.edge2_id,
+                edge2_position=edge_pos[edge2_index].contiguous(),
+                edge2_direction=edge_dir[edge2_index].contiguous(),
+                edge2_t_min=edge_t_min[edge2_index].contiguous(),
+                edge2_t_max=edge_t_max[edge2_index].contiguous(),
+            )
+        )
+        launch_count += 1
+        candidate_count += dd_request.candidate_count
+        dd_kept = torch.nonzero(dd_exported.valid, as_tuple=False).reshape(-1)
+        dd_kept_count = int(dd_kept.shape[0])
+        if dd_kept_count == 0:
+            continue
+        # interaction_type is [2, 2], so the object sequence is exactly the two
+        # edge ids; the field stage recovers both edges from edge_sequence
+        # (slot 0 = e1, slot 1 = e2). material_sequence is fully -1: edges carry
+        # wedge materials resolved by the field stage.
+        dd_object_sequence = (
+            dd_exported.edge_sequence[dd_kept].to(dtype=torch.int32).contiguous()
+        )
+        dd_material_sequence = torch.full(
+            (dd_kept_count, 2), -1, device=device, dtype=torch.int32
+        )
+        dd_nan = torch.full(
+            (dd_kept_count,), float("nan"), device=device, dtype=torch.float32
+        )
+        blocks.append(
+            _ensure_topology_fields(
+                {
+                    "valid": torch.ones(
+                        (dd_kept_count,), device=device, dtype=torch.bool
+                    ),
+                    "tx_id": dd_request.tx_slot[dd_kept]
+                    .to(dtype=torch.int32)
+                    .contiguous(),
+                    "rx_id": dd_request.rx_slot[dd_kept]
+                    .to(dtype=torch.int32)
+                    .contiguous(),
+                    "depth": torch.full(
+                        (dd_kept_count,), 2, device=device, dtype=torch.int32
+                    ),
+                    "component_id": torch.full(
+                        (dd_kept_count,),
+                        dd_request.component_id,
+                        device=device,
+                        dtype=torch.int32,
+                    ),
+                    "primitive_id": torch.full(
+                        (dd_kept_count,), -1, device=device, dtype=torch.int32
+                    ),
+                    "edge_id": dd_exported.edge1_id[dd_kept].to(dtype=torch.int32),
+                    "path_length_m": dd_exported.path_length_m[dd_kept],
+                    "delay_s": dd_exported.delay_s[dd_kept],
+                    "path_gain": dd_nan,
+                },
+                interaction_position=dd_exported.interaction_positions[dd_kept, 0],
+                interaction_normal=dd_exported.interaction_normals[dd_kept, 0],
+                material_id=torch.full(
+                    (dd_kept_count,), -1, device=device, dtype=torch.int32
+                ),
+                path_field=torch.complex(dd_nan, dd_nan),
+                primitive_sequence=dd_object_sequence,
+                material_sequence=dd_material_sequence,
+                interaction_positions=dd_exported.interaction_positions[dd_kept],
+                interaction_normals=dd_exported.interaction_normals[dd_kept],
+            )
+        )
     return (
         _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
         launch_count,
@@ -388,8 +478,13 @@ def _coupled_reflection_diffraction_topology_rx_streamed(
     tx_count = int(tx_positions.shape[0])
     rx_count = int(rx_positions.shape[0])
     effective_limit = min(int(candidate_limit), _MAX_COUPLED_CANDIDATES)
-    # Both directions (R->D and D->R) evaluate every candidate, hence the x2.
-    per_receiver_candidates = tx_count * context.candidates_per_pair * 2
+    # The block budget counts the whole coupled union a receiver evaluates:
+    # both R->D / D->R directions (x2 over groups*edges) plus the one-direction
+    # D->D ordered edge-pair stream (edges*(edges-1)) (ADR-013 D1).
+    edge_count = int(context.selected_edges.shape[0])
+    per_receiver_candidates = tx_count * (
+        context.candidates_per_pair * 2 + edge_count * (edge_count - 1)
+    )
     block_rx = max(1, effective_limit // max(per_receiver_candidates, 1))
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0

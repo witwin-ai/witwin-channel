@@ -19,6 +19,28 @@ The platform `core` package's `channel` and `all` extras now route to
 installation route; application-level canary/default-on state still requires
 confirmation from each consumer owner.
 
+## API surface changes
+
+### ADR-013 coupled double diffraction (D->D)
+
+`coupled_paths=True` now enables the uniform order-2 compensator family
+{R->D, D->R, D->D} instead of the R->D / D->R pair alone. There is no new
+`Config` field and no new public toggle: a partial family is non-uniform by
+measurement, so the double-diffraction term (component id 7) shares the
+existing `coupled_paths` gate, per-block candidate budget, and coupled
+accumulator slot. Exported `coupled_paths=True` path tables now include cid 7
+rows (kept distinct from cid 3/4 for audits), and the aggregated `coupled`
+component map sums cids 3, 4, and 7. Coupled-off solves stay byte-identical.
+
+The semantic capability manifest (`capabilities()`) gains
+`coupled_double_diffraction: True` on every solver block that declares
+reflection-diffraction coupling support (`path`, `deterministic`,
+`montecarlo_bdpt`); `montecarlo_basic`, which does not support coupling, does
+not expose the key. This is an intentional additive surface change under the
+ADR-003 process; the curated `public-api-snapshot.json` function/class
+contracts are unchanged because no public callable signature or `Config` field
+changed.
+
 ## Rollout states
 
 1. Inventory: route every real call to a supported Native capability or record

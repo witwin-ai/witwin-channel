@@ -46,18 +46,6 @@
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 118
     },
-    "0856d52ffda63e53": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "field_transport.cu",
-        "fields.cpp"
-      ],
-      "owner": "field-transport",
-      "provenance": "hand-curated",
-      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
-      "token_count": 145
-    },
     "08e995cd62aad4d1": {
       "category": "other",
       "corpus": "native",
@@ -206,6 +194,17 @@
       "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
       "token_count": 103
     },
+    "1eadf7071c0627b9": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "token_count": 101,
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression."
+    },
     "1ec83ce5841f084b": {
       "category": "host_check",
       "corpus": "native",
@@ -269,6 +268,18 @@
       "provenance": "hand-curated",
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 123
+    },
+    "26b4a4634fea5fd7": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "token_count": 155,
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the coupled double-diffraction binding boundary."
     },
     "29591dce40e20e3c": {
       "category": "indexing_packing",
@@ -485,6 +496,17 @@
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 177
     },
+    "53674b499b83c070": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "token_count": 106,
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression."
+    },
     "5a869cd26cfde7b0": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -652,6 +674,17 @@
       "reason": "Repeated Python facade signature and argument plumbing.",
       "token_count": 127
     },
+    "64b05a9a86b24943": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "token_count": 108,
+      "reason": "Repeated dataclass/argument boilerplate between the coupled R-D and double-diffraction AD Functions."
+    },
     "651981f0dc7ee1d9": {
       "category": "host_check",
       "corpus": "native",
@@ -776,18 +809,6 @@
       "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
       "token_count": 100
     },
-    "7cbdfdef8c6a096d": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "field_transport.cu",
-        "field_wedge_ad_coupled.cu"
-      ],
-      "owner": "field-transport",
-      "provenance": "hand-curated",
-      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
-      "token_count": 141
-    },
     "7da298b872725188": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -815,6 +836,18 @@
       "provenance": "hand-curated",
       "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
       "token_count": 237
+    },
+    "84d3ed58786cd593": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "token_count": 202,
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the coupled double-diffraction binding boundary."
     },
     "85faad32c57fe131": {
       "category": "numeric_sensitive_exempt",
@@ -865,6 +898,18 @@
       "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
       "token_count": 128
     },
+    "8ad12154d8608118": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "token_count": 120,
+      "reason": "Repeated Python facade signature and argument plumbing for the coupled double-diffraction field op."
+    },
     "8cd88c46a7d8ec3c": {
       "category": "other",
       "corpus": "native",
@@ -899,17 +944,16 @@
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 140
     },
-    "8f52521f454c3a8f": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
+    "8e89bcae3ac23cff": {
+      "category": "indexing_packing",
+      "corpus": "native",
       "files": [
-        "autograd.py",
-        "functional.py"
+        "field_wedge_ad_coupled.cu"
       ],
-      "owner": "autograd",
+      "owner": "field-transport",
       "provenance": "hand-curated",
-      "reason": "Repeated Python facade signature and argument plumbing.",
-      "token_count": 108
+      "token_count": 133,
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression."
     },
     "9075cec2a19027b9": {
       "category": "numeric_sensitive_exempt",
@@ -1217,6 +1261,17 @@
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 101
     },
+    "c72e314ee9a1edc6": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "token_count": 174,
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression."
+    },
     "cb6b4edbee6eabc8": {
       "category": "host_check",
       "corpus": "python",
@@ -1395,6 +1450,18 @@
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 227
     },
+    "eb9126329a65a992": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "token_count": 161,
+      "reason": "Repeated Python facade signature and argument plumbing for the coupled double-diffraction field op."
+    },
     "ed6ac289285f13e1": {
       "category": "other",
       "corpus": "native",
@@ -1429,6 +1496,22 @@
       "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
       "token_count": 109
     },
+    "f34ec15d3420e882": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "token_count": 309,
+      "lockstep_tests": [
+        "tests/ad/test_solver_diffraction_coupled_ad.py",
+        "tests/test_native_owner_inventory.py"
+      ],
+      "reason": "Coupled double-diffraction primal kernel and its AD dual mirror share pair setup and index bookkeeping in lockstep (ADR-013 D4); the floating-point physics lives in the shared RayD header."
+    },
     "f434a45f5cb4b0a1": {
       "category": "other",
       "corpus": "native",
@@ -1440,6 +1523,28 @@
       "provenance": "hand-curated",
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 131
+    },
+    "f4cacba1764ffda8": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "token_count": 127,
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression."
+    },
+    "f6a3fd1ad42d62b4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "token_count": 136,
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression."
     },
     "f8fede21dbaef0e9": {
       "category": "numeric_sensitive_exempt",
