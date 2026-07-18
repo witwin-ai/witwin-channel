@@ -44,6 +44,64 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
     return flattened
 
 
+def _synthetic_endpoint_factor(
+    endpoints: Sequence[object],
+    directions: torch.Tensor,
+    *,
+    num_ant: int,
+    frequency_hz: float,
+    conjugate_pattern: bool,
+) -> torch.Tensor:
+    """Batch steering/pattern weights over endpoints sharing the same object.
+
+    ``directions`` has shape ``(endpoint, *batch, 3)`` where ``directions[i]``
+    is the far-field direction for ``endpoints[i]``. ``steering_vector`` and
+    ``AntennaPattern.field_response`` are per-direction operations (the only
+    reductions are the fixed length-3 vec3 contractions inside each element),
+    so evaluating a group of endpoints in one batched launch is numerically
+    identical to evaluating them one at a time. Endpoints that reference the
+    same object (for example every element of one ``ReceiverGrid``) share
+    array/orientation/pattern and are batched together, collapsing a per-
+    endpoint Python loop into one native launch per distinct endpoint object.
+    Returns ``(endpoint, *batch, num_ant)``.
+    """
+
+    groups: dict[int, list[int]] = {}
+    for index, endpoint in enumerate(endpoints):
+        groups.setdefault(id(endpoint), []).append(index)
+
+    def _weights(endpoint: object, sub: torch.Tensor) -> torch.Tensor:
+        steering = steering_vector(
+            endpoint.array,
+            sub,
+            frequency_hz=frequency_hz,
+            orientation=endpoint.orientation,
+        )
+        pattern = endpoint.pattern.field_response(
+            _local_direction(sub, endpoint.orientation)
+        )
+        if conjugate_pattern:
+            pattern = pattern.conj()
+        return steering * pattern.unsqueeze(-1)
+
+    if len(groups) == 1:
+        # Single shared endpoint object: evaluate every direction in one launch
+        # with no scatter (the common single-grid case).
+        return _weights(endpoints[0], directions)
+
+    out = torch.empty(
+        (len(endpoints), *directions.shape[1:-1], num_ant),
+        dtype=torch.complex64,
+        device=directions.device,
+    )
+    for indices in groups.values():
+        idx = torch.tensor(indices, device=directions.device, dtype=torch.long)
+        out.index_copy_(
+            0, idx, _weights(endpoints[indices[0]], directions.index_select(0, idx))
+        )
+    return out
+
+
 def _stack_endpoint_weights(
     endpoints: Sequence[object], *, attribute: str, device: torch.device
 ) -> torch.Tensor | None:
@@ -156,21 +214,14 @@ def pack_synthetic_arrays(
     # (rx, tx, path, tx_ant) -> (rx, tx, tx_ant, path)
     tx_factor = torch.stack(tx_factors, dim=1).permute(0, 1, 3, 2)
 
-    rx_factors: list[torch.Tensor] = []
-    for rx_id, receiver in enumerate(flat_receivers):
-        direction = arrival_source_direction[rx_id]
-        steering = steering_vector(
-            receiver.array,
-            direction,
-            frequency_hz=frequency_hz,
-            orientation=receiver.orientation,
-        )
-        pattern = receiver.pattern.field_response(
-            _local_direction(direction, receiver.orientation)
-        ).conj()
-        rx_factors.append(steering * pattern.unsqueeze(-1))
     # (rx, tx, path, rx_ant) -> (rx, rx_ant, tx, path)
-    rx_factor = torch.stack(rx_factors, dim=0).permute(0, 3, 1, 2)
+    rx_factor = _synthetic_endpoint_factor(
+        flat_receivers,
+        arrival_source_direction,
+        num_ant=num_rx_ant,
+        frequency_hz=frequency_hz,
+        conjugate_pattern=True,
+    ).permute(0, 3, 1, 2)
     factor = rx_factor[:, :, :, None, :] * tx_factor[:, None, :, :, :]
 
     def expand_path(value: torch.Tensor) -> torch.Tensor:

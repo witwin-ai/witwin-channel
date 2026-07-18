@@ -92,12 +92,6 @@
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Workspace-sizing and native-capability validation stage extracted verbatim from the former solve() monolith."
     },
-    "src/witwin/channel_native/path/arrays.py::pack_synthetic_arrays": {
-      "ceiling": 16,
-      "expires_on": "2027-01-31",
-      "owner": "path maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
     "src/witwin/channel_native/path/config.py::Config.__post_init__": {
       "ceiling": 16,
       "expires_on": "2027-01-31",
