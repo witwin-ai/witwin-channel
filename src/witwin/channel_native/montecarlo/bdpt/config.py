@@ -23,6 +23,27 @@ _VALID_RECEIVER_STRATEGIES = frozenset({"grid_area", "point_sphere"})
 _VALID_ACCUMULATION_STRATEGIES = frozenset({"auto", "atomic", "staged", "compact"})
 
 
+def _validate_coherent_combine(
+    coherent: bool, components: frozenset[str], ad_mode: str
+) -> None:
+    """ADR-019: coherent combine is only defined for the enumerable delta/UTD
+    family that carries a complex field. Refuse it loudly for the stochastic
+    transmission/scattering samplers rather than silently combining Monte
+    Carlo power samples as phasors. The AD refusal mirrors ADR-017: the
+    coherent path refuses AD until its native companions exist (subsumed by
+    the release-wide ad_mode gate, kept explicit for the ADR-019 record)."""
+    if not coherent:
+        return
+    unsupported = components & {"transmission", "scattering"}
+    if unsupported:
+        raise RuntimeError(
+            "coherent combine supports only {los, reflection, diffraction} "
+            f"components; refused for {sorted(unsupported)}"
+        )
+    if ad_mode != "none":
+        raise RuntimeError("coherent combine does not support ad_mode != 'none'")
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
     samples: int = 4096
@@ -112,23 +133,7 @@ class Config:
                 "montecarlo_bdpt supports_ad=False in the first replacement release; "
                 "ad_mode must be 'none'"
             )
-        if self.coherent:
-            # ADR-019: coherent combine is only defined for the enumerable
-            # delta/UTD family that carries a complex field. Refuse it loudly
-            # for the stochastic transmission/scattering samplers rather than
-            # silently combining Monte Carlo power samples as phasors.
-            unsupported = components & {"transmission", "scattering"}
-            if unsupported:
-                raise RuntimeError(
-                    "coherent combine supports only {los, reflection, diffraction} "
-                    f"components; refused for {sorted(unsupported)}"
-                )
-            if self.ad_mode != "none":
-                # AD stance mirrors ADR-017: the coherent path refuses AD until
-                # its native forward/JVP/VJP companions exist. BDPT has no AD in
-                # this release, so this is subsumed by the ad_mode gate above and
-                # kept explicit for the ADR-019 record.
-                raise RuntimeError("coherent combine does not support ad_mode != 'none'")
+        _validate_coherent_combine(self.coherent, components, self.ad_mode)
         if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
             raise ValueError("workspace_limit_bytes must be non-negative")
 
