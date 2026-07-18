@@ -155,8 +155,9 @@ def _typed_tensors(evaluated: EvaluatedPaths) -> dict[str, torch.Tensor]:
 
 
 def _install_row_collector(monkeypatch: pytest.MonkeyPatch) -> None:
-    def collect(_scene, _config, *, device, info):
+    def collect(_scene, _config, *, device, info, ad_mode="none"):
         assert device == torch.device("cpu")
+        assert ad_mode == "none"
         info.update(
             visibility_launch_count=13,
             path_count=2,
