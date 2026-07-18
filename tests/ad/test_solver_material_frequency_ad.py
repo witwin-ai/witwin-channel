@@ -311,10 +311,3 @@ def test_jvp_metadata_reports_dual_companions_without_tape(solver):
     assert kernel["jvp_launch_count"] > 0
     assert kernel["backward_launch_count"] == 0
     assert kernel["tape_bytes"] == 0
-
-
-@pytest.mark.parametrize("solver", _SOLVERS)
-def test_scattering_component_fails_loudly_in_ad_mode(solver):
-    scene = _reflection_scene()
-    with pytest.raises(RuntimeError, match="scattering"):
-        _solve(scene, solver, frozenset({"reflection", "scattering"}), "vjp")

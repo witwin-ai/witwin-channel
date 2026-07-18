@@ -186,9 +186,26 @@ priority `scattering > diffraction > transmission > reflection > los`.
   coupled adjoints take the wall plane and edge tables as frozen winners,
   and the solver fails loudly (`NotImplementedError`) instead of returning
   a silently incomplete gradient (registered as `xfail(strict=True)`).
-- Explicit-failure policy: the scattering component raises a `RuntimeError`
-  naming the interaction before any launch when `ad_mode != "none"`. A
-  montecarlo.basic reflection solve whose `max_depth` exceeds the native
+- Deterministic scattering AD (ADR-014): the two native scattering ops gain
+  registered JVP/VJP companions (`scattering_ensemble_eval_{backward,jvp}`,
+  `scattering_patch_integral_eval_{backward,jvp}`). Under `ad_mode != "none"`
+  the enumerated scattering seam builds the radiometric scale `coef` (ensemble
+  rows) and the wavenumber `k0` plus the outer amplitude scale (realization
+  rows) as Torch scalars and dispatches the `_ad` wrappers, so gradients reach
+  the resident Kirchhoff BSDF tables, the phase-screen heights, the
+  fixed-topology row geometry, and the carrier frequency; the fixed
+  winner/visibility structure, polarizations, material ids, table metadata and
+  quadrature nodes stay frozen and reject a requested gradient/tangent loudly.
+  `ad_mode == "none"` keeps the exact bitwise primal path (no tape, no
+  `autograd.Function`). The AD kernels recompute their primals under
+  `--fmad=false` in lockstep with the forwards. The former path/deterministic
+  pipeline guard rejecting `scattering` under `ad_mode != "none"` is lifted:
+  both solvers now solve scattering scenes end-to-end in `vjp`/`jvp` mode
+  (locked by `tests/ad/test_solver_scattering_ad.py`).
+- Explicit-failure policy: a montecarlo.basic scattering solve still raises a
+  `RuntimeError` naming the interaction before any launch when
+  `ad_mode != "none"` (Monte Carlo scattering AD stays out of ADR-014 scope).
+  A montecarlo.basic reflection solve whose `max_depth` exceeds the native
   reflection AD depth cap (`ops.mc_reflection_ad_max_depth()`, mirrored from
   the kernel constant) is rejected the same way at `solve()` instead of
   failing mid-backward.

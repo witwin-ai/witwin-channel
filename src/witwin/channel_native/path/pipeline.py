@@ -55,13 +55,6 @@ def _receiver_positions(scene: Scene, *, reference: torch.Tensor) -> torch.Tenso
 def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.path solver requires CUDA")
-    if config.ad_mode != "none" and "scattering" in config.components:
-        # Kirchhoff patch paths bypass the shared field seam; their fields are
-        # not differentiable yet (plan 07 AD-4). Fail before any launch.
-        raise RuntimeError(
-            f"path ad_mode='{config.ad_mode}' does not support the scattering "
-            "component yet"
-        )
     info = build_info()
     reflection_available = bool(info["uses_raydn_native"])
     diffraction_available = bool(info["uses_raydn_native"])

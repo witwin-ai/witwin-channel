@@ -12,9 +12,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # docs/dev/baselines/0892d855.../static/bindings.json is an immutable
 # historical artifact and must never be rewritten; symbol additions are
 # re-frozen HERE, with the delta explained in the introducing change
-# (ADR-010 added the 5 scattering/rough-reflection kernels: 174 -> 179).
+# (ADR-010 added the 5 scattering/rough-reflection kernels: 174 -> 179;
+# ADR-014 added the 4 scattering JVP/VJP companions: 179 -> 183).
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 179
+EXPECTED_BINDING_COUNT = 183
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )

@@ -277,10 +277,374 @@ def scattering_patch_integral_eval(
     return out
 
 
+_ENSEMBLE_OUTPUT_FIELDS = ("gain", "amplitude", "length", "keep")
+_ENSEMBLE_TANGENT_FIELDS = ("tangent_gain", "tangent_amplitude", "tangent_length")
+_ENSEMBLE_BACKWARD_FIELDS = (
+    "grad_wo_rows",
+    "grad_r2_rows",
+    "grad_cos_o_rows",
+    "grad_n_o",
+    "grad_t1r",
+    "grad_t2r",
+    "grad_wi_local",
+    "grad_cos_i",
+    "grad_r1",
+    "grad_a_te2",
+    "grad_a_tm2",
+    "grad_weights",
+    "grad_f_te",
+    "grad_f_tm",
+    "grad_coef",
+)
+_PATCH_OUTPUT_FIELDS = ("total", "integral", "row_value")
+_PATCH_BACKWARD_FIELDS = (
+    "grad_heights",
+    "grad_r_te",
+    "grad_r_tm",
+    "grad_d_i",
+    "grad_d_o",
+    "grad_r1_rows",
+    "grad_r2_rows",
+    "grad_centroids",
+    "grad_k0",
+)
+
+
+def scattering_ensemble_eval_backward(
+    wo_rows: torch.Tensor,
+    r2_rows: torch.Tensor,
+    cos_o_rows: torch.Tensor,
+    n_o: torch.Tensor,
+    t1r: torch.Tensor,
+    t2r: torch.Tensor,
+    wi_local: torch.Tensor,
+    cos_i: torch.Tensor,
+    r1: torch.Tensor,
+    a_te2: torch.Tensor,
+    a_tm2: torch.Tensor,
+    weights: torch.Tensor,
+    material_id: torch.Tensor,
+    backup_axis: torch.Tensor,
+    rx_pol: torch.Tensor,
+    rc_idx: torch.Tensor,
+    sc_idx: torch.Tensor,
+    f_te_flat: torch.Tensor,
+    f_tm_flat: torch.Tensor,
+    table_offset: torch.Tensor,
+    table_dims: torch.Tensor,
+    material_slot: torch.Tensor,
+    *,
+    coef: float,
+    threshold: float,
+    grad_gain: torch.Tensor | None = None,
+    grad_amplitude: torch.Tensor | None = None,
+    grad_length: torch.Tensor | None = None,
+    need_grad_rows: bool = False,
+    need_grad_samples: bool = False,
+    need_grad_tables: bool = False,
+    need_grad_coef: bool = False,
+) -> dict[str, torch.Tensor | None]:
+    """VJP of :func:`scattering_ensemble_eval` (ADR-014 op 1)."""
+
+    validate_cuda_tensor("wo_rows", wo_rows, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("r2_rows", r2_rows, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("cos_o_rows", cos_o_rows, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("wi_local", wi_local, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("rc_idx", rc_idx, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("sc_idx", sc_idx, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2)
+    out = _required_native_op("scattering_ensemble_eval_backward")(
+        wo_rows,
+        r2_rows,
+        cos_o_rows,
+        n_o,
+        t1r,
+        t2r,
+        wi_local,
+        cos_i,
+        r1,
+        a_te2,
+        a_tm2,
+        weights,
+        material_id,
+        backup_axis,
+        rx_pol,
+        rc_idx,
+        sc_idx,
+        f_te_flat,
+        f_tm_flat,
+        table_offset,
+        table_dims,
+        material_slot,
+        float(coef),
+        float(threshold),
+        grad_gain,
+        grad_amplitude,
+        grad_length,
+        bool(need_grad_rows),
+        bool(need_grad_samples),
+        bool(need_grad_tables),
+        bool(need_grad_coef),
+    )
+    if not isinstance(out, dict) or set(out) != set(_ENSEMBLE_BACKWARD_FIELDS):
+        raise TypeError(
+            "_channel_native.scattering_ensemble_eval_backward returned invalid fields"
+        )
+    return out
+
+
+def scattering_ensemble_eval_jvp(
+    wo_rows: torch.Tensor,
+    r2_rows: torch.Tensor,
+    cos_o_rows: torch.Tensor,
+    n_o: torch.Tensor,
+    t1r: torch.Tensor,
+    t2r: torch.Tensor,
+    wi_local: torch.Tensor,
+    cos_i: torch.Tensor,
+    r1: torch.Tensor,
+    a_te2: torch.Tensor,
+    a_tm2: torch.Tensor,
+    weights: torch.Tensor,
+    material_id: torch.Tensor,
+    backup_axis: torch.Tensor,
+    rx_pol: torch.Tensor,
+    rc_idx: torch.Tensor,
+    sc_idx: torch.Tensor,
+    f_te_flat: torch.Tensor,
+    f_tm_flat: torch.Tensor,
+    table_offset: torch.Tensor,
+    table_dims: torch.Tensor,
+    material_slot: torch.Tensor,
+    *,
+    coef: float,
+    threshold: float,
+    tangent_wo_rows: torch.Tensor | None = None,
+    tangent_r2_rows: torch.Tensor | None = None,
+    tangent_cos_o_rows: torch.Tensor | None = None,
+    tangent_n_o: torch.Tensor | None = None,
+    tangent_t1r: torch.Tensor | None = None,
+    tangent_t2r: torch.Tensor | None = None,
+    tangent_wi_local: torch.Tensor | None = None,
+    tangent_cos_i: torch.Tensor | None = None,
+    tangent_r1: torch.Tensor | None = None,
+    tangent_a_te2: torch.Tensor | None = None,
+    tangent_a_tm2: torch.Tensor | None = None,
+    tangent_weights: torch.Tensor | None = None,
+    tangent_f_te_flat: torch.Tensor | None = None,
+    tangent_f_tm_flat: torch.Tensor | None = None,
+    tangent_coef: float = 0.0,
+) -> dict[str, torch.Tensor]:
+    """JVP of :func:`scattering_ensemble_eval` (ADR-014 op 1)."""
+
+    validate_cuda_tensor("wo_rows", wo_rows, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("r2_rows", r2_rows, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("cos_o_rows", cos_o_rows, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("wi_local", wi_local, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("rc_idx", rc_idx, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("sc_idx", sc_idx, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2)
+    out = _required_native_op("scattering_ensemble_eval_jvp")(
+        wo_rows,
+        r2_rows,
+        cos_o_rows,
+        n_o,
+        t1r,
+        t2r,
+        wi_local,
+        cos_i,
+        r1,
+        a_te2,
+        a_tm2,
+        weights,
+        material_id,
+        backup_axis,
+        rx_pol,
+        rc_idx,
+        sc_idx,
+        f_te_flat,
+        f_tm_flat,
+        table_offset,
+        table_dims,
+        material_slot,
+        float(coef),
+        float(threshold),
+        tangent_wo_rows,
+        tangent_r2_rows,
+        tangent_cos_o_rows,
+        tangent_n_o,
+        tangent_t1r,
+        tangent_t2r,
+        tangent_wi_local,
+        tangent_cos_i,
+        tangent_r1,
+        tangent_a_te2,
+        tangent_a_tm2,
+        tangent_weights,
+        tangent_f_te_flat,
+        tangent_f_tm_flat,
+        float(tangent_coef),
+    )
+    if not isinstance(out, dict) or set(out) != set(_ENSEMBLE_TANGENT_FIELDS):
+        raise TypeError(
+            "_channel_native.scattering_ensemble_eval_jvp returned invalid fields"
+        )
+    return out
+
+
+def scattering_patch_integral_eval_backward(
+    patch_tris: torch.Tensor,
+    patch_uvs: torch.Tensor,
+    rows: torch.Tensor,
+    d_i: torch.Tensor,
+    d_o: torch.Tensor,
+    n_rows: torch.Tensor,
+    r_te: torch.Tensor,
+    r_tm: torch.Tensor,
+    pol_t: torch.Tensor,
+    pol_r: torch.Tensor,
+    r1_rows: torch.Tensor,
+    r2_rows: torch.Tensor,
+    centroids: torch.Tensor,
+    heights: torch.Tensor,
+    *,
+    k0: float,
+    grad_total: torch.Tensor,
+    need_grad_heights: bool = False,
+    need_grad_jones: bool = False,
+    need_grad_geometry: bool = False,
+    need_grad_k0: bool = False,
+) -> dict[str, torch.Tensor | None]:
+    """VJP of :func:`scattering_patch_integral_eval` (ADR-014 op 2)."""
+
+    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("d_i", d_i, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("d_o", d_o, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("r_te", r_te, dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("r_tm", r_tm, dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
+    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
+    out = _required_native_op("scattering_patch_integral_eval_backward")(
+        patch_tris,
+        patch_uvs,
+        rows,
+        d_i,
+        d_o,
+        n_rows,
+        r_te,
+        r_tm,
+        pol_t,
+        pol_r,
+        r1_rows,
+        r2_rows,
+        centroids,
+        heights,
+        quad_a,
+        quad_b,
+        quad_w,
+        float(k0),
+        grad_total,
+        bool(need_grad_heights),
+        bool(need_grad_jones),
+        bool(need_grad_geometry),
+        bool(need_grad_k0),
+    )
+    if not isinstance(out, dict) or set(out) != set(_PATCH_BACKWARD_FIELDS):
+        raise TypeError(
+            "_channel_native.scattering_patch_integral_eval_backward returned"
+            " invalid fields"
+        )
+    return out
+
+
+def scattering_patch_integral_eval_jvp(
+    patch_tris: torch.Tensor,
+    patch_uvs: torch.Tensor,
+    rows: torch.Tensor,
+    d_i: torch.Tensor,
+    d_o: torch.Tensor,
+    n_rows: torch.Tensor,
+    r_te: torch.Tensor,
+    r_tm: torch.Tensor,
+    pol_t: torch.Tensor,
+    pol_r: torch.Tensor,
+    r1_rows: torch.Tensor,
+    r2_rows: torch.Tensor,
+    centroids: torch.Tensor,
+    heights: torch.Tensor,
+    *,
+    k0: float,
+    tangent_heights: torch.Tensor | None = None,
+    tangent_r_te: torch.Tensor | None = None,
+    tangent_r_tm: torch.Tensor | None = None,
+    tangent_d_i: torch.Tensor | None = None,
+    tangent_d_o: torch.Tensor | None = None,
+    tangent_r1_rows: torch.Tensor | None = None,
+    tangent_r2_rows: torch.Tensor | None = None,
+    tangent_centroids: torch.Tensor | None = None,
+    tangent_k0: float = 0.0,
+) -> dict[str, torch.Tensor]:
+    """JVP of :func:`scattering_patch_integral_eval` (ADR-014 op 2)."""
+
+    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("d_i", d_i, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("d_o", d_o, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("r_te", r_te, dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("r_tm", r_tm, dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
+    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
+    out = _required_native_op("scattering_patch_integral_eval_jvp")(
+        patch_tris,
+        patch_uvs,
+        rows,
+        d_i,
+        d_o,
+        n_rows,
+        r_te,
+        r_tm,
+        pol_t,
+        pol_r,
+        r1_rows,
+        r2_rows,
+        centroids,
+        heights,
+        quad_a,
+        quad_b,
+        quad_w,
+        float(k0),
+        tangent_heights,
+        tangent_r_te,
+        tangent_r_tm,
+        tangent_d_i,
+        tangent_d_o,
+        tangent_r1_rows,
+        tangent_r2_rows,
+        tangent_centroids,
+        float(tangent_k0),
+    )
+    if not isinstance(out, dict) or set(out) != {"tangent_total"}:
+        raise TypeError(
+            "_channel_native.scattering_patch_integral_eval_jvp returned invalid fields"
+        )
+    return out
+
+
 __all__ = [
     "scattering_ensemble_eval",
+    "scattering_ensemble_eval_backward",
+    "scattering_ensemble_eval_jvp",
     "scattering_event_probabilities",
     "scattering_patch_integral_eval",
+    "scattering_patch_integral_eval_backward",
+    "scattering_patch_integral_eval_jvp",
     "scattering_table_eval",
     "scattering_table_pdf",
     "scattering_table_sample",

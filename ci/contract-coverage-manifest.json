@@ -40,7 +40,9 @@
     "native-scattering": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
     "native-field-rough-scale": "tests/kernels/test_field_rough_reflection_scale.py::test_rough_reflection_scale_contract_shapes_and_dtypes",
     "native-scattering-ensemble": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
-    "native-scattering-patch-integral": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes"
+    "native-scattering-patch-integral": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes",
+    "native-scattering-ensemble-ad": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+    "native-scattering-patch-integral-ad": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -73,7 +75,8 @@
     "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive",
     "deterministic-rough-reflection-ad": "tests/ad/test_solver_rough_reflection_ad.py::test_rough_reflection_frequency_grad_matches_fd",
     "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
-    "deterministic-scattering-realization": "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection"
+    "deterministic-scattering-realization": "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection",
+    "deterministic-scattering-ad": "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
   },
   "public_exports": [
     [
@@ -1905,6 +1908,24 @@
       ]
     ],
     [
+      "scattering_ensemble_eval_backward",
+      "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_backward",
+      "named_wrapper",
+      "native-scattering-ensemble-ad",
+      [
+        "deterministic-scattering-ad"
+      ]
+    ],
+    [
+      "scattering_ensemble_eval_jvp",
+      "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_jvp",
+      "named_wrapper",
+      "native-scattering-ensemble-ad",
+      [
+        "deterministic-scattering-ad"
+      ]
+    ],
+    [
       "scattering_event_probabilities",
       "witwin.channel_native.scattering.kernels.functional.scattering_event_probabilities",
       "named_wrapper",
@@ -1920,6 +1941,24 @@
       "native-scattering-patch-integral",
       [
         "deterministic-scattering-realization"
+      ]
+    ],
+    [
+      "scattering_patch_integral_eval_backward",
+      "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_backward",
+      "named_wrapper",
+      "native-scattering-patch-integral-ad",
+      [
+        "deterministic-scattering-ad"
+      ]
+    ],
+    [
+      "scattering_patch_integral_eval_jvp",
+      "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_jvp",
+      "named_wrapper",
+      "native-scattering-patch-integral-ad",
+      [
+        "deterministic-scattering-ad"
       ]
     ],
     [
