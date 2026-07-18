@@ -934,7 +934,7 @@ TableDims check_inputs(
 std::pair<at::Tensor, at::Tensor> single_material_csr(int layer_total,
                                                       const at::Tensor& reference) {
     auto int_opts = reference.options().dtype(at::kInt);
-    auto offset = at::zeros({1}, int_opts);
+    auto offset = zero_filled({1}, int_opts);
     auto count = at::full({1}, layer_total, int_opts);
     return {offset, count};
 }

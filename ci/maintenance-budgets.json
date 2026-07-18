@@ -51,7 +51,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel_native/montecarlo/basic/pipeline.py::solve_pipeline": {
-      "ceiling": 59,
+      "ceiling": 57,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
