@@ -14,14 +14,18 @@ Authoritative companion records:
 
 ## 1. Repository / build state
 
+All of this work landed on `main` and the temporary worktree was removed —
+**future work happens directly on `main` in the main checkout**, off fresh
+short-lived branches, not in a `.codex/worktrees/*` copy.
+
 | Item | State |
 | --- | --- |
-| Worktree | `E:/Code/witwin-platform/channel_native/.codex/worktrees/fullwave-ground-truth`, branch `codex/fullwave-ground-truth`, HEAD `53af8e4` |
-| RayD | `E:/Code/RayDi`, branch `fix/utd-continuity`, HEAD `9495a70` (**NOT pushed to remote**), lock `dependencies/rayd.lock.json` matches |
-| Commit chain (round 1) | `bb4b092` (UTD continuity + polarization fixes) |
-| Commit chain (round 2) | `ea04351` (3-cube harness) → `6cbb6a9`+RayD `545f1bc` (G1 T_mono) → `d93d0b2`+RayD `6d6b212` (G2 odd blend) → `53af8e4`+RayD `9495a70` (G3+G4 coupled paths) |
-| Build | `artifacts/cmake-fw` (conftest auto-discovers). Recipe: vcvars64 + `cmake --build <dir> -j 4` (cl.exe OOM → just rerun). Identity guard trips after commits → run `cmake <dir>` once to reconfigure. |
-| Run env | `PYTHONPATH=<worktree>/src`, `WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE=1`, `WITWIN_CHANNEL_NATIVE_EXTENSION_PATH=<pyd>`, `WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT=<trimmed sidecar>` |
+| Working copy | `E:/Code/witwin-platform/channel_native`, branch `main`. Push remote `origin` = `https://github.com/witwin-ai/channel_native.git` (private). Branch off `main` for each new phase; the old `.codex/worktrees/fullwave-ground-truth` worktree and its `codex/fullwave-ground-truth` branch are gone (fully merged). |
+| RayD | `E:/Code/RayDi`, branch `main` = `origin/main` = `408a086` (pushed to `github.com/Asixa/RayD.git`), = UTD continuity + the merged RT backend. `dependencies/rayd.lock.json` pins `408a086`. |
+| Commit chain | UTD continuity `bb4b092` → 3-cube harness `ea04351` → G1 `6cbb6a9`+RayD `545f1bc` → G2 `d93d0b2`+RayD `6d6b212` → G3/G4 coupled paths `53af8e4`+RayD `9495a70` → plan `863657b` → merge-in-main `73bc724` → RT-integ governance `3ef6ede`+RayD `408a086`. (SHAs before the build-artifact history purge; re-read `git log` for current values.) |
+| Preserved data | The irreplaceable gitignored artifacts from the deleted worktree (Maxwell/Tidy3D ground-truth npzs, deterministic baselines, comparison figures, `fable_*`/`render_pil` diagnostic scripts) were copied to `artifacts/fullwave-refs/` in the main checkout (gitignored). Paths in §2/§9 that read `.test-tmp/fullwave-smoke/...` or `artifacts/fullwave-fix/...` now live under `artifacts/fullwave-refs/{fullwave-smoke,fullwave-fix}/...`. |
+| Build | Configure a fresh `artifacts/cmake-<name>` in the main checkout (conftest auto-discovers `artifacts/cmake-*`). Recipe: vcvars64 + `cmake -S . -B artifacts/cmake-<name> ...` then `cmake --build <dir> -j 4` (cl.exe OOM → just rerun). Identity guard trips after commits → run `cmake <dir>` once to reconfigure. There is no pre-built pyd anymore — first phase rebuilds. |
+| Run env | `PYTHONPATH=<main-checkout>/src`, `WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE=1`, `WITWIN_CHANNEL_NATIVE_EXTENSION_PATH=<pyd>`, `WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT=<trimmed sidecar>`. Redirect `$env:TEMP/$env:TMP` to a fresh dir before `ci/run_ci_tier.py` (the shared Windows `pytest-of-Asixa` temp dir permission-locks and yields phantom ERRORs). |
 | Fingerprint semantics | The build fingerprint hashes **git SHAs + ABI metadata, not binary bytes** — it does NOT distinguish builds from uncommitted source edits. Use behavior probes / mtimes when in doubt. |
 
 ## 2. Single-cube state (DONE, all gates green)
