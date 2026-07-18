@@ -1,4 +1,3 @@
-import math
 import statistics
 
 import pytest
@@ -27,20 +26,24 @@ def _estimates(*, samples: int, mis: str) -> list[float]:
     ]
 
 
-def _ci_half_width(values: list[float]) -> float:
-    return 1.96 * statistics.stdev(values) / math.sqrt(len(values))
-
-
-def test_bdpt_diffraction_four_x_samples_shrinks_confidence_interval():
+def test_bdpt_diffraction_estimate_is_sample_count_and_seed_invariant():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT statistics")
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native diffraction is not built")
 
+    # ADR-018: standalone diffraction is now a deterministic enumerated estimate,
+    # so it no longer depends on the Monte Carlo sample budget or seed. Distinct
+    # sample counts and seeds collapse to the identical value, replacing the
+    # retired variance-shrinks-with-samples convergence check on the stochastic
+    # Keller sampler.
     small = _estimates(samples=256, mis="power_heuristic")
     large = _estimates(samples=1024, mis="power_heuristic")
 
-    assert _ci_half_width(large) < _ci_half_width(small)
+    reference = small[0]
+    assert reference > 0.0
+    for value in small + large:
+        assert value == pytest.approx(reference, rel=1e-6)
 
 
 def test_bdpt_diffraction_mis_on_off_means_agree_across_seeds():

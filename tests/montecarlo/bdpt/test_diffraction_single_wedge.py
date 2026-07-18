@@ -60,43 +60,46 @@ def test_bdpt_single_wedge_diffraction_fixed_seed_is_stable():
     second = solve(scene, Config(samples=512, seed=7, components={"diffraction"}))
     changed = solve(scene, Config(samples=512, seed=8, components={"diffraction"}))
 
+    # ADR-018: standalone diffraction routes through the deterministic
+    # enumerated engine, so the estimate is seed-invariant. Distinct seeds must
+    # produce the identical map, unlike the retired stochastic Keller sampler.
     torch.testing.assert_close(first.component_maps["diffraction"], second.component_maps["diffraction"])
-    assert not torch.equal(first.component_maps["diffraction"], changed.component_maps["diffraction"])
+    torch.testing.assert_close(first.component_maps["diffraction"], changed.component_maps["diffraction"])
 
 
-def test_bdpt_single_wedge_diffraction_uses_original_direct_keller_split():
-    assert bdpt_solver._diffraction_sample_split(16, mis="power_heuristic") == (6, 5, 0)
-    assert bdpt_solver._diffraction_sample_split(17, mis="balance") == (6, 6, 0)
-    assert bdpt_solver._diffraction_sample_split(512, mis="power_heuristic") == (171, 171, 0)
-    assert bdpt_solver._diffraction_sample_split(16, mis="none") == (16, 0, 0)
-
-
-@pytest.mark.parametrize(
-    ("samples", "relative_tolerance"),
-    [
-        (4096, 0.35),
-        (16384, 0.20),
-    ],
-)
-def test_bdpt_single_wedge_point_diffraction_converges_to_maintained_reference(samples, relative_tolerance):
+def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for BDPT diffraction convergence")
+        pytest.skip("CUDA is required for BDPT diffraction")
     if not build_info()["uses_raydn_native"]:
         pytest.skip("RayDN native diffraction is not built")
 
-    result = solve(
-        wedge_diffraction_scene(),
-        Config(samples=samples, seed=7, components={"diffraction"}, receiver_strategy="point_sphere"),
-    )
+    from witwin.channel_native.deterministic import Config as DeterministicConfig
+    from witwin.channel_native.deterministic import solve as deterministic_solve
 
-    observed = result.component_power["diffraction"].detach().cpu()
-    # Maintained reference for the single-wedge point-receiver estimate. The
-    # historical value 1.25e-04 fossilized a 2x double count of the identical
-    # direct/keller strategies (strategy_count=1 gave each full MIS weight);
-    # 6.25e-05 still carried the duplicate half-plane record for the shared
-    # wedge edge (audit D-6), now merged into one 3*pi/2 wedge state.
-    reference = torch.tensor(4.66e-05, dtype=observed.dtype)
-    torch.testing.assert_close(observed, reference, rtol=relative_tolerance, atol=1.0e-8)
+    scene = wedge_diffraction_scene()
+    observed = (
+        solve(
+            scene,
+            Config(samples=512, seed=7, components={"diffraction"}, receiver_strategy="point_sphere"),
+        )
+        .component_power["diffraction"]
+        .detach()
+        .sum()
+    )
+    # ADR-018: BDPT standalone diffraction now consumes the same first-order UTD
+    # enumerated evaluation as the deterministic solver, so the point-receiver
+    # estimate reproduces the deterministic reference. The retired crude power
+    # heuristic over-counted this fixture by ~2175x (fossilized as 4.66e-05).
+    reference = (
+        deterministic_solve(
+            scene,
+            DeterministicConfig(components={"diffraction"}, max_depth=1, coherent=False),
+        )
+        .component_power["diffraction"]
+        .detach()
+        .sum()
+    )
+    torch.testing.assert_close(observed, reference, rtol=1.0e-4, atol=1.0e-12)
 
 
 def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges():

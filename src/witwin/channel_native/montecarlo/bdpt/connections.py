@@ -2,25 +2,20 @@
 
 Each builder returns (or streams) connection-sample dictionaries in the
 light-major layout consumed by :func:`bdpt_accumulate_connection_samples`.
-The enumerated delta reflection/coupled builders stay in ``pipeline`` because
-they depend on the shared ``propagation`` enumerated engine (ADR-008); this
-module owns the native LoS, diffraction, straight transmission and
+The enumerated delta reflection/diffraction/coupled builders stay in
+``pipeline`` because they depend on the shared ``propagation`` enumerated engine
+(ADR-008/ADR-018); this module owns the native LoS, straight transmission and
 event-selected shooting connection samplers plus their event-merge helpers.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import Any
 
 import torch
 
-from witwin.channel_native.core.diffraction_geometry import (
-    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
-)
 from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
 from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
-    bdpt_diffraction_point_connection_samples,
     bdpt_endpoint_connection_samples,
     bdpt_endpoint_connection_visibility_inputs,
     bdpt_endpoint_subpath_state,
@@ -30,10 +25,8 @@ from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_transmitted_light_subpath_state,
 )
 from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
-    bdpt_diffraction_state_pack,
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,
-    bdpt_selected_edge_indices,
 )
 from witwin.channel_native.montecarlo.events.scattering import (
     local_frames,
@@ -52,10 +45,8 @@ from witwin.channel_native.montecarlo.events.transmission import (
     unpolarized_power_budgets,
 )
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel_native.scene.models import Scene
 
 
-_LIGHT_SPEED_M_PER_S = 299_792_458.0
 _TRANSMISSION_COMPONENT_ID = 5
 _MASK_REFLECTION = 2
 _MASK_TRANSMISSION = 8
@@ -96,115 +87,6 @@ def _native_los_connection_samples(
         visibility_inputs["active"],
     )[0]
     return bdpt_filter_connection_samples(samples, visible)
-
-
-def _diffraction_sample_split(sample_count: int, *, mis: str) -> tuple[int, int, int]:
-    if mis == "none":
-        return int(sample_count), 0, 0
-    direct = (int(sample_count) + 2) // 3
-    keller = (int(sample_count) + 1) // 3
-    return direct, keller, 0
-
-
-def _diffraction_strategy_count(direct_samples: int, keller_samples: int) -> int:
-    return (1 if direct_samples > 0 else 0) + (1 if keller_samples > 0 else 0)
-
-
-def _native_diffraction_point_connection_samples(
-    scene: Scene,
-    raydn: Any,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    material_tensors: tuple[torch.Tensor, ...],
-    *,
-    samples: int,
-    seed: int,
-    mis: str,
-    beta: float,
-) -> Iterator[dict[str, torch.Tensor]]:
-    _eps_r, _sigma_e, _mu_r, material_gain, material_valid, _thickness = (
-        material_tensors
-    )
-    edge_geometry = _cached_diffraction_edge_geometry(raydn)
-    (
-        selected,
-        edge_pos,
-        edge_dir,
-        _lengths,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-    ) = edge_geometry
-    edge_indices = bdpt_selected_edge_indices(selected)
-    wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
-    direct_samples, keller_samples, _suffix_samples = _diffraction_sample_split(
-        int(samples), mis=mis
-    )
-    for tx_index in range(int(tx_positions.shape[0])):
-        states = bdpt_diffraction_state_pack(
-            edge_indices,
-            edge_pos,
-            edge_dir,
-            line_min,
-            line_max,
-            n0,
-            n1,
-            face0,
-            face1,
-            exterior_angle,
-            tx_positions[tx_index],
-            tx_power[tx_index],
-        )
-        state_count = int(states[0].shape[0])
-        if state_count <= 0:
-            continue
-        for rx_start in range(0, int(rx_positions.shape[0]), 64):
-            rx_end = min(rx_start + 64, int(rx_positions.shape[0]))
-            exported = bdpt_diffraction_point_connection_samples(
-                rx_positions[rx_start:rx_end],
-                states,
-                material_gain,
-                material_valid,
-                tx_index=tx_index,
-                state_count=state_count,
-                direct_samples=int(direct_samples),
-                keller_samples=int(keller_samples),
-                seed=int(seed) + tx_index * 104729,
-                wavelength=float(wavelength),
-                mis=mis,
-                beta=beta,
-                strategy_count=_diffraction_strategy_count(
-                    direct_samples, keller_samples
-                ),
-            )
-            samples_out = exported["samples"]
-            if not isinstance(samples_out, dict):
-                raise RuntimeError(
-                    "native BDPT diffraction point sampler returned invalid samples"
-                )
-            if rx_start:
-                samples_out["rx_id"].add_(rx_start)
-                samples_out["grid_linear_id"].add_(rx_start)
-                samples_out["topology"][:, 1].add_(rx_start)
-            visible_source = geometry_bridge.raydn_visibility_forward(
-                raydn.require_handle(),
-                exported["source_start"],
-                exported["source_end"],
-                exported["visibility_active"],
-            )[0]
-            filtered = bdpt_filter_connection_samples(samples_out, visible_source)
-            visible_target = geometry_bridge.raydn_visibility_forward(
-                raydn.require_handle(),
-                exported["target_start"],
-                exported["target_end"],
-                exported["visibility_active"],
-            )[0]
-            yield bdpt_filter_connection_samples(filtered, visible_target)
 
 
 def _merge_event_states(

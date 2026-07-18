@@ -127,20 +127,21 @@ def test_bdpt_reflection_path_export_uses_seeded_native_subpath_samples():
     torch.testing.assert_close(first.path_samples.light_depth, torch.ones_like(first.path_samples.light_depth))
 
 
-def test_bdpt_grid_diffraction_path_export_is_seeded_by_native_direct_tape():
+def test_bdpt_grid_diffraction_path_export_is_deterministic_enumerated():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction path export")
 
     scene = wedge_diffraction_scene().add(_reflection_grid())
-    # Grid diffraction uses the bounded-variance direct proposal; edge
-    # positions remain seeded and are exported from the native tape.
+    # ADR-018: grid diffraction is exported from the deterministic enumerated
+    # engine (first-order UTD), so the exported edge connections are
+    # seed-invariant rather than seeded from a native direct tape.
     first = solve(scene, Config(samples=512, seed=17, components={"diffraction"}, export_paths=True))
     second = solve(scene, Config(samples=512, seed=17, components={"diffraction"}, export_paths=True))
-    changed = solve(scene, Config(samples=512, seed=18, components={"diffraction"}, export_paths=True))
+    seed_changed = solve(scene, Config(samples=512, seed=18, components={"diffraction"}, export_paths=True))
 
     assert isinstance(first.path_samples, BDPTPathSamples)
     assert isinstance(second.path_samples, BDPTPathSamples)
-    assert isinstance(changed.path_samples, BDPTPathSamples)
+    assert isinstance(seed_changed.path_samples, BDPTPathSamples)
     assert first.path_samples.contribution.shape[0] > 0
     # The export compaction assigns row slots atomically, so compare the
     # exported samples as an unordered set.
@@ -152,12 +153,12 @@ def test_bdpt_grid_diffraction_path_export_is_seeded_by_native_direct_tape():
         first.path_samples.rx_id.sort().values,
         second.path_samples.rx_id.sort().values,
     )
-    assert changed.path_samples.contribution.shape[0] > 0
-    if changed.path_samples.contribution.shape == first.path_samples.contribution.shape:
-        assert not torch.equal(
-            first.path_samples.contribution.sort().values,
-            changed.path_samples.contribution.sort().values,
-        )
+    # A distinct seed now yields the identical deterministic export.
+    assert seed_changed.path_samples.contribution.shape[0] == first.path_samples.contribution.shape[0]
+    torch.testing.assert_close(
+        first.path_samples.contribution.sort().values,
+        seed_changed.path_samples.contribution.sort().values,
+    )
     torch.testing.assert_close(
         first.path_samples.component_id,
         torch.full_like(first.path_samples.component_id, 2),

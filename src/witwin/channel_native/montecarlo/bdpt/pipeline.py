@@ -47,7 +47,6 @@ from .accumulation import (
 )
 from .config import Config
 from .connections import (
-    _native_diffraction_point_connection_samples,
     _native_los_connection_samples,
     _transmission_sampled_connection_samples,
     _transmission_straight_connection_samples,
@@ -198,20 +197,6 @@ def _effective_native_depth(config: Config) -> int:
     return min(int(config.max_depth), int(config.max_light_depth))
 
 
-def _face_material_tensors(
-    scene: Scene, *, device: torch.device
-) -> tuple[torch.Tensor, ...]:
-    bundle = face_material_field_bundle(scene, device=device)
-    return (
-        bundle["eps_r"],
-        bundle["sigma_e"],
-        bundle["mu_r"],
-        bundle["gain"],
-        bundle["valid"],
-        bundle["thickness"],
-    )
-
-
 def _reduced_light_endpoint_state(
     tx_reference: torch.Tensor,
     tx_power: torch.Tensor,
@@ -275,20 +260,65 @@ def _evaluated_connection_samples(
     }
 
 
-def _reflection_discrete_connection_samples(
-    scene: Scene, config: Config
+def _single_class_discrete_connection_samples(
+    scene: Scene,
+    config: Config,
+    *,
+    component: str,
+    component_id: int,
 ) -> dict[str, torch.Tensor] | None:
-    """Enumerate delta-specular paths with unit forward/reverse discrete mass."""
+    """Enumerate one delta-like path class as unit-mass discrete connections.
+
+    Shared by the reflection and standalone-diffraction BDPT connection builders:
+    both consume the public ``evaluate_enumerated_paths`` for a single delta/UTD
+    component (ADR-008), select the matching enumerated rows, and pack them with
+    unit forward/reverse discrete mass. The selected ``component_id`` also names
+    the accumulation bucket (reflection -> 1, diffraction -> 2). The coupled
+    builder differs (mixed-order discovery plus a >=3 class selection) and keeps
+    its own body.
+    """
 
     paths, _ = evaluate_enumerated_paths(
         scene,
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
-            components=frozenset({"reflection"}),
+            components=frozenset({component}),
         ),
     )
-    selected = torch.nonzero(paths.topology.component_id == 1, as_tuple=False).flatten()
-    return _evaluated_connection_samples(paths, selected, component_out=1)
+    selected = torch.nonzero(
+        paths.topology.component_id == component_id, as_tuple=False
+    ).flatten()
+    return _evaluated_connection_samples(paths, selected, component_out=component_id)
+
+
+def _reflection_discrete_connection_samples(
+    scene: Scene, config: Config
+) -> dict[str, torch.Tensor] | None:
+    """Enumerate delta-specular paths with unit forward/reverse discrete mass."""
+
+    return _single_class_discrete_connection_samples(
+        scene, config, component="reflection", component_id=1
+    )
+
+
+def _diffraction_discrete_connection_samples(
+    scene: Scene, config: Config
+) -> dict[str, torch.Tensor] | None:
+    """Enumerate first-order UTD diffraction paths with unit discrete mass.
+
+    Standalone diffraction is a delta-like discrete path: first-order UTD emits
+    one deterministic edge-diffraction connection per (tx, edge, rx) triple with
+    the same field the deterministic solver evaluates. BDPT consumes it as an
+    opaque discrete-path oracle (ADR-008/ADR-018) exactly as it does reflection,
+    so the standalone diffraction component reproduces the deterministic
+    reference instead of the retired crude power heuristic. The enumerated engine
+    only implements order-1 diffraction, so max_diffraction_order stays at its
+    default of 1.
+    """
+
+    return _single_class_discrete_connection_samples(
+        scene, config, component="diffraction", component_id=2
+    )
 
 
 def _coupled_discrete_connection_samples(
@@ -483,7 +513,6 @@ def _collect_connection_samples(
     scene: Scene,
     config: Config,
     *,
-    grid: ReceiverGrid | None,
     prep: _SolvePrep,
     workspace: _EndpointWorkspace,
 ) -> tuple[
@@ -533,22 +562,6 @@ def _collect_connection_samples(
         estimate_samples = endpoint_connection_samples
     else:
         sample_blocks: list[dict[str, torch.Tensor]] = []
-        streamed_matrices = {
-            "los": zero_component_matrix(),
-            "reflection": zero_component_matrix(),
-            "diffraction": zero_component_matrix(),
-            "transmission": zero_component_matrix(),
-            "scattering": zero_component_matrix(),
-        }
-        material_tensors = (
-            _face_material_tensors(scene, device=tx_reference.device)
-            if scene.structures
-            and (
-                ("reflection" in config.components)
-                or ("diffraction" in config.components)
-            )
-            else None
-        )
         if los_light_state is not None:
             sample_blocks.append(
                 _native_los_connection_samples(
@@ -566,13 +579,13 @@ def _collect_connection_samples(
         reflection_requested = (
             "reflection" in config.components
             and reflection_available
-            and material_tensors is not None
+            and bool(scene.structures)
             and native_max_depth >= 1
         )
         diffraction_requested = (
             "diffraction" in config.components
             and diffraction_available
-            and material_tensors is not None
+            and bool(scene.structures)
             and native_max_depth >= 1
         )
         if reflection_requested:
@@ -583,33 +596,16 @@ def _collect_connection_samples(
                 sample_blocks.append(reflection_samples)
                 launch_count += 1
         if diffraction_requested:
-            retain_diffraction_samples = (
-                grid is None or config.export_paths or config.diagnostics
+            # Standalone first-order diffraction routes through the shared
+            # enumerated engine as a unit-mass discrete connection, exactly like
+            # reflection above (ADR-008/ADR-018), replacing the retired crude
+            # native power heuristic.
+            diffraction_samples = _diffraction_discrete_connection_samples(
+                topology_scene, config
             )
-            for diffraction_samples in _native_diffraction_point_connection_samples(
-                scene,
-                raydn,
-                tx_reference,
-                tx_power,
-                rx_positions,
-                material_tensors,
-                samples=native_samples,
-                seed=int(config.seed),
-                mis=config.mis,
-                beta=config.power_heuristic_beta,
-            ):
-                if retain_diffraction_samples:
-                    sample_blocks.append(diffraction_samples)
-                    continue
-                chunk = bdpt_accumulate_connection_samples(
-                    diffraction_samples,
-                    tx_count=tx_count,
-                    rx_count=rx_count,
-                    accumulation_strategy=selected_accumulation,
-                )
-                for component in streamed_matrices:
-                    streamed_matrices[component].add_(chunk[component])
-            launch_count += 3
+            if diffraction_samples is not None:
+                sample_blocks.append(diffraction_samples)
+                launch_count += 1
         if config.coupled_paths:
             coupled_samples = _coupled_discrete_connection_samples(
                 topology_scene, config
@@ -700,11 +696,26 @@ def _collect_connection_samples(
                 accumulation_strategy=selected_accumulation,
             )
             component_matrices = {
-                component: accumulated[component] + streamed_matrices[component]
-                for component in streamed_matrices
+                component: accumulated[component]
+                for component in (
+                    "los",
+                    "reflection",
+                    "diffraction",
+                    "transmission",
+                    "scattering",
+                )
             }
         else:
-            component_matrices = streamed_matrices
+            component_matrices = {
+                component: zero_component_matrix()
+                for component in (
+                    "los",
+                    "reflection",
+                    "diffraction",
+                    "transmission",
+                    "scattering",
+                )
+            }
     return (
         component_matrices,
         estimate_samples,
@@ -955,7 +966,7 @@ def solve(
         scattering_runtimes,
         launch_count,
     ) = _collect_connection_samples(
-        scene, config, grid=grid, prep=prep, workspace=workspace
+        scene, config, prep=prep, workspace=workspace
     )
     component_maps, path_gain, component_power, variance = _accumulate_and_finalize(
         config,

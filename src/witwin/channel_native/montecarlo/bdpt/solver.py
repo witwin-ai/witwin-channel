@@ -17,7 +17,6 @@ from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
 from witwin.channel_native.scene.models import Scene
 
 from .config import Config
-from .connections import _diffraction_sample_split as _diffraction_sample_split
 from .endpoints import transmitter_tensors as transmitter_tensors
 from .pipeline import (
     _BDPTTopologyOptions as _BDPTTopologyOptions,
@@ -40,7 +39,6 @@ def solve(scene: Scene, config: Config) -> Result:
 
 __all__ = [
     "_BDPTTopologyOptions",
-    "_diffraction_sample_split",
     "_estimate_workspace_bytes",
     "bdpt_component_map_buffer",
     "bdpt_diffraction_state_pack",
