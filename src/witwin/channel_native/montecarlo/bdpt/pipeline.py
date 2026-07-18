@@ -49,7 +49,6 @@ from .config import Config
 from .connections import (
     _native_los_connection_samples,
     _transmission_sampled_connection_samples,
-    _transmission_straight_connection_samples,
 )
 from .endpoints import (
     receiver_positions,
@@ -321,6 +320,24 @@ def _diffraction_discrete_connection_samples(
     )
 
 
+def _transmission_discrete_connection_samples(
+    scene: Scene, config: Config
+) -> dict[str, torch.Tensor] | None:
+    """Enumerate pure straight-segment transmission paths with unit discrete mass.
+
+    ADR-020. Pure specular transmission is delta-like exactly as reflection is,
+    so BDPT consumes it as an opaque enumerated discrete-path oracle (ADR-008),
+    reproducing the deterministic full-Jones layer-stack field
+    (``field_transmission_sequence``) instead of the retired straight-chain TE/TM
+    mean. Mixed reflection+transmission chains are not enumerable and stay with
+    the event-selected shooting sampler (native full-Jones field).
+    """
+
+    return _single_class_discrete_connection_samples(
+        scene, config, component="transmission", component_id=5
+    )
+
+
 def _coupled_discrete_connection_samples(
     scene: Scene, config: Config
 ) -> dict[str, torch.Tensor] | None:
@@ -377,7 +394,7 @@ def _enumerated_component_block_with_field(
     if block is None:
         return None
     field = paths.fields.path_field.index_select(0, selected)
-    return block, field.real.contiguous(), field.imag.contiguous()
+    return block, field.real, field.imag
 
 
 def _coupled_component_block_with_field(
@@ -399,7 +416,7 @@ def _coupled_component_block_with_field(
     if block is None:
         return None
     field = paths.fields.path_field.index_select(0, selected)
-    return block, field.real.contiguous(), field.imag.contiguous()
+    return block, field.real, field.imag
 
 
 def _collect_coherent_connection_samples(
@@ -824,31 +841,19 @@ def _collect_connection_samples(
             )
             scene_diagonal = scene_diagonal_m(scene)
         if transmission_requested:
-            transmission_light_state = _reduced_light_endpoint_state(
-                tx_reference,
-                tx_power,
-                tx_polarization,
-                rx_positions,
-                rx_polarization,
+            # ADR-020: pure straight-segment transmission routes through the
+            # shared enumerated engine as a unit-mass discrete connection, like
+            # reflection/diffraction (ADR-008/ADR-018), replacing the
+            # polarization-agnostic straight-chain TE/TM mean with the full-Jones
+            # layer-stack field. Mixed reflection+transmission chains are handled
+            # separately by the event-selected shooting sampler below.
+            transmission_samples = _transmission_discrete_connection_samples(
+                topology_scene, config
             )
-            straight_samples, transmission_chain_count = (
-                _transmission_straight_connection_samples(
-                    raydn,
-                    transmission_light_state,
-                    endpoint_subpaths["sensor"],
-                    tx_reference,
-                    rx_positions,
-                    material_bundle,
-                    frequency_hz=float(scene.frequency),
-                    max_depth=native_max_depth,
-                    scene_diagonal=scene_diagonal,
-                    mis=config.mis,
-                    beta=config.power_heuristic_beta,
-                )
-            )
-            if straight_samples is not None:
-                sample_blocks.append(straight_samples)
-            launch_count += 2
+            if transmission_samples is not None:
+                sample_blocks.append(transmission_samples)
+                transmission_chain_count = int(transmission_samples["valid"].sum())
+            launch_count += 1
         if sampler_requested:
             mixed_blocks, event_counts = _transmission_sampled_connection_samples(
                 raydn,

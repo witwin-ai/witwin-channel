@@ -34,11 +34,11 @@ def _validate_coherent_combine(
     the release-wide ad_mode gate, kept explicit for the ADR-019 record)."""
     if not coherent:
         return
-    unsupported = components & {"transmission", "scattering"}
-    if unsupported:
+    refused = components & {"transmission", "scattering"}
+    if refused:
         raise RuntimeError(
             "coherent combine supports only {los, reflection, diffraction} "
-            f"components; refused for {sorted(unsupported)}"
+            f"components; refused for {sorted(refused)}"
         )
     if ad_mode != "none":
         raise RuntimeError("coherent combine does not support ad_mode != 'none'")

@@ -574,7 +574,13 @@ def bdpt_accumulate_connection_samples(
         if coeff_real is None or coeff_imag is None:
             raise ValueError("coherent combine requires coeff_real and coeff_imag")
         for name, tensor in (("coeff_real", coeff_real), ("coeff_imag", coeff_imag)):
-            validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
+            # The coefficients arrive as .real/.imag strided views of the
+            # natively-computed complex path field; the one-time layout copy
+            # happens at the C++ ABI boundary (mc hot-path layout-copy rule),
+            # so contiguity is not required here.
+            validate_cuda_tensor(
+                name, tensor, dtype=torch.float32, ndim=1, require_contiguous=False
+            )
             if tensor.shape != samples["contribution"].shape:
                 raise ValueError(f"{name} must match connection-sample rows")
             if tensor.get_device() != samples["contribution"].get_device():

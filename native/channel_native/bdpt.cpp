@@ -745,8 +745,12 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
         tensor_from_dict(samples, "rx_id"),
         tensor_from_dict(samples, "component_id"),
         tensor_from_dict(samples, "valid"),
-        coeff_real,
-        coeff_imag,
+        // Coherent coefficients arrive as .real/.imag strided views of the
+        // natively-computed complex path field; the one-time layout copy to
+        // dense planes belongs at this ABI boundary, not in the Python hot
+        // path (mc hot-path layout-copy rule).
+        coeff_real.defined() ? coeff_real.contiguous() : coeff_real,
+        coeff_imag.defined() ? coeff_imag.contiguous() : coeff_imag,
         tx_count,
         rx_count,
         accumulation_strategy,

@@ -112,7 +112,12 @@ def test_bdpt_lossy_wall_transmission_power_ratio_matches_stack():
     empty = solve(_point_scene([]), Config(samples=1024, seed=5, components={"los"}))
 
     oracle = layer_stack_rt([(0.1, 4.0, 0.05, 1.0)], 1.0, _FREQUENCY)
-    expected_t = 0.5 * (float(oracle.T_te) + float(oracle.T_tm))
+    # ADR-020: the transmission component is the full-Jones layer-stack field
+    # projected on the polarization, not the unpolarized TE/TM mean. At this
+    # exact normal incidence the plane of incidence is degenerate and
+    # T_te == T_tm, so the polarized value is simply T_te.
+    expected_t = float(oracle.T_te)
+    assert float(oracle.T_te) == pytest.approx(float(oracle.T_tm), rel=1.0e-6)
     assert 0.0 < expected_t < 1.0
     observed_ratio = float(walled.component_power["transmission"]) / float(
         empty.component_power["los"]

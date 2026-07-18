@@ -30,6 +30,9 @@ from witwin.channel_native.runtime.autograd_contracts import _ad_frequency_value
 _MIN_EPSILON_M = 1.0e-6
 _RELATIVE_EPSILON = 1.0e-6
 _EVENT_PROBABILITY_FLOOR = 0.05
+# sin^2(theta) below which the plane of incidence is treated as degenerate
+# (normal incidence); matches the scattering event-glue convention.
+_DEGENERATE_SIN_SQ = 1.0e-12
 
 _SPLITMIX_GAMMA = 0x9E3779B97F4A7C15
 _SPLITMIX_MUL0 = 0xBF58476D1CE4E5B9
@@ -117,6 +120,43 @@ def unpolarized_power_budgets(
     return r_eff, t_eff
 
 
+def incident_te_tm_fractions(
+    direction: torch.Tensor,
+    normal: torch.Tensor,
+    polarization: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Incident TE/TM power fractions ``(f_te, f_tm)`` of a polarized ray.
+
+    ADR-020. ``direction`` is the propagation direction into the wall,
+    ``normal`` the wall normal (orientation-independent: the s/p basis squares
+    both projections), ``polarization`` the incident unit polarization vector.
+    The local plane-of-incidence basis is ``s = normalize(direction x normal)``
+    (TE) and ``p = s x direction`` (TM), matching the native layer-stack and the
+    scattering event glue (``te_tm_incident_power``). The returned fractions
+    partition the transverse incident power onto the wall's TE/TM axes and sum
+    to one for any fully transverse polarization. At normal incidence the plane
+    of incidence is degenerate; there TE and TM transmittances coincide, so the
+    split is irrelevant and falls back to the unpolarized halves.
+    """
+
+    s = torch.linalg.cross(direction, normal)
+    s_norm_sq = (s * s).sum(dim=-1, keepdim=True)
+    degenerate = s_norm_sq <= _DEGENERATE_SIN_SQ
+    s = torch.where(
+        degenerate, torch.zeros_like(s), s * torch.rsqrt(s_norm_sq.clamp_min(1.0e-30))
+    )
+    p = torch.linalg.cross(s, direction)
+    p_te = (polarization * s).sum(dim=-1) ** 2
+    p_tm = (polarization * p).sum(dim=-1) ** 2
+    total = p_te + p_tm
+    safe = total > _DEGENERATE_SIN_SQ
+    half = torch.full_like(p_te, 0.5)
+    inv_total = torch.where(safe, 1.0 / total.clamp_min(1.0e-30), torch.zeros_like(total))
+    f_te = torch.where(safe, p_te * inv_total, half)
+    f_tm = torch.where(safe, p_tm * inv_total, half)
+    return f_te, f_tm
+
+
 def transmission_event_probability(
     r_eff: torch.Tensor,
     t_eff: torch.Tensor,
@@ -142,6 +182,7 @@ def straight_transmission_chains(
     *,
     face_material_id: torch.Tensor,
     layer_csr: dict[str, torch.Tensor],
+    polarization: torch.Tensor,
     frequency_hz: float | torch.Tensor,
     frequency_value: float | None = None,
     max_depth: int,
@@ -152,12 +193,20 @@ def straight_transmission_chains(
     """March straight origin->target segments through up to ``max_depth``
     thin_sheet walls and accumulate the per-wall power transmittance product.
 
-    Returns per-row tensors: ``transmittance`` (product of unpolarized wall
-    power transmittances; zero when blocked), ``wall_count`` (int32
-    penetrations), and ``penetrated`` (bool: at least one wall crossed AND the
-    target was reached within the depth budget). Rows with more walls than
-    ``max_depth`` or an invalid wall material are truthfully blocked
-    (transmittance zero), never approximated.
+    ADR-020: each wall's power transmittance is the Jones-derived TE/TM power
+    ``f_te * cap_T_te + f_tm * cap_T_tm`` projected on the incident
+    ``polarization`` (a ``(3,)`` or ``(count, 3)`` unit vector), sharing the
+    full-Jones layer-stack model with the deterministic/Path solvers rather than
+    the polarization-agnostic TE/TM mean. The estimator stays power-domain (the
+    radiomap accumulates total transmitted power, so the projection is on the
+    incident polarization only, without a receiver-antenna projection).
+
+    Returns per-row tensors: ``transmittance`` (product of polarized wall power
+    transmittances; zero when blocked), ``wall_count`` (int32 penetrations), and
+    ``penetrated`` (bool: at least one wall crossed AND the target was reached
+    within the depth budget). Rows with more walls than ``max_depth`` or an
+    invalid wall material are truthfully blocked (transmittance zero), never
+    approximated.
     """
 
     device = origins.device
@@ -249,7 +298,15 @@ def straight_transmission_chains(
                 layer_csr["layer_mu_r"],
                 frequency_hz=float(frequency_hz),
             )
-        _r_eff, t_eff = unpolarized_power_budgets(stack)
+        # ADR-020: polarized power transmittance projected on the incident
+        # polarization, sharing the deterministic full-Jones model. The plane
+        # of incidence is orientation-independent so the raw hit normal is fine.
+        f_te, f_tm = incident_te_tm_fractions(
+            row_direction,
+            hit["n"].index_select(0, rows),
+            polarization,
+        )
+        t_eff = f_te * stack["cap_T_te"] + f_tm * stack["cap_T_tm"]
         t_eff = torch.where(material_ok, t_eff, torch.zeros_like(t_eff))
         transmittance[rows] = transmittance.index_select(0, rows) * t_eff
         wall_count[rows] = wall_count.index_select(0, rows) + 1

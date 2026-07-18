@@ -124,7 +124,12 @@ def test_lossy_wall_attenuates_by_stack_power_transmittance():
     oracle = layer_stack_rt(
         [(thickness, eps_r, sigma_e, 1.0)], 1.0, _FREQUENCY
     )
-    expected_t = 0.5 * (float(oracle.T_te) + float(oracle.T_tm))
+    # ADR-020: the per-wall transmittance is the Jones-derived power projected on
+    # the incident polarization, not the unpolarized TE/TM mean. At this exact
+    # normal incidence the plane of incidence is degenerate and T_te == T_tm, so
+    # the polarized projection is simply T_te.
+    expected_t = float(oracle.T_te)
+    assert float(oracle.T_te) == pytest.approx(float(oracle.T_tm), rel=1.0e-6)
     assert 0.0 < expected_t < 1.0
     torch.testing.assert_close(
         walled.component_maps["transmission"],

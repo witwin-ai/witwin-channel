@@ -244,6 +244,9 @@ def transmission_component_map(
     # carrier gradient survives.
     frequency_value = _frequency_scalar(scene)
     frequency_hz = scene.frequency if ad else frequency_value
+    # ADR-020: per-tx incident polarization drives the polarized wall
+    # transmittance (frozen physical vector; a detached AD winner).
+    tx_pol = transmitter_polarizations(scene, device=device)
     gains = []
     for tx_index in range(int(tx_pos.shape[0])):
         origins = tx_march[tx_index].unsqueeze(0).repeat(rx_count, 1)
@@ -253,6 +256,7 @@ def transmission_component_map(
             rx_pos,
             face_material_id=bundle["material_id"],
             layer_csr=layer_csr,
+            polarization=tx_pol[tx_index],
             frequency_hz=frequency_hz,
             frequency_value=frequency_value if ad else None,
             max_depth=int(max_depth),

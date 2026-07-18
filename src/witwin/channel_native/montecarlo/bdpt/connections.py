@@ -40,14 +40,12 @@ from witwin.channel_native.montecarlo.events.scattering import (
 from witwin.channel_native.montecarlo.events.transmission import (
     event_uniforms,
     layer_csr_view,
-    straight_transmission_chains,
     transmission_event_probability,
     unpolarized_power_budgets,
 )
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 
 
-_TRANSMISSION_COMPONENT_ID = 5
 _MASK_REFLECTION = 2
 _MASK_TRANSMISSION = 8
 
@@ -108,92 +106,6 @@ def _merge_event_states(
         condition = wide if reflected_value.dim() == 2 else choose_transmit
         merged[key] = torch.where(condition, transmitted[key], reflected_value)
     return merged
-
-
-def _transmission_straight_connection_samples(
-    raydn: Any,
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    material_bundle: dict[str, torch.Tensor],
-    *,
-    frequency_hz: float,
-    max_depth: int,
-    scene_diagonal: float,
-    mis: str,
-    beta: float,
-) -> tuple[dict[str, torch.Tensor] | None, int]:
-    """Exact pure-transmission Tx->Rx chains (endpoint-connection context).
-
-    Specular thin_sheet transmission never bends the ray (parallel-plate
-    exit), so every pure-transmission path topology IS the straight Tx->Rx
-    segment. Marching that segment yields the per-pair power transmittance
-    product, which scales the analytic endpoint-connection LoS contribution
-    and is reclassified as the exclusive transmission path class (component
-    id 5). Like the discrete reflection enumeration, these chains carry unit
-    bidirectional mass (mis weight 1). Pairs whose segment crosses no wall
-    belong to the los class and are filtered out here; a vacuum wall has unit
-    power transmittance, so the transmission component reproduces the
-    unobstructed LoS value exactly.
-    """
-
-    rx_count = int(rx_positions.shape[0])
-    if int(tx_positions.shape[0]) == 0 or rx_count == 0:
-        return None, 0
-    samples = bdpt_endpoint_connection_samples(
-        light,
-        sensor,
-        frequency_hz=frequency_hz,
-        samples_per_tx=1,
-        max_paths=None,
-        mis=mis,
-        beta=beta,
-        strategy_count=1,
-    )
-    layer_csr = layer_csr_view(material_bundle)
-    transmittance_rows = []
-    penetrated_rows = []
-    wall_rows = []
-    for tx_index in range(int(tx_positions.shape[0])):
-        origins = tx_positions[tx_index].unsqueeze(0).repeat(rx_count, 1)
-        chain = straight_transmission_chains(
-            raydn,
-            origins,
-            rx_positions,
-            face_material_id=material_bundle["material_id"],
-            layer_csr=layer_csr,
-            frequency_hz=frequency_hz,
-            max_depth=max_depth,
-            scene_diagonal=scene_diagonal,
-        )
-        transmittance_rows.append(chain["transmittance"])
-        penetrated_rows.append(chain["penetrated"])
-        wall_rows.append(chain["wall_count"])
-    # Connection rows are light-major (light_index * sensor_count + sensor)
-    # and the reduced light state carries exactly one row per transmitter, so
-    # the concatenated per-tx march aligns 1:1 with the connection table.
-    transmittance = torch.cat(transmittance_rows, dim=0)
-    penetrated = torch.cat(penetrated_rows, dim=0)
-    wall_count = torch.cat(wall_rows, dim=0)
-    samples["contribution"] = samples["contribution"] * transmittance
-    samples = bdpt_filter_connection_samples(samples, penetrated)
-    chain_count = int(samples["valid"].sum())
-    if chain_count == 0:
-        return None, 0
-    component_id = torch.where(
-        samples["valid"],
-        torch.full_like(samples["component_id"], _TRANSMISSION_COMPONENT_ID),
-        samples["component_id"],
-    )
-    light_depth = torch.where(samples["valid"], wall_count, samples["light_depth"])
-    topology = samples["topology"].clone()
-    topology[:, 2] = component_id
-    topology[:, 3] = light_depth
-    samples["component_id"] = component_id
-    samples["light_depth"] = light_depth
-    samples["topology"] = topology
-    return samples, chain_count
 
 
 def _merge_scattered_state(

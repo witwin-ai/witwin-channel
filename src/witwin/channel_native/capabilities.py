@@ -184,7 +184,7 @@ _CAPABILITIES: dict[str, Any] = {
             # the coupled compensator folded into diffraction) is summed as a
             # complex phasor per (tx, rx, component) and finalized |sum|^2; the
             # stochastic transmission/scattering samplers have no coherent field
-            # and are refused. AD is unsupported in the coherent path.
+            # and are refused. AD is refused in the coherent path.
             "coherent_combine": {
                 "default": False,
                 "combine_domains": ["power", "coherent"],
