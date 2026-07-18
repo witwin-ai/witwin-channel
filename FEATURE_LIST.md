@@ -191,12 +191,47 @@ priority `scattering > diffraction > transmission > reflection > los`.
   coupled adjoints take the wall plane and edge tables as frozen winners,
   and the solver fails loudly (`NotImplementedError`) instead of returning
   a silently incomplete gradient (registered as `xfail(strict=True)`).
-- Explicit-failure policy: the scattering component raises a `RuntimeError`
-  naming the interaction before any launch when `ad_mode != "none"`. A
-  montecarlo.basic reflection solve whose `max_depth` exceeds the native
-  reflection AD depth cap (`ops.mc_reflection_ad_max_depth()`, mirrored from
-  the kernel constant) is rejected the same way at `solve()` instead of
-  failing mid-backward.
+- Deterministic scattering AD (ADR-014): the two native scattering ops gain
+  registered JVP/VJP companions (`scattering_ensemble_eval_{backward,jvp}`,
+  `scattering_patch_integral_eval_{backward,jvp}`). Under `ad_mode != "none"`
+  the enumerated scattering seam builds the radiometric scale `coef` (ensemble
+  rows) and the wavenumber `k0` plus the outer amplitude scale (realization
+  rows) as Torch scalars and dispatches the `_ad` wrappers, so gradients reach
+  the resident Kirchhoff BSDF tables, the phase-screen heights, the
+  fixed-topology row geometry, and the carrier frequency; the fixed
+  winner/visibility structure, polarizations, material ids, table metadata and
+  quadrature nodes stay frozen and reject a requested gradient/tangent loudly.
+  `ad_mode == "none"` keeps the exact bitwise primal path (no tape, no
+  `autograd.Function`). The AD kernels recompute their primals under
+  `--fmad=false` in lockstep with the forwards. The former path/deterministic
+  pipeline guard rejecting `scattering` under `ad_mode != "none"` is lifted:
+  both solvers now solve scattering scenes end-to-end in `vjp`/`jvp` mode
+  (locked by `tests/ad/test_solver_scattering_ad.py`).
+- Scattering AD completion (ADR-015): the remaining forward-only scattering
+  paths gain native derivative companions, so scattering is differentiable
+  across every non-BDPT solver. (A) Monte Carlo basic scattering: the resident
+  Kirchhoff BSDF table lookup gains `scattering_table_eval_{backward,jvp}`; the
+  MC-basic scattering map (`scattering_map_matrix`) dispatches the `_ad` wrapper
+  under `ad_mode != "none"`, carrying gradients to the table values, the carrier
+  frequency (through the `(lambda/4pi)^2` amplitude factor) and `tx_power`,
+  while the multinomial sample set, both visibility masks and the active gates
+  stay frozen (detached). (B) Realization material chain: the enumerated
+  realization rows dispatch `em_layer_stack_ad`, completing
+  `total -> r_te/r_tm -> layer eps_r / sigma_e / thickness / frequency /
+  cos_theta`. (C) Differentiable Kirchhoff table construction: the float64
+  numpy build stays the bit-for-bit compile-time island, wrapped by an
+  `autograd.Function` whose native `kirchhoff_table_build_{backward,jvp}`
+  companions differentiate the resident `f_te`/`f_tm` values w.r.t. the
+  roughness statistics (`sigma_h`, `corr_x`, `corr_y`), the CSR layer
+  parameters and the carrier frequency (implicit-Sinkhorn adjoint solved with
+  a cuSOLVER dense LU). All primal paths stay bitwise identical under
+  `ad_mode == "none"`; BDPT keeps rejecting every `ad_mode`. Bindings re-frozen
+  183 -> 187 (locked by `tests/ad/test_mc_basic_scattering_ad.py`,
+  `tests/scattering/test_table_build_ad.py`).
+- Explicit-failure policy: a montecarlo.basic reflection solve whose
+  `max_depth` exceeds the native reflection AD depth cap
+  (`ops.mc_reflection_ad_max_depth()`, mirrored from the kernel constant) is
+  rejected at `solve()` instead of failing mid-backward.
 - AD metadata (plan 07 AD-4): `result.metadata["kernel"]` reports the real
   `ad_status`, `tape_bytes` (bytes retained via `save_for_backward`; zero
   for `none`/`jvp`), `backward_launch_count` / `jvp_launch_count`

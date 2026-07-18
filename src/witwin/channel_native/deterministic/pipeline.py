@@ -54,13 +54,6 @@ def _validate_requested_components(config: Config) -> None:
             "isb_boundary_taper does not support ad_mode != 'none' yet "
             "(ADR-017 gate 3 C1 clearance companion is a follow-up)"
         )
-    if config.ad_mode != "none" and "scattering" in config.components:
-        # Kirchhoff patch paths bypass the shared field seam; their fields are
-        # not differentiable yet (plan 07 AD-4). Fail before any launch.
-        raise RuntimeError(
-            f"deterministic ad_mode='{config.ad_mode}' does not support the "
-            "scattering component yet"
-        )
     if "reflection" in config.components and config.max_depth < 1:
         raise RuntimeError("deterministic reflection requires max_depth >= 1")
     if "diffraction" in config.components:

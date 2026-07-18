@@ -72,7 +72,9 @@ from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
+from witwin.channel_native.materials.kernels import autograd as material_autograd
 from witwin.channel_native.materials.kernels import functional as material_kernels
+from witwin.channel_native.scattering.kernels import autograd as scattering_autograd
 from witwin.channel_native.scattering.kernels import functional as scattering_kernels
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.endpoints import (
@@ -80,6 +82,10 @@ from witwin.channel_native.propagation.geometry.endpoints import (
     transmitter_tensors,
 )
 from witwin.channel_native.propagation.enumerated.contracts import TopologyConfig
+from witwin.channel_native.propagation.enumerated.scattering_scalars import (
+    ensemble_coef_scale,
+    realization_scalars,
+)
 from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
@@ -322,8 +328,10 @@ def _ensemble_rows(
     ensemble_faces: torch.Tensor,
     scene_diagonal: torch.Tensor,
     info: dict[str, Any],
+    ad_mode: str = "none",
 ) -> None:
     device = tx_positions.device
+    ad_enabled = ad_mode != "none"
     records = compiled.raydn.edge_records()
     faces = records.faces.to(torch.int64)[ensemble_faces]
     tri = records.vertices[faces]  # [F, 3, 3]
@@ -364,6 +372,11 @@ def _ensemble_rows(
     # Repo path_gain units (module docstring): P_t * f * cos_i * cos_o * A
     # * lambda^2 / ((4*pi)^2 * r1^2 * r2^2).
     power_scale = wavelength**2 / (4.0 * math.pi) ** 2
+    # AD mode (ADR-014): the radiometric scale ``coef`` becomes a Torch scalar
+    # so frequency gradients flow through the ensemble rows (their only
+    # frequency dependence). Ensemble rows are zero-phase power rows, so nothing
+    # else here is differentiable w.r.t. frequency.
+    coef_scale_t = ensemble_coef_scale(scene, device, ad_enabled=ad_enabled)
 
     eps = _offset_eps(points, scene_diagonal)
     threshold = float(getattr(config, "scattering_power_threshold", 0.0))
@@ -441,7 +454,7 @@ def _ensemble_rows(
             # projections, f_eff, gain, keep, amplitude and length. The row
             # selection/concat below stays Torch (structural).
             wo_row = wo_w[rc, sc].contiguous()
-            evaluated = scattering_kernels.scattering_ensemble_eval(
+            ensemble_args = (
                 wo_row,
                 r2[rc, sc].contiguous(),
                 cos_o[rc, sc].contiguous(),
@@ -464,9 +477,19 @@ def _ensemble_rows(
                 stack.table_offset,
                 stack.table_dims,
                 stack.material_slot,
-                coef=float(tx_power[tx_index]) * power_scale,
-                threshold=max(threshold, 0.0),
             )
+            if ad_enabled:
+                evaluated = scattering_autograd.scattering_ensemble_eval_ad(
+                    *ensemble_args,
+                    coef=float(tx_power[tx_index]) * coef_scale_t,
+                    threshold=max(threshold, 0.0),
+                )
+            else:
+                evaluated = scattering_kernels.scattering_ensemble_eval(
+                    *ensemble_args,
+                    coef=float(tx_power[tx_index]) * power_scale,
+                    threshold=max(threshold, 0.0),
+                )
             keep = evaluated["keep"]
             if not bool(keep.any()):
                 continue
@@ -548,8 +571,10 @@ def _realization_rows(
     screens: dict[int, PhaseScreen],
     scene_diagonal: torch.Tensor,
     info: dict[str, Any],
+    ad_mode: str = "none",
 ) -> None:
     device = tx_positions.device
+    ad_enabled = ad_mode != "none"
     records = compiled.raydn.edge_records()
     face_structure = compiled.geometry.face_structure_id.to(
         device=device, dtype=torch.int64
@@ -568,6 +593,11 @@ def _realization_rows(
     frequency = float(scene.frequency)
     k0 = 2.0 * math.pi * frequency / C0
     wavelength = C0 / frequency
+    # AD mode (ADR-014): k0 and the outer amplitude scale become Torch scalars
+    # so frequency gradients flow through the coherent phase, the Kirchhoff
+    # prefactor and the radiometric normalization.
+    if ad_enabled:
+        frequency_t, k0_t, amplitude_scale_t = realization_scalars(scene, device)
     runtimes = compiled.phase_screen_runtimes
     density = float(getattr(config, "scattering_samples_per_m2", 8.0))
 
@@ -699,7 +729,7 @@ def _realization_rows(
                     continue
 
                 # Smooth-stack Jones at the mean plane per patch.
-                stack = material_kernels.em_layer_stack_eval(
+                stack_args = (
                     cos_i[rows].contiguous(),
                     torch.full(
                         (int(rows.numel()),),
@@ -713,8 +743,23 @@ def _realization_rows(
                     layer_eps,
                     layer_sigma,
                     layer_mu,
-                    frequency_hz=frequency,
                 )
+                if ad_enabled:
+                    # AD mode (ADR-015 Part B): the differentiable stack keeps
+                    # the shared CSR layer eps_r / sigma_e / thickness and the
+                    # carrier frequency on the graph, so the realization
+                    # r_te/r_tm carry material and frequency gradients. Frequency
+                    # threads as the Torch scalar the AD branch already builds
+                    # (mirrors montecarlo/events/transmission.py).
+                    stack = material_autograd.em_layer_stack_ad(
+                        *stack_args,
+                        frequency=frequency_t,
+                    )
+                else:
+                    stack = material_kernels.em_layer_stack_eval(
+                        *stack_args,
+                        frequency_hz=frequency,
+                    )
                 r_te = torch.complex(stack["r_te_real"], stack["r_te_imag"])
                 r_tm = torch.complex(stack["r_tm_real"], stack["r_tm_imag"])
 
@@ -729,7 +774,7 @@ def _realization_rows(
                 # integrand exp(-j*(q'.x + q_n'*h)) with q' = -q (the
                 # physical +j integrand of the module docstring derivation)
                 # and the fixed-order deterministic total reduction.
-                evaluated = scattering_kernels.scattering_patch_integral_eval(
+                patch_args = (
                     patch_tris,
                     patch_uvs,
                     rows.contiguous(),
@@ -744,16 +789,31 @@ def _realization_rows(
                     r2[rows].contiguous(),
                     centroids[rows].contiguous(),
                     runtime.heights_m,
-                    k0=k0,
                 )
+                if ad_enabled:
+                    evaluated = scattering_autograd.scattering_patch_integral_eval_ad(
+                        *patch_args,
+                        k0=k0_t,
+                    )
+                else:
+                    evaluated = scattering_kernels.scattering_patch_integral_eval(
+                        *patch_args,
+                        k0=k0,
+                    )
                 total = evaluated["total"]
                 # Same VALUE as the previous per-patch loop counter: one
                 # integral per selected row, counted host-side.
                 info["realization_patch_integrals"] += int(rows.numel())
 
-                amplitude_scale = math.sqrt(
-                    max(float(tx_power[tx_index]), 1.0e-30)
-                ) * wavelength / (4.0 * math.pi)
+                if ad_enabled:
+                    amplitude_scale = (
+                        math.sqrt(max(float(tx_power[tx_index]), 1.0e-30))
+                        * amplitude_scale_t
+                    )
+                else:
+                    amplitude_scale = math.sqrt(
+                        max(float(tx_power[tx_index]), 1.0e-30)
+                    ) * wavelength / (4.0 * math.pi)
                 path_field = (amplitude_scale * total).reshape(1)
                 gain = path_field.abs().square().to(torch.float32)
                 patch_areas = 0.5 * torch.linalg.vector_norm(
@@ -992,6 +1052,7 @@ def _collect_scattering_rows(
     *,
     device: torch.device,
     info: dict[str, Any],
+    ad_mode: str = "none",
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = scene.compile()
     screens = _realization_structures(compiled)
@@ -1044,6 +1105,7 @@ def _collect_scattering_rows(
             ensemble_faces=ensemble_faces,
             scene_diagonal=scene_diagonal,
             info=info,
+            ad_mode=ad_mode,
         )
     if screens:
         _realization_rows(
@@ -1059,6 +1121,7 @@ def _collect_scattering_rows(
             screens=screens,
             scene_diagonal=scene_diagonal,
             info=info,
+            ad_mode=ad_mode,
         )
 
     rows = collector.cat()
@@ -1111,11 +1174,13 @@ def append_scattering_evaluated_paths(
     if not scene.structures:
         return evaluated, sidecars, info
 
+    ad_mode = str(getattr(config, "ad_mode", "none"))
     rows, launch_delta, candidate_delta, guardrail_delta = _collect_scattering_rows(
         scene,
         config,
         device=evaluated.device,
         info=info,
+        ad_mode=ad_mode,
     )
     if rows is None:
         return evaluated, sidecars, info

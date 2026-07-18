@@ -42,7 +42,11 @@
   "native-scattering-ensemble": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
   "native-scattering-patch-integral": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes",
   "native-coupled-dd-geometry": "tests/propagation/geometry/test_coupled.py::test_coupled_dd_query_names_raw_geometry_and_preserves_identity",
-  "native-isb-taper": "tests/kernels/test_los_silhouette_clearance.py::test_silhouette_clearance_matches_reference_formulas"
+  "native-isb-taper": "tests/kernels/test_los_silhouette_clearance.py::test_silhouette_clearance_matches_reference_formulas",
+  "native-scattering-ensemble-ad": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+  "native-scattering-patch-integral-ad": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
+  "native-scattering-table-eval-ad": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
+  "native-kirchhoff-table-build-ad": "tests/scattering/test_table_build_ad.py::test_backward_matches_oracle"
  },
  "e2e_scenarios": {
   "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -77,7 +81,10 @@
   "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
   "deterministic-scattering-realization": "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection",
   "deterministic-coupled": "tests/deterministic/test_coupled_paths.py::test_coupled_on_exports_finite_nonzero_coupled_component",
-  "isb-boundary-taper": "tests/deterministic/test_isb_boundary_taper.py::test_isb_boundary_taper_on_softens_los_shadow_boundary"
+  "isb-boundary-taper": "tests/deterministic/test_isb_boundary_taper.py::test_isb_boundary_taper_on_softens_los_shadow_boundary",
+  "deterministic-scattering-ad": "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd",
+  "mc-basic-scattering-ad": "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd",
+  "scattering-table-build-ad": "tests/scattering/test_table_build_ad.py::test_end_to_end_roughness_gradient_is_nonzero"
  },
  "public_exports": [
   [
@@ -2005,6 +2012,78 @@
    "native-scattering",
    [
     "bdpt-scattering"
+   ]
+  ],
+  [
+   "scattering_ensemble_eval_backward",
+   "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_backward",
+   "named_wrapper",
+   "native-scattering-ensemble-ad",
+   [
+    "deterministic-scattering-ad"
+   ]
+  ],
+  [
+   "scattering_ensemble_eval_jvp",
+   "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_jvp",
+   "named_wrapper",
+   "native-scattering-ensemble-ad",
+   [
+    "deterministic-scattering-ad"
+   ]
+  ],
+  [
+   "scattering_patch_integral_eval_backward",
+   "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_backward",
+   "named_wrapper",
+   "native-scattering-patch-integral-ad",
+   [
+    "deterministic-scattering-ad"
+   ]
+  ],
+  [
+   "scattering_patch_integral_eval_jvp",
+   "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_jvp",
+   "named_wrapper",
+   "native-scattering-patch-integral-ad",
+   [
+    "deterministic-scattering-ad"
+   ]
+  ],
+  [
+   "scattering_table_eval_backward",
+   "witwin.channel_native.scattering.kernels.functional.scattering_table_eval_backward",
+   "named_wrapper",
+   "native-scattering-table-eval-ad",
+   [
+    "mc-basic-scattering-ad"
+   ]
+  ],
+  [
+   "scattering_table_eval_jvp",
+   "witwin.channel_native.scattering.kernels.functional.scattering_table_eval_jvp",
+   "named_wrapper",
+   "native-scattering-table-eval-ad",
+   [
+    "mc-basic-scattering-ad"
+   ]
+  ],
+  [
+   "kirchhoff_table_build_backward",
+   "witwin.channel_native.scattering.kernels.table_build_ad.kirchhoff_table_build_backward",
+   "named_wrapper",
+   "native-kirchhoff-table-build-ad",
+   [
+    "scattering-table-build-ad"
+   ]
+  ],
+  [
+   "kirchhoff_table_build_jvp",
+   "witwin.channel_native.scattering.kernels.table_build_ad.kirchhoff_table_build_jvp",
+   "named_wrapper",
+   "native-kirchhoff-table-build-ad",
+   [
+    "scattering-table-build-ad"
    ]
   ]
  ]

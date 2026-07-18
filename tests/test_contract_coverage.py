@@ -65,4 +65,4 @@ def test_contract_matrix_rejects_nonexistent_contract_nodeids():
 
 def test_contract_coverage_cli_passes_with_repository_defaults(capsys):
     assert coverage.main(["--repository-root", str(REPOSITORY_ROOT)]) == 0
-    assert "37 public exports, 185 native bindings" in capsys.readouterr().out
+    assert "37 public exports, 193 native bindings" in capsys.readouterr().out

@@ -12,7 +12,6 @@ from witwin.channel_native.materials.evaluation import (
 
 from .config import Config
 from .pipeline import (
-    _AD_PENDING_COMPONENTS,
     _enforce_workspace_budget,
     _face_material_tensors,
     _receiver_count,
@@ -26,7 +25,6 @@ if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
 __all__ = [
-    "_AD_PENDING_COMPONENTS",
     "_enforce_workspace_budget",
     "_face_material_tensors",
     "_receiver_count",

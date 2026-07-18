@@ -44,21 +44,9 @@ if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
 
-# Components whose Monte Carlo power maps have no AD companions yet: the
-# Kirchhoff scattering map (deferred past plan 07 AD-4). Fail before any
-# launch instead of returning silently detached maps.
-_AD_PENDING_COMPONENTS = ("scattering",)
-
-
 def _validate_ad_config(config: Config) -> None:
     if config.ad_mode == "none":
         return
-    for name in _AD_PENDING_COMPONENTS:
-        if name in config.components:
-            raise RuntimeError(
-                f"MC basic ad_mode='{config.ad_mode}' does not support the "
-                f"{name} component yet (plan 07 AD-4)"
-            )
     if "reflection" in config.components:
         depth_cap = mc_reflection_ad_max_depth()
         if config.max_depth > depth_cap:
@@ -121,6 +109,41 @@ def _face_material_tensors(
         return build()
     with torch.no_grad():
         return build()
+
+
+def _mc_scattering_component(
+    scene: Scene,
+    raydn,
+    grid,
+    config: Config,
+    *,
+    device: torch.device,
+    ad: bool,
+    ledger,
+    zero_component_map,
+) -> tuple[torch.Tensor, dict[str, int] | None, int, int]:
+    """Scattering component map and (path, valid) row-count deltas.
+
+    Grid receivers with structures carry the native scattering map; otherwise the
+    component is a zero map with no row-count contribution. Preserves the exact
+    call semantics and ad/ledger threading of the inline dispatch it replaces.
+    """
+
+    if scene.structures:
+        component_map, stats = scattering_component_map(
+            scene,
+            raydn,
+            grid,
+            samples=config.samples,
+            seed=config.seed,
+            device=device,
+            ad=ad,
+            ledger=ledger if ad else None,
+        )
+        path_delta = stats["sample_count"]
+        valid_delta = int(torch.count_nonzero(component_map))
+        return component_map, stats, path_delta, valid_delta
+    return zero_component_map(), None, 0, 0
 
 
 def solve_pipeline(
@@ -284,21 +307,24 @@ def solve_pipeline(
             )
         elif "transmission" in config.components:
             component_maps["transmission"] = zero_component_map()
-        if "scattering" in config.components and scene.structures:
-            component_maps["scattering"], scattering_stats = scattering_component_map(
+        if "scattering" in config.components:
+            (
+                component_maps["scattering"],
+                scattering_stats,
+                scattering_path_delta,
+                scattering_valid_delta,
+            ) = _mc_scattering_component(
                 scene,
                 raydn,
                 grid,
-                samples=config.samples,
-                seed=config.seed,
+                config,
                 device=device,
+                ad=ad,
+                ledger=ledger,
+                zero_component_map=zero_component_map,
             )
-            path_count += scattering_stats["sample_count"]
-            valid_contribution_count += int(
-                torch.count_nonzero(component_maps["scattering"])
-            )
-        elif "scattering" in config.components:
-            component_maps["scattering"] = zero_component_map()
+            path_count += scattering_path_delta
+            valid_contribution_count += scattering_valid_delta
 
     path_gain = los
     if component_maps is not None:

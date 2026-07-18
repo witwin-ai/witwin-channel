@@ -4218,7 +4218,7 @@
   },
   {
    "doc": "Layer-stack VJP over cos_theta, CSR layer parameters and frequency (CUDA duals).",
-   "line": 119,
+   "line": 278,
    "name": "em_layer_stack_backward",
    "parameters": [
     {
@@ -4295,7 +4295,7 @@
   },
   {
    "doc": "Evaluate shared em/ layer-stack reflection/transmission coefficients for parity tests.",
-   "line": 115,
+   "line": 274,
    "name": "em_layer_stack_eval",
    "parameters": [
     {
@@ -4352,7 +4352,7 @@
   },
   {
    "doc": "Layer-stack JVP over cos_theta, CSR layer parameters and frequency (CUDA duals).",
-   "line": 123,
+   "line": 282,
    "name": "em_layer_stack_jvp",
    "parameters": [
     {
@@ -7601,6 +7601,270 @@
    "return_arity": 1,
    "return_type": "pybind11::dict",
    "target": "cn_field_transmission_sequence_jvp"
+  },
+  {
+   "doc": "VJP of the offline Kirchhoff table build over roughness, layers and frequency (ADR-015).",
+   "line": 310,
+   "name": "kirchhoff_table_build_backward",
+   "parameters": [
+    {
+     "default": null,
+     "name": "s_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "s_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_diff_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_diff_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_i",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "phi_i",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_o",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "phi_o",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_thickness_m",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_eps_r",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_sigma_e",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_mu_r",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "sigma_h",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "corr_x",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "corr_y",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "frequency_hz",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "grad_f_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "grad_f_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "need_grad_rough",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_layers",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_frequency",
+     "type": "bool"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_kirchhoff_table_build_backward"
+  },
+  {
+   "doc": "JVP of the offline Kirchhoff table build over roughness, layers and frequency (ADR-015).",
+   "line": 312,
+   "name": "kirchhoff_table_build_jvp",
+   "parameters": [
+    {
+     "default": null,
+     "name": "s_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "s_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_diff_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_diff_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_i",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "phi_i",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_o",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "phi_o",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_thickness_m",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_eps_r",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_sigma_e",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "layer_mu_r",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "sigma_h",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "corr_x",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "corr_y",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "frequency_hz",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "t_layer_thickness_m",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_layer_eps_r",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_layer_sigma_e",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_sigma_h",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "t_corr_x",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "t_corr_y",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "t_frequency",
+     "type": "double"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_kirchhoff_table_build_jvp"
   },
   {
    "doc": null,
@@ -11111,7 +11375,7 @@
   },
   {
    "doc": "Evaluate the Kirchhoff ensemble scattering row physics with native CUDA (ADR-010 op 1).",
-   "line": 135,
+   "line": 294,
    "name": "scattering_ensemble_eval",
    "parameters": [
     {
@@ -11242,8 +11506,382 @@
    "target": "cn_scattering_ensemble_eval"
   },
   {
+   "doc": "Fixed-topology VJP of the Kirchhoff ensemble scattering rows (rows, samples, tables, coef) (ADR-014).",
+   "line": 298,
+   "name": "scattering_ensemble_eval_backward",
+   "parameters": [
+    {
+     "default": null,
+     "name": "wo_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r2_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_o_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "n_o",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "t1r",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "t2r",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "wi_local",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_i",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r1",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_te2",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_tm2",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "weights",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "material_id",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "backup_axis",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "rx_pol",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "rc_idx",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "sc_idx",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "fte_flat",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "ftm_flat",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "table_offset",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "table_dims",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "material_slot",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "coef",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "threshold",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "grad_gain",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "grad_amplitude",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "grad_length",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "need_grad_rows",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_samples",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_tables",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_coef",
+     "type": "bool"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_scattering_ensemble_eval_backward"
+  },
+  {
+   "doc": "Fixed-topology JVP of the Kirchhoff ensemble scattering rows (rows, samples, tables, coef) (ADR-014).",
+   "line": 300,
+   "name": "scattering_ensemble_eval_jvp",
+   "parameters": [
+    {
+     "default": null,
+     "name": "wo_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r2_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_o_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "n_o",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "t1r",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "t2r",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "wi_local",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "cos_i",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r1",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_te2",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "a_tm2",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "weights",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "material_id",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "backup_axis",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "rx_pol",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "rc_idx",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "sc_idx",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "fte_flat",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "ftm_flat",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "table_offset",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "table_dims",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "material_slot",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "coef",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "threshold",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "t_wo_rows",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_r2_rows",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_cos_o_rows",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_n_o",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_t1r",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_t2r",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_wi_local",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_cos_i",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_r1",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_a_te2",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_a_tm2",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_weights",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_fte_flat",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_ftm_flat",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "tangent_coef",
+     "type": "double"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_scattering_ensemble_eval_jvp"
+  },
+  {
    "doc": "Evaluate fused rough-surface event budgets with native CUDA.",
-   "line": 133,
+   "line": 292,
    "name": "scattering_event_probabilities",
    "parameters": [
     {
@@ -11305,7 +11943,7 @@
   },
   {
    "doc": "Evaluate the realization-coherent phase-screen patch integral with native CUDA (ADR-010 op 2).",
-   "line": 137,
+   "line": 296,
    "name": "scattering_patch_integral_eval",
    "parameters": [
     {
@@ -11406,8 +12044,282 @@
    "target": "cn_scattering_patch_integral_eval"
   },
   {
+   "doc": "Fixed-topology VJP of the realization-coherent phase-screen patch integral (heights, jones, geometry, k0) (ADR-014).",
+   "line": 302,
+   "name": "scattering_patch_integral_eval_backward",
+   "parameters": [
+    {
+     "default": null,
+     "name": "patch_tris",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "patch_uvs",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "d_i",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "d_o",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "n_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_te",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_tm",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "pol_t",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "pol_r",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r1_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r2_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "centroids",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "heights",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "quad_a",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "quad_b",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "quad_w",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "k0",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "grad_total",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "need_grad_heights",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_jones",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_geometry",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_k0",
+     "type": "bool"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_scattering_patch_integral_eval_backward"
+  },
+  {
+   "doc": "Fixed-topology JVP of the realization-coherent phase-screen patch integral (heights, jones, geometry, k0) (ADR-014).",
+   "line": 304,
+   "name": "scattering_patch_integral_eval_jvp",
+   "parameters": [
+    {
+     "default": null,
+     "name": "patch_tris",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "patch_uvs",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "d_i",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "d_o",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "n_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_te",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r_tm",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "pol_t",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "pol_r",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r1_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "r2_rows",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "centroids",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "heights",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "quad_a",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "quad_b",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "quad_w",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "k0",
+     "type": "double"
+    },
+    {
+     "default": null,
+     "name": "t_heights",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_r_te",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_r_tm",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_d_i",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_d_o",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_r1_rows",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_r2_rows",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_centroids",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "tangent_k0",
+     "type": "double"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_scattering_patch_integral_eval_jvp"
+  },
+  {
    "doc": "Evaluate a resident Kirchhoff BSDF table with native CUDA.",
-   "line": 127,
+   "line": 286,
    "name": "scattering_table_eval",
    "parameters": [
     {
@@ -11438,8 +12350,112 @@
    "target": "cn_scattering_table_eval"
   },
   {
+   "doc": "Fixed-topology VJP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).",
+   "line": 306,
+   "name": "scattering_table_eval_backward",
+   "parameters": [
+    {
+     "default": null,
+     "name": "wi",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "wo",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "f_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "f_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "grad_out_f_te",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "grad_out_f_tm",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "need_grad_dirs",
+     "type": "bool"
+    },
+    {
+     "default": null,
+     "name": "need_grad_tables",
+     "type": "bool"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_scattering_table_eval_backward"
+  },
+  {
+   "doc": "Fixed-topology JVP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).",
+   "line": 308,
+   "name": "scattering_table_eval_jvp",
+   "parameters": [
+    {
+     "default": null,
+     "name": "wi",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "wo",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "f_te",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "f_tm",
+     "type": "at::Tensor"
+    },
+    {
+     "default": null,
+     "name": "t_wi",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_wo",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_f_te",
+     "type": "pybind11::object"
+    },
+    {
+     "default": null,
+     "name": "t_f_tm",
+     "type": "pybind11::object"
+    }
+   ],
+   "path": "native/channel_native/binding/materials.cpp",
+   "pybind_arguments": [],
+   "return_arity": 1,
+   "return_type": "pybind11::dict",
+   "target": "cn_scattering_table_eval_jvp"
+  },
+  {
    "doc": "Evaluate a resident Kirchhoff sampling PDF with native CUDA.",
-   "line": 129,
+   "line": 288,
    "name": "scattering_table_pdf",
    "parameters": [
     {
@@ -11471,7 +12487,7 @@
   },
   {
    "doc": "Sample a resident Kirchhoff CDF table with native CUDA.",
-   "line": 131,
+   "line": 290,
    "name": "scattering_table_sample",
    "parameters": [
     {

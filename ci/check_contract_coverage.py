@@ -28,12 +28,14 @@ PYTHON_PACKAGE_PATH = Path("src/witwin/channel_native")
 EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # 174 phase-0 symbols + 5 ADR-010 native scattering/rough-reflection kernels
 # + 2 ADR-013 coupled double-diffraction forward symbols (field_coupled_dd,
-# raydn_coupled_dd_geometry_forward). The two AD companions
-# (field_coupled_dd_backward/jvp) land with the parallel AD change and bump
-# this to 183 together with their manifest, phase10, and coverage entries.
-# + 2 ADR-017 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply)
-# bump this to 185.
-EXPECTED_NATIVE_BINDING_COUNT = 185
+# raydn_coupled_dd_geometry_forward) + their 2 AD companions
+# (field_coupled_dd_backward/jvp): 179 -> 183.
+# + 2 ADR-017 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply):
+# 183 -> 185.
+# + 4 ADR-014 native scattering JVP/VJP companions: 185 -> 189.
+# + 4 ADR-015 native scattering table-eval / table-build JVP/VJP companions:
+# 189 -> 193.
+EXPECTED_NATIVE_BINDING_COUNT = 193
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",
@@ -484,7 +486,7 @@ def _initial_native_scenario(name: str) -> str:
         if "diffraction" in name or "edge" in name:
             return "path-diffraction"
         return "path-reflection"
-    if name.startswith("scattering_"):
+    if name.startswith("scattering_") or name.startswith("kirchhoff_"):
         return "bdpt-scattering"
     if name.startswith("core_"):
         return "path-diffraction"
@@ -496,7 +498,7 @@ def _initial_native_contract(name: str) -> str:
         return "native-bootstrap"
     if name.startswith("em_layer_stack"):
         return "native-material-layer-stack"
-    if name.startswith("scattering_"):
+    if name.startswith("scattering_") or name.startswith("kirchhoff_"):
         return "native-scattering"
     if name.startswith("coupled_rd_prepare") or name.startswith("field_coupled_rd"):
         return "native-field-coupled"

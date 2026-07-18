@@ -15,22 +15,10 @@ def test_basic_ad_config_accepts_fixed_topology_modes(ad_mode):
     assert Config(ad_mode=ad_mode).ad_mode == ad_mode
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
-@pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
-@pytest.mark.parametrize("component", ["scattering"])
-def test_basic_ad_solve_rejects_pending_components(ad_mode, component):
-    # Diffraction gained its AD companions with plan 07 AD-4b (see
-    # tests/ad/test_mc_basic_ad.py); the Kirchhoff scattering map remains
-    # the one explicitly rejected component.
-    scene = empty_space_los_scene()
-    config = Config(
-        samples=64,
-        components={"los", component},
-        max_depth=1,
-        ad_mode=ad_mode,
-    )
-    with pytest.raises(RuntimeError, match=component):
-        solve(scene, config)
+# ADR-015 Part A enabled Kirchhoff scattering AD in the MC-basic solver, so the
+# former "pending component" rejection guard is gone; there are no remaining
+# AD-unsupported components to reject. Enabled-path coverage lives in
+# tests/ad/test_mc_basic_scattering_ad.py (acceptance protocol point 5).
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")

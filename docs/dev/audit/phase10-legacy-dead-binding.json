@@ -309,7 +309,7 @@
     }
   ],
   "binding_ownership": {
-    "expected_count": 185,
+    "expected_count": 193,
     "baseline": "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/bindings.json",
     "evidence": {
       "kind": "python_source_reference",
@@ -438,6 +438,8 @@
       "field_transmission_sequence",
       "field_transmission_sequence_backward",
       "field_transmission_sequence_jvp",
+      "kirchhoff_table_build_backward",
+      "kirchhoff_table_build_jvp",
       "los_silhouette_clearance",
       "los_taper_apply",
       "mc_apply_los_visibility",
@@ -498,9 +500,15 @@
       "raydn_trace_reflections_forward_tape",
       "raydn_trace_reflections_jvp",
       "scattering_ensemble_eval",
+      "scattering_ensemble_eval_backward",
+      "scattering_ensemble_eval_jvp",
       "scattering_event_probabilities",
       "scattering_patch_integral_eval",
+      "scattering_patch_integral_eval_backward",
+      "scattering_patch_integral_eval_jvp",
       "scattering_table_eval",
+      "scattering_table_eval_backward",
+      "scattering_table_eval_jvp",
       "scattering_table_pdf",
       "scattering_table_sample"
     ]

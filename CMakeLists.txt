@@ -504,10 +504,14 @@ Python_add_library(
     native/channel_native/kernels/material.cu
     native/channel_native/kernels/path_compaction.cu
     native/channel_native/kernels/path_trace.cu
+    native/channel_native/kernels/kirchhoff_table_ad.cu
     native/channel_native/kernels/reflection.cu
     native/channel_native/kernels/scattering.cu
     native/channel_native/kernels/scattering_ensemble.cu
+    native/channel_native/kernels/scattering_ensemble_ad.cu
     native/channel_native/kernels/scattering_patch_integral.cu
+    native/channel_native/kernels/scattering_patch_integral_ad.cu
+    native/channel_native/kernels/scattering_table_eval_ad.cu
     native/channel_native/kernels/sampling.cu
     native/channel_native/montecarlo_basic.cpp
     native/channel_native/path_solver.cpp
@@ -530,8 +534,12 @@ target_compile_features(_channel_native PRIVATE cxx_std_17)
 # disabled for these TUs (explicit fmaf calls, e.g. the shared table
 # interpolation, are unaffected).
 set_source_files_properties(
+    native/channel_native/kernels/kirchhoff_table_ad.cu
     native/channel_native/kernels/scattering_ensemble.cu
+    native/channel_native/kernels/scattering_ensemble_ad.cu
     native/channel_native/kernels/scattering_patch_integral.cu
+    native/channel_native/kernels/scattering_patch_integral_ad.cu
+    native/channel_native/kernels/scattering_table_eval_ad.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 if(MSVC)
     # RayD's extern "C" integration entries raise std::runtime_error on
@@ -553,7 +561,12 @@ target_link_libraries(
         rayd_torch_native_core
         "${TORCH_LIBRARIES}"
         "${TORCH_PYTHON_LIBRARY}"
-        "${CHANNEL_NATIVE_PYTHON_LIBRARY}")
+        "${CHANNEL_NATIVE_PYTHON_LIBRARY}"
+        # ADR-015 kirchhoff_table_ad.cu solves the implicit Sinkhorn adjoint
+        # with cuSOLVER dense LU (Sgetrf/Sgetrs). The CUDA:: imported targets
+        # are provided by the CUDAToolkit package that Torch already discovers
+        # (CUDA::cudart is linked by the BUILD_TESTING lockstep target below).
+        CUDA::cusolver)
 if(WIN32)
     target_link_directories(_channel_native PRIVATE "${CHANNEL_NATIVE_PYTHON_LIBRARY_DIR}")
 endif()
