@@ -27,9 +27,20 @@ Measure and normalization conventions (documented once, used everywhere):
   subpath stores ``pdf_forward *= pdf(wo|wi)`` and ``pdf_reverse *=
   pdf(wi|wo)`` from the SAME reciprocal table with swapped arguments
   (contract section 5).
-- v1 depth rule: scattering is single-bounce. A scattered subpath connects
-  to the receivers (NEE) and terminates; reflection/transmission never
-  follow a scattering event in v1.
+- Depth rule (BDPT ``max_scattering_order``, ADR-021 D4):
+    * order 1 (default): scattering is single-bounce. A scattered subpath
+      connects to the receivers (NEE) and terminates; reflection/transmission
+      never follow a scattering event.
+    * order > 1: the terminal rule is lifted. A scattered subpath emits its
+      NEE row and then CONTINUES in its lobe-sampled direction (its power
+      already divided by ``p_scatter * pdf(wo)`` in
+      :func:`scattered_subpath_state`), and may reflect/transmit/scatter again
+      up to ``max_scattering_order`` scatter events, emitting an NEE row at
+      every scatter vertex. Because a scatter event clears the Complex3 Jones
+      carrier, a subsequent scatter vertex reads its incident power from the
+      scalar throughput (:func:`scatter_carried_incident_power`), split
+      unpolarized across the local TE/TM channels. Scattering stays power-only
+      and excluded from the ADR-019 coherent combine in both modes.
 
 NEE contribution derivation (the BDPT connection convention is
 ``contribution = source_power * |field|^2 * (lambda/(4*pi*L))^2 / N`` with
@@ -109,6 +120,7 @@ __all__ = [
     "local_to_world",
     "rough_material_runtimes",
     "sample_scatter_directions",
+    "scatter_carried_incident_power",
     "scatter_direction_uniforms",
     "scattered_subpath_state",
     "scattering_map_matrix",
@@ -287,6 +299,25 @@ def te_tm_incident_power(
     p_te = (field_real * s).sum(dim=-1) ** 2 + (field_imag * s).sum(dim=-1) ** 2
     p_tm = (field_real * p).sum(dim=-1) ** 2 + (field_imag * p).sum(dim=-1) ** 2
     return p_te, p_tm
+
+
+def scatter_carried_incident_power(
+    throughput_real: torch.Tensor, throughput_imag: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Unpolarized incident ``(P_te, P_tm)`` of an already-scattered subpath.
+
+    A scatter event clears the Complex3 Jones carrier (scattering is power-only
+    in v1) and moves the transported power into the scalar throughput, so a
+    FURTHER scatter vertex on the same multi-order subpath (ADR-021 D4) reads
+    its incident power from the throughput rather than the zeroed field. The
+    carried power is unpolarized, so it is split evenly across the local TE/TM
+    channels; both halves feed the same ``P_te*f_te + P_tm*f_tm`` NEE kernel and
+    the continuation's polarization-weighted BSDF as the single-bounce field
+    decomposition (:func:`te_tm_incident_power`) does at the first scatter."""
+
+    power = throughput_real**2 + throughput_imag**2
+    half = 0.5 * power
+    return half, half
 
 
 def _grouped_rows(
@@ -566,8 +597,19 @@ def scattered_subpath_state(
     Scattering contributions are POWER-ONLY ensemble estimates. No coherent
     phase or cross-polarized Jones amplitude is available from the current
     Kirchhoff table, so the Complex3 carrier is explicitly cleared instead of
-    manufacturing a zero-phase field. ``throughput_real`` remains a sampling
-    proxy and must never be consumed as a field amplitude.
+    manufacturing a zero-phase field.
+
+    Post-scatter carrier semantics (ADR-021 D4): the scattered subpath's
+    ``throughput_real`` is seeded from the FIELD-BASED incident power at this
+    vertex (``sqrt(p_te + p_tm)``, which excludes ``source_power`` — the
+    connection convention multiplies ``source_power`` separately), times the
+    unbiased continuation amplitude ``sqrt(f_weighted * cos_o / (pdf * p))``.
+    From this vertex on, ``|throughput|^2`` IS the authoritative unpolarized
+    power weight of the subpath: subsequent specular events scale it by
+    ``sqrt(gain * R_eff)`` at the actual incidence angle, which is the exact
+    unpolarized power transport. The PRE-scatter throughput remains the
+    sampling proxy of contract section 5 and is deliberately not consumed
+    here.
     """
 
     sampled = sample_scatter_directions(material_id, wi_local, uniforms, runtimes)
@@ -595,11 +637,15 @@ def scattered_subpath_state(
     scattered["direction"] = wo_world
     scattered["field_real"] = torch.zeros_like(state["field_real"])
     scattered["field_imag"] = torch.zeros_like(state["field_imag"])
-    throughput_amp = torch.sqrt(
-        state["throughput_real"] ** 2 + state["throughput_imag"] ** 2
-    )
-    scattered["throughput_real"] = throughput_amp * amplitude_scale
-    scattered["throughput_imag"] = torch.zeros_like(throughput_amp)
+    # Seed the post-scatter carrier from the field-based incident power at
+    # this vertex, NOT from the pre-scatter proxy throughput: the proxy
+    # includes sqrt(tx_power) (double-counted by the connection convention's
+    # separate source_power factor) and approximates the polarized specular
+    # chain, while (p_te + p_tm) is exact for the first scatter and is the
+    # carried unpolarized power for later scatters on the same subpath.
+    incident_amp = incident_power.sqrt()
+    scattered["throughput_real"] = incident_amp * amplitude_scale
+    scattered["throughput_imag"] = torch.zeros_like(incident_amp)
     scattered["pdf_forward"] = state["pdf_forward"] * p_scatter * pdf_forward
     scattered["pdf_reverse"] = state["pdf_reverse"] * p_scatter * sampled["pdf_reverse"]
     scattered["depth"] = state["depth"] + 1

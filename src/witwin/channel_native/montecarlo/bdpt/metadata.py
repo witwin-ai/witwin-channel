@@ -137,6 +137,17 @@ def make_solver_metadata(
         "workspace_bytes": int(workspace_bytes),
         "variance": bool(variance_enabled),
         "throughput_domain": "complex3_jones_coherent_events",
+        # ADR-021 D4: BDPT multi-order diffuse scattering. Order 1 (default)
+        # keeps the single-bounce terminal rule (a scattered subpath connects
+        # via NEE and terminates); order > 1 lets a scattered subpath continue
+        # and scatter again up to the cap, emitting an NEE row at every scatter
+        # vertex (power domain, excluded from the coherent combine).
+        "max_scattering_order": int(config.max_scattering_order),
+        "scattering_depth_rule": (
+            "single_bounce_terminal"
+            if int(config.max_scattering_order) <= 1
+            else "multi_order_continuation"
+        ),
         "field_transport": {
             "authoritative_carrier": "complex3_jones",
             "scalar_throughput_role": "sampling_probability_proxy_only",

@@ -70,14 +70,28 @@ __device__ void direction_from_seed(unsigned long long seed, float* dir) {
 
 // SubpathState tensor schema (see _BDPT_SUBPATH_SCHEMA in ops.py).
 //
-// throughput_real/imag is a REAL-VALUED diagnostic amplitude proxy (contract
+// throughput_real/imag semantics split at the first diffuse-scatter event
+// (component_mask MASK_SCATTERING bit, ADR-021 D4):
+//
+// PRE-scatter it is a REAL-VALUED diagnostic amplitude proxy (contract
 // section 5): at specular events it is scaled by the amplitude
 // sqrt(material_gain * R_eff) (reflection) or sqrt(T_eff) (transmission),
 // never by the power itself. It may only be used for event/Russian-roulette
-// probabilities. It MUST NOT enter connection contributions - the Complex3
+// probabilities and MUST NOT enter connection contributions - the Complex3
 // Jones field (field_real/field_imag) is the single authoritative amplitude
 // carrier (verified: the connection kernels read light_source_power and the
-// field tensors only; throughput never reaches a contribution).
+// field tensors only; pre-scatter throughput never reaches a contribution).
+//
+// POST-scatter (multi-order continuation only; at max_scattering_order == 1
+// scattered subpaths terminate) the Complex3 carrier is cleared and
+// |throughput|^2 becomes the authoritative UNPOLARIZED power weight of the
+// subpath: it is re-seeded at the scatter vertex from the field-based
+// incident power (excluding source_power, which connection kernels multiply
+// separately) times the unbiased continuation weight, and the specular
+// sqrt(gain * R_eff) scaling at the actual incidence angle is thereafter the
+// exact unpolarized power transport, not a proxy. Only the torch-side
+// scattering NEE glue consumes it (scatter_carried_incident_power); native
+// connection kernels still never read it.
 std::vector<at::Tensor> allocate_subpath_state(const at::Tensor& reference, int64_t count) {
     auto float_options = reference.options().dtype(at::kFloat);
     auto int_options = reference.options().dtype(at::kInt);

@@ -182,8 +182,20 @@ For `max_scattering_order > 1`:
   unbiased estimator; reflection/transmission events may follow, and further
   scatter events are allowed up to `max_scattering_order`.
 - The Jones carrier through a scatter event stays power-only in this ADR
-  (`P_te/P_tm` incident powers weight the table channels; carried outgoing
-  field is the unpolarized-power placeholder with phase 0, as today).
+  (`P_te/P_tm` incident powers weight the table channels). Post-scatter
+  carrier contract: the Complex3 field is cleared at the scatter vertex and
+  the scalar `throughput` is RE-SEEDED from the field-based incident power
+  `sqrt(P_te + P_tm)` (excluding `source_power`, which the connection
+  convention multiplies separately) times the unbiased continuation
+  amplitude `sqrt(f_weighted cos_o / (pdf(wo) p_scatter))`. From that vertex
+  on `|throughput|^2` is the authoritative unpolarized power weight — the
+  per-bounce specular `sqrt(gain * R_eff)` scaling at the actual incidence
+  angle is exact unpolarized transport — and a later scatter vertex reads
+  its incident power from it, split evenly across the local TE/TM channels.
+  The pre-scatter throughput remains the contract-section-5 sampling proxy
+  and never enters a contribution. Mixed-transmission endpoint rows are not
+  emitted for post-scatter subpaths (`S -> ... -> T` chains are a documented
+  v1 coverage gap, not a biased zero).
   Scattering remains EXCLUDED from the ADR-019 coherent combine; a coherent
   MC diffuse carrier (phase-screen height at the sampled point + unfolded
   phase) is the documented follow-up that ADR-019's revisit condition
@@ -278,7 +290,8 @@ ADR-014 conventions):
    tables, layer params, frequency through a chain-scatter solve),
    JVP-vs-VJP consistency, loud rejection of every fixed input,
    `ad_mode="none"` builds no tape.
-9. **Governance.** Binding manifest (+4 symbols), contract-coverage manifest,
+9. **Governance.** Binding manifest (+6 symbols: 2 chain-op forwards + 4
+   companions, 193 -> 199), contract-coverage manifest,
    owner inventory, duplication ledger, launch ledger, public-api snapshot
    (new config fields), FEATURE_LIST, and migration notes move in the same
    change; `ci/check_import_graph.py` passes with no new debt.

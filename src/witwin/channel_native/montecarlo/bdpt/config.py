@@ -51,6 +51,14 @@ class Config:
     max_depth: int = 3
     max_light_depth: int | None = None
     max_diffraction_order: int = 1
+    # ADR-021 D4: maximum number of diffuse-scatter events a single BDPT light
+    # subpath may undergo. DEFAULT 1 is today's behavior BIT-IDENTICALLY: a
+    # scattered subpath emits its NEE connection and terminates (single-bounce
+    # terminal rule). >1 lifts the terminal rule so a scattered subpath
+    # continues in its sampled direction and may reflect/transmit/scatter again
+    # up to this cap, emitting an NEE row at every scatter vertex (power domain;
+    # scattering stays excluded from the ADR-019 coherent combine).
+    max_scattering_order: int = 1
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
@@ -92,6 +100,8 @@ class Config:
             raise ValueError("max_light_depth must be non-negative")
         if self.max_diffraction_order not in {0, 1}:
             raise ValueError("max_diffraction_order must be 0 or 1")
+        if self.max_scattering_order < 1:
+            raise ValueError("max_scattering_order must be >= 1")
         components = validated_components(
             self.components,
             error_message="components must be a non-empty subset of {valid}",

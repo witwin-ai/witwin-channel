@@ -29,7 +29,9 @@ from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
     bdpt_sample_directions,
 )
 from witwin.channel_native.montecarlo.events.scattering import (
+    MASK_SCATTERING,
     local_frames,
+    scatter_carried_incident_power,
     scatter_direction_uniforms,
     scattered_subpath_state,
     scattering_nee_connection_samples,
@@ -144,6 +146,7 @@ def _transmission_sampled_connection_samples(
     scattering_runtimes: dict[int, Any] | None = None,
     emit_mixed_transmission: bool = True,
     scene_diagonal: float = 0.0,
+    max_scattering_order: int = 1,
 ) -> tuple[list[dict[str, torch.Tensor]], dict[str, int]]:
     """Shooting-context light subpaths with three-way event selection.
 
@@ -166,9 +169,18 @@ def _transmission_sampled_connection_samples(
     - MIXED reflection+transmission chains connect through the native
       endpoint kernel (component 5), as in wave 2; emitted only when
       ``emit_mixed_transmission`` (the transmission component is requested).
-    - Scatter-selected vertices emit torch-side NEE rows (component 6) and
-      then TERMINATE (v1 single-bounce rule; reflection/transmission never
-      follow a scattering event).
+    - Scatter-selected vertices emit torch-side NEE rows (component 6).
+      Depth rule (ADR-021 D4, ``max_scattering_order``):
+        * order 1 (default, BIT-IDENTICAL): the scattered subpath emits its
+          NEE row and TERMINATES; reflection/transmission never follow.
+        * order > 1: the scattered subpath CONTINUES in its lobe-sampled
+          direction (power divided by ``p_scatter * pdf(wo)`` in
+          :func:`scattered_subpath_state`) and may reflect/transmit/scatter
+          again, emitting an NEE row at every scatter vertex, until it has
+          undergone ``max_scattering_order`` scatter events. A post-scatter
+          subpath carries power in the scalar throughput (its Complex3 Jones
+          field is cleared at a scatter vertex), so its incident power at a
+          further scatter vertex is the unpolarized throughput power.
     - Pure reflection stays with the discrete enumeration and pure
       transmission with the straight endpoint chains.
     """
@@ -207,6 +219,14 @@ def _transmission_sampled_connection_samples(
             "ray_tmax": launch_inputs["ray_tmax"],
             "active": launch_inputs["active"],
         }
+        # Per-subpath diffuse-scatter event tally for the order cap. Only
+        # allocated when multi-order continuation is requested; order 1 keeps
+        # the single-bounce terminal rule and never reads it.
+        scatter_count = (
+            torch.zeros((int(samples),), device=device, dtype=torch.int32)
+            if int(max_scattering_order) > 1
+            else None
+        )
         for bounce in range(max(1, int(max_depth))):
             hit = geometry_bridge.bdpt_intersect_forward(
                 raydn.require_handle(),
@@ -362,6 +382,23 @@ def _transmission_sampled_connection_samples(
                     direction,
                     normal_flipped,
                 )
+                if int(max_scattering_order) > 1:
+                    # A subpath that has ALREADY scattered carries no Complex3
+                    # field (cleared at the previous scatter vertex); its
+                    # incident power lives in the scalar throughput. Route that
+                    # unpolarized power into the local TE/TM channels so both
+                    # the NEE row and the continuation weight see the correct
+                    # incident power at this vertex. Order 1 never reaches here
+                    # (no subpath is ever a continued scatter), so the default
+                    # stays bitwise the field-based decomposition above.
+                    already_scattered = (
+                        state["component_mask"] & MASK_SCATTERING
+                    ) != 0
+                    carried_te, carried_tm = scatter_carried_incident_power(
+                        state["throughput_real"], state["throughput_imag"]
+                    )
+                    p_te = torch.where(already_scattered, carried_te, p_te)
+                    p_tm = torch.where(already_scattered, carried_tm, p_tm)
                 direction_uniforms = scatter_direction_uniforms(
                     int(samples),
                     seed=seed,
@@ -426,6 +463,14 @@ def _transmission_sampled_connection_samples(
                 & ~choose_scatter
                 & ((mask & _MASK_REFLECTION) != 0)
                 & ((mask & _MASK_TRANSMISSION) != 0)
+                # Post-scatter subpaths carry no Complex3 field (cleared at
+                # the scatter vertex); their |F|^2 = 0 endpoint rows would
+                # contribute nothing while contaminating the component-5
+                # sample statistics. Their path class (S -> ... -> T) is
+                # explicitly not covered in v1 (ADR-021 D4). At order 1 no
+                # subpath survives with the scattering bit, so this term is
+                # structurally inert for the default.
+                & ((mask & MASK_SCATTERING) == 0)
             )
             if emit_mixed_transmission and bool(mixed.any()):
                 samples_out = bdpt_endpoint_connection_samples(
@@ -451,9 +496,26 @@ def _transmission_sampled_connection_samples(
                 )[0]
                 keep = visible & mixed.repeat_interleave(sensor_count)
                 sample_blocks.append(bdpt_filter_connection_samples(samples_out, keep))
-            # v1 single-bounce rule: scattered subpaths connected above and
-            # terminate here; reflection/transmission never follow them.
-            merged["valid"] = merged["valid"] & ~choose_scatter
+            if scatter_count is None:
+                # order 1 (default): scattered subpaths connected above and
+                # terminate here; reflection/transmission never follow them.
+                merged["valid"] = merged["valid"] & ~choose_scatter
+            else:
+                # order > 1 (ADR-021 D4): a successfully scattered subpath
+                # CONTINUES (its new direction/origin/throughput are already
+                # overlaid in ``merged`` by _merge_scattered_state) until it
+                # reaches the scatter-event cap. NEE rows were emitted above at
+                # this vertex exactly as at order 1. Count only successful
+                # scatter events; a subpath that just hit the cap terminates
+                # (its NEE is already recorded), and a scatter selection whose
+                # direction sample failed is dropped.
+                scatter_count = scatter_count + scattered_valid.to(scatter_count.dtype)
+                reached_cap = scatter_count >= int(max_scattering_order)
+                merged["valid"] = (
+                    merged["valid"]
+                    & ~(choose_scatter & ~scattered_valid)
+                    & ~reached_cap
+                )
             if not bool(merged["valid"].any()):
                 break
             state = merged
