@@ -216,6 +216,74 @@ _FIXED = (
 )
 
 
+def _backward_need_flags(needed) -> tuple[bool, bool, bool]:
+    """Resolve which native grad groups the VJP must compute."""
+
+    need_rough = bool(needed[0] or needed[1] or needed[2])
+    need_layers = bool(needed[3] or needed[4] or needed[5])
+    need_frequency = bool(needed[7])
+    return need_rough, need_layers, need_frequency
+
+
+def _backward_is_noop(
+    need_rough: bool,
+    need_layers: bool,
+    need_frequency: bool,
+    grad_f_te: torch.Tensor | None,
+    grad_f_tm: torch.Tensor | None,
+) -> bool:
+    """True when no differentiable input is requested or no upstream grad flows."""
+
+    no_grad_requested = not (need_rough or need_layers or need_frequency)
+    no_upstream = grad_f_te is None and grad_f_tm is None
+    return no_grad_requested or no_upstream
+
+
+def _backward_grad_tuple(out, ctx, needed, *, need_frequency: bool) -> tuple:
+    """Pack the 21-slot input-gradient tuple from the native VJP output."""
+
+    grad_sigma_h = (
+        out["grad_sigma_h"].reshape(ctx.rough_shapes[0]) if needed[0] else None
+    )
+    grad_corr_x = (
+        out["grad_corr_x"].reshape(ctx.rough_shapes[1]) if needed[1] else None
+    )
+    grad_corr_y = (
+        out["grad_corr_y"].reshape(ctx.rough_shapes[2]) if needed[2] else None
+    )
+    grad_thickness = out["grad_layer_thickness_m"] if needed[3] else None
+    grad_eps = out["grad_layer_eps_r"] if needed[4] else None
+    grad_sigma = out["grad_layer_sigma_e"] if needed[5] else None
+    grad_frequency = (
+        _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+        if need_frequency
+        else None
+    )
+    return (
+        grad_sigma_h,
+        grad_corr_x,
+        grad_corr_y,
+        grad_thickness,
+        grad_eps,
+        grad_sigma,
+        None,  # layer_mu_r
+        grad_frequency,
+        None,  # f_te_built
+        None,  # f_tm_built
+        None,  # s_te
+        None,  # s_tm
+        None,  # a_te
+        None,  # a_tm
+        None,  # r_diff_te
+        None,  # r_diff_tm
+        None,  # cos_i
+        None,  # phi_i
+        None,  # cos_o
+        None,  # phi_o
+        None,  # frequency_value
+    )
+
+
 class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
     """Differentiable Kirchhoff table build (ADR-015 Part C).
 
@@ -291,11 +359,9 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
             "kirchhoff_table_build_ad", ctx.needs_input_grad, _FIXED
         )
         needed = ctx.needs_input_grad
-        need_rough = bool(needed[0] or needed[1] or needed[2])
-        need_layers = bool(needed[3] or needed[4] or needed[5])
-        need_frequency = bool(needed[7])
-        if not (need_rough or need_layers or need_frequency) or (
-            grad_f_te is None and grad_f_tm is None
+        need_rough, need_layers, need_frequency = _backward_need_flags(needed)
+        if _backward_is_noop(
+            need_rough, need_layers, need_frequency, grad_f_te, grad_f_tm
         ):
             return none_grads
         saved = ctx.saved_tensors
@@ -316,46 +382,7 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
             need_grad_layers=need_layers,
             need_grad_frequency=need_frequency,
         )
-        grad_sigma_h = (
-            out["grad_sigma_h"].reshape(ctx.rough_shapes[0]) if needed[0] else None
-        )
-        grad_corr_x = (
-            out["grad_corr_x"].reshape(ctx.rough_shapes[1]) if needed[1] else None
-        )
-        grad_corr_y = (
-            out["grad_corr_y"].reshape(ctx.rough_shapes[2]) if needed[2] else None
-        )
-        grad_thickness = out["grad_layer_thickness_m"] if needed[3] else None
-        grad_eps = out["grad_layer_eps_r"] if needed[4] else None
-        grad_sigma = out["grad_layer_sigma_e"] if needed[5] else None
-        grad_frequency = (
-            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
-            if need_frequency
-            else None
-        )
-        return (
-            grad_sigma_h,
-            grad_corr_x,
-            grad_corr_y,
-            grad_thickness,
-            grad_eps,
-            grad_sigma,
-            None,  # layer_mu_r
-            grad_frequency,
-            None,  # f_te_built
-            None,  # f_tm_built
-            None,  # s_te
-            None,  # s_tm
-            None,  # a_te
-            None,  # a_tm
-            None,  # r_diff_te
-            None,  # r_diff_tm
-            None,  # cos_i
-            None,  # phi_i
-            None,  # cos_o
-            None,  # phi_o
-            None,  # frequency_value
-        )
+        return _backward_grad_tuple(out, ctx, needed, need_frequency=need_frequency)
 
     @staticmethod
     def jvp(

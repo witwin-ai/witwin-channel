@@ -111,6 +111,41 @@ def _face_material_tensors(
         return build()
 
 
+def _mc_scattering_component(
+    scene: Scene,
+    raydn,
+    grid,
+    config: Config,
+    *,
+    device: torch.device,
+    ad: bool,
+    ledger,
+    zero_component_map,
+) -> tuple[torch.Tensor, dict[str, int] | None, int, int]:
+    """Scattering component map and (path, valid) row-count deltas.
+
+    Grid receivers with structures carry the native scattering map; otherwise the
+    component is a zero map with no row-count contribution. Preserves the exact
+    call semantics and ad/ledger threading of the inline dispatch it replaces.
+    """
+
+    if scene.structures:
+        component_map, stats = scattering_component_map(
+            scene,
+            raydn,
+            grid,
+            samples=config.samples,
+            seed=config.seed,
+            device=device,
+            ad=ad,
+            ledger=ledger if ad else None,
+        )
+        path_delta = stats["sample_count"]
+        valid_delta = int(torch.count_nonzero(component_map))
+        return component_map, stats, path_delta, valid_delta
+    return zero_component_map(), None, 0, 0
+
+
 def solve_pipeline(
     scene: Scene,
     config: Config,
@@ -272,23 +307,24 @@ def solve_pipeline(
             )
         elif "transmission" in config.components:
             component_maps["transmission"] = zero_component_map()
-        if "scattering" in config.components and scene.structures:
-            component_maps["scattering"], scattering_stats = scattering_component_map(
+        if "scattering" in config.components:
+            (
+                component_maps["scattering"],
+                scattering_stats,
+                scattering_path_delta,
+                scattering_valid_delta,
+            ) = _mc_scattering_component(
                 scene,
                 raydn,
                 grid,
-                samples=config.samples,
-                seed=config.seed,
+                config,
                 device=device,
                 ad=ad,
-                ledger=ledger if ad else None,
+                ledger=ledger,
+                zero_component_map=zero_component_map,
             )
-            path_count += scattering_stats["sample_count"]
-            valid_contribution_count += int(
-                torch.count_nonzero(component_maps["scattering"])
-            )
-        elif "scattering" in config.components:
-            component_maps["scattering"] = zero_component_map()
+            path_count += scattering_path_delta
+            valid_contribution_count += scattering_valid_delta
 
     path_gain = los
     if component_maps is not None:

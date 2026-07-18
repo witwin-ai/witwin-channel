@@ -82,6 +82,10 @@ from witwin.channel_native.propagation.geometry.endpoints import (
     transmitter_tensors,
 )
 from witwin.channel_native.propagation.enumerated.contracts import TopologyConfig
+from witwin.channel_native.propagation.enumerated.scattering_scalars import (
+    ensemble_coef_scale,
+    realization_scalars,
+)
 from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
@@ -109,20 +113,6 @@ _R2_ALPHA = (0.7548776662466927, 0.5698402909980532)
 
 def _unit(v: torch.Tensor, eps: float = 1.0e-12) -> torch.Tensor:
     return normalize_vec3(v, eps=eps)
-
-
-def _frequency_tensor(scene: Scene, device: torch.device) -> torch.Tensor:
-    """Scene carrier frequency as a 0-d float32 CUDA tensor for AD scalars.
-
-    A ``requires_grad`` scene frequency keeps its autograd graph so frequency
-    gradients flow through the radiometric ``coef`` / ``k0`` scalars; a plain
-    Python-float frequency becomes a constant scalar tensor.
-    """
-
-    frequency = scene.frequency
-    if isinstance(frequency, torch.Tensor):
-        return frequency.to(device=device, dtype=torch.float32)
-    return torch.tensor(float(frequency), device=device, dtype=torch.float32)
 
 
 def _stable_tangent(n: torch.Tensor) -> torch.Tensor:
@@ -386,11 +376,7 @@ def _ensemble_rows(
     # so frequency gradients flow through the ensemble rows (their only
     # frequency dependence). Ensemble rows are zero-phase power rows, so nothing
     # else here is differentiable w.r.t. frequency.
-    coef_scale_t = (
-        (C0 / _frequency_tensor(scene, device)) ** 2 / (4.0 * math.pi) ** 2
-        if ad_enabled
-        else None
-    )
+    coef_scale_t = ensemble_coef_scale(scene, device, ad_enabled=ad_enabled)
 
     eps = _offset_eps(points, scene_diagonal)
     threshold = float(getattr(config, "scattering_power_threshold", 0.0))
@@ -611,9 +597,7 @@ def _realization_rows(
     # so frequency gradients flow through the coherent phase, the Kirchhoff
     # prefactor and the radiometric normalization.
     if ad_enabled:
-        frequency_t = _frequency_tensor(scene, device)
-        k0_t = 2.0 * math.pi * frequency_t / C0
-        amplitude_scale_t = (C0 / frequency_t) / (4.0 * math.pi)
+        frequency_t, k0_t, amplitude_scale_t = realization_scalars(scene, device)
     runtimes = compiled.phase_screen_runtimes
     density = float(getattr(config, "scattering_samples_per_m2", 8.0))
 
