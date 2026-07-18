@@ -214,8 +214,6 @@ def test_deterministic_los_field_matches_python_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic LoS field")
 
-    from witwin.channel_native.deterministic.field import free_space_complex_field
-
     path_gain = torch.tensor([1.0e-4, 2.5e-5, 0.0], device="cuda", dtype=torch.float32)
     path_length = torch.tensor([1.0, 3.25, 9.5], device="cuda", dtype=torch.float32)
 
@@ -226,7 +224,9 @@ def test_deterministic_los_field_matches_python_reference():
     )
 
     field = torch.complex(result["field_real"], result["field_imag"])
-    expected = free_space_complex_field(path_gain, path_length, 3.0e9)
+    expected = deterministic_fields.deterministic_pack_complex(
+        result["field_real"], result["field_imag"]
+    )
     torch.testing.assert_close(field, expected, rtol=2.0e-5, atol=1.0e-7)
     torch.testing.assert_close(result["path_gain"], path_gain, rtol=0.0, atol=0.0)
 
@@ -1112,8 +1112,6 @@ def test_deterministic_diffraction_vector_field_matches_python_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction field")
 
-    from witwin.channel_native.deterministic.field import equivalent_field_from_vector_components
-
     x_re = torch.tensor([1.0, -0.5, 0.0], device="cuda", dtype=torch.float32)
     x_im = torch.tensor([0.5, 0.25, 0.0], device="cuda", dtype=torch.float32)
     y_re = torch.tensor([0.25, 0.75, 0.0], device="cuda", dtype=torch.float32)
@@ -1129,10 +1127,20 @@ def test_deterministic_diffraction_vector_field_matches_python_reference():
         z_re=z_re,
         z_im=z_im,
     )
+    reference = deterministic_fields.deterministic_diffraction_vector_field(
+        x_re=x_re,
+        x_im=x_im,
+        y_re=y_re,
+        y_im=y_im,
+        z_re=z_re,
+        z_im=z_im,
+    )
 
     field = torch.complex(result["field_real"], result["field_imag"])
-    expected_gain, expected_field = equivalent_field_from_vector_components(x_re, x_im, y_re, y_im, z_re, z_im)
-    torch.testing.assert_close(result["path_gain"], expected_gain, rtol=2.0e-6, atol=1.0e-7)
+    expected_field = deterministic_fields.deterministic_pack_complex(
+        reference["field_real"], reference["field_imag"]
+    )
+    torch.testing.assert_close(result["path_gain"], reference["path_gain"], rtol=2.0e-6, atol=1.0e-7)
     torch.testing.assert_close(field, expected_field, rtol=2.0e-6, atol=1.0e-7)
 
 
@@ -1204,8 +1212,6 @@ def test_deterministic_reflection_sequence_field_matches_python_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection sequence field")
 
-    from witwin.channel_native.deterministic.field import reflection_sequence_complex_field
-
     tx_position = torch.tensor([[0.0, 0.0, 1.0], [0.2, 0.0, 1.0]], device="cuda", dtype=torch.float32)
     hit_positions = torch.tensor(
         [
@@ -1242,17 +1248,22 @@ def test_deterministic_reflection_sequence_field_matches_python_reference():
         gain=gain,
         frequency_hz=3.0e9,
     )
-    expected_gain, expected_field, expected_length = reflection_sequence_complex_field(
+    reference = deterministic_fields.deterministic_reflection_sequence_field(
         tx_position=tx_position,
         rx_position=rx_position,
         hit_positions=hit_positions,
         normals=normals,
-        tx_power_w=tx_power,
+        tx_power=tx_power,
         eps_r=eps_r,
         sigma_e=sigma_e,
         mu_r=mu_r,
         gain=gain,
         frequency_hz=3.0e9,
+    )
+    expected_gain = reference["path_gain"]
+    expected_length = reference["path_length_m"]
+    expected_field = deterministic_fields.deterministic_pack_complex(
+        reference["field_real"], reference["field_imag"]
     )
 
     field = torch.complex(result["field_real"], result["field_imag"])

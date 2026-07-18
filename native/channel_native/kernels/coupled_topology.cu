@@ -201,7 +201,7 @@ __global__ void coupled_active_mask_kernel(
 
 // Double-diffraction (cid 7) discovery: alternating-projection Fermat solve of
 // the two-edge Keller point pair, mirroring the eps/inside semantics of
-// coupled_rd_prepare_kernel. No CPU/Torch fallback and no heuristic clamping:
+// coupled_rd_prepare_kernel. No CPU/Torch recomputation and no heuristic clamping:
 // each iteration takes the raw closed-form single-edge projection and the row
 // is validated (or dropped) purely by the strict-inside test on both segments.
 constexpr int kDoubleDiffractionIterations = 16;

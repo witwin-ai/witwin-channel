@@ -5,7 +5,7 @@ import inspect
 import pytest
 
 from witwin.channel_native.deterministic.kernels import accumulation
-from witwin.channel_native.deterministic.kernels import fields as compatibility_fields
+from witwin.channel_native.propagation import fields as public_fields
 from witwin.channel_native.propagation.fields.kernels import deterministic as fields
 from witwin.channel_native.runtime import (
     autograd_contracts,
@@ -42,7 +42,7 @@ def test_deterministic_fields_is_the_single_object_owner(name: str):
     owner = getattr(fields, name)
 
     assert owner.__module__ == fields.__name__
-    assert getattr(compatibility_fields, name) is owner
+    assert getattr(public_fields, name) is owner
 
 
 def test_deterministic_fields_uses_canonical_runtime_dependencies():

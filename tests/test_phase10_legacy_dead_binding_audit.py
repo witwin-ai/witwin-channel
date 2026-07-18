@@ -174,12 +174,6 @@ def test_phase10_fresnel_scalar_dead_candidate_is_removed_exactly() -> None:
         if item["name"] == "_fresnel_scalar_coefficient"
     )
     field_path = REPOSITORY_ROOT / "src/witwin/channel_native/deterministic/field.py"
-    tree = ast.parse(field_path.read_text(encoding="utf-8-sig"))
-    top_level_names = {
-        node.name
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-    }
     production_references = [
         path.relative_to(REPOSITORY_ROOT).as_posix()
         for path in PYTHON_ROOT.rglob("*.py")
@@ -189,7 +183,9 @@ def test_phase10_fresnel_scalar_dead_candidate_is_removed_exactly() -> None:
 
     assert candidate["classification"] == "dead"
     assert candidate["decision"] == candidate["status"] == "removed"
-    assert "_fresnel_scalar_coefficient" not in top_level_names
+    # The deterministic field wrapper module that once held the dead stub is
+    # itself removed, so the symbol cannot reappear at top level.
+    assert not field_path.exists()
     assert production_references == []
 
 
