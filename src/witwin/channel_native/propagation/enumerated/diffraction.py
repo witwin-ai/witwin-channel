@@ -79,6 +79,7 @@ def _diffraction_topology_order1(
     rx_positions: torch.Tensor,
     *,
     frequency_hz: float,
+    isb_boundary_taper_width: float = 0.0,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
     from witwin.channel_native.propagation.fields.kernels import (
         deterministic as field_kernels,
@@ -183,6 +184,10 @@ def _diffraction_topology_order1(
                     state_count=state_count,
                     capacity=rx_request.capacity,
                     wavelength=float(wavelength),
+                    # ISB boundary taper (ADR-017), D member. 0.0 when the
+                    # switch is off keeps the RayD export bit-identical; the
+                    # width notches the incident-boundary odd part in the header.
+                    isb_taper_width_scale=float(isb_boundary_taper_width),
                 )
             )
             launch_count += 1

@@ -21,6 +21,33 @@ def test_config_defaults_match_public_contract():
     # matches the path solver.
     assert config.coupled_paths is False
     assert config.coupled_candidate_limit == 1_000_000
+    # ISB boundary taper (ADR-017) is DEFAULT-OFF; the width default is the
+    # projection-validated 0.5 but is inert while the switch is off.
+    assert config.isb_boundary_taper is False
+    assert config.isb_boundary_taper_width == 0.5
+
+
+def test_isb_boundary_taper_accepts_width_bounds():
+    for width in (0.25, 0.5, 1.0, 4.0):
+        config = Config(isb_boundary_taper=True, isb_boundary_taper_width=width)
+        assert config.isb_boundary_taper is True
+        assert config.isb_boundary_taper_width == width
+
+
+@pytest.mark.parametrize(
+    ("width", "message"),
+    [
+        (0.0, r"isb_boundary_taper_width must be in \(0, 4\]"),
+        (-0.5, r"isb_boundary_taper_width must be in \(0, 4\]"),
+        (4.0001, r"isb_boundary_taper_width must be in \(0, 4\]"),
+        (10.0, r"isb_boundary_taper_width must be in \(0, 4\]"),
+    ],
+)
+def test_isb_boundary_taper_width_validation(width, message):
+    # The width bound is validated regardless of the on/off flag so a bad width
+    # is rejected at construction, not silently ignored while off.
+    with pytest.raises(ValueError, match=message):
+        Config(isb_boundary_taper_width=width)
 
 
 def test_config_normalizes_component_iterables_to_frozenset():

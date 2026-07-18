@@ -309,7 +309,7 @@
     }
   ],
   "binding_ownership": {
-    "expected_count": 183,
+    "expected_count": 185,
     "baseline": "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/bindings.json",
     "evidence": {
       "kind": "python_source_reference",
@@ -438,6 +438,8 @@
       "field_transmission_sequence",
       "field_transmission_sequence_backward",
       "field_transmission_sequence_jvp",
+      "los_silhouette_clearance",
+      "los_taper_apply",
       "mc_apply_los_visibility",
       "mc_component_map_buffer",
       "mc_diffraction_edge_geometry",

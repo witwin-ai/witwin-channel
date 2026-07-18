@@ -63,7 +63,8 @@ pybind11::dict cn_field_diffraction_wedge(
     pybind11::object vertex_v1,
     pybind11::object vertex_opp0,
     pybind11::object vertex_opp1,
-    pybind11::object edge_boundary);
+    pybind11::object edge_boundary,
+    double isb_boundary_taper_width);
 pybind11::dict cn_field_diffraction_wedge_backward(
     at::Tensor source,
     at::Tensor target,
@@ -96,7 +97,8 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     bool need_grad_material,
     bool need_grad_frequency,
     bool need_grad_geometry,
-    bool need_grad_vertices);
+    bool need_grad_vertices,
+    double isb_boundary_taper_width);
 pybind11::dict cn_field_diffraction_wedge_jvp(
     at::Tensor source,
     at::Tensor target,
@@ -136,7 +138,8 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     pybind11::object tangent_vertex_v0,
     pybind11::object tangent_vertex_v1,
     pybind11::object tangent_vertex_opp0,
-    pybind11::object tangent_vertex_opp1);
+    pybind11::object tangent_vertex_opp1,
+    double isb_boundary_taper_width);
 pybind11::dict cn_field_coupled_rd_backward(
     at::Tensor source,
     at::Tensor target,

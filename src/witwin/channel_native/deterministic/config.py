@@ -79,10 +79,22 @@ class Config:
     scattering_samples_per_m2: float = 8.0
     scattering_max_paths_per_pair: int = 4096
     scattering_power_threshold: float = 0.0
+    # ISB boundary taper (ADR-017). DEFAULT-OFF visual-continuity heuristic: the
+    # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
+    # and the compensating order-1 diffraction odd step spreads over the same
+    # congruent window. OFF (the default) is bit-identical to the hard gate and
+    # the unchanged diffraction window for every existing caller (enforced by a
+    # bitwise regression test); the switch must never default ON. The width
+    # scales the Fresnel penumbra w_F of the grazed silhouette edge; the
+    # projection-validated optimum is 0.5 (artifacts/isb-taper/report.json).
+    isb_boundary_taper: bool = False
+    isb_boundary_taper_width: float = 0.5
 
     def __post_init__(self) -> None:
         if self.max_depth < 0:
             raise ValueError("max_depth must be non-negative")
+        if not (0.0 < self.isb_boundary_taper_width <= 4.0):
+            raise ValueError("isb_boundary_taper_width must be in (0, 4]")
         if self.scattering_samples_per_m2 <= 0.0:
             raise ValueError("scattering_samples_per_m2 must be positive")
         if self.scattering_max_paths_per_pair <= 0:

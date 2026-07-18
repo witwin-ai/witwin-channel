@@ -948,6 +948,11 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             vertex_opp0,
             vertex_opp1,
             edge_boundary,
+            # ISB boundary taper (ADR-017), D member. Always 0.0 here: taper + AD
+            # is refused by the deterministic/path pipelines (gate 3, C1 clearance
+            # companion pending), so the differentiable twin never tapers. The
+            # argument is threaded for lockstep completeness of the guarded path.
+            0.0,
         )
         return tuple(out[name] for name in _WEDGE_OUTPUT_FIELDS)
 
@@ -1034,6 +1039,8 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             need_frequency,
             need_geometry,
             need_vertices,
+            # ADR-017 D-member width; always 0.0 (taper + AD is guarded off).
+            0.0,
         )
         grad_frequency = (
             _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
@@ -1150,6 +1157,8 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
                 material_tangents["face1_gain"],
                 float(tangent_frequency),
                 *vertex_tangents,
+                # ADR-017 D-member width; always 0.0 (taper + AD is guarded off).
+                0.0,
             )
         return (out["tangent_field_vector"], out["tangent_direction"])
 

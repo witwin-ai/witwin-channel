@@ -1,6 +1,6 @@
 {
   "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
-  "manifest_sha256": "2ada7e1b6e8dfb200107b73a7a9a8079c7f1cb6dedcc8c254df799f0432285be",
+  "manifest_sha256": "a03fb1d09b6ddd847878c997082b50f52ab8b34d948701aa7a2c135ad7837baa",
   "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
   "owners": [
     {
@@ -967,21 +967,21 @@
           "token_count": 62
         },
         {
-          "body_sha256": "3a2a0ecebfa3d797929a111256dd810953831ae1b6fcd177d1651de078ddd057",
+          "body_sha256": "ca1ba4d3b175facda66f81e86cc91620249b2e5e1d53cd0c9d3504402ac4ba99",
           "name": "wedge_row_eval",
           "signature_sha256": "eebcfc55403a0d9c73a824f557b15ef52218955daf3bde3ce44aac86eaae4485",
-          "token_count": 741
+          "token_count": 749
         },
         {
-          "body_sha256": "618aee89cffce5cda02da3fc904897c29c678a939a9978f667eefdde34ae3f55",
+          "body_sha256": "555d0db0eaed8ba47f6187ef5cf87db6f538b106d74dad207d99c20dca5e9535",
           "name": "load_wedge_row",
-          "signature_sha256": "603ef7f9d84b22b86274ede6719645a7c6731a42dfc901caa085a1127aff5779",
-          "token_count": 322
+          "signature_sha256": "40bc68470cebaec399cd48dc7e41f5ddf58e92717a7cd947abf1d0a59eea0402",
+          "token_count": 328
         },
         {
           "body_sha256": "7deeb4ded7817c6a6e95d7130f909c2547d7d866095dba515bd55e6be47c1286",
           "name": "diffraction_wedge_forward_kernel",
-          "signature_sha256": "3b6b878f07a947203cfb5013164ae5a190b1d8f99bd96f1bc12ee8d5fe452cb3",
+          "signature_sha256": "c8c41f829c9291572a9e41373bc65ac762bf13f0e831314d9739681b07fae7d6",
           "token_count": 167
         },
         {
@@ -1047,19 +1047,19 @@
         {
           "body_sha256": "c5d257682b148e3abbaf71ed254d081ab24939365d6ae758a861e618f598d9eb",
           "name": "cn_field_diffraction_wedge",
-          "signature_sha256": "a308eddc9dbf7bc063542e3d0697e3b9faa529b0fb40034e1a827fca4a01fb15",
+          "signature_sha256": "6fe72cadfd77e9c427a244bc092c9ba781d390303de94935201787daf3f4e5b1",
           "token_count": 247
         },
         {
           "body_sha256": "e584db67ef5f8c8e8d02a29fbf8fc11d1f15749edc349cdbf14e854943549f66",
           "name": "cn_field_diffraction_wedge_backward",
-          "signature_sha256": "ff96ce4190c067f801639eb392e3e315064b15de57060369d5edf1d02ad2026f",
+          "signature_sha256": "d7e1c2fedfc70e00246ac50c9d63e0ebb7f652c6aa121f3f915be0ea601b9e91",
           "token_count": 1205
         },
         {
           "body_sha256": "744f1ca42788f6c3262ced6f84aadaaa3c5dce0bf04e42213b9172c05176a85e",
           "name": "cn_field_diffraction_wedge_jvp",
-          "signature_sha256": "5b6c962befd6fd303ed24653141da4e832d4f70f278bf6a7a1cd8e6f76509ed8",
+          "signature_sha256": "b14ea8c47a4cd210f01ca93820644be19dbd0d81afa9404499576368d919359f",
           "token_count": 808
         }
       ],

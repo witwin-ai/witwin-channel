@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from witwin.channel_native.propagation.geometry.silhouette_clearance import (
+    los_clearance_factor,
+    occluder_boxes,
+)
 from witwin.channel_native.propagation.geometry.visibility import (
     VisibilityQuery,
     run_visibility_query,
@@ -33,6 +37,8 @@ def _los_topology(
     *,
     frequency_hz: float,
     sequence_width: int,
+    isb_boundary_taper: bool = False,
+    isb_boundary_taper_width: float = 0.5,
 ) -> tuple[dict[str, torch.Tensor], int, int, int]:
     # R5: the per-transmitter polarization (threaded from the caller) drives the
     # LoS dipole sin^2 pattern in path_los_export.
@@ -51,21 +57,42 @@ def _los_topology(
     )
     visible = None
     if bool(scene.structures) and plan.candidate_count > 0:
-        visibility_inputs = topology_blocks.path_los_visibility_inputs(
-            tx_positions,
-            rx_positions,
-            plan.tx_id.to(dtype=torch.int32).contiguous(),
-            plan.rx_id.to(dtype=torch.int32).contiguous(),
+        # ISB boundary taper (ADR-017), LoS member. When on, the hard RayDN
+        # occlusion gate is replaced by the C1 membership predicate tau > 0: LoS
+        # rows within one taper margin of the shadow boundary survive and carry
+        # the clearance factor (re-derived and applied in the field stage). The
+        # off path (the default) is untouched and stays the exact RayDN gate.
+        taper_boxes = (
+            occluder_boxes(compiled) if isb_boundary_taper else None
         )
-        visible = run_visibility_query(
-            VisibilityQuery(
-                raydn=compiled.raydn,
-                start=visibility_inputs["start"],
-                end=visibility_inputs["end"],
-                active=visibility_inputs["active"],
+        if taper_boxes is not None:
+            box_min, box_max = taper_boxes
+            tau = los_clearance_factor(
+                tx_positions[plan.tx_id.to(dtype=torch.int64)].contiguous(),
+                rx_positions[plan.rx_id.to(dtype=torch.int64)].contiguous(),
+                box_min,
+                box_max,
+                frequency_hz=frequency_hz,
+                width=isb_boundary_taper_width,
             )
-        ).visible
-        launch_count += 1
+            visible = tau > 0.0
+            launch_count += 1
+        else:
+            visibility_inputs = topology_blocks.path_los_visibility_inputs(
+                tx_positions,
+                rx_positions,
+                plan.tx_id.to(dtype=torch.int32).contiguous(),
+                plan.rx_id.to(dtype=torch.int32).contiguous(),
+            )
+            visible = run_visibility_query(
+                VisibilityQuery(
+                    raydn=compiled.raydn,
+                    start=visibility_inputs["start"],
+                    end=visibility_inputs["end"],
+                    active=visibility_inputs["active"],
+                )
+            ).visible
+            launch_count += 1
     los_block = _ensure_topology_fields(
         topology_construction.deterministic_los_topology_block(
             plan.tx_id.to(dtype=torch.int32).contiguous(),

@@ -31,7 +31,9 @@ EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # raydn_coupled_dd_geometry_forward). The two AD companions
 # (field_coupled_dd_backward/jvp) land with the parallel AD change and bump
 # this to 183 together with their manifest, phase10, and coverage entries.
-EXPECTED_NATIVE_BINDING_COUNT = 183
+# + 2 ADR-017 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply)
+# bump this to 185.
+EXPECTED_NATIVE_BINDING_COUNT = 185
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",

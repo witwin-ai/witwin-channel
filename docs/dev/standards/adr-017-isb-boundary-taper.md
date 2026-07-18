@@ -1,7 +1,12 @@
 # ADR-017: Switchable joint ISB boundary taper (visual-continuity heuristic)
 
-- **Status:** Accepted for implementation (2026-07-18). Numerical change
-  behind a DEFAULT-OFF switch; the off path is bit-identical.
+- **Status:** LANDED AS EXPERIMENTAL (2026-07-18). The DEFAULT-OFF path is
+  bit-identical (verified three times against the frozen P2 path-table SHA)
+  and fully governed; the ON path did NOT meet the acceptance gates and is
+  scope-gated to experimental use only (never enable in benchmarks). See
+  "Native acceptance results" below for the measured misses and the two
+  named residual mechanisms; completing the ON path requires its own
+  follow-up ADR.
 - **Kind:** Declared heuristic (user-authorized deviation from the
   no-heuristics rule, scoped to ISB visual continuity). NOT new physics;
   the vertex/near-zone physics program (plan 10) is unaffected and remains
@@ -74,6 +79,43 @@ Deep-multipath fringing seams are intentionally untouched (plan-10 scope).
 5. RayD lock refreeze + drjit committed-PTX regeneration recorded as the
    release chore for the header change.
 6. Runtime: warm three-cube within +10% of 2.6 s.
+
+## Native acceptance results (2026-07-18) - ON path NOT accepted
+
+Implementation landed end to end (RayD PairInputsT.isbTaperWidthScale +
+mend notch + receiver-plane-magnified window derivation; torch-backend op
+threading; channel-native clearance kernel with the (d1+d2)/d1
+magnification; config/AD-guard/governance at 185 bindings). Verified:
+taper-OFF bit-identity (frozen path-table SHA exact, three independent
+sweeps); D member live and congruent at the seam median (D/LoS ON-OFF
+delta ratio 1.05 at 178.7 deg ~ -K); RSB and single-cube ISB gates pass.
+MISSED: three-cube ISB p95 excess 2.08 (gate 0.81; OFF baseline 1.08),
+NMSE 0.108/0.0433 vs 0.0922/0.0358.
+
+Two named residual mechanisms (decomposed, not tuned):
+
+1. **Clearance-metric fidelity.** The kernel's 3D segment-to-AABB distance
+   times (d1+d2)/d1 undershoots the true in-receiver-plane
+   distance-transform clearance by ~8x at boundary pixels with a much
+   shallower gradient, so the taper band covers 28-29% of valid cells vs
+   the accepted projection's 11-13%. Fix = compute the in-plane signed
+   distance to the projected shadow-boundary curve per occluder edge (a
+   kernel redesign, not a constant).
+2. **Coherent re-interference.** The solver tapers the true complex LoS
+   path field, which re-interferes with diffraction/coupled inside the
+   widened band and manufactures native-only deep nulls (measured -68 dB
+   vs projection -52 dB vs truth -13 dB at cube-edge cells), driving the
+   ISB p95 and NMSE misses. The offline projection avoided this by
+   spreading the LOCKED residual analytically - an operation that is NOT
+   expressible as independent per-row complex factors in a coherent
+   solver. Any completion must resolve this design gap explicitly (e.g. a
+   power-domain component blend at accumulation, with its own evidence).
+
+Consequently the switch stays default-OFF and experimental; benchmarks and
+production presets must not enable it. The projection remains the accepted
+evidence of what the joint taper CAN deliver; the native completion is a
+recorded follow-up requiring a new ADR with the two mechanisms above as
+its acceptance targets.
 
 ## Risks
 

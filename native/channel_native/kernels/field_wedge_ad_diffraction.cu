@@ -50,6 +50,13 @@ struct WedgeRowInputs {
     bool valid1;
     float tx_power;
     float frequency;
+    // ISB boundary taper (ADR-017), D member. Plain (non-differentiated) config
+    // scalar carried into pair.isbTaperWidthScale so the shared UTD header
+    // notches the incident-boundary odd part. 0 reproduces the hard GO step.
+    // Taper + AD is refused upstream (deterministic/path pipelines), so this is
+    // always 0 on the live AD path; it is threaded for lockstep completeness of
+    // the guarded path only.
+    float isb_taper_width_scale;
     // Optional winner vertices (plan 07 section 9.3 mesh-vertex x
     // diffraction). When present, the row rebuilds the edge tables from them
     // so vertex seeds reach the edge geometry; the frozen tables above stay
@@ -218,6 +225,12 @@ __device__ WedgeRowOutputs<T> wedge_row_eval(
     pair.edgeLineMax = edge_t_max;
     pair.sourcePos = source;
     pair.selectStationaryPoint = 1.f;
+    // ISB boundary taper (ADR-017), D member. isbTaperWidthScale is a plain
+    // float in PairInputsT (a config scalar like selectStationaryPoint), so it
+    // is assigned directly and carries no tangent; the header derives w_F / s2
+    // internally, so the kernel must not precompute them. 0 = hard GO step
+    // (bit-identical to the pre-ADR-017 twin).
+    pair.isbTaperWidthScale = in.isb_taper_width_scale;
     pair.face0Material = wedge_face_material(
         in.valid0, seeded<T>(in.eps0, seeds.eps0),
         seeded<T>(in.sigma0, seeds.sigma0), in.mu0,
@@ -289,7 +302,8 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
     const float* vertex_v1,
     const float* vertex_opp0,
     const float* vertex_opp1,
-    const bool* edge_boundary) {
+    const bool* edge_boundary,
+    float isb_taper_width) {
     WedgeRowInputs in;
     in.source = load3f(source, index);
     in.target = load3f(target, index);
@@ -312,6 +326,7 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
     in.gain1 = face1_gain[index];
     in.tx_power = tx_power[index];
     in.frequency = frequency_hz;
+    in.isb_taper_width_scale = isb_taper_width;
     in.has_vertices = vertex_v0 != nullptr;
     if (in.has_vertices) {
         in.edge_boundary = edge_boundary[index];
@@ -341,7 +356,7 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
         const float* face1_gain, const float* tx_power, float frequency_hz,   \
         const float* vertex_v0, const float* vertex_v1,                       \
         const float* vertex_opp0, const float* vertex_opp1,                   \
-        const bool* edge_boundary
+        const bool* edge_boundary, float isb_taper_width
 
 #define WEDGE_ROW_ARGS(index)                                                 \
     index, source, target, edge_position, edge_direction, edge_t_min,         \
@@ -349,7 +364,7 @@ __device__ __forceinline__ WedgeRowInputs load_wedge_row(
         face0_eps_r, face0_sigma_e, face0_mu_r, face0_gain, face1_valid,      \
         face1_eps_r, face1_sigma_e, face1_mu_r, face1_gain, tx_power,         \
         frequency_hz, vertex_v0, vertex_v1, vertex_opp0, vertex_opp1,         \
-        edge_boundary
+        edge_boundary, isb_taper_width
 
 __global__ void diffraction_wedge_forward_kernel(
     int64_t count,
@@ -679,7 +694,8 @@ void resolve_wedge_vertices(
         face1_gain.data_ptr<float>(), tx_power.data_ptr<float>(),             \
         static_cast<float>(frequency_hz), opt_ptr<float>(vertex_args.v0),     \
         opt_ptr<float>(vertex_args.v1), opt_ptr<float>(vertex_args.opp0),     \
-        opt_ptr<float>(vertex_args.opp1), opt_ptr<bool>(vertex_args.boundary)
+        opt_ptr<float>(vertex_args.opp1), opt_ptr<bool>(vertex_args.boundary), \
+        static_cast<float>(isb_boundary_taper_width)
 
 pybind11::dict cn_field_diffraction_wedge(
     at::Tensor source,
@@ -707,7 +723,8 @@ pybind11::dict cn_field_diffraction_wedge(
     pybind11::object vertex_v1,
     pybind11::object vertex_opp0,
     pybind11::object vertex_opp1,
-    pybind11::object edge_boundary) {
+    pybind11::object edge_boundary,
+    double isb_boundary_taper_width) {
     check_wedge_primal(
         source, target, edge_position, edge_direction, edge_t_min, edge_t_max,
         edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r,
@@ -768,7 +785,8 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     bool need_grad_material,
     bool need_grad_frequency,
     bool need_grad_geometry,
-    bool need_grad_vertices) {
+    bool need_grad_vertices,
+    double isb_boundary_taper_width) {
     check_wedge_primal(
         source, target, edge_position, edge_direction, edge_t_min, edge_t_max,
         edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r,
@@ -948,7 +966,8 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     pybind11::object tangent_vertex_v0,
     pybind11::object tangent_vertex_v1,
     pybind11::object tangent_vertex_opp0,
-    pybind11::object tangent_vertex_opp1) {
+    pybind11::object tangent_vertex_opp1,
+    double isb_boundary_taper_width) {
     check_wedge_primal(
         source, target, edge_position, edge_direction, edge_t_min, edge_t_max,
         edge_n0, edge_n1, exterior_angle, face0_valid, face0_eps_r,

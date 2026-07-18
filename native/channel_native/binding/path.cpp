@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <vector>
 
 torch::Tensor cn_core_pack_int2(torch::Tensor x, torch::Tensor y);
@@ -119,6 +120,22 @@ pybind11::dict cn_deterministic_los_field(
     torch::Tensor path_gain,
     torch::Tensor path_length_m,
     double frequency_hz);
+// ISB boundary taper (ADR-017) LoS member; both ops are launched only when the
+// DEFAULT-OFF isb_boundary_taper switch is on.
+torch::Tensor cn_los_silhouette_clearance(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor box_min,
+    torch::Tensor box_max,
+    double wavelength,
+    double width);
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+cn_los_taper_apply(
+    torch::Tensor field_vector,
+    torch::Tensor coefficient,
+    torch::Tensor path_field,
+    torch::Tensor path_gain,
+    torch::Tensor tau);
 pybind11::dict cn_deterministic_diffraction_vector_field(
     torch::Tensor x_re,
     torch::Tensor x_im,
@@ -423,6 +440,16 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_los_field",
         &cn_deterministic_los_field,
         "Evaluate deterministic LoS/free-space scalar complex fields with a CUDA kernel.");
+    module.def(
+        "los_silhouette_clearance",
+        &cn_los_silhouette_clearance,
+        "ISB boundary taper (ADR-017): per-(source,target) C1 clearance membership "
+        "factor tau against the nearest occluding box silhouette with a CUDA kernel.");
+    module.def(
+        "los_taper_apply",
+        &cn_los_taper_apply,
+        "ISB boundary taper (ADR-017): scale a LoS field bundle by the per-row "
+        "clearance factor tau with a CUDA kernel.");
     module.def(
         "deterministic_diffraction_vector_field",
         &cn_deterministic_diffraction_vector_field,

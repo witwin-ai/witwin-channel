@@ -13,6 +13,20 @@ def test_path_config_defaults_are_explicit():
     assert config.max_paths_scope == "per_pair"
     assert config.coupled_candidate_limit == 1_000_000
     assert config.ad_mode == "none"
+    # ISB boundary taper (ADR-017) is DEFAULT-OFF with the projection-validated
+    # width default; the switch never defaults on.
+    assert config.isb_boundary_taper is False
+    assert config.isb_boundary_taper_width == 0.5
+
+
+def test_path_config_isb_boundary_taper_width_bounds():
+    for width in (0.25, 0.5, 1.0, 4.0):
+        assert Config(
+            isb_boundary_taper=True, isb_boundary_taper_width=width
+        ).isb_boundary_taper_width == width
+    for width in (0.0, -1.0, 4.5):
+        with pytest.raises(ValueError, match=r"isb_boundary_taper_width must be in"):
+            Config(isb_boundary_taper_width=width)
 
 
 def test_path_config_validates_inputs():

@@ -280,6 +280,7 @@ using DiffractionPathsOrder1ForwardFn = int64_t (*)(
     int64_t,
     int64_t,
     double,
+    double,
     at::Tensor *,
     int64_t);
 

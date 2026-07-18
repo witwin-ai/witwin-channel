@@ -73,9 +73,10 @@ def test_phase10_binding_inventory_covers_all_current_symbols_and_python_owners(
 
     # 174 phase-10 symbols + 5 ADR-010 scattering/rough-reflection kernels
     # + 2 ADR-013 coupled double-diffraction forward symbols + the two ADR-013
-    # AD companions (field_coupled_dd_backward/_jvp) = 183.
-    assert ownership["expected_count"] == 183
-    assert len(audited_names) == len(set(audited_names)) == 183
+    # AD companions (field_coupled_dd_backward/_jvp) + 2 ADR-017 ISB-taper LoS
+    # symbols (los_silhouette_clearance, los_taper_apply) = 185.
+    assert ownership["expected_count"] == 185
+    assert len(audited_names) == len(set(audited_names)) == 185
     assert audited_names == current_names
 
     sources = {

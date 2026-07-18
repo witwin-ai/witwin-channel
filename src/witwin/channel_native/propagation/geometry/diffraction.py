@@ -144,6 +144,10 @@ class DiffractionOrder1Query:
     state_count: int
     capacity: int
     wavelength: float
+    # ISB boundary taper (ADR-017), D member. 0.0 (default) reproduces the hard
+    # RayD GO step; > 0 notches the incident-boundary odd part over the congruent
+    # window inside the shared UTD header (pair.isbTaperWidthScale).
+    isb_taper_width_scale: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +196,7 @@ def query_diffraction_order1(
         query.state_count,
         query.capacity,
         query.wavelength,
+        query.isb_taper_width_scale,
     )
     return DiffractionOrder1Geometry(
         valid=raw[1],

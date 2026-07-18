@@ -43,6 +43,11 @@ from witwin.channel_native.propagation.geometry.kernels import (
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
+from witwin.channel_native.propagation.geometry.silhouette_clearance import (
+    apply_los_taper,
+    los_clearance_factor,
+    occluder_boxes,
+)
 from witwin.channel_native.propagation.geometry.reevaluate import (
     _geometry_participates_in_ad,
     _opposite_vertex_ids,
@@ -152,6 +157,9 @@ def _evaluate_los_fields(
     delay: torch.Tensor,
     direction: torch.Tensor,
     launch_count: int,
+    compiled: object,
+    frequency_hz: float,
+    isb_boundary_taper_width: float,
 ) -> int:
     los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
     if int(los_rows.shape[0]) > 0:
@@ -165,6 +173,32 @@ def _evaluate_los_fields(
         if ledger is not None:
             ledger.add(*los_args)
         evaluated = los_field_op(*los_args)
+        # ISB boundary taper (ADR-017), LoS member. When on (width > 0), scale the
+        # LoS field bundle by the C1 clearance factor tau re-derived on these rows
+        # from the same native kernel that set the survival gate in discovery, so
+        # the tapered rows carry a smoothly-decaying amplitude across the shadow
+        # boundary. Off (width == 0, the default) leaves the bundle untouched.
+        if isb_boundary_taper_width > 0.0:
+            taper_boxes = occluder_boxes(compiled)
+            if taper_boxes is not None:
+                box_min, box_max = taper_boxes
+                tau = los_clearance_factor(
+                    los_args[0],
+                    los_args[1],
+                    box_min,
+                    box_max,
+                    frequency_hz=frequency_hz,
+                    width=isb_boundary_taper_width,
+                )
+                scaled = apply_los_taper(
+                    evaluated["field_vector"],
+                    evaluated["coefficient"],
+                    evaluated["path_field"],
+                    evaluated["path_gain"],
+                    tau,
+                )
+                evaluated = {**evaluated, **scaled}
+                launch_count += 2
         field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
         coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
         path_field.index_copy_(0, los_rows, evaluated["path_field"])
@@ -775,6 +809,7 @@ def evaluate_path_fields(
     components: frozenset[str] | set[str] = frozenset(),
     ad_mode: str = "none",
     frequency_value: float | None = None,
+    isb_boundary_taper_width: float = 0.0,
 ) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
 
@@ -889,6 +924,12 @@ def evaluate_path_fields(
         delay,
         direction,
         launch_count,
+        compiled,
+        # The LoS taper only ever runs on the ad_mode="none" primal (taper + AD is
+        # rejected upstream until the C1 clearance companion lands, ADR-017 gate
+        # 3), so the frequency here is always the host float scalar.
+        (float(frequency_value) if frequency_value is not None else frequency),
+        isb_boundary_taper_width,
     )
 
     material: dict[str, torch.Tensor] | None = None

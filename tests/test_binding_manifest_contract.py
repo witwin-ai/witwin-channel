@@ -14,9 +14,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # re-frozen HERE, with the delta explained in the introducing change
 # (ADR-010 added the 5 scattering/rough-reflection kernels: 174 -> 179;
 # ADR-013 added the 2 coupled double-diffraction forward symbols and the two
-# AD companions (field_coupled_dd_backward/_jvp): 179 -> 183).
+# AD companions (field_coupled_dd_backward/_jvp): 179 -> 183; ADR-017 added the
+# 2 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply): 183 -> 185).
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 183
+EXPECTED_BINDING_COUNT = 185
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )

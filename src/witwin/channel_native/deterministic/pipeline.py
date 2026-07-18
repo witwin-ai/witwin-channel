@@ -45,6 +45,15 @@ if TYPE_CHECKING:
 
 
 def _validate_requested_components(config: Config) -> None:
+    if config.isb_boundary_taper and config.ad_mode != "none":
+        # ISB boundary taper (ADR-017) gate 3: the C1 clearance-factor AD
+        # companion (d(tau)/d(endpoint)) is a documented follow-up. Until it
+        # lands, taper + AD is rejected loudly rather than returning a silently
+        # incomplete gradient. OFF-path AD stays bit-identical.
+        raise RuntimeError(
+            "isb_boundary_taper does not support ad_mode != 'none' yet "
+            "(ADR-017 gate 3 C1 clearance companion is a follow-up)"
+        )
     if config.ad_mode != "none" and "scattering" in config.components:
         # Kirchhoff patch paths bypass the shared field seam; their fields are
         # not differentiable yet (plan 07 AD-4). Fail before any launch.

@@ -126,7 +126,7 @@
           "name": "Config",
           "kind": "class",
           "target": "witwin.channel_native.path.config.Config",
-          "contract_sha256": "9a264f063ac91ca8bde85b2a9676acbc6716b9f7fcc434e094d5e28851ccfaa3"
+          "contract_sha256": "21a7271b4460b954964401887f760614492203fed1739a5e4fb2a1b99430ea74"
         },
         {
           "name": "InteractionType",
@@ -183,7 +183,7 @@
           "name": "Config",
           "kind": "class",
           "target": "witwin.channel_native.deterministic.config.Config",
-          "contract_sha256": "1200a78d70dc5a8f54799d9735bf82f611f8a878710be5d9f791b3f3b3570ac5"
+          "contract_sha256": "02827cd56db741e22c43f4c83c2db91a564d71374648f138c56cb596a429a0f3"
         },
         {
           "name": "PathTable",

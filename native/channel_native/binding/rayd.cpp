@@ -264,7 +264,8 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     torch::Tensor material_valid,
     int64_t state_limit,
     int64_t capacity,
-    double wavelength);
+    double wavelength,
+    double isb_taper_width_scale);
 pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
     int64_t scene_handle,
     pybind11::object active,

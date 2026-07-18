@@ -99,6 +99,14 @@ def evaluate_enumerated_paths(
     if ad_mode != "none":
         _require_frequency_ad_constant_materials(scene, compiled, ad_mode=ad_mode)
     components = _path_components(config)
+    # ISB boundary taper (ADR-017): DEFAULT-OFF. When off, width 0.0 flows to the
+    # field/diffraction stages and every existing call path is untouched.
+    isb_boundary_taper = bool(getattr(config, "isb_boundary_taper", False))
+    isb_boundary_taper_width = (
+        float(getattr(config, "isb_boundary_taper_width", 0.5))
+        if isb_boundary_taper
+        else 0.0
+    )
     coupled_paths = bool(getattr(config, "coupled_paths", False))
     sequence_width = max(int(config.max_depth), 2 if coupled_paths else 0)
     blocks: list[dict[str, torch.Tensor]] = []
@@ -119,6 +127,12 @@ def evaluate_enumerated_paths(
                 tx_polarizations,
                 frequency_hz=frequency_hz,
                 sequence_width=sequence_width,
+                isb_boundary_taper=isb_boundary_taper,
+                isb_boundary_taper_width=(
+                    float(getattr(config, "isb_boundary_taper_width", 0.5))
+                    if isb_boundary_taper
+                    else 0.5
+                ),
             )
         )
         launch_count += los_launches
@@ -163,6 +177,7 @@ def evaluate_enumerated_paths(
                 tx_power,
                 rx_positions,
                 frequency_hz=frequency_hz,
+                isb_boundary_taper_width=isb_boundary_taper_width,
             )
         )
         launch_count += diffraction_launches
@@ -224,6 +239,7 @@ def evaluate_enumerated_paths(
             components=components,
             ad_mode=ad_mode,
             frequency_value=frequency_hz,
+            isb_boundary_taper_width=isb_boundary_taper_width,
         )
         return evaluated, replace(sidecars, execution=execution)
     padded_blocks = [
@@ -264,5 +280,6 @@ def evaluate_enumerated_paths(
         components=components,
         ad_mode=ad_mode,
         frequency_value=frequency_hz,
+        isb_boundary_taper_width=isb_boundary_taper_width,
     )
     return evaluated, replace(sidecars, execution=execution)

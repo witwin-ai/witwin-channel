@@ -162,7 +162,8 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     torch::Tensor material_valid,
     int64_t state_limit,
     int64_t capacity,
-    double wavelength) {
+    double wavelength,
+    double isb_taper_width_scale) {
     at::Tensor active_storage;
     const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     // tx_pol is the scene transmitter polarization threaded from the caller
@@ -198,6 +199,7 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
         state_limit,
         capacity,
         wavelength,
+        isb_taper_width_scale,
         outputs.data(),
         kOutputCount);
     if (output_count < 0 || output_count > kOutputCount)
@@ -343,6 +345,9 @@ pybind11::dict cn_path_diffraction_paths_order1(
             state_limit,
             capacity,
             wavelength,
+            // ADR-017 ISB taper is not wired through this legacy per-tx path
+            // table (no live solver caller); pass 0 to keep the hard GO step.
+            0.0,
             outputs.data(),
             kOutputCount);
         TORCH_CHECK(output_count == kOutputCount, "RayDN order-1 diffraction path export returned an unexpected output count");

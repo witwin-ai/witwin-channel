@@ -55,6 +55,14 @@ def _receiver_positions(scene: Scene, *, reference: torch.Tensor) -> torch.Tenso
 def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel_native.path solver requires CUDA")
+    if config.isb_boundary_taper and config.ad_mode != "none":
+        # ISB boundary taper (ADR-017) gate 3: the C1 clearance-factor AD
+        # companion is a documented follow-up; reject taper + AD loudly rather
+        # than returning a silently incomplete gradient.
+        raise RuntimeError(
+            "isb_boundary_taper does not support ad_mode != 'none' yet "
+            "(ADR-017 gate 3 C1 clearance companion is a follow-up)"
+        )
     if config.ad_mode != "none" and "scattering" in config.components:
         # Kirchhoff patch paths bypass the shared field seam; their fields are
         # not differentiable yet (plan 07 AD-4). Fail before any launch.
