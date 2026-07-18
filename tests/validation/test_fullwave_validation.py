@@ -44,7 +44,7 @@ def _map(field, *, components=None, backend="test") -> FieldMap:
     )
 
 
-def test_manifest_declares_original_layout_provenance_and_four_cases():
+def test_manifest_declares_original_layout_provenance_and_six_cases():
     manifest = load_manifest()
     single_metal = load_case("single_cube", "metal")
 
@@ -61,7 +61,7 @@ def test_manifest_declares_original_layout_provenance_and_four_cases():
     )
     cases = {
         load_case(scenario, material).case_id
-        for scenario in ("single_cube", "three_cube")
+        for scenario in ("single_cube", "three_cube", "three_cube_320")
         for material in ("metal", "dielectric")
     }
     assert cases == {
@@ -69,13 +69,67 @@ def test_manifest_declares_original_layout_provenance_and_four_cases():
         "single_cube-dielectric",
         "three_cube-metal",
         "three_cube-dielectric",
+        "three_cube_320-metal",
+        "three_cube_320-dielectric",
     }
     assert single_metal.tx_position == (-0.2, -0.5, 0.42)
     assert single_metal.receiver_shape == (256, 256)
     assert single_metal.fullwave_dl_m == pytest.approx(0.00625)
 
 
-@pytest.mark.parametrize("scenario,cube_count", [("single_cube", 1), ("three_cube", 3)])
+def test_three_cube_320_shares_physical_scene_with_three_cube():
+    base = load_case("three_cube", "metal")
+    aligned = load_case("three_cube_320", "metal")
+
+    assert aligned.cube_centers == base.cube_centers
+    assert aligned.tx_position == base.tx_position
+    assert aligned.plane_z == base.plane_z
+    assert aligned.cube_size_m == base.cube_size_m
+    assert aligned.max_depth == base.max_depth
+    assert aligned.analysis_bounds_xy == base.analysis_bounds_xy
+    assert aligned.receiver_shape == (320, 320)
+    assert aligned.fullwave_dl_m == base.fullwave_dl_m
+    assert aligned.fingerprint != base.fingerprint
+
+
+@pytest.mark.parametrize("scenario", ["single_cube", "three_cube_320"])
+def test_receiver_cells_are_yee_phase_locked(scenario):
+    """Receiver cell centers must coincide with Maxwell Ez Yee nodes.
+
+    Ez nodes sit at integer x/y offsets and half-integer z offsets from the
+    domain origin on a uniform Yee grid; jump metrics must never come from a
+    half-cell-interpolated field.
+    """
+    spec = load_case(scenario, "metal")
+    dl = spec.fullwave_dl_m
+
+    for axis_values, (domain_lo, domain_hi) in zip(
+        (spec.x, spec.y), spec.domain_bounds_xyz[:2], strict=True
+    ):
+        offsets = (axis_values - domain_lo) / dl
+        assert np.max(np.abs(offsets - np.round(offsets))) < 1.0e-9
+        span_cells = (domain_hi - domain_lo) / dl
+        assert abs(span_cells - round(span_cells)) < 1.0e-9
+        assert axis_values[1] - axis_values[0] == pytest.approx(dl)
+
+    z_lo, z_hi = spec.domain_bounds_xyz[2]
+    plane_offset = (spec.plane_z - z_lo) / dl
+    assert abs(plane_offset - np.floor(plane_offset) - 0.5) < 1.0e-9
+    z_span_cells = (z_hi - z_lo) / dl
+    assert abs(z_span_cells - round(z_span_cells)) < 1.0e-9
+
+
+def test_legacy_three_cube_256_is_not_yee_phase_locked():
+    """The legacy 256-case pitch (7.8125 mm) is documented as NOT grid-
+    coincident; full-wave jump statistics must use three_cube_320 instead."""
+    spec = load_case("three_cube", "metal")
+    assert spec.x[1] - spec.x[0] != pytest.approx(spec.fullwave_dl_m)
+
+
+@pytest.mark.parametrize(
+    "scenario,cube_count",
+    [("single_cube", 1), ("three_cube", 3), ("three_cube_320", 3)],
+)
 @pytest.mark.parametrize("material", ["metal", "dielectric"])
 def test_channel_scene_matches_case_geometry_and_material(
     scenario, cube_count, material
@@ -106,7 +160,7 @@ def test_tidy3d_scene_uses_true_pec_and_dielectric_volumes():
 
 
 def test_fullwave_analysis_source_and_geometry_are_outside_pml():
-    for scenario in ("single_cube", "three_cube"):
+    for scenario in ("single_cube", "three_cube", "three_cube_320"):
         spec = load_case(scenario, "metal")
         pml = spec.fullwave_pml_layers * spec.fullwave_dl_m
         interior = tuple((lo + pml, hi - pml) for lo, hi in spec.domain_bounds_xyz)

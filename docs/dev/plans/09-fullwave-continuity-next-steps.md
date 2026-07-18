@@ -87,16 +87,18 @@ order-3 responsibilities — the standard UTD hierarchy: each order heals the
 previous order's seams and introduces weaker ones of its own.
 IMPORTANT NUANCE: the net-dB budget is a *continuity* metric, not
 accuracy-vs-truth. OFF is "smoothly wrong" (whole reflected-shadow regions
-missing real energy); ON is "raggedly closer". Only the full-wave arbiter
-(P1) can decide the benchmark default. Do not flip `coupled_paths` in
-`benchmarks/fullwave_validation/backends.py` before P1 concludes.
+missing real energy); ON is "raggedly closer". RESOLVED by P1 (2026-07-17):
+the FDTD arbiter confirmed the OFF shadow sectors are unphysical (truth is
+smooth and 35-53 dB above OFF there) and the benchmark default stays coupled
+ON — see the P1 section below and ADR-011's arbiter addendum.
 
 ## 4. Known residuals (complete list)
 
 1. **Flagship residual 11.6 dB** sits at receivers ~λ/5 (1.2 cm) from the
-   compensating PEC edge — kL≈1.3, UTD outside its asymptotic regime; and
-   three_cube has **no full-wave reference** (receiver pitch 7.8125 mm not
-   Yee-coincident). → P1.
+   compensating PEC edge — kL≈1.3, UTD outside its asymptotic regime.
+   RESOLVED measurement-wise by P1: the Yee-coincident `three_cube_320` FDTD
+   reference exists and shows the residual is real deterministic error (ON is
+   3-20 dB below truth in the healed sector), not a truth-side step. → P2/P4.
 2. **R→R→D missing everywhere** (order-2 RSB 48.6% >3 dB, audit M2) and
    **D→D missing** (pure-D blockage boundaries + coupled sector edges). → P2/P3.
 3. **Two-variable corner transition** (generalized Fresnel / complex-pole
@@ -114,7 +116,34 @@ missing real energy); ON is "raggedly closer". Only the full-wave arbiter
 
 ## 5. Execution plan
 
-### P1 — Three-cube full-wave arbiter (FIRST; cheap; decides everything else)
+### P1 — Three-cube full-wave arbiter — **DONE 2026-07-17**
+
+Executed as planned; all acceptance items delivered. Results:
+
+- `three_cube_320` versioned case added (Yee-locked domain
+  x/y `[-1.396875, 1.403125]`, z `[-0.496875, 0.903125]`, 320^2 receivers);
+  FDTD reference + empty calibration recorded (22,991 steps, ~355 s / ~311 s;
+  s_empty 62.5931, cross-checks single-cube 62.2108); OFF/ON solves + path
+  tables + comparison under `artifacts/fullwave/three-cube-metal-320/`.
+- **DECISION: benchmark default stays coupled ON** — decision paragraph +
+  evidence in ADR-011 ("P1 full-wave arbiter decision"); metrics table +
+  frozen thresholds in the runbook. Key numbers: NMSE 0.0899 (OFF) vs 0.0934
+  (ON); coherence 0.8475 vs 0.8455; ISB p95 excess +0.39 vs +2.04 dB; RSB
+  +3.55 vs +3.53 dB; flagship row max jump 39.3 dB (OFF) vs 9.2 dB (ON) vs
+  13.5 dB (FDTD, physical null elsewhere on the row).
+- **FDTD shows NO step at the flagship boundary** and real energy throughout
+  the reflected-shadow sector (truth -15..-21 dB where OFF sits at -52): the
+  compensator is confirmed physics; the lambda/5 near-field did NOT make the
+  truth look like the deterministic step.
+- **P2's primary target is now measured**: past the face-edge-exit existence
+  boundary the coupled term becomes an anti-phase equal-magnitude duplicate
+  of order-1 D (worst cell `(0.0531, 0.4531)`: gap -0.5 dB OFF -> -59.9 dB
+  ON; same mechanism at `(-0.059, 0.491)`, `(-0.028, 0.672)`,
+  `(0.284, 0.241)`). ISB edges touching coupled-active cells: p95 excess
+  +1.11 (OFF) -> +3.92 dB (ON). Region-A (coupled moves total > 1 dB, 10.8%
+  of cells) NMSE 0.331 (OFF) vs 0.350 (ON) — P2 must flip this.
+
+Original P1 spec (kept for reference):
 
 Goal: a versioned, Yee-grid-coincident three-cube FDTD reference and the
 ON-vs-truth / OFF-vs-truth comparison.

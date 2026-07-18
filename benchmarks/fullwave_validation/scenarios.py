@@ -19,7 +19,7 @@ from .models import CaseSpec, MaterialSpec
 
 
 MANIFEST_PATH = Path(__file__).parents[1] / "scenarios" / "fullwave_validation.v1.json"
-SCENARIOS = ("single_cube", "three_cube")
+SCENARIOS = ("single_cube", "three_cube", "three_cube_320")
 MATERIALS = ("metal", "dielectric")
 
 

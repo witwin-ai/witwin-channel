@@ -48,8 +48,10 @@ class CaseSpec:
     source_layout: str
 
     def __post_init__(self) -> None:
-        if self.scenario not in {"single_cube", "three_cube"}:
-            raise ValueError("scenario must be 'single_cube' or 'three_cube'")
+        if self.scenario not in {"single_cube", "three_cube", "three_cube_320"}:
+            raise ValueError(
+                "scenario must be 'single_cube', 'three_cube', or 'three_cube_320'"
+            )
         expected_cubes = 1 if self.scenario == "single_cube" else 3
         if len(self.cube_centers) != expected_cubes:
             raise ValueError(f"{self.scenario} requires {expected_cubes} cube centers")

@@ -306,6 +306,40 @@ evidence. Collect:
    deterministic launch count in metadata and freeze the coupled-on ledger as a
    new baseline artifact (do not compare it against the coupled-off ledger).
 
+## P1 full-wave arbiter decision (2026-07-17)
+
+The plan-09 P1 arbiter compared coupled-OFF and coupled-ON against a
+Yee-grid-coincident witwin-maxwell FDTD reference on the versioned
+`three_cube_320` / `metal` case (recorded metrics and setup:
+`docs/dev/fullwave-validation.md`, "Three-cube full-wave reference";
+artifacts under `artifacts/fullwave/three-cube-metal-320/`).
+
+**Decision: the benchmark default stays coupled ON**
+(`benchmarks/fullwave_validation/backends.py`, `coupled_paths = max_depth >= 2`).
+
+Evidence summary:
+
+- FDTD shows **no step** at the flagship occlusion RSB (y about 0.457): the
+  truth profile is smooth (-15 to -21 dB) where coupled-OFF carries a 39.3 dB
+  adjacent-cell step and an entire reflected-shadow sector 35-53 dB below
+  truth. Coupled-ON fills that sector to within 3-20 dB and caps the row jump
+  at 9.2 dB. The compensator is real physics confirmed by the arbiter, not a
+  smoothing device.
+- Aggregate metrics are a statistical wash (NMSE 0.0899 OFF vs 0.0934 ON,
+  coherence 0.8475 vs 0.8455): the coupled component's own
+  enumeration-existence seams give back what the healed sector gains.
+- The dominant ON liability is now precisely characterized: past the
+  face-edge-exit existence boundary the coupled term degenerates into an
+  **anti-phase, equal-magnitude duplicate of order-1 diffraction** (measured
+  example at `(x=0.0531, y=0.4531)`: diffraction 3.174e-3 at +57.0 deg vs coupled
+  3.174e-3 at -130.5 deg, total collapsing to 3.4e-6 — a -59.9 dB gap versus
+  truth where OFF was within 0.5 dB), and ISB edges touching coupled-active
+  cells carry +3.92 dB p95 excess versus +1.11 dB with OFF. Healing these
+  sector edges is the P2 (D-to-D) acceptance gate; ON keeps the benchmark
+  sensitive to that healing.
+- Coupled-OFF remains bitwise identical to the pre-ADR-011 baseline, so
+  single-cube continuity gates are unaffected by this default.
+
 ## Consequences
 
 - The deterministic grid solver gains the reflection-diffraction coupling
