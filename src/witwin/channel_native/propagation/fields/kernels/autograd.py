@@ -1354,6 +1354,8 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
         frequency,
         reverse,
         frequency_value,
+        edge_line_min,
+        edge_line_max,
     ):
         out = _required_native_op("field_coupled_rd")(
             source,
@@ -1383,6 +1385,8 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             w1_mu_r,
             w1_gain,
             w1_thickness,
+            edge_line_min,
+            edge_line_max,
             frequency_value,
             bool(reverse),
         )
@@ -1396,6 +1400,14 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in inputs[:27]
         )
+        # edge_line_min / edge_line_max (inputs[30], inputs[31]) are frozen edge
+        # bounds (G4): non-differentiable, but saved so the backward/jvp
+        # companions can forward them to the native coupled kernels in the same
+        # position as the primal.
+        bounds = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in (inputs[30], inputs[31])
+        )
         ctx.frequency_value = inputs[29]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
@@ -1403,8 +1415,8 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             else None
         )
         ctx.reverse = bool(inputs[28])
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
+        ctx.save_for_backward(*primals, *bounds)
+        ctx.save_for_forward(*primals, *bounds)
         ctx.mark_non_differentiable(output[4])
 
     @staticmethod
@@ -1417,7 +1429,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
         grad_path_gain,
         _grad_direction,
     ):
-        none_grads = (None,) * 30
+        none_grads = (None,) * 32
         _ad_reject_fixed_inputs(
             "field_coupled_rd_ad",
             ctx.needs_input_grad,
@@ -1433,6 +1445,8 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
                 (14, "reflection_mu_r"),
                 (19, "wedge_mu_r0"),
                 (24, "wedge_mu_r1"),
+                (30, "edge_line_min"),
+                (31, "edge_line_max"),
             ),
         )
         need_geometry = any(
@@ -1513,6 +1527,8 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             grad_frequency,
             None,
             None,
+            None,
+            None,
         )
 
     @staticmethod
@@ -1531,6 +1547,8 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
                 (tangents[14], "reflection_mu_r"),
                 (tangents[19], "wedge_mu_r0"),
                 (tangents[24], "wedge_mu_r1"),
+                (tangents[30], "edge_line_min"),
+                (tangents[31], "edge_line_max"),
             ),
         )
         saved = ctx.saved_tensors
@@ -1625,6 +1643,8 @@ def field_coupled_rd_ad(
     reflection_material: tuple[torch.Tensor, ...],
     wedge_material0: tuple[torch.Tensor, ...],
     wedge_material1: tuple[torch.Tensor, ...],
+    edge_line_min: torch.Tensor,
+    edge_line_max: torch.Tensor,
     *,
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
@@ -1665,6 +1685,8 @@ def field_coupled_rd_ad(
         frequency,
         bool(reverse),
         float(frequency_value),
+        edge_line_min,
+        edge_line_max,
     )
     return dict(zip(_COUPLED_OUTPUT_FIELDS, values, strict=True))
 

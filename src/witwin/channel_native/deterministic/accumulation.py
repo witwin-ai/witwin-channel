@@ -17,10 +17,10 @@ from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 
 
 # Component slots materialized by the native accumulator
-# (kAccumSlotCount=5 in kernels/deterministic_accum.cu); the path component
-# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4 (3=reflection->
-# diffraction and 4=diffraction->reflection are path-solver coupled classes
-# consumed per path by the path API, never materialized here). Under
+# (kAccumSlotCount=6 in kernels/deterministic_accum.cu); the path component
+# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and 3/4 -> 5 (ADR-011:
+# reflection->diffraction and diffraction->reflection are the coupled classes,
+# both summed coherently into the single coupled field slot). Under
 # ad_mode != "none" the same native forward runs inside a dispatch-only
 # autograd.Function whose backward/jvp are native CUDA companions
 # (accumulation_kernels.deterministic_accumulate_flat_ad), so the accumulated
@@ -31,13 +31,16 @@ from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 # rough-surface patch paths (wave 3) and is an incoherent POWER slot (plan
 # 05 sections 6.7.3 / 7.3): its rows always fold into the totals in the
 # power domain, never as zero-phase amplitudes, and its complex cell field
-# is a diagnostic only.
+# is a diagnostic only. coupled carries the reflection-diffraction
+# compensator (ADR-011) and is an ordinary coherent field slot that joins
+# the coherent field total like the first three slots.
 _NATIVE_COMPONENT_SLOTS = {
     "los": 0,
     "reflection": 1,
     "diffraction": 2,
     "transmission": 3,
     "scattering": 4,
+    "coupled": 5,
 }
 _BASE_COMPONENTS = ("los", "reflection", "diffraction")
 _OPTIONAL_COMPONENTS = ("transmission", "scattering")

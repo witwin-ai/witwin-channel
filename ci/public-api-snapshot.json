@@ -183,7 +183,7 @@
           "name": "Config",
           "kind": "class",
           "target": "witwin.channel_native.deterministic.config.Config",
-          "contract_sha256": "bf48f320804f3949c26d92c9ee6314e6f2b205cfd24388963fc191bc044bab0f"
+          "contract_sha256": "1200a78d70dc5a8f54799d9735bf82f611f8a878710be5d9f791b3f3b3570ac5"
         },
         {
           "name": "PathTable",

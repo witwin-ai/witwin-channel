@@ -50,7 +50,9 @@ def test_public_ad_capability_advertises_fixed_topology_jvp_vjp():
         ],
         "ad_excluded": {
             "path": ["scattering", "coupled_paths_mesh_vertex"],
-            "deterministic": ["scattering"],
+            # ADR-011: the grid solver now carries coupled paths and shares the
+            # path solver's coupled mesh-vertex AD refusal.
+            "deterministic": ["scattering", "coupled_paths_mesh_vertex"],
             "montecarlo_basic": ["scattering"],
             "montecarlo_bdpt": ["all"],
         },

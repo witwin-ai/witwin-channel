@@ -26,7 +26,7 @@ from benchmarks.fullwave_validation.scenarios import (  # noqa: E402
 DEFAULT_OUTPUT_DIR = ROOT / "artifacts/fullwave/three-cube-metal"
 DEFAULT_DETERMINISTIC_PATH = DEFAULT_OUTPUT_DIR / "deterministic.npz"
 DEFAULT_PLOT_PATH = DEFAULT_OUTPUT_DIR / "three-cube-deterministic-components.png"
-_COMPONENTS = ("los", "reflection", "diffraction")
+_COMPONENTS = ("los", "reflection", "diffraction", "coupled")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -122,15 +122,25 @@ def plot_three_cube_deterministic(
         deterministic.components["los"],
         deterministic.components["reflection"],
         deterministic.components["diffraction"],
+        deterministic.components["coupled"],
     )
-    titles = ("Total |Ez|", "LoS |Ez|", "Reflection |Ez|", "Diffraction |Ez|")
+    titles = (
+        "Total |Ez|",
+        "LoS |Ez|",
+        "Reflection |Ez|",
+        "Diffraction |Ez|",
+        "Coupled R↔D |Ez|",
+    )
     extent = _image_extent(deterministic.x, deterministic.y)
     colormap = plt.get_cmap("viridis").copy()
     colormap.set_bad("0.72")
 
-    figure, axes = plt.subplots(2, 2, figsize=(12.0, 10.4), constrained_layout=True)
+    figure, axes = plt.subplots(2, 3, figsize=(17.4, 10.4), constrained_layout=True)
+    flat_axes = axes.ravel()
+    for spare in flat_axes[len(values):]:
+        spare.axis("off")
     images = []
-    for axis, field, title in zip(axes.ravel(), values, titles, strict=True):
+    for axis, field, title in zip(flat_axes[: len(values)], values, titles, strict=True):
         field_db = _db_relative(field, peak)
         field_db[~valid] = np.nan
         image = axis.imshow(
@@ -160,8 +170,8 @@ def plot_three_cube_deterministic(
     figure.suptitle(
         "Three-cube deterministic field — 0.1× geometric layout from original "
         "channel; 5 GHz PEC benchmark\n"
-        "Current deterministic solver (coupled R↔D unavailable; no full-wave "
-        "reference loaded)",
+        "Current deterministic solver with coupled R↔D compensator (ADR-011; "
+        "no full-wave reference loaded)",
         fontweight="normal",
     )
     output_path = Path(output).resolve()

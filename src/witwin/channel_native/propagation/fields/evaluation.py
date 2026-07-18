@@ -655,6 +655,23 @@ def _evaluate_coupled_fields(
                 edge_position = resolved["edge_point"]
                 reflection_position = resolved["reflection_point"]
 
+            # G4: edge-segment bounds relative to the passed edge (Keller) point,
+            # along the normalized edge axis, so the native stationary machinery
+            # can truncate and corner-mend the coupled diffraction leg. The edge
+            # tables carry line_min/line_max as arc-lengths from the segment
+            # reference origin (edge_geometry[1]); shift them by the Keller
+            # point's arc offset. Frozen (detached): coupled rows carry no
+            # edge-geometry gradient (ADR-011); the tx/rx gradient flows through
+            # source/target inside the native re-anchoring.
+            edge_ref = edge_geometry[1][edge_id]
+            edge_axis = edge_geometry[2][edge_id]
+            edge_axis = edge_axis / edge_axis.norm(dim=-1, keepdim=True).clamp_min(
+                1.0e-12
+            )
+            t_keller = ((edge_position.detach() - edge_ref) * edge_axis).sum(dim=-1)
+            edge_line_min = (edge_geometry[4][edge_id] - t_keller).contiguous()
+            edge_line_max = (edge_geometry[5][edge_id] - t_keller).contiguous()
+
             def material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
                 return tuple(
                     material[name][face].contiguous()
@@ -698,12 +715,16 @@ def _evaluate_coupled_fields(
                     *reflection_materials,
                     *wedge_materials0,
                     *wedge_materials1,
+                    edge_line_min,
+                    edge_line_max,
                 )
             evaluated = coupled_field_op(
                 *coupled_args,
                 reflection_materials,
                 wedge_materials0,
                 wedge_materials1,
+                edge_line_min,
+                edge_line_max,
                 reverse=reverse_order,
             )
             field_xyz.index_copy_(0, rows, evaluated["field_vector"])

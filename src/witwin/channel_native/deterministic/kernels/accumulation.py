@@ -88,7 +88,9 @@ def deterministic_accumulate_flat(
         dtype=torch.float32,
         ndim=3,
     )
-    expected_component_shape = (5, int(num_tx), int(num_rx))
+    # Six materialized slots (ADR-011): los / reflection / diffraction /
+    # transmission / scattering / coupled.
+    expected_component_shape = (6, int(num_tx), int(num_rx))
     if tuple(exported["power_total"].shape) != (int(num_tx), int(num_rx)):
         raise ValueError(
             "_channel_native.deterministic_accumulate_flat returned bad power_total shape"
@@ -200,10 +202,11 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     The forward is the primal native accumulator: each kept path's complex
     field and real power scatter into a frozen (component_slot, tx, rx)
-    cell over the five slots los / reflection / diffraction / transmission /
-    scattering, then coherent cells square the summed field (|sum E|^2 over
-    the four field slots) while incoherent cells sum per-path powers and
-    expose a sqrt-power pseudo-field. Scattering is a power-domain slot in
+    cell over the six slots los / reflection / diffraction / transmission /
+    scattering / coupled, then coherent cells square the summed field
+    (|sum E|^2 over the five coherent field slots) while incoherent cells sum
+    per-path powers and expose a sqrt-power pseudo-field. Scattering is a
+    power-domain slot in
     both modes: its gains add linearly to the totals and its cell field is
     a diagnostic that reaches no total. The scatter is linear in the
     per-path field/power, so the adjoint is one masked-gather kernel

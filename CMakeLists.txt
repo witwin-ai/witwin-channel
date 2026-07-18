@@ -450,6 +450,12 @@ find_library(
         "${TORCH_PACKAGE_DIR}/lib"
     REQUIRED)
 
+# Single registration point for the fast-math wedge TU: the literal path must
+# appear exactly once in this file (native-boundary contract), so both the
+# source list and the fast-math property block reference it via this variable.
+set(CHANNEL_NATIVE_FAST_MATH_WEDGE_TU
+    native/channel_native/kernels/field_wedge_ad_diffraction.cu)
+
 Python_add_library(
     _channel_native
     MODULE
@@ -483,7 +489,7 @@ Python_add_library(
     native/channel_native/kernels/field_transport_free_space.cu
     native/channel_native/kernels/field_transport_reflection.cu
     native/channel_native/kernels/field_transport_transmission.cu
-    native/channel_native/kernels/field_wedge_ad_diffraction.cu
+    ${CHANNEL_NATIVE_FAST_MATH_WEDGE_TU}
     native/channel_native/kernels/field_wedge_ad_coupled.cu
     native/channel_native/kernels/field_wedge_ad_project.cu
     native/channel_native/kernels/field_wedge_ad_prepare.cu
@@ -552,7 +558,7 @@ target_compile_definitions(_channel_native PRIVATE CHANNEL_NATIVE_WITH_RAYD=1 CH
 # coupled/LoS/reflection/transmission AD kernels reproduce channel_native's own
 # precise-math field kernels and must stay precise (matching their primals).
 set_source_files_properties(
-    native/channel_native/kernels/field_wedge_ad_diffraction.cu
+    ${CHANNEL_NATIVE_FAST_MATH_WEDGE_TU}
     PROPERTIES COMPILE_OPTIONS "--use_fast_math")
 set_source_files_properties(
     native/channel_native/build_info.cpp

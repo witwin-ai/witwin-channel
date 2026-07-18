@@ -18,20 +18,27 @@ constexpr int kBlockSize = 256;
 // (los / reflection / diffraction only).
 constexpr int kComponentCount = 3;
 // Slots materialized by the flat accumulator: los, reflection, diffraction,
-// transmission and scattering. Scattering is an incoherent POWER slot (plan
-// 05 sections 6.7.3 / 7.3): its rows fold into the totals in the power
+// transmission, scattering and coupled. Scattering is an incoherent POWER slot
+// (plan 05 sections 6.7.3 / 7.3): its rows fold into the totals in the power
 // domain and never enter the coherent field sum; its complex cell field is
-// kept as a diagnostic only.
-constexpr int kAccumSlotCount = 5;
+// kept as a diagnostic only. Coupled is an ordinary coherent field slot
+// (ADR-011): reflection-diffraction and its reciprocal both land there and sum
+// coherently in-cell, joining field_total / power_total like the first three
+// slots.
+constexpr int kAccumSlotCount = 6;
 constexpr int kScatteringSlot = 4;
+constexpr int kCoupledSlot = 5;
 
 // Path component ids: 0=los, 1=reflection, 2=diffraction, 3/4=coupled
-// reflection-diffraction (consumed per path by the path API, never
-// materialized here), 5=transmission, 6=scattering. Ids without a slot
-// return -1 and are dropped by the scatter/gather gates.
+// reflection-diffraction and its reciprocal (ADR-011: both map to the single
+// coherent coupled slot 5 and sum in-cell), 5=transmission, 6=scattering. Ids
+// without a slot return -1 and are dropped by the scatter/gather gates.
 __device__ __forceinline__ int accum_slot(int component_id) {
     if (component_id >= 0 && component_id < kComponentCount) {
         return component_id;
+    }
+    if (component_id == 3 || component_id == 4) {
+        return kCoupledSlot;
     }
     if (component_id == 5) {
         return 3;

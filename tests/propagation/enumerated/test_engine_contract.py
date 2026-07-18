@@ -15,7 +15,9 @@ _COMPONENT_STAGES = (
     "_reflection_topology_multibounce",
     "_diffraction_topology_order1",
     "_transmission_topology",
-    "_coupled_reflection_diffraction_topology_order2",
+    # ADR-011 / G3: the engine now dispatches through the public coupled entry,
+    # which selects the single-shot or rx-streamed discovery internally.
+    "coupled_reflection_diffraction_topology",
 )
 
 
@@ -52,9 +54,21 @@ def test_engine_signature_ownership_and_dependency_boundary():
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert list(signature.parameters) == ["scene", "config", "frequency_value"]
+    assert list(signature.parameters) == [
+        "scene",
+        "config",
+        "frequency_value",
+        "coupled_rx_streaming",
+    ]
     assert signature.parameters["frequency_value"].kind is inspect.Parameter.KEYWORD_ONLY
     assert signature.parameters["frequency_value"].default is None
+    # ADR-011 / G3: the deterministic grid solver opts into receiver-block
+    # streaming of coupled discovery; path and MC keep the single-shot default.
+    assert (
+        signature.parameters["coupled_rx_streaming"].kind
+        is inspect.Parameter.KEYWORD_ONLY
+    )
+    assert signature.parameters["coupled_rx_streaming"].default is False
     assert signature.return_annotation == "tuple[EvaluatedPaths, EvaluatedPathSidecars]"
     assert not any(module.endswith(".core.path_topology") for module in imported_modules)
     assert "TopologyBatch" not in Path(engine.__file__).read_text(encoding="utf-8")

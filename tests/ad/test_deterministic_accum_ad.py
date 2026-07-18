@@ -2,13 +2,13 @@
 
 Strict float64 torch.autograd.gradcheck of
 ops.deterministic_accumulate_flat_ad on a small path fixture covering all
-five materialized slots (coherent |sum field|^2 totals over the los /
-reflection / diffraction / transmission field slots, the power-domain
-scattering slot, and incoherent power sums with the sqrt pseudo-field), a
-jvp-vs-vjp inner-product duality check, float32 forward parity against the
-primal native accumulator, and the frozen-gate contract: rows outside the
-materialized component slots or the tx/rx ranges receive exactly zero
-gradient.
+six materialized slots (coherent |sum field|^2 totals over the los /
+reflection / diffraction / transmission / coupled field slots, the
+power-domain scattering slot, and incoherent power sums with the sqrt
+pseudo-field), a jvp-vs-vjp inner-product duality check, float32 forward
+parity against the primal native accumulator, and the frozen-gate contract:
+rows outside the materialized component slots or the tx/rx ranges receive
+exactly zero gradient.
 """
 
 from __future__ import annotations
@@ -34,17 +34,19 @@ _OUTPUT_FIELDS = (
     "component_field_imag",
 )
 
-# Rows 0-5 and 8-9 are kept and cover every materialized slot: cell (0, 0)
-# carries a same-slot collision on slot 0 plus reflection and scattering
-# rows, so the cell nonlinearities mix several paths; row 5 is a
+# Rows 0-5, 8-9 and 10-11 are kept and cover every materialized slot: cell
+# (0, 0) carries a same-slot collision on slot 0 plus reflection and
+# scattering rows, so the cell nonlinearities mix several paths; row 5 is a
 # transmission row (slot 3, part of the coherent field sum) and row 9 a
-# scattering row (slot 4, power-domain in both modes). Row 6 has an
-# out-of-range tx, row 7 an out-of-range rx and row 10 a coupled component
-# id without a slot: the accumulator must drop all three.
-_TX_ID = (0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 1)
-_RX_ID = (0, 0, 1, 1, 0, 1, 0, 3, 0, 0, 1)
-_COMPONENT_ID = (0, 1, 1, 2, 0, 5, 1, 2, 0, 6, 3)
-_DROPPED_ROWS = (6, 7, 10)
+# scattering row (slot 4, power-domain in both modes). Rows 10 (cid 3, R->D)
+# and 11 (cid 4, D->R) are coupled rows that both land in the coherent coupled
+# slot 5 and collide in cell (1, 1), exercising the E_RD + E_DR sum (ADR-011).
+# Row 6 has an out-of-range tx and row 7 an out-of-range rx: the accumulator
+# must drop both.
+_TX_ID = (0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 1, 1)
+_RX_ID = (0, 0, 1, 1, 0, 1, 0, 3, 0, 0, 1, 1)
+_COMPONENT_ID = (0, 1, 1, 2, 0, 5, 1, 2, 0, 6, 3, 4)
+_DROPPED_ROWS = (6, 7)
 
 
 def _fixture(dtype: torch.dtype):

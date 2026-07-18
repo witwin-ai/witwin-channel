@@ -1,6 +1,5 @@
 {
   "adr": "docs/dev/standards/adr-009-native-fusion-ownership.md",
-  "manifest_sha256": "546186d1c8658f449797f89c583c0bafbb7d57d408250dd14734dc850bdac022",
   "normalization": "tools.refactor_baseline.cpp_body_hashes: (name, token_count, signature_sha256, body_sha256); paths and line numbers deliberately excluded so complete functions may move",
   "owners": [
     {
@@ -647,13 +646,13 @@
           "token_count": 299
         },
         {
-          "body_sha256": "ecb5b0ca355560ef32bdfd137085778a7ba216864510be15118cf3c2c761f054",
+          "body_sha256": "0fd6da6ad0db5e7e20105f87b4fb5465e9e7e269270166543af22953c9fc3c5e",
           "name": "free_space_backward_kernel",
           "signature_sha256": "3a61f6c8c815838d230c1b9246d96d642b2decd756213b473e3cf493f87b48da",
           "token_count": 928
         },
         {
-          "body_sha256": "e6dbd3199d60fbed6242a3528820d013f020ad3395dc12aed5eb71b0507f88d0",
+          "body_sha256": "aca29505b9947255ed1a86a9ee7bc14c28da09c5b907d2db8780a82b394bbcde",
           "name": "free_space_jvp_kernel",
           "signature_sha256": "b6aff5a450b9e4e20a7411af5666305e7a72443f390e2932e38d87a9164e50b0",
           "token_count": 596
@@ -739,13 +738,13 @@
       "baseline_source": "native/channel_native/kernels/field_transport_ad.cu",
       "cpp_body_hash_multiset": [
         {
-          "body_sha256": "b4c5ae9c3fd0563f68f4ad92508f2c7398fa8d3c147e0cd49f8dc5c85ec061e1",
+          "body_sha256": "28211745e4b8cfe7bd749caaf968d077ea3153f96b3cf35b18f0813e6f2c6d6e",
           "name": "reflection_chain_eval",
           "signature_sha256": "bafc78e2b3759b1a52ea056c58ea7c5072c7950c86b2f4c6bf57eb792598502f",
           "token_count": 665
         },
         {
-          "body_sha256": "49f356521cf7c27e4ff09efe85a4b850f1d37d4632a522f79e37d0e56238bd1e",
+          "body_sha256": "a910894e58458c73e5c1929a0de7dc03ddd3c7dc0f61ef42ae14a17e98c56ad1",
           "name": "reflection_sequence_backward_kernel",
           "signature_sha256": "3b237d348b9af7e8d7838722714ccbcfb954e4c641b575526f4da623910d1dfc",
           "token_count": 2056
@@ -763,7 +762,7 @@
           "token_count": 35
         },
         {
-          "body_sha256": "64aa57a98f10b51dfeb0424c01b48233d843a45274404c7fdddc04b7961fde4f",
+          "body_sha256": "9d182d97166cfaf056ddc1d2e9c187b6185a1ea9d27ebe45176c6e2460cd27b9",
           "name": "reflection_sequence_jvp_kernel",
           "signature_sha256": "0d7514ff4c6a7358ab7c5f61533f595264503a733d26c9f6884b45a5fb8f26ce",
           "token_count": 1163
@@ -816,7 +815,7 @@
       "baseline_source": "native/channel_native/kernels/field_transport_ad.cu",
       "cpp_body_hash_multiset": [
         {
-          "body_sha256": "df87bf1db3418af3d4e900f196746ef95ef324f78198ee497fbb2f3f483aa7bf",
+          "body_sha256": "ebae8067eee80a2d56216325e8b4785d07a32e38cdac74dfda117b3b1f8eb8f7",
           "name": "transmission_chain_eval",
           "signature_sha256": "7e61a9e0dc3ceef7defbdc0a36d440d990556b6f32caf5158e3dc7fefa538851",
           "token_count": 749
@@ -840,13 +839,13 @@
           "token_count": 36
         },
         {
-          "body_sha256": "7be698e5fa9b2b3a3ffcd69726e578b055b73521e7e50190983d91063b5e2d41",
+          "body_sha256": "3e64e3d516a5f627813de43a0aaff03ea6c2816ce2c56d42d288532e5a2ba7fc",
           "name": "transmission_sequence_backward_kernel",
           "signature_sha256": "082fc621f6b557ad9e7f8e2cb1c6336f2cc592caf35b5c84841ad766385aed8a",
           "token_count": 1541
         },
         {
-          "body_sha256": "b20d690bc487a9c7a047b662c55ca99cdc7dcdfce9ad1a519184932737e7a4d0",
+          "body_sha256": "477444b24733dc05cca1e299fd771a91214ac1ece643ae6f0a9caae9eee5eba8",
           "name": "transmission_sequence_jvp_kernel",
           "signature_sha256": "53a89f1e70d317242f005a3cb79b93d4d1f7e61e6f8374ae8437ab8b58f86e89",
           "token_count": 1036
@@ -1107,16 +1106,16 @@
           "token_count": 58
         },
         {
-          "body_sha256": "ae820b6cb9570012f8da3691582c440879b9c864b3123230a00a3f1f15f9fb8c",
+          "body_sha256": "d62bbd8ab11f0956b6930e3b5172ee453120f855878a94711228072b7d4f2a99",
           "name": "coupled_rd_row_dual",
           "signature_sha256": "8098a15cdcbb5307bcb50f6ff13caf0ad88c49229dd4fa5ebee6937b64ca5b11",
-          "token_count": 1369
+          "token_count": 1213
         },
         {
-          "body_sha256": "3a365b07d1a7f261bb84d476cebe8a44a9036fa48d4a27b133bfb06d5187b484",
+          "body_sha256": "2323de2d0140255158ff30c5329239a428760d97cf8b9ae424100dd8e0144db0",
           "name": "load_coupled_row",
-          "signature_sha256": "4c4904e466c4ee04f5116b626ca877a7086dcdc3c5df44e04be7a9f552c3944f",
-          "token_count": 281
+          "signature_sha256": "8b3fbc64ecca316a0638c51e6fe8524712d751bcd1340448087066ee8f47ae84",
+          "token_count": 299
         },
         {
           "body_sha256": "6d0f873a6c4961bfbafd965117e9b8832455dedbbcc7b6012a62ee0e3ad84a2b",
@@ -1184,13 +1183,13 @@
       "baseline_source": "native/channel_native/kernels/field_wedge_ad.cu",
       "cpp_body_hash_multiset": [
         {
-          "body_sha256": "c8d4866aff298432c8c18f0ad1a5a9b8b054ddbc6ff6e07a1b59d399693cc7d2",
+          "body_sha256": "958197db35d9215208b6f92f42de95a0ddaee26d68d612076a7d2b57ba4ea1fc",
           "name": "project_complex3_backward_kernel",
           "signature_sha256": "3958529346188495d368ef94a1669cacd1559d12b135f668bf7a0c5fb98a35e7",
           "token_count": 375
         },
         {
-          "body_sha256": "3a44f3f058c8e45100b03c10ef7f7f2560cfee6b5b01b9fcd8f2110a07d3f28f",
+          "body_sha256": "f73a3b849d1e4ce07a3c4791382daaed8891dbdb99e16a687ec4e4099726f247",
           "name": "project_complex3_jvp_kernel",
           "signature_sha256": "583eca5d6cef94f150b1db7296f1e2eeff75a3bb8a6a5baa529e96865ea46264",
           "token_count": 314
@@ -2371,5 +2370,6 @@
     "hard_limit_lines": 3000,
     "planned_owner_debt": {},
     "recommended_limit_lines": 2000
-  }
+  },
+  "manifest_sha256": "3dbf8f077a771ed525f24f3ccc19d874a0a3c59ff835e96a4ed84a09b108bd3e"
 }

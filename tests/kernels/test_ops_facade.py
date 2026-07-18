@@ -2072,21 +2072,37 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic accumulation")
 
-    # Component ids 0/1/2/5/6 map to slots 0/1/2/3/4; transmission (slot 3)
-    # joins the coherent field sum while scattering (slot 4) folds into the
-    # totals in the power domain and keeps its field as a diagnostic.
-    tx_id = torch.tensor([0, 0, 0, 1, 0, 0], device="cuda", dtype=torch.int32)
-    rx_id = torch.tensor([0, 0, 1, 1, 1, 0], device="cuda", dtype=torch.int32)
-    component_id = torch.tensor([0, 1, 1, 2, 5, 6], device="cuda", dtype=torch.int32)
+    # Component ids 0/1/2/5/6 map to slots 0/1/2/3/4 and 3/4 map to the coupled
+    # slot 5 (ADR-011). transmission (slot 3) and coupled (slot 5) join the
+    # coherent field sum; scattering (slot 4) folds into the totals in the
+    # power domain and keeps its field as a diagnostic. The last two rows are a
+    # coupled R->D (cid 3) and its reciprocal D->R (cid 4) colliding in cell
+    # (1, 0) so slot 5 exercises the coherent E_RD + E_DR sum.
+    tx_id = torch.tensor([0, 0, 0, 1, 0, 0, 1, 1], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, 0, 1, 1, 1, 0, 0, 0], device="cuda", dtype=torch.int32)
+    component_id = torch.tensor(
+        [0, 1, 1, 2, 5, 6, 3, 4], device="cuda", dtype=torch.int32
+    )
     path_gain = torch.tensor(
-        [1.0, 4.0, 9.0, 16.0, 25.0, 0.5], device="cuda", dtype=torch.float32
+        [1.0, 4.0, 9.0, 16.0, 25.0, 0.5, 2.0, 3.0],
+        device="cuda",
+        dtype=torch.float32,
     )
     field = torch.tensor(
-        [1.0 + 0.0j, 0.0 + 2.0j, 3.0 + 0.0j, 0.0 + 4.0j, 5.0 + 1.0j, 0.5 + 0.0j],
+        [
+            1.0 + 0.0j,
+            0.0 + 2.0j,
+            3.0 + 0.0j,
+            0.0 + 4.0j,
+            5.0 + 1.0j,
+            0.5 + 0.0j,
+            1.0 + 1.0j,
+            2.0 - 1.0j,
+        ],
         device="cuda",
         dtype=torch.complex64,
     )
-    slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4}
+    slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4, 3: 5, 4: 5}
 
     result = deterministic_accumulation.deterministic_accumulate_flat(
         tx_id,
@@ -2100,7 +2116,7 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
         coherent=True,
     )
 
-    expected_component_field = torch.zeros((5, 2, 2), device="cuda", dtype=torch.complex64)
+    expected_component_field = torch.zeros((6, 2, 2), device="cuda", dtype=torch.complex64)
     expected_scattering_power = torch.zeros((2, 2), device="cuda", dtype=torch.float32)
     for index in range(int(tx_id.numel())):
         cid = int(component_id[index])
@@ -2111,7 +2127,9 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
             expected_scattering_power[tx, rx] += path_gain[index]
     expected_component_power = expected_component_field.abs().square()
     expected_component_power[4] = expected_scattering_power
-    expected_field_total = expected_component_field[:4].sum(dim=0)
+    # Coherent field slots are 0/1/2/3 (los/reflection/diffraction/transmission)
+    # and 5 (coupled); scattering slot 4 stays in the power domain.
+    expected_field_total = expected_component_field[[0, 1, 2, 3, 5]].sum(dim=0)
     expected_power_total = (
         expected_field_total.abs().square() + expected_scattering_power
     )

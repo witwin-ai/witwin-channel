@@ -63,7 +63,7 @@ _CAPABILITIES: dict[str, Any] = {
         # Per-solver refusals (fail loudly before any launch).
         "ad_excluded": {
             "path": ["scattering", "coupled_paths_mesh_vertex"],
-            "deterministic": ["scattering"],
+            "deterministic": ["scattering", "coupled_paths_mesh_vertex"],
             "montecarlo_basic": ["scattering"],
             "montecarlo_bdpt": ["all"],
         },
@@ -126,13 +126,24 @@ _CAPABILITIES: dict[str, Any] = {
         "deterministic": {
             "max_reflection_depth": 5,
             "max_diffraction_order": 1,
-            "supports_reflection_diffraction_coupling": False,
+            # Coupled reflection-diffraction on the grid solver (ADR-011). The
+            # coupling keys mirror the path solver; the deterministic engine
+            # streams coupled discovery over receiver blocks under the same
+            # per-block candidate limit.
+            "supports_reflection_diffraction_coupling": True,
+            "supports_reflection_diffraction_coupling_geometry": True,
+            "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
+            "max_reflections_in_coupled_path": 1,
+            "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
             "supports_arrays": False,
             "supports_ad": True,
             "ad_modes": ["none", "jvp", "vjp"],
-            "ad_excluded": ["scattering"],
+            # Mesh vertex gradients through coupled R-D paths are refused (the
+            # coupled adjoints take the wall plane / edge tables as frozen
+            # winners), matching the path solver.
+            "ad_excluded": ["scattering", "coupled_paths_mesh_vertex"],
         },
         "montecarlo_basic": {
             "max_diffraction_order": 1,

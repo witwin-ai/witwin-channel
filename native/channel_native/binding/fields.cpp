@@ -165,6 +165,8 @@ pybind11::dict cn_field_coupled_rd_backward(
     at::Tensor wedge_mu_r1,
     at::Tensor wedge_gain1,
     at::Tensor wedge_thickness1,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
     double frequency_hz,
     bool reverse,
     pybind11::object grad_field_vector,
@@ -205,6 +207,8 @@ pybind11::dict cn_field_coupled_rd_jvp(
     at::Tensor wedge_mu_r1,
     at::Tensor wedge_gain1,
     at::Tensor wedge_thickness1,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
     double frequency_hz,
     bool reverse,
     pybind11::object tangent_source,
@@ -434,6 +438,8 @@ pybind11::dict cn_field_coupled_rd(
     torch::Tensor wedge_mu_r1,
     torch::Tensor wedge_gain1,
     torch::Tensor wedge_thickness1,
+    torch::Tensor edge_line_min,
+    torch::Tensor edge_line_max,
     double frequency_hz,
     bool reverse);
 

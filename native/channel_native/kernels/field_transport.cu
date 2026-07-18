@@ -374,6 +374,8 @@ __global__ void coupled_rd_field_kernel(
     const float* wedge_mu_r1,
     const float* wedge_gain1,
     const float* wedge_thickness1,
+    const float* edge_line_min,
+    const float* edge_line_max,
     float frequency_hz,
     bool reverse,
     c10::complex<float>* field_vector,
@@ -452,8 +454,11 @@ __global__ void coupled_rd_field_kernel(
         pair.n0 = load3(edge_n0, index);
         pair.nn = load3(edge_n1, index);
         pair.wedgeN = exterior_angle[index] / field::UTD_PI;
-        pair.edgeLineMin = -1.0e5f;
-        pair.edgeLineMax = 1.0e5f;
+        // G4: real edge-segment bounds (offsets of the segment endpoints from the
+        // passed edge point along edge_axis) so the stationary machinery truncates
+        // and corner-mends the coupled leg. Replaces the former +-1e5 infinite edge.
+        pair.edgeLineMin = edge_line_min[index];
+        pair.edgeLineMax = edge_line_max[index];
         pair.sourcePos = diffraction_source;
         pair.incidentBasis = input_edge_basis;
         pair.incidentJones = field::jones_from_vector(
@@ -487,7 +492,16 @@ __global__ void coupled_rd_field_kernel(
             outgoing_direction,
             input_edge_basis,
             output_edge_basis);
-        pair.selectStationaryPoint = 0.0f;
+        // G4: run the stationary-path continuity machinery (edge re-anchoring,
+        // monotone even truncation, corner_mend_gamma, boundary-distance blend)
+        // on the coupled diffraction leg. stationaryExternalIncident tells the
+        // header to re-extrapolate the frozen EXTERNAL incident (the coupled
+        // image-source spherical wave stored in incidentJones/incidentBasis) to
+        // the re-anchored stationary point instead of using the direct source.
+        // The slab face operators stay frozen at this Keller point (omega < 0
+        // keeps the stored operators) per the coupled contract.
+        pair.selectStationaryPoint = 1.0f;
+        pair.stationaryExternalIncident = 1.0f;
         field::MaterialParams material{};
         material.omega = -1.0f;
         field::Complex3 value = field::compute_pair_contribution(
@@ -857,6 +871,8 @@ pybind11::dict cn_field_coupled_rd(
     at::Tensor wedge_mu_r1,
     at::Tensor wedge_gain1,
     at::Tensor wedge_thickness1,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
     double frequency_hz,
     bool reverse) {
     using channel_native::check_flat_tensor;
@@ -890,7 +906,9 @@ pybind11::dict cn_field_coupled_rd(
              {wedge_sigma_e1, "wedge_sigma_e1"},
              {wedge_mu_r1, "wedge_mu_r1"},
              {wedge_gain1, "wedge_gain1"},
-             {wedge_thickness1, "wedge_thickness1"}})
+             {wedge_thickness1, "wedge_thickness1"},
+             {edge_line_min, "edge_line_min"},
+             {edge_line_max, "edge_line_max"}})
         check_flat_tensor(named.first, named.second, at::kFloat);
     const int64_t count = source.size(0);
     for (const auto& tensor : {target,
@@ -919,7 +937,9 @@ pybind11::dict cn_field_coupled_rd(
                                wedge_sigma_e1,
                                wedge_mu_r1,
                                wedge_gain1,
-                               wedge_thickness1})
+                               wedge_thickness1,
+                               edge_line_min,
+                               edge_line_max})
         TORCH_CHECK(tensor.size(0) == count, "coupled field scalar rows must match source");
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
 
@@ -960,6 +980,8 @@ pybind11::dict cn_field_coupled_rd(
             wedge_mu_r1.data_ptr<float>(),
             wedge_gain1.data_ptr<float>(),
             wedge_thickness1.data_ptr<float>(),
+            edge_line_min.data_ptr<float>(),
+            edge_line_max.data_ptr<float>(),
             static_cast<float>(frequency_hz),
             reverse,
             field_vector.data_ptr<c10::complex<float>>(),

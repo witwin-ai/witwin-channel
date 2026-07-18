@@ -303,6 +303,8 @@ def field_coupled_rd(
     reflection_material: tuple[torch.Tensor, ...],
     wedge_material0: tuple[torch.Tensor, ...],
     wedge_material1: tuple[torch.Tensor, ...],
+    edge_line_min: torch.Tensor,
+    edge_line_max: torch.Tensor,
     *,
     frequency_hz: float,
     reverse: bool,
@@ -334,6 +336,8 @@ def field_coupled_rd(
         *reflection_material,
         *wedge_material0,
         *wedge_material1,
+        edge_line_min,
+        edge_line_max,
     )
     for value in scalars:
         validate_cuda_tensor("coupled_scalar", value, dtype=torch.float32, ndim=1)
@@ -350,6 +354,8 @@ def field_coupled_rd(
         *reflection_material,
         *wedge_material0,
         *wedge_material1,
+        edge_line_min,
+        edge_line_max,
         float(frequency_hz),
         bool(reverse),
     )

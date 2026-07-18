@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
@@ -26,7 +27,7 @@ from witwin.channel_native.propagation.topology.concatenate import (
 )
 from witwin.channel_native.propagation.topology.discovery.coupled import (
     _COUPLED_CANDIDATE_CHUNK_SIZE,  # noqa: F401 - compatibility re-export
-    _MAX_COUPLED_CANDIDATES,  # noqa: F401 - compatibility re-export
+    _MAX_COUPLED_CANDIDATES,
     iter_coupled_candidate_requests,
     prepare_coupled_candidate_plan,
 )
@@ -42,31 +43,59 @@ if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
 
-def _coupled_reflection_diffraction_topology_order2(
+@dataclass(frozen=True, slots=True)
+class _CoupledTopologyContext:
+    """Receiver-independent coupled discovery inputs.
+
+    Every field is a function of the scene geometry and materials only, so a
+    single context is reused across all receiver blocks of a streamed
+    deterministic solve; ``candidates_per_pair`` (= coplanar groups x selected
+    edges) sizes the receiver blocks without re-running the geometry setup.
+    """
+
+    device: torch.device
+    raydn: object
+    representative_faces: torch.Tensor
+    tri_a: torch.Tensor
+    normals: torch.Tensor
+    selected_edges: torch.Tensor
+    edge_pos: torch.Tensor
+    edge_dir: torch.Tensor
+    edge_t_min: torch.Tensor
+    edge_t_max: torch.Tensor
+    face_material_id: torch.Tensor
+    surface_group_id: torch.Tensor
+    surface_group_size: torch.Tensor
+    surface_group_members: torch.Tensor
+    candidates_per_pair: int
+
+
+def _prepare_coupled_topology_context(
     scene: Scene,
     compiled: object,
     tx_positions: torch.Tensor,
     rx_positions: torch.Tensor,
-    *,
-    candidate_limit: int,
-) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Construct bounded 1R+1D and reciprocal 1D+1R geometry.
+) -> _CoupledTopologyContext | None:
+    """Build the receiver-independent coupled context, or ``None`` when empty.
 
-    This phase deliberately exports no physical coefficient. Phase 3 applies
-    the shared complex/Jones transport to these canonical event sequences.
+    Returns ``None`` for every case the single-shot discovery would resolve to
+    an empty block (no structures, no endpoints, no faces, or zero
+    candidates-per-pair) and raises loudly when RayDN native capability is
+    missing. No candidate budget is evaluated here; the per-block plan owns the
+    total-cap guard.
     """
 
     device = tx_positions.device
     raydn = compiled.raydn
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
-        return _ensure_topology_fields(_empty_path_block(device)), 0, 0
+        return None
     if not raydn.available:
         raise RuntimeError("coupled topology requires RayDN native scene capability")
 
     records = raydn.edge_records()
     faces = records.faces.contiguous()
     if int(faces.shape[0]) == 0:
-        return _ensure_topology_fields(_empty_path_block(device)), 0, 0
+        return None
     vertices = records.vertices.contiguous()
     normals = geometry_primitives.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
@@ -105,34 +134,85 @@ def _coupled_reflection_diffraction_topology_order2(
         else _cached_diffraction_edge_geometry(raydn)
     )
     selected_edges = topology_primitives.mc_selected_edge_indices(selected)
-    plan = prepare_coupled_candidate_plan(
-        tx_count=int(tx_positions.shape[0]),
-        rx_count=int(rx_positions.shape[0]),
-        representative_faces=representative_faces,
-        selected_edges=selected_edges,
-        candidate_limit=candidate_limit,
+    candidates_per_pair = int(representative_faces.shape[0]) * int(
+        selected_edges.shape[0]
     )
-    if plan.candidates_per_pair == 0:
-        return _ensure_topology_fields(_empty_path_block(device)), 0, 0
+    if candidates_per_pair == 0:
+        return None
 
     face_material_id = compiled.assignments.face_material_id.to(
         device=device, dtype=torch.int32
     ).contiguous()
-    blocks: list[dict[str, torch.Tensor]] = []
-    launch_count = 0
-    candidate_count = 0
     surface_group_id = groups["surface_group_id"].to(dtype=torch.int32).contiguous()
     surface_group_size = groups["surface_group_size"].to(dtype=torch.int32).contiguous()
     surface_group_members = (
         groups["surface_group_members"].to(dtype=torch.int32).contiguous()
     )
+    return _CoupledTopologyContext(
+        device=device,
+        raydn=raydn,
+        representative_faces=representative_faces,
+        tri_a=tri_a,
+        normals=normals,
+        selected_edges=selected_edges,
+        edge_pos=edge_pos,
+        edge_dir=edge_dir,
+        edge_t_min=edge_t_min,
+        edge_t_max=edge_t_max,
+        face_material_id=face_material_id,
+        surface_group_id=surface_group_id,
+        surface_group_size=surface_group_size,
+        surface_group_members=surface_group_members,
+        candidates_per_pair=candidates_per_pair,
+    )
+
+
+def _coupled_topology_rx_block(
+    context: _CoupledTopologyContext,
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    *,
+    candidate_limit: int,
+) -> tuple[dict[str, torch.Tensor], int, int]:
+    """Discover coupled rows for one receiver slice against a prepared context.
+
+    ``rx_id`` is local to ``rx_positions``; the streamed wrapper offsets it back
+    to the global receiver index. ``prepare_coupled_candidate_plan`` runs the
+    unchanged total-cap guard on this slice's candidate count, so a slice that
+    exceeds the budget fails loudly here.
+    """
+
+    device = context.device
+    plan = prepare_coupled_candidate_plan(
+        tx_count=int(tx_positions.shape[0]),
+        rx_count=int(rx_positions.shape[0]),
+        representative_faces=context.representative_faces,
+        selected_edges=context.selected_edges,
+        candidate_limit=candidate_limit,
+    )
+    if plan.candidates_per_pair == 0:
+        return _ensure_topology_fields(_empty_path_block(device)), 0, 0
+
+    tri_a = context.tri_a
+    normals = context.normals
+    edge_pos = context.edge_pos
+    edge_dir = context.edge_dir
+    edge_t_min = context.edge_t_min
+    edge_t_max = context.edge_t_max
+    face_material_id = context.face_material_id
+    surface_group_id = context.surface_group_id
+    surface_group_size = context.surface_group_size
+    surface_group_members = context.surface_group_members
+    blocks: list[dict[str, torch.Tensor]] = []
+    launch_count = 0
+    candidate_count = 0
     current_chunk_start = -1
     common_args: tuple[object, ...] = ()
     for request in iter_coupled_candidate_requests(plan, device=device):
         if request.chunk_start != current_chunk_start:
             edge_index = request.edge_id.to(dtype=torch.int64)
             common_args = (
-                raydn.require_handle(),
+                context.raydn.require_handle(),
                 tx_positions[request.tx_slot].contiguous(),
                 rx_positions[request.rx_slot].contiguous(),
                 request.face_id,
@@ -211,6 +291,122 @@ def _coupled_reflection_diffraction_topology_order2(
                 interaction_normals=exported.interaction_normals[kept],
             )
         )
+    return (
+        _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
+        launch_count,
+        candidate_count,
+    )
+
+
+def _coupled_reflection_diffraction_topology_order2(
+    scene: Scene,
+    compiled: object,
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    *,
+    candidate_limit: int,
+) -> tuple[dict[str, torch.Tensor], int, int]:
+    """Construct bounded 1R+1D and reciprocal 1D+1R geometry.
+
+    This phase deliberately exports no physical coefficient. Phase 3 applies
+    the shared complex/Jones transport to these canonical event sequences.
+
+    Single-shot discovery over the full receiver set: the whole receiver axis is
+    one candidate plan, so a scene whose total candidate count exceeds
+    ``candidate_limit`` fails loudly in ``prepare_coupled_candidate_plan``. The
+    path and Monte Carlo solvers keep this total-cap contract; the deterministic
+    grid solver streams over receiver blocks instead
+    (:func:`_coupled_reflection_diffraction_topology_rx_streamed`).
+    """
+
+    context = _prepare_coupled_topology_context(
+        scene, compiled, tx_positions, rx_positions
+    )
+    if context is None:
+        return _ensure_topology_fields(_empty_path_block(tx_positions.device)), 0, 0
+    return _coupled_topology_rx_block(
+        context, tx_positions, rx_positions, candidate_limit=candidate_limit
+    )
+
+
+def coupled_reflection_diffraction_topology(
+    scene: Scene,
+    compiled: object,
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    *,
+    candidate_limit: int,
+    rx_streamed: bool,
+) -> tuple[dict[str, torch.Tensor], int, int]:
+    """Dispatch coupled discovery: receiver-streamed grid vs single-shot.
+
+    The deterministic grid solver streams over receiver blocks (ADR-011); the
+    path and Monte Carlo callers use the single-shot total-cap discovery.
+    """
+
+    topology = (
+        _coupled_reflection_diffraction_topology_rx_streamed
+        if rx_streamed
+        else _coupled_reflection_diffraction_topology_order2
+    )
+    return topology(
+        scene, compiled, tx_positions, rx_positions, candidate_limit=candidate_limit
+    )
+
+
+def _coupled_reflection_diffraction_topology_rx_streamed(
+    scene: Scene,
+    compiled: object,
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    *,
+    candidate_limit: int,
+) -> tuple[dict[str, torch.Tensor], int, int]:
+    """Stream coupled discovery over receiver blocks for the grid solver.
+
+    A full 65k-receiver grid needs far more than the 1M candidate budget in one
+    plan, so ``candidate_limit`` is treated as a per-block work/safety budget:
+    the receiver axis is split into blocks of ``block_rx`` receivers sized so
+    each block's candidate count stays under the (min-with-hard-cap) limit. Each
+    block runs the same order-2 discovery as the single-shot path, its local
+    ``rx_id`` is offset back to the global receiver index, and the compacted
+    blocks are concatenated in ascending receiver-block order. That
+    concatenation order IS the row identity and is deterministic across runs.
+
+    The shared ``_MAX_COUPLED_CANDIDATES`` guard and the discovery iterator are
+    untouched: a block that cannot fit even a single receiver under the budget
+    still fails loudly in ``prepare_coupled_candidate_plan``.
+    """
+
+    device = tx_positions.device
+    context = _prepare_coupled_topology_context(
+        scene, compiled, tx_positions, rx_positions
+    )
+    if context is None:
+        return _ensure_topology_fields(_empty_path_block(device)), 0, 0
+
+    tx_count = int(tx_positions.shape[0])
+    rx_count = int(rx_positions.shape[0])
+    effective_limit = min(int(candidate_limit), _MAX_COUPLED_CANDIDATES)
+    # Both directions (R->D and D->R) evaluate every candidate, hence the x2.
+    per_receiver_candidates = tx_count * context.candidates_per_pair * 2
+    block_rx = max(1, effective_limit // max(per_receiver_candidates, 1))
+    blocks: list[dict[str, torch.Tensor]] = []
+    launch_count = 0
+    candidate_count = 0
+    for rx_start in range(0, rx_count, block_rx):
+        rx_end = min(rx_start + block_rx, rx_count)
+        rx_slice = rx_positions[rx_start:rx_end].contiguous()
+        block, block_launches, block_candidates = _coupled_topology_rx_block(
+            context, tx_positions, rx_slice, candidate_limit=candidate_limit
+        )
+        launch_count += block_launches
+        candidate_count += block_candidates
+        if int(block["valid"].numel()) == 0:
+            continue
+        if rx_start > 0:
+            block["rx_id"] = block["rx_id"] + rx_start
+        blocks.append(block)
     return (
         _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
         launch_count,

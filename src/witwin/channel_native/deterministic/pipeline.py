@@ -63,6 +63,46 @@ def _validate_requested_components(config: Config) -> None:
             )
 
 
+def _coupled_paths_metadata(config: Config) -> dict[str, Any]:
+    """Coupled reflection-diffraction metadata block (ADR-011).
+
+    Mirrors the path solver's coupled_paths block.
+    """
+
+    if not config.coupled_paths:
+        return {
+            "requested": False,
+            "geometry": "not_requested",
+            "coefficient": "not_requested",
+        }
+    return {
+        "requested": True,
+        "geometry": "native_1r1d_reciprocal",
+        "coefficient": "unified_complex3_jones",
+    }
+
+
+def _register_coupled_component(
+    config: Config,
+    topology: Any,
+    component_counts: dict[str, int],
+    extra_components: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Record the coupled component count and export name (ADR-011).
+
+    Coupled rows carry component ids 3 (R->D) and 4 (D->R); both accumulate
+    into the single coupled slot. "coupled" is not a public component name, so
+    it is enabled by the coupled_paths gate rather than the components set.
+    """
+
+    if not config.coupled_paths:
+        return extra_components
+    component_counts["coupled"] = int(
+        ((topology.component_id == 3) | (topology.component_id == 4)).sum().item()
+    )
+    return extra_components + ("coupled",)
+
+
 def _metadata(
     *,
     config: Config,
@@ -159,6 +199,9 @@ def _metadata(
         "field_abi": "complex3_v1",
         "phase_convention": dict(PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
+        # Coupled reflection-diffraction compensator (ADR-011); mirrors the
+        # path solver's coupled_paths metadata block.
+        "coupled_paths": _coupled_paths_metadata(config),
     }
     if metadata_transmission is not None:
         metadata["transmission"] = metadata_transmission
@@ -233,6 +276,9 @@ def solve(scene: Scene, config: Config) -> Result:
         scene,
         config,
         frequency_value=frequency_hz,
+        # Stream coupled discovery over receiver blocks so a full grid solve
+        # stays under the per-block candidate budget (ADR-011).
+        coupled_rx_streaming=config.coupled_paths,
     )
     scattering_info = None
     if "scattering" in config.components:
@@ -253,6 +299,9 @@ def solve(scene: Scene, config: Config) -> Result:
             )
     extra_components = tuple(
         name for name in _OPTIONAL_COMPONENTS if name in config.components
+    )
+    extra_components = _register_coupled_component(
+        config, topology, component_counts, extra_components
     )
     path_gain, field, component_power, component_fields = accumulate_path_result(
         evaluated,

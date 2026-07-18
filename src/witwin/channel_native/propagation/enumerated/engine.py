@@ -12,7 +12,7 @@ from witwin.channel_native.materials.evaluation import (
     _require_frequency_ad_constant_materials,
 )
 from witwin.channel_native.propagation.enumerated.coupled import (
-    _coupled_reflection_diffraction_topology_order2,
+    coupled_reflection_diffraction_topology,
 )
 from witwin.channel_native.propagation.enumerated.diffraction import (
     _diffraction_topology_order1,
@@ -73,8 +73,16 @@ def evaluate_enumerated_paths(
     config: TopologyConfig,
     *,
     frequency_value: float | None = None,
+    coupled_rx_streaming: bool = False,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
-    """Discover, select, and evaluate canonical enumerated propagation rows."""
+    """Discover, select, and evaluate canonical enumerated propagation rows.
+
+    ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
+    over receiver blocks so a full grid solve stays under the per-block
+    candidate budget (ADR-011). The deterministic grid solver sets it; the path
+    and Monte Carlo callers keep the single-shot total-cap discovery, so their
+    coupled behavior is unchanged.
+    """
 
     device = torch.device("cuda")
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
@@ -180,7 +188,7 @@ def evaluate_enumerated_paths(
         and {"reflection", "diffraction"}.issubset(components)
     ):
         block, coupled_launches, coupled_candidates = (
-            _coupled_reflection_diffraction_topology_order2(
+            coupled_reflection_diffraction_topology(
                 scene,
                 compiled,
                 tx_positions,
@@ -188,6 +196,7 @@ def evaluate_enumerated_paths(
                 candidate_limit=int(
                     getattr(config, "coupled_candidate_limit", 1_000_000)
                 ),
+                rx_streamed=coupled_rx_streaming,
             )
         )
         launch_count += coupled_launches

@@ -14,7 +14,7 @@ from witwin.channel_native.propagation.topology.discovery import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
-_COUPLED_DIGEST = "6cd6c11c193f48e09ac4ede98766a2da44c0f3f170f757947f168b492789bbc5"
+_COUPLED_DIGEST = "229a286fe971ea970efc5d2821234068a6ca7f0d428454f87e1e35d8450697b3"
 
 
 def _digest(module, name: str) -> str:
@@ -53,11 +53,14 @@ def test_coupled_owner_preserves_function_and_constant_identity():
 
 def test_enumerated_coupled_consumes_named_geometry_only():
     tree = ast.parse(Path(coupled.__file__).read_text(encoding="utf-8"))
+    # ADR-011 / G3: the per-receiver-block worker is where the shared named
+    # discovery/geometry is consumed after the rx-streaming refactor; the
+    # order-2 owner and its rx-streamed sibling delegate to it.
     definition = next(
         node
         for node in tree.body
         if isinstance(node, ast.FunctionDef)
-        and node.name == "_coupled_reflection_diffraction_topology_order2"
+        and node.name == "_coupled_topology_rx_block"
     )
 
     assert "geometry_bridge" not in coupled.__dict__
@@ -96,7 +99,8 @@ def test_export_component_stage_order_remains_canonical():
         "_reflection_topology_multibounce",
         "_diffraction_topology_order1",
         "_transmission_topology",
-        "_coupled_reflection_diffraction_topology_order2",
+        # ADR-011 / G3: the engine dispatches through the public coupled entry.
+        "coupled_reflection_diffraction_topology",
     )
     assert [call_lines[name] for name in stages] == sorted(
         call_lines[name] for name in stages

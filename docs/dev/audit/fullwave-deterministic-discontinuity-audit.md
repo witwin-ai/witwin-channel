@@ -160,7 +160,51 @@ and no self-face handling (reflection.cu:177).
 
 ## Fix design
 
-See `utd-continuity-fix-design.md` (F1–F6).
+See `utd-continuity-fix-design.md` (F1–F6, F5e/F5f) and, for the coupled
+multipath work, `../standards/adr-011-deterministic-coupled-paths.md` and
+`adr-012-stationary-coupled-diffraction.md`.
+
+## Addendum (2026-07-17, round 2): shadow gap + three-cube multipath
+
+Post-fix comparison against Maxwell exposed a deep-shadow +3.8 dB
+over-brightness. Diagnosis chain (each step dose-response verified): the
+visible shadow is transition(odd)-dominated (kL≈40 → ~23° transition
+width), so (a) the complex truncation factor's Fresnel ripple
+(|T|≈1.29∠14° at mid-edge = PO corner waves the full wave contradicts)
+was replaced by the monotone T_mono on the even part (F5e), and (b) the
+odd part gained the boundary-distance blend B(δ) (F5f, C_BLEND=0.35
+Maxwell-calibrated). Result: shadow gap median +3.6 → **+1.36 dB**,
+envelope NMSE 0.0435 → **0.0358**, magnitude correlation 0.874, ISB/RSB
+p95 excess −0.73/−0.19 dB.
+
+Three-cube multipath audit (256², max_depth=5, 1.02 M rows) found the
+dominant refinement-persistent defect class: **missing coupled
+compensators for reflected fields**. Every 20–40 dB hard step was a
+reflection GO boundary (occlusion by another cube, or a double-bounce
+RSB) that order-1 direct-field UTD cannot compensate; an isolated
+self-plate RSB scans smooth to 0.08 dB. Fixes (ADR-011 + ADR-012):
+deterministic coupled R→D / D→R enablement (config, RX-chunked streaming
+under the 1 M candidate budget — 86 blocks for the 65 k grid, ~97 k
+surviving rows, 1.6 s solve), a sixth coherent accumulator slot for
+component ids 3/4, and stationary-path semantics for the coupled
+diffraction leg (external-incident spherical re-extrapolation + real
+edge bounds — it previously ran an infinite-edge non-stationary
+evaluation and injected its own extension-plane steps).
+
+Flagship occlusion-RSB (cube2 reflection clearing cube3's silhouette,
+y=0.457): 33.2 dB (coupled off) → 24.1 dB (coupled on, non-stationary
+leg) → **11.6 dB** (stationary leg); 19/24 occlusion pairs improved
+(median 11.9 → 4.4 dB); single-cube results bit-identical with coupled
+off and all gates green with coupled on.
+
+Honest residual: the remaining flagship step sits at receivers ~1.2 cm
+(λ/5) from the compensating PEC edge — deep sub-wavelength near field
+(kL≈1.3, transition width ~128°) where single-diffraction UTD is outside
+its asymptotic regime, and the three-cube case has **no full-wave
+reference** to calibrate against (receiver pitch 7.8125 mm is not
+Yee-grid coincident; the versioned 320×320 case is future work). Order-2
+reflection boundaries (48.6% >3 dB) additionally need an R→R→D class
+that no solver has. Both are recorded follow-ups, not silent gaps.
 
 ## Reference metrics from the recorded run
 

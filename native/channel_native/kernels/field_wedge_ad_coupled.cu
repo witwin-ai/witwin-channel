@@ -84,11 +84,14 @@ __device__ DualC3 reflect_complex3_dual(
 // Coupled reflection-diffraction dual row (components 3/4). Mirrors
 // coupled_rd_field_kernel step by step on RayD duals.
 //
-// Truncation-factor policy: the primal evaluates the pair with +/-1e5
-// pseudo-infinite edge bounds, where the Boersma endpoint ripple makes the
-// truncation factor's derivative float32 noise amplified by the 1e5 lever
-// arm (the true infinite-edge derivative is zero; see the plan 07 AD-4a
-// notes). The dual therefore freezes that factor at its primal value.
+// Truncation-factor policy (G4): the primal now evaluates the coupled leg on
+// the stationary path (selectStationaryPoint = 1, stationaryExternalIncident =
+// 1) with real edge-segment bounds, so the truncation lives INSIDE the pair
+// coefficient (monotone even T_mono + corner_mend_gamma + boundary blend). The
+// dual mirrors this by calling compute_pair_vector_contribution directly, and
+// those derivatives flow in lockstep with the primal (there is no longer a
+// pseudo-infinite factor to freeze). The edge geometry itself stays frozen
+// (ADR-011: coupled rows carry no mesh-vertex gradient).
 // ---------------------------------------------------------------------------
 
 struct CoupledRowInputs {
@@ -101,6 +104,8 @@ struct CoupledRowInputs {
     field::float3a n0;
     field::float3a n1;
     float exterior_angle;
+    float edge_line_min;
+    float edge_line_max;
     field::float3a tx_pol;
     field::float3a rx_pol;
     float tx_power;
@@ -238,8 +243,11 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
     pair.n0 = field::dual_const3(in.n0);
     pair.nn = field::dual_const3(in.n1);
     pair.wedgeN = Dual(in.exterior_angle / field::UTD_PI);
-    pair.edgeLineMin = Dual(-1.0e5f);
-    pair.edgeLineMax = Dual(1.0e5f);
+    // G4: real edge-segment bounds (frozen constants; the coupled leg does not
+    // differentiate the edge geometry per ADR-011) so the stationary machinery
+    // truncates and corner-mends. Replaces the former +-1e5 infinite edge.
+    pair.edgeLineMin = Dual(in.edge_line_min);
+    pair.edgeLineMax = Dual(in.edge_line_max);
     pair.sourcePos = diffraction_source;
     pair.incidentBasis = input_edge_basis;
     pair.incidentJones = field::jones_from_vector(incident_field, input_edge_basis);
@@ -272,30 +280,23 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
         outgoing_direction,
         input_edge_basis,
         output_edge_basis);
-    pair.selectStationaryPoint = 0.0f;
+    // G4: run the stationary-path machinery (re-anchor + monotone even
+    // truncation + corner_mend_gamma + boundary-distance blend + external
+    // incidence re-extrapolation) on the coupled leg, matching the primal.
+    pair.selectStationaryPoint = 1.0f;
+    pair.stationaryExternalIncident = 1.0f;
     field::MaterialParamsT<Dual> material{};
     material.omega = Dual(-1.0f);
 
-    // Pair vector path (compute_pair_vector_contribution with
-    // selectStationaryPoint = 0), with the truncation factor frozen.
-    DualC3 value = field::c3_zero<Dual>();
-    const bool src_ext = field::wedge_exterior_mask(
-        field::f3_sub(pair.sourcePos, pair.edgePos), pair.edgeDir, pair.n0, pair.nn);
-    Dual phi, phi_p, s, s_p, sb;
-    field::compute_edge_geometry_3d(
-        pair.sourcePos, pair.edgePos, pair.edgeDir, pair.n0, diffraction_target,
-        phi, phi_p, s, s_p, sb);
-    const bool geom_valid =
-        src_ext && (s_p > field::UTD_MIN_DISTANCE) && (s > field::UTD_MIN_DISTANCE);
-    if (geom_valid) {
-        DualCx finite_factor = field::finite_wedge_truncation_factor(
-            pair, diffraction_target, wave_number);
-        finite_factor.re.d = 0.f;
-        finite_factor.im.d = 0.f;
-        value = field::compute_pair_vector_at_angles(
-            pair, diffraction_target, wave_number, material, phi, phi_p, s, s_p,
-            sb, input_edge_basis, output_edge_basis, finite_factor);
-    }
+    // Evaluate through the shared RayD header template, identical in structure
+    // to the primal's compute_pair_contribution and to the order-1 diffraction
+    // dual (field_wedge_ad_diffraction.cu). The header owns edge re-anchoring,
+    // truncation and validity (it returns zero for a blocked/short geometry),
+    // so the former manual pre-check and frozen-finite-factor inline are gone;
+    // the T_mono / gamma / B derivatives now flow through the dual in lockstep
+    // with the primal.
+    DualC3 value = field::compute_pair_vector_contribution(
+        pair, diffraction_target, wave_number, material);
 
     DualV3 final_direction = outgoing_direction;
     if (in.reverse) {
@@ -356,6 +357,8 @@ __device__ __forceinline__ CoupledRowInputs load_coupled_row(
     const float* wedge_mu_r1,
     const float* wedge_gain1,
     const float* wedge_thickness1,
+    const float* edge_line_min,
+    const float* edge_line_max,
     float frequency_hz,
     bool reverse) {
     CoupledRowInputs in;
@@ -368,6 +371,8 @@ __device__ __forceinline__ CoupledRowInputs load_coupled_row(
     in.n0 = load3f(edge_n0, index);
     in.n1 = load3f(edge_n1, index);
     in.exterior_angle = exterior_angle[index];
+    in.edge_line_min = edge_line_min[index];
+    in.edge_line_max = edge_line_max[index];
     in.tx_pol = load3f(tx_polarization, index);
     in.rx_pol = load3f(rx_polarization, index);
     in.tx_power = tx_power[index];
@@ -405,7 +410,8 @@ __device__ __forceinline__ CoupledRowInputs load_coupled_row(
         const float* wedge_gain0, const float* wedge_thickness0,              \
         const float* wedge_eps_r1, const float* wedge_sigma_e1,               \
         const float* wedge_mu_r1, const float* wedge_gain1,                   \
-        const float* wedge_thickness1, float frequency_hz, bool reverse
+        const float* wedge_thickness1, const float* edge_line_min,            \
+        const float* edge_line_max, float frequency_hz, bool reverse
 
 #define COUPLED_ROW_ARGS(index)                                               \
     index, source, target, reflection_position, reflection_normal,            \
@@ -414,7 +420,8 @@ __device__ __forceinline__ CoupledRowInputs load_coupled_row(
         reflection_sigma_e, reflection_mu_r, reflection_gain,                 \
         reflection_thickness, wedge_eps_r0, wedge_sigma_e0, wedge_mu_r0,      \
         wedge_gain0, wedge_thickness0, wedge_eps_r1, wedge_sigma_e1,          \
-        wedge_mu_r1, wedge_gain1, wedge_thickness1, frequency_hz, reverse
+        wedge_mu_r1, wedge_gain1, wedge_thickness1, edge_line_min,            \
+        edge_line_max, frequency_hz, reverse
 
 __device__ __forceinline__ float coupled_contract(
     int64_t index,
@@ -636,6 +643,7 @@ void check_coupled_primal_rows(
         wedge_thickness0.data_ptr<float>(), wedge_eps_r1.data_ptr<float>(),   \
         wedge_sigma_e1.data_ptr<float>(), wedge_mu_r1.data_ptr<float>(),      \
         wedge_gain1.data_ptr<float>(), wedge_thickness1.data_ptr<float>(),    \
+        edge_line_min.data_ptr<float>(), edge_line_max.data_ptr<float>(),     \
         static_cast<float>(frequency_hz), reverse
 
 #define COUPLED_HOST_PARAMS                                                   \
@@ -651,7 +659,8 @@ void check_coupled_primal_rows(
         at::Tensor wedge_gain0, at::Tensor wedge_thickness0,                  \
         at::Tensor wedge_eps_r1, at::Tensor wedge_sigma_e1,                   \
         at::Tensor wedge_mu_r1, at::Tensor wedge_gain1,                       \
-        at::Tensor wedge_thickness1, double frequency_hz, bool reverse
+        at::Tensor wedge_thickness1, at::Tensor edge_line_min,                \
+        at::Tensor edge_line_max, double frequency_hz, bool reverse
 
 #define COUPLED_CHECK_LISTS                                                   \
     check_coupled_primal_rows(                                                \
@@ -681,7 +690,9 @@ void check_coupled_primal_rows(
          {wedge_sigma_e1, "wedge_sigma_e1"},                                  \
          {wedge_mu_r1, "wedge_mu_r1"},                                        \
          {wedge_gain1, "wedge_gain1"},                                        \
-         {wedge_thickness1, "wedge_thickness1"}},                             \
+         {wedge_thickness1, "wedge_thickness1"},                              \
+         {edge_line_min, "edge_line_min"},                                    \
+         {edge_line_max, "edge_line_max"}},                                   \
         frequency_hz)
 
 pybind11::dict cn_field_coupled_rd_backward(
