@@ -1,8 +1,13 @@
-# ADR-014 (DRAFT): Incomplete pole-transition integral for finite-edge boundaries
+# ADR-016 (DRAFT): Incomplete pole-transition integral for finite-edge boundaries
 
-- **Status:** Draft - oracle stage in progress (plan-09 P4). Numerical-kernel
-  change in the SHARED RayD UTD header; requires its own acceptance evidence
-  and the drjit committed-PTX regeneration chore before release.
+(Renumbered from the initial ADR-014 draft: the concurrent `wt/scattering-ad`
+branch already carries adr-014/adr-015 for scattering AD.)
+
+- **Status:** ORACLE STAGE COMPLETE - device implementation NOT accepted
+  (2026-07-18). The oracle protocol reached its own stop condition: the
+  exact object regresses field-level acceptance. Findings and the recorded
+  follow-up are in "Oracle-stage results and decision" below. The oracle
+  library under `artifacts/p4-oracle/` is the retained foundation.
 - **Date:** 2026-07-18
 - **Kind:** Replaces the empirical single-variable corner-mend stand-ins with
   the exact truncated (incomplete) boundary-transition object.
@@ -98,6 +103,69 @@ the part O4 must settle empirically - do not guess.
    recorded as a release chore with the RayD lock update.
 4. Runtime: three-cube warm <= 4 s (from 2.6 s; the new special function
    must stay O(10) flops per boundary-active term).
+
+## Oracle-stage results and decision (2026-07-18)
+
+All artifacts under `artifacts/p4-oracle/` (oracle_lib.py, o1/o2/o3/o3b
+reports and matrices). Executed as O1 || O2 -> O3 -> O3b (scoped rerun).
+
+**O1 - PASSED.** The fp64 port reproduces the header operation-for-operation
+(Boersma literals, C roundf N-selection, MC fast-path bit-identity). The
+pole mapping is pinned analytically: for each beta-term,
+`p = j sqrt(kL a(beta))`, `C = cot sqrt(x) e^{-j pi/4}/sqrt(pi)`, and
+`C G(p; -inf, inf) == cot F(kL a)` exactly (Faddeeva bridge; verified to
+1.0e-14 over 4212 (beta, n, kL) points including exactly-on-boundary, by an
+independent contour quadrature). Mirror-argument N reselection falls out of
+re-running the term at betaM. The header's Boersma F itself is a 1.4e-8
+rational approximation of the true transition function; the identity is
+stated against the true function, as it must be.
+
+**O2 - PASSED, with one mapping correction.** The finite-edge bounds scale
+is `sqrt(k kappa / 2)` (e^{-j t^2} kernel), not the Fresnel-C/S scale
+`sqrt(k kappa / pi)` O1 lifted from `finite_wedge_truncation_factor_bounds`
+- a factor sqrt(pi/2) verified across every matrix row. With the corrected
+scale, G matches the brute-force equivalent-edge-current reference to
+0.95%/0.23 deg (corner rays), 1.17%/0.75 deg (deep shadow), 0.13%/0.19 deg
+(D->D pair), 3.7%/1.0 deg at the lambda/20 cells (kL 0.43; documented
+graceful degradation). The production stand-in errs by up to 5.0-6.5 dB /
+11-19 deg in the corner-truncation regime, with a systematic ~0.6-0.7 dB
+T_mono undershoot even for interior stationary points, and its error signs
+match the recorded ADR-013 G-A failures (cid-7 cell over-bright, cid-4 cell
+over-attenuated).
+
+**O3 - full replacement REJECTED by measurement.** Reweighting every
+reconstructable diffraction term with the exact G on the recorded solves:
+3 of 4 G-A cells clear (de-cancellation; (0.284,0.241) -39.4 -> 0.0 dB),
+but every calibrated aggregate regresses - decisively, the artifact-free
+single-cube full reweight moves corner-zone ISB toggle median 1.09 ->
+5.09 dB and NMSE 0.0358 -> 0.0639. Mechanism: `C_BLEND = 0.35` was
+calibrated against the Maxwell reference and therefore ABSORBS higher-order
+physics the single-edge theory omits (vertex/corner waves launched at edge
+ends, inter-edge vertex coupling); the exact-but-incomplete single-edge
+object is ~+6.8 dB brighter in the corner-truncation regime, and removing
+the calibrated compensation de-smooths the very boundaries it was tuned on.
+
+**O3b - scoped (coupled-only cid 3/4/7) replacement: necessary-safe, NOT
+sufficient.** Leaving order-1 cid-2 on the calibrated stand-in removes the
+aggregate catastrophe (ISB excess 1.86 not 7.48; RSB stays PASS at 1.74)
+and heals the coupled null ((0.284,0.241) -39.4 -> -1.5 dB), but G-D still
+regresses (2.48 -> 4.35), and the remaining hard gates - G-A cell
+(0.0531,0.4531) and the single-cube corner zone - are cid-2-dominated by
+construction. Coupled-family label coverage 61.6% (cid-4 31%) is a mild
+caveat on the exact projections, not on the verdict.
+
+**DECISION:** do not implement the naked replacement (full or scoped) in
+the device header. The calibrated single-variable stand-in stays, now with
+a measured characterization of what it compensates: the difference between
+the exact single-edge incomplete integral and the true field, i.e. the
+missing vertex-wave / inter-edge physics (~6.8 dB effective extra
+attenuation in the corner-truncation regime). The principled completion is
+`exact G + vertex diffraction terms + edge-interaction coupling` as one
+numerical unit - a research-scale follow-up with its own plan and ADR,
+building on the retained oracle library (validated port, G evaluators with
+the corrected bounds scale, brute-force EEC reference, dose-response
+harness). Do not partially land any of it without that unit passing this
+ADR's frozen gates.
 
 ## Open questions for the oracle stage
 

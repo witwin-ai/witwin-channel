@@ -238,7 +238,23 @@ the double-image source. Only build it if P1 shows the order-2 RSB
 boundaries matter vs truth (they are 168 pairs, median 5.4 dB — visible,
 but truth may smooth them at this geometry).
 
-### P4 — Two-variable corner transition (the principled residual killer)
+### P4 — Two-variable corner transition — **ORACLE COMPLETE, IMPLEMENTATION REJECTED 2026-07-18 (ADR-016)**
+
+The full oracle protocol ran (O1 identity 1e-14 + pinned pole mapping;
+O2 brute-force EEC matrix: G exact to <1.2% where UTD is valid, stand-in
+wrong by 5-6.5 dB in corner-truncation regimes; O3 full dose-response;
+O3b coupled-only scoped rerun). VERDICT: the exact incomplete integral -
+full or scoped - regresses the field-level gates because C_BLEND=0.35 is a
+Maxwell-calibrated effective model absorbing missing vertex-wave and
+inter-edge physics (~6.8 dB in the corner-truncation regime). Decision in
+ADR-016: keep the calibrated stand-in; the principled completion is
+`exact G + vertex diffraction + edge interaction` as ONE numerical unit
+(research-scale follow-up, own plan/ADR); the validated oracle library is
+retained under `artifacts/p4-oracle/`. The remaining measured residuals
+(three-cube G-A cell (0.0531,0.4531) at -21 dB, single-cube corner-zone
+median 1.09 dB, shadow-gap spread) are owned by that follow-up.
+
+Original P4 spec (kept for reference):
 
 Replaces the single-variable γ(u)·B(δ) stand-ins with the complex-pole
 truncated transition integral (generalized Fresnel / incomplete transition
@@ -252,11 +268,26 @@ per-sample TRUE off-cone angular arguments, (b) the P1 fullwave reference
 at corner rays. This is a research-grade change: oracle-first, host probes,
 then the header. Budget: a full session.
 
-### P5 — Chores (fold into whichever phase ships next)
+### P5 — Chores — status 2026-07-18
 
-RayD push + PTX regen story; MC-basic γ decision; dead-kernel deprecation;
-keep `docs/dev/audit/*` updated per phase; commit per phase (the standing
-user requirement).
+- RayD push: `main` = `origin/main` = 408a086 (already pushed); P2/P4 made
+  NO RayD source change, so no drjit committed-PTX regeneration is owed by
+  this plan's work (the standing regen chore from the UTD-continuity
+  session remains tied to any future RayD device-header change, e.g. the
+  ADR-016 follow-up).
+- MC-basic gamma decision: KEEP gamma==1 semantics. Grounds: the P4 oracle
+  showed the calibrated mend outperforms the exact single-edge object at
+  field level, and MC-basic has no coupled family; the mend fast path is
+  bit-identical for MC callers by contract (verified in O1).
+- Deterministic accumulator run-to-run ULP noise (1.4e-9, atomic order in
+  reflection/diffraction component accumulation; predates P2, measured
+  during P2 acceptance): OPEN chore - investigate deterministic reduction
+  order if byte-reproducibility across runs is ever required.
+- `deterministic_field.cu` dead-kernel deprecation cycle: still open
+  (recipe in the Phase-F cleanup agent output).
+- Munich perf pin at 1.5x: keep watching.
+- Commit-per-phase: P1 `dd67a6f`; P2 `f2c35db`+`06ce197`+`a44cb16`;
+  P4 oracle + ADR-016 in the closing docs commit.
 
 ---
 
