@@ -56,6 +56,92 @@ def scattering_table_eval(
     return out["f_te"], out["f_tm"]
 
 
+_TABLE_EVAL_BACKWARD_FIELDS = ("grad_wi", "grad_wo", "grad_f_te", "grad_f_tm")
+_TABLE_EVAL_JVP_FIELDS = ("tangent_f_te", "tangent_f_tm")
+
+
+def scattering_table_eval_backward(
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+    f_te: torch.Tensor,
+    f_tm: torch.Tensor,
+    *,
+    grad_out_f_te: torch.Tensor | None = None,
+    grad_out_f_tm: torch.Tensor | None = None,
+    need_grad_dirs: bool = False,
+    need_grad_tables: bool = False,
+) -> dict[str, torch.Tensor | None]:
+    """VJP of :func:`scattering_table_eval` (ADR-015 op 1).
+
+    ``grad_wi``/``grad_wo`` are ``[N, 3]`` direct stores (``need_grad_dirs``);
+    ``grad_f_te``/``grad_f_tm`` are the table-shaped 16-corner atomicAdd scatter
+    (``need_grad_tables``). Entries are ``None`` when their owning flag is off.
+    """
+
+    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
+    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
+    if wi.shape != wo.shape or wi.shape[1:] != (3,):
+        raise ValueError("wi and wo must have matching shape (N, 3)")
+    out = _required_native_op("scattering_table_eval_backward")(
+        wi,
+        wo,
+        f_te,
+        f_tm,
+        grad_out_f_te,
+        grad_out_f_tm,
+        bool(need_grad_dirs),
+        bool(need_grad_tables),
+    )
+    if not isinstance(out, dict) or set(out) != set(_TABLE_EVAL_BACKWARD_FIELDS):
+        raise TypeError(
+            "_channel_native.scattering_table_eval_backward returned invalid fields"
+        )
+    return out
+
+
+def scattering_table_eval_jvp(
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+    f_te: torch.Tensor,
+    f_tm: torch.Tensor,
+    *,
+    tangent_wi: torch.Tensor | None = None,
+    tangent_wo: torch.Tensor | None = None,
+    tangent_f_te: torch.Tensor | None = None,
+    tangent_f_tm: torch.Tensor | None = None,
+) -> dict[str, torch.Tensor]:
+    """JVP of :func:`scattering_table_eval` (ADR-015 op 1).
+
+    Elementwise per-row tangents ``tangent_f_te``/``tangent_f_tm`` ``[N]`` from
+    the live tangents of ``wi``, ``wo`` and the two tables; a missing tangent is
+    a zero tangent.
+    """
+
+    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
+    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
+    if wi.shape != wo.shape or wi.shape[1:] != (3,):
+        raise ValueError("wi and wo must have matching shape (N, 3)")
+    out = _required_native_op("scattering_table_eval_jvp")(
+        wi,
+        wo,
+        f_te,
+        f_tm,
+        tangent_wi,
+        tangent_wo,
+        tangent_f_te,
+        tangent_f_tm,
+    )
+    if not isinstance(out, dict) or set(out) != set(_TABLE_EVAL_JVP_FIELDS):
+        raise TypeError(
+            "_channel_native.scattering_table_eval_jvp returned invalid fields"
+        )
+    return out
+
+
 def scattering_table_pdf(
     wi: torch.Tensor,
     wo: torch.Tensor,
@@ -646,6 +732,8 @@ __all__ = [
     "scattering_patch_integral_eval_backward",
     "scattering_patch_integral_eval_jvp",
     "scattering_table_eval",
+    "scattering_table_eval_backward",
+    "scattering_table_eval_jvp",
     "scattering_table_pdf",
     "scattering_table_sample",
 ]

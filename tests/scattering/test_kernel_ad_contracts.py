@@ -1180,3 +1180,296 @@ def test_patch_ad_mode_none_has_no_autograd_function():
     case = _patch_case(seed=273)
     out = _patch_forward(case)
     assert not out["total"].requires_grad
+
+
+# ---------------------------------------------------------------------------
+# ADR-015 op 1: resident Kirchhoff table lookup (scattering_table_eval)
+# backward / jvp companions. Lockstep against the float64 bsdf_table_interp
+# oracle in tests.reference.kirchhoff_ensemble (the same helper the ensemble
+# op-1 lockstep uses). All four inputs (wi, wo, f_te, f_tm) are live; there is
+# no fixed-input reject list.
+# ---------------------------------------------------------------------------
+
+
+def _table_case(*, seed, rows=24, nti=8, npi=1, nto=8, npo=8, device="cuda"):
+    """Rows above the horizon with interior cos axes (no clamp saturation)."""
+
+    generator = torch.Generator(device=device).manual_seed(seed)
+
+    def randn(*shape):
+        return torch.randn(*shape, generator=generator, device=device, dtype=torch.float32)
+
+    def rand(*shape):
+        return torch.rand(*shape, generator=generator, device=device, dtype=torch.float32)
+
+    def dirs(n):
+        # cos component (z) in (0.3, 0.8) sits interior to the clamped cos axis;
+        # xy carry a strictly nonzero azimuth so the atan2 chain is defined.
+        return torch.stack((randn(n), randn(n), 0.3 + 0.5 * rand(n)), dim=-1).contiguous()
+
+    return {
+        "wi": dirs(rows),
+        "wo": dirs(rows),
+        "f_te": (0.2 + rand(nti, npi, nto, npo)).contiguous(),
+        "f_tm": (0.2 + rand(nti, npi, nto, npo)).contiguous(),
+    }
+
+
+_TABLE_ARGS = ("wi", "wo", "f_te", "f_tm")
+
+
+def _table_reference(case, *, make_leaves=False):
+    leaves = {name: case[name].double().clone() for name in _TABLE_ARGS}
+    if make_leaves:
+        for value in leaves.values():
+            value.requires_grad_(True)
+    te, tm = ref_ensemble.bsdf_table_interp(
+        leaves["wi"], leaves["wo"], leaves["f_te"], leaves["f_tm"]
+    )
+    return te, tm, leaves
+
+
+def test_table_eval_forward_matches_reference():
+    case = _table_case(seed=311)
+    te, tm = scattering_functional.scattering_table_eval(*(case[n] for n in _TABLE_ARGS))
+    ref_te, ref_tm, _ = _table_reference(case)
+    assert relative_error(te, ref_te, abs_floor=ABS_TOL) <= _REL_TOL_DIRECT
+    assert relative_error(tm, ref_tm, abs_floor=ABS_TOL) <= _REL_TOL_DIRECT
+
+
+@pytest.mark.parametrize("npi", (1, 6))
+def test_table_eval_backward_matches_reference_autograd(npi):
+    case = _table_case(seed=313, npi=npi)
+    rows = case["wi"].shape[0]
+    generator = torch.Generator(device="cuda").manual_seed(929)
+
+    def randn(n):
+        return torch.randn(n, generator=generator, device="cuda", dtype=torch.float32)
+
+    grad_te = randn(rows)
+    grad_tm = randn(rows)
+    native = scattering_functional.scattering_table_eval_backward(
+        *(case[n] for n in _TABLE_ARGS),
+        grad_out_f_te=grad_te,
+        grad_out_f_tm=grad_tm,
+        need_grad_dirs=True,
+        need_grad_tables=True,
+    )
+
+    te, tm, leaves = _table_reference(case, make_leaves=True)
+    (grad_te.double() * te + grad_tm.double() * tm).sum().backward()
+    for key, leaf in (("grad_wi", "wi"), ("grad_wo", "wo")):
+        assert (
+            relative_error(native[key], leaves[leaf].grad, abs_floor=ABS_TOL)
+            <= _REL_TOL_DIRECT
+        ), key
+    for key, leaf in (("grad_f_te", "f_te"), ("grad_f_tm", "f_tm")):
+        assert (
+            relative_error(native[key], leaves[leaf].grad, abs_floor=ABS_TOL)
+            <= _REL_TOL_ACCUM
+        ), key
+
+
+def test_table_eval_jvp_matches_reference_autograd():
+    case = _table_case(seed=317)
+    generator = torch.Generator(device="cuda").manual_seed(731)
+
+    def tangent_like(value):
+        return torch.randn(*value.shape, generator=generator, device="cuda", dtype=torch.float32)
+
+    tangents = {name: tangent_like(case[name]) for name in _TABLE_ARGS}
+    native = scattering_functional.scattering_table_eval_jvp(
+        *(case[n] for n in _TABLE_ARGS),
+        tangent_wi=tangents["wi"],
+        tangent_wo=tangents["wo"],
+        tangent_f_te=tangents["f_te"],
+        tangent_f_tm=tangents["f_tm"],
+    )
+    with torch.autograd.forward_ad.dual_level():
+        duals = {
+            name: torch.autograd.forward_ad.make_dual(
+                case[name].double(), tangents[name].double()
+            )
+            for name in _TABLE_ARGS
+        }
+        te, tm = ref_ensemble.bsdf_table_interp(
+            duals["wi"], duals["wo"], duals["f_te"], duals["f_tm"]
+        )
+        expected_te = torch.autograd.forward_ad.unpack_dual(te).tangent
+        expected_tm = torch.autograd.forward_ad.unpack_dual(tm).tangent
+    assert (
+        relative_error(native["tangent_f_te"], expected_te, abs_floor=ABS_TOL)
+        <= _REL_TOL_ACCUM
+    )
+    assert (
+        relative_error(native["tangent_f_tm"], expected_tm, abs_floor=ABS_TOL)
+        <= _REL_TOL_ACCUM
+    )
+
+
+def test_table_eval_jvp_vjp_inner_product_identity():
+    case = _table_case(seed=319)
+    rows = case["wi"].shape[0]
+    generator = torch.Generator(device="cuda").manual_seed(1441)
+
+    def randn(*shape):
+        return torch.randn(*shape, generator=generator, device="cuda", dtype=torch.float32)
+
+    tangents = {name: randn(*case[name].shape) for name in _TABLE_ARGS}
+    g_te, g_tm = randn(rows), randn(rows)
+
+    jvp = scattering_functional.scattering_table_eval_jvp(
+        *(case[n] for n in _TABLE_ARGS),
+        tangent_wi=tangents["wi"], tangent_wo=tangents["wo"],
+        tangent_f_te=tangents["f_te"], tangent_f_tm=tangents["f_tm"],
+    )
+    lhs = (g_te * jvp["tangent_f_te"]).sum() + (g_tm * jvp["tangent_f_tm"]).sum()
+
+    vjp = scattering_functional.scattering_table_eval_backward(
+        *(case[n] for n in _TABLE_ARGS),
+        grad_out_f_te=g_te, grad_out_f_tm=g_tm,
+        need_grad_dirs=True, need_grad_tables=True,
+    )
+    rhs = torch.zeros((), device="cuda", dtype=torch.float64)
+    for key, name in (
+        ("grad_wi", "wi"), ("grad_wo", "wo"),
+        ("grad_f_te", "f_te"), ("grad_f_tm", "f_tm"),
+    ):
+        rhs = rhs + (vjp[key].double() * tangents[name].double()).sum()
+    assert relative_error(lhs, rhs, abs_floor=ABS_TOL) <= _REL_TOL_ACCUM
+
+
+def test_table_eval_jvp_matches_native_forward_fd():
+    case = _table_case(seed=323)
+    generator = torch.Generator(device="cuda").manual_seed(818)
+
+    def randn(*shape):
+        return torch.randn(*shape, generator=generator, device="cuda", dtype=torch.float32)
+
+    tangents = {name: randn(*case[name].shape) for name in _TABLE_ARGS}
+    jvp = scattering_functional.scattering_table_eval_jvp(
+        *(case[n] for n in _TABLE_ARGS),
+        tangent_wi=tangents["wi"], tangent_wo=tangents["wo"],
+        tangent_f_te=tangents["f_te"], tangent_f_tm=tangents["f_tm"],
+    )
+
+    def forward_at(step):
+        shifted = [case[name] + step * tangents[name] for name in _TABLE_ARGS]
+        return scattering_functional.scattering_table_eval(*shifted)
+
+    plus = forward_at(_FD_STEP)
+    minus = forward_at(-_FD_STEP)
+    for idx, t_name in ((0, "tangent_f_te"), (1, "tangent_f_tm")):
+        fd = (plus[idx] - minus[idx]) / (2.0 * _FD_STEP)
+        assert (
+            relative_error(jvp[t_name], fd, abs_floor=ABS_TOL) <= _REL_TOL_FD_FORWARD
+        ), t_name
+
+
+def test_table_eval_backward_need_flags_gate_outputs():
+    case = _table_case(seed=331)
+    rows = case["wi"].shape[0]
+    out = scattering_functional.scattering_table_eval_backward(
+        *(case[n] for n in _TABLE_ARGS),
+        grad_out_f_te=torch.ones(rows, device="cuda"),
+        grad_out_f_tm=None,
+        need_grad_dirs=False,
+        need_grad_tables=True,
+    )
+    assert out["grad_wi"] is None
+    assert out["grad_wo"] is None
+    assert out["grad_f_te"] is not None
+    assert out["grad_f_tm"] is not None
+    # The tm cotangent is absent, so its table adjoint is exactly zero.
+    assert float(out["grad_f_tm"].abs().sum()) == 0.0
+
+
+def test_table_eval_backward_rejects_wrong_dtype():
+    case = _table_case(seed=333)
+    rows = case["wi"].shape[0]
+    bad = dict(case)
+    bad["f_te"] = case["f_te"].double()
+    with pytest.raises((TypeError, ValueError)):
+        scattering_functional.scattering_table_eval_backward(
+            *(bad[n] for n in _TABLE_ARGS),
+            grad_out_f_te=torch.ones(rows, device="cuda"),
+            need_grad_dirs=True,
+            need_grad_tables=True,
+        )
+
+
+def test_table_eval_backward_empty_rows():
+    case = _table_case(seed=337, rows=0)
+    out = scattering_functional.scattering_table_eval_backward(
+        *(case[n] for n in _TABLE_ARGS),
+        grad_out_f_te=torch.zeros(0, device="cuda"),
+        grad_out_f_tm=torch.zeros(0, device="cuda"),
+        need_grad_dirs=True,
+        need_grad_tables=True,
+    )
+    assert out["grad_wi"].shape == (0, 3)
+    assert out["grad_wo"].shape == (0, 3)
+    # No row touches a table entry -> the scatter adjoints are all zero.
+    assert float(out["grad_f_te"].abs().sum()) == 0.0
+    assert float(out["grad_f_tm"].abs().sum()) == 0.0
+
+
+def test_table_eval_horizon_rows_are_gated():
+    # Rows below the horizon (cos <= 0) contribute zero value and no gradient.
+    case = _table_case(seed=341)
+    case["wo"][:4, 2] = -0.1
+    te, tm = scattering_functional.scattering_table_eval(*(case[n] for n in _TABLE_ARGS))
+    assert torch.all(te[:4] == 0.0)
+    assert torch.all(tm[:4] == 0.0)
+
+    rows = case["wi"].shape[0]
+    out = scattering_functional.scattering_table_eval_backward(
+        *(case[n] for n in _TABLE_ARGS),
+        grad_out_f_te=torch.ones(rows, device="cuda"),
+        grad_out_f_tm=torch.ones(rows, device="cuda"),
+        need_grad_dirs=True,
+        need_grad_tables=True,
+    )
+    # Gated rows store exactly zero direction gradients.
+    assert torch.all(out["grad_wi"][:4] == 0.0)
+    assert torch.all(out["grad_wo"][:4] == 0.0)
+    te_ref, tm_ref, leaves = _table_reference(case, make_leaves=True)
+    (te_ref + tm_ref).sum().backward()
+    assert (
+        relative_error(out["grad_f_te"], leaves["f_te"].grad, abs_floor=ABS_TOL)
+        <= _REL_TOL_ACCUM
+    )
+
+
+def test_table_eval_backward_requires_native_kernel(monkeypatch):
+    case = _table_case(seed=343)
+    rows = case["wi"].shape[0]
+    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    with pytest.raises(RuntimeError, match="CUDA kernel is required"):
+        scattering_functional.scattering_table_eval_backward(
+            *(case[n] for n in _TABLE_ARGS),
+            grad_out_f_te=torch.ones(rows, device="cuda"),
+            need_grad_dirs=True,
+            need_grad_tables=True,
+        )
+
+
+def test_table_eval_ad_wrapper_matches_functional_backward():
+    case = _table_case(seed=347)
+    leaves = {name: case[name].clone().requires_grad_(True) for name in _TABLE_ARGS}
+    te, tm = scattering_autograd.scattering_table_eval_ad(*(leaves[n] for n in _TABLE_ARGS))
+    generator = torch.Generator(device="cuda").manual_seed(543)
+    rows = case["wi"].shape[0]
+    g_te = torch.randn(rows, generator=generator, device="cuda")
+    g_tm = torch.randn(rows, generator=generator, device="cuda")
+    (g_te * te + g_tm * tm).sum().backward()
+    for name in _TABLE_ARGS:
+        assert leaves[name].grad is not None, name
+        assert torch.isfinite(leaves[name].grad).all(), name
+
+
+def test_table_eval_ad_mode_none_has_no_autograd_function():
+    case = _table_case(seed=349)
+    te, tm = scattering_functional.scattering_table_eval(*(case[n] for n in _TABLE_ARGS))
+    assert not te.requires_grad
+    assert not tm.requires_grad

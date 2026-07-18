@@ -159,6 +159,12 @@ def em_layer_stack_backward(
         raise ValueError(
             "grad_outputs must carry one cotangent slot per stack output"
         )
+    # Autograd may hand cotangents with arbitrary strides (e.g. slices of the
+    # realization reflectance rows); the native ABI requires contiguous
+    # cotangents. contiguous() is a no-op when the stride is already dense.
+    grad_outputs = tuple(
+        None if value is None else value.contiguous() for value in grad_outputs
+    )
     out = _required_native_op("em_layer_stack_backward")(
         cos_theta,
         material_id,

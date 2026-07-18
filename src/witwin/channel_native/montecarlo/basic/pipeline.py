@@ -44,21 +44,9 @@ if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
 
-# Components whose Monte Carlo power maps have no AD companions yet: the
-# Kirchhoff scattering map (deferred past plan 07 AD-4). Fail before any
-# launch instead of returning silently detached maps.
-_AD_PENDING_COMPONENTS = ("scattering",)
-
-
 def _validate_ad_config(config: Config) -> None:
     if config.ad_mode == "none":
         return
-    for name in _AD_PENDING_COMPONENTS:
-        if name in config.components:
-            raise RuntimeError(
-                f"MC basic ad_mode='{config.ad_mode}' does not support the "
-                f"{name} component yet (plan 07 AD-4)"
-            )
     if "reflection" in config.components:
         depth_cap = mc_reflection_ad_max_depth()
         if config.max_depth > depth_cap:
@@ -292,6 +280,8 @@ def solve_pipeline(
                 samples=config.samples,
                 seed=config.seed,
                 device=device,
+                ad=ad,
+                ledger=ledger if ad else None,
             )
             path_count += scattering_stats["sample_count"]
             valid_contribution_count += int(

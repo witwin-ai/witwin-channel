@@ -72,6 +72,7 @@ from witwin.channel_native.core.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
+from witwin.channel_native.materials.kernels import autograd as material_autograd
 from witwin.channel_native.materials.kernels import functional as material_kernels
 from witwin.channel_native.scattering.kernels import autograd as scattering_autograd
 from witwin.channel_native.scattering.kernels import functional as scattering_kernels
@@ -744,7 +745,7 @@ def _realization_rows(
                     continue
 
                 # Smooth-stack Jones at the mean plane per patch.
-                stack = material_kernels.em_layer_stack_eval(
+                stack_args = (
                     cos_i[rows].contiguous(),
                     torch.full(
                         (int(rows.numel()),),
@@ -758,8 +759,23 @@ def _realization_rows(
                     layer_eps,
                     layer_sigma,
                     layer_mu,
-                    frequency_hz=frequency,
                 )
+                if ad_enabled:
+                    # AD mode (ADR-015 Part B): the differentiable stack keeps
+                    # the shared CSR layer eps_r / sigma_e / thickness and the
+                    # carrier frequency on the graph, so the realization
+                    # r_te/r_tm carry material and frequency gradients. Frequency
+                    # threads as the Torch scalar the AD branch already builds
+                    # (mirrors montecarlo/events/transmission.py).
+                    stack = material_autograd.em_layer_stack_ad(
+                        *stack_args,
+                        frequency=frequency_t,
+                    )
+                else:
+                    stack = material_kernels.em_layer_stack_eval(
+                        *stack_args,
+                        frequency_hz=frequency,
+                    )
                 r_te = torch.complex(stack["r_te_real"], stack["r_te_imag"])
                 r_tm = torch.complex(stack["r_tm_real"], stack["r_tm_imag"])
 

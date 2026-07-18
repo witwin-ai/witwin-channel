@@ -234,6 +234,41 @@ pybind11::dict cn_scattering_patch_integral_eval_jvp(
     pybind11::object t_r2_rows,
     pybind11::object t_centroids,
     double tangent_k0);
+pybind11::dict cn_scattering_table_eval_backward(
+    at::Tensor wi,
+    at::Tensor wo,
+    at::Tensor f_te,
+    at::Tensor f_tm,
+    pybind11::object grad_out_f_te,
+    pybind11::object grad_out_f_tm,
+    bool need_grad_dirs,
+    bool need_grad_tables);
+pybind11::dict cn_scattering_table_eval_jvp(
+    at::Tensor wi,
+    at::Tensor wo,
+    at::Tensor f_te,
+    at::Tensor f_tm,
+    pybind11::object t_wi,
+    pybind11::object t_wo,
+    pybind11::object t_f_te,
+    pybind11::object t_f_tm);
+pybind11::dict cn_kirchhoff_table_build_backward(
+    at::Tensor s_te, at::Tensor s_tm, at::Tensor a_te, at::Tensor a_tm,
+    at::Tensor r_diff_te, at::Tensor r_diff_tm, at::Tensor cos_i,
+    at::Tensor phi_i, at::Tensor cos_o, at::Tensor phi_o,
+    at::Tensor layer_thickness_m, at::Tensor layer_eps_r, at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r, double sigma_h, double corr_x, double corr_y,
+    double frequency_hz, at::Tensor grad_f_te, at::Tensor grad_f_tm,
+    bool need_grad_rough, bool need_grad_layers, bool need_grad_frequency);
+pybind11::dict cn_kirchhoff_table_build_jvp(
+    at::Tensor s_te, at::Tensor s_tm, at::Tensor a_te, at::Tensor a_tm,
+    at::Tensor r_diff_te, at::Tensor r_diff_tm, at::Tensor cos_i,
+    at::Tensor phi_i, at::Tensor cos_o, at::Tensor phi_o,
+    at::Tensor layer_thickness_m, at::Tensor layer_eps_r, at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r, double sigma_h, double corr_x, double corr_y,
+    double frequency_hz, pybind11::object t_layer_thickness_m,
+    pybind11::object t_layer_eps_r, pybind11::object t_layer_sigma_e,
+    double t_sigma_h, double t_corr_x, double t_corr_y, double t_frequency);
 
 void register_materials(pybind11::module_ &module) {
     module.def(
@@ -268,4 +303,12 @@ void register_materials(pybind11::module_ &module) {
                "Fixed-topology VJP of the realization-coherent phase-screen patch integral (heights, jones, geometry, k0) (ADR-014).");
     module.def("scattering_patch_integral_eval_jvp", &cn_scattering_patch_integral_eval_jvp,
                "Fixed-topology JVP of the realization-coherent phase-screen patch integral (heights, jones, geometry, k0) (ADR-014).");
+    module.def("scattering_table_eval_backward", &cn_scattering_table_eval_backward,
+               "Fixed-topology VJP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).");
+    module.def("scattering_table_eval_jvp", &cn_scattering_table_eval_jvp,
+               "Fixed-topology JVP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).");
+    module.def("kirchhoff_table_build_backward", &cn_kirchhoff_table_build_backward,
+               "VJP of the offline Kirchhoff table build over roughness, layers and frequency (ADR-015).");
+    module.def("kirchhoff_table_build_jvp", &cn_kirchhoff_table_build_jvp,
+               "JVP of the offline Kirchhoff table build over roughness, layers and frequency (ADR-015).");
 }

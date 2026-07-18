@@ -837,9 +837,3 @@ def test_ad_mode_none_keeps_primal_contract():
     )
     assert primal.metadata["kernel"]["ad_status"] == "none"
     assert ad.metadata["kernel"]["ad_status"] == "vjp"
-
-
-def test_scattering_component_fails_loudly_in_ad_mode():
-    scene = _reflection_scene()
-    with pytest.raises((RuntimeError, NotImplementedError), match="scattering"):
-        _solve(scene, frozenset({"reflection", "scattering"}), "vjp")

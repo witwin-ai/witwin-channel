@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import torch
 
@@ -109,9 +109,15 @@ def build_kirchhoff_resources(
             corr_length_y_m=float(store.rough_corr_y_m[index]),
             principal_axis_rad=float(store.rough_axis_rad[index]),
         )
+        # The float64 numpy build runs unchanged (host float() reads are the
+        # sanctioned compile-time island). When any roughness/layer store tensor
+        # participates in AD, route f_te/f_tm through the native build adjoint so
+        # the resident table values keep a graph to those leaves (ADR-015 Part
+        # C); otherwise today's path is bitwise identical.
         table = scattering.build_kirchhoff_table(
             roughness, layers, store.frequency_hz, device=key.device
         )
+        table = _maybe_differentiate_table(store, index, offset, count, table, key)
         tables[index] = table
         materials[index] = RoughMaterialRuntime(
             material_index=index,
@@ -125,6 +131,60 @@ def build_kirchhoff_resources(
     return KirchhoffRuntimeResources(
         key=key, tables=tables, materials=materials, stack=stack
     )
+
+
+def _maybe_differentiate_table(
+    store: MaterialStore,
+    index: int,
+    offset: int,
+    count: int,
+    table: KirchhoffTable,
+    key: ScatteringResourceKey,
+) -> KirchhoffTable:
+    """Attach the native build adjoint when store leaves participate in AD.
+
+    ``store.frequency_hz`` is a host float, so a store-driven build carries no
+    differentiable frequency leaf here (the AD wrapper still handles frequency
+    when a caller supplies a live frequency tensor); the store trigger is the
+    roughness/layer slices. When nothing requires grad the numpy table is
+    returned unchanged (bitwise primal path).
+    """
+
+    from witwin.channel_native.runtime.autograd_contracts import _ad_geometry_live
+
+    # Store parameter tensors are host-side float32 metadata; the native build
+    # adjoint runs on device, so move the differentiable leaves to key.device.
+    # The copy is differentiable, so gradients still accumulate on the original
+    # store leaves.
+    sigma_h = store.rough_sigma_h_m[index].to(key.device)
+    corr_x = store.rough_corr_x_m[index].to(key.device)
+    corr_y = store.rough_corr_y_m[index].to(key.device)
+    thickness = store.layer_thickness_m[offset : offset + count].to(key.device)
+    eps_r = store.layer_eps_r[offset : offset + count].to(key.device)
+    sigma_e = store.layer_sigma_e[offset : offset + count].to(key.device)
+    mu_r = store.layer_mu_r[offset : offset + count].to(key.device)
+    frequency = torch.tensor(
+        store.frequency_hz, dtype=torch.float32, device=key.device
+    )
+    if not _ad_geometry_live(sigma_h, corr_x, corr_y, thickness, eps_r, sigma_e, frequency):
+        return table
+
+    from witwin.channel_native.scattering.kernels.table_build_ad import (
+        kirchhoff_table_build_ad,
+    )
+
+    f_te, f_tm = kirchhoff_table_build_ad(
+        sigma_h,
+        corr_x,
+        corr_y,
+        thickness,
+        eps_r,
+        sigma_e,
+        mu_r,
+        frequency,
+        table=table,
+    )
+    return replace(table, f_te=f_te, f_tm=f_tm)
 
 
 def build_kirchhoff_table_stack(

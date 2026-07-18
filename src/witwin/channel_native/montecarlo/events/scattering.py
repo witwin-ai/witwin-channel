@@ -75,6 +75,7 @@ from typing import Any
 import torch
 from witwin.channel_native.core.tensor_math import normalize_vec3
 
+from witwin.channel_native.scattering.kernels.autograd import scattering_table_eval_ad
 from witwin.channel_native.scattering.kernels.functional import (
     scattering_event_probabilities,
     scattering_table_sample,
@@ -342,19 +343,36 @@ def eval_bsdf_rows(
     wi_local: torch.Tensor,
     wo_local: torch.Tensor,
     runtimes: dict[int, RoughMaterialRuntime],
+    *,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Batched ``(f_te, f_tm)`` lookups grouped by rough material."""
+    """Batched ``(f_te, f_tm)`` lookups grouped by rough material.
+
+    Under ``ad`` the native forward is dispatched behind
+    :func:`scattering_table_eval_ad` so the resident table values keep their
+    gradient (ADR-015 op 1); the plain (``ad`` off) path is bitwise unchanged.
+    """
 
     count = int(material_id.shape[0])
     device = wi_local.device
     f_te = torch.zeros((count,), device=device, dtype=torch.float32)
     f_tm = torch.zeros((count,), device=device, dtype=torch.float32)
     for runtime, rows in _grouped_rows(material_id, runtimes):
-        te_rows, tm_rows = kirchhoff_tables.eval_bsdf(
-            runtime.table,
-            wi_local.index_select(0, rows).contiguous(),
-            wo_local.index_select(0, rows).contiguous(),
-        )
+        wi_rows = wi_local.index_select(0, rows).contiguous()
+        wo_rows = wo_local.index_select(0, rows).contiguous()
+        if ad:
+            if ledger is not None:
+                ledger.add(
+                    runtime.table.f_te, runtime.table.f_tm, wi_rows, wo_rows
+                )
+            te_rows, tm_rows = scattering_table_eval_ad(
+                wi_rows, wo_rows, runtime.table.f_te, runtime.table.f_tm
+            )
+        else:
+            te_rows, tm_rows = kirchhoff_tables.eval_bsdf(
+                runtime.table, wi_rows, wo_rows
+            )
         f_te[rows] = te_rows
         f_tm[rows] = tm_rows
     return f_te, f_tm
@@ -605,6 +623,8 @@ def scattering_map_matrix(
     samples: int,
     seed: int,
     device: torch.device,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """(tx, rx) matrix of the MC basic Kirchhoff scattering path gain.
 
@@ -690,7 +710,11 @@ def scattering_map_matrix(
     diagonal = scene_diagonal_m(scene)
     epsilon = scale_aware_epsilon(points, scene_diagonal=diagonal)
     rx_count = int(rx_pos.shape[0])
-    wavelength = LIGHT_SPEED_M_PER_S / float(scene.frequency)
+    # Under ad the carrier stays a live tensor so lambda / amplitude^2 carry the
+    # frequency gradient; the plain path reads the detached host scalar and is
+    # bitwise unchanged.
+    frequency = scene.frequency if ad else float(scene.frequency)
+    wavelength = LIGHT_SPEED_M_PER_S / frequency
     amplitude_sq = (wavelength / (4.0 * math.pi)) ** 2
     area_weight = total_area / float(count)
     cell_chunk = max(1, 4_194_304 // max(count, 1))
@@ -747,6 +771,8 @@ def scattering_map_matrix(
                 wi_local.repeat_interleave(block, dim=0).contiguous(),
                 wo_local.contiguous(),
                 runtimes,
+                ad=ad,
+                ledger=ledger,
             )
             f_unpol = 0.5 * (f_te + f_tm)
             visible_rx = geometry_bridge.raydn_visibility_forward(

@@ -287,6 +287,8 @@ def scattering_component_map(
     samples: int,
     seed: int,
     device: torch.device,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
 
@@ -296,6 +298,13 @@ def scattering_component_map(
     holds the per-cell scattering PATH GAIN at the cell center times the
     transmitter power, mirroring the LoS / transmission map conventions, so
     component_power equals the map sum.
+
+    Under ``ad`` the matrix keeps its graph (table values, frequency and tx
+    power gradients, ADR-015 op 1) and the grid layout runs behind the same
+    ``mc_los_grid_maps_ad`` autograd Function the LoS/transmission maps use;
+    the area-sample set, both visibility masks and the incidence gates stay
+    frozen winners (they are folded into the matrix before layout, so the layout
+    carries no separate visibility mask).
     """
 
     tx_pos, tx_power = transmitter_positions(scene, device=device)
@@ -317,7 +326,18 @@ def scattering_component_map(
         samples=samples,
         seed=seed,
         device=device,
+        ad=ad,
+        ledger=ledger,
     )
+    if ad:
+        if ledger is not None:
+            ledger.add()
+        return (
+            mc_los_grid_maps_ad(
+                matrix, None, rows=grid.shape[0], cols=grid.shape[1]
+            ),
+            stats,
+        )
     return (
         mc_los_component_maps_from_matrix(
             matrix, rows=grid.shape[0], cols=grid.shape[1]

@@ -169,6 +169,17 @@ class KirchhoffTable:
     tangent_plane_ok: bool
     slope_ok: bool
     reciprocity_error: float
+    # ADR-015 Part C differentiable-build intermediates. The float64 numpy
+    # build is unchanged bit-for-bit; these are the exact f32 downcasts of the
+    # structural quantities the native table-build adjoint recomputes against
+    # (no f32 recompute drift). ``pre_balance_lobe_*`` are the reciprocity-
+    # symmetrized raw lobes ``S`` BEFORE the diagonal energy balance
+    # (``F = a S a``); the balance factors ``a`` and the diffuse budgets are
+    # already exposed as ``normalization_applied`` and ``r_diff_te``/
+    # ``r_diff_tm``. All default to ``None`` so a table built without the AD
+    # path (e.g. a bare numpy import) carries no extra state.
+    pre_balance_lobe_te: torch.Tensor | None = None  # [Nti, Npi, Nto, Npo]
+    pre_balance_lobe_tm: torch.Tensor | None = None  # [Nti, Npi, Nto, Npo]
 
     @property
     def device(self) -> torch.device:
@@ -422,6 +433,13 @@ def build_kirchhoff_table(
     f_sym_te = 0.5 * (f_raw_te + swap_te)
     f_sym_tm = 0.5 * (f_raw_tm + swap_tm)
 
+    # ADR-015 Part C: snapshot the pre-balance symmetrized lobes S before the
+    # in-place diagonal energy balance below overwrites f_sym. The native
+    # table-build adjoint consumes these (with a, r_diff) as its saved
+    # intermediates; the numpy primal is unaffected.
+    pre_balance_lobe_te = f_sym_te.copy()
+    pre_balance_lobe_tm = f_sym_tm.copy()
+
     # 6) Symmetric energy balance on the discrete directional state matrix.
     # A one-sided row scale would make the energy exact but destroy
     # f(wi,wo)==f(wo,wi).  Diagonal scaling on both arguments preserves the
@@ -504,6 +522,8 @@ def build_kirchhoff_table(
         tangent_plane_ok=tangent_plane_ok,
         slope_ok=slope_ok,
         reciprocity_error=reciprocity_error,
+        pre_balance_lobe_te=as32(pre_balance_lobe_te),
+        pre_balance_lobe_tm=as32(pre_balance_lobe_tm),
     )
 
 

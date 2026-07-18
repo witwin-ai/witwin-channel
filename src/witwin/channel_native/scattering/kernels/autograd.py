@@ -33,6 +33,9 @@ from .functional import (
     scattering_ensemble_eval_jvp,
     scattering_patch_integral_eval_backward,
     scattering_patch_integral_eval_jvp,
+    scattering_table_eval,
+    scattering_table_eval_backward,
+    scattering_table_eval_jvp,
 )
 
 
@@ -385,6 +388,97 @@ def scattering_ensemble_eval_ad(
     return dict(zip(_ENSEMBLE_OUTPUT_FIELDS, values, strict=True))
 
 
+_TABLE_EVAL_OUTPUT_FIELDS = ("f_te", "f_tm")
+
+
+class _ScatteringTableEvalAdFunction(torch.autograd.Function):
+    """Differentiable resident Kirchhoff BSDF table lookup (ADR-015 op 1).
+
+    Every input is live: the local-frame directions ``wi``/``wo`` and the two
+    4-D tables ``f_te``/``f_tm``. There is no fixed-input reject list. Both
+    ``f_te_row``/``f_tm_row`` outputs are differentiable; a below-horizon row
+    carries zero value and zero gradient (the shared quadrilinear helper gates
+    it). Used by the MC-basic scattering map so table values, and through the
+    surrounding Torch arithmetic frequency and tx power, keep their gradients.
+    """
+
+    @staticmethod
+    def forward(wi, wo, f_te, f_tm):
+        return scattering_table_eval(wi, wo, f_te, f_tm)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        primals = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs
+        )
+        ctx.save_for_backward(*primals)
+        ctx.save_for_forward(*primals)
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_f_te, grad_f_tm):
+        need_dirs = bool(ctx.needs_input_grad[0]) or bool(ctx.needs_input_grad[1])
+        need_tables = bool(ctx.needs_input_grad[2]) or bool(ctx.needs_input_grad[3])
+        if (not (need_dirs or need_tables)) or (
+            grad_f_te is None and grad_f_tm is None
+        ):
+            return None, None, None, None
+        out = scattering_table_eval_backward(
+            *ctx.saved_tensors,
+            grad_out_f_te=grad_f_te,
+            grad_out_f_tm=grad_f_tm,
+            need_grad_dirs=need_dirs,
+            need_grad_tables=need_tables,
+        )
+        return (
+            _grad_or_none(out, "grad_wi", bool(ctx.needs_input_grad[0])),
+            _grad_or_none(out, "grad_wo", bool(ctx.needs_input_grad[1])),
+            _grad_or_none(out, "grad_f_te", bool(ctx.needs_input_grad[2])),
+            _grad_or_none(out, "grad_f_tm", bool(ctx.needs_input_grad[3])),
+        )
+
+    @staticmethod
+    def jvp(ctx, t_wi, t_wo, t_f_te, t_f_tm):
+        saved = ctx.saved_tensors
+        tangents = {
+            "tangent_wi": _ad_geometry_tangent(
+                "scattering_table_eval_ad tangent_wi", t_wi, saved[0]
+            ),
+            "tangent_wo": _ad_geometry_tangent(
+                "scattering_table_eval_ad tangent_wo", t_wo, saved[1]
+            ),
+            "tangent_f_te": _ad_geometry_tangent(
+                "scattering_table_eval_ad tangent_f_te", t_f_te, saved[2]
+            ),
+            "tangent_f_tm": _ad_geometry_tangent(
+                "scattering_table_eval_ad tangent_f_tm", t_f_tm, saved[3]
+            ),
+        }
+        if all(value is None for value in tangents.values()):
+            return None, None
+        with torch_compat.disable_functorch():
+            out = scattering_table_eval_jvp(
+                *(_ad_native_tensor(value) for value in saved), **tangents
+            )
+        return out["tangent_f_te"], out["tangent_f_tm"]
+
+
+def scattering_table_eval_ad(
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+    f_te: torch.Tensor,
+    f_tm: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Differentiable :func:`scattering_table_eval` (ADR-015 op 1).
+
+    Returns the ``(f_te_row, f_tm_row)`` pair like the plain forward, so the
+    MC-basic scattering map can drop it in behind ``ad``.
+    """
+
+    return _ScatteringTableEvalAdFunction.apply(wi, wo, f_te, f_tm)
+
+
 class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
     """Fixed-topology differentiable phase-screen patch integral (ADR-014 op 2).
 
@@ -698,6 +792,8 @@ def scattering_patch_integral_eval_ad(
 __all__ = [
     "_ScatteringEnsembleEvalAdFunction",
     "_ScatteringPatchIntegralEvalAdFunction",
+    "_ScatteringTableEvalAdFunction",
     "scattering_ensemble_eval_ad",
     "scattering_patch_integral_eval_ad",
+    "scattering_table_eval_ad",
 ]
