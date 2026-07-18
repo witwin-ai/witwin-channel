@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
@@ -23,7 +22,6 @@ from witwin.channel_native.materials.encoding import (
     face_material_tensors,
 )
 from witwin.channel_native.scene.tensors import (
-    LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
     _frequency_scalar,
 )
 from witwin.channel_native.propagation.fields.kernels import (
@@ -31,6 +29,9 @@ from witwin.channel_native.propagation.fields.kernels import (
 )
 from witwin.channel_native.propagation.fields.kernels import (
     functional as field_functional,
+)
+from witwin.channel_native.propagation.fields.kernels import (
+    rough_scale as field_rough_scale,
 )
 from witwin.channel_native.propagation.geometry.kernels import (
     autograd as geometry_autograd,
@@ -60,28 +61,25 @@ if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
 
-def _rough_reflection_factor(
+def _rough_scale_inputs(
     compiled: object,
     topology: PathTopology,
     rows: torch.Tensor,
     depth_value: int,
-    source: torch.Tensor,
     material: dict[str, torch.Tensor],
-    positions: torch.Tensor,
-    normals: torch.Tensor,
     *,
-    frequency_hz: float | torch.Tensor,
     scattering_active: bool,
-) -> torch.Tensor | None:
-    """Per-row field scale for rough-surface specular reflection rows.
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
+    """Host-side per-bounce inputs for the native rough-reflection C_r op.
 
     Kirchhoff-rough faces (scatter_model_id == 1) attenuate their coherent
     specular Jones by C_r = exp(-2*(k0*cos_theta_i*sigma_h)^2) per bounce
-    (plan 05 section 6.2, contract section 6). C_r is a real positive scalar,
-    so this first-order Python-side attenuation of the native smooth-stack
-    field is exact for the field magnitude and phase-neutral. Under AD the
-    seam passes the 0-d tensor frequency so k0 (and hence dC_r/df) stays on
-    the autograd graph; a float frequency keeps the primal path.
+    (plan 05 section 6.2, contract section 6). The native op
+    ``field_rough_reflection_scale`` (ADR-010 op 3) owns the factor math and
+    its application; this helper only gates on the host materials and gathers
+    the per-bounce ``sigma_b`` / ``rough_b`` and the realization ``replaced``
+    mask. Returns ``None`` for smooth scenes so the reflection loop pays no
+    extra GPU work.
 
     When the scattering component is active, single-bounce specular rows on a
     surface carrying a realization_coherent phase screen are zeroed: the
@@ -104,10 +102,23 @@ def _rough_reflection_factor(
     if not rough_face_any and not realization_ids:
         return None
 
+    row_count = int(rows.numel())
     face_material = material["material_id"].to(dtype=torch.int64)
     rough_face = material["scatter_model_id"] == 1
-    realization_face = None
-    if realization_ids:
+    face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
+    if rough_face_any:
+        sigma_face = material["rough_sigma_h_m"][face_material]
+        sigma_b = sigma_face[face_id].to(torch.float32).contiguous()
+        rough_b = rough_face[face_material][face_id].contiguous()
+    else:
+        sigma_b = torch.zeros(
+            (row_count, depth_value), device=device, dtype=torch.float32
+        )
+        rough_b = torch.zeros(
+            (row_count, depth_value), device=device, dtype=torch.bool
+        )
+    replaced = torch.zeros((row_count,), device=device, dtype=torch.bool)
+    if realization_ids and depth_value == 1:
         face_structure = compiled.geometry.face_structure_id.to(
             device=device, dtype=torch.int64
         )
@@ -116,29 +127,8 @@ def _rough_reflection_factor(
         )
         for index in realization_ids:
             realization_face |= face_structure == index
-
-    face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
-    factor = torch.ones((int(rows.numel()),), device=device, dtype=torch.float32)
-    if rough_face_any:
-        sigma_face = material["rough_sigma_h_m"][face_material]
-        sigma_b = sigma_face[face_id]
-        rough_b = rough_face[face_material][face_id]
-        prev = torch.cat(
-            (source[rows].unsqueeze(1), positions[:, : depth_value - 1]), dim=1
-        )
-        seg = positions - prev
-        seg_dir = seg / torch.linalg.vector_norm(seg, dim=-1, keepdim=True).clamp_min(
-            1.0e-9
-        )
-        cos_b = (seg_dir * normals).sum(-1).abs()
-        k0 = 2.0 * math.pi * frequency_hz / _LIGHT_SPEED_M_PER_S
-        attenuation = torch.exp(-2.0 * (k0 * cos_b * sigma_b).square())
-        c_r = torch.where(rough_b, attenuation, torch.ones_like(attenuation))
-        factor = c_r.prod(dim=1)
-    if realization_face is not None and depth_value == 1:
-        replaced = realization_face[face_id[:, 0]]
-        factor = torch.where(replaced, torch.zeros_like(factor), factor)
-    return factor
+        replaced = realization_face[face_id[:, 0]].contiguous()
+    return sigma_b, rough_b, replaced
 
 
 def _evaluate_los_fields(
@@ -199,6 +189,8 @@ def _evaluate_reflection_fields(
     reflection_field_op: Callable[..., dict[str, torch.Tensor]],
     ledger: AdLaunchLedger | None,
     material: dict[str, torch.Tensor] | None,
+    ad_enabled: bool,
+    frequency_value: float | None,
     field_xyz: torch.Tensor,
     coefficient: torch.Tensor,
     path_field: torch.Tensor,
@@ -253,28 +245,53 @@ def _evaluate_reflection_fields(
             ledger.add(*reflection_args)
         evaluated = reflection_field_op(*reflection_args)
         # Rough-surface coherent attenuation / realization delta replacement
-        # (see _rough_reflection_factor). Applied Python-side on the native
-        # smooth-stack result; C_r is real, so field magnitude scaling is
-        # exact and phase-neutral.
-        rough_factor = _rough_reflection_factor(
+        # (ADR-010 op 3). The native field_rough_reflection_scale kernel owns
+        # the C_r factor and its application onto the four field outputs; C_r
+        # is real, so magnitude scaling is exact and phase-neutral. The
+        # host-side material gating stays here (no added GPU sync for smooth
+        # scenes).
+        rough_inputs = _rough_scale_inputs(
             compiled,
             topology,
             rows,
             depth_value,
-            source,
             material,
-            positions,
-            normals,
-            frequency_hz=frequency,
             scattering_active="scattering" in components,
         )
-        if rough_factor is not None:
-            field_scale = rough_factor.to(torch.float32)
-            evaluated = dict(evaluated)
-            evaluated["field_vector"] = evaluated["field_vector"] * field_scale[:, None]
-            evaluated["coefficient"] = evaluated["coefficient"] * field_scale
-            evaluated["path_field"] = evaluated["path_field"] * field_scale
-            evaluated["path_gain"] = evaluated["path_gain"] * field_scale.square()
+        if rough_inputs is not None:
+            sigma_b, rough_b, replaced = rough_inputs
+            scale_args = (
+                evaluated["field_vector"],
+                evaluated["coefficient"],
+                evaluated["path_field"],
+                evaluated["path_gain"],
+                positions,
+                normals,
+                source[rows].contiguous(),
+                sigma_b,
+                rough_b,
+                replaced,
+            )
+            if ledger is not None:
+                ledger.add(*scale_args)
+            if ad_enabled:
+                scaled = field_rough_scale.field_rough_reflection_scale_ad(
+                    *scale_args,
+                    frequency=frequency,
+                    frequency_value=frequency_value,
+                )
+            else:
+                scaled = field_functional.field_rough_reflection_scale(
+                    *scale_args, frequency_hz=frequency
+                )
+            evaluated = {
+                **evaluated,
+                "field_vector": scaled["field_vector"],
+                "coefficient": scaled["coefficient"],
+                "path_field": scaled["path_field"],
+                "path_gain": scaled["path_gain"],
+            }
+            launch_count += 1
         field_xyz.index_copy_(0, rows, evaluated["field_vector"])
         coefficient.index_copy_(0, rows, evaluated["coefficient"])
         path_field.index_copy_(0, rows, evaluated["path_field"])
@@ -882,6 +899,8 @@ def evaluate_path_fields(
         reflection_field_op,
         ledger,
         material,
+        ad_enabled,
+        frequency_value if ad_enabled else None,
         field_xyz,
         coefficient,
         path_field,

@@ -66,6 +66,50 @@ pybind11::dict cn_scattering_event_probabilities(
     torch::Tensor scatter_model_id,
     double frequency_hz,
     double probability_floor);
+pybind11::dict cn_scattering_patch_integral_eval(
+    torch::Tensor patch_tris,
+    torch::Tensor patch_uvs,
+    torch::Tensor rows,
+    torch::Tensor d_i,
+    torch::Tensor d_o,
+    torch::Tensor n_rows,
+    torch::Tensor r_te,
+    torch::Tensor r_tm,
+    torch::Tensor pol_t,
+    torch::Tensor pol_r,
+    torch::Tensor r1_rows,
+    torch::Tensor r2_rows,
+    torch::Tensor centroids,
+    torch::Tensor heights,
+    torch::Tensor quad_a,
+    torch::Tensor quad_b,
+    torch::Tensor quad_w,
+    double k0);
+pybind11::dict cn_scattering_ensemble_eval(
+    torch::Tensor wo_rows,
+    torch::Tensor r2_rows,
+    torch::Tensor cos_o_rows,
+    torch::Tensor n_o,
+    torch::Tensor t1r,
+    torch::Tensor t2r,
+    torch::Tensor wi_local,
+    torch::Tensor cos_i,
+    torch::Tensor r1,
+    torch::Tensor a_te2,
+    torch::Tensor a_tm2,
+    torch::Tensor weights,
+    torch::Tensor material_id,
+    torch::Tensor backup_axis,
+    torch::Tensor rx_pol,
+    torch::Tensor rc_idx,
+    torch::Tensor sc_idx,
+    torch::Tensor fte_flat,
+    torch::Tensor ftm_flat,
+    torch::Tensor table_offset,
+    torch::Tensor table_dims,
+    torch::Tensor material_slot,
+    double coef,
+    double threshold);
 
 void register_materials(pybind11::module_ &module) {
     module.def(
@@ -88,4 +132,8 @@ void register_materials(pybind11::module_ &module) {
                "Sample a resident Kirchhoff CDF table with native CUDA.");
     module.def("scattering_event_probabilities", &cn_scattering_event_probabilities,
                "Evaluate fused rough-surface event budgets with native CUDA.");
+    module.def("scattering_ensemble_eval", &cn_scattering_ensemble_eval,
+               "Evaluate the Kirchhoff ensemble scattering row physics with native CUDA (ADR-010 op 1).");
+    module.def("scattering_patch_integral_eval", &cn_scattering_patch_integral_eval,
+               "Evaluate the realization-coherent phase-screen patch integral with native CUDA (ADR-010 op 2).");
 }

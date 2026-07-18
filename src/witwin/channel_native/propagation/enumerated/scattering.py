@@ -73,6 +73,7 @@ from witwin.channel_native.core.field_state import (
     transmitter_polarizations,
 )
 from witwin.channel_native.materials.kernels import functional as material_kernels
+from witwin.channel_native.scattering.kernels import functional as scattering_kernels
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.endpoints import (
     receiver_positions_and_layout,
@@ -86,7 +87,6 @@ from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.propagation.topology.export import EvaluatedPathSidecars
 from witwin.channel_native.materials.models import PhaseScreen
 from witwin.channel_native.physics.conventions import C0
-from witwin.channel_native.scattering import eval_bsdf, patch_phase_integral
 from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE
 
 if TYPE_CHECKING:
@@ -353,9 +353,11 @@ def _ensemble_rows(
     info["ensemble_sample_count"] = sample_count
     info["ensemble_face_count"] = int(ensemble_faces.numel())
 
-    tables = compiled.kirchhoff_tables  # raises kirchhoff_domain_exceeded
+    resources = compiled.kirchhoff_resources  # raises kirchhoff_domain_exceeded
+    stack = resources.stack
     materials = compiled.materials
     axis_rad = materials.rough_axis_rad.to(device=device, dtype=torch.float32)
+    sample_material_i32 = sample_material.to(torch.int32).contiguous()
 
     frequency = float(scene.frequency)
     wavelength = C0 / frequency
@@ -431,53 +433,48 @@ def _ensemble_rows(
             if int(sc.shape[0]) == 0:
                 continue
 
-            wo_row = wo_w[rc, sc]
-            cos_o_row = cos_o[rc, sc]
-            r2_row = r2[rc, sc]
-            wo_local = torch.stack(
-                (
-                    (wo_row * t1r[sc]).sum(-1),
-                    (wo_row * t2r[sc]).sum(-1),
-                    cos_o_row,
-                ),
-                dim=-1,
+            # Native Kirchhoff ensemble row physics (ADR-010 op 1). The
+            # candidate grid (to_rx/r2/wo/cos_o) stays Torch per the ADR;
+            # its surviving rows are gathered here (bitwise the values the
+            # previous Torch physics consumed) and the kernel owns wo_local,
+            # the stacked-table lookup, the outgoing s/p basis + receiver
+            # projections, f_eff, gain, keep, amplitude and length. The row
+            # selection/concat below stays Torch (structural).
+            wo_row = wo_w[rc, sc].contiguous()
+            evaluated = scattering_kernels.scattering_ensemble_eval(
+                wo_row,
+                r2[rc, sc].contiguous(),
+                cos_o[rc, sc].contiguous(),
+                n_o,
+                t1r,
+                t2r,
+                wi_local,
+                cos_i,
+                r1,
+                a_te2,
+                a_tm2,
+                weights,
+                sample_material_i32,
+                backup_axis,
+                rx_pol[rx_start:rx_end].contiguous(),
+                rc.contiguous(),
+                sc.contiguous(),
+                stack.f_te_flat,
+                stack.f_tm_flat,
+                stack.table_offset,
+                stack.table_dims,
+                stack.material_slot,
+                coef=float(tx_power[tx_index]) * power_scale,
+                threshold=max(threshold, 0.0),
             )
-            f_te = torch.zeros_like(cos_o_row)
-            f_tm = torch.zeros_like(cos_o_row)
-            for material_index, table in tables.items():
-                mask = sample_material[sc] == material_index
-                if not bool(mask.any()):
-                    continue
-                te, tm = eval_bsdf(
-                    table, wi_local[sc][mask].contiguous(), wo_local[mask].contiguous()
-                )
-                f_te[mask] = te
-                f_tm[mask] = tm
-
-            # Receive-side co-pol s/p projections of the receiver polarization.
-            s_o, p_o = _sp_basis(n_o[sc], wo_row, backup_axis[sc])
-            pol_r = rx_pol[rx_start + rc]
-            pol_r_perp = pol_r - (pol_r * wo_row).sum(-1, keepdim=True) * wo_row
-            g_te2 = (pol_r_perp * s_o).sum(-1).square()
-            g_tm2 = (pol_r_perp * p_o).sum(-1).square()
-            f_eff = f_te * a_te2[sc] * g_te2 + f_tm * a_tm2[sc] * g_tm2
-
-            gain = (
-                float(tx_power[tx_index])
-                * power_scale
-                * f_eff
-                * cos_i[sc]
-                * cos_o_row
-                * weights[sc]
-                / (r1[sc].square() * r2_row.square())
-            )
-            keep = gain > max(threshold, 0.0)
+            keep = evaluated["keep"]
             if not bool(keep.any()):
                 continue
-            rc, sc, gain, r2_row = rc[keep], sc[keep], gain[keep], r2_row[keep]
+            rc, sc = rc[keep], sc[keep]
+            gain = evaluated["gain"][keep]
+            length = evaluated["length"][keep]
             wo_row = wo_row[keep]
-            length = r1[sc] + r2_row
-            amplitude = gain.clamp_min(0.0).sqrt()
+            amplitude = evaluated["amplitude"][keep]
             zero = torch.zeros_like(amplitude)
             collector.add(
                 tx_id=torch.full_like(sc, tx_index, dtype=torch.int64).to(torch.int32),
@@ -724,54 +721,35 @@ def _realization_rows(
                 d_i = -wi_w[rows]
                 d_o = wo_w[rows]
                 n_rows = n_o[rows]
-                backup_axis = _stable_tangent(n_rows)
-                s_i, p_i = _sp_basis(n_rows, d_i, backup_axis)
-                s_o, p_o = _sp_basis(n_rows, d_o, backup_axis)
-                pol_t = tx_pol[tx_index].reshape(1, 3)
-                pol_t_perp = pol_t - (pol_t * d_i).sum(-1, keepdim=True) * d_i
-                pol_r = rx_pol[rx_index].reshape(1, 3)
-                pol_r_perp = pol_r - (pol_r * d_o).sum(-1, keepdim=True) * d_o
-                a_te = (pol_t_perp * s_i).sum(-1)
-                a_tm = (pol_t_perp * p_i).sum(-1)
-                g_te = (pol_r_perp * s_o).sum(-1)
-                g_tm = (pol_r_perp * p_o).sum(-1)
-                jones = r_te * (a_te * g_te) + r_tm * (a_tm * g_tm)
 
-                k_i_vec = d_i * k0
-                k_s_vec = d_o * k0
-                q = k_s_vec - k_i_vec
-                q_norm = torch.linalg.vector_norm(q, dim=-1)
-                q_n = (q * n_rows).sum(-1)
-                prefactor = (
-                    1j * k0 * (q_norm.square() / (k0 * q_n.clamp_min(1.0e-9)))
-                    / (4.0 * math.pi)
+                # Native phase-screen patch integral (ADR-010 op 2): the
+                # kernel owns the jones/prefactor/carrier assembly and the
+                # Duffy-mapped 16x16 Gauss-Legendre quadrature over the
+                # phase-screen heights, evaluating the swapped-wave-vector
+                # integrand exp(-j*(q'.x + q_n'*h)) with q' = -q (the
+                # physical +j integrand of the module docstring derivation)
+                # and the fixed-order deterministic total reduction.
+                evaluated = scattering_kernels.scattering_patch_integral_eval(
+                    patch_tris,
+                    patch_uvs,
+                    rows.contiguous(),
+                    d_i.contiguous(),
+                    d_o.contiguous(),
+                    n_rows.contiguous(),
+                    r_te.contiguous(),
+                    r_tm.contiguous(),
+                    tx_pol[tx_index].contiguous(),
+                    rx_pol[rx_index].contiguous(),
+                    r1[rows].contiguous(),
+                    r2[rows].contiguous(),
+                    centroids[rows].contiguous(),
+                    runtime.heights_m,
+                    k0=k0,
                 )
-                carrier = torch.polar(
-                    torch.ones_like(q_n),
-                    -(k0 * (r1[rows] + r2[rows]) + (q * centroids[rows]).sum(-1)),
-                ).to(torch.complex64)
-
-                total = torch.zeros((), device=device, dtype=torch.complex64)
-                row_list = rows.tolist()
-                for slot, patch_index in enumerate(row_list):
-                    # Swapped wave vectors: patch_phase_integral integrates
-                    # exp(-j*(q'.x + q_n'*h)) with q' = -q, i.e. the physical
-                    # +j integrand of the module docstring derivation.
-                    integral = patch_phase_integral(
-                        runtime,
-                        patch_tris[patch_index],
-                        patch_uvs[patch_index],
-                        k_s_vec[slot],
-                        k_i_vec[slot],
-                        frequency,
-                    )
-                    total = total + (
-                        prefactor[slot]
-                        * jones[slot]
-                        * carrier[slot]
-                        / (r1[patch_index] * r2[patch_index])
-                    ) * integral
-                    info["realization_patch_integrals"] += 1
+                total = evaluated["total"]
+                # Same VALUE as the previous per-patch loop counter: one
+                # integral per selected row, counted host-side.
+                info["realization_patch_integrals"] += int(rows.numel())
 
                 amplitude_scale = math.sqrt(
                     max(float(tx_power[tx_index]), 1.0e-30)

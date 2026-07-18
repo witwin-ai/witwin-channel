@@ -674,21 +674,10 @@
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 201
     },
-    "6ce0690a21d4d0a8": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "python",
-      "files": [
-        "evaluation.py"
-      ],
-      "lockstep_tests": [
-        "tests/test_native_owner_inventory.py",
-        "tests/kernels/test_em_layer_stack.py",
-        "tests/kernels/test_scattering_kernels.py"
-      ],
-      "owner": "materials-evaluation",
-      "provenance": "hand-curated",
-      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
-      "token_count": 100
+    "6a6cd66ce1fb7900": {
+      "category": "host_check",
+      "owner": "propagation/fields/kernels rough_scale",
+      "reason": "backward and jvp host entry points repeat the tensor-contract validation preamble; reducible by a shared host helper in a follow-up dedup change"
     },
     "6ed62094d3b7940f": {
       "category": "indexing_packing",
@@ -1053,6 +1042,17 @@
       "reason": "Repeated native-op keyword argument plumbing for the diffraction grid spec.",
       "token_count": 101
     },
+    "a1a46b4d20910899": {
+      "category": "numeric_sensitive_exempt",
+      "lockstep_tests": [
+        "tests/kernels/test_field_rough_reflection_scale.py",
+        "tests/ad/test_solver_rough_reflection_ad.py",
+        "tests/ad/test_deterministic_accum_ad.py",
+        "tests/ad/test_field_em_ad.py"
+      ],
+      "owner": "native AD kernels (field_transport/wedge/deterministic_accum/rough_scale)",
+      "reason": "float-faithful per-TU device math primitives (rn-qualified dot/segment helpers) mirrored across AD translation units; per-TU copies preserve fmad and rounding configuration per ADR-009/ADR-010, consolidation into an owned header is a follow-up dedup PR"
+    },
     "a34b1b0e14359094": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -1130,6 +1130,15 @@
       "provenance": "hand-curated",
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 142
+    },
+    "b475dbf93c651169": {
+      "category": "numeric_sensitive_exempt",
+      "lockstep_tests": [
+        "tests/kernels/test_field_rough_reflection_scale.py",
+        "tests/ad/test_solver_rough_reflection_ad.py"
+      ],
+      "owner": "propagation/fields/kernels rough_scale",
+      "reason": "primal, backward, and jvp kernels repeat the C_r attenuation expression block; expression-order equality across the three entry points is the AD contract (plan G3, ADR-010 op 3) and must not be abstracted"
     },
     "b62eda431fcd1344": {
       "category": "host_check",
@@ -1340,19 +1349,6 @@
       "provenance": "hand-curated",
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 150
-    },
-    "e3a2e88d2ed37a9c": {
-      "category": "host_check",
-      "corpus": "native",
-      "files": [
-        "deterministic_accum.cu",
-        "field_transport_ad_common.cuh",
-        "field_wedge_ad_common.cuh"
-      ],
-      "owner": "deterministic",
-      "provenance": "hand-curated",
-      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
-      "token_count": 297
     },
     "e3baf626b3c6e751": {
       "category": "host_check",

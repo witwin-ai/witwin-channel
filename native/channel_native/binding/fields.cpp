@@ -442,6 +442,57 @@ pybind11::dict cn_field_coupled_rd(
     torch::Tensor edge_line_max,
     double frequency_hz,
     bool reverse);
+pybind11::dict cn_field_rough_reflection_scale(
+    torch::Tensor field_vector,
+    torch::Tensor coefficient,
+    torch::Tensor path_field,
+    torch::Tensor path_gain,
+    torch::Tensor positions,
+    torch::Tensor normals,
+    torch::Tensor source,
+    torch::Tensor sigma_b,
+    torch::Tensor rough_b,
+    torch::Tensor replaced,
+    double frequency_hz);
+pybind11::dict cn_field_rough_reflection_scale_backward(
+    torch::Tensor field_vector,
+    torch::Tensor coefficient,
+    torch::Tensor path_field,
+    torch::Tensor path_gain,
+    torch::Tensor positions,
+    torch::Tensor normals,
+    torch::Tensor source,
+    torch::Tensor sigma_b,
+    torch::Tensor rough_b,
+    torch::Tensor replaced,
+    double frequency_hz,
+    pybind11::object grad_field_vector,
+    pybind11::object grad_coefficient,
+    pybind11::object grad_path_field,
+    pybind11::object grad_path_gain,
+    bool need_field,
+    bool need_geometry,
+    bool need_frequency);
+pybind11::dict cn_field_rough_reflection_scale_jvp(
+    torch::Tensor field_vector,
+    torch::Tensor coefficient,
+    torch::Tensor path_field,
+    torch::Tensor path_gain,
+    torch::Tensor positions,
+    torch::Tensor normals,
+    torch::Tensor source,
+    torch::Tensor sigma_b,
+    torch::Tensor rough_b,
+    torch::Tensor replaced,
+    double frequency_hz,
+    pybind11::object tangent_field_vector,
+    pybind11::object tangent_coefficient,
+    pybind11::object tangent_path_field,
+    pybind11::object tangent_path_gain,
+    pybind11::object tangent_positions,
+    pybind11::object tangent_normals,
+    pybind11::object tangent_source,
+    double tangent_frequency);
 
 void register_fields(pybind11::module_ &module) {
     module.def(
@@ -520,6 +571,18 @@ void register_fields(pybind11::module_ &module) {
         "field_project_complex3_jvp",
         &cn_field_project_complex3_jvp,
         "JVP of the receiver projection (field vector and arrival direction).");
+    module.def(
+        "field_rough_reflection_scale",
+        &cn_field_rough_reflection_scale,
+        "Apply the rough-surface coherent attenuation C_r onto the reflection field outputs (ADR-010 op 3).");
+    module.def(
+        "field_rough_reflection_scale_backward",
+        &cn_field_rough_reflection_scale_backward,
+        "Fixed-topology VJP of the rough-reflection scale (frequency and hit geometry).");
+    module.def(
+        "field_rough_reflection_scale_jvp",
+        &cn_field_rough_reflection_scale_jvp,
+        "Fixed-topology JVP of the rough-reflection scale (frequency and hit geometry).");
     module.def(
         "coupled_rd_prepare",
         &cn_coupled_rd_prepare_cuda,

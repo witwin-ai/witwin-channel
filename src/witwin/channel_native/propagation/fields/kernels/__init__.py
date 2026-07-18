@@ -26,9 +26,16 @@ from .functional import (
     field_reflection_sequence,
     field_reflection_sequence_backward,
     field_reflection_sequence_jvp,
+    field_rough_reflection_scale,
+    field_rough_reflection_scale_backward,
+    field_rough_reflection_scale_jvp,
     field_transmission_sequence,
     field_transmission_sequence_backward,
     field_transmission_sequence_jvp,
+)
+from .rough_scale import (
+    _FieldRoughReflectionScaleAdFunction,
+    field_rough_reflection_scale_ad,
 )
 
 
@@ -39,6 +46,7 @@ __all__ = [
     "_FieldFreeSpaceAdFunction",
     "_FieldProjectComplex3AdFunction",
     "_FieldReflectionSequenceAdFunction",
+    "_FieldRoughReflectionScaleAdFunction",
     "_FieldTransmissionSequenceAdFunction",
     "coupled_rd_prepare_ad",
     "field_coupled_rd",
@@ -55,6 +63,10 @@ __all__ = [
     "field_reflection_sequence_ad",
     "field_reflection_sequence_backward",
     "field_reflection_sequence_jvp",
+    "field_rough_reflection_scale",
+    "field_rough_reflection_scale_ad",
+    "field_rough_reflection_scale_backward",
+    "field_rough_reflection_scale_jvp",
     "field_transmission_sequence",
     "field_transmission_sequence_ad",
     "field_transmission_sequence_backward",

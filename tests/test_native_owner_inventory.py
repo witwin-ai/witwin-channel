@@ -18,6 +18,7 @@ EXPECTED_OWNER_IDS = {
     "path.core",
     "field_transport.free_space",
     "field_transport.reflection_sequence",
+    "field_transport.rough_scale",
     "field_transport.transmission_sequence",
     "field_wedge.diffraction",
     "field_wedge.coupled_rd",
@@ -29,6 +30,9 @@ EXPECTED_OWNER_IDS = {
     "bdpt.connection_storage",
     "legacy_slab.primal",
     "legacy_slab.dual",
+    # ADR-010 native scattering / rough-reflection kernel owners.
+    "scattering.ensemble_eval",
+    "scattering.patch_integral",
 }
 HASH_FIELDS = (
     "name",

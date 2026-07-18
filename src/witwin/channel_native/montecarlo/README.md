@@ -41,9 +41,10 @@ promises. The parent `montecarlo` package exports no solver symbols.
 
 - Basic and BDPT are sibling owners. Neither solver may import the other or
   any other solver package.
-- Monte Carlo solvers must not call
-  `witwin.channel_native.propagation.enumerated`; that engine belongs to the
-  deterministic/path family.
+- Basic must not call `witwin.channel_native.propagation.enumerated`. Under the
+  narrow ADR-008 exception, `montecarlo.bdpt.pipeline` may call only the public
+  `evaluate_enumerated_paths` entry read-only as an opaque discrete-path oracle;
+  it must not import enumerated internals or add BDPT policy to that engine.
 - Orchestration may use public scene, material, geometry, topology, and field
   contracts. Solver-local kernel facades obtain required native symbols
   through the runtime symbol layer; pipelines must not import the raw
