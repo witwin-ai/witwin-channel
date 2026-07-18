@@ -88,7 +88,8 @@ fails loudly (`_ad_reject_fixed_*`), and their values are bitwise identical to
 | `bdpt_finalize_point_components_backward` / `_jvp` | linear map finalize |
 | `bdpt_finalize_component_maps_backward` / `_jvp` | linear map finalize |
 
-Twelve new ABI symbols (193 -> 205). Structural ops (concat, compact, filter,
+Twelve new ABI symbols (+12; after ADR-021's +6 the count moves 199 -> 211;
+ADR-021 lands first). Structural ops (concat, compact, filter,
 count, variance, zero, mis_weights, launch-input/sampling ops) need no
 companions: they are index/copy/diagnostic operations on frozen structure;
 the autograd Functions route cotangents through the stored index maps in the
@@ -169,7 +170,8 @@ ADR-014):
 6. **Governance.** Binding manifest (+12 symbols -> 205), contract-coverage
    manifest, owner inventory, duplication ledger, public-api snapshot
    (config contract change), FEATURE_LIST, migration note; import graph
-   clean; `EXPECTED_NATIVE_BINDING_COUNT` updated with the rebuild.
+   clean; `EXPECTED_NATIVE_BINDING_COUNT` updated with the rebuild (final
+   211 after ADR-021's 199).
 
 ## Consequences
 
