@@ -339,6 +339,187 @@ def _coupled_discrete_connection_samples(
     return _evaluated_connection_samples(paths, selected, component_out=2)
 
 
+_COHERENT_ENUMERATED_COMPONENTS = (
+    ("los", 0),
+    ("reflection", 1),
+    ("diffraction", 2),
+)
+
+
+def _enumerated_component_block_with_field(
+    scene: Scene,
+    config: Config,
+    *,
+    component: str,
+    component_id: int,
+) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor] | None:
+    """Enumerate one delta/UTD class as a discrete block plus its complex field.
+
+    ADR-019 coherent path. Returns the same unit-mass discrete connection block
+    the power-domain path uses, together with the per-row complex projected
+    field coefficient (``path_field``) selected in row order so it aligns with
+    the block. ``path_field`` is the natively evaluated complex field the
+    deterministic coherent accumulator sums, so BDPT coherent reproduces the
+    deterministic per-component coherent power.
+    """
+
+    paths, _ = evaluate_enumerated_paths(
+        scene,
+        _BDPTTopologyOptions(
+            max_depth=int(config.max_depth),
+            components=frozenset({component}),
+        ),
+    )
+    selected = torch.nonzero(
+        paths.topology.component_id == component_id, as_tuple=False
+    ).flatten()
+    block = _evaluated_connection_samples(paths, selected, component_out=component_id)
+    if block is None:
+        return None
+    field = paths.fields.path_field.index_select(0, selected)
+    return block, field.real.contiguous(), field.imag.contiguous()
+
+
+def _coupled_component_block_with_field(
+    scene: Scene, config: Config
+) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor] | None:
+    """Coupled reflection-diffraction discrete block plus its complex field."""
+
+    paths, _ = evaluate_enumerated_paths(
+        scene,
+        _BDPTTopologyOptions(
+            max_depth=int(config.max_depth),
+            components=frozenset({"reflection", "diffraction"}),
+            coupled_paths=True,
+            coupled_candidate_limit=int(config.coupled_candidate_limit),
+        ),
+    )
+    selected = torch.nonzero(paths.topology.component_id >= 3, as_tuple=False).flatten()
+    block = _evaluated_connection_samples(paths, selected, component_out=2)
+    if block is None:
+        return None
+    field = paths.fields.path_field.index_select(0, selected)
+    return block, field.real.contiguous(), field.imag.contiguous()
+
+
+def _collect_coherent_connection_samples(
+    scene: Scene,
+    config: Config,
+    *,
+    prep: _SolvePrep,
+    workspace: _EndpointWorkspace,
+) -> tuple[
+    dict[str, torch.Tensor],
+    dict[str, torch.Tensor] | None,
+    int,
+    dict[str, int],
+    dict[int, Any],
+    int,
+]:
+    """ADR-019 coherent collection over the enumerable delta/UTD family.
+
+    Every coherent-eligible component (los / reflection / diffraction, plus the
+    coupled compensator folded into diffraction) routes through the shared
+    enumerated engine as a unit-mass discrete block carrying its complex field.
+    The blocks concatenate through the native connection-sample concat (12-field
+    schema, unchanged) while the per-row field coefficients concatenate in the
+    same block order, then the coherent accumulate op sums the phasor per
+    (tx, rx, component) and finalizes ``|sum|^2``. Config validation already
+    guarantees ``components`` is a subset of {los, reflection, diffraction}, so
+    transmission/scattering never reach here.
+    """
+
+    topology_scene = workspace.topology_scene
+    tx_count = workspace.tx_count
+    rx_count = workspace.rx_count
+    launch_count = workspace.launch_count
+
+    def zero_component_matrix() -> torch.Tensor:
+        return bdpt_zero_matrix(
+            workspace.tx_reference, rows=tx_count, cols=rx_count
+        )
+
+    sample_blocks: list[dict[str, torch.Tensor]] = []
+    coeff_reals: list[torch.Tensor] = []
+    coeff_imags: list[torch.Tensor] = []
+    for component, component_id in _COHERENT_ENUMERATED_COMPONENTS:
+        if component not in config.components:
+            continue
+        built = _enumerated_component_block_with_field(
+            topology_scene, config, component=component, component_id=component_id
+        )
+        if built is not None:
+            block, coeff_real, coeff_imag = built
+            sample_blocks.append(block)
+            coeff_reals.append(coeff_real)
+            coeff_imags.append(coeff_imag)
+            launch_count += 1
+    if config.coupled_paths:
+        built = _coupled_component_block_with_field(topology_scene, config)
+        if built is not None:
+            block, coeff_real, coeff_imag = built
+            sample_blocks.append(block)
+            coeff_reals.append(coeff_real)
+            coeff_imags.append(coeff_imag)
+            launch_count += 1
+
+    empty_event_counts = {
+        "transmit": 0,
+        "reflect": 0,
+        "scatter": 0,
+        "scattering_nee_rows": 0,
+    }
+    if not sample_blocks:
+        component_matrices = {
+            component: zero_component_matrix()
+            for component in (
+                "los",
+                "reflection",
+                "diffraction",
+                "transmission",
+                "scattering",
+            )
+        }
+        return component_matrices, None, 0, empty_event_counts, {}, launch_count
+
+    estimate_samples = (
+        sample_blocks[0]
+        if len(sample_blocks) == 1
+        else bdpt_concat_connection_samples(tuple(sample_blocks))
+    )
+    # Concatenate the field coefficients in the identical block order the
+    # native concat uses so the coefficient rows align 1:1 with the samples.
+    coeff_real = coeff_reals[0] if len(coeff_reals) == 1 else torch.cat(coeff_reals, dim=0)
+    coeff_imag = coeff_imags[0] if len(coeff_imags) == 1 else torch.cat(coeff_imags, dim=0)
+    accumulated = bdpt_accumulate_connection_samples(
+        estimate_samples,
+        tx_count=tx_count,
+        rx_count=rx_count,
+        accumulation_strategy=prep.selected_accumulation,
+        combine_domain="coherent",
+        coeff_real=coeff_real,
+        coeff_imag=coeff_imag,
+    )
+    component_matrices = {
+        component: accumulated[component]
+        for component in (
+            "los",
+            "reflection",
+            "diffraction",
+            "transmission",
+            "scattering",
+        )
+    }
+    return (
+        component_matrices,
+        estimate_samples,
+        0,
+        empty_event_counts,
+        {},
+        launch_count,
+    )
+
+
 def _validate(scene: Scene, config: Config) -> ReceiverGrid | None:
     grid = first_receiver_grid(scene)
     if grid is not None and config.receiver_strategy != "grid_area":
@@ -537,6 +718,13 @@ def _collect_connection_samples(
     tx_count = workspace.tx_count
     rx_count = workspace.rx_count
     launch_count = workspace.launch_count
+    if config.coherent:
+        # ADR-019 opt-in coherent combine. Config validation guarantees the
+        # component set is coherent-eligible; route the whole solve through the
+        # enumerated delta/UTD collector with phasor accumulation.
+        return _collect_coherent_connection_samples(
+            scene, config, prep=prep, workspace=workspace
+        )
     raydn = prep.raydn
     native_samples = prep.native_samples
     native_max_depth = prep.native_max_depth

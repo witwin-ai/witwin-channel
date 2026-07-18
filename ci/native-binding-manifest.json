@@ -27,10 +27,54 @@
      "default": null,
      "name": "accumulation_strategy",
      "type": "int64_t"
+    },
+    {
+     "default": null,
+     "name": "combine_domain",
+     "type": "int64_t"
+    },
+    {
+     "default": null,
+     "name": "coeff_real",
+     "type": "torch::Tensor"
+    },
+    {
+     "default": null,
+     "name": "coeff_imag",
+     "type": "torch::Tensor"
     }
    ],
    "path": "native/channel_native/binding/bdpt.cpp",
-   "pybind_arguments": [],
+   "pybind_arguments": [
+    {
+     "default": null,
+     "name": "samples"
+    },
+    {
+     "default": null,
+     "name": "tx_count"
+    },
+    {
+     "default": null,
+     "name": "rx_count"
+    },
+    {
+     "default": null,
+     "name": "accumulation_strategy"
+    },
+    {
+     "default": "0",
+     "name": "combine_domain"
+    },
+    {
+     "default": "torch::Tensor()",
+     "name": "coeff_real"
+    },
+    {
+     "default": "torch::Tensor()",
+     "name": "coeff_imag"
+    }
+   ],
    "return_arity": 1,
    "return_type": "pybind11::dict",
    "target": "cn_bdpt_accumulate_connection_samples"

@@ -60,7 +60,10 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
     pybind11::dict samples,
     int64_t tx_count,
     int64_t rx_count,
-    int64_t accumulation_strategy);
+    int64_t accumulation_strategy,
+    int64_t combine_domain,
+    torch::Tensor coeff_real,
+    torch::Tensor coeff_imag);
 pybind11::dict cn_bdpt_filter_connection_samples(pybind11::dict samples, torch::Tensor visible);
 int64_t cn_bdpt_count_valid_connection_samples(pybind11::dict samples);
 pybind11::dict cn_bdpt_compact_connection_samples(pybind11::dict samples, int64_t max_paths);
@@ -269,7 +272,14 @@ void register_bdpt_connections(pybind11::module_ &module) {
     module.def(
         "bdpt_accumulate_connection_samples",
         &cn_bdpt_accumulate_connection_samples,
-        "Accumulate BDPT connection samples into component matrices.");
+        "Accumulate BDPT connection samples into component matrices.",
+        pybind11::arg("samples"),
+        pybind11::arg("tx_count"),
+        pybind11::arg("rx_count"),
+        pybind11::arg("accumulation_strategy"),
+        pybind11::arg("combine_domain") = 0,
+        pybind11::arg("coeff_real") = torch::Tensor(),
+        pybind11::arg("coeff_imag") = torch::Tensor());
     module.def(
         "bdpt_filter_connection_samples",
         &cn_bdpt_filter_connection_samples,

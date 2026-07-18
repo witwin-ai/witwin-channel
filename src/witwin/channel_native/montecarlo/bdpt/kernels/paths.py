@@ -543,7 +543,22 @@ def bdpt_accumulate_connection_samples(
     tx_count: int,
     rx_count: int,
     accumulation_strategy: str = "atomic",
+    combine_domain: str = "power",
+    coeff_real: torch.Tensor | None = None,
+    coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
+    """Accumulate connection samples into per-component matrices.
+
+    ``combine_domain='power'`` (default) is the incoherent per-path power
+    accumulation, bit-identical to the pre-ADR-019 behaviour; the coefficient
+    tensors are ignored. ``combine_domain='coherent'`` (ADR-019, opt-in) sums
+    the complex projected field coefficient (``coeff_real``/``coeff_imag``,
+    row-aligned to ``samples``) into per-(tx, rx, component) phasor bins and
+    finalizes ``|sum|^2``; the ``accumulation_strategy`` perf axis stays
+    orthogonal (the coherent phasor sum always uses the atomic-double
+    reduction).
+    """
+
     _validate_bdpt_connection_samples("samples", samples, None)
     if tx_count < 0 or rx_count < 0:
         raise ValueError("tx_count and rx_count must be non-negative")
@@ -552,11 +567,32 @@ def bdpt_accumulate_connection_samples(
         raise ValueError(
             "accumulation_strategy must be 'atomic', 'staged', or 'compact'"
         )
+    combine_ids = {"power": 0, "coherent": 1}
+    if combine_domain not in combine_ids:
+        raise ValueError("combine_domain must be 'power' or 'coherent'")
+    if combine_domain == "coherent":
+        if coeff_real is None or coeff_imag is None:
+            raise ValueError("coherent combine requires coeff_real and coeff_imag")
+        for name, tensor in (("coeff_real", coeff_real), ("coeff_imag", coeff_imag)):
+            validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
+            if tensor.shape != samples["contribution"].shape:
+                raise ValueError(f"{name} must match connection-sample rows")
+            if tensor.get_device() != samples["contribution"].get_device():
+                raise ValueError(f"{name} must share the connection-sample device")
+    else:
+        empty = torch.empty(
+            (0,), device=samples["contribution"].device, dtype=torch.float32
+        )
+        coeff_real = empty
+        coeff_imag = empty
     exported = _required_native_op("bdpt_accumulate_connection_samples")(
         samples,
         int(tx_count),
         int(rx_count),
         int(strategy_ids[accumulation_strategy]),
+        int(combine_ids[combine_domain]),
+        coeff_real,
+        coeff_imag,
     )
     if not isinstance(exported, dict):
         raise TypeError(

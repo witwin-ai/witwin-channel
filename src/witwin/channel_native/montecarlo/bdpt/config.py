@@ -35,6 +35,17 @@ class Config:
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
         _DEFAULT_COMPONENTS
     )
+    # Coherent combine (ADR-019). DEFAULT-OFF opt-in switch. OFF (the default)
+    # keeps today's power-domain incoherent accumulation BIT-IDENTICAL (enforced
+    # by a bitwise regression test). ON sums the complex projected field
+    # coefficient of the enumerated delta/UTD discrete connections per
+    # (tx, rx, component) and finalizes |sum|^2, so paths within a component
+    # interfere coherently (matching the deterministic per-component coherent
+    # power). Only the enumerable delta/UTD family carries a coherent field, so
+    # coherent is scoped to components subset of {los, reflection, diffraction}
+    # (coupled folds into diffraction); BDPT's stochastic transmission/scattering
+    # samplers have no coherent field and are refused under coherent.
+    coherent: bool = False
     mis: str = "power_heuristic"
     power_heuristic_beta: float = 2.0
     receiver_strategy: str = "grid_area"
@@ -101,6 +112,23 @@ class Config:
                 "montecarlo_bdpt supports_ad=False in the first replacement release; "
                 "ad_mode must be 'none'"
             )
+        if self.coherent:
+            # ADR-019: coherent combine is only defined for the enumerable
+            # delta/UTD family that carries a complex field. Refuse it loudly
+            # for the stochastic transmission/scattering samplers rather than
+            # silently combining Monte Carlo power samples as phasors.
+            unsupported = components & {"transmission", "scattering"}
+            if unsupported:
+                raise RuntimeError(
+                    "coherent combine supports only {los, reflection, diffraction} "
+                    f"components; refused for {sorted(unsupported)}"
+                )
+            if self.ad_mode != "none":
+                # AD stance mirrors ADR-017: the coherent path refuses AD until
+                # its native forward/JVP/VJP companions exist. BDPT has no AD in
+                # this release, so this is subsumed by the ad_mode gate above and
+                # kept explicit for the ADR-019 record.
+                raise RuntimeError("coherent combine does not support ad_mode != 'none'")
         if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
             raise ValueError("workspace_limit_bytes must be non-negative")
 

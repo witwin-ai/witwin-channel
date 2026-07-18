@@ -44,6 +44,116 @@ __global__ void bdpt_accumulate_connection_samples_double_kernel(
     }
 }
 
+// ADR-019 coherent combine (opt-in, DEFAULT OFF). Sum the complex per-row
+// projected field coefficient into per-(tx, rx, component) phasor bins, then
+// finalize |sum|^2. Coherent-eligible rows are the enumerated delta/UTD
+// discrete connections (los / reflection / diffraction / coupled->diffraction)
+// which carry unit forward/reverse mass, so the phasor is summed with UNIT
+// weight (mis_weight is identically 1 for those rows) and the estimate is
+// MIS-invariant by construction. This path is only reached when
+// combine_domain == 1; combine_domain == 0 keeps the power-domain incoherent
+// accumulation bit-identical and never touches the coefficient buffers.
+__global__ void bdpt_accumulate_connection_samples_coherent_kernel(
+    int64_t count,
+    const float* coeff_real,
+    const float* coeff_imag,
+    const int* tx_id,
+    const int* rx_id,
+    const int* component_id,
+    const bool* valid,
+    int64_t tx_count,
+    int64_t rx_count,
+    double* los_real,
+    double* los_imag,
+    double* reflection_real,
+    double* reflection_imag,
+    double* diffraction_real,
+    double* diffraction_imag,
+    double* transmission_real,
+    double* transmission_imag,
+    double* scattering_real,
+    double* scattering_imag) {
+    int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count || !valid[index]) {
+        return;
+    }
+    const int tx = tx_id[index];
+    const int rx = rx_id[index];
+    const int component = component_id[index];
+    if (tx < 0 || tx >= tx_count || rx < 0 || rx >= rx_count ||
+        !bdpt_component_accumulable(component)) {
+        return;
+    }
+    const int64_t out_index = static_cast<int64_t>(tx) * rx_count + rx;
+    const double re = static_cast<double>(coeff_real[index]);
+    const double im = static_cast<double>(coeff_imag[index]);
+    if (component == kComponentLos) {
+        atomicAdd(los_real + out_index, re);
+        atomicAdd(los_imag + out_index, im);
+    } else if (component == kComponentReflection) {
+        atomicAdd(reflection_real + out_index, re);
+        atomicAdd(reflection_imag + out_index, im);
+    } else if (component == kComponentDiffraction) {
+        atomicAdd(diffraction_real + out_index, re);
+        atomicAdd(diffraction_imag + out_index, im);
+    } else if (component == kComponentTransmission) {
+        atomicAdd(transmission_real + out_index, re);
+        atomicAdd(transmission_imag + out_index, im);
+    } else if (component == kComponentScattering) {
+        atomicAdd(scattering_real + out_index, re);
+        atomicAdd(scattering_imag + out_index, im);
+    }
+}
+
+__global__ void bdpt_finalize_coherent_accumulation_kernel(
+    int64_t count,
+    const double* los_real,
+    const double* los_imag,
+    const double* reflection_real,
+    const double* reflection_imag,
+    const double* diffraction_real,
+    const double* diffraction_imag,
+    const double* transmission_real,
+    const double* transmission_imag,
+    const double* scattering_real,
+    const double* scattering_imag,
+    float* path_gain,
+    float* los,
+    float* reflection,
+    float* diffraction,
+    float* transmission,
+    float* scattering) {
+    int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    const double los_power =
+        los_real[index] * los_real[index] + los_imag[index] * los_imag[index];
+    const double reflection_power =
+        reflection_real[index] * reflection_real[index] +
+        reflection_imag[index] * reflection_imag[index];
+    const double diffraction_power =
+        diffraction_real[index] * diffraction_real[index] +
+        diffraction_imag[index] * diffraction_imag[index];
+    const double transmission_power =
+        transmission_real[index] * transmission_real[index] +
+        transmission_imag[index] * transmission_imag[index];
+    const double scattering_power =
+        scattering_real[index] * scattering_real[index] +
+        scattering_imag[index] * scattering_imag[index];
+    // Paths within one component combine coherently; components combine
+    // incoherently into path_gain (matches the deterministic per-component
+    // coherent power the ADR-019 acceptance gate compares against).
+    los[index] = static_cast<float>(los_power);
+    reflection[index] = static_cast<float>(reflection_power);
+    diffraction[index] = static_cast<float>(diffraction_power);
+    transmission[index] = static_cast<float>(transmission_power);
+    scattering[index] = static_cast<float>(scattering_power);
+    path_gain[index] = static_cast<float>(
+        los_power + reflection_power + diffraction_power + transmission_power +
+        scattering_power);
+}
+
 __global__ void bdpt_compact_valid_connection_indices_kernel(
     int64_t count,
     const int* tx_id,
@@ -253,9 +363,12 @@ cn_bdpt_accumulate_connection_samples_cuda(
     at::Tensor rx_id,
     at::Tensor component_id,
     at::Tensor valid,
+    at::Tensor coeff_real,
+    at::Tensor coeff_imag,
     int64_t tx_count,
     int64_t rx_count,
-    int64_t accumulation_strategy) {
+    int64_t accumulation_strategy,
+    int64_t combine_domain) {
     check_float_cuda(contribution, "contribution", 1);
     check_float_cuda(mis_weight, "mis_weight", 1);
     check_int_cuda(tx_id, "tx_id", 1);
@@ -274,6 +387,7 @@ cn_bdpt_accumulate_connection_samples_cuda(
     check_same_device(component_id, contribution, "component_id");
     check_same_device(valid, contribution, "valid");
     TORCH_CHECK(accumulation_strategy >= 0 && accumulation_strategy <= 2, "accumulation_strategy must be 0, 1, or 2");
+    TORCH_CHECK(combine_domain == 0 || combine_domain == 1, "combine_domain must be 0 (power) or 1 (coherent)");
     auto float_options = contribution.options().dtype(at::kFloat);
     auto path_gain = at::empty({tx_count, rx_count}, float_options);
     auto los = at::empty({tx_count, rx_count}, float_options);
@@ -283,6 +397,89 @@ cn_bdpt_accumulate_connection_samples_cuda(
     auto scattering = at::empty({tx_count, rx_count}, float_options);
     const int64_t count = contribution.numel();
     const int64_t out_count = tx_count * rx_count;
+    if (combine_domain == 1) {
+        // ADR-019 coherent combine. accumulation_strategy is a power-domain
+        // reduction perf axis and stays orthogonal: the coherent phasor sum
+        // always uses the atomic-double reduction regardless of its value.
+        check_float_cuda(coeff_real, "coeff_real", 1);
+        check_float_cuda(coeff_imag, "coeff_imag", 1);
+        TORCH_CHECK(coeff_real.sizes() == contribution.sizes(), "coeff_real must match contribution");
+        TORCH_CHECK(coeff_imag.sizes() == contribution.sizes(), "coeff_imag must match contribution");
+        check_same_device(coeff_real, contribution, "coeff_real");
+        check_same_device(coeff_imag, contribution, "coeff_imag");
+        auto double_options = contribution.options().dtype(at::kDouble);
+        auto los_re = at::empty({tx_count, rx_count}, double_options);
+        auto los_im = at::empty({tx_count, rx_count}, double_options);
+        auto reflection_re = at::empty({tx_count, rx_count}, double_options);
+        auto reflection_im = at::empty({tx_count, rx_count}, double_options);
+        auto diffraction_re = at::empty({tx_count, rx_count}, double_options);
+        auto diffraction_im = at::empty({tx_count, rx_count}, double_options);
+        auto transmission_re = at::empty({tx_count, rx_count}, double_options);
+        auto transmission_im = at::empty({tx_count, rx_count}, double_options);
+        auto scattering_re = at::empty({tx_count, rx_count}, double_options);
+        auto scattering_im = at::empty({tx_count, rx_count}, double_options);
+        zero_double_tensor(los_re);
+        zero_double_tensor(los_im);
+        zero_double_tensor(reflection_re);
+        zero_double_tensor(reflection_im);
+        zero_double_tensor(diffraction_re);
+        zero_double_tensor(diffraction_im);
+        zero_double_tensor(transmission_re);
+        zero_double_tensor(transmission_im);
+        zero_double_tensor(scattering_re);
+        zero_double_tensor(scattering_im);
+        if (count > 0) {
+            constexpr int threads = 256;
+            int blocks = static_cast<int>((count + threads - 1) / threads);
+            cudaStream_t stream = at::cuda::getCurrentCUDAStream(contribution.get_device()).stream();
+            bdpt_accumulate_connection_samples_coherent_kernel<<<blocks, threads, 0, stream>>>(
+                count,
+                coeff_real.data_ptr<float>(),
+                coeff_imag.data_ptr<float>(),
+                tx_id.data_ptr<int>(),
+                rx_id.data_ptr<int>(),
+                component_id.data_ptr<int>(),
+                valid.data_ptr<bool>(),
+                tx_count,
+                rx_count,
+                los_re.data_ptr<double>(),
+                los_im.data_ptr<double>(),
+                reflection_re.data_ptr<double>(),
+                reflection_im.data_ptr<double>(),
+                diffraction_re.data_ptr<double>(),
+                diffraction_im.data_ptr<double>(),
+                transmission_re.data_ptr<double>(),
+                transmission_im.data_ptr<double>(),
+                scattering_re.data_ptr<double>(),
+                scattering_im.data_ptr<double>());
+            C10_CUDA_KERNEL_LAUNCH_CHECK();
+        }
+        if (out_count > 0) {
+            constexpr int threads = 256;
+            int blocks = static_cast<int>((out_count + threads - 1) / threads);
+            cudaStream_t stream = at::cuda::getCurrentCUDAStream(contribution.get_device()).stream();
+            bdpt_finalize_coherent_accumulation_kernel<<<blocks, threads, 0, stream>>>(
+                out_count,
+                los_re.data_ptr<double>(),
+                los_im.data_ptr<double>(),
+                reflection_re.data_ptr<double>(),
+                reflection_im.data_ptr<double>(),
+                diffraction_re.data_ptr<double>(),
+                diffraction_im.data_ptr<double>(),
+                transmission_re.data_ptr<double>(),
+                transmission_im.data_ptr<double>(),
+                scattering_re.data_ptr<double>(),
+                scattering_im.data_ptr<double>(),
+                path_gain.data_ptr<float>(),
+                los.data_ptr<float>(),
+                reflection.data_ptr<float>(),
+                diffraction.data_ptr<float>(),
+                transmission.data_ptr<float>(),
+                scattering.data_ptr<float>());
+            C10_CUDA_KERNEL_LAUNCH_CHECK();
+        }
+        return {path_gain, los, reflection, diffraction, transmission, scattering};
+    }
     if (accumulation_strategy == 1) {
         if (out_count > 0) {
             constexpr int threads = 256;

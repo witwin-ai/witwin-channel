@@ -243,7 +243,7 @@
           "name": "Config",
           "kind": "class",
           "target": "witwin.channel_native.montecarlo.bdpt.config.Config",
-          "contract_sha256": "f9ac0dec7f0c8abe46b4ed4868f5be8daf16ef8a54802047e2434b43387edd19"
+          "contract_sha256": "3c749195f82ca22774ea58ae89f8a82280d25c429f6f6784ec13eaa1ab091fe8"
         },
         {
           "name": "Result",

@@ -106,6 +106,11 @@ def make_solver_metadata(
         "sample_streams": config.sample_streams,
         "mis": config.mis,
         "power_heuristic_beta": config.power_heuristic_beta,
+        # ADR-019: which combine domain produced the component powers. "power"
+        # is the default incoherent per-path accumulation; "coherent" sums the
+        # enumerated delta/UTD complex field per (tx, rx, component).
+        "combine_domain": "coherent" if config.coherent else "power",
+        "coherent": bool(config.coherent),
         "max_depth": config.max_depth,
         "max_light_depth": config.max_light_depth,
         "max_diffraction_order": config.max_diffraction_order,

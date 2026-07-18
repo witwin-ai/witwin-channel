@@ -108,3 +108,31 @@ python ci/check_production_dependencies.py --consumer-roots ..\core ..\genesis .
 
 Consumer mode rejects the old Channel import only. This intentionally does not
 classify Radar's independent DrJit/RayD tracer as a Channel runtime fallback.
+
+## Public API additions (backward compatible)
+
+### ADR-019: `montecarlo.bdpt` coherent combine (2026-07-18)
+
+`witwin.channel_native.montecarlo.bdpt.Config` gains one field:
+
+- `coherent: bool = False`
+
+This is a purely additive, opt-in switch. The default (`False`) preserves the
+existing power-domain incoherent accumulation BIT-IDENTICALLY, so no existing
+caller, benchmark, or preset changes behaviour. Existing positional/keyword
+construction of the config is unaffected (the field appends after `components`
+with a default).
+
+When set to `True`, BDPT sums the enumerated delta/UTD family (`los`,
+`reflection`, `diffraction`, plus the `coupled_paths` compensator) coherently
+per (tx, rx, component) and finalizes `|sum|^2`, tracking the deterministic
+per-component coherent power. Coherent is refused for `transmission`/`scattering`
+components (stochastic samplers, no coherent field) and for `ad_mode != 'none'`.
+Result metadata records the active combine domain under `metadata["combine_domain"]`
+(`"power"` or `"coherent"`). See
+`docs/dev/standards/adr-019-bdpt-coherent-combine.md`.
+
+The public-api snapshot updates only the `montecarlo.bdpt.Config`
+`contract_sha256` (export count unchanged). No native ABI symbol is added; the
+`bdpt_accumulate_connection_samples` binding gains defaulted `combine_domain` /
+`coeff_real` / `coeff_imag` arguments (binding count unchanged at 193).

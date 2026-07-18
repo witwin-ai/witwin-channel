@@ -976,10 +976,26 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
         pytest.skip("CUDA is required for BDPT connection accumulation")
 
     calls: list[int] = []
+    combine_calls: list[tuple[int, bool]] = []
 
     class FakeNative:
-        def bdpt_accumulate_connection_samples(self, samples, tx_count, rx_count, accumulation_strategy):
+        def bdpt_accumulate_connection_samples(
+            self,
+            samples,
+            tx_count,
+            rx_count,
+            accumulation_strategy,
+            combine_domain=0,
+            coeff_real=None,
+            coeff_imag=None,
+        ):
             calls.append(accumulation_strategy)
+            combine_calls.append(
+                (
+                    int(combine_domain),
+                    coeff_real is not None and int(coeff_real.numel()) > 0,
+                )
+            )
             return {
                 "path_gain": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
                 "los": torch.zeros((tx_count, rx_count), device="cuda", dtype=torch.float32),
@@ -1014,6 +1030,32 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
         )
 
     assert calls == [0, 1, 2]
+    # Default combine domain is power (0) with no coefficient tensors.
+    assert combine_calls == [(0, False), (0, False), (0, False)]
+
+    # ADR-019: coherent combine passes combine_domain=1 with row-aligned
+    # coefficient tensors; the accumulation_strategy axis stays orthogonal.
+    coeff = torch.ones((1,), device="cuda", dtype=torch.float32)
+    ops.bdpt_accumulate_connection_samples(
+        samples,
+        tx_count=1,
+        rx_count=1,
+        accumulation_strategy="atomic",
+        combine_domain="coherent",
+        coeff_real=coeff,
+        coeff_imag=coeff,
+    )
+    assert combine_calls[-1] == (1, True)
+
+    # Coherent combine without coefficients is rejected before dispatch.
+    with pytest.raises(ValueError, match="coherent combine requires"):
+        ops.bdpt_accumulate_connection_samples(
+            samples,
+            tx_count=1,
+            rx_count=1,
+            accumulation_strategy="atomic",
+            combine_domain="coherent",
+        )
 
 
 def test_bdpt_accumulation_strategies_agree_with_invalid_and_duplicate_samples():

@@ -213,9 +213,12 @@ cn_bdpt_accumulate_connection_samples_cuda(
     at::Tensor rx_id,
     at::Tensor component_id,
     at::Tensor valid,
+    at::Tensor coeff_real,
+    at::Tensor coeff_imag,
     int64_t tx_count,
     int64_t rx_count,
-    int64_t accumulation_strategy);
+    int64_t accumulation_strategy,
+    int64_t combine_domain);
 void cn_bdpt_filter_connection_samples_cuda(
     at::Tensor contribution,
     at::Tensor pdf,
@@ -731,7 +734,10 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
     pybind11::dict samples,
     int64_t tx_count,
     int64_t rx_count,
-    int64_t accumulation_strategy) {
+    int64_t accumulation_strategy,
+    int64_t combine_domain,
+    torch::Tensor coeff_real,
+    torch::Tensor coeff_imag) {
     auto [path_gain, los, reflection, diffraction, transmission, scattering] = cn_bdpt_accumulate_connection_samples_cuda(
         tensor_from_dict(samples, "contribution"),
         tensor_from_dict(samples, "mis_weight"),
@@ -739,9 +745,12 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
         tensor_from_dict(samples, "rx_id"),
         tensor_from_dict(samples, "component_id"),
         tensor_from_dict(samples, "valid"),
+        coeff_real,
+        coeff_imag,
         tx_count,
         rx_count,
-        accumulation_strategy);
+        accumulation_strategy,
+        combine_domain);
     pybind11::dict out;
     out["path_gain"] = path_gain;
     out["los"] = los;

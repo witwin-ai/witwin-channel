@@ -179,6 +179,19 @@ _CAPABILITIES: dict[str, Any] = {
             "pdf_measure": "proposal_density_excludes_geometry_jacobian",
             "endpoint_connection_strategies": 1,
             "diffraction_mis_strategies": ["direct", "keller"],
+            # ADR-019: opt-in coherent combine (DEFAULT OFF). When enabled, the
+            # enumerable delta/UTD family (los / reflection / diffraction, plus
+            # the coupled compensator folded into diffraction) is summed as a
+            # complex phasor per (tx, rx, component) and finalized |sum|^2; the
+            # stochastic transmission/scattering samplers have no coherent field
+            # and are refused. AD is unsupported in the coherent path.
+            "coherent_combine": {
+                "default": False,
+                "combine_domains": ["power", "coherent"],
+                "coherent_components": ["los", "reflection", "diffraction"],
+                "coherent_excluded": ["transmission", "scattering"],
+                "supports_ad": False,
+            },
             "supports_ad": False,
             "ad_modes": ["none"],
         },
