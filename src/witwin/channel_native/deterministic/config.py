@@ -86,6 +86,14 @@ class Config:
     scattering_samples_per_m2: float = 8.0
     scattering_max_paths_per_pair: int = 4096
     scattering_power_threshold: float = 0.0
+    # Coherent scattering combine (ADR-021 D3). DEFAULT-OFF opt-in. OFF keeps
+    # the scattering slot an incoherent POWER sum bit-identical to today; ON
+    # sums the complex path_field of scattering rows per (tx, rx) and finalizes
+    # |sum|^2 (the ADR-019 per-component phasor precedent). It is physical only
+    # for realization-coherent phase-screen rows, which carry a true complex
+    # field; ensemble rows are zero-phase power rows, so the pipeline refuses an
+    # ensemble-only solve loudly. Requires the 'scattering' component.
+    scattering_coherent: bool = False
     # ISB boundary taper (ADR-017). DEFAULT-OFF visual-continuity heuristic: the
     # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
     # and the compensating order-1 diffraction odd step spreads over the same
@@ -116,6 +124,16 @@ class Config:
             self.components,
             error_message="components must be a non-empty subset of {valid}",
         )
+        if self.scattering_coherent and "scattering" not in components:
+            # ADR-021 D3: the coherent combine only applies to scattering rows.
+            # The scene-level requirement (realization-coherent phase screens,
+            # not ensemble surfaces) is enforced at solve time where the scene
+            # is known; here we reject the config-level precondition loudly.
+            raise RuntimeError(
+                "scattering_coherent=True requires the 'scattering' component "
+                "(ADR-021 D3 combines scattering rows coherently and has no "
+                "effect on any other component)"
+            )
         if self.max_depth > 5 and components & _DEPTH_CAPPED_COMPONENTS:
             raise RuntimeError(
                 "deterministic reflection/transmission currently support max_depth <= 5"

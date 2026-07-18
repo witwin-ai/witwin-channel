@@ -107,7 +107,8 @@ __global__ void deterministic_finalize_accumulation_kernel(
     T *__restrict__ field_total_real,
     T *__restrict__ field_total_imag,
     int64_t cell_count,
-    int coherent) {
+    int coherent,
+    int scattering_coherent) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t cell = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          cell < cell_count;
@@ -122,15 +123,39 @@ __global__ void deterministic_finalize_accumulation_kernel(
             const T imag = component_field_imag[out];
             if (coherent) {
                 if (slot == kScatteringSlot) {
-                    // Power-domain slot: keep the scattered gains as the
-                    // component power and fold them after the field square.
-                    scattering_power += component_power[out];
+                    if (scattering_coherent) {
+                        // ADR-021 D3 (opt-in): scattering rows combine
+                        // coherently. The slot already holds the summed
+                        // complex path field (scattered by the paths
+                        // kernel); its |sum|^2 replaces the incoherent gain
+                        // sum as the scattering component power and still
+                        // folds into power_total as a power term (components
+                        // stay mutually incoherent, exactly the ADR-019
+                        // per-component phasor precedent).
+                        const T coherent_power = real * real + imag * imag;
+                        component_power[out] = coherent_power;
+                        scattering_power += coherent_power;
+                    } else {
+                        // Power-domain slot: keep the scattered gains as the
+                        // component power and fold them after the field
+                        // square.
+                        scattering_power += component_power[out];
+                    }
                     continue;
                 }
                 const T coherent_power = real * real + imag * imag;
                 component_power[out] = coherent_power;
             } else {
-                power_sum += component_power[out];
+                if (slot == kScatteringSlot && scattering_coherent) {
+                    // ADR-021 D3 in an incoherent solve: scattering rows
+                    // still interfere with each other, but the combined
+                    // power adds incoherently to the other components.
+                    const T coherent_power = real * real + imag * imag;
+                    component_power[out] = coherent_power;
+                    power_sum += coherent_power;
+                } else {
+                    power_sum += component_power[out];
+                }
             }
             real_sum += real;
             imag_sum += imag;
@@ -175,7 +200,8 @@ __global__ void deterministic_accumulate_backward_kernel(
     int64_t path_count,
     int64_t num_tx,
     int64_t num_rx,
-    int coherent) {
+    int coherent,
+    int scattering_coherent) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     const int64_t cell_count = num_tx * num_rx;
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -202,7 +228,35 @@ __global__ void deterministic_accumulate_backward_kernel(
         if (grad_component_field_imag != nullptr) {
             g_imag += grad_component_field_imag[out];
         }
-        if (coherent && slot == kScatteringSlot) {
+        if (scattering_coherent && slot == kScatteringSlot) {
+            // ADR-021 D3 / ADR-022 accumulate spec: the scattering slot's
+            // component_power and its contribution to power_total (and, in an
+            // incoherent solve, to field_total via sqrt) are all |S|^2 with
+            // S the summed complex field. d|S|^2 = 2 Re(S) dRe + 2 Im(S) dIm,
+            // so every cotangent routes through the field with the pair
+            // convention (grad_c = 2 grad_P S); the gain reaches no total.
+            const T sr = component_field_real[out];
+            const T si = component_field_imag[out];
+            if (grad_component_power != nullptr) {
+                const T g = grad_component_power[out];
+                g_real += T(2) * sr * g;
+                g_imag += T(2) * si * g;
+            }
+            if (grad_power_total != nullptr) {
+                const T g = grad_power_total[cell];
+                g_real += T(2) * sr * g;
+                g_imag += T(2) * si * g;
+            }
+            if (!coherent && grad_field_total_real != nullptr) {
+                const T total = power_total[cell];
+                if (total > T(0)) {
+                    const T factor =
+                        grad_field_total_real[cell] / (T(2) * accum_sqrt(total));
+                    g_real += T(2) * sr * factor;
+                    g_imag += T(2) * si * factor;
+                }
+            }
+        } else if (coherent && slot == kScatteringSlot) {
             // Power-domain slot inside the coherent totals:
             // component_power = scatter(gain) and power_total adds it
             // linearly after the field square; the cell field is a
@@ -278,7 +332,8 @@ __global__ void deterministic_accumulate_tangent_scatter_kernel(
     int64_t path_count,
     int64_t num_tx,
     int64_t num_rx,
-    int coherent) {
+    int coherent,
+    int scattering_coherent) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     const int64_t cell_count = num_tx * num_rx;
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -292,8 +347,14 @@ __global__ void deterministic_accumulate_tangent_scatter_kernel(
         }
         const int64_t cell = static_cast<int64_t>(tx) * num_rx + rx;
         const int64_t out = static_cast<int64_t>(slot) * cell_count + cell;
-        if (tangent_path_gain != nullptr &&
-            (!coherent || slot == kScatteringSlot)) {
+        // Gain tangents scatter into the power buffer only where the finalize
+        // derives that slot's power from the gain sum. The scattering slot
+        // does so unless the ADR-021 D3 coherent combine is active, in which
+        // case its power comes from the summed field tangents instead.
+        const bool scatter_gain = (slot == kScatteringSlot)
+                                      ? !scattering_coherent
+                                      : !coherent;
+        if (tangent_path_gain != nullptr && scatter_gain) {
             atomicAdd(t_component_power + out, tangent_path_gain[idx]);
         }
         if (tangent_field_real != nullptr) {
@@ -321,7 +382,8 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
     T *__restrict__ t_field_total_real,
     T *__restrict__ t_field_total_imag,
     int64_t cell_count,
-    int coherent) {
+    int coherent,
+    int scattering_coherent) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t cell = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          cell < cell_count;
@@ -338,9 +400,23 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
             const T t_imag = t_component_field_imag[out];
             if (coherent) {
                 if (slot == kScatteringSlot) {
-                    // Power-domain slot: its tangent power is the scattered
-                    // gain tangents and its field tangent reaches no total.
-                    t_scattering_power += t_component_power[out];
+                    if (scattering_coherent) {
+                        // ADR-021 D3: the scattering power is |S|^2 of the
+                        // summed field, so its tangent is the linearized
+                        // square 2 Re(conj(S) t_S), folded into the total as
+                        // a power term (excluded from the coherent field sum).
+                        const T real = component_field_real[out];
+                        const T imag = component_field_imag[out];
+                        const T t_power =
+                            T(2) * (real * t_real + imag * t_imag);
+                        t_component_power[out] = t_power;
+                        t_scattering_power += t_power;
+                    } else {
+                        // Power-domain slot: its tangent power is the
+                        // scattered gain tangents and its field tangent
+                        // reaches no total.
+                        t_scattering_power += t_component_power[out];
+                    }
                     continue;
                 }
                 const T real = component_field_real[out];
@@ -349,7 +425,15 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
                 real_sum += real;
                 imag_sum += imag;
             } else {
-                t_power_sum += t_component_power[out];
+                if (slot == kScatteringSlot && scattering_coherent) {
+                    const T real = component_field_real[out];
+                    const T imag = component_field_imag[out];
+                    const T t_power = T(2) * (real * t_real + imag * t_imag);
+                    t_component_power[out] = t_power;
+                    t_power_sum += t_power;
+                } else {
+                    t_power_sum += t_component_power[out];
+                }
             }
             t_real_sum += t_real;
             t_imag_sum += t_imag;
@@ -500,7 +584,8 @@ pybind11::dict accumulate_flat_launch(
     const at::Tensor &field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent) {
+    bool coherent,
+    int scattering_coherent) {
     auto fopts = path_gain.options();
     at::Tensor component_power = at::empty({kAccumSlotCount, num_tx, num_rx}, fopts);
     at::Tensor component_field_real = at::empty({kAccumSlotCount, num_tx, num_rx}, fopts);
@@ -557,7 +642,8 @@ pybind11::dict accumulate_flat_launch(
                 field_total_real.data_ptr<T>(),
                 field_total_imag.data_ptr<T>(),
                 cell_count,
-                coherent ? 1 : 0);
+                coherent ? 1 : 0,
+                scattering_coherent);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
@@ -581,6 +667,7 @@ pybind11::dict accumulate_flat_checked(
     int64_t num_tx,
     int64_t num_rx,
     bool coherent,
+    int64_t scattering_combine_domain,
     c10::ScalarType real_dtype) {
     check_accumulate_indices(tx_id, rx_id, component_id, num_tx, num_rx);
     check_flat_tensor(path_gain, "path_gain", real_dtype);
@@ -589,14 +676,18 @@ pybind11::dict accumulate_flat_checked(
     TORCH_CHECK(path_gain.sizes() == tx_id.sizes(), "path_gain must match tx_id");
     TORCH_CHECK(field_real.sizes() == tx_id.sizes(), "field_real must match tx_id");
     TORCH_CHECK(field_imag.sizes() == tx_id.sizes(), "field_imag must match tx_id");
+    TORCH_CHECK(
+        scattering_combine_domain == 0 || scattering_combine_domain == 1,
+        "scattering_combine_domain must be 0 (power) or 1 (coherent)");
+    const int scattering_coherent = static_cast<int>(scattering_combine_domain);
     if (real_dtype == at::kFloat) {
         return accumulate_flat_launch<float>(
             tx_id, rx_id, component_id, path_gain, field_real, field_imag,
-            num_tx, num_rx, coherent);
+            num_tx, num_rx, coherent, scattering_coherent);
     }
     return accumulate_flat_launch<double>(
         tx_id, rx_id, component_id, path_gain, field_real, field_imag,
-        num_tx, num_rx, coherent);
+        num_tx, num_rx, coherent, scattering_coherent);
 }
 
 }  // namespace
@@ -610,10 +701,11 @@ pybind11::dict cn_deterministic_accumulate_flat(
     at::Tensor field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent) {
+    bool coherent,
+    int64_t scattering_combine_domain) {
     return accumulate_flat_checked(
         tx_id, rx_id, component_id, path_gain, field_real, field_imag,
-        num_tx, num_rx, coherent, at::kFloat);
+        num_tx, num_rx, coherent, scattering_combine_domain, at::kFloat);
 }
 
 pybind11::dict cn_deterministic_accumulate_flat_fwd64(
@@ -625,10 +717,11 @@ pybind11::dict cn_deterministic_accumulate_flat_fwd64(
     at::Tensor field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent) {
+    bool coherent,
+    int64_t scattering_combine_domain) {
     return accumulate_flat_checked(
         tx_id, rx_id, component_id, path_gain, field_real, field_imag,
-        num_tx, num_rx, coherent, at::kDouble);
+        num_tx, num_rx, coherent, scattering_combine_domain, at::kDouble);
 }
 
 pybind11::dict cn_deterministic_accumulate_flat_backward(
@@ -648,12 +741,17 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
     pybind11::object grad_component_field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent) {
+    bool coherent,
+    int64_t scattering_combine_domain) {
     check_accumulate_indices(tx_id, rx_id, component_id, num_tx, num_rx);
     const c10::ScalarType real_dtype = component_field_real.scalar_type();
     TORCH_CHECK(
         real_dtype == at::kFloat || real_dtype == at::kDouble,
         "deterministic_accumulate_flat_backward requires float32 or float64 cells");
+    TORCH_CHECK(
+        scattering_combine_domain == 0 || scattering_combine_domain == 1,
+        "scattering_combine_domain must be 0 (power) or 1 (coherent)");
+    const int scattering_coherent = static_cast<int>(scattering_combine_domain);
     const std::array<int64_t, 3> component_sizes{kAccumSlotCount, num_tx, num_rx};
     const std::array<int64_t, 2> total_sizes{num_tx, num_rx};
     check_cell_tensor(
@@ -723,7 +821,8 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
                     path_count,
                     num_tx,
                     num_rx,
-                    coherent ? 1 : 0);
+                    coherent ? 1 : 0,
+                    scattering_coherent);
         } else {
             deterministic_accumulate_backward_kernel<double>
                 <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
@@ -747,7 +846,8 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
                     path_count,
                     num_tx,
                     num_rx,
-                    coherent ? 1 : 0);
+                    coherent ? 1 : 0,
+                    scattering_coherent);
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -770,12 +870,17 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
     pybind11::object tangent_field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent) {
+    bool coherent,
+    int64_t scattering_combine_domain) {
     check_accumulate_indices(tx_id, rx_id, component_id, num_tx, num_rx);
     const c10::ScalarType real_dtype = component_field_real.scalar_type();
     TORCH_CHECK(
         real_dtype == at::kFloat || real_dtype == at::kDouble,
         "deterministic_accumulate_flat_jvp requires float32 or float64 cells");
+    TORCH_CHECK(
+        scattering_combine_domain == 0 || scattering_combine_domain == 1,
+        "scattering_combine_domain must be 0 (power) or 1 (coherent)");
+    const int scattering_coherent = static_cast<int>(scattering_combine_domain);
     const std::array<int64_t, 3> component_sizes{kAccumSlotCount, num_tx, num_rx};
     const std::array<int64_t, 2> total_sizes{num_tx, num_rx};
     const at::IntArrayRef path_sizes = tx_id.sizes();
@@ -828,7 +933,8 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
                     path_count,
                     num_tx,
                     num_rx,
-                    coherent ? 1 : 0);
+                    coherent ? 1 : 0,
+                    scattering_coherent);
         } else {
             deterministic_accumulate_tangent_scatter_kernel<double>
                 <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
@@ -844,7 +950,8 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
                     path_count,
                     num_tx,
                     num_rx,
-                    coherent ? 1 : 0);
+                    coherent ? 1 : 0,
+                    scattering_coherent);
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -862,7 +969,8 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
                     t_field_total_real.data_ptr<float>(),
                     t_field_total_imag.data_ptr<float>(),
                     cell_count,
-                    coherent ? 1 : 0);
+                    coherent ? 1 : 0,
+                    scattering_coherent);
         } else {
             deterministic_accumulate_jvp_finalize_kernel<double>
                 <<<launch_blocks(cell_count), kBlockSize, 0, stream>>>(
@@ -876,7 +984,8 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
                     t_field_total_real.data_ptr<double>(),
                     t_field_total_imag.data_ptr<double>(),
                     cell_count,
-                    coherent ? 1 : 0);
+                    coherent ? 1 : 0,
+                    scattering_coherent);
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
