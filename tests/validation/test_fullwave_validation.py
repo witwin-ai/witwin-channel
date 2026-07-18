@@ -200,6 +200,7 @@ def test_three_cube_deterministic_plot_draws_scene_and_writes_png(tmp_path):
             "los": 0.6 * base,
             "reflection": 0.3j * base,
             "diffraction": 0.1 * base,
+            "coupled": 0.05j * base,
         },
         metadata={
             "backend": "deterministic",

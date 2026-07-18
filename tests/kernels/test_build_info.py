@@ -20,7 +20,7 @@ def test_build_info_contract():
     assert len(info["channel_native_git_sha"]) == 40
     assert isinstance(info["channel_native_git_dirty"], bool)
     assert info["rayd_repository_url"] == "https://github.com/Asixa/RayD.git"
-    assert info["rayd_commit"] == "6047089cc7a41661402a02d40c96b9117e03a135"
+    assert info["rayd_commit"] == "408a086f392c9400e1ea6deaabf32dc907f5fa26"
     assert isinstance(info["rayd_dirty"], bool)
     assert info["rayd_integration_abi_kind"] == "source-header-sha256"
     assert (
