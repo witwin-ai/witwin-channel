@@ -20,6 +20,13 @@ _VALID_MAX_PATHS_SCOPES = frozenset({"per_pair"})
 _MAX_COUPLED_CANDIDATES = 1_000_000
 
 
+def _validate_isb_boundary_taper(width: float) -> None:
+    """Validate the ADR-017 ISB boundary taper width bound."""
+
+    if not (0.0 < width <= 4.0):
+        raise ValueError("isb_boundary_taper_width must be in (0, 4]")
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
     max_depth: int = 1
@@ -51,8 +58,7 @@ class Config:
     def __post_init__(self) -> None:
         if self.max_depth < 0:
             raise ValueError("max_depth must be non-negative")
-        if not (0.0 < self.isb_boundary_taper_width <= 4.0):
-            raise ValueError("isb_boundary_taper_width must be in (0, 4]")
+        _validate_isb_boundary_taper(self.isb_boundary_taper_width)
         if self.scattering_samples_per_m2 <= 0.0:
             raise ValueError("scattering_samples_per_m2 must be positive")
         if self.scattering_max_paths_per_pair <= 0:

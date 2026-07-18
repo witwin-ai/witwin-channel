@@ -68,6 +68,21 @@ def _path_components(config: TopologyConfig) -> set[str]:
     return components
 
 
+def _resolve_isb_taper(config: TopologyConfig) -> tuple[bool, float, float]:
+    """Resolve the ADR-017 ISB boundary taper flag and per-stage widths.
+
+    DEFAULT-OFF: when the taper is disabled the field/diffraction stages receive
+    width 0.0 (every existing call path untouched) and the LoS membership stage
+    receives the default 0.5, preserving the pre-ADR-017 calls byte-for-byte.
+    """
+
+    enabled = bool(getattr(config, "isb_boundary_taper", False))
+    configured_width = float(getattr(config, "isb_boundary_taper_width", 0.5))
+    field_width = configured_width if enabled else 0.0
+    los_width = configured_width if enabled else 0.5
+    return enabled, field_width, los_width
+
+
 def evaluate_enumerated_paths(
     scene: Scene,
     config: TopologyConfig,
@@ -101,11 +116,8 @@ def evaluate_enumerated_paths(
     components = _path_components(config)
     # ISB boundary taper (ADR-017): DEFAULT-OFF. When off, width 0.0 flows to the
     # field/diffraction stages and every existing call path is untouched.
-    isb_boundary_taper = bool(getattr(config, "isb_boundary_taper", False))
-    isb_boundary_taper_width = (
-        float(getattr(config, "isb_boundary_taper_width", 0.5))
-        if isb_boundary_taper
-        else 0.0
+    isb_boundary_taper, isb_boundary_taper_width, isb_los_width = _resolve_isb_taper(
+        config
     )
     coupled_paths = bool(getattr(config, "coupled_paths", False))
     sequence_width = max(int(config.max_depth), 2 if coupled_paths else 0)
@@ -128,11 +140,7 @@ def evaluate_enumerated_paths(
                 frequency_hz=frequency_hz,
                 sequence_width=sequence_width,
                 isb_boundary_taper=isb_boundary_taper,
-                isb_boundary_taper_width=(
-                    float(getattr(config, "isb_boundary_taper_width", 0.5))
-                    if isb_boundary_taper
-                    else 0.5
-                ),
+                isb_boundary_taper_width=isb_los_width,
             )
         )
         launch_count += los_launches

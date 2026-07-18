@@ -1324,7 +1324,7 @@
   ],
   [
    "field_project_complex3_backward",
-   "witwin.channel_native.propagation.fields.kernels.autograd._FieldProjectComplex3AdFunction.backward",
+   "witwin.channel_native.propagation.fields.kernels.autograd_projection._FieldProjectComplex3AdFunction.backward",
    "native_call_site",
    "native-field-reflection",
    [
@@ -1333,7 +1333,7 @@
   ],
   [
    "field_project_complex3_jvp",
-   "witwin.channel_native.propagation.fields.kernels.autograd._FieldProjectComplex3AdFunction.jvp",
+   "witwin.channel_native.propagation.fields.kernels.autograd_projection._FieldProjectComplex3AdFunction.jvp",
    "native_call_site",
    "native-field-reflection",
    [

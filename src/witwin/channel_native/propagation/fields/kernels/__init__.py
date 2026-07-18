@@ -5,20 +5,22 @@ from .autograd import (
     _FieldCoupledRdAdFunction,
     _FieldDiffractionWedgeAdFunction,
     _FieldFreeSpaceAdFunction,
-    _FieldProjectComplex3AdFunction,
     _FieldReflectionSequenceAdFunction,
     _FieldTransmissionSequenceAdFunction,
     coupled_rd_prepare_ad,
     field_coupled_rd_ad,
     field_diffraction_wedge_ad,
     field_free_space_ad,
-    field_project_complex3_ad,
     field_reflection_sequence_ad,
     field_transmission_sequence_ad,
 )
 from .autograd_coupled_dd import (
     _FieldCoupledDdAdFunction,
     field_coupled_dd_ad,
+)
+from .autograd_projection import (
+    _FieldProjectComplex3AdFunction,
+    field_project_complex3_ad,
 )
 from .functional import (
     field_coupled_dd,

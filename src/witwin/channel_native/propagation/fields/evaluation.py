@@ -28,6 +28,9 @@ from witwin.channel_native.propagation.fields.kernels import (
     autograd as field_autograd,
 )
 from witwin.channel_native.propagation.fields.kernels import (
+    autograd_projection as field_autograd_projection,
+)
+from witwin.channel_native.propagation.fields.kernels import (
     functional as field_functional,
 )
 from witwin.channel_native.propagation.fields.kernels import (
@@ -68,6 +71,20 @@ from witwin.channel_native.runtime import autograd_contracts as ops
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
+
+
+def _los_taper_frequency(
+    frequency_value: float | None, frequency: float | torch.Tensor
+) -> float | torch.Tensor:
+    """Host frequency for the ADR-017 LoS taper clearance kernel.
+
+    The LoS taper only ever runs on the ad_mode="none" primal (taper + AD is
+    rejected upstream until the C1 clearance companion lands, ADR-017 gate 3),
+    so ``frequency_value`` is the host float scalar when set; fall back to the
+    resolved frequency otherwise.
+    """
+
+    return float(frequency_value) if frequency_value is not None else frequency
 
 
 def _rough_scale_inputs(
@@ -550,7 +567,7 @@ def _evaluate_diffraction_fields(
             arrival = evaluated["direction"]
             if ledger is not None:
                 ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
-            projected = field_autograd.field_project_complex3_ad(
+            projected = field_autograd_projection.field_project_complex3_ad(
                 powered_xyz,
                 arrival,
                 rx_pol[diffraction_rows].contiguous(),
@@ -925,10 +942,7 @@ def evaluate_path_fields(
         direction,
         launch_count,
         compiled,
-        # The LoS taper only ever runs on the ad_mode="none" primal (taper + AD is
-        # rejected upstream until the C1 clearance companion lands, ADR-017 gate
-        # 3), so the frequency here is always the host float scalar.
-        (float(frequency_value) if frequency_value is not None else frequency),
+        _los_taper_frequency(frequency_value, frequency),
         isb_boundary_taper_width,
     )
 
