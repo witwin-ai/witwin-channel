@@ -1454,7 +1454,7 @@
       "category": "fixture_boilerplate",
       "corpus": "python",
       "files": [
-        "autograd.py",
+        "autograd_coupled_dd.py",
         "functional.py"
       ],
       "owner": "autograd",

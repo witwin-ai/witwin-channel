@@ -33,6 +33,10 @@ from witwin.channel_native.propagation.fields.kernels import (
 from witwin.channel_native.propagation.fields.kernels import (
     rough_scale as field_rough_scale,
 )
+from witwin.channel_native.propagation.fields.coupled_evaluation import (
+    _evaluate_coupled_dd_rows,
+    _resolve_coupled_rd_stationary,
+)
 from witwin.channel_native.propagation.geometry.kernels import (
     autograd as geometry_autograd,
 )
@@ -635,45 +639,21 @@ def _evaluate_coupled_fields(
                 rows, edge_slot
             ].contiguous()
             if coupled_geometry_ad:
-                # Plan 07 AD-4: the coupled interaction points move with the
-                # endpoints (Fresnel angles are not stationary), so re-solve
-                # the frozen winner's stationary geometry differentiably (the
-                # same image-source math as the discovery prepare kernel) and
-                # feed the live points into the field kernel. D->R is the
-                # reciprocal problem with the endpoints exchanged.
-                epc_source = target[rows] if reverse_order else source[rows]
-                epc_receiver = source[rows] if reverse_order else target[rows]
-                resolved = field_autograd.coupled_rd_prepare_ad(
-                    epc_source.contiguous(),
-                    epc_receiver.contiguous(),
-                    tri_a[reflection_face].contiguous(),
-                    normals_table[reflection_face].contiguous(),
-                    edge_geometry[1][edge_id].contiguous(),
-                    edge_geometry[2][edge_id].contiguous(),
-                    edge_geometry[4][edge_id].contiguous(),
-                    edge_geometry[5][edge_id].contiguous(),
-                )
-                if not bool(resolved["active"].all()):
-                    raise RuntimeError(
-                        "fixed-winner coupled stationary re-solve no longer "
-                        "reproduces the discovered coupled paths; the winner "
-                        "topology moved under the current scene tensors"
+                edge_position, reflection_position = (
+                    _resolve_coupled_rd_stationary(
+                        source,
+                        target,
+                        rows,
+                        reverse_order,
+                        tri_a,
+                        normals_table,
+                        reflection_face,
+                        edge_geometry,
+                        edge_id,
+                        edge_position,
+                        reflection_position,
                     )
-                for name, reference in (
-                    ("edge_point", edge_position),
-                    ("reflection_point", reflection_position),
-                ):
-                    if not bool(
-                        torch.isclose(
-                            resolved[name].detach(), reference, atol=1.0e-3
-                        ).all()
-                    ):
-                        raise RuntimeError(
-                            "fixed-winner coupled stationary re-solve moved the "
-                            f"{name} away from the discovered topology"
-                        )
-                edge_position = resolved["edge_point"]
-                reflection_position = resolved["reflection_point"]
+                )
 
             # G4: edge-segment bounds relative to the passed edge (Keller) point,
             # along the normalized edge axis, so the native stationary machinery
@@ -754,126 +734,32 @@ def _evaluate_coupled_fields(
             direction.index_copy_(0, rows, evaluated["direction"])
             launch_count += 1
 
-        # ADR-013: coupled double diffraction (cid 7, TX->e1->e2->RX). Both
-        # interactions are diffraction (type 2), so both primitive_sequence
-        # slots carry edge ids; interaction_positions carry the frozen Fermat
-        # seeds [Q1, Q2]. The geometry is a pure addition to the coupled family
-        # and lands in the same coherent coupled slot as cid 3/4.
-        dd_rows = torch.nonzero(
-            topology.component_id == 7, as_tuple=False
-        ).reshape(-1)
-        if int(dd_rows.shape[0]) > 0:
-            edge1_id = topology.primitive_sequence[dd_rows, 0].to(dtype=torch.int64)
-            edge2_id = topology.primitive_sequence[dd_rows, 1].to(dtype=torch.int64)
-            q1 = geometry.interaction_positions[dd_rows, 0].contiguous()
-            q2 = geometry.interaction_positions[dd_rows, 1].contiguous()
-
-            def _dd_line_bounds(
-                edge_id: torch.Tensor, keller_point: torch.Tensor
-            ) -> tuple[torch.Tensor, torch.Tensor]:
-                # G4/ADR-013: edge-segment bounds relative to the passed Keller
-                # point along the normalized edge axis, so the native stationary
-                # machinery truncates and corner-mends each DD leg. Frozen
-                # (detached): DD rows carry no edge-geometry gradient; tx/rx
-                # gradient flows through source/target inside the native
-                # re-anchoring (same lookup path as the cid 3/4 single edge).
-                edge_ref = edge_geometry[1][edge_id]
-                edge_axis = edge_geometry[2][edge_id]
-                edge_axis = edge_axis / edge_axis.norm(
-                    dim=-1, keepdim=True
-                ).clamp_min(1.0e-12)
-                t_keller = (
-                    (keller_point.detach() - edge_ref) * edge_axis
-                ).sum(dim=-1)
-                line_min = (edge_geometry[4][edge_id] - t_keller).contiguous()
-                line_max = (edge_geometry[5][edge_id] - t_keller).contiguous()
-                return line_min, line_max
-
-            edge1_line_min, edge1_line_max = _dd_line_bounds(edge1_id, q1)
-            edge2_line_min, edge2_line_max = _dd_line_bounds(edge2_id, q2)
-
-            def _dd_wedge_faces(
-                edge_id: torch.Tensor,
-            ) -> tuple[torch.Tensor, torch.Tensor]:
-                face0 = edge_face0[edge_id]
-                raw_face1 = edge_face1[edge_id]
-                # Boundary edges have no second face; reuse face0 like cid 3/4.
-                face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
-                return face0, face1
-
-            edge1_face0, edge1_face1 = _dd_wedge_faces(edge1_id)
-            edge2_face0, edge2_face1 = _dd_wedge_faces(edge2_id)
-
-            def _dd_material_tuple(
-                face: torch.Tensor,
-            ) -> tuple[torch.Tensor, ...]:
-                return tuple(
-                    material[name][face].contiguous()
-                    for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
-                )
-
-            wedge1_material0 = _dd_material_tuple(edge1_face0)
-            wedge1_material1 = _dd_material_tuple(edge1_face1)
-            wedge2_material0 = _dd_material_tuple(edge2_face0)
-            wedge2_material1 = _dd_material_tuple(edge2_face1)
-
-            coupled_dd_field_op = (
-                partial(
-                    field_autograd.field_coupled_dd_ad,
-                    frequency=frequency,
-                    frequency_value=frequency_value,
-                )
-                if ad_enabled
-                else partial(
-                    field_functional.field_coupled_dd, frequency_hz=frequency
-                )
-            )
-            dd_args = (
-                source[dd_rows].contiguous(),
-                target[dd_rows].contiguous(),
-                q1,
-                edge_geometry[2][edge1_id].contiguous(),
-                edge_n0[edge1_id].contiguous(),
-                edge_n1[edge1_id].contiguous(),
-                edge_exterior[edge1_id].contiguous(),
-                q2,
-                edge_geometry[2][edge2_id].contiguous(),
-                edge_n0[edge2_id].contiguous(),
-                edge_n1[edge2_id].contiguous(),
-                edge_exterior[edge2_id].contiguous(),
-                source_power[dd_rows].contiguous(),
-                tx_pol[dd_rows].contiguous(),
-                rx_pol[dd_rows].contiguous(),
-            )
-            if ledger is not None:
-                ledger.add(
-                    *dd_args,
-                    *wedge1_material0,
-                    *wedge1_material1,
-                    *wedge2_material0,
-                    *wedge2_material1,
-                    edge1_line_min,
-                    edge1_line_max,
-                    edge2_line_min,
-                    edge2_line_max,
-                )
-            evaluated = coupled_dd_field_op(
-                *dd_args,
-                wedge1_material0,
-                wedge1_material1,
-                wedge2_material0,
-                wedge2_material1,
-                edge1_line_min,
-                edge1_line_max,
-                edge2_line_min,
-                edge2_line_max,
-            )
-            field_xyz.index_copy_(0, dd_rows, evaluated["field_vector"])
-            coefficient.index_copy_(0, dd_rows, evaluated["coefficient"])
-            path_field.index_copy_(0, dd_rows, evaluated["path_field"])
-            path_gain.index_copy_(0, dd_rows, evaluated["path_gain"])
-            direction.index_copy_(0, dd_rows, evaluated["direction"])
-            launch_count += 1
+        launch_count = _evaluate_coupled_dd_rows(
+            topology,
+            geometry,
+            source,
+            target,
+            source_power,
+            tx_pol,
+            rx_pol,
+            material,
+            edge_geometry,
+            edge_n0,
+            edge_n1,
+            edge_exterior,
+            edge_face0,
+            edge_face1,
+            ad_enabled,
+            frequency,
+            frequency_value,
+            ledger,
+            field_xyz,
+            coefficient,
+            path_field,
+            path_gain,
+            direction,
+            launch_count,
+        )
     return material, launch_count
 
 

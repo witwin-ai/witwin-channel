@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from .autograd import (
     _CoupledRdPrepareAdFunction,
-    _FieldCoupledDdAdFunction,
     _FieldCoupledRdAdFunction,
     _FieldDiffractionWedgeAdFunction,
     _FieldFreeSpaceAdFunction,
@@ -10,13 +9,16 @@ from .autograd import (
     _FieldReflectionSequenceAdFunction,
     _FieldTransmissionSequenceAdFunction,
     coupled_rd_prepare_ad,
-    field_coupled_dd_ad,
     field_coupled_rd_ad,
     field_diffraction_wedge_ad,
     field_free_space_ad,
     field_project_complex3_ad,
     field_reflection_sequence_ad,
     field_transmission_sequence_ad,
+)
+from .autograd_coupled_dd import (
+    _FieldCoupledDdAdFunction,
+    field_coupled_dd_ad,
 )
 from .functional import (
     field_coupled_dd,

@@ -1205,7 +1205,7 @@
     ],
     [
       "field_coupled_dd_backward",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldCoupledDdAdFunction.backward",
+      "witwin.channel_native.propagation.fields.kernels.autograd_coupled_dd._FieldCoupledDdAdFunction.backward",
       "native_call_site",
       "native-field-coupled",
       [
@@ -1214,7 +1214,7 @@
     ],
     [
       "field_coupled_dd_jvp",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldCoupledDdAdFunction.jvp",
+      "witwin.channel_native.propagation.fields.kernels.autograd_coupled_dd._FieldCoupledDdAdFunction.jvp",
       "native_call_site",
       "native-field-coupled",
       [
