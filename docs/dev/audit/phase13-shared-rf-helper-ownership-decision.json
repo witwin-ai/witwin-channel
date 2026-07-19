@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "plan": "Plan 13",
+  "phase": 5,
+  "decision": "ADR-024 accepted 2026-07-19",
+  "baseline": {
+    "path": "docs/dev/audit/phase13-shared-rf-helper-ledger.json",
+    "sha256": "3fb2a616a0a0635320104b5311bd5def74a0c16797b81715eab023083bfb26c9",
+    "helper_count": 129,
+    "status": "immutable Phase 0 extraction evidence"
+  },
+  "totals": {
+    "helper_count": 129,
+    "adr_024_rayd": 112,
+    "channel_boundary": 10,
+    "adr_026_rayd": 7,
+    "pending": 0
+  },
+  "groups": [
+    {
+      "baseline_source": "native/channel_native/em/complex.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "shared/include/rayd/shared/rf/complex.cuh",
+      "helpers": [
+        "c_sqrt_passive",
+        "c_exp_neg_j",
+        "c_div",
+        "c_abs2"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/em/medium.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "shared/include/rayd/shared/rf/medium.cuh",
+      "helpers": [
+        "make_medium",
+        "vacuum_medium"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/em/fresnel.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "shared/include/rayd/shared/rf/fresnel.cuh",
+      "helpers": [
+        "kz_from_kpar",
+        "admittance_te",
+        "admittance_tm",
+        "admittance",
+        "interface_rt"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/em/layer_stack.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "shared/include/rayd/shared/rf/layer_stack.cuh",
+      "helpers": [
+        "layer_one_way_phase",
+        "stack_rt"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/field_transport.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "shared/include/rayd/shared/rf/field_transport.cuh",
+      "helpers": [
+        "precise_neg_kd",
+        "free_space_complex3",
+        "project_receiver",
+        "exp_neg_2i",
+        "legacy_add",
+        "legacy_sub",
+        "legacy_mul",
+        "legacy_scale",
+        "legacy_div",
+        "legacy_div_floor",
+        "legacy_sqrt",
+        "legacy_interface_sqrt",
+        "legacy_interface_fresnel",
+        "legacy_exp_neg_2i",
+        "legacy_sionna_slab_fresnel",
+        "slab_fresnel",
+        "complex3_dot_real",
+        "reflect_frame",
+        "reflect_complex3",
+        "wall_frame",
+        "slab_face_operator"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/field_transport_ad.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh",
+      "helpers": [
+        "df_const",
+        "dc_const",
+        "dc_make",
+        "dc_add",
+        "dc_sub",
+        "dc_mul",
+        "dc_mul_real",
+        "dc_mul_dualreal",
+        "dc_div_utd",
+        "dc_div_em",
+        "dc_sqrt_utd",
+        "dc_sqrt_passive",
+        "dc_exp_neg_2i",
+        "adj_dot",
+        "d_fabsf",
+        "slab_fresnel_dual",
+        "make_medium_dual",
+        "dc_kz_from_kpar2",
+        "dc_admittance",
+        "dc_interface_rt",
+        "dc_layer_one_way_phase",
+        "stack_rt_dual",
+        "v3_load",
+        "v3_sub",
+        "v3_scale",
+        "v3_dot",
+        "v3_length",
+        "v3_safe_normalize",
+        "v3_stable_perp_basis",
+        "v3_transverse_project",
+        "free_space_eval",
+        "v3_add",
+        "v3_neg",
+        "dv3_const",
+        "dv3_sub",
+        "dual_v3_length",
+        "dual_v3_safe_normalize",
+        "dual_v3_stable_perp_basis",
+        "adj_v3_length",
+        "adj_v3_normalize_branch",
+        "adj_v3_safe_normalize",
+        "adj_v3_stable_perp_basis",
+        "dual_v3_transverse_project",
+        "adj_v3_transverse_project",
+        "df3_const",
+        "df3_make",
+        "df3_sub",
+        "df3_neg",
+        "df3_cross",
+        "df3_dot",
+        "dual_safe_length",
+        "adj_safe_length",
+        "dual_safe_normalize",
+        "dual_stable_perp_basis",
+        "dual_transverse_project",
+        "adj_transverse_project",
+        "dual_reflect_frame",
+        "adj_reflect_frame",
+        "dual_wall_frame",
+        "adj_wall_frame",
+        "dlc_const",
+        "dlc_make",
+        "dlc_add",
+        "dlc_sub",
+        "dlc_mul",
+        "dlc_scale_dual",
+        "dlc_div",
+        "dlc_sqrt",
+        "dlc_exp_neg_2i",
+        "legacy_sionna_slab_fresnel_dual",
+        "dual_cplx_from",
+        "seeded",
+        "seeded3",
+        "const3",
+        "slab_fresnel_dual_rd",
+        "slab_face_operator_dual"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD",
+      "transfer_phase": "6A Channel pin/switch",
+      "target_header": "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh",
+      "classification": "numerical output-chain AD",
+      "helpers": [
+        "fold_output_cotangents",
+        "write_output_tangents"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "Channel Native",
+      "transfer_phase": "retained",
+      "target_header": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "classification": "Torch validation, tensor conversion, allocation and launch adapters",
+      "helpers": [
+        "load3f",
+        "load_sequence3f",
+        "load_dual3f",
+        "load_dual_sequence3f",
+        "complex_of",
+        "to_c10",
+        "launch_blocks",
+        "zero_filled",
+        "optional_grad",
+        "grad_ptr"
+      ]
+    },
+    {
+      "baseline_source": "native/channel_native/kernels/scattering_table.cuh",
+      "current_owner": "Channel Native",
+      "accepted_target_owner": "RayD after ADR-026",
+      "transfer_phase": "10A Channel pin/switch",
+      "target_header": "ADR-026 scattering table public header",
+      "helpers": [
+        "positive_phi",
+        "linear_axis",
+        "nearest_axis",
+        "interp4",
+        "eval_te_tm",
+        "linear_axis_grad",
+        "eval_te_tm_grad"
+      ]
+    }
+  ],
+  "acceptance": [
+    "every baseline helper appears exactly once",
+    "no helper remains pending",
+    "current ownership is not changed until its Channel pin/switch commit",
+    "normalized body, compiler attributes, codegen and primal/dual lockstep are required before deletion",
+    "RayD never includes a Channel-private header"
+  ]
+}

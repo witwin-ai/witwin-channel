@@ -100,7 +100,7 @@
     {
       "id": "native/channel_native/kernels/scattering_table.cuh",
       "current_source_owner": "Channel Native",
-      "target_source_owner": "RayD after ADR-024",
+      "target_source_owner": "RayD after ADR-026",
       "direct_consumers": [
         "native/channel_native/kernels/scattering.cu",
         "native/channel_native/kernels/scattering_chain_ensemble.cu",

@@ -4,7 +4,10 @@
 
 `materials` owns material models, Material ABI v3 encoding, layer-CSR
 validation, frequency evaluation, loader parsing, and native electromagnetic
-layer-stack facades. Scene stores cache encoded records; propagation and
+layer-stack facades. Under ADR-024, RayD becomes the numerical source owner of
+the resident layer-stack primal/backward/JVP family only after the Phase 6A
+pin/switch; the model, ABI/CSR, cache, resource, validation, and facade
+contracts remain here. Scene stores cache encoded records; propagation and
 solvers consume them without redefining material semantics.
 
 ## Public entry points
@@ -18,7 +21,8 @@ are internal.
 ## Dependency rules
 
 Models and encoders do not import solvers or mutable scene runtime. Kernel
-facades may depend on runtime symbol/tensor contracts. Scene may consume
+facades may depend on runtime symbol/tensor contracts and the typed RayD RF
+entry, but may not reproduce its numerical implementation. Scene may consume
 materials; materials cannot reach back into compiled scene or solver policy.
 
 ## Numerical and AD contract

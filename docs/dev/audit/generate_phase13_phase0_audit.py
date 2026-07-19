@@ -860,9 +860,13 @@ graph_nodes = [
         "id": header,
         "current_source_owner": "Channel Native",
         "target_source_owner": (
-            "RayD after ADR-024"
-            if header != "native/channel_native/kernels/field_transport_ad_common.cuh"
-            else "split: RayD numerical helpers / Channel Torch validation wrapper"
+            "split: RayD numerical helpers / Channel Torch validation wrapper"
+            if header == "native/channel_native/kernels/field_transport_ad_common.cuh"
+            else (
+                "RayD after ADR-026"
+                if header == "native/channel_native/kernels/scattering_table.cuh"
+                else "RayD after ADR-024"
+            )
         ),
         "direct_consumers": sorted(set(direct_consumers[header])),
         "sha256": sha256(REPO / header),

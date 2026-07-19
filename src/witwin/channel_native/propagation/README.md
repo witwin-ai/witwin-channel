@@ -5,7 +5,10 @@
 This package owns row-aligned topology, continuous geometry, RF fields, and
 the enumerated propagation stages shared by Path and Deterministic solvers.
 `EvaluatedPaths` is the internal composition boundary; solver accumulation and
-public result types remain solver-owned.
+public result types remain solver-owned. ADR-024 transfers the complete-row
+transmission numerical primal/backward/JVP family to RayD after the Phase 6B
+pin/switch, while row contracts, field facades, AD dispatch, topology, and
+result assembly remain owned here.
 
 ## Public entry points
 
@@ -20,7 +23,8 @@ Topology cannot depend on scene, continuous fields, geometry, or solver policy.
 Geometry cannot choose winners; geometry kernel modules depend on runtime, not
 scene. Fields cannot discover topology. Enumerated propagation serves Path and
 Deterministic; Monte Carlo sampling, MIS, solver results, and deterministic
-accumulation remain outside this package.
+accumulation remain outside this package. Field facades may call the typed RayD
+transmission entry but cannot reconstruct or fall back from its native math.
 
 Raw native tuples may exist only inside domain `kernels` modules. A kernel
 façade must validate and convert them to a named internal contract before any

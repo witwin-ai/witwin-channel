@@ -190,6 +190,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-021-multibounce-coherent-scattering.md`
 - `docs/dev/standards/adr-022-bdpt-fixed-topology-ad.md`
 - `docs/dev/standards/adr-023-direct-rayd-typed-integration.md`
+- `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or

@@ -1,7 +1,7 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024/025/026 仍须在各自条件阶段先接受，再实施对应 owner move
+ADR-023/024 已接受，ADR-025/026 仍须在各自条件阶段先接受，再实施对应 owner move
 
 **计划日期：** 2026-07-18
 
@@ -32,7 +32,9 @@ primal/JVP/VJP family。除明确独立立项的 batched penetration trace 外�
 [ADR-018](../standards/adr-018-bdpt-diffraction-realignment.md)、
 [ADR-020](../standards/adr-020-mc-transmission-polarization-unification.md)、
 [ADR-021](../standards/adr-021-multibounce-coherent-scattering.md)、
-[ADR-022](../standards/adr-022-bdpt-fixed-topology-ad.md)。
+[ADR-022](../standards/adr-022-bdpt-fixed-topology-ad.md)、
+[ADR-023](../standards/adr-023-direct-rayd-typed-integration.md)、
+[ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)。
 
 ## 1. 执行结论
 
@@ -535,6 +537,8 @@ stream contract、legacy API期限、Channel 零 shim/零旧名和 exact/packagi
 4. 跑 import graph、no-fallback和solver dependency gates。
 
 ### Phase 5 — ADR-024：Shared RF primitives 与 transmission ownership
+
+**状态：** COMPLETE（2026-07-19；仅冻结决策，numerical owner transfer 在 Phase 6A/6B 完成）
 
 冻结第 5.2-5.4 节：public device-header ABI、6 个 Channel-facing contracts、完整 family move、
 precise-math/fusion/tape、Channel保留内容和双仓 dormant-candidate切换规则。
