@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 
 
 def _deterministic_diffraction_states(
-    raydn: object,
+    rayd: object,
     tx: torch.Tensor,
     tx_power: torch.Tensor,
     tx_index: int,
@@ -51,7 +51,7 @@ def _deterministic_diffraction_states(
     preserve_imported_edges: bool = False,
 ) -> tuple[torch.Tensor, ...]:
     edges = query_diffraction_edges(
-        raydn,
+        rayd,
         preserve_imported_edges=preserve_imported_edges,
     )
     return topology_primitives.deterministic_diffraction_state_pack(
@@ -86,7 +86,7 @@ def _diffraction_topology_order1(
     )
 
     device = tx_positions.device
-    raydn = compiled.raydn
+    rayd = compiled.rayd
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return (
             _ensure_topology_fields(
@@ -112,9 +112,9 @@ def _diffraction_topology_order1(
                 dtype=torch.complex64,
             ),
         )
-    if not raydn.available:
+    if not rayd.available:
         raise RuntimeError(
-            "deterministic diffraction requires RayDN native scene capability"
+            "deterministic diffraction requires RayD native scene capability"
         )
 
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (
@@ -125,7 +125,7 @@ def _diffraction_topology_order1(
     # fabricated z-axis vector.
     tx_polarizations = transmitter_polarizations(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     blocks: list[dict[str, torch.Tensor]] = []
     vector_field = torch.zeros(
         (int(tx_positions.shape[0]), int(rx_positions.shape[0]), 3),
@@ -146,13 +146,13 @@ def _diffraction_topology_order1(
         tx_index = tx_request.tx_index
         tx = tx_request.tx
         states = _deterministic_diffraction_states(
-            raydn,
+            rayd,
             tx,
             tx_power,
             tx_index,
             preserve_imported_edges=plan.preserve_imported_edges,
         )
-        states = _tx_visible_diffraction_states(raydn, states, tx)
+        states = _tx_visible_diffraction_states(rayd, states, tx)
         named_states = name_diffraction_states(states)
         state_count = int(named_states.edge_index.shape[0])
         if state_count <= 0:

@@ -29,8 +29,8 @@ def test_bdpt_fixed_seed_reproduces_outputs_metadata_and_exports():
 def test_bdpt_delta_reflection_is_seed_invariant_and_reproducible():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT seed stability")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     grid = ReceiverGrid(
         origin=torch.tensor([0.0, -1.0, 0.0]),

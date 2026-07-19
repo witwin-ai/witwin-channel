@@ -1,4 +1,4 @@
-"""AD-2 layer 1: RayDN reflection EPC paths geometry JVP/VJP versus central FD.
+"""AD-2 layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
 
 Exercises the new fixed-winner C-ABI directly (channel_native bridge facades
 only): d(hit points, emitted unit normals, path length) / d(vertices, source,
@@ -37,7 +37,7 @@ from witwin.channel_native.propagation.topology.kernels import (
 from witwin.channel_native.core.materials import Dielectric
 
 pytestmark = pytest.mark.skipif(
-    not torch.cuda.is_available(), reason="CUDA is required for RayDN geometry AD"
+    not torch.cuda.is_available(), reason="CUDA is required for RayD geometry AD"
 )
 
 _WALL_VERTICES = (
@@ -66,9 +66,9 @@ def _source_linked_rayd_available() -> bool:
         return False
 
 
-def _build_raydn_scene(vertices: torch.Tensor, faces) -> object:
+def _build_rayd_scene(vertices: torch.Tensor, faces) -> object:
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
     scene = Scene(
         structures=[
             Structure(
@@ -81,15 +81,15 @@ def _build_raydn_scene(vertices: torch.Tensor, faces) -> object:
         receivers=[],
         frequency=3.5e9,
     )
-    return scene.raydn_scene()
+    return scene.rayd_scene()
 
 
 def _plane_inputs(
-    raydn: object, sequence: torch.Tensor
+    rayd: object, sequence: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Direct-plane arrays exactly as the solver seam builds them."""
 
-    records = raydn.edge_records()
+    records = rayd.edge_records()
     tri_a = topology_construction.deterministic_face_anchor_points(
         records.vertices.contiguous(), records.faces.contiguous()
     )
@@ -100,8 +100,8 @@ def _plane_inputs(
     return tri_a[face_id].contiguous(), normals[face_id].contiguous()
 
 
-def _single_group(raydn: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    records = raydn.edge_records()
+def _single_group(rayd: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    records = rayd.edge_records()
     face_count = int(records.faces.shape[0])
     device = records.faces.device
     return (
@@ -111,10 +111,10 @@ def _single_group(raydn: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tens
     )
 
 
-def _wall_groups(raydn: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def _wall_groups(rayd: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """One coplanar group per wall of the two-wall corridor fixture."""
 
-    device = raydn.edge_records().faces.device
+    device = rayd.edge_records().faces.device
     group_id = torch.tensor([0, 0, 1, 1], device=device, dtype=torch.int32)
     group_size = torch.tensor([2, 2], device=device, dtype=torch.int32)
     members = torch.tensor([0, 1, 2, 3], device=device, dtype=torch.int32)
@@ -122,15 +122,15 @@ def _wall_groups(raydn: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tenso
 
 
 def _single_bounce_case() -> dict[str, object]:
-    raydn = _build_raydn_scene(
+    rayd = _build_rayd_scene(
         torch.tensor(_WALL_VERTICES, dtype=torch.float32), _WALL_FACES
     )
     source = torch.tensor([[0.0, -1.0, 0.5]], dtype=torch.float32, device="cuda")
     receiver = torch.tensor([[0.1, 1.2, 0.4]], dtype=torch.float32, device="cuda")
     sequence = torch.tensor([[0]], dtype=torch.int32, device="cuda")
-    groups = _single_group(raydn)
+    groups = _single_group(rayd)
     return {
-        "raydn": raydn,
+        "rayd": rayd,
         "faces": _WALL_FACES,
         "base_vertices": torch.tensor(_WALL_VERTICES, dtype=torch.float32),
         "source": source,
@@ -142,15 +142,15 @@ def _single_bounce_case() -> dict[str, object]:
 
 
 def _two_bounce_case() -> dict[str, object]:
-    raydn = _build_raydn_scene(
+    rayd = _build_rayd_scene(
         torch.tensor(_CORRIDOR_VERTICES, dtype=torch.float32), _CORRIDOR_FACES
     )
     source = torch.tensor([[0.3, -1.0, 0.5]], dtype=torch.float32, device="cuda")
     receiver = torch.tensor([[-0.4, 1.0, 0.6]], dtype=torch.float32, device="cuda")
     sequence = torch.tensor([[0, 2]], dtype=torch.int32, device="cuda")
-    groups = _wall_groups(raydn)
+    groups = _wall_groups(rayd)
     return {
-        "raydn": raydn,
+        "rayd": rayd,
         "faces": _CORRIDOR_FACES,
         "base_vertices": torch.tensor(_CORRIDOR_VERTICES, dtype=torch.float32),
         "source": source,
@@ -161,14 +161,14 @@ def _two_bounce_case() -> dict[str, object]:
     }
 
 
-def _epc_forward(case: dict[str, object], raydn=None, source=None, receiver=None):
-    raydn = case["raydn"] if raydn is None else raydn
+def _epc_forward(case: dict[str, object], rayd=None, source=None, receiver=None):
+    rayd = case["rayd"] if rayd is None else rayd
     source = case["source"] if source is None else source
     receiver = case["receiver"] if receiver is None else receiver
-    plane_points, plane_normals = _plane_inputs(raydn, case["sequence"])
+    plane_points, plane_normals = _plane_inputs(rayd, case["sequence"])
     group_id, group_size, group_members = case["groups"]
-    out = geometry_bridge.raydn_reflection_epc_paths_forward(
-        raydn.require_handle(),
+    out = geometry_bridge.rayd_reflection_epc_paths_forward(
+        rayd.require_resource(),
         source.contiguous(),
         receiver.contiguous(),
         None,
@@ -219,12 +219,12 @@ def test_epc_paths_plane_contract_matches_scene_tables(case_builder):
     lie on it."""
 
     case = case_builder()
-    records = case["raydn"].edge_records()
+    records = case["rayd"].edge_records()
     faces = records.faces.to(dtype=torch.int64)
     vertices = records.vertices
     face_id = case["sequence"].to(dtype=torch.int64)
 
-    plane_points, plane_normals = _plane_inputs(case["raydn"], case["sequence"])
+    plane_points, plane_normals = _plane_inputs(case["rayd"], case["sequence"])
     v0 = vertices[faces[face_id][..., 0]]
     v1 = vertices[faces[face_id][..., 1]]
     v2 = vertices[faces[face_id][..., 2]]
@@ -244,8 +244,8 @@ def test_epc_paths_backward_matches_fd_wrt_endpoints(case_builder):
     weights = _loss_weights(case, seed=101)
     _out, plane_points, plane_normals, valid, bounce_count = _frozen_winner(case)
 
-    grads = ops.raydn_reflection_epc_paths_backward(
-        case["raydn"],
+    grads = ops.rayd_reflection_epc_paths_backward(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -284,8 +284,8 @@ def test_epc_paths_backward_matches_fd_wrt_vertices(case_builder):
     weights = _loss_weights(case, seed=103)
     _out, plane_points, plane_normals, valid, bounce_count = _frozen_winner(case)
 
-    grads = ops.raydn_reflection_epc_paths_backward(
-        case["raydn"],
+    grads = ops.rayd_reflection_epc_paths_backward(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -300,8 +300,8 @@ def test_epc_paths_backward_matches_fd_wrt_vertices(case_builder):
     )
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt = _build_raydn_scene(perturbed_vertices, case["faces"])
-        out, _, _ = _epc_forward(case, raydn=rebuilt)
+        rebuilt = _build_rayd_scene(perturbed_vertices, case["faces"])
+        out, _, _ = _epc_forward(case, rayd=rebuilt)
         return _weighted_loss(out, weights)
 
     generator = torch.Generator(device="cpu").manual_seed(107)
@@ -323,8 +323,8 @@ def test_epc_paths_jvp_matches_fd_wrt_endpoints():
     generator = torch.Generator(device="cpu").manual_seed(109)
     v_source = torch.randn(case["source"].shape, generator=generator).to("cuda")
     v_receiver = torch.randn(case["receiver"].shape, generator=generator).to("cuda")
-    tangents = ops.raydn_reflection_epc_paths_jvp(
-        case["raydn"],
+    tangents = ops.rayd_reflection_epc_paths_jvp(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -367,8 +367,8 @@ def test_epc_paths_jvp_matches_fd_wrt_vertices():
     direction = torch.randn(case["base_vertices"].shape, generator=generator).to(
         "cuda"
     )
-    tangents = ops.raydn_reflection_epc_paths_jvp(
-        case["raydn"],
+    tangents = ops.rayd_reflection_epc_paths_jvp(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -380,8 +380,8 @@ def test_epc_paths_jvp_matches_fd_wrt_vertices():
     )
 
     def rebuild_outputs(perturbed_vertices: torch.Tensor, index: int) -> torch.Tensor:
-        rebuilt = _build_raydn_scene(perturbed_vertices, case["faces"])
-        out, _, _ = _epc_forward(case, raydn=rebuilt)
+        rebuilt = _build_rayd_scene(perturbed_vertices, case["faces"])
+        out, _, _ = _epc_forward(case, rayd=rebuilt)
         return out[index]
 
     base = case["base_vertices"].cuda()
@@ -416,8 +416,8 @@ def test_epc_paths_jvp_vjp_inner_product_duality(case_builder):
     v_source = torch.randn(case["source"].shape, generator=generator).to("cuda")
     v_receiver = torch.randn(case["receiver"].shape, generator=generator).to("cuda")
 
-    tangents = ops.raydn_reflection_epc_paths_jvp(
-        case["raydn"],
+    tangents = ops.rayd_reflection_epc_paths_jvp(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -433,8 +433,8 @@ def test_epc_paths_jvp_vjp_inner_product_duality(case_builder):
     lhs = lhs + (tangents[1].double() * u_normals.double()).sum()
     lhs = lhs + (tangents[2].double() * u_length.double()).sum()
 
-    grads = ops.raydn_reflection_epc_paths_backward(
-        case["raydn"],
+    grads = ops.rayd_reflection_epc_paths_backward(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -461,15 +461,15 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
     frozen outputs stay detached, and torch.func.jvp matches the native jvp."""
 
     case = _single_bounce_case()
-    records = case["raydn"].edge_records()
-    plane_points, plane_normals = _plane_inputs(case["raydn"], case["sequence"])
+    records = case["rayd"].edge_records()
+    plane_points, plane_normals = _plane_inputs(case["rayd"], case["sequence"])
     group_id, group_size, group_members = case["groups"]
 
     vertices_ad = records.vertices.detach().clone().requires_grad_(True)
     source_ad = case["source"].clone().requires_grad_(True)
     receiver_ad = case["receiver"].clone().requires_grad_(True)
-    out = ops.raydn_reflection_epc_paths_ad(
-        case["raydn"],
+    out = ops.rayd_reflection_epc_paths_ad(
+        case["rayd"],
         vertices_ad,
         source_ad,
         receiver_ad,
@@ -501,8 +501,8 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
 
     # The Function VJP must be the native backward exactly.
     _out, pp, pn, valid, bounce_count = _frozen_winner(case)
-    grads = ops.raydn_reflection_epc_paths_backward(
-        case["raydn"],
+    grads = ops.rayd_reflection_epc_paths_backward(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -523,8 +523,8 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
 
     generator = torch.Generator(device="cpu").manual_seed(137)
     v_source = torch.randn(case["source"].shape, generator=generator).to("cuda")
-    expected = ops.raydn_reflection_epc_paths_jvp(
-        case["raydn"],
+    expected = ops.rayd_reflection_epc_paths_jvp(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -536,8 +536,8 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
     )
 
     def f(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        result = ops.raydn_reflection_epc_paths_ad(
-            case["raydn"],
+        result = ops.rayd_reflection_epc_paths_ad(
+            case["rayd"],
             records.vertices,
             x,
             case["receiver"],
@@ -559,7 +559,7 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
 
 def test_face_normals_companions_match_fd_and_duality():
     case = _single_bounce_case()
-    records = case["raydn"].edge_records()
+    records = case["rayd"].edge_records()
     face_count = int(records.faces.shape[0])
 
     generator = torch.Generator(device="cpu").manual_seed(139)
@@ -568,14 +568,14 @@ def test_face_normals_companions_match_fd_and_duality():
         "cuda"
     )
 
-    grad_vertices = ops.raydn_scene_face_normals_backward(case["raydn"], u_normals)
-    tangent_normals = ops.raydn_scene_face_normals_jvp(case["raydn"], v_vertices)
+    grad_vertices = ops.rayd_scene_face_normals_backward(case["rayd"], u_normals)
+    tangent_normals = ops.rayd_scene_face_normals_jvp(case["rayd"], v_vertices)
     lhs = (tangent_normals.double() * u_normals.double()).sum()
     rhs = (grad_vertices.double() * v_vertices.double()).sum()
     assert relative_error(lhs.cpu(), rhs.cpu(), abs_floor=ABS_TOL) <= REL_TOL_PATH
 
     def rebuild_table(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt = _build_raydn_scene(perturbed_vertices, case["faces"])
+        rebuilt = _build_rayd_scene(perturbed_vertices, case["faces"])
         rebuilt_records = rebuilt.edge_records()
         return geometry_primitives.deterministic_normalize_vec3(
             rebuilt_records.face_normals.contiguous(), eps=1.0e-6
@@ -592,11 +592,11 @@ def test_face_normals_companions_match_fd_and_duality():
 
 def test_face_normals_ad_function_routes_vertex_gradients():
     case = _single_bounce_case()
-    records = case["raydn"].edge_records()
+    records = case["rayd"].edge_records()
 
     vertices_ad = records.vertices.detach().clone().requires_grad_(True)
-    table = ops.raydn_face_normals_ad(
-        case["raydn"], vertices_ad, records.face_normals.contiguous()
+    table = ops.rayd_face_normals_ad(
+        case["rayd"], vertices_ad, records.face_normals.contiguous()
     )
     assert table.requires_grad
     expected = geometry_primitives.deterministic_normalize_vec3(
@@ -608,15 +608,15 @@ def test_face_normals_ad_function_routes_vertex_gradients():
     u_normals = torch.randn(table.shape, generator=generator).to("cuda")
     (table * u_normals).sum().backward()
     assert vertices_ad.grad is not None
-    native = ops.raydn_scene_face_normals_backward(case["raydn"], u_normals)
+    native = ops.rayd_scene_face_normals_backward(case["rayd"], u_normals)
     assert torch.allclose(vertices_ad.grad, native)
 
     v_vertices = torch.randn(vertices_ad.shape, generator=generator).to("cuda")
-    expected_tangent = ops.raydn_scene_face_normals_jvp(case["raydn"], v_vertices)
+    expected_tangent = ops.rayd_scene_face_normals_jvp(case["rayd"], v_vertices)
 
     def f(x: torch.Tensor) -> torch.Tensor:
-        return ops.raydn_face_normals_ad(
-            case["raydn"], x, records.face_normals.contiguous()
+        return ops.rayd_face_normals_ad(
+            case["rayd"], x, records.face_normals.contiguous()
         )
 
     _primal, tangent = torch.func.jvp(
@@ -653,8 +653,8 @@ def test_face_normals_companions_follow_sliver_clamp_branch():
     derivative."""
 
     base = torch.tensor(_SLIVER_VERTICES, dtype=torch.float32)
-    raydn = _build_raydn_scene(base, _SLIVER_FACES)
-    records = raydn.edge_records()
+    rayd = _build_rayd_scene(base, _SLIVER_FACES)
+    records = rayd.edge_records()
     raw = records.face_normals
     # The fixture must actually sit below the clamp, or this test is vacuous.
     assert float(raw[1].norm()) < 1.0e-6
@@ -664,12 +664,12 @@ def test_face_normals_companions_follow_sliver_clamp_branch():
     w = torch.randn(2, 3, generator=generator).to("cuda")
 
     vertices_ad = records.vertices.detach().clone().requires_grad_(True)
-    table = ops.raydn_face_normals_ad(raydn, vertices_ad, raw.contiguous())
+    table = ops.rayd_face_normals_ad(rayd, vertices_ad, raw.contiguous())
     (w * table).sum().backward()
     assert vertices_ad.grad is not None
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt = _build_raydn_scene(perturbed_vertices, _SLIVER_FACES)
+        rebuilt = _build_rayd_scene(perturbed_vertices, _SLIVER_FACES)
         rebuilt_table = geometry_primitives.deterministic_normalize_vec3(
             rebuilt.edge_records().face_normals.contiguous(), eps=1.0e-6
         )
@@ -697,7 +697,7 @@ def test_face_normals_companions_follow_sliver_clamp_branch():
             rebuild_loss, base.cuda(), direction, step
         )
         vjp_value = (vertices_ad.grad.double() * direction.double()).sum().cpu()
-        tangent = ops.raydn_scene_face_normals_jvp(raydn, direction.contiguous())
+        tangent = ops.rayd_scene_face_normals_jvp(rayd, direction.contiguous())
         jvp_value = (w.double().cpu() * tangent.double().cpu()).sum()
         assert float(fd_value.abs()) > 0.0
         assert relative_error(vjp_value, fd_value, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
@@ -712,8 +712,8 @@ def test_epc_paths_backward_skips_invalid_rows():
     invalid = torch.zeros_like(valid)
 
     weights = _loss_weights(case, seed=151)
-    grads = ops.raydn_reflection_epc_paths_backward(
-        case["raydn"],
+    grads = ops.rayd_reflection_epc_paths_backward(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -728,8 +728,8 @@ def test_epc_paths_backward_skips_invalid_rows():
         need_grad_source=True,
         need_grad_receiver=True,
     )
-    tangents = ops.raydn_reflection_epc_paths_jvp(
-        case["raydn"],
+    tangents = ops.rayd_reflection_epc_paths_jvp(
+        case["rayd"],
         case["source"],
         case["receiver"],
         case["sequence"],
@@ -751,8 +751,8 @@ def test_epc_paths_facades_reject_mismatched_batches():
     source2 = case["source"].repeat(2, 1).contiguous()
     receiver2 = case["receiver"].repeat(2, 1).contiguous()
     with pytest.raises(ValueError):
-        ops.raydn_reflection_epc_paths_backward(
-            case["raydn"],
+        ops.rayd_reflection_epc_paths_backward(
+            case["rayd"],
             source2,
             receiver2,
             case["sequence"],
@@ -764,8 +764,8 @@ def test_epc_paths_facades_reject_mismatched_batches():
             need_grad_source=True,
         )
     with pytest.raises(ValueError):
-        ops.raydn_reflection_epc_paths_jvp(
-            case["raydn"],
+        ops.rayd_reflection_epc_paths_jvp(
+            case["rayd"],
             source2,
             receiver2,
             case["sequence"],
@@ -783,8 +783,8 @@ def test_epc_paths_facades_reject_mismatched_batches():
         device="cuda",
     )
     with pytest.raises(RuntimeError):
-        ops.raydn_reflection_epc_paths_jvp(
-            case["raydn"],
+        ops.rayd_reflection_epc_paths_jvp(
+            case["rayd"],
             case["source"],
             case["receiver"],
             case["sequence"],
@@ -795,4 +795,4 @@ def test_epc_paths_facades_reject_mismatched_batches():
             tangent_vertices=bad_vertices,
         )
     with pytest.raises(RuntimeError):
-        ops.raydn_scene_face_normals_jvp(case["raydn"], bad_vertices)
+        ops.rayd_scene_face_normals_jvp(case["rayd"], bad_vertices)

@@ -30,8 +30,8 @@ def test_contract_detects_direct_and_from_imports():
     ]
 
 
-def test_relative_native_raydn_module_is_not_python_raydn_dependency():
-    assert contract.scan_source("from .raydn import RayDNScene\n") == []
+def test_relative_native_rayd_module_is_not_python_rayd_dependency():
+    assert contract.scan_source("from .rayd import RayDSceneResource\n") == []
 
 
 def test_consumer_scan_allows_independent_radar_stack_but_rejects_old_channel():

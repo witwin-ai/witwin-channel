@@ -27,7 +27,7 @@ def _fake_exported() -> dict[str, torch.Tensor]:
 
 def test_los_and_visibility_canonical_owner_identity():
     assert los._los_topology.__module__ == los.__name__
-    assert visibility._raydn_visibility_mask.__module__ == visibility.__name__
+    assert visibility._rayd_visibility_mask.__module__ == visibility.__name__
     assert visibility._los_visibility_mask.__module__ == visibility.__name__
 
 
@@ -76,7 +76,7 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
     def fake_visibility(query):
         events.append("visibility")
         assert isinstance(query, visibility.VisibilityQuery)
-        assert query.raydn is compiled.raydn
+        assert query.rayd is compiled.rayd
         assert query.start is start
         assert query.end is end
         assert query.active is active
@@ -98,7 +98,7 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
         assert block is raw_block
         return block
 
-    compiled = SimpleNamespace(raydn=object())
+    compiled = SimpleNamespace(rayd=object())
     monkeypatch.setattr(los.topology_blocks, "path_los_export", fake_export)
     monkeypatch.setattr(los, "prepare_los_candidates", fake_prepare)
     monkeypatch.setattr(
@@ -168,7 +168,7 @@ def test_los_topology_skips_visibility_for_structure_free_scene(monkeypatch):
 
     result = los._los_topology(
         SimpleNamespace(structures=[]),
-        SimpleNamespace(raydn=object()),
+        SimpleNamespace(rayd=object()),
         torch.zeros((2, 3), dtype=torch.float32),
         torch.ones((2,), dtype=torch.float32),
         torch.ones((2, 3), dtype=torch.float32),

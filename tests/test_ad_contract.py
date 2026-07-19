@@ -109,7 +109,7 @@ def test_primal_metadata_reports_no_ad_for_every_solver():
     deterministic = deterministic_metadata(
         config=DeterministicConfig(max_depth=0, components={"los"}),
         native_info={
-            "uses_raydn_native": False,
+            "uses_rayd_native": False,
             "uses_path_native": True,
             "cuda_available": True,
             "optix_available": False,

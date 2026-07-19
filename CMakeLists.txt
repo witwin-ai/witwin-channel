@@ -471,7 +471,6 @@ Python_add_library(
     native/channel_native/build_info.cpp
     native/channel_native/bdpt.cpp
     native/channel_native/bdpt_ad_dispatch.cpp
-    native/channel_native/rayd/common.cpp
     native/channel_native/rayd/scene.cpp
     native/channel_native/rayd/geometry.cpp
     native/channel_native/rayd/reflection.cpp
@@ -554,16 +553,10 @@ set_source_files_properties(
     native/channel_native/kernels/scattering_table_eval_ad.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 if(MSVC)
-    # RayD's extern "C" integration entries raise std::runtime_error on
-    # invalid inputs by contract. MSVC's default /EHc (part of /EHsc) assumes
-    # extern "C" functions never raise, which turns those raises into
-    # std::terminate at the bridge call sites; /EHc- keeps them catchable so
-    # they surface as Python RuntimeError like every other validation error.
+    # Channel Native's two diffraction discovery entries retain their existing
+    # extern "C" CUDA boundary until Phase 4. Keep validation exceptions
+    # catchable at those direct call sites.
     set_source_files_properties(
-        native/channel_native/rayd/common.cpp
-        native/channel_native/rayd/scene.cpp
-        native/channel_native/rayd/geometry.cpp
-        native/channel_native/rayd/reflection.cpp
         native/channel_native/rayd/diffraction.cpp
         PROPERTIES COMPILE_OPTIONS "/EHc-")
 endif()

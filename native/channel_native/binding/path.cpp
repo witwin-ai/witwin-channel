@@ -1,5 +1,6 @@
 #include <torch/extension.h>
 
+#include "../rayd/resource.h"
 #include "registry.h"
 
 #include <cstdint>
@@ -21,7 +22,7 @@ int64_t cn_core_diffraction_edge_count(
     bool boundary_half_plane,
     double plane_tol);
 pybind11::dict cn_path_diffraction_paths_order1(
-    int64_t scene_handle,
+    RayDSceneResource &scene,
     torch::Tensor tx_positions,
     torch::Tensor tx_polarizations,
     torch::Tensor tx_power,
@@ -103,7 +104,7 @@ pybind11::dict cn_path_filter_block(
     torch::Tensor visible0,
     torch::Tensor visible1);
 pybind11::dict cn_path_diffraction_block(
-    pybind11::sequence raydn_output,
+    pybind11::sequence rayd_output,
     int64_t tx_index);
 pybind11::dict cn_path_merge_blocks(
     pybind11::sequence blocks,
@@ -416,11 +417,11 @@ void register_path(pybind11::module_ &module) {
     module.def(
         "path_diffraction_block",
         &cn_path_diffraction_block,
-        "Convert RayDN order-1 diffraction outputs into a compact path block with native CUDA kernels.");
+        "Convert RayD order-1 diffraction outputs into a compact path block with native CUDA kernels.");
     module.def(
         "path_diffraction_paths_order1",
         &cn_path_diffraction_paths_order1,
-        "Build compact order-1 diffraction path blocks through native CUDA/RayDN without Python tensor loops.");
+        "Build compact order-1 diffraction path blocks through native CUDA/RayD without Python tensor loops.");
     module.def(
         "path_merge_blocks",
         &cn_path_merge_blocks,
@@ -457,7 +458,7 @@ void register_path_deterministic(pybind11::module_ &module) {
     module.def(
         "deterministic_diffraction_vector_field",
         &cn_deterministic_diffraction_vector_field,
-        "Convert RayDN diffraction vector components into scalar deterministic fields with a CUDA kernel.");
+        "Convert RayD diffraction vector components into scalar deterministic fields with a CUDA kernel.");
     module.def(
         "deterministic_reflection_field",
         &cn_deterministic_reflection_field,
@@ -541,7 +542,7 @@ void register_path_deterministic(pybind11::module_ &module) {
     module.def(
         "deterministic_diffraction_order1_compact",
         &cn_deterministic_diffraction_order1_compact,
-        "Compact deterministic first-order diffraction RayDN outputs with native CUDA.");
+        "Compact deterministic first-order diffraction RayD outputs with native CUDA.");
     module.def(
         "deterministic_normalize_vec3",
         &cn_deterministic_normalize_vec3,

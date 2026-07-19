@@ -15,7 +15,7 @@ from witwin.channel_native.scene import compile as canonical_compile
 
 _HELPER_BODY_HASHES = {
     "_compile_geometry": (
-        "503f84d98057d67c94230176d4a18e2ee6d374788e689f8167d4455b30bd0c97"
+        "d02f440224fdc213ed353ac49a17438ac9001a3de25946ca42658e145ea71697"
     ),
     "_abi_v3_layer_view": (
         "dc7258913a12cb41c84af8446726e1c656e41c32e8fee332c1025bffd6b2e23e"
@@ -93,19 +93,19 @@ def test_compile_cache_hit_preserves_the_exact_call_ledger(monkeypatch):
 
         monkeypatch.setattr(canonical_compile, name, record)
 
-    original_raydn_scene = Scene.raydn_scene
+    original_rayd_scene = Scene.rayd_scene
 
-    def raydn_scene(scene):
-        ledger.append("raydn_scene")
-        return original_raydn_scene(scene)
+    def rayd_scene(scene):
+        ledger.append("rayd_scene")
+        return original_rayd_scene(scene)
 
-    monkeypatch.setattr(Scene, "raydn_scene", raydn_scene)
+    monkeypatch.setattr(Scene, "rayd_scene", rayd_scene)
     scene = Scene(structures=[], transmitters=[], receivers=[], frequency=3.5e9)
 
     compiled = scene.compile()
     assert ledger == [
         "_material_records",
-        "raydn_scene",
+        "rayd_scene",
         "_compile_geometry",
         "_frequency_dependent_material_keys",
         "_compile_materials",

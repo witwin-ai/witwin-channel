@@ -44,7 +44,7 @@ def test_basic_ad_solve_rejects_reflection_depth_over_ad_cap(ad_mode, monkeypatc
         )
 
     monkeypatch.setattr(
-        geometry_bridge, "raydn_trace_reflections_forward", _forbidden_forward
+        geometry_bridge, "rayd_trace_reflections_forward", _forbidden_forward
     )
     scene = empty_space_los_scene()
     config = Config(

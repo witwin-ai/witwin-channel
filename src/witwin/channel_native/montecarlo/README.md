@@ -94,7 +94,7 @@ promises. The parent `montecarlo` package exports no solver symbols.
 
 ## Forbidden fallback
 
-Missing CUDA, the channel-native extension, required native symbols, or RayDN
+Missing CUDA, the channel-native extension, required native symbols, or RayD
 capability is a hard error. Do not add CPU, Python/Torch recomputation,
 finite-difference, legacy RayD/DrJit, zero-result, or reference-oracle
 fallbacks. A less capable accumulation strategy is valid only when it is an

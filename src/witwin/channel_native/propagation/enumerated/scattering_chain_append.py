@@ -527,9 +527,9 @@ def append_chain_scattering_paths(
 
     device = evaluated.device
     compiled = scene.compile()
-    if not compiled.raydn.available:
+    if not compiled.rayd.available:
         raise RuntimeError(
-            "deterministic scatter-chain discovery requires RayDN native capability"
+            "deterministic scatter-chain discovery requires RayD native capability"
         )
     screens = _realization_structures(compiled)
     ensemble_faces = _ensemble_scatter_faces(compiled, screens, device=device)
@@ -544,7 +544,7 @@ def append_chain_scattering_paths(
         return evaluated, sidecars
     tx_pol = transmitter_polarizations(scene, device=device)
     rx_pol = receiver_polarizations(scene, device=device)
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     vertices = records.vertices
     scene_diagonal = (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
 

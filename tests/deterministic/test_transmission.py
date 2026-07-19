@@ -28,9 +28,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _require_raydn() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+def _require_rayd() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 def _scene(structures: list, rx_position: list[float]) -> Scene:
@@ -86,7 +86,7 @@ def _stack_t_te(material: PhysicalSurface, cos_theta: float) -> complex:
     ),
 )
 def test_vacuum_wall_transmission_equals_empty_scene_los(rx_position):
-    _require_raydn()
+    _require_rayd()
 
     wall = solve(
         _scene([transmission_wall_structure(2.5, _vacuum_wall())], rx_position),
@@ -118,7 +118,7 @@ def test_vacuum_wall_transmission_equals_empty_scene_los(rx_position):
     ),
 )
 def test_lossy_wall_matches_layer_stack_transmission(rx_position, cos_theta):
-    _require_raydn()
+    _require_rayd()
 
     material = _lossy_wall()
     wall = solve(
@@ -141,7 +141,7 @@ def test_lossy_wall_matches_layer_stack_transmission(rx_position, cos_theta):
 
 
 def test_two_walls_transmission_is_the_product_of_single_wall_stacks():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     wall_a = transmission_wall_structure(
@@ -170,7 +170,7 @@ def test_two_walls_transmission_is_the_product_of_single_wall_stacks():
 
 
 def test_max_depth_capping_is_truthful_for_two_walls():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     structures = [
@@ -187,7 +187,7 @@ def test_max_depth_capping_is_truthful_for_two_walls():
 
 
 def test_los_transmission_exclusivity():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     config = Config(components={"los", "transmission"}, max_depth=1, coherent=False)
@@ -207,7 +207,7 @@ def test_los_transmission_exclusivity():
 
 
 def test_pec_wall_transmission_is_negligible():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     wall = solve(

@@ -16,8 +16,8 @@ from witwin.channel_native.path import solve as solve_paths
 def test_single_plane_reflection_matches_path_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     scene = same_side_wall_reflection_scene()
     result = solve(
@@ -58,8 +58,8 @@ def test_single_plane_reflection_matches_path_reference():
 def test_reflection_path_field_export_uses_native_complex_fields():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     result = solve(
         same_side_wall_reflection_scene(),
@@ -93,8 +93,8 @@ def test_reflection_path_field_export_uses_native_complex_fields():
 def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
     if not hasattr(ops.native_extension(), "deterministic_reflection_field"):
         pytest.skip("native deterministic reflection field kernel is not built")
 
@@ -125,8 +125,8 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
 def test_single_plane_reflection_does_not_use_python_triangle_fallback():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     assert not hasattr(topology, "_inside_triangle")
 
@@ -142,8 +142,8 @@ def test_single_plane_reflection_does_not_use_python_triangle_fallback():
 def test_reflection_solver_requires_native_field_kernel(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     def fail_native_kernel(**kwargs):
         raise RuntimeError(

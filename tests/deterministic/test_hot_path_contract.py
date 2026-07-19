@@ -56,8 +56,8 @@ def test_los_hot_path_uses_native_topology_facade(monkeypatch):
 def test_diffraction_hot_path_uses_native_vector_field_facade(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic hot-path contract")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     calls = []
     original = deterministic_fields.deterministic_diffraction_vector_field

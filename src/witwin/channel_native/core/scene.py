@@ -39,7 +39,7 @@ from witwin.channel_native.scene.compile import (  # noqa: F401
 )
 from witwin.channel_native.scene.compiled import CompiledScene  # noqa: F401
 from witwin.channel_native.scene.kernels.rayd_scene import (  # noqa: F401
-    RayDNScene,
+    RayDSceneResource,
     build_scene_from_structures,
 )
 from witwin.channel_native.scene.models import (  # noqa: F401
@@ -49,7 +49,7 @@ from witwin.channel_native.scene.models import (  # noqa: F401
     Scene,
     Structure,
     Transmitter,
-    _diffraction_edge_count_from_raydn_scene,
+    _diffraction_edge_count_from_rayd_scene,
     _RAYD_EDGE_INFO_PLANE_TOL,
 )
 from witwin.channel_native.scene.stores.assignments import AssignmentStore  # noqa: F401

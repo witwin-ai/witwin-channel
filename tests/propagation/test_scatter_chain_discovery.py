@@ -3,7 +3,7 @@
 The pure structural helpers (join / stable order / budget / padding / contract
 validation / multi-slot topology assembly) are exercised on CPU tensors with no
 scene. The end-to-end discovery on a two-wall scene, the default-off byte
-identity, and the loud D2-facade dependency require the built RayDN extension and
+identity, and the loud D2-facade dependency require the built RayD extension and
 are CUDA-guarded.
 """
 
@@ -211,19 +211,19 @@ def test_chain_topology_slot_layout():
 
 
 # ---------------------------------------------------------------------------
-# End-to-end discovery on a two-wall scene (CUDA + RayDN required).
+# End-to-end discovery on a two-wall scene (CUDA + RayD required).
 # ---------------------------------------------------------------------------
 
 _FREQUENCY_HZ = 3.0e9
 
 
-def _require_cuda_raydn() -> None:
+def _require_cuda_rayd() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA torch is required")
     from witwin.channel_native.core.kernels.extension import build_info
 
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 def _two_wall_scene():
@@ -280,7 +280,7 @@ def _run_discovery(scene, config):
         return None
     tx_positions, _ = transmitter_tensors(scene, device=device)
     rx_positions, _ = receiver_positions_and_layout(scene, device=device)
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     vertices = records.vertices
     diag = (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
     return sc.discover_scatter_chains(
@@ -294,7 +294,7 @@ def _run_discovery(scene, config):
 
 
 def test_discovery_default_off_returns_none():
-    _require_cuda_raydn()
+    _require_cuda_rayd()
     scene = _two_wall_scene()
     config = DeterministicConfig(
         max_depth=2,
@@ -305,7 +305,7 @@ def test_discovery_default_off_returns_none():
 
 
 def test_discovery_deterministic_and_valid():
-    _require_cuda_raydn()
+    _require_cuda_rayd()
     scene = _two_wall_scene()
     config = DeterministicConfig(
         max_depth=2,
@@ -329,7 +329,7 @@ def test_discovery_deterministic_and_valid():
 
 
 def test_discovery_depth_and_join_bounds():
-    _require_cuda_raydn()
+    _require_cuda_rayd()
     scene = _two_wall_scene()
     max_chain = 3
     config = DeterministicConfig(
@@ -360,7 +360,7 @@ def test_discovery_depth_and_join_bounds():
 
 
 def test_solver_default_off_appends_no_chain_rows():
-    _require_cuda_raydn()
+    _require_cuda_rayd()
     from witwin.channel_native.deterministic import solve
 
     scene = _two_wall_scene()
@@ -382,7 +382,7 @@ def test_solver_chain_enabled_end_to_end():
     registered so the suite stays green while D2 lands.
     """
 
-    _require_cuda_raydn()
+    _require_cuda_rayd()
     if getattr(scattering_mod.scattering_kernels, "scattering_chain_ensemble_eval", None) is None:
         pytest.skip("ADR-021 D2 Op A facade not yet registered")
     from witwin.channel_native.runtime.symbols import native_extension
@@ -415,7 +415,7 @@ def test_solver_chain_enabled_end_to_end():
 def test_solver_chain_ad_mode_requires_companion():
     """AD-mode chain solve fails loudly until the D5 Op A ``_ad`` companion lands."""
 
-    _require_cuda_raydn()
+    _require_cuda_rayd()
     if getattr(scattering_mod.scattering_autograd, "scattering_chain_ensemble_eval_ad", None) is not None:
         pytest.skip("ADR-021 D5 Op A _ad companion is available")
     from witwin.channel_native.deterministic import solve

@@ -64,17 +64,17 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
             "(ADR-017 gate 3 C1 clearance companion is a follow-up)"
         )
     info = build_info()
-    reflection_available = bool(info["uses_raydn_native"])
-    diffraction_available = bool(info["uses_raydn_native"])
+    reflection_available = bool(info["uses_rayd_native"])
+    diffraction_available = bool(info["uses_rayd_native"])
     path_native_available = bool(info.get("uses_path_native", False))
     if not path_native_available:
         raise RuntimeError(
             "path solver requires _channel_native path native CUDA kernels"
         )
     if "reflection" in config.components and not reflection_available:
-        raise RuntimeError("reflection paths require RayDN native capability")
+        raise RuntimeError("reflection paths require RayD native capability")
     if "diffraction" in config.components and not diffraction_available:
-        raise RuntimeError("diffraction paths require RayDN native capability")
+        raise RuntimeError("diffraction paths require RayD native capability")
     if config.max_depth < 1 and (
         "reflection" in config.components or "diffraction" in config.components
     ):

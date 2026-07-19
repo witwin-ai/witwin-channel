@@ -40,7 +40,7 @@ from witwin.channel_native.core.receiver_geometry import (
     component_grid_shape,
 )
 from witwin.channel_native.materials.encoding import face_material_field_bundle
-from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
+from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 from witwin.channel_native.montecarlo.events.scattering import scattering_map_matrix
 from witwin.channel_native.montecarlo.events.transmission import (
     layer_csr_view,
@@ -122,19 +122,19 @@ def _grid_los_matrix(
 
 def _grid_visibility_masks(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     grid: ReceiverGrid,
     *,
     device: torch.device,
 ) -> torch.Tensor:
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     tx_pos, _ = transmitter_positions(scene, device=device)
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     masks: list[torch.Tensor] = []
     for tx_index in range(tx_pos.shape[0]):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
         masks.append(
-            geometry_bridge.raydn_visibility_forward(
+            geometry_bridge.rayd_visibility_forward(
                 handle, inputs["start"], rx_pos, inputs["active"]
             )[0]
         )
@@ -143,7 +143,7 @@ def _grid_visibility_masks(
 
 def los_component_map(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     grid: ReceiverGrid,
     *,
     device: torch.device,
@@ -157,9 +157,9 @@ def los_component_map(
         # the visibility mask is a frozen winner, the matrix keeps its graph.
         visible = None
         if scene.structures:
-            if not raydn.available:
-                raise RuntimeError("LoS visibility requires RayDN native scene capability")
-            visible = _grid_visibility_masks(scene, raydn, grid, device=device)
+            if not rayd.available:
+                raise RuntimeError("LoS visibility requires RayD native scene capability")
+            visible = _grid_visibility_masks(scene, rayd, grid, device=device)
         if ledger is not None:
             ledger.add(visible)
         return mc_los_grid_maps_ad(
@@ -168,14 +168,14 @@ def los_component_map(
     maps = mc_los_component_maps_from_matrix(los, rows=grid.shape[0], cols=grid.shape[1])
     if not scene.structures:
         return maps
-    if not raydn.available:
-        raise RuntimeError("LoS visibility requires RayDN native scene capability")
-    handle = raydn.require_handle()
+    if not rayd.available:
+        raise RuntimeError("LoS visibility requires RayD native scene capability")
+    handle = rayd.require_resource()
     tx_pos, _ = transmitter_positions(scene, device=device)
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     for tx_index in range(tx_pos.shape[0]):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
-        visible = geometry_bridge.raydn_visibility_forward(
+        visible = geometry_bridge.rayd_visibility_forward(
             handle, inputs["start"], rx_pos, inputs["active"]
         )[0]
         mc_apply_los_visibility(maps, los, visible, tx_index=tx_index)
@@ -188,7 +188,7 @@ def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
 
 def transmission_component_map(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     grid: ReceiverGrid,
     *,
     max_depth: int,
@@ -217,8 +217,8 @@ def transmission_component_map(
         return mc_component_map_buffer(
             tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
         )
-    if not raydn.available:
-        raise RuntimeError("transmission requires RayDN native scene capability")
+    if not rayd.available:
+        raise RuntimeError("transmission requires RayD native scene capability")
     los_matrix = _grid_los_matrix(
         scene, grid, device=device, los=los, ad=ad, ledger=ledger
     )
@@ -251,7 +251,7 @@ def transmission_component_map(
     for tx_index in range(int(tx_pos.shape[0])):
         origins = tx_march[tx_index].unsqueeze(0).repeat(rx_count, 1)
         chain = straight_transmission_chains(
-            raydn,
+            rayd,
             origins,
             rx_pos,
             face_material_id=bundle["material_id"],
@@ -285,7 +285,7 @@ def transmission_component_map(
 
 def scattering_component_map(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     grid: ReceiverGrid,
     *,
     samples: int,
@@ -318,12 +318,12 @@ def scattering_component_map(
             tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
         )
         return maps, {"sample_count": 0, "rough_face_count": 0, "tx_visible_samples": 0, "deposited_rows": 0}
-    if not raydn.available:
-        raise RuntimeError("scattering requires RayDN native scene capability")
+    if not rayd.available:
+        raise RuntimeError("scattering requires RayD native scene capability")
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     matrix, stats = scattering_map_matrix(
         scene,
-        raydn,
+        rayd,
         tx_pos,
         tx_power,
         rx_pos,
@@ -352,7 +352,7 @@ def scattering_component_map(
 
 def reflection_component_maps_with_wedges(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     grid: ReceiverGrid,
     *,
     samples: int,
@@ -371,10 +371,10 @@ def reflection_component_maps_with_wedges(
             maps=maps,
             wedge_events=(),
         )
-    if not raydn.available:
-        raise RuntimeError("reflection requires RayDN native scene capability")
+    if not rayd.available:
+        raise RuntimeError("reflection requires RayD native scene capability")
     spec = grid_spec(grid)
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     tx_live = (
         transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
@@ -391,7 +391,7 @@ def reflection_component_maps_with_wedges(
         material_valid,
         material_thickness,
     ) = material_tensors
-    face_normals = raydn.edge_records().face_normals
+    face_normals = rayd.edge_records().face_normals
     solid_angle_per_ray = float(4.0 * math.pi / max(1, int(samples)))
     dim0, dim1 = component_grid_shape(grid)
     ad_maps: list[torch.Tensor] = []
@@ -407,7 +407,7 @@ def reflection_component_maps_with_wedges(
         ray_o = launch_inputs["ray_o"]
         ray_tmax = launch_inputs["ray_tmax"]
         active = launch_inputs["active"]
-        trace = geometry_bridge.raydn_trace_reflections_forward(
+        trace = geometry_bridge.rayd_trace_reflections_forward(
             handle,
             ray_o,
             ray_d,
@@ -541,23 +541,23 @@ def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tu
 
 
 def _cached_primitive_edge_candidates(
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     selected: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     key = (int(selected.data_ptr()), int(selected.numel()))
-    cache = raydn.runtime_cache
+    cache = rayd.runtime_cache
     cached = cache.get("mc_primitive_edge_candidates")
     if cached is not None:
         cached_key, cached_candidates = cached  # type: ignore[misc]
         if cached_key == key:
             return cached_candidates  # type: ignore[return-value]
-    candidates = _native_surface_group_edge_candidates(raydn.edge_records(), selected)
+    candidates = _native_surface_group_edge_candidates(rayd.edge_records(), selected)
     cache["mc_primitive_edge_candidates"] = (key, candidates)
     return candidates
 
 
 def _discover_diffraction_edges_from_wedges(
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     wedges: WedgeEventBatch,
     edge_geometry: tuple[torch.Tensor, ...] | None = None,
     edge_candidates: tuple[torch.Tensor, torch.Tensor] | None = None,
@@ -574,12 +574,12 @@ def _discover_diffraction_edges_from_wedges(
         _face0,
         face1,
         _exterior_angle,
-    ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(raydn)
+    ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(rayd)
     if edge_candidates is None:
-        edge_candidates = _cached_primitive_edge_candidates(raydn, selected)
+        edge_candidates = _cached_primitive_edge_candidates(rayd, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
     if wedges.event_count is not None:
-        return geometry_bridge.raydn_diffraction_discover_edges_counted(
+        return geometry_bridge.rayd_diffraction_discover_edges_counted(
             wedges.tx_pos,
             wedges.ray_dir,
             wedges.prim_id,
@@ -597,7 +597,7 @@ def _discover_diffraction_edges_from_wedges(
             line_max,
             face1,
         )
-    return geometry_bridge.raydn_diffraction_discover_edges(
+    return geometry_bridge.rayd_diffraction_discover_edges(
         wedges.tx_pos,
         wedges.ray_dir,
         wedges.prim_id,
@@ -617,7 +617,7 @@ def _discover_diffraction_edges_from_wedges(
 
 
 def _diffraction_states_from_edge_indices(
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     tx: torch.Tensor,
     tx_power: torch.Tensor,
     tx_power_index: int,
@@ -636,7 +636,7 @@ def _diffraction_states_from_edge_indices(
         face0,
         face1,
         exterior_angle,
-    ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(raydn)
+    ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(rayd)
     return deterministic_diffraction_state_pack(
         edge_indices,
         edge_pos,
@@ -656,14 +656,14 @@ def _diffraction_states_from_edge_indices(
 
 def _diffraction_states(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     tx: torch.Tensor,
     tx_power: torch.Tensor,
     tx_power_index: int,
     edge_geometry: tuple[torch.Tensor, ...] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     del scene
-    geometry = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(raydn)
+    geometry = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(rayd)
     (
         selected,
         edge_pos,
@@ -696,7 +696,7 @@ def _diffraction_states(
 
 def diffraction_component_map(
     scene: Scene,
-    raydn: RayDNScene,
+    rayd: RayDSceneResource,
     grid: ReceiverGrid,
     *,
     samples: int,
@@ -711,10 +711,10 @@ def diffraction_component_map(
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
         return mc_component_map_buffer(tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1)
-    if not raydn.available:
-        raise RuntimeError("diffraction requires RayDN native scene capability")
+    if not rayd.available:
+        raise RuntimeError("diffraction requires RayD native scene capability")
     spec = grid_spec(grid)
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     tx_live = (
         transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
@@ -748,7 +748,7 @@ def diffraction_component_map(
         nonlocal edge_geometry
         if edge_geometry is None:
             edge_geometry = _cached_diffraction_edge_geometry(
-                raydn,
+                rayd,
                 preserve_imported_edges=preserve_imported_edges,
             )
         return edge_geometry
@@ -756,7 +756,7 @@ def diffraction_component_map(
     def get_edge_candidates(geometry: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, torch.Tensor]:
         nonlocal edge_candidates
         if edge_candidates is None:
-            edge_candidates = _cached_primitive_edge_candidates(raydn, geometry[0])
+            edge_candidates = _cached_primitive_edge_candidates(rayd, geometry[0])
         return edge_candidates
 
     def zero_map() -> torch.Tensor:
@@ -770,7 +770,7 @@ def diffraction_component_map(
                 continue
             geometry = get_edge_geometry()
             edge_indices = _discover_diffraction_edges_from_wedges(
-                raydn,
+                rayd,
                 wedge_events[tx_index],
                 edge_geometry=geometry,
                 edge_candidates=get_edge_candidates(geometry),
@@ -780,7 +780,7 @@ def diffraction_component_map(
                     ad_maps.append(zero_map())
                 continue
             states = _diffraction_states_from_edge_indices(
-                raydn,
+                rayd,
                 tx,
                 tx_power,
                 tx_index,
@@ -790,7 +790,7 @@ def diffraction_component_map(
         else:
             states = _diffraction_states(
                 scene,
-                raydn,
+                rayd,
                 tx,
                 tx_power,
                 tx_index,
@@ -828,7 +828,7 @@ def diffraction_component_map(
             dtype=torch.float32,
         )
         state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
-        sampled = geometry_bridge.raydn_diffraction_accumulation_forward(
+        sampled = geometry_bridge.rayd_diffraction_accumulation_forward(
             handle, None, *states, state_wi, state_wi,
             material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
             state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),

@@ -10,7 +10,7 @@ dedicated chain-sample set as virtual endpoints (``tx -> {samples}`` for C1 and
 ``rx -> {samples}`` for C2, reciprocal), then joining the two legs on the sample
 index. No geometry is recomputed in Python/Torch: every hit point, normal, and
 face id comes from the native RayD EPC (``query_reflection_epc`` /
-``raydn_reflection_epc_paths_forward``) exactly as the deterministic reflection
+``rayd_reflection_epc_paths_forward``) exactly as the deterministic reflection
 topology owner uses it (``propagation/enumerated/reflection.py``). The only
 Python work here is the sanctioned structural boundary work (plan 10a section 2):
 join on the sample index, keep-strongest budgeting, stable row ordering, padding
@@ -399,7 +399,7 @@ def build_chain_samples(
 
     if int(ensemble_faces.numel()) == 0:
         return None
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     faces = records.faces.to(torch.int64)[ensemble_faces]
     tri = records.vertices[faces]  # [F, 3, 3]
     normals = _normalize(records.face_normals[ensemble_faces])
@@ -453,7 +453,7 @@ class _ReflectionGeometry:
 
 
 def _reflection_geometry(compiled: object, device: torch.device) -> _ReflectionGeometry:
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
     normals = geometry_primitives.deterministic_normalize_vec3(
@@ -472,7 +472,7 @@ def _reflection_geometry(compiled: object, device: torch.device) -> _ReflectionG
         device=device, dtype=torch.long
     ).contiguous()
     groups = _cached_coplanar_face_groups(
-        compiled.raydn, tri_a, normals, face_group_source
+        compiled.rayd, tri_a, normals, face_group_source
     )
     return _ReflectionGeometry(
         tri_a=tri_a,
@@ -509,17 +509,17 @@ def _polyline_length(
 
 
 def _visibility(
-    raydn: object, start: torch.Tensor, end: torch.Tensor
+    rayd: object, start: torch.Tensor, end: torch.Tensor
 ) -> torch.Tensor:
     count = int(start.shape[0])
     if count == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     masks = []
     for lo in range(0, count, _VISIBILITY_CHUNK):
         hi = min(lo + _VISIBILITY_CHUNK, count)
         masks.append(
-            geometry_bridge.raydn_visibility_forward(
+            geometry_bridge.rayd_visibility_forward(
                 handle, start[lo:hi].contiguous(), end[lo:hi].contiguous(), None
             )[0]
         )
@@ -635,7 +635,7 @@ def _gather_leg(
     """
 
     device = samples.position.device
-    raydn = compiled.raydn
+    rayd = compiled.rayd
     sample_pos = samples.position
     sample_normal = samples.normal
     s_count = int(sample_pos.shape[0])
@@ -652,7 +652,7 @@ def _gather_leg(
         n_o = sample_normal * side[:, None]
         offset_points = sample_pos + n_o * eps[:, None]
         visible = _visibility(
-            raydn,
+            rayd,
             source_row.expand(s_count, 3).contiguous(),
             offset_points,
         )
@@ -729,13 +729,13 @@ def _gather_leg_order1(
         tri_a=geom.tri_a,
         normals=geom.normals,
         trace_group_chains=lambda tx, *, face_group_id, max_depth: _trace_group_chains(
-            compiled.raydn, tx, face_group_id=face_group_id, max_depth=max_depth
+            compiled.rayd, tx, face_group_id=face_group_id, max_depth=max_depth
         ),
     ):
         epc_inputs = request.epc_inputs
         epc = query_reflection_epc(
             ReflectionEpcQuery(
-                raydn=compiled.raydn,
+                rayd=compiled.rayd,
                 source=epc_inputs["tx_batch"],
                 receiver=epc_inputs["rx_batch"],
                 active=None,
@@ -817,7 +817,7 @@ def _gather_leg_multibounce(
         tri_a=geom.tri_a,
         normals=geom.normals,
         trace_group_chains=lambda tx, *, face_group_id, max_depth: _trace_group_chains(
-            compiled.raydn, tx, face_group_id=face_group_id, max_depth=max_depth
+            compiled.rayd, tx, face_group_id=face_group_id, max_depth=max_depth
         ),
         record_candidate_count=lambda candidate_count: None,
     ):
@@ -825,7 +825,7 @@ def _gather_leg_multibounce(
         epc_inputs = request.epc_inputs
         epc = query_reflection_epc(
             ReflectionEpcQuery(
-                raydn=compiled.raydn,
+                rayd=compiled.rayd,
                 source=epc_inputs["tx_batch"],
                 receiver=epc_inputs["rx_batch"],
                 active=None,
@@ -876,7 +876,7 @@ def _gather_leg_multibounce(
 
 
 def _trace_group_chains(
-    raydn: object,
+    rayd: object,
     tx: torch.Tensor,
     *,
     face_group_id: torch.Tensor,
@@ -897,8 +897,8 @@ def _trace_group_chains(
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
     ray_d = mc_sample_directions(ray_count, tx.reshape(1, 3))
     ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
-    out = geometry_bridge.raydn_trace_reflections_forward(
-        raydn.require_handle(), ray_o, ray_d, ray_tmax, None, int(max_depth)
+    out = geometry_bridge.rayd_trace_reflections_forward(
+        rayd.require_resource(), ray_o, ray_d, ray_tmax, None, int(max_depth)
     )
     prim_chain = out[2].to(dtype=torch.long).reshape(ray_count, int(max_depth))
     chains = torch.full_like(prim_chain, -1)

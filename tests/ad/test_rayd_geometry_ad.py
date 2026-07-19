@@ -1,4 +1,4 @@
-"""AD-A0: RayDN fixed-winner geometry JVP/VJP versus central finite differences.
+"""AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences.
 
 Small analytic scenes (a tilted triangle, a quad wall) exercised through the
 channel_native C-bridge AD entry points only. Vertex perturbations rebuild the
@@ -29,7 +29,7 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 from witwin.channel_native.core.materials import Dielectric
 
 pytestmark = pytest.mark.skipif(
-    not torch.cuda.is_available(), reason="CUDA is required for RayDN geometry AD"
+    not torch.cuda.is_available(), reason="CUDA is required for RayD geometry AD"
 )
 
 _TILTED_TRIANGLE_VERTICES = (
@@ -57,11 +57,11 @@ def _source_linked_rayd_available() -> bool:
         return False
 
 
-def _build_raydn_scene(vertices: torch.Tensor, faces) -> tuple[object, torch.Tensor]:
-    """Build a single-structure RayDN scene; returns (scene wrapper, global vertices)."""
+def _build_rayd_scene(vertices: torch.Tensor, faces) -> tuple[object, torch.Tensor]:
+    """Build a single-structure RayD scene; returns (scene wrapper, global vertices)."""
 
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
     scene = Scene(
         structures=[
             Structure(
@@ -74,18 +74,18 @@ def _build_raydn_scene(vertices: torch.Tensor, faces) -> tuple[object, torch.Ten
         receivers=[],
         frequency=3.5e9,
     )
-    raydn = scene.raydn_scene()
-    return raydn, raydn.mesh_tensors[0][0]
+    rayd = scene.rayd_scene()
+    return rayd, rayd.mesh_tensors[0][0]
 
 
 def _triangle_scene() -> tuple[object, torch.Tensor]:
-    return _build_raydn_scene(
+    return _build_rayd_scene(
         torch.tensor(_TILTED_TRIANGLE_VERTICES, dtype=torch.float32), _TRIANGLE_FACES
     )
 
 
 def _wall_scene() -> tuple[object, torch.Tensor]:
-    return _build_raydn_scene(
+    return _build_rayd_scene(
         torch.tensor(_WALL_VERTICES, dtype=torch.float32), _WALL_FACES
     )
 
@@ -112,14 +112,14 @@ def _intersect_loss_weights(ray_count: int) -> tuple[torch.Tensor, torch.Tensor]
 
 
 def _intersect_fd_loss(
-    raydn: object,
+    rayd: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     w_t: torch.Tensor,
     w_p: torch.Tensor,
 ) -> torch.Tensor:
     hit = geometry_bridge.bdpt_intersect_forward(
-        raydn, ray_o.contiguous(), ray_d, _empty_tmax(), None, flags=7
+        rayd, ray_o.contiguous(), ray_d, _empty_tmax(), None, flags=7
     )
     loss = (w_t.double() * hit["t"].double()).sum()
     loss = loss + (w_p.double() * hit["p"].double()).sum()
@@ -127,18 +127,18 @@ def _intersect_fd_loss(
 
 
 def test_intersect_vjp_matches_fd_wrt_ray_origin():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     w_t, w_p = _intersect_loss_weights(ray_o.shape[0])
 
     ray_o_ad = ray_o.clone().requires_grad_(True)
-    out = ops.raydn_intersect_ad(raydn, vertices, ray_o_ad, ray_d, _empty_tmax())
+    out = ops.rayd_intersect_ad(rayd, vertices, ray_o_ad, ray_d, _empty_tmax())
     loss = (w_t * out["t"]).sum() + (w_p * out["p"]).sum()
     loss.backward()
     assert ray_o_ad.grad is not None
 
     fd_grad = central_difference_gradient(
-        lambda x: _intersect_fd_loss(raydn, x, ray_d, w_t, w_p),
+        lambda x: _intersect_fd_loss(rayd, x, ray_d, w_t, w_p),
         ray_o,
         FD_STEP_POSITION,
     )
@@ -148,18 +148,18 @@ def test_intersect_vjp_matches_fd_wrt_ray_origin():
 
 
 def test_intersect_vjp_matches_fd_wrt_vertices():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     w_t, w_p = _intersect_loss_weights(ray_o.shape[0])
 
     vertices_ad = vertices.detach().clone().requires_grad_(True)
-    out = ops.raydn_intersect_ad(raydn, vertices_ad, ray_o, ray_d, _empty_tmax())
+    out = ops.rayd_intersect_ad(rayd, vertices_ad, ray_o, ray_d, _empty_tmax())
     loss = (w_t * out["t"]).sum() + (w_p * out["p"]).sum()
     loss.backward()
     assert vertices_ad.grad is not None
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt, _ = _build_raydn_scene(perturbed_vertices, _TRIANGLE_FACES)
+        rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
         return _intersect_fd_loss(rebuilt, ray_o, ray_d, w_t, w_p)
 
     generator = torch.Generator(device="cpu").manual_seed(11)
@@ -175,15 +175,15 @@ def test_intersect_vjp_matches_fd_wrt_vertices():
 
 
 def test_intersect_jvp_matches_fd_wrt_ray_origin():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     del vertices
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.bdpt_intersect_forward(raydn, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = geometry_bridge.bdpt_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(13)
     direction = torch.randn(ray_o.shape, generator=generator).to("cuda")
-    tangents = ops.raydn_intersect_jvp(
-        raydn,
+    tangents = ops.rayd_intersect_jvp(
+        rayd,
         ray_o,
         ray_d,
         None,
@@ -194,12 +194,12 @@ def test_intersect_jvp_matches_fd_wrt_ray_origin():
 
     def forward_t(x: torch.Tensor) -> torch.Tensor:
         return geometry_bridge.bdpt_intersect_forward(
-            raydn, x.contiguous(), ray_d, _empty_tmax(), None, flags=7
+            rayd, x.contiguous(), ray_d, _empty_tmax(), None, flags=7
         )["t"]
 
     def forward_p(x: torch.Tensor) -> torch.Tensor:
         return geometry_bridge.bdpt_intersect_forward(
-            raydn, x.contiguous(), ray_d, _empty_tmax(), None, flags=7
+            rayd, x.contiguous(), ray_d, _empty_tmax(), None, flags=7
         )["p"]
 
     fd_t = central_difference_directional(forward_t, ray_o, direction, FD_STEP_POSITION)
@@ -209,14 +209,14 @@ def test_intersect_jvp_matches_fd_wrt_ray_origin():
 
 
 def test_intersect_jvp_matches_fd_wrt_vertices():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.bdpt_intersect_forward(raydn, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = geometry_bridge.bdpt_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(17)
     direction = torch.randn(vertices.shape, generator=generator).to("cuda")
-    tangents = ops.raydn_intersect_jvp(
-        raydn,
+    tangents = ops.rayd_intersect_jvp(
+        rayd,
         ray_o,
         ray_d,
         None,
@@ -226,13 +226,13 @@ def test_intersect_jvp_matches_fd_wrt_vertices():
     )
 
     def rebuild_t(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt, _ = _build_raydn_scene(perturbed_vertices, _TRIANGLE_FACES)
+        rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
         return geometry_bridge.bdpt_intersect_forward(
             rebuilt, ray_o, ray_d, _empty_tmax(), None, flags=7
         )["t"]
 
     def rebuild_p(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt, _ = _build_raydn_scene(perturbed_vertices, _TRIANGLE_FACES)
+        rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
         return geometry_bridge.bdpt_intersect_forward(
             rebuilt, ray_o, ray_d, _empty_tmax(), None, flags=7
         )["p"]
@@ -248,14 +248,14 @@ def test_intersect_jvp_matches_fd_wrt_vertices():
 
 
 def test_intersect_forward_mode_dual_matches_native_jvp():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.bdpt_intersect_forward(raydn, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = geometry_bridge.bdpt_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(19)
     direction = torch.randn(ray_o.shape, generator=generator).to("cuda")
-    expected = ops.raydn_intersect_jvp(
-        raydn,
+    expected = ops.rayd_intersect_jvp(
+        rayd,
         ray_o,
         ray_d,
         None,
@@ -266,7 +266,7 @@ def test_intersect_forward_mode_dual_matches_native_jvp():
 
     with torch.autograd.forward_ad.dual_level():
         dual_ray_o = torch.autograd.forward_ad.make_dual(ray_o, direction)
-        out = ops.raydn_intersect_ad(raydn, vertices, dual_ray_o, ray_d, _empty_tmax())
+        out = ops.rayd_intersect_ad(rayd, vertices, dual_ray_o, ray_d, _empty_tmax())
         _, tangent_t = torch.autograd.forward_ad.unpack_dual(out["t"])
         _, tangent_p = torch.autograd.forward_ad.unpack_dual(out["p"])
 
@@ -276,9 +276,9 @@ def test_intersect_forward_mode_dual_matches_native_jvp():
 
 
 def test_intersect_jvp_vjp_inner_product_duality():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.bdpt_intersect_forward(raydn, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = geometry_bridge.bdpt_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(23)
     u_t = torch.randn(ray_o.shape[0], generator=generator).to("cuda")
@@ -287,8 +287,8 @@ def test_intersect_jvp_vjp_inner_product_duality():
     v_vertices = torch.randn(vertices.shape, generator=generator).to("cuda")
 
     # <J v, u> from the native JVP.
-    tangents = ops.raydn_intersect_jvp(
-        raydn,
+    tangents = ops.rayd_intersect_jvp(
+        rayd,
         ray_o,
         ray_d,
         None,
@@ -303,7 +303,7 @@ def test_intersect_jvp_vjp_inner_product_duality():
     # <v, J^T u> from the autograd.Function VJP.
     ray_o_ad = ray_o.clone().requires_grad_(True)
     vertices_ad = vertices.detach().clone().requires_grad_(True)
-    out = ops.raydn_intersect_ad(raydn, vertices_ad, ray_o_ad, ray_d, _empty_tmax())
+    out = ops.rayd_intersect_ad(rayd, vertices_ad, ray_o_ad, ray_d, _empty_tmax())
     loss = (u_t * out["t"]).sum() + (u_p * out["p"]).sum()
     loss.backward()
     rhs = (ray_o_ad.grad.double() * v_ray_o.double()).sum()
@@ -327,14 +327,14 @@ def _reflection_loss_weights() -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def _reflection_fd_loss(
-    raydn: object,
+    rayd: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     w_t: torch.Tensor,
     w_img: torch.Tensor,
 ) -> torch.Tensor:
-    forward = ops.raydn_trace_reflections_forward_tape(
-        raydn, ray_o.contiguous(), ray_d, _empty_tmax(), None, 1
+    forward = ops.rayd_trace_reflections_forward_tape(
+        rayd, ray_o.contiguous(), ray_d, _empty_tmax(), None, 1
     )
     loss = (w_t.double() * forward[1].double()).sum()
     loss = loss + (w_img.double() * forward[2].double()).sum()
@@ -342,13 +342,13 @@ def _reflection_fd_loss(
 
 
 def test_reflection_chain_vjp_matches_fd_wrt_ray_origin():
-    raydn, vertices = _wall_scene()
+    rayd, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
     w_t, w_img = _reflection_loss_weights()
 
     ray_o_ad = ray_o.clone().requires_grad_(True)
-    out = ops.raydn_trace_reflections_ad(
-        raydn, vertices, ray_o_ad, ray_d, _empty_tmax(), None, 1
+    out = ops.rayd_trace_reflections_ad(
+        rayd, vertices, ray_o_ad, ray_d, _empty_tmax(), None, 1
     )
     assert bool(out["valid"].all())
     loss = (w_t * out["t"]).sum() + (w_img * out["image_sources"]).sum()
@@ -356,7 +356,7 @@ def test_reflection_chain_vjp_matches_fd_wrt_ray_origin():
     assert ray_o_ad.grad is not None
 
     fd_grad = central_difference_gradient(
-        lambda x: _reflection_fd_loss(raydn, x, ray_d, w_t, w_img),
+        lambda x: _reflection_fd_loss(rayd, x, ray_d, w_t, w_img),
         ray_o,
         FD_STEP_POSITION,
     )
@@ -366,13 +366,13 @@ def test_reflection_chain_vjp_matches_fd_wrt_ray_origin():
 
 
 def test_reflection_chain_vjp_matches_fd_wrt_vertices():
-    raydn, vertices = _wall_scene()
+    rayd, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
     w_t, w_img = _reflection_loss_weights()
 
     vertices_ad = vertices.detach().clone().requires_grad_(True)
-    out = ops.raydn_trace_reflections_ad(
-        raydn, vertices_ad, ray_o, ray_d, _empty_tmax(), None, 1
+    out = ops.rayd_trace_reflections_ad(
+        rayd, vertices_ad, ray_o, ray_d, _empty_tmax(), None, 1
     )
     assert bool(out["valid"].all())
     loss = (w_t * out["t"]).sum() + (w_img * out["image_sources"]).sum()
@@ -380,7 +380,7 @@ def test_reflection_chain_vjp_matches_fd_wrt_vertices():
     assert vertices_ad.grad is not None
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt, _ = _build_raydn_scene(perturbed_vertices, _WALL_FACES)
+        rebuilt, _ = _build_rayd_scene(perturbed_vertices, _WALL_FACES)
         return _reflection_fd_loss(rebuilt, ray_o, ray_d, w_t, w_img)
 
     generator = torch.Generator(device="cpu").manual_seed(31)
@@ -394,10 +394,10 @@ def test_reflection_chain_vjp_matches_fd_wrt_vertices():
 
 
 def test_reflection_chain_jvp_vjp_inner_product_duality():
-    raydn, vertices = _wall_scene()
+    rayd, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
-    forward = ops.raydn_trace_reflections_forward_tape(
-        raydn, ray_o, ray_d, _empty_tmax(), None, 1
+    forward = ops.rayd_trace_reflections_forward_tape(
+        rayd, ray_o, ray_d, _empty_tmax(), None, 1
     )
     _valid, t, image_sources, _prim, tape_prim_id, tape_bary, tape_hits, tape_normals, _active = forward
 
@@ -407,8 +407,8 @@ def test_reflection_chain_jvp_vjp_inner_product_duality():
     v_ray_o = torch.randn(ray_o.shape, generator=generator).to("cuda")
     v_vertices = torch.randn(vertices.shape, generator=generator).to("cuda")
 
-    tangents = ops.raydn_trace_reflections_jvp(
-        raydn,
+    tangents = ops.rayd_trace_reflections_jvp(
+        rayd,
         ray_o,
         ray_d,
         None,
@@ -423,8 +423,8 @@ def test_reflection_chain_jvp_vjp_inner_product_duality():
     lhs = (tangents[0].double() * u_t.double()).sum()
     lhs = lhs + (tangents[1].double() * u_img.double()).sum()
 
-    grads = ops.raydn_trace_reflections_backward(
-        raydn,
+    grads = ops.rayd_trace_reflections_backward(
+        rayd,
         ray_o,
         ray_d,
         _empty_tmax(),
@@ -444,14 +444,14 @@ def test_reflection_chain_jvp_vjp_inner_product_duality():
 
 
 def test_fixed_winner_tape_outputs_are_non_differentiable():
-    raydn, vertices = _wall_scene()
+    rayd, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
 
     vertices_ad = vertices.detach().clone().requires_grad_(True)
     ray_o_ad = ray_o.clone().requires_grad_(True)
 
-    intersect_out = ops.raydn_intersect_ad(
-        raydn, vertices_ad, ray_o_ad, ray_d, _empty_tmax()
+    intersect_out = ops.rayd_intersect_ad(
+        rayd, vertices_ad, ray_o_ad, ray_d, _empty_tmax()
     )
     assert intersect_out["t"].requires_grad
     assert intersect_out["p"].requires_grad
@@ -459,8 +459,8 @@ def test_fixed_winner_tape_outputs_are_non_differentiable():
         assert not intersect_out[name].requires_grad
         assert intersect_out[name].grad_fn is None
 
-    reflection_out = ops.raydn_trace_reflections_ad(
-        raydn, vertices_ad, ray_o_ad, ray_d, _empty_tmax(), None, 1
+    reflection_out = ops.rayd_trace_reflections_ad(
+        rayd, vertices_ad, ray_o_ad, ray_d, _empty_tmax(), None, 1
     )
     assert reflection_out["t"].requires_grad
     assert reflection_out["image_sources"].requires_grad
@@ -479,21 +479,21 @@ def test_intersect_vjp_matches_fd_wrt_normal_and_barycentric_cotangents():
     """Nonzero cotangents on the n and barycentric outputs (the gn/gbary
     adjoint kernel paths) versus scene-rebuild central FD."""
 
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     generator = torch.Generator(device="cpu").manual_seed(53)
     w_n = torch.randn(ray_o.shape[0], 3, generator=generator).to("cuda")
     w_b = torch.randn(ray_o.shape[0], 3, generator=generator).to("cuda")
 
     vertices_ad = vertices.detach().clone().requires_grad_(True)
-    out = ops.raydn_intersect_ad(raydn, vertices_ad, ray_o, ray_d, _empty_tmax())
+    out = ops.rayd_intersect_ad(rayd, vertices_ad, ray_o, ray_d, _empty_tmax())
     loss = (w_n * out["n"]).sum() + (w_b * out["barycentric"]).sum()
     loss.backward()
     assert vertices_ad.grad is not None
     assert float(vertices_ad.grad.abs().max()) > 0.0
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
-        rebuilt, _ = _build_raydn_scene(perturbed_vertices, _TRIANGLE_FACES)
+        rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
         hit = geometry_bridge.bdpt_intersect_forward(
             rebuilt, ray_o, ray_d, _empty_tmax(), None, flags=7
         )
@@ -511,19 +511,19 @@ def test_intersect_vjp_matches_fd_wrt_normal_and_barycentric_cotangents():
 
 
 def test_intersect_vjp_matches_fd_wrt_ray_direction():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     w_t, w_p = _intersect_loss_weights(ray_o.shape[0])
 
     ray_d_ad = ray_d.clone().requires_grad_(True)
-    out = ops.raydn_intersect_ad(raydn, vertices, ray_o, ray_d_ad, _empty_tmax())
+    out = ops.rayd_intersect_ad(rayd, vertices, ray_o, ray_d_ad, _empty_tmax())
     loss = (w_t * out["t"]).sum() + (w_p * out["p"]).sum()
     loss.backward()
     assert ray_d_ad.grad is not None
     assert float(ray_d_ad.grad.abs().max()) > 0.0
 
     fd_grad = central_difference_gradient(
-        lambda d: _intersect_fd_loss(raydn, ray_o, d.contiguous(), w_t, w_p),
+        lambda d: _intersect_fd_loss(rayd, ray_o, d.contiguous(), w_t, w_p),
         ray_d,
         FD_STEP_POSITION,
     )
@@ -533,19 +533,19 @@ def test_intersect_vjp_matches_fd_wrt_ray_direction():
 
 
 def test_reflection_chain_functional_jvp_matches_native():
-    """Exercise _RaydnTraceReflectionsAdFunction.jvp through torch.func.jvp."""
+    """Exercise _RaydTraceReflectionsAdFunction.jvp through torch.func.jvp."""
 
-    raydn, vertices = _wall_scene()
+    rayd, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
-    forward = ops.raydn_trace_reflections_forward_tape(
-        raydn, ray_o, ray_d, _empty_tmax(), None, 1
+    forward = ops.rayd_trace_reflections_forward_tape(
+        rayd, ray_o, ray_d, _empty_tmax(), None, 1
     )
     _valid, _t, image_sources, _prim, tape_prim_id, tape_bary, tape_hits, tape_normals, _active = forward
 
     generator = torch.Generator(device="cpu").manual_seed(61)
     v_ray_o = torch.randn(ray_o.shape, generator=generator).to("cuda")
-    expected = ops.raydn_trace_reflections_jvp(
-        raydn,
+    expected = ops.rayd_trace_reflections_jvp(
+        rayd,
         ray_o,
         ray_d,
         None,
@@ -558,8 +558,8 @@ def test_reflection_chain_functional_jvp_matches_native():
     )
 
     def f(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        out = ops.raydn_trace_reflections_ad(
-            raydn, vertices, x, ray_d, _empty_tmax(), None, 1
+        out = ops.rayd_trace_reflections_ad(
+            rayd, vertices, x, ray_d, _empty_tmax(), None, 1
         )
         return out["t"], out["image_sources"]
 
@@ -570,16 +570,16 @@ def test_reflection_chain_functional_jvp_matches_native():
 
 
 def test_jvp_facades_reject_wrong_shaped_tangents():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.bdpt_intersect_forward(raydn, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = geometry_bridge.bdpt_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     bad_width = torch.zeros(
         (ray_o.shape[0], 2), dtype=torch.float32, device="cuda"
     )
     with pytest.raises(ValueError):
-        ops.raydn_intersect_jvp(
-            raydn,
+        ops.rayd_intersect_jvp(
+            rayd,
             ray_o,
             ray_d,
             None,
@@ -592,8 +592,8 @@ def test_jvp_facades_reject_wrong_shaped_tangents():
         (ray_o.shape[0] + 1, 3), dtype=torch.float32, device="cuda"
     )
     with pytest.raises(ValueError):
-        ops.raydn_intersect_jvp(
-            raydn,
+        ops.rayd_intersect_jvp(
+            rayd,
             ray_o,
             ray_d,
             None,
@@ -608,8 +608,8 @@ def test_jvp_facades_reject_wrong_shaped_tangents():
         (vertices.shape[0] + 5, 3), dtype=torch.float32, device="cuda"
     )
     with pytest.raises(RuntimeError):
-        ops.raydn_intersect_jvp(
-            raydn,
+        ops.rayd_intersect_jvp(
+            rayd,
             ray_o,
             ray_d,
             None,
@@ -620,14 +620,14 @@ def test_jvp_facades_reject_wrong_shaped_tangents():
 
 
 def test_backward_and_jvp_facades_reject_mismatched_tape_batch():
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.bdpt_intersect_forward(raydn, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = geometry_bridge.bdpt_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
     grad_t = torch.ones(ray_o.shape[0], dtype=torch.float32, device="cuda")
 
     with pytest.raises(ValueError):
-        ops.raydn_intersect_backward(
-            raydn,
+        ops.rayd_intersect_backward(
+            rayd,
             ray_o,
             ray_d,
             _empty_tmax(),
@@ -638,8 +638,8 @@ def test_backward_and_jvp_facades_reject_mismatched_tape_batch():
             need_grad_ray_o=True,
         )
     with pytest.raises(ValueError):
-        ops.raydn_intersect_jvp(
-            raydn,
+        ops.rayd_intersect_jvp(
+            rayd,
             ray_o,
             ray_d,
             None,
@@ -650,10 +650,10 @@ def test_backward_and_jvp_facades_reject_mismatched_tape_batch():
 
 
 def test_reflection_facades_reject_mismatched_tape_batch():
-    raydn, vertices = _wall_scene()
+    rayd, vertices = _wall_scene()
     ray_o, ray_d = _wall_reflection_rays()
-    forward = ops.raydn_trace_reflections_forward_tape(
-        raydn, ray_o, ray_d, _empty_tmax(), None, 1
+    forward = ops.rayd_trace_reflections_forward_tape(
+        rayd, ray_o, ray_d, _empty_tmax(), None, 1
     )
     _valid, _t, image_sources, _prim, tape_prim_id, tape_bary, tape_hits, tape_normals, _active = forward
 
@@ -662,8 +662,8 @@ def test_reflection_facades_reject_mismatched_tape_batch():
     ray_d2 = ray_d.repeat(2, 1).contiguous()
     grad_t2 = torch.ones((2, 1), dtype=torch.float32, device="cuda")
     with pytest.raises(ValueError):
-        ops.raydn_trace_reflections_backward(
-            raydn,
+        ops.rayd_trace_reflections_backward(
+            rayd,
             ray_o2,
             ray_d2,
             _empty_tmax(),
@@ -676,8 +676,8 @@ def test_reflection_facades_reject_mismatched_tape_batch():
             grad_t=grad_t2,
         )
     with pytest.raises(ValueError):
-        ops.raydn_trace_reflections_jvp(
-            raydn,
+        ops.rayd_trace_reflections_jvp(
+            rayd,
             ray_o2,
             ray_d2,
             None,
@@ -694,13 +694,13 @@ def test_composed_functorch_transforms_raise_not_implemented():
     """torch.func.grad over forward-mode jvp (the HVP recipe) must fail
     loudly instead of silently returning zeros (plan 07 section 7)."""
 
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     generator = torch.Generator(device="cpu").manual_seed(71)
     direction = torch.randn(ray_o.shape, generator=generator).to("cuda")
 
     def scalar_loss(x: torch.Tensor) -> torch.Tensor:
-        out = ops.raydn_intersect_ad(raydn, vertices, x, ray_d, _empty_tmax())
+        out = ops.rayd_intersect_ad(rayd, vertices, x, ray_d, _empty_tmax())
         return out["t"].sum()
 
     def jvp_scalar(x: torch.Tensor) -> torch.Tensor:
@@ -713,7 +713,7 @@ def test_composed_functorch_transforms_raise_not_implemented():
     def dual_scalar(x: torch.Tensor) -> torch.Tensor:
         with torch.autograd.forward_ad.dual_level():
             dual = torch.autograd.forward_ad.make_dual(x, direction)
-            out = ops.raydn_intersect_ad(raydn, vertices, dual, ray_d, _empty_tmax())
+            out = ops.rayd_intersect_ad(rayd, vertices, dual, ray_d, _empty_tmax())
             return torch.autograd.forward_ad.unpack_dual(out["t"]).tangent.sum()
 
     with pytest.raises(NotImplementedError):
@@ -724,10 +724,10 @@ def test_double_backward_raises():
     """create_graph=True through the once-differentiable backwards must raise
     instead of silently dropping second-order contributions."""
 
-    raydn, vertices = _triangle_scene()
+    rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     ray_o_ad = ray_o.clone().requires_grad_(True)
-    out = ops.raydn_intersect_ad(raydn, vertices, ray_o_ad, ray_d, _empty_tmax())
+    out = ops.rayd_intersect_ad(rayd, vertices, ray_o_ad, ray_d, _empty_tmax())
     (grad,) = torch.autograd.grad(out["t"].sum(), ray_o_ad, create_graph=True)
     with pytest.raises(RuntimeError):
         grad.sum().backward()
@@ -735,7 +735,7 @@ def test_double_backward_raises():
     wall, wall_vertices = _wall_scene()
     refl_ray_o, refl_ray_d = _wall_reflection_rays()
     refl_ray_o_ad = refl_ray_o.clone().requires_grad_(True)
-    refl_out = ops.raydn_trace_reflections_ad(
+    refl_out = ops.rayd_trace_reflections_ad(
         wall, wall_vertices, refl_ray_o_ad, refl_ray_d, _empty_tmax(), None, 1
     )
     (refl_grad,) = torch.autograd.grad(

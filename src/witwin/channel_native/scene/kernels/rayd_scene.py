@@ -5,11 +5,10 @@ from dataclasses import dataclass, field
 import torch
 
 from witwin.channel_native.runtime.native_buffers import mc_pack_vec3
-from witwin.channel_native.runtime.native_handles import _raydn_scene_handle_id
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 
 
-def raydn_scene_create(
+def rayd_scene_create(
     vertices: list[torch.Tensor],
     faces: list[torch.Tensor],
     uv: list[torch.Tensor],
@@ -17,8 +16,8 @@ def raydn_scene_create(
     to_world_left: list[torch.Tensor],
     to_world_right: list[torch.Tensor],
     mesh_flags: list[int],
-) -> tuple[int, object]:
-    out = _required_native_op("raydn_scene_create")(
+) -> object:
+    resource = _required_native_op("rayd_scene_create")(
         vertices,
         faces,
         uv,
@@ -27,31 +26,22 @@ def raydn_scene_create(
         to_world_right,
         mesh_flags,
     )
-    if not isinstance(out, (tuple, list)) or len(out) != 2:
-        raise TypeError(
-            "_channel_native.raydn_scene_create must return (handle, owner)"
-        )
-    handle = out[0]
-    if not isinstance(handle, int) or handle == 0:
-        raise RuntimeError(
-            "_channel_native.raydn_scene_create returned an invalid handle"
-        )
-    return handle, out[1]
+    if resource is None or not bool(getattr(resource, "available", False)):
+        raise RuntimeError("_channel_native.rayd_scene_create returned an invalid resource")
+    return resource
 
 
-def raydn_scene_edge_records(handle: int) -> tuple[torch.Tensor, ...]:
-    out = _required_native_op("raydn_scene_edge_records")(
-        _raydn_scene_handle_id(handle),
-    )
+def rayd_scene_edge_records(resource: object) -> tuple[torch.Tensor, ...]:
+    out = _required_native_op("rayd_scene_edge_records")(resource)
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.raydn_scene_edge_records must return a tensor sequence"
+            "_channel_native.rayd_scene_edge_records must return a tensor sequence"
         )
     return tuple(out)
 
 
 @dataclass(frozen=True, slots=True)
-class RayDNEdgeRecords:
+class RayDEdgeRecords:
     vertices: torch.Tensor
     faces: torch.Tensor
     face_normals: torch.Tensor
@@ -65,11 +55,10 @@ class RayDNEdgeRecords:
 
 
 @dataclass(frozen=True, slots=True)
-class RayDNScene:
-    """Opaque wrapper for a native RayDN scene/cache handle."""
+class RayDSceneResource:
+    """Typed, owning wrapper for a native RayD scene resource."""
 
-    handle: int | None = None
-    owner: object | None = None
+    resource: object | None = None
     mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
     reason: str | None = None
     runtime_cache: dict[str, object] = field(
@@ -78,25 +67,28 @@ class RayDNScene:
 
     @property
     def available(self) -> bool:
-        return self.handle is not None
+        return self.resource is not None and bool(
+            getattr(self.resource, "available", False)
+        )
 
-    def require_handle(self) -> int:
-        if self.handle is None:
+    def require_resource(self) -> object:
+        if not self.available:
             reason = "unknown" if self.reason is None else self.reason
-            raise RuntimeError(f"RayDN native scene is unavailable: {reason}")
-        return self.handle
+            raise RuntimeError(f"RayD native scene is unavailable: {reason}")
+        assert self.resource is not None
+        return self.resource
 
-    def edge_records(self) -> RayDNEdgeRecords:
+    def edge_records(self) -> RayDEdgeRecords:
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
             return cached  # type: ignore[return-value]
-        values = raydn_scene_edge_records(self.require_handle())
+        values = rayd_scene_edge_records(self.require_resource())
         if len(values) != 12:
             raise RuntimeError(
-                f"RayDN edge_records returned {len(values)} tensors, expected 12"
+                f"RayD edge_records returned {len(values)} tensors, expected 12"
             )
         face_normals = mc_pack_vec3(values[2], values[3], values[4])
-        records = RayDNEdgeRecords(
+        records = RayDEdgeRecords(
             vertices=values[0],
             faces=values[1],
             face_normals=face_normals,
@@ -129,17 +121,17 @@ def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -
     return flags
 
 
-def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
-    """Build a RayDN native scene from Channel Native structures.
+def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneResource:
+    """Build a typed RayD native scene from Channel Native structures.
 
     This function uses the RayD native core source-linked into
     `_channel_native`. It does not import a RayD Python package or dispatcher.
     """
 
     if not structures:
-        return RayDNScene(reason="scene has no structures")
+        return RayDSceneResource(reason="scene has no structures")
     if not torch.cuda.is_available():
-        return RayDNScene(reason="CUDA is unavailable")
+        return RayDSceneResource(reason="CUDA is unavailable")
 
     device = torch.device("cuda")
     vertices: list[torch.Tensor] = []
@@ -191,7 +183,7 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
             )
         )
 
-    handle, owner = raydn_scene_create(
+    resource = rayd_scene_create(
         vertices,
         faces,
         uv,
@@ -200,20 +192,15 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDNScene:
         to_world_right,
         mesh_flags,
     )
-    return RayDNScene(handle=handle, owner=owner, mesh_tensors=tuple(keepalive))
-
-
-RayDNEdgeRecords.__module__ = "witwin.channel_native.core.runtime.raydn"
-RayDNScene.__module__ = "witwin.channel_native.core.runtime.raydn"
+    return RayDSceneResource(resource=resource, mesh_tensors=tuple(keepalive))
 
 
 __all__ = [
-    "RayDNEdgeRecords",
-    "RayDNScene",
+    "RayDEdgeRecords",
+    "RayDSceneResource",
     "_empty_tensor",
     "_mesh_flags",
-    "_raydn_scene_handle_id",
     "build_scene_from_structures",
-    "raydn_scene_create",
-    "raydn_scene_edge_records",
+    "rayd_scene_create",
+    "rayd_scene_edge_records",
 ]

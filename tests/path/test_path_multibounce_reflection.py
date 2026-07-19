@@ -17,8 +17,8 @@ from witwin.channel_native.path import Config, solve
 def _require_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for native multi-bounce topology")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
 
 def _cube(center: tuple[float, float, float], *, surface_id: int) -> Structure:

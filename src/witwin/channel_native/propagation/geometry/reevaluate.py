@@ -53,15 +53,15 @@ def _coplanar_face_groups(
 
 
 def _cached_coplanar_face_groups(
-    raydn: object,
+    rayd: object,
     tri_a: torch.Tensor,
     normals: torch.Tensor,
     surface_ids: torch.Tensor,
 ) -> dict[str, torch.Tensor | int]:
-    """Coplanar face groups are geometry-only; cache them per RayDN scene so
+    """Coplanar face groups are geometry-only; cache them per RayD scene so
     the union-find does not rerun for every component of every solve."""
 
-    cache = getattr(raydn, "runtime_cache", None)
+    cache = getattr(rayd, "runtime_cache", None)
     if cache is None:
         return _coplanar_face_groups(tri_a, normals, surface_ids)
     cached = cache.get("deterministic_coplanar_face_groups")
@@ -141,8 +141,8 @@ def _reflection_geometry_ad(
     vertices itself, so nothing geometric is re-derived here.
     """
 
-    raydn = compiled.raydn
-    records = raydn.edge_records()
+    rayd = compiled.rayd
+    records = rayd.edge_records()
     tri_a = topology_construction.deterministic_face_anchor_points(
         records.vertices.contiguous(), records.faces.contiguous()
     )
@@ -150,15 +150,15 @@ def _reflection_geometry_ad(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     groups = _cached_coplanar_face_groups(
-        raydn,
+        rayd,
         tri_a,
         normals_table,
         compiled.geometry.face_surface_id.to(
             device=face_id.device, dtype=torch.long
         ).contiguous(),
     )
-    epc = geometry_autograd.raydn_reflection_epc_paths_ad(
-        raydn.require_handle(),
+    epc = geometry_autograd.rayd_reflection_epc_paths_ad(
+        rayd.require_resource(),
         vertices,
         source,
         target,

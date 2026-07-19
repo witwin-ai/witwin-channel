@@ -52,8 +52,8 @@ def _diffraction_power(result) -> float:
 def _skip_unless_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction parity")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
 
 def test_bdpt_grid_diffraction_within_2x_of_deterministic():

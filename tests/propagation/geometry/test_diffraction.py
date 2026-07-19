@@ -8,7 +8,7 @@ import torch
 from witwin.channel_native.propagation.geometry import diffraction
 
 
-class _Raydn:
+class _Rayd:
     def __init__(self):
         self.records = object()
         self.edge_record_calls = 0
@@ -18,7 +18,7 @@ class _Raydn:
         self.edge_record_calls += 1
         return self.records
 
-    def require_handle(self):
+    def require_resource(self):
         self.handle_calls += 1
         return 29
 
@@ -49,12 +49,12 @@ def _state_raw() -> tuple[torch.Tensor, ...]:
 def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(
     monkeypatch,
 ):
-    raydn = _Raydn()
+    rayd = _Rayd()
     raw = _edge_raw()
     calls = []
 
-    def fake_cached(actual_raydn):
-        calls.append(("cached", actual_raydn))
+    def fake_cached(actual_rayd):
+        calls.append(("cached", actual_rayd))
         return raw
 
     def fake_imported(records):
@@ -69,16 +69,16 @@ def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(
     monkeypatch.setattr(diffraction, "_diffraction_edge_geometry", fake_imported)
 
     cached = diffraction.query_diffraction_edges(
-        raydn,
+        rayd,
         preserve_imported_edges=False,
     )
     imported = diffraction.query_diffraction_edges(
-        raydn,
+        rayd,
         preserve_imported_edges=True,
     )
 
-    assert calls == [("cached", raydn), ("imported", raydn.records)]
-    assert raydn.edge_record_calls == 1
+    assert calls == [("cached", rayd), ("imported", rayd.records)]
+    assert rayd.edge_record_calls == 1
     assert [field.name for field in fields(cached)] == [
         "selected",
         "edge_position",
@@ -138,7 +138,7 @@ def test_state_geometry_names_raw_pack_by_identity():
 
 
 def test_tx_visibility_uses_all_prefilter_fractions_in_order(monkeypatch):
-    raydn = _Raydn()
+    rayd = _Rayd()
     states = _state_raw()
     sampled_x = []
 
@@ -152,18 +152,18 @@ def test_tx_visibility_uses_all_prefilter_fractions_in_order(monkeypatch):
 
     monkeypatch.setattr(
         diffraction.geometry_bridge,
-        "raydn_visibility_forward",
+        "rayd_visibility_forward",
         fake_visibility,
     )
 
     result = diffraction._tx_visible_diffraction_states(
-        raydn,
+        rayd,
         states,
         torch.zeros(3),
     )
 
     assert result is states
-    assert raydn.handle_calls == 4
+    assert rayd.handle_calls == 4
     assert sampled_x == pytest.approx(
         [0.02, 1.0 / 3.0, 2.0 / 3.0, 0.98]
     )
@@ -184,7 +184,7 @@ def test_order1_query_consumes_raw_native_tuple_and_preserves_state_identity(
 
     monkeypatch.setattr(
         diffraction.geometry_bridge,
-        "raydn_diffraction_paths_order1_forward",
+        "rayd_diffraction_paths_order1_forward",
         fake_forward,
     )
     tx_polarization = torch.tensor([[0.0, 0.0, 1.0]])

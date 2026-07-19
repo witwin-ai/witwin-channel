@@ -26,10 +26,10 @@ pybind11::dict cn_build_info() {
     info["backend"] = "channel-native";
     info["uses_dr_jit"] = false;
 #if CHANNEL_NATIVE_WITH_RAYD
-    info["uses_raydn_native"] = true;
+    info["uses_rayd_native"] = true;
     info["rayd_integration"] = "source-linked";
 #else
-    info["uses_raydn_native"] = false;
+    info["uses_rayd_native"] = false;
     info["rayd_integration"] = "unavailable";
 #endif
     info["uses_path_native"] = true;

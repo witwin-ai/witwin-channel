@@ -37,9 +37,9 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
     rx_positions = torch.ones((2, 3))
     raw_states = _states()
     material = tuple(torch.ones(1) for _ in range(5))
-    raydn = SimpleNamespace(
+    rayd = SimpleNamespace(
         available=True,
-        require_handle=lambda: events.append("handle") or 41,
+        require_resource=lambda: events.append("handle") or 41,
     )
     scene = SimpleNamespace(
         structures=[object()],
@@ -48,7 +48,7 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         # polarization (transmitter_polarizations reads scene.transmitters).
         transmitters=[SimpleNamespace(polarization=torch.tensor([0.0, 0.0, 1.0]))],
     )
-    compiled = SimpleNamespace(raydn=raydn)
+    compiled = SimpleNamespace(rayd=rayd)
 
     def fake_materials(*args, **kwargs):
         events.append("materials")
@@ -76,9 +76,9 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         fake_tx_requests,
     )
 
-    def fake_states(raydn_arg, tx, power, tx_index, *, preserve_imported_edges):
+    def fake_states(rayd_arg, tx, power, tx_index, *, preserve_imported_edges):
         events.append("states")
-        assert raydn_arg is raydn
+        assert rayd_arg is rayd
         assert tx.data_ptr() == tx_positions[0].data_ptr()
         assert power is tx_power
         assert tx_index == 0
@@ -91,9 +91,9 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         fake_states,
     )
 
-    def fake_visibility(raydn_arg, states, tx):
+    def fake_visibility(rayd_arg, states, tx):
         events.append("visibility")
-        assert raydn_arg is raydn
+        assert rayd_arg is rayd
         assert states is raw_states
         assert tx.data_ptr() == tx_positions[0].data_ptr()
         return states

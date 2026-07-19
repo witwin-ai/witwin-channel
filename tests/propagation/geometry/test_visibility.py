@@ -12,19 +12,19 @@ from witwin.channel_native.propagation.geometry import visibility
 
 
 _DIGESTS = {
-    "_raydn_visibility_mask": (
-        "8f0ec8468fa0a8307d5883bce328614249e4ece7a2f04421cacb5c0c400404e1"
+    "_rayd_visibility_mask": (
+        "d5504e604dc2337262971760294ce696d38c71fa7b74920d28fc59e9d494411c"
     ),
     "_los_visibility_mask": (
-        "1b5f5f0e89251850cc03de2763c1220ab8c5369b1e69ecd1ac75ceabd5a61675"
+        "95411fd7b1c9d50f50e40d1d2af9e55d171c71c904e4139686148a5602c00878"
     ),
 }
 
 
-class _Raydn:
+class _Rayd:
     available = True
 
-    def require_handle(self) -> int:
+    def require_resource(self) -> int:
         return 17
 
 
@@ -58,11 +58,11 @@ def test_typed_visibility_query_consumes_raw_native_tuple(monkeypatch):
 
     monkeypatch.setattr(
         visibility.geometry_bridge,
-        "raydn_visibility_forward",
+        "rayd_visibility_forward",
         fake_forward,
     )
     query = visibility.VisibilityQuery(
-        raydn=_Raydn(),
+        rayd=_Rayd(),
         start=start,
         end=end,
         active=active,
@@ -72,7 +72,7 @@ def test_typed_visibility_query_consumes_raw_native_tuple(monkeypatch):
 
     assert isinstance(result, visibility.VisibilityResult)
     assert [field.name for field in fields(query)] == [
-        "raydn",
+        "rayd",
         "start",
         "end",
         "active",
@@ -96,18 +96,18 @@ def test_legacy_visibility_helpers_keep_contiguous_and_gating_semantics(monkeypa
 
     monkeypatch.setattr(
         visibility.geometry_bridge,
-        "raydn_visibility_forward",
+        "rayd_visibility_forward",
         fake_forward,
     )
 
     assert visibility._los_visibility_mask(
-        _Raydn(),
+        _Rayd(),
         start,
         end,
         has_structures=False,
     ) is None
     result = visibility._los_visibility_mask(
-        _Raydn(),
+        _Rayd(),
         start,
         end,
         has_structures=True,

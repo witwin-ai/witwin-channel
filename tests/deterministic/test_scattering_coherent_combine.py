@@ -31,9 +31,9 @@ _needs_cuda = pytest.mark.skipif(
 )
 
 
-def _require_raydn() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+def _require_rayd() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 def _screen(realization_id: int) -> PhaseScreen:
@@ -113,7 +113,7 @@ def test_config_default_flag_is_false():
 def test_default_flag_absent_matches_explicit_false():
     """Flag absent and scattering_coherent=False produce identical results."""
 
-    _require_raydn()
+    _require_rayd()
     scene = _scene([_wall(2.5, realization_id=1, surface_id=1, name="w1")])
     absent = solve(scene, _config())
     explicit = solve(scene, _config(scattering_coherent=False))
@@ -133,7 +133,7 @@ def test_default_flag_absent_matches_explicit_false():
 def test_single_row_coherent_equals_incoherent():
     """One scattering row per (tx, rx): |sum|^2 == sum |.|^2 exactly."""
 
-    _require_raydn()
+    _require_rayd()
     scene = _scene([_wall(2.5, realization_id=1, surface_id=1, name="w1")])
     incoherent = solve(scene, _config())
     coherent = solve(scene, _config(scattering_coherent=True))
@@ -157,7 +157,7 @@ def test_multi_row_coherent_differs_and_is_reproducible():
     """Two scattering rows per (tx, rx) interfere; the combine is bit-exact
     run-to-run."""
 
-    _require_raydn()
+    _require_rayd()
     structures = [
         _wall(2.5, realization_id=1, surface_id=1, name="w1"),
         _wall(-2.5, realization_id=2, surface_id=2, name="w2"),
@@ -188,7 +188,7 @@ def test_pipeline_refuses_ensemble_only_scene():
     """A rough material without a realization phase screen is ensemble-only;
     the coherent combine is refused loudly."""
 
-    _require_raydn()
+    _require_rayd()
     ensemble_wall = rough_wall_structure(
         2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=1.0
     )
@@ -202,7 +202,7 @@ def test_pipeline_refuses_scene_without_scattering_surfaces():
     """Scattering requested but no rough/realization surface: nothing to
     combine coherently."""
 
-    _require_raydn()
+    _require_rayd()
     smooth_wall = rough_wall_structure(
         2.5, rms_height_m=0.0, corr_length_m=0.15, half_size=1.0
     )

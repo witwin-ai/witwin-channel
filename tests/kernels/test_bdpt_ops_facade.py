@@ -361,7 +361,7 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
     torch.testing.assert_close(reflected["valid"].cpu(), torch.tensor([True, False], dtype=torch.bool))
 
 
-def test_bdpt_subpath_intersection_inputs_expose_native_raydn_ray_schema():
+def test_bdpt_subpath_intersection_inputs_expose_native_rayd_ray_schema():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT subpath intersection inputs")
 

@@ -4,7 +4,7 @@
 
 `witwin.channel_native` is the native entrypoint for the capabilities it
 advertises. Repository-owned production Python must not import DrJit, Mitsuba,
-Sionna, Python RayDN, or `witwin.channel`. The old Channel may remain in tests
+Sionna, a RayD Python dispatcher, or `witwin.channel`. The old Channel may remain in tests
 and benchmarks as an offline correctness oracle; it must never be a production
 fallback. The independent radar implementation is a separate product and is
 not evidence for either Channel implementation.
@@ -18,6 +18,34 @@ The platform `core` package's `channel` and `all` extras now route to
 `witwin-channel` distribution. This establishes the repository-owned default
 installation route; application-level canary/default-on state still requires
 confirmation from each consumer owner.
+
+### Plan 13 Phase 3: direct typed RayD integration
+
+Channel Native now source-links RayD commit
+`adf0ea2d1481f7548c5ef30c31b4adbaf831f963` into its single `_channel_native`
+extension and calls `rayd::torch` through
+`backends/torch/include/rayd/torch/integration_v2.h` (SHA-256
+`d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928`).
+The copied C signatures, getter indirection, `bridge.h`/`common.cpp`, raw integer
+scene handles, and compatibility re-exports are removed. Scene ownership is a
+typed RAII `RayDSceneResource`, and edge tables are exposed as
+`RayDEdgeRecords` without reconstructing RayD geometry in Python.
+
+Sixteen strict internal ABI names moved to their canonical identity: scene
+create/edge records, intersect JVP/VJP, reflection trace primal/tape/JVP/VJP,
+reflection EPC primal/JVP/VJP, face-normal JVP/VJP, and diffraction order-1
+export now use `rayd_*`; the two Channel-composed geometry operations use
+`coupled_rd_geometry_forward` and `coupled_dd_geometry_forward`. The exact
+mapping and current owner evidence live in
+`docs/dev/audit/phase13-migration-delta.json` and
+`docs/dev/audit/phase13-current-native-owner-inventory.json`.
+
+Phase 4 intentionally retains the native names `bdpt_intersect_forward`,
+`bdpt_visibility_forward`, `bdpt_reflection_accumulation_forward`,
+`bdpt_diffraction_accumulation_forward`, and the two
+`bdpt_diffraction_discover_edges*` entries. Their implementations no longer use
+the retired RayD bridge: RayD-backed entries dispatch typed C++, while edge
+discovery calls the existing Channel-owned CUDA entry directly.
 
 ## API surface changes
 

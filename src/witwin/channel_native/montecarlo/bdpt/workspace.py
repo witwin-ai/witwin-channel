@@ -49,7 +49,7 @@ class _SolvePrep:
     selected_accumulation: str
     workspace_bytes: int
     info: dict[str, object]
-    raydn: Any
+    rayd: Any
     reflection_available: bool
     diffraction_available: bool
     transmission_available: bool

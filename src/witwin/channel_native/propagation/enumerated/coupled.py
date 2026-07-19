@@ -57,7 +57,7 @@ class _CoupledTopologyContext:
     """
 
     device: torch.device
-    raydn: object
+    rayd: object
     representative_faces: torch.Tensor
     tri_a: torch.Tensor
     normals: torch.Tensor
@@ -83,19 +83,19 @@ def _prepare_coupled_topology_context(
 
     Returns ``None`` for every case the single-shot discovery would resolve to
     an empty block (no structures, no endpoints, no faces, or zero
-    candidates-per-pair) and raises loudly when RayDN native capability is
+    candidates-per-pair) and raises loudly when RayD native capability is
     missing. No candidate budget is evaluated here; the per-block plan owns the
     total-cap guard.
     """
 
     device = tx_positions.device
-    raydn = compiled.raydn
+    rayd = compiled.rayd
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return None
-    if not raydn.available:
-        raise RuntimeError("coupled topology requires RayDN native scene capability")
+    if not rayd.available:
+        raise RuntimeError("coupled topology requires RayD native scene capability")
 
-    records = raydn.edge_records()
+    records = rayd.edge_records()
     faces = records.faces.contiguous()
     if int(faces.shape[0]) == 0:
         return None
@@ -105,7 +105,7 @@ def _prepare_coupled_topology_context(
     )
     tri_a = topology_construction.deterministic_face_anchor_points(vertices, faces)
     groups = _cached_coplanar_face_groups(
-        raydn,
+        rayd,
         tri_a,
         normals,
         compiled.geometry.face_surface_id.to(
@@ -134,7 +134,7 @@ def _prepare_coupled_topology_context(
     ) = (
         _diffraction_edge_geometry(records)
         if preserve_imported_edges
-        else _cached_diffraction_edge_geometry(raydn)
+        else _cached_diffraction_edge_geometry(rayd)
     )
     selected_edges = topology_primitives.mc_selected_edge_indices(selected)
     candidates_per_pair = int(representative_faces.shape[0]) * int(
@@ -153,7 +153,7 @@ def _prepare_coupled_topology_context(
     )
     return _CoupledTopologyContext(
         device=device,
-        raydn=raydn,
+        rayd=rayd,
         representative_faces=representative_faces,
         tri_a=tri_a,
         normals=normals,
@@ -215,7 +215,7 @@ def _coupled_topology_rx_block(
         if request.chunk_start != current_chunk_start:
             edge_index = request.edge_id.to(dtype=torch.int64)
             common_args = (
-                context.raydn.require_handle(),
+                context.rayd.require_resource(),
                 tx_positions[request.tx_slot].contiguous(),
                 rx_positions[request.rx_slot].contiguous(),
                 request.face_id,
@@ -300,13 +300,13 @@ def _coupled_topology_rx_block(
     # cascade: both edge ids live in the object sequence, no face is touched.
     # Hoist the native handle out of the chunk loop (mirrors the R->D/D->R
     # common_args hoist above): it is a per-solve constant, not per-chunk work.
-    dd_raydn_handle = context.raydn.require_handle()
+    dd_rayd_resource = context.rayd.require_resource()
     for dd_request in iter_coupled_dd_candidate_requests(plan, device=device):
         edge1_index = dd_request.edge1_id.to(dtype=torch.int64)
         edge2_index = dd_request.edge2_id.to(dtype=torch.int64)
         dd_exported = query_coupled_dd_geometry(
             CoupledDdGeometryQuery(
-                raydn_handle=dd_raydn_handle,
+                rayd_resource=dd_rayd_resource,
                 source=tx_positions[dd_request.tx_slot].contiguous(),
                 receiver=rx_positions[dd_request.rx_slot].contiguous(),
                 edge1_id=dd_request.edge1_id,

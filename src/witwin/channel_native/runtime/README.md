@@ -11,7 +11,7 @@ materials, propagation algorithms, or RF numerical kernels.
 
 The stable root entry is `witwin.channel_native.build_info`. `runtime.__all__`
 also exposes internal loader/symbol APIs for domain facades; these are not root
-public promises. `runtime.native_handles._raydn_scene_handle_id` is the unique
+public promises. `runtime.native_resources._rayd_scene_resource` is the unique
 owner and scene/core modules compatibility-re-export the same object.
 
 ## Dependency rules

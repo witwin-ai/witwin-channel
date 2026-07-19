@@ -34,7 +34,7 @@ def test_validate_cuda_tensor_has_one_canonical_owner_and_preserved_body():
         == "witwin.channel_native.runtime.tensor_contracts"
     )
     assert _body_hash(tensor_contracts.validate_cuda_tensor) == (
-        "b3e1c30d4505a02059609e9e3fe3836556ca17c0cb741c39920c6366d9b16af0"
+        "9bdc2b05b219a2d840d8ec2879ca83bb3547baeedf2c3fc325dff80a3310681f"
     )
 
 

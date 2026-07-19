@@ -45,8 +45,8 @@ _LAYER = (0.1, 4.0, 0.05, 1.0)
 
 
 def _require_native() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native transmission is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native transmission is not built")
 
 
 def _wall() -> object:

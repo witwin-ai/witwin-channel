@@ -14,13 +14,13 @@ def test_bdpt_diffraction_errors_when_capability_missing(monkeypatch):
         bdpt_solver,
         "build_info",
         lambda: {
-            "uses_raydn_native": False,
+            "uses_rayd_native": False,
             "cuda_available": True,
             "optix_available": False,
         },
     )
 
-    with pytest.raises(RuntimeError, match="diffraction.*RayDN"):
+    with pytest.raises(RuntimeError, match="diffraction.*RayD"):
         solve(wedge_diffraction_scene(), Config(components={"diffraction"}))
 
 
@@ -32,7 +32,7 @@ def test_bdpt_los_only_skips_diffraction_capability(monkeypatch):
         bdpt_solver,
         "build_info",
         lambda: {
-            "uses_raydn_native": False,
+            "uses_rayd_native": False,
             "cuda_available": True,
             "optix_available": False,
         },

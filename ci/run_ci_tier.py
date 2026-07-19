@@ -113,7 +113,7 @@ CUDA_GATES = (
             "tests/propagation/geometry/test_autograd_kernels.py",
             "tests/propagation/fields/test_autograd_kernels.py",
             "tests/ad/test_field_em_ad.py",
-            "tests/ad/test_raydn_geometry_ad.py",
+            "tests/ad/test_rayd_geometry_ad.py",
         ),
     ),
 )

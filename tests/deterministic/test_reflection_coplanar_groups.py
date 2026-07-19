@@ -12,8 +12,8 @@ from witwin.channel_native.deterministic import Config, solve
 def _require_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
 
 def _subdivided_wall_vertices_faces(splits: int) -> tuple[torch.Tensor, torch.Tensor]:

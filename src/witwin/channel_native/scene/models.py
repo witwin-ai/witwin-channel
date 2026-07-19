@@ -10,7 +10,7 @@ from witwin.channel_native.core.antenna import AntennaArray, AntennaPattern, ori
 if TYPE_CHECKING:
     from witwin.channel_native.core.edge_policy import EdgePolicy
     from witwin.channel_native.scene.compiled import CompiledScene
-    from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
+    from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 
 
 class Material(Protocol):
@@ -295,7 +295,7 @@ class Scene:
     _compiled_cache: CompiledScene | None = field(
         default=None, init=False, compare=False, repr=False
     )
-    _raydn_cache: RayDNScene | None = field(
+    _rayd_cache: RayDSceneResource | None = field(
         default=None, init=False, compare=False, repr=False
     )
 
@@ -333,7 +333,7 @@ class Scene:
         object.__setattr__(self, "_material_version", _material_version)
         object.__setattr__(self, "_assignment_version", _assignment_version)
         object.__setattr__(self, "_compiled_cache", None)
-        object.__setattr__(self, "_raydn_cache", None)
+        object.__setattr__(self, "_rayd_cache", None)
 
     @classmethod
     def load_mitsuba(cls, filename: str, **kwargs) -> Scene:
@@ -381,32 +381,32 @@ class Scene:
             return 0
         if len(self.structures) == 0:
             return 0
-        raydn_scene = self.raydn_scene()
-        if not raydn_scene.available:
+        rayd_scene = self.rayd_scene()
+        if not rayd_scene.available:
             raise RuntimeError(
-                "diffraction edge counting requires RayDN native scene capability"
+                "diffraction edge counting requires RayD native scene capability"
             )
-        return _diffraction_edge_count_from_raydn_scene(raydn_scene, policy)
+        return _diffraction_edge_count_from_rayd_scene(rayd_scene, policy)
 
     @property
     def n_diffraction_edges(self) -> int:
         return self.diffraction_edge_count()
 
-    def raydn_scene(self) -> RayDNScene:
+    def rayd_scene(self) -> RayDSceneResource:
         from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
         from witwin.channel_native.scene.kernels.rayd_scene import (
             build_scene_from_structures,
         )
 
-        cached = self._raydn_cache
+        cached = self._rayd_cache
         if cached is not None:
             return cached
-        raydn = build_scene_from_structures(self.structures)
+        rayd = build_scene_from_structures(self.structures)
         # Expose the scene's edge policy to the diffraction edge-geometry
         # builders so path generation honors it (audit DF-4).
-        raydn.runtime_cache["edge_policy"] = resolve_scene_edge_policy(self)
-        object.__setattr__(self, "_raydn_cache", raydn)
-        return raydn
+        rayd.runtime_cache["edge_policy"] = resolve_scene_edge_policy(self)
+        object.__setattr__(self, "_rayd_cache", rayd)
+        return rayd
 
     def compile(self) -> CompiledScene:
         from witwin.channel_native.scene.compile import compile_scene
@@ -414,14 +414,14 @@ class Scene:
         return compile_scene(self)
 
 
-def _diffraction_edge_count_from_raydn_scene(
-    raydn_scene: RayDNScene, edge_policy: EdgePolicy
+def _diffraction_edge_count_from_rayd_scene(
+    rayd_scene: RayDSceneResource, edge_policy: EdgePolicy
 ) -> int:
     from witwin.channel_native.propagation.geometry.kernels import (
         primitives as geometry_primitives,
     )
 
-    records = raydn_scene.edge_records()
+    records = rayd_scene.edge_records()
     return geometry_primitives.core_diffraction_edge_count(
         vertices=records.vertices,
         faces=records.faces,

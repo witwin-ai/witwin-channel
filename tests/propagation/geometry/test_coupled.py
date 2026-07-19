@@ -46,11 +46,11 @@ def test_coupled_query_names_raw_geometry_and_preserves_identity(monkeypatch):
 
     monkeypatch.setattr(
         coupled.geometry_bridge,
-        "raydn_coupled_rd_geometry_forward",
+        "coupled_rd_geometry_forward",
         fake_forward,
     )
     query = coupled.CoupledGeometryQuery(
-        raydn_handle=23,
+        rayd_resource=23,
         source=source,
         receiver=receiver,
         face_id=face_id,
@@ -70,7 +70,7 @@ def test_coupled_query_names_raw_geometry_and_preserves_identity(monkeypatch):
     result = coupled.query_coupled_geometry(query)
 
     assert [field.name for field in fields(query)] == [
-        "raydn_handle",
+        "rayd_resource",
         "source",
         "receiver",
         "face_id",
@@ -149,11 +149,11 @@ def test_coupled_dd_query_names_raw_geometry_and_preserves_identity(monkeypatch)
 
     monkeypatch.setattr(
         coupled.geometry_bridge,
-        "raydn_coupled_dd_geometry_forward",
+        "coupled_dd_geometry_forward",
         fake_forward,
     )
     query = coupled.CoupledDdGeometryQuery(
-        raydn_handle=42,
+        rayd_resource=42,
         source=source,
         receiver=receiver,
         edge1_id=edge1_id,
@@ -171,7 +171,7 @@ def test_coupled_dd_query_names_raw_geometry_and_preserves_identity(monkeypatch)
     result = coupled.query_coupled_dd_geometry(query)
 
     assert [field.name for field in fields(query)] == [
-        "raydn_handle",
+        "rayd_resource",
         "source",
         "receiver",
         "edge1_id",

@@ -20,10 +20,10 @@ def test_basic_solver_metadata_reports_counts_and_capabilities():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
 
-    raydn_native = build_info()["uses_raydn_native"]
+    rayd_native = build_info()["uses_rayd_native"]
     config = (
         Config(samples=32, seed=123, diagnostics=True)
-        if raydn_native
+        if rayd_native
         else Config(samples=32, seed=123, diagnostics=True, components={"los"})
     )
     result = solve(_scene(), config)
@@ -33,11 +33,11 @@ def test_basic_solver_metadata_reports_counts_and_capabilities():
     assert result.metadata["samples"] == 32
     assert result.metadata["path_count"] == 32
     assert result.metadata["valid_contribution_count"] == 32
-    assert result.metadata["raydn"]["reflection"] is raydn_native
-    assert result.metadata["raydn"]["diffraction"] is raydn_native
+    assert result.metadata["rayd"]["reflection"] is rayd_native
+    assert result.metadata["rayd"]["diffraction"] is rayd_native
     assert result.metadata["components"]["los"] == "enabled"
-    assert result.metadata["components"]["reflection"] == ("enabled" if raydn_native else "not_requested")
-    assert result.metadata["components"]["diffraction"] == ("enabled" if raydn_native else "not_requested")
+    assert result.metadata["components"]["reflection"] == ("enabled" if rayd_native else "not_requested")
+    assert result.metadata["components"]["diffraction"] == ("enabled" if rayd_native else "not_requested")
     assert result.metadata["edge_policy"] == {
         "edge_selection_mode": "all_edges",
         "edge_diffraction": True,

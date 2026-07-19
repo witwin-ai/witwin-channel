@@ -11,7 +11,7 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 
 @dataclass(frozen=True, slots=True)
 class CoupledGeometryQuery:
-    raydn_handle: object
+    rayd_resource: object
     source: torch.Tensor
     receiver: torch.Tensor
     face_id: torch.Tensor
@@ -48,7 +48,7 @@ class CoupledGeometry:
 
 @dataclass(frozen=True, slots=True)
 class CoupledDdGeometryQuery:
-    raydn_handle: object
+    rayd_resource: object
     source: torch.Tensor
     receiver: torch.Tensor
     edge1_id: torch.Tensor
@@ -80,8 +80,8 @@ class CoupledDdGeometry:
 
 
 def query_coupled_geometry(query: CoupledGeometryQuery) -> CoupledGeometry:
-    raw = geometry_bridge.raydn_coupled_rd_geometry_forward(
-        query.raydn_handle,
+    raw = geometry_bridge.coupled_rd_geometry_forward(
+        query.rayd_resource,
         query.source,
         query.receiver,
         query.face_id,
@@ -116,8 +116,8 @@ def query_coupled_geometry(query: CoupledGeometryQuery) -> CoupledGeometry:
 
 
 def query_coupled_dd_geometry(query: CoupledDdGeometryQuery) -> CoupledDdGeometry:
-    raw = geometry_bridge.raydn_coupled_dd_geometry_forward(
-        query.raydn_handle,
+    raw = geometry_bridge.coupled_dd_geometry_forward(
+        query.rayd_resource,
         query.source,
         query.receiver,
         query.edge1_id,

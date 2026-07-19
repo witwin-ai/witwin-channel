@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan": "Plan 13 Phase 0",
+  "plan": "Plan 13 Phase 3",
   "baseline": {
     "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
     "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
@@ -514,7 +514,7 @@
       "binding_target": "cn_bdpt_diffraction_accumulation_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 411
+        "line": 419
       },
       "target_source_evidence": [
         {
@@ -533,7 +533,7 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
+      "owner_kind": "RayD native implementation through typed RayD C++ API",
       "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_accumulation_forward",
       "python_definitions": [
         {
@@ -543,7 +543,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 831,
           "via_alias": "raydn_diffraction_accumulation_forward"
         }
@@ -616,7 +616,7 @@
       "binding_target": "cn_bdpt_diffraction_discover_edges",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 399
+        "line": 407
       },
       "target_source_evidence": [
         {
@@ -645,7 +645,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 600,
           "via_alias": "raydn_diffraction_discover_edges"
         }
@@ -670,7 +670,7 @@
       "binding_target": "cn_bdpt_diffraction_discover_edges_counted",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 403
+        "line": 411
       },
       "target_source_evidence": [
         {
@@ -699,7 +699,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 582,
           "via_alias": "raydn_diffraction_discover_edges_counted"
         }
@@ -1683,7 +1683,7 @@
       "binding_target": "cn_bdpt_intersect_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 332
+        "line": 340
       },
       "target_source_evidence": [
         {
@@ -1702,7 +1702,7 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
+      "owner_kind": "RayD native implementation through typed RayD C++ API",
       "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_intersect_forward",
       "python_definitions": [
         {
@@ -2372,7 +2372,7 @@
       "binding_target": "cn_bdpt_reflection_accumulation_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 395
+        "line": 403
       },
       "target_source_evidence": [
         {
@@ -2391,7 +2391,7 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
+      "owner_kind": "RayD native implementation through typed RayD C++ API",
       "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_reflection_accumulation_forward",
       "python_definitions": [
         {
@@ -3039,7 +3039,7 @@
       "binding_target": "cn_bdpt_visibility_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 336
+        "line": 344
       },
       "target_source_evidence": [
         {
@@ -3058,7 +3058,7 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
+      "owner_kind": "RayD native implementation through typed RayD C++ API",
       "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_visibility_forward",
       "python_definitions": [
         {
@@ -3073,12 +3073,12 @@
           "via_alias": "raydn_visibility_forward"
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 178,
           "via_alias": "raydn_visibility_forward"
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 137,
           "via_alias": "raydn_visibility_forward"
         },
@@ -3288,7 +3288,7 @@
       "binding_target": "cn_core_diffraction_edge_count",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 374
+        "line": 375
       },
       "target_source_evidence": [
         {
@@ -3341,7 +3341,7 @@
       "binding_target": "cn_core_pack_int2",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 370
+        "line": 371
       },
       "target_source_evidence": [
         {
@@ -3542,7 +3542,7 @@
       "binding_target": "cn_deterministic_accumulate_flat",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 573
+        "line": 574
       },
       "target_source_evidence": [
         {
@@ -3594,7 +3594,7 @@
       "binding_target": "cn_deterministic_accumulate_flat_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 601
+        "line": 602
       },
       "target_source_evidence": [
         {
@@ -3647,7 +3647,7 @@
       "binding_target": "cn_deterministic_accumulate_flat_fwd64",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 587
+        "line": 588
       },
       "target_source_evidence": [
         {
@@ -3685,7 +3685,7 @@
       "binding_target": "cn_deterministic_accumulate_flat_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 623
+        "line": 624
       },
       "target_source_evidence": [
         {
@@ -3738,7 +3738,7 @@
       "binding_target": "cn_deterministic_component_counts",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 432
+        "line": 433
       },
       "target_source_evidence": [
         {
@@ -3791,7 +3791,7 @@
       "binding_target": "cn_deterministic_concat_topology_blocks",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 553
+        "line": 554
       },
       "target_source_evidence": [
         {
@@ -3844,7 +3844,7 @@
       "binding_target": "cn_deterministic_delay_to_path_length",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 469
+        "line": 470
       },
       "target_source_evidence": [
         {
@@ -3896,7 +3896,7 @@
       "binding_target": "cn_deterministic_diffraction_order1_compact",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 541
+        "line": 542
       },
       "target_source_evidence": [
         {
@@ -3949,7 +3949,7 @@
       "binding_target": "cn_deterministic_diffraction_state_pack",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 381
+        "line": 382
       },
       "target_source_evidence": [
         {
@@ -3978,7 +3978,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 640
         },
         {
@@ -4006,7 +4006,7 @@
       "binding_target": "cn_deterministic_diffraction_state_pack_selected",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 385
+        "line": 386
       },
       "target_source_evidence": [
         {
@@ -4035,7 +4035,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 680
         }
       ],
@@ -4059,7 +4059,7 @@
       "binding_target": "cn_deterministic_diffraction_vector_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 457
+        "line": 458
       },
       "target_source_evidence": [
         {
@@ -4111,7 +4111,7 @@
       "binding_target": "cn_deterministic_face_anchor_points",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 517
+        "line": 518
       },
       "target_source_evidence": [
         {
@@ -4184,7 +4184,7 @@
       "binding_target": "cn_deterministic_face_groups",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 561
+        "line": 562
       },
       "target_source_evidence": [
         {
@@ -4237,7 +4237,7 @@
       "binding_target": "cn_deterministic_face_sequence_chunk",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 525
+        "line": 526
       },
       "target_source_evidence": [
         {
@@ -4290,7 +4290,7 @@
       "binding_target": "cn_deterministic_field_from_power_phase",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 489
+        "line": 490
       },
       "target_source_evidence": [
         {
@@ -4338,7 +4338,7 @@
       "binding_target": "cn_deterministic_gather_topology_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 557
+        "line": 558
       },
       "target_source_evidence": [
         {
@@ -4391,7 +4391,7 @@
       "binding_target": "cn_deterministic_los_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 443
+        "line": 444
       },
       "target_source_evidence": [
         {
@@ -4439,7 +4439,7 @@
       "binding_target": "cn_deterministic_los_topology_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 493
+        "line": 494
       },
       "target_source_evidence": [
         {
@@ -4492,7 +4492,7 @@
       "binding_target": "cn_deterministic_los_topology_block_all_visible",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 497
+        "line": 498
       },
       "target_source_evidence": [
         {
@@ -4535,7 +4535,7 @@
       "binding_target": "cn_deterministic_mapped_face_sequence_chunk",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 529
+        "line": 530
       },
       "target_source_evidence": [
         {
@@ -4592,7 +4592,7 @@
       "binding_target": "cn_deterministic_normalize_vec3",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 545
+        "line": 546
       },
       "target_source_evidence": [
         {
@@ -4685,7 +4685,7 @@
       "binding_target": "cn_deterministic_pack_complex",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 473
+        "line": 474
       },
       "target_source_evidence": [
         {
@@ -4753,7 +4753,7 @@
       "binding_target": "cn_deterministic_pad_topology_sequences",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 505
+        "line": 506
       },
       "target_source_evidence": [
         {
@@ -4806,7 +4806,7 @@
       "binding_target": "cn_deterministic_phase_from_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 477
+        "line": 478
       },
       "target_source_evidence": [
         {
@@ -4858,7 +4858,7 @@
       "binding_target": "cn_deterministic_phase_from_length",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 485
+        "line": 486
       },
       "target_source_evidence": [
         {
@@ -4906,7 +4906,7 @@
       "binding_target": "cn_deterministic_reflect_points",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 549
+        "line": 550
       },
       "target_source_evidence": [
         {
@@ -4959,7 +4959,7 @@
       "binding_target": "cn_deterministic_reflection_epc_input_batch",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 521
+        "line": 522
       },
       "target_source_evidence": [
         {
@@ -5020,7 +5020,7 @@
       "binding_target": "cn_deterministic_reflection_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 461
+        "line": 462
       },
       "target_source_evidence": [
         {
@@ -5072,7 +5072,7 @@
       "binding_target": "cn_deterministic_reflection_order1_compact",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 533
+        "line": 534
       },
       "target_source_evidence": [
         {
@@ -5129,7 +5129,7 @@
       "binding_target": "cn_deterministic_reflection_sequence_compact",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 537
+        "line": 538
       },
       "target_source_evidence": [
         {
@@ -5186,7 +5186,7 @@
       "binding_target": "cn_deterministic_reflection_sequence_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 465
+        "line": 466
       },
       "target_source_evidence": [
         {
@@ -5238,7 +5238,7 @@
       "binding_target": "cn_deterministic_repeat_range",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 513
+        "line": 514
       },
       "target_source_evidence": [
         {
@@ -5286,7 +5286,7 @@
       "binding_target": "cn_deterministic_selected_edge_count",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 436
+        "line": 437
       },
       "target_source_evidence": [
         {
@@ -5339,7 +5339,7 @@
       "binding_target": "cn_deterministic_sort_order",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 569
+        "line": 570
       },
       "target_source_evidence": [
         {
@@ -5392,7 +5392,7 @@
       "binding_target": "cn_deterministic_surface_face_groups",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 565
+        "line": 566
       },
       "target_source_evidence": [
         {
@@ -5440,7 +5440,7 @@
       "binding_target": "cn_deterministic_topology_base_fields",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 509
+        "line": 510
       },
       "target_source_evidence": [
         {
@@ -5501,7 +5501,7 @@
       "binding_target": "cn_deterministic_topology_default_fields",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 501
+        "line": 502
       },
       "target_source_evidence": [
         {
@@ -5558,7 +5558,7 @@
       "binding_target": "cn_deterministic_zero_field_phase",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 481
+        "line": 482
       },
       "target_source_evidence": [
         {
@@ -7117,7 +7117,7 @@
       "binding_target": "cn_los_silhouette_clearance",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 447
+        "line": 448
       },
       "target_source_evidence": [
         {
@@ -7160,7 +7160,7 @@
       "binding_target": "cn_los_taper_apply",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 452
+        "line": 453
       },
       "target_source_evidence": [
         {
@@ -7244,7 +7244,7 @@
           "line": 235
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 181
         }
       ],
@@ -7300,31 +7300,31 @@
           "line": 217
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 217
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 317
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 369
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 400
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 713
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 738
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 763
         }
       ],
@@ -7476,7 +7476,7 @@
           "line": 71
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 830
         }
       ],
@@ -7741,15 +7741,15 @@
           "line": 229
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 168
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 281
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 346
         }
       ],
@@ -7914,11 +7914,11 @@
           "line": 439
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 135
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 177
         }
       ],
@@ -8187,7 +8187,7 @@
           "line": 33
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 404
         }
       ],
@@ -8235,7 +8235,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 186
         },
         {
@@ -8359,7 +8359,7 @@
           "line": 1517
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 887
         }
       ],
@@ -8521,7 +8521,7 @@
           "line": 991
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 466
         }
       ],
@@ -8679,7 +8679,7 @@
           "line": 323
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 897
         }
       ],
@@ -8731,7 +8731,7 @@
           "line": 348
         },
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 492
         }
       ],
@@ -8779,7 +8779,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 530
         },
         {
@@ -8934,7 +8934,7 @@
       "binding_target": "cn_path_concat_vec3",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 396
+        "line": 397
       },
       "target_source_evidence": [
         {
@@ -8987,7 +8987,7 @@
       "binding_target": "cn_path_diffraction_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 416
+        "line": 417
       },
       "target_source_evidence": [
         {
@@ -9035,7 +9035,7 @@
       "binding_target": "cn_path_diffraction_paths_order1",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 420
+        "line": 421
       },
       "target_source_evidence": [
         {
@@ -9083,7 +9083,7 @@
       "binding_target": "cn_path_filter_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 412
+        "line": 413
       },
       "target_source_evidence": [
         {
@@ -9131,7 +9131,7 @@
       "binding_target": "cn_path_filter_los",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 404
+        "line": 405
       },
       "target_source_evidence": [
         {
@@ -9179,7 +9179,7 @@
       "binding_target": "cn_path_finalize_blocks",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 428
+        "line": 429
       },
       "target_source_evidence": [
         {
@@ -9227,7 +9227,7 @@
       "binding_target": "cn_path_los_export",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 392
+        "line": 393
       },
       "target_source_evidence": [
         {
@@ -9288,7 +9288,7 @@
       "binding_target": "cn_path_los_visibility_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 400
+        "line": 401
       },
       "target_source_evidence": [
         {
@@ -9341,7 +9341,7 @@
       "binding_target": "cn_path_merge_blocks",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 424
+        "line": 425
       },
       "target_source_evidence": [
         {
@@ -9389,7 +9389,7 @@
       "binding_target": "cn_path_reflection_candidates",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 408
+        "line": 409
       },
       "target_source_evidence": [
         {
@@ -9432,12 +9432,12 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "raydn_coupled_dd_geometry_forward",
+      "symbol": "coupled_dd_geometry_forward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_coupled_dd_geometry_forward",
+      "binding_target": "cn_coupled_dd_geometry_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 388
+        "line": 396
       },
       "target_source_evidence": [
         {
@@ -9456,8 +9456,8 @@
         }
       ],
       "numerical_owner": "Channel operation / RayD primitives",
-      "owner_kind": "composed owner",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_dd_geometry_forward",
+      "owner_kind": "composed owner using typed RayD primitives",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_dd_geometry_forward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
@@ -9482,15 +9482,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 neutral layered owner name complete"
     },
     {
-      "symbol": "raydn_coupled_rd_geometry_forward",
+      "symbol": "coupled_rd_geometry_forward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_coupled_rd_geometry_forward",
+      "binding_target": "cn_coupled_rd_geometry_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 384
+        "line": 392
       },
       "target_source_evidence": [
         {
@@ -9509,8 +9509,8 @@
         }
       ],
       "numerical_owner": "Channel operation / RayD primitives",
-      "owner_kind": "composed owner",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_rd_geometry_forward",
+      "owner_kind": "composed owner using typed RayD primitives",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_rd_geometry_forward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
@@ -9535,15 +9535,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 neutral layered owner name complete"
     },
     {
-      "symbol": "raydn_diffraction_paths_order1_forward",
+      "symbol": "rayd_diffraction_paths_order1_forward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_diffraction_paths_order1_forward",
+      "binding_target": "cn_rayd_diffraction_paths_order1_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 407
+        "line": 415
       },
       "target_source_evidence": [
         {
@@ -9562,8 +9562,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_diffraction_paths_order1_forward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_diffraction_paths_order1_forward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
@@ -9588,15 +9588,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_intersect_backward",
+      "symbol": "rayd_intersect_backward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_intersect_backward",
+      "binding_target": "cn_rayd_intersect_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 348
+        "line": 356
       },
       "target_source_evidence": [
         {
@@ -9615,8 +9615,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_intersect_backward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_intersect_backward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -9641,15 +9641,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_intersect_jvp",
+      "symbol": "rayd_intersect_jvp",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_intersect_jvp",
+      "binding_target": "cn_rayd_intersect_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 352
+        "line": 360
       },
       "target_source_evidence": [
         {
@@ -9668,8 +9668,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_intersect_jvp",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_intersect_jvp",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -9694,15 +9694,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_reflection_epc_paths_backward",
+      "symbol": "rayd_reflection_epc_paths_backward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_reflection_epc_paths_backward",
+      "binding_target": "cn_rayd_reflection_epc_paths_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 368
+        "line": 376
       },
       "target_source_evidence": [
         {
@@ -9721,8 +9721,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_reflection_epc_paths_backward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_backward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -9747,15 +9747,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_reflection_epc_paths_forward",
+      "symbol": "rayd_reflection_epc_paths_forward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_reflection_epc_paths_forward",
+      "binding_target": "cn_rayd_reflection_epc_paths_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 344
+        "line": 352
       },
       "target_source_evidence": [
         {
@@ -9774,8 +9774,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_reflection_epc_paths_forward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_reflection_epc_paths_forward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
@@ -9804,15 +9804,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_reflection_epc_paths_jvp",
+      "symbol": "rayd_reflection_epc_paths_jvp",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_reflection_epc_paths_jvp",
+      "binding_target": "cn_rayd_reflection_epc_paths_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 372
+        "line": 380
       },
       "target_source_evidence": [
         {
@@ -9831,8 +9831,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_reflection_epc_paths_jvp",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_jvp",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -9857,15 +9857,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_scene_create",
+      "symbol": "rayd_scene_create",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_scene_create",
+      "binding_target": "cn_rayd_scene_create",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 324
+        "line": 332
       },
       "target_source_evidence": [
         {
@@ -9884,8 +9884,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_create",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.scene.kernels.rayd_scene.rayd_scene_create",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/scene/kernels/rayd_scene.py",
@@ -9906,19 +9906,19 @@
       ],
       "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_scene_edge_records",
+      "symbol": "rayd_scene_edge_records",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_scene_edge_records",
+      "binding_target": "cn_rayd_scene_edge_records",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 328
+        "line": 336
       },
       "target_source_evidence": [
         {
@@ -9937,8 +9937,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_edge_records",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.scene.kernels.rayd_scene.rayd_scene_edge_records",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/scene/kernels/rayd_scene.py",
@@ -9959,19 +9959,19 @@
       ],
       "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_scene_face_normals_backward",
+      "symbol": "rayd_scene_face_normals_backward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_scene_face_normals_backward",
+      "binding_target": "cn_rayd_scene_face_normals_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 376
+        "line": 384
       },
       "target_source_evidence": [
         {
@@ -9990,8 +9990,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_scene_face_normals_backward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_scene_face_normals_backward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -10012,19 +10012,19 @@
       ],
       "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_scene_face_normals_jvp",
+      "symbol": "rayd_scene_face_normals_jvp",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_scene_face_normals_jvp",
+      "binding_target": "cn_rayd_scene_face_normals_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 380
+        "line": 388
       },
       "target_source_evidence": [
         {
@@ -10043,8 +10043,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_scene_face_normals_jvp",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_scene_face_normals_jvp",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -10065,19 +10065,19 @@
       ],
       "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_trace_reflections_backward",
+      "symbol": "rayd_trace_reflections_backward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_trace_reflections_backward",
+      "binding_target": "cn_rayd_trace_reflections_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 360
+        "line": 368
       },
       "target_source_evidence": [
         {
@@ -10096,8 +10096,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_backward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_backward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -10122,15 +10122,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_trace_reflections_forward",
+      "symbol": "rayd_trace_reflections_forward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_trace_reflections_forward",
+      "binding_target": "cn_rayd_trace_reflections_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 340
+        "line": 348
       },
       "target_source_evidence": [
         {
@@ -10149,8 +10149,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_trace_reflections_forward",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_trace_reflections_forward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
@@ -10159,7 +10159,7 @@
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
           "line": 410
         },
         {
@@ -10183,15 +10183,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_trace_reflections_forward_tape",
+      "symbol": "rayd_trace_reflections_forward_tape",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_trace_reflections_forward_tape",
+      "binding_target": "cn_rayd_trace_reflections_forward_tape",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 356
+        "line": 364
       },
       "target_source_evidence": [
         {
@@ -10210,8 +10210,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_forward_tape",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_forward_tape",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -10235,15 +10235,15 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
-      "symbol": "raydn_trace_reflections_jvp",
+      "symbol": "rayd_trace_reflections_jvp",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_raydn_trace_reflections_jvp",
+      "binding_target": "cn_rayd_trace_reflections_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 364
+        "line": 372
       },
       "target_source_evidence": [
         {
@@ -10262,8 +10262,8 @@
         }
       ],
       "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through legacy Channel bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_jvp",
+      "owner_kind": "RayD native implementation through direct typed C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_jvp",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
@@ -10288,7 +10288,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 direct typed boundary complete"
     },
     {
       "symbol": "scattering_chain_ensemble_eval",
@@ -11263,5 +11263,86 @@
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "move numerical owner to RayD as a complete family"
     }
-  ]
+  ],
+  "current_phase": 3,
+  "phase3_direct_typed_boundary": {
+    "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
+    "scene_resource": "RayDSceneResource",
+    "edge_records": "RayDEdgeRecords",
+    "legacy_bridge_files_removed": [
+      "native/channel_native/rayd/bridge.h",
+      "native/channel_native/rayd/common.cpp"
+    ],
+    "strict_renames": [
+      {
+        "from": "raydn_scene_create",
+        "to": "rayd_scene_create"
+      },
+      {
+        "from": "raydn_scene_edge_records",
+        "to": "rayd_scene_edge_records"
+      },
+      {
+        "from": "raydn_intersect_backward",
+        "to": "rayd_intersect_backward"
+      },
+      {
+        "from": "raydn_intersect_jvp",
+        "to": "rayd_intersect_jvp"
+      },
+      {
+        "from": "raydn_trace_reflections_forward",
+        "to": "rayd_trace_reflections_forward"
+      },
+      {
+        "from": "raydn_trace_reflections_forward_tape",
+        "to": "rayd_trace_reflections_forward_tape"
+      },
+      {
+        "from": "raydn_trace_reflections_backward",
+        "to": "rayd_trace_reflections_backward"
+      },
+      {
+        "from": "raydn_trace_reflections_jvp",
+        "to": "rayd_trace_reflections_jvp"
+      },
+      {
+        "from": "raydn_reflection_epc_paths_forward",
+        "to": "rayd_reflection_epc_paths_forward"
+      },
+      {
+        "from": "raydn_reflection_epc_paths_backward",
+        "to": "rayd_reflection_epc_paths_backward"
+      },
+      {
+        "from": "raydn_reflection_epc_paths_jvp",
+        "to": "rayd_reflection_epc_paths_jvp"
+      },
+      {
+        "from": "raydn_scene_face_normals_backward",
+        "to": "rayd_scene_face_normals_backward"
+      },
+      {
+        "from": "raydn_scene_face_normals_jvp",
+        "to": "rayd_scene_face_normals_jvp"
+      },
+      {
+        "from": "raydn_diffraction_paths_order1_forward",
+        "to": "rayd_diffraction_paths_order1_forward"
+      },
+      {
+        "from": "raydn_coupled_rd_geometry_forward",
+        "to": "coupled_rd_geometry_forward"
+      },
+      {
+        "from": "raydn_coupled_dd_geometry_forward",
+        "to": "coupled_dd_geometry_forward"
+      }
+    ],
+    "binding_count": 211,
+    "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
+    "coupled_ownership": "Channel-composed layered owner using RayD typed EPC/visibility primitives"
+  }
 }

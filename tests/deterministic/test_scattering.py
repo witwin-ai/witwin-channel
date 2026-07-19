@@ -39,9 +39,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _require_raydn() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+def _require_rayd() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 def _scene(
@@ -95,7 +95,7 @@ def _smooth_reflection_power() -> float:
 
 
 def test_rough_wall_energy_budget_and_smooth_limit():
-    _require_raydn()
+    _require_rayd()
     smooth = _smooth_reflection_power()
 
     rough = solve(_scene(0.015), _config())
@@ -127,7 +127,7 @@ def test_narrow_lobe_normalization_cross_check():
     band [0.75, 1.0] fails on any 4*pi / cos-factor / r^2 normalization slip.
     """
 
-    _require_raydn()
+    _require_rayd()
     rough = solve(_scene(0.004, 0.3, half_size=1.0), _config(
         scattering_samples_per_m2=256.0
     ))
@@ -142,7 +142,7 @@ def test_narrow_lobe_normalization_cross_check():
 
 
 def test_specular_attenuation_matches_coherent_factor():
-    _require_raydn()
+    _require_rayd()
     smooth = _smooth_reflection_power()
     for rms in (0.008, 0.015):
         rough = solve(_scene(rms), _config())
@@ -151,7 +151,7 @@ def test_specular_attenuation_matches_coherent_factor():
 
 
 def test_scattering_convergence_under_sample_doubling():
-    _require_raydn()
+    _require_rayd()
     base = solve(_scene(0.015), _config(scattering_samples_per_m2=64.0))
     fine = solve(_scene(0.015), _config(scattering_samples_per_m2=128.0))
     p_base = float(base.component_power["scattering"])
@@ -166,7 +166,7 @@ def test_scattering_reciprocity():
     factor is a function of the incidence bin, so the frozen table is
     reciprocal only up to the bin-to-bin scale variation)."""
 
-    _require_raydn()
+    _require_rayd()
     forward = solve(_scene(0.015), _config())
     reverse = solve(_scene(0.015, swap_endpoints=True), _config())
     p_fwd = float(forward.component_power["scattering"])
@@ -175,7 +175,7 @@ def test_scattering_reciprocity():
 
 
 def test_grid_receiver_scattering_map():
-    _require_raydn()
+    _require_rayd()
     grid = ReceiverGrid(
         origin=torch.tensor([0.0, 0.5, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -214,7 +214,7 @@ def test_table_passivity_per_incidence_angle():
 def test_incoherent_power_accumulation_in_coherent_mode():
     """Scattering folds as power: total = |coherent field|^2 + scattering."""
 
-    _require_raydn()
+    _require_rayd()
     result = solve(_scene(0.015), _config())
     coherent_power = result.field.abs().square()
     expected = coherent_power + result.component_power["scattering"]
@@ -250,7 +250,7 @@ def test_realization_coherent_flat_screen_matches_smooth_reflection():
     phase of the patch quadrature -> image source), and it REPLACES the delta
     specular for that surface (reflection component reports zero)."""
 
-    _require_raydn()
+    _require_rayd()
     smooth = solve(
         _scene(0.0, half_size=1.0), Config(max_depth=1, components={"reflection"})
     )
@@ -265,7 +265,7 @@ def test_realization_coherent_flat_screen_matches_smooth_reflection():
 
 
 def test_realization_coherent_reproducible_and_realization_dependent():
-    _require_raydn()
+    _require_rayd()
     cfg = _config()
     first = solve(_scene(0.008, half_size=1.0, phase_screen=_screen(1)), cfg)
     second = solve(_scene(0.008, half_size=1.0, phase_screen=_screen(1)), cfg)
@@ -280,7 +280,7 @@ def test_realization_coherent_reproducible_and_realization_dependent():
 
 
 def test_realization_vs_ensemble_exclusivity_raises():
-    _require_raydn()
+    _require_rayd()
     screen = PhaseScreen(
         height=torch.zeros(16, 16),
         height_scale_m=1.0e-9,
@@ -292,7 +292,7 @@ def test_realization_vs_ensemble_exclusivity_raises():
 
 
 def test_phase_screen_geometry_limit_guard():
-    _require_raydn()
+    _require_rayd()
     steep = PhaseScreen(
         height=torch.rand(64, 64),  # O(1) meter heights over a 4 m wall
         height_scale_m=1.0,
@@ -304,7 +304,7 @@ def test_phase_screen_geometry_limit_guard():
 
 
 def test_out_of_domain_roughness_raises_kirchhoff_domain_exceeded():
-    _require_raydn()
+    _require_rayd()
     # k0 * corr_length = 3.1 < 6: outside the tangent-plane domain.
     scene = _scene(0.008, corr_length_m=0.05)
     with pytest.raises((RuntimeError, ValueError), match="kirchhoff_domain_exceeded"):

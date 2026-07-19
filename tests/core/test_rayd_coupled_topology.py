@@ -11,7 +11,7 @@ from witwin.channel_native.runtime import symbols
 
 
 def _wall_and_wedge_scene():
-    return coupled_wall_wedge_scene().raydn_scene()
+    return coupled_wall_wedge_scene().rayd_scene()
 
 
 def _coupled_inputs(*, edge_id: int, reverse_endpoints: bool = False):
@@ -48,7 +48,7 @@ def test_coupled_reflection_diffraction_geometry_matches_image_solution():
         (records.edge_v0 == 5) & (records.edge_v1 == 4)
     )
     edge_id = int(torch.nonzero(axis, as_tuple=False)[0, 0].item())
-    result = ops.raydn_coupled_rd_geometry_forward(
+    result = ops.coupled_rd_geometry_forward(
         scene, *_coupled_inputs(edge_id=edge_id), False
     )
 
@@ -103,10 +103,10 @@ def test_coupled_diffraction_reflection_is_reciprocal_geometry():
         (records.edge_v0 == 5) & (records.edge_v1 == 4)
     )
     edge_id = int(torch.nonzero(axis, as_tuple=False)[0, 0].item())
-    rd = ops.raydn_coupled_rd_geometry_forward(
+    rd = ops.coupled_rd_geometry_forward(
         scene, *_coupled_inputs(edge_id=edge_id), False
     )
-    dr = ops.raydn_coupled_rd_geometry_forward(
+    dr = ops.coupled_rd_geometry_forward(
         scene, *_coupled_inputs(edge_id=edge_id, reverse_endpoints=True), True
     )
 
@@ -141,7 +141,7 @@ def test_coupled_geometry_rejects_stationary_point_outside_edge_bounds():
     inputs = list(_coupled_inputs(edge_id=edge_id))
     inputs[8] = torch.tensor([0.25], device="cuda")
 
-    result = ops.raydn_coupled_rd_geometry_forward(scene, *inputs, False)
+    result = ops.coupled_rd_geometry_forward(scene, *inputs, False)
 
     assert not bool(result["valid"][0].item())
 
@@ -164,14 +164,14 @@ def test_coupled_geometry_rejects_blocked_secondary_segment():
         transmitters=base.transmitters,
         receivers=base.receivers,
         frequency=base.frequency,
-    ).raydn_scene()
+    ).rayd_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
         (records.edge_v0 == 5) & (records.edge_v1 == 4)
     )
     edge_id = int(torch.nonzero(axis, as_tuple=False)[0, 0].item())
 
-    result = ops.raydn_coupled_rd_geometry_forward(
+    result = ops.coupled_rd_geometry_forward(
         scene, *_coupled_inputs(edge_id=edge_id), False
     )
 

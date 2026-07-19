@@ -3,7 +3,6 @@ from pathlib import Path
 
 
 RAYD_BRIDGE_SOURCES = (
-    "common.cpp",
     "scene.cpp",
     "geometry.cpp",
     "reflection.cpp",
@@ -12,33 +11,33 @@ RAYD_BRIDGE_SOURCES = (
 
 WRAPPERS_BY_SOURCE = {
     "scene.cpp": {
-        "cn_raydn_scene_create",
-        "cn_raydn_scene_edge_records",
+        "cn_rayd_scene_create",
+        "cn_rayd_scene_edge_records",
     },
     "geometry.cpp": {
         "cn_bdpt_intersect_forward",
         "cn_bdpt_visibility_forward",
-        "cn_raydn_intersect_backward",
-        "cn_raydn_intersect_jvp",
-        "cn_raydn_coupled_rd_geometry_forward",
-        "cn_raydn_coupled_dd_geometry_forward",
+        "cn_rayd_intersect_backward",
+        "cn_rayd_intersect_jvp",
+        "cn_coupled_rd_geometry_forward",
+        "cn_coupled_dd_geometry_forward",
     },
     "reflection.cpp": {
-        "cn_raydn_trace_reflections_forward",
-        "cn_raydn_reflection_epc_paths_forward",
-        "cn_raydn_trace_reflections_forward_tape",
-        "cn_raydn_trace_reflections_backward",
-        "cn_raydn_trace_reflections_jvp",
-        "cn_raydn_reflection_epc_paths_backward",
-        "cn_raydn_reflection_epc_paths_jvp",
-        "cn_raydn_scene_face_normals_backward",
-        "cn_raydn_scene_face_normals_jvp",
+        "cn_rayd_trace_reflections_forward",
+        "cn_rayd_reflection_epc_paths_forward",
+        "cn_rayd_trace_reflections_forward_tape",
+        "cn_rayd_trace_reflections_backward",
+        "cn_rayd_trace_reflections_jvp",
+        "cn_rayd_reflection_epc_paths_backward",
+        "cn_rayd_reflection_epc_paths_jvp",
+        "cn_rayd_scene_face_normals_backward",
+        "cn_rayd_scene_face_normals_jvp",
         "cn_bdpt_reflection_accumulation_forward",
     },
     "diffraction.cpp": {
         "cn_bdpt_diffraction_discover_edges",
         "cn_bdpt_diffraction_discover_edges_counted",
-        "cn_raydn_diffraction_paths_order1_forward",
+        "cn_rayd_diffraction_paths_order1_forward",
         "cn_path_diffraction_paths_order1",
         "cn_bdpt_diffraction_accumulation_forward",
     },
@@ -51,7 +50,8 @@ def _repo_root() -> Path:
 
 def _cn_wrapper_definitions(source: str) -> set[str]:
     signature = re.compile(
-        r"(?m)^(?:pybind11::(?:tuple|dict)|(?:at|torch)::Tensor)\s+"
+        r"(?m)^(?:pybind11::(?:tuple|dict)|(?:at|torch)::Tensor|"
+        r"std::shared_ptr<RayDSceneResource>)\s+"
         r"(cn_[A-Za-z0-9_]+)\s*\("
     )
     definitions: set[str] = set()
@@ -66,11 +66,13 @@ def _cn_wrapper_definitions(source: str) -> set[str]:
     return definitions
 
 
-def test_rayd_bridge_has_only_the_modular_sources():
+def test_rayd_direct_integration_has_only_the_modular_sources():
     bridge_root = _repo_root() / "native" / "channel_native" / "rayd"
 
-    assert not (_repo_root() / "native" / "channel_native" / "raydn_bridge.cpp").exists()
-    assert (bridge_root / "bridge.h").is_file()
+    assert not (_repo_root() / "native" / "channel_native" / "rayd_bridge.cpp").exists()
+    assert not (bridge_root / "bridge.h").exists()
+    assert not (bridge_root / "common.cpp").exists()
+    assert (bridge_root / "resource.h").is_file()
     assert tuple(path.name for path in sorted(bridge_root.glob("*.cpp"))) == tuple(
         sorted(RAYD_BRIDGE_SOURCES)
     )
@@ -92,7 +94,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
     assert all(len(source_names) == 1 for source_names in owners.values())
 
 
-def test_cmake_builds_every_rayd_bridge_source_with_catchable_exceptions():
+def test_cmake_builds_every_rayd_source_and_scopes_legacy_exception_boundary():
     cmake = (_repo_root() / "CMakeLists.txt").read_text()
     source_paths = tuple(
         f"native/channel_native/rayd/{source_name}"
@@ -114,7 +116,11 @@ def test_cmake_builds_every_rayd_bridge_source_with_catchable_exceptions():
         cmake,
         re.DOTALL,
     )
-    assert any(
-        all(source_path in group for source_path in source_paths)
-        for group in exception_source_groups
+    assert len(exception_source_groups) == 1
+    exception_group = exception_source_groups[0]
+    assert "native/channel_native/rayd/diffraction.cpp" in exception_group
+    assert all(
+        source_path not in exception_group
+        for source_path in source_paths
+        if not source_path.endswith("diffraction.cpp")
     )

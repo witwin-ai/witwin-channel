@@ -11,7 +11,7 @@ from pathlib import Path
 FORBIDDEN_MODULES = (
     "drjit",
     "mitsuba",
-    "raydn",
+    "rayd",
     "sionna",
     "witwin.channel",
 )

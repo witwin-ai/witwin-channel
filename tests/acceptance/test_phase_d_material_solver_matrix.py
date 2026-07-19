@@ -26,8 +26,8 @@ _SEEDS = (3, 7, 11)
 def _require_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA torch is required")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native material transport is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native material transport is not built")
 
 
 def _adapter(name: str) -> SolverAdapter:

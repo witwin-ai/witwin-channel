@@ -1,9 +1,7 @@
-#include "bridge.h"
+#include "resource.h"
 #include "../tensor_checks.h"
 
-#include <array>
 #include <cstdint>
-#include <stdexcept>
 #include <vector>
 
 std::vector<at::Tensor> cn_coupled_rd_prepare_cuda(
@@ -52,68 +50,47 @@ namespace {
 
 using channel_native::check_flat_tensor;
 using channel_native::check_vec3_table;
-using channel_native::rayd_bridge::optional_tensor;
-using channel_native::rayd_bridge::raydn_intersect_backward_fn;
-using channel_native::rayd_bridge::raydn_intersect_forward_fn;
-using channel_native::rayd_bridge::raydn_intersect_jvp_fn;
-using channel_native::rayd_bridge::raydn_reflection_epc_paths_forward_fn;
-using channel_native::rayd_bridge::raydn_visibility_forward_fn;
-using channel_native::rayd_bridge::tensor_or_none;
 
 }  // namespace
 
 pybind11::tuple cn_bdpt_intersect_forward(
-    int64_t scene_handle,
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
     int64_t flags) {
-    at::Tensor active_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    constexpr int64_t kOutputCount = 10;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_forward_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        &ray_tmax,
-        active_ptr,
-        flags,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN intersect forward returned an unexpected output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+    rayd::torch::IntersectResult out = rayd::torch::intersect_forward(
+        scene.resource(),
+        rayd::torch::RayBatch{ray_o, ray_d, ray_tmax, optional_tensor(active)},
+        flags);
+    return pybind11::make_tuple(
+        out.t,
+        out.p,
+        out.n,
+        out.geo_n,
+        out.uv,
+        out.barycentric,
+        out.shape_id,
+        out.prim_id,
+        out.local_prim_id,
+        out.global_prim_id);
 }
 
 pybind11::tuple cn_bdpt_visibility_forward(
-    int64_t scene_handle,
+    RayDSceneResource &scene,
     torch::Tensor start,
     torch::Tensor end,
     pybind11::object active) {
-    at::Tensor active_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    at::Tensor visible;
-    at::Tensor blocker_prim;
-    at::Tensor tape_t;
-    raydn_visibility_forward_fn()(
-        scene_handle,
-        &start,
-        &end,
-        active_ptr,
-        &visible,
-        &blocker_prim,
-        &tape_t);
-    return pybind11::make_tuple(visible, blocker_prim, tape_t);
+    rayd::torch::VisibilityResult out = rayd::torch::visibility_forward(
+        scene.resource(),
+        rayd::torch::VisibilityRequest{start, end, optional_tensor(active)});
+    return pybind11::make_tuple(out.visible, out.blocker_prim, out.tape_t);
 }
 
 
-pybind11::tuple cn_raydn_intersect_backward(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_intersect_backward(
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
@@ -130,53 +107,31 @@ pybind11::tuple cn_raydn_intersect_backward(
     bool need_grad_ray_o,
     bool need_grad_ray_d,
     bool need_grad_ray_tmax) {
-    at::Tensor active_storage;
-    at::Tensor grad_t_storage;
-    at::Tensor grad_p_storage;
-    at::Tensor grad_n_storage;
-    at::Tensor grad_geo_n_storage;
-    at::Tensor grad_uv_storage;
-    at::Tensor grad_barycentric_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    const at::Tensor *grad_t_ptr = optional_tensor(std::move(grad_t), grad_t_storage);
-    const at::Tensor *grad_p_ptr = optional_tensor(std::move(grad_p), grad_p_storage);
-    const at::Tensor *grad_n_ptr = optional_tensor(std::move(grad_n), grad_n_storage);
-    const at::Tensor *grad_geo_n_ptr = optional_tensor(std::move(grad_geo_n), grad_geo_n_storage);
-    const at::Tensor *grad_uv_ptr = optional_tensor(std::move(grad_uv), grad_uv_storage);
-    const at::Tensor *grad_barycentric_ptr =
-        optional_tensor(std::move(grad_barycentric), grad_barycentric_storage);
-    constexpr int64_t kOutputCount = 4;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_backward_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        &ray_tmax,
-        active_ptr,
-        &tape_prim_id,
-        &tape_barycentric,
-        grad_t_ptr,
-        grad_p_ptr,
-        grad_n_ptr,
-        grad_geo_n_ptr,
-        grad_uv_ptr,
-        grad_barycentric_ptr,
-        need_grad_vertices,
-        need_grad_ray_o,
-        need_grad_ray_d,
-        need_grad_ray_tmax,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN intersect backward returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
-    return result;
+    rayd::torch::IntersectBackwardRequest request;
+    request.rays = {ray_o, ray_d, ray_tmax, optional_tensor(active)};
+    request.tape_prim_id = tape_prim_id;
+    request.tape_barycentric = tape_barycentric;
+    request.grad_t = optional_tensor(grad_t);
+    request.grad_p = optional_tensor(grad_p);
+    request.grad_n = optional_tensor(grad_n);
+    request.grad_geo_n = optional_tensor(grad_geo_n);
+    request.grad_uv = optional_tensor(grad_uv);
+    request.grad_barycentric = optional_tensor(grad_barycentric);
+    request.need_grad_vertices = need_grad_vertices;
+    request.need_grad_ray_o = need_grad_ray_o;
+    request.need_grad_ray_d = need_grad_ray_d;
+    request.need_grad_ray_tmax = need_grad_ray_tmax;
+    rayd::torch::IntersectBackwardResult out =
+        rayd::torch::intersect_backward(scene.resource(), request);
+    return pybind11::make_tuple(
+        tensor_or_none(out.grad_vertices),
+        tensor_or_none(out.grad_ray_o),
+        tensor_or_none(out.grad_ray_d),
+        tensor_or_none(out.grad_ray_tmax));
 }
 
-pybind11::tuple cn_raydn_intersect_jvp(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_intersect_jvp(
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     pybind11::object active,
@@ -186,42 +141,29 @@ pybind11::tuple cn_raydn_intersect_jvp(
     pybind11::object tangent_ray_o,
     pybind11::object tangent_ray_d,
     int64_t flags) {
-    at::Tensor active_storage;
-    at::Tensor tangent_vertices_storage;
-    at::Tensor tangent_ray_o_storage;
-    at::Tensor tangent_ray_d_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    const at::Tensor *tangent_vertices_ptr =
-        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
-    const at::Tensor *tangent_ray_o_ptr =
-        optional_tensor(std::move(tangent_ray_o), tangent_ray_o_storage);
-    const at::Tensor *tangent_ray_d_ptr =
-        optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
-    constexpr int64_t kOutputCount = 6;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_intersect_jvp_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        active_ptr,
-        &tape_prim_id,
-        &tape_barycentric,
-        tangent_vertices_ptr,
-        tangent_ray_o_ptr,
-        tangent_ray_d_ptr,
-        flags,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN intersect jvp returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
-    return result;
+    rayd::torch::IntersectJvpRequest request;
+    request.ray_o = ray_o;
+    request.ray_d = ray_d;
+    request.active = optional_tensor(active);
+    request.tape_prim_id = tape_prim_id;
+    request.tape_barycentric = tape_barycentric;
+    request.tangent_vertices = optional_tensor(tangent_vertices);
+    request.tangent_ray_o = optional_tensor(tangent_ray_o);
+    request.tangent_ray_d = optional_tensor(tangent_ray_d);
+    request.flags = flags;
+    rayd::torch::IntersectJvpResult out =
+        rayd::torch::intersect_jvp(scene.resource(), request);
+    return pybind11::make_tuple(
+        tensor_or_none(out.tangent_t),
+        tensor_or_none(out.tangent_p),
+        tensor_or_none(out.tangent_n),
+        tensor_or_none(out.tangent_geo_n),
+        tensor_or_none(out.tangent_uv),
+        tensor_or_none(out.tangent_barycentric));
 }
 
-pybind11::dict cn_raydn_coupled_rd_geometry_forward(
-    int64_t scene_handle,
+pybind11::dict cn_coupled_rd_geometry_forward(
+    RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
     torch::Tensor face_id,
@@ -282,46 +224,34 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     at::Tensor direct_plane_points = plane_point.reshape({count, 1, 3}).contiguous();
     at::Tensor direct_plane_normals = plane_normal.reshape({count, 1, 3}).contiguous();
 
-    constexpr int64_t kEpcOutputCount = 6;
-    std::array<at::Tensor, static_cast<size_t>(kEpcOutputCount)> epc;
-    const int64_t epc_output_count = raydn_reflection_epc_paths_forward_fn()(
-        scene_handle,
-        &epc_source,
-        &diffraction_point,
-        &candidate_active,
-        &expected_faces,
-        &direct_plane_points,
-        &direct_plane_normals,
-        &surface_group_id,
-        &surface_group_size,
-        &surface_group_members,
-        1,
-        1,
-        1.0e-3,
-        epc.data(),
-        kEpcOutputCount);
-    TORCH_CHECK(epc_output_count == kEpcOutputCount,
-                "RayDN reflection EPC returned an unexpected tensor count for coupled R-D geometry");
+    rayd::torch::ReflectionEpcRequest epc_request;
+    epc_request.source = epc_source;
+    epc_request.receiver = diffraction_point;
+    epc_request.active = candidate_active;
+    epc_request.expected_prim_ids = expected_faces;
+    epc_request.direct_plane_points = direct_plane_points;
+    epc_request.direct_plane_normals = direct_plane_normals;
+    epc_request.surface_group_id = surface_group_id;
+    epc_request.surface_group_size = surface_group_size;
+    epc_request.surface_group_members = surface_group_members;
+    epc_request.max_bounces = 1;
+    epc_request.visibility_ignore_mode = 1;
+    epc_request.plane_tolerance = 1.0e-3;
+    rayd::torch::ReflectionEpcResult epc =
+        rayd::torch::reflection_epc_paths_forward(scene.resource(), epc_request);
 
-    at::Tensor prefix_active = cn_coupled_active_mask_cuda(candidate_active, epc[0]);
-    at::Tensor suffix_visible;
-    at::Tensor suffix_blocker;
-    at::Tensor suffix_tape_t;
-    raydn_visibility_forward_fn()(
-        scene_handle,
-        &diffraction_point,
-        &epc_receiver,
-        &prefix_active,
-        &suffix_visible,
-        &suffix_blocker,
-        &suffix_tape_t);
-    at::Tensor resolved_face = epc[2].select(1, 0).contiguous();
-    at::Tensor reflection_position = epc[4].select(1, 0).contiguous();
-    at::Tensor reflection_normal = epc[5].select(1, 0).contiguous();
+    at::Tensor prefix_active = cn_coupled_active_mask_cuda(candidate_active, epc.valid);
+    rayd::torch::VisibilityResult suffix = rayd::torch::visibility_forward(
+        scene.resource(),
+        rayd::torch::VisibilityRequest{
+            diffraction_point, epc_receiver, prefix_active});
+    at::Tensor resolved_face = epc.resolved_prim_ids.select(1, 0).contiguous();
+    at::Tensor reflection_position = epc.hit_positions.select(1, 0).contiguous();
+    at::Tensor reflection_normal = epc.normals.select(1, 0).contiguous();
     pybind11::dict out = cn_coupled_rd_finalize_cuda(
         prefix_active,
-        suffix_visible,
-        epc[1].contiguous(),
+        suffix.visible,
+        epc.path_length.contiguous(),
         resolved_face,
         edge_id,
         reflection_position,
@@ -333,12 +263,12 @@ pybind11::dict cn_raydn_coupled_rd_geometry_forward(
     out["candidate_active"] = candidate_active;
     out["virtual_source"] = prepared[2];
     out["predicted_reflection_position"] = prepared[3];
-    out["suffix_blocker_primitive"] = suffix_blocker;
+    out["suffix_blocker_primitive"] = suffix.blocker_prim;
     return out;
 }
 
-pybind11::dict cn_raydn_coupled_dd_geometry_forward(
-    int64_t scene_handle,
+pybind11::dict cn_coupled_dd_geometry_forward(
+    RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
     torch::Tensor edge1_id,
@@ -391,27 +321,18 @@ pybind11::dict cn_raydn_coupled_dd_geometry_forward(
     at::Tensor q1 = prepared[1];
     at::Tensor q2 = prepared[2];
 
-    // Three RayDN segment visibility queries (tx->Q1, Q1->Q2, Q2->rx), each
+    // Three RayD segment visibility queries (tx->Q1, Q1->Q2, Q2->rx), each
     // gated by the candidate mask and ANDed into the row validity.
-    at::Tensor visible_leg1;
-    at::Tensor blocker_leg1;
-    at::Tensor tape_leg1;
-    raydn_visibility_forward_fn()(
-        scene_handle, &source, &q1, &candidate_active, &visible_leg1, &blocker_leg1, &tape_leg1);
-    at::Tensor visible_leg2;
-    at::Tensor blocker_leg2;
-    at::Tensor tape_leg2;
-    raydn_visibility_forward_fn()(
-        scene_handle, &q1, &q2, &candidate_active, &visible_leg2, &blocker_leg2, &tape_leg2);
-    at::Tensor visible_leg3;
-    at::Tensor blocker_leg3;
-    at::Tensor tape_leg3;
-    raydn_visibility_forward_fn()(
-        scene_handle, &q2, &receiver, &candidate_active, &visible_leg3, &blocker_leg3, &tape_leg3);
+    rayd::torch::VisibilityResult leg1 = rayd::torch::visibility_forward(
+        scene.resource(), {source, q1, candidate_active});
+    rayd::torch::VisibilityResult leg2 = rayd::torch::visibility_forward(
+        scene.resource(), {q1, q2, candidate_active});
+    rayd::torch::VisibilityResult leg3 = rayd::torch::visibility_forward(
+        scene.resource(), {q2, receiver, candidate_active});
 
-    at::Tensor prefix_active = cn_coupled_active_mask_cuda(candidate_active, visible_leg1);
-    prefix_active = cn_coupled_active_mask_cuda(prefix_active, visible_leg2);
-    prefix_active = cn_coupled_active_mask_cuda(prefix_active, visible_leg3);
+    at::Tensor prefix_active = cn_coupled_active_mask_cuda(candidate_active, leg1.visible);
+    prefix_active = cn_coupled_active_mask_cuda(prefix_active, leg2.visible);
+    prefix_active = cn_coupled_active_mask_cuda(prefix_active, leg3.visible);
 
     pybind11::dict out = cn_coupled_dd_finalize_cuda(
         prefix_active,

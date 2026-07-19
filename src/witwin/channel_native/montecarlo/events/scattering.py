@@ -410,7 +410,7 @@ def eval_bsdf_rows(
 
 
 def scattering_nee_connection_samples(
-    raydn: Any,
+    rayd: Any,
     sensor: dict[str, torch.Tensor],
     runtimes: dict[int, Any],
     *,
@@ -533,8 +533,8 @@ def scattering_nee_connection_samples(
     )
     start = flat(expand_rows(position)) + wo_flat * epsilon[:, None]
     end = flat(rx_origin[None, :, :].expand(vertex_count, sensor_count, 3)).contiguous()
-    visible = geometry_bridge.raydn_visibility_forward(
-        raydn.require_handle(),
+    visible = geometry_bridge.rayd_visibility_forward(
+        rayd.require_resource(),
         start.contiguous(),
         end,
         valid.contiguous(),
@@ -678,7 +678,7 @@ def scattered_subpath_state(
 
 def scattering_map_matrix(
     scene: Any,
-    raydn: Any,
+    rayd: Any,
     tx_pos: torch.Tensor,
     tx_power: torch.Tensor,
     rx_pos: torch.Tensor,
@@ -723,11 +723,11 @@ def scattering_map_matrix(
     if not runtimes:
         return matrix, stats
 
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     bundle = face_material_field_bundle(scene, device=device)
     face_material_id = bundle["material_id"].to(torch.int64)
     face_scatter_model = bundle["scatter_model_id"].index_select(0, face_material_id)
-    records = raydn.edge_records()
+    records = rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.to(torch.int64)
     v0 = vertices.index_select(0, faces[:, 0])
@@ -796,7 +796,7 @@ def scattering_map_matrix(
         # Unobstructed tx->point requirement (v1): binary visibility on the
         # segment shortened off the surface by the scale-aware epsilon.
         candidates = cos_i > 1.0e-6
-        visible_tx = geometry_bridge.raydn_visibility_forward(
+        visible_tx = geometry_bridge.rayd_visibility_forward(
             handle,
             tx_pos[tx_index][None, :].expand(count, 3).contiguous(),
             (points + normal_flipped * epsilon[:, None]).contiguous(),
@@ -838,7 +838,7 @@ def scattering_map_matrix(
                 ledger=ledger,
             )
             f_unpol = 0.5 * (f_te + f_tm)
-            visible_rx = geometry_bridge.raydn_visibility_forward(
+            visible_rx = geometry_bridge.rayd_visibility_forward(
                 handle,
                 (points[:, None, :] + wo_world * epsilon[:, None, None])
                 .reshape(count * block, 3)

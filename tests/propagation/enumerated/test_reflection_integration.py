@@ -21,13 +21,13 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
     faces = torch.tensor([[0, 1, 2]], dtype=torch.int32)
     normals = torch.ones((1, 3))
     records = SimpleNamespace(vertices=vertices, faces=faces, face_normals=normals)
-    raydn = SimpleNamespace(
+    rayd = SimpleNamespace(
         available=True,
         edge_records=lambda: records,
-        require_handle=lambda: object(),
+        require_resource=lambda: object(),
     )
     compiled = SimpleNamespace(
-        raydn=raydn,
+        rayd=rayd,
         assignments=SimpleNamespace(face_material_id=torch.tensor([0])),
         geometry=SimpleNamespace(face_surface_id=torch.tensor([0])),
     )
@@ -91,7 +91,7 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
     )
     monkeypatch.setattr(
         reflection.geometry_bridge,
-        "raydn_reflection_epc_paths_forward",
+        "rayd_reflection_epc_paths_forward",
         lambda *a: events.append("epc") or epc,
     )
 

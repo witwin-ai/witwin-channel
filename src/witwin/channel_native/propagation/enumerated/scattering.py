@@ -130,20 +130,20 @@ def _offset_eps(points: torch.Tensor, scene_diagonal: torch.Tensor) -> torch.Ten
 
 
 def _visible(
-    raydn: object, start: torch.Tensor, end: torch.Tensor
+    rayd: object, start: torch.Tensor, end: torch.Tensor
 ) -> tuple[torch.Tensor, int]:
     """Chunked segment visibility; returns (mask, launch_count)."""
 
     count = int(start.shape[0])
     if count == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool), 0
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     masks = []
     launches = 0
     for lo in range(0, count, _VISIBILITY_CHUNK):
         hi = min(lo + _VISIBILITY_CHUNK, count)
         masks.append(
-            geometry_bridge.raydn_visibility_forward(
+            geometry_bridge.rayd_visibility_forward(
                 handle, start[lo:hi].contiguous(), end[lo:hi].contiguous(), None
             )[0]
         )
@@ -315,7 +315,7 @@ def _ensemble_rows(
 ) -> None:
     device = tx_positions.device
     ad_enabled = ad_mode != "none"
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     faces = records.faces.to(torch.int64)[ensemble_faces]
     tri = records.vertices[faces]  # [F, 3, 3]
     normals = _unit(records.face_normals[ensemble_faces])
@@ -379,7 +379,7 @@ def _ensemble_rows(
         tx_active = cos_i > _MIN_COS
         offset_points = points + n_o * eps[:, None]
         vis_tx, launches = _visible(
-            compiled.raydn,
+            compiled.rayd,
             tx.reshape(1, 3).expand(sample_count, 3).contiguous(),
             offset_points,
         )
@@ -420,7 +420,7 @@ def _ensemble_rows(
                 continue
             rc, sc = rows[:, 0], rows[:, 1]
             vis_rx, launches = _visible(
-                compiled.raydn,
+                compiled.rayd,
                 rx_block[rc].contiguous(),
                 offset_points[sc].contiguous(),
             )
@@ -558,7 +558,7 @@ def _realization_rows(
 ) -> None:
     device = tx_positions.device
     ad_enabled = ad_mode != "none"
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     face_structure = compiled.geometry.face_structure_id.to(
         device=device, dtype=torch.int64
     )
@@ -683,7 +683,7 @@ def _realization_rows(
             front = cos_i > _MIN_COS
             offset_points = centroids + n_o * eps[:, None]
             vis_tx, launches = _visible(
-                compiled.raydn,
+                compiled.rayd,
                 tx.reshape(1, 3).expand(patch_count, 3).contiguous(),
                 offset_points,
             )
@@ -702,7 +702,7 @@ def _realization_rows(
                 if int(rows.numel()) == 0:
                     continue
                 vis_rx, launches = _visible(
-                    compiled.raydn,
+                    compiled.rayd,
                     rx.reshape(1, 3).expand(int(rows.numel()), 3).contiguous(),
                     offset_points[rows].contiguous(),
                 )
@@ -1061,9 +1061,9 @@ def _collect_scattering_rows(
     info["realization_structure_count"] = len(screens)
     if int(ensemble_faces.numel()) == 0 and not screens:
         return None, 0, 0, 0
-    if not compiled.raydn.available:
+    if not compiled.rayd.available:
         raise RuntimeError(
-            "deterministic scattering requires RayDN native scene capability"
+            "deterministic scattering requires RayD native scene capability"
         )
 
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
@@ -1072,7 +1072,7 @@ def _collect_scattering_rows(
         return None, 0, 0, 0
     tx_pol = transmitter_polarizations(scene, device=device)
     rx_pol = receiver_polarizations(scene, device=device)
-    records = compiled.raydn.edge_records()
+    records = compiled.rayd.edge_records()
     vertices = records.vertices
     scene_diagonal = (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
 

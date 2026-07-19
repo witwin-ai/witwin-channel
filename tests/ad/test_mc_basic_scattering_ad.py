@@ -74,8 +74,8 @@ _THICKNESS = 0.1
 
 
 def _require_native() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scattering is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scattering is not built")
 
 
 def _wall() -> Structure:
@@ -118,17 +118,17 @@ def _scene(frequency: float | torch.Tensor = _FREQUENCY_HZ) -> Scene:
 
 def _map_handles(scene: Scene):
     device = torch.device("cuda")
-    raydn = scene.raydn_scene()
+    rayd = scene.rayd_scene()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     grid = scene.receivers[0]
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
-    return device, raydn, tx_pos, tx_power, rx_pos
+    return device, rayd, tx_pos, tx_power, rx_pos
 
 
-def _matrix(scene, raydn, tx_pos, tx_power, rx_pos, *, ad: bool):
+def _matrix(scene, rayd, tx_pos, tx_power, rx_pos, *, ad: bool):
     matrix, stats = scattering_map_matrix(
         scene,
-        raydn,
+        rayd,
         tx_pos,
         tx_power,
         rx_pos,
@@ -148,14 +148,14 @@ def _matrix(scene, raydn, tx_pos, tx_power, rx_pos, *, ad: bool):
 def test_scattering_table_value_grad_matches_fd():
     _require_native()
     scene = _scene()
-    device, raydn, tx_pos, tx_power, rx_pos = _map_handles(scene)
+    device, rayd, tx_pos, tx_power, rx_pos = _map_handles(scene)
     runtimes = rough_material_runtimes(scene.compile())
     assert runtimes, "the fixture must have a rough material"
     table = next(iter(runtimes.values())).table
     f_te = table.f_te
 
     # Sanity: the map deposits nonzero power on this fixture.
-    base_matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=False)
+    base_matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=False)
     assert float(base_matrix.abs().sum()) > 0.0
 
     base = f_te.detach().clone()
@@ -166,7 +166,7 @@ def test_scattering_table_value_grad_matches_fd():
         with torch.no_grad():
             f_te.copy_(value.to(device=f_te.device, dtype=f_te.dtype))
         try:
-            matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=False)
+            matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=False)
             return matrix.sum().detach()
         finally:
             with torch.no_grad():
@@ -176,7 +176,7 @@ def test_scattering_table_value_grad_matches_fd():
 
     f_te.requires_grad_(True)
     try:
-        matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=True)
+        matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=True)
         assert matrix.requires_grad
         matrix.sum().backward()
         assert f_te.grad is not None
@@ -198,20 +198,20 @@ def test_scattering_table_value_grad_matches_fd():
 def test_scattering_tx_power_grad_matches_fd():
     _require_native()
     scene = _scene()
-    device, raydn, tx_pos, tx_power_native, rx_pos = _map_handles(scene)
+    device, rayd, tx_pos, tx_power_native, rx_pos = _map_handles(scene)
 
     base = tx_power_native.detach().clone()
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
         matrix, _ = _matrix(
-            scene, raydn, tx_pos, value.to(base), rx_pos, ad=False
+            scene, rayd, tx_pos, value.to(base), rx_pos, ad=False
         )
         return matrix.sum().detach()
 
     expected = central_difference_gradient(evaluate, base, 1.0e-3)
 
     tx_power = base.clone().requires_grad_(True)
-    matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=True)
+    matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=True)
     matrix.sum().backward()
     assert tx_power.grad is not None
     assert float(tx_power.grad.abs().max()) > 0.0
@@ -229,7 +229,7 @@ def test_scattering_frequency_grad_matches_fd():
     scene = _scene(frequency=frequency)
     # Compile once so the Kirchhoff table is pinned at the base frequency; the
     # FD below moves only the amplitude carrier, matching Part A.
-    device, raydn, tx_pos, tx_power, rx_pos = _map_handles(scene)
+    device, rayd, tx_pos, tx_power, rx_pos = _map_handles(scene)
     assert rough_material_runtimes(scene.compile())
 
     base = frequency.detach().clone()
@@ -238,7 +238,7 @@ def test_scattering_frequency_grad_matches_fd():
         with torch.no_grad():
             frequency.copy_(value.to(device=frequency.device, dtype=frequency.dtype))
         try:
-            matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=False)
+            matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=False)
             return matrix.sum().detach()
         finally:
             with torch.no_grad():
@@ -247,7 +247,7 @@ def test_scattering_frequency_grad_matches_fd():
     step = FD_REL_STEP_FREQUENCY * _FREQUENCY_HZ
     expected = central_difference_gradient(evaluate, base, step)
 
-    matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=True)
+    matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=True)
     assert matrix.requires_grad
     matrix.sum().backward()
     assert frequency.grad is not None
@@ -262,7 +262,7 @@ def test_scattering_frequency_grad_matches_fd():
 def test_scattering_forward_mode_table_dual_matches_reverse():
     _require_native()
     scene = _scene()
-    device, raydn, tx_pos, tx_power, rx_pos = _map_handles(scene)
+    device, rayd, tx_pos, tx_power, rx_pos = _map_handles(scene)
     table = next(iter(rough_material_runtimes(scene.compile()).values())).table
     f_te = table.f_te
     base = f_te.detach().clone()
@@ -273,7 +273,7 @@ def test_scattering_forward_mode_table_dual_matches_reverse():
         dual = torch.autograd.forward_ad.make_dual(base.clone(), tangent)
         object.__setattr__(table, "f_te", dual)
         try:
-            matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=True)
+            matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=True)
             jvp = torch.autograd.forward_ad.unpack_dual(matrix.sum()).tangent
         finally:
             # Restore the ORIGINAL leaf tensor object (not a clone) so the
@@ -283,7 +283,7 @@ def test_scattering_forward_mode_table_dual_matches_reverse():
 
     f_te.requires_grad_(True)
     try:
-        matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=True)
+        matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=True)
         matrix.sum().backward()
         vjp = (f_te.grad.detach() * tangent).sum()
     finally:
@@ -303,17 +303,17 @@ def test_scattering_ad_preserves_frozen_primal_map():
 
     _require_native()
     scene = _scene()
-    device, raydn, tx_pos, tx_power, rx_pos = _map_handles(scene)
+    device, rayd, tx_pos, tx_power, rx_pos = _map_handles(scene)
 
-    a, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=False)
-    b, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=False)
+    a, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=False)
+    b, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=False)
     # The area-sample set and both visibility masks are seed-deterministic.
     torch.testing.assert_close(a, b, rtol=0.0, atol=0.0)
 
     # The AD path runs the same native forward and torch arithmetic on the
     # same frozen sample set, so the primal value is unchanged (no live leaf
     # here, so the AD matrix carries no graph and that is fine).
-    ad_matrix, _ = _matrix(scene, raydn, tx_pos, tx_power, rx_pos, ad=True)
+    ad_matrix, _ = _matrix(scene, rayd, tx_pos, tx_power, rx_pos, ad=True)
     torch.testing.assert_close(ad_matrix.detach(), a, rtol=1.0e-6, atol=0.0)
 
 

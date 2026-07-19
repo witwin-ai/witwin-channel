@@ -6,12 +6,12 @@ FORBIDDEN_MODULES = (
     "drjit",
     "mitsuba",
     "sionna",
-    "raydn",
+    "rayd",
     "witwin.channel",
 )
 
 FORBIDDEN_INTERNAL_MODULES = (
-    "witwin.channel_native.path.raydn_export",
+    "witwin.channel_native.path.rayd_export",
 )
 
 

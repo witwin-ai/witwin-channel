@@ -23,7 +23,7 @@ def _native_unoccluded_scene():
         receivers=[],
         frequency=3.0e9,
     )
-    return scene.raydn_scene()
+    return scene.rayd_scene()
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
@@ -58,7 +58,7 @@ def test_diffraction_accumulation_accepts_sample_state_slots_and_weights():
     sample_state_index = torch.tensor([1], device="cuda", dtype=torch.int32)
     sample_edge_weight = torch.tensor([1.0], device="cuda", dtype=torch.float32)
 
-    out = ops.raydn_diffraction_accumulation_forward(
+    out = ops.rayd_diffraction_accumulation_forward(
         scene,
         active,
         state_edge_index,

@@ -20,8 +20,8 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 def _require_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for native coupled topology")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
 
 _BASE_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
@@ -161,7 +161,7 @@ def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
     _require_native()
     monkeypatch.setattr(
         geometry_bridge,
-        "raydn_coupled_rd_geometry_forward",
+        "coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail(
             "coupled kernel launched before the candidate guard"
         ),
@@ -189,14 +189,14 @@ def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
     _require_native()
     monkeypatch.setattr(
         geometry_bridge,
-        "raydn_coupled_rd_geometry_forward",
+        "coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail(
             "coupled R-D kernel launched before the candidate guard"
         ),
     )
     monkeypatch.setattr(
         geometry_bridge,
-        "raydn_coupled_dd_geometry_forward",
+        "coupled_dd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail(
             "coupled D-D kernel launched before the candidate guard"
         ),

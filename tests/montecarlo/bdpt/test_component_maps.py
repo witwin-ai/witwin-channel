@@ -29,15 +29,15 @@ def test_bdpt_component_maps_include_all_components_and_total():
     total = result.component_maps["los"] + result.component_maps["reflection"] + result.component_maps["diffraction"]
     assert result.path_gain.shape == (1, 4, 4)
     torch.testing.assert_close(result.path_gain, total, rtol=1.0e-5, atol=1.0e-8)
-    if build_info()["uses_raydn_native"]:
+    if build_info()["uses_rayd_native"]:
         assert torch.isfinite(result.component_maps["reflection"]).all()
 
 
 def test_bdpt_component_maps_include_transmission_and_zero_scattering():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT component maps")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native transmission is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native transmission is not built")
 
     scene = single_wall_reflection_scene().add(_grid())
     components = {"los", "reflection", "diffraction", "transmission", "scattering"}

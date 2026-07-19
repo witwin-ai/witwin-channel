@@ -39,8 +39,8 @@ def test_deterministic_config_rejects_unknown_component():
 def test_single_component_power_matches_total_for_reflection_only():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}, coherent=False))
 

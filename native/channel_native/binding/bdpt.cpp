@@ -443,11 +443,11 @@ void register_bdpt_subpaths(pybind11::module_ &module) {
     module.def(
         "bdpt_subpath_intersection_inputs",
         &cn_bdpt_subpath_intersection_inputs,
-        "Expose BDPT subpath state as RayDN intersection ray inputs with native tensor storage.");
+        "Expose BDPT subpath state as RayD intersection ray inputs with native tensor storage.");
     module.def(
         "bdpt_reflected_light_subpath_state",
         &cn_bdpt_reflected_light_subpath_state,
-        "Propagate BDPT light subpaths through native RayDN hit geometry with CUDA reflection.");
+        "Propagate BDPT light subpaths through native RayD hit geometry with CUDA reflection.");
     module.def(
         "bdpt_transmitted_light_subpath_state",
         &cn_bdpt_transmitted_light_subpath_state,
@@ -478,7 +478,7 @@ void register_bdpt_connections(pybind11::module_ &module) {
     module.def(
         "bdpt_endpoint_connection_visibility_inputs",
         &cn_bdpt_endpoint_connection_visibility_inputs,
-        "Build RayDN visibility inputs for BDPT endpoint connection samples.");
+        "Build RayD visibility inputs for BDPT endpoint connection samples.");
     module.def(
         "bdpt_accumulate_connection_samples",
         &cn_bdpt_accumulate_connection_samples,
@@ -533,7 +533,7 @@ void register_bdpt_connections(pybind11::module_ &module) {
     module.def(
         "bdpt_diffraction_connection_samples_from_tape",
         &cn_bdpt_diffraction_connection_samples_from_tape,
-        "Replay RayDN diffraction tape into BDPT native connection samples.");
+        "Replay RayD diffraction tape into BDPT native connection samples.");
     module.def(
         "bdpt_diffraction_point_connection_samples",
         &cn_bdpt_diffraction_point_connection_samples,
@@ -616,11 +616,11 @@ void register_bdpt_components(pybind11::module_ &module) {
     module.def(
         "bdpt_apply_los_visibility",
         &cn_bdpt_apply_los_visibility,
-        "Apply RayDN LoS visibility to one BDPT transmitter component map with a CUDA kernel.");
+        "Apply RayD LoS visibility to one BDPT transmitter component map with a CUDA kernel.");
     module.def(
         "bdpt_los_visibility_inputs",
         &cn_bdpt_los_visibility_inputs,
-        "Prepare RayDN LoS visibility start and active tensors for BDPT with a CUDA kernel.");
+        "Prepare RayD LoS visibility start and active tensors for BDPT with a CUDA kernel.");
 }
 
 void register_bdpt_diffraction_support(pybind11::module_ &module) {
@@ -631,7 +631,7 @@ void register_bdpt_diffraction_support(pybind11::module_ &module) {
     module.def(
         "bdpt_reflection_launch_inputs",
         &cn_bdpt_reflection_launch_inputs,
-        "Prepare RayDN reflection launch tensors for BDPT with a CUDA kernel.");
+        "Prepare RayD reflection launch tensors for BDPT with a CUDA kernel.");
     module.def(
         "bdpt_diffraction_state_wi",
         &cn_bdpt_diffraction_state_wi,

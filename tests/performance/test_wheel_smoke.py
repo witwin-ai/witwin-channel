@@ -103,7 +103,7 @@ def test_smoke_program_contains_strict_isolation_and_native_checks(tmp_path: Pat
     assert "is_relative_to(target)" in code
     assert 'find_spec("witwin.channel_native._channel_native")' in code
     assert 'build_info.get("uses_dr_jit") is not False' in code
-    assert 'build_info.get("uses_raydn_native") is not True' in code
+    assert 'build_info.get("uses_rayd_native") is not True' in code
 def test_resolve_wheel_accepts_one_file_or_one_wheel_directory(tmp_path: Path):
     wheel = tmp_path / "package.whl"
     wheel.write_bytes(b"wheel")

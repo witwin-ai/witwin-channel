@@ -56,7 +56,7 @@
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel_native/montecarlo/basic/raydn_components.py::diffraction_component_map": {
+    "src/witwin/channel_native/montecarlo/basic/rayd_components.py::diffraction_component_map": {
       "ceiling": 19,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/basic maintainers",

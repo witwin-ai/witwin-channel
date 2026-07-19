@@ -6,7 +6,11 @@ import pytest
 from witwin.channel_native.propagation.fields.kernels import autograd as ops
 from witwin.channel_native.propagation import fields
 from witwin.channel_native.propagation.fields import kernels
-from witwin.channel_native.propagation.fields.kernels import autograd, functional
+from witwin.channel_native.propagation.fields.kernels import (
+    autograd,
+    autograd_projection,
+    functional,
+)
 from witwin.channel_native.runtime import autograd_contracts, symbols, torch_compat
 
 
@@ -15,16 +19,19 @@ _OWNER_NAMES = (
     "_FieldCoupledRdAdFunction",
     "_FieldDiffractionWedgeAdFunction",
     "_FieldFreeSpaceAdFunction",
-    "_FieldProjectComplex3AdFunction",
     "_FieldReflectionSequenceAdFunction",
     "_FieldTransmissionSequenceAdFunction",
     "coupled_rd_prepare_ad",
     "field_coupled_rd_ad",
     "field_diffraction_wedge_ad",
     "field_free_space_ad",
-    "field_project_complex3_ad",
     "field_reflection_sequence_ad",
     "field_transmission_sequence_ad",
+)
+
+_PROJECTION_OWNER_NAMES = (
+    "_FieldProjectComplex3AdFunction",
+    "field_project_complex3_ad",
 )
 
 
@@ -36,6 +43,16 @@ def test_fields_autograd_is_the_single_object_owner(name: str):
     assert getattr(kernels, name) is owner
     assert getattr(fields, name) is owner
     assert getattr(ops, name) is owner
+
+
+@pytest.mark.parametrize("name", _PROJECTION_OWNER_NAMES)
+def test_fields_projection_autograd_is_the_single_object_owner(name: str):
+    owner = getattr(autograd_projection, name)
+
+    assert owner.__module__ == autograd_projection.__name__
+    assert getattr(kernels, name) is owner
+    assert getattr(fields, name) is owner
+    assert not hasattr(autograd, name)
 
 
 def test_fields_autograd_uses_canonical_runtime_dependencies():

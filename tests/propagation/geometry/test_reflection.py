@@ -10,8 +10,8 @@ from witwin.channel_native.propagation.geometry import (
 )
 
 
-class _Raydn:
-    def require_handle(self) -> int:
+class _Rayd:
+    def require_resource(self) -> int:
         return 23
 
 
@@ -41,11 +41,11 @@ def test_reflection_epc_query_names_raw_geometry_and_preserves_identity(monkeypa
 
     monkeypatch.setattr(
         geometry_reflection.geometry_bridge,
-        "raydn_reflection_epc_paths_forward",
+        "rayd_reflection_epc_paths_forward",
         fake_forward,
     )
     query = geometry_reflection.ReflectionEpcQuery(
-        raydn=_Raydn(),
+        rayd=_Rayd(),
         source=source,
         receiver=receiver,
         active=active,
@@ -62,7 +62,7 @@ def test_reflection_epc_query_names_raw_geometry_and_preserves_identity(monkeypa
     result = geometry_reflection.query_reflection_epc(query)
 
     assert [field.name for field in fields(query)] == [
-        "raydn",
+        "rayd",
         "source",
         "receiver",
         "active",

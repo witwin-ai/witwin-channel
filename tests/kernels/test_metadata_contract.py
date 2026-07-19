@@ -11,7 +11,7 @@ def test_make_metadata_includes_required_fields():
     metadata = make_metadata(
         primitive="trace_los_field",
         forward_launch_count=1,
-        raydn_native=False,
+        rayd_native=False,
         accumulation_strategy="atomic_add",
         ad_status="none",
     )
@@ -19,7 +19,7 @@ def test_make_metadata_includes_required_fields():
     assert set(REQUIRED_METADATA_FIELDS).issubset(metadata)
     assert metadata["primitive"] == "trace_los_field"
     assert metadata["forward_launch_count"] == 1
-    assert metadata["raydn_native"] is False
+    assert metadata["rayd_native"] is False
     assert "fusion_debt" not in metadata
     validate_metadata(metadata)
 

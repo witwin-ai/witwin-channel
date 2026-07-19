@@ -26,8 +26,8 @@ _FREQUENCY = 3.0e9
 
 
 def _require_native() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native transmission is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native transmission is not built")
 
 
 def _wall(material, *, x: float = 2.5) -> Structure:

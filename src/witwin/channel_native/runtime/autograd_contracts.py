@@ -17,7 +17,7 @@ def _ad_raise_composed_transforms() -> None:
     # kernels an unwrapped tensor that has silently lost its transform
     # tracking (which would produce exact-zero tangents/gradients).
     raise NotImplementedError(
-        "raydn_*_ad entry points support a single forward-mode transform"
+        "rayd_*_ad entry points support a single forward-mode transform"
         " level; composed functorch transforms (e.g. torch.func.grad over"
         " forward-mode jvp) are not supported by the native geometry kernels"
         " (first-order only)"

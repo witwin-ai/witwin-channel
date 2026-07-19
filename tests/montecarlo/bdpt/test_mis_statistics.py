@@ -29,8 +29,8 @@ def _estimates(*, samples: int, mis: str) -> list[float]:
 def test_bdpt_diffraction_estimate_is_sample_count_and_seed_invariant():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT statistics")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     # ADR-018: standalone diffraction is now a deterministic enumerated estimate,
     # so it no longer depends on the Monte Carlo sample budget or seed. Distinct
@@ -49,8 +49,8 @@ def test_bdpt_diffraction_estimate_is_sample_count_and_seed_invariant():
 def test_bdpt_diffraction_mis_on_off_means_agree_across_seeds():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT statistics")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     enabled = statistics.mean(_estimates(samples=1024, mis="power_heuristic"))
     disabled = statistics.mean(_estimates(samples=1024, mis="none"))

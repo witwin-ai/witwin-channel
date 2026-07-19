@@ -49,7 +49,7 @@ def _transmission_topology(
     """
 
     device = tx_positions.device
-    raydn = compiled.raydn
+    rayd = compiled.rayd
     if (
         not scene.structures
         or tx_positions.numel() == 0
@@ -57,13 +57,13 @@ def _transmission_topology(
         or max_depth < 1
     ):
         return _ensure_topology_fields(_empty_path_block(device)), 0, 0, 0
-    if not raydn.available:
+    if not rayd.available:
         raise RuntimeError(
-            "deterministic transmission requires RayDN native scene capability"
+            "deterministic transmission requires RayD native scene capability"
         )
 
-    handle = raydn.require_handle()
-    records = raydn.edge_records()
+    handle = rayd.require_resource()
+    records = rayd.edge_records()
     vertices = records.vertices
     scene_diagonal = (
         vertices.max(dim=0).values - vertices.min(dim=0).values

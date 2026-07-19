@@ -22,7 +22,7 @@ _DIGESTS = {
     "_face_sequence_chunks": "c2e35ad0f2221530491334a89aec3d102bb34c53816c730a02d511e9964074e5",
     "_reflect_points": "2d94849ad9f55be907f1fa6b8aa3024035506e24d4315c3128a96c1871ff3d30",
     "_discovered_group_chains": (
-        "0ab4299eb5a2c6ece2296ccdf9432de986f1e15fdf127ecd595b61bee6b04fa7"
+        "c153fbda36ca6c16bcac25397791309bdb0b184c5d12bf0058833644c96cbcd6"
     ),
 }
 

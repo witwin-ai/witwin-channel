@@ -9,7 +9,7 @@ from witwin.channel_native.propagation.geometry import kernels
 from witwin.channel_native.propagation.geometry.kernels import autograd, primitives
 from witwin.channel_native.runtime import (
     autograd_contracts,
-    native_handles,
+    native_resources,
     symbols,
     tensor_contracts,
 )
@@ -17,24 +17,24 @@ from witwin.channel_native.runtime import torch_compat
 
 
 _OWNER_NAMES = (
-    "_RaydnFaceNormalsAdFunction",
-    "_RaydnIntersectAdFunction",
-    "_RaydnReflectionEpcPathsAdFunction",
-    "_RaydnTraceReflectionsAdFunction",
+    "_RaydFaceNormalsAdFunction",
+    "_RaydIntersectAdFunction",
+    "_RaydReflectionEpcPathsAdFunction",
+    "_RaydTraceReflectionsAdFunction",
     "_epc_paths_frozen_winner_checks",
-    "raydn_face_normals_ad",
-    "raydn_intersect_ad",
-    "raydn_intersect_backward",
-    "raydn_intersect_jvp",
-    "raydn_reflection_epc_paths_ad",
-    "raydn_reflection_epc_paths_backward",
-    "raydn_reflection_epc_paths_jvp",
-    "raydn_scene_face_normals_backward",
-    "raydn_scene_face_normals_jvp",
-    "raydn_trace_reflections_ad",
-    "raydn_trace_reflections_backward",
-    "raydn_trace_reflections_forward_tape",
-    "raydn_trace_reflections_jvp",
+    "rayd_face_normals_ad",
+    "rayd_intersect_ad",
+    "rayd_intersect_backward",
+    "rayd_intersect_jvp",
+    "rayd_reflection_epc_paths_ad",
+    "rayd_reflection_epc_paths_backward",
+    "rayd_reflection_epc_paths_jvp",
+    "rayd_scene_face_normals_backward",
+    "rayd_scene_face_normals_jvp",
+    "rayd_trace_reflections_ad",
+    "rayd_trace_reflections_backward",
+    "rayd_trace_reflections_forward_tape",
+    "rayd_trace_reflections_jvp",
 )
 
 
@@ -51,8 +51,8 @@ def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
     assert autograd._required_native_op is symbols.required_symbol
     assert autograd.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
     assert autograd.torch_compat is torch_compat
-    assert "_raydn_module_handle" not in autograd.__dict__
-    assert autograd._raydn_scene_handle_id is native_handles._raydn_scene_handle_id
+    assert "_rayd_resource" not in autograd.__dict__
+    assert autograd._rayd_scene_resource is native_resources._rayd_scene_resource
     assert (
         autograd.deterministic_normalize_vec3 is primitives.deterministic_normalize_vec3
     )
@@ -71,54 +71,54 @@ def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
 
 def test_autograd_methods_resolve_companions_in_the_canonical_owner():
     assert (
-        autograd._RaydnFaceNormalsAdFunction.forward.__globals__[
+        autograd._RaydFaceNormalsAdFunction.forward.__globals__[
             "deterministic_normalize_vec3"
         ]
         is primitives.deterministic_normalize_vec3
     )
     assert (
-        inspect.unwrap(autograd._RaydnFaceNormalsAdFunction.backward).__globals__[
-            "raydn_scene_face_normals_backward"
+        inspect.unwrap(autograd._RaydFaceNormalsAdFunction.backward).__globals__[
+            "rayd_scene_face_normals_backward"
         ]
-        is autograd.raydn_scene_face_normals_backward
+        is autograd.rayd_scene_face_normals_backward
     )
     assert (
-        autograd._RaydnFaceNormalsAdFunction.jvp.__globals__[
-            "raydn_scene_face_normals_jvp"
+        autograd._RaydFaceNormalsAdFunction.jvp.__globals__[
+            "rayd_scene_face_normals_jvp"
         ]
-        is autograd.raydn_scene_face_normals_jvp
+        is autograd.rayd_scene_face_normals_jvp
     )
     assert (
-        inspect.unwrap(autograd._RaydnIntersectAdFunction.backward).__globals__[
-            "raydn_intersect_backward"
+        inspect.unwrap(autograd._RaydIntersectAdFunction.backward).__globals__[
+            "rayd_intersect_backward"
         ]
-        is autograd.raydn_intersect_backward
+        is autograd.rayd_intersect_backward
     )
     assert (
-        autograd._RaydnIntersectAdFunction.jvp.__globals__["raydn_intersect_jvp"]
-        is autograd.raydn_intersect_jvp
+        autograd._RaydIntersectAdFunction.jvp.__globals__["rayd_intersect_jvp"]
+        is autograd.rayd_intersect_jvp
     )
     assert (
-        inspect.unwrap(autograd._RaydnTraceReflectionsAdFunction.backward).__globals__[
-            "raydn_trace_reflections_backward"
+        inspect.unwrap(autograd._RaydTraceReflectionsAdFunction.backward).__globals__[
+            "rayd_trace_reflections_backward"
         ]
-        is autograd.raydn_trace_reflections_backward
+        is autograd.rayd_trace_reflections_backward
     )
     assert (
-        autograd._RaydnTraceReflectionsAdFunction.jvp.__globals__[
-            "raydn_trace_reflections_jvp"
+        autograd._RaydTraceReflectionsAdFunction.jvp.__globals__[
+            "rayd_trace_reflections_jvp"
         ]
-        is autograd.raydn_trace_reflections_jvp
+        is autograd.rayd_trace_reflections_jvp
     )
     assert (
         inspect.unwrap(
-            autograd._RaydnReflectionEpcPathsAdFunction.backward
-        ).__globals__["raydn_reflection_epc_paths_backward"]
-        is autograd.raydn_reflection_epc_paths_backward
+            autograd._RaydReflectionEpcPathsAdFunction.backward
+        ).__globals__["rayd_reflection_epc_paths_backward"]
+        is autograd.rayd_reflection_epc_paths_backward
     )
     assert (
-        autograd._RaydnReflectionEpcPathsAdFunction.jvp.__globals__[
-            "raydn_reflection_epc_paths_jvp"
+        autograd._RaydReflectionEpcPathsAdFunction.jvp.__globals__[
+            "rayd_reflection_epc_paths_jvp"
         ]
-        is autograd.raydn_reflection_epc_paths_jvp
+        is autograd.rayd_reflection_epc_paths_jvp
     )

@@ -12,6 +12,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
+CURRENT_OWNER_INVENTORY_PATH = (
+    REPOSITORY_ROOT
+    / "docs/dev/audit/phase13-current-native-owner-inventory.json"
+)
+MIGRATION_DELTA_PATH = (
+    REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
+)
 EXPECTED_OWNER_IDS = {
     "path.compaction",
     "path.topology",
@@ -142,14 +149,63 @@ def test_bdpt_abi_owners_are_complete_and_frozen() -> None:
 
 def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() -> None:
     inventory = _load_inventory()
+    current_inventory = json.loads(
+        CURRENT_OWNER_INVENTORY_PATH.read_text(encoding="utf-8")
+    )
+    migration = json.loads(MIGRATION_DELTA_PATH.read_text(encoding="utf-8"))
     expected = Counter(
         _hash_tuple(entry)
         for owner in inventory["owners"]
         for entry in owner["cpp_body_hash_multiset"]
     )
-    actual = Counter(_hash_tuple(entry) for entry in cpp_body_hashes(REPOSITORY_ROOT))
+    current_hashes = cpp_body_hashes(REPOSITORY_ROOT)
+    actual = Counter(_hash_tuple(entry) for entry in current_hashes)
+    transfers = migration["phase3_current"][
+        "approved_phase9_body_hash_transfer_multiset"
+    ]
+    approved_before = Counter(
+        _hash_tuple(transfer["before"]) for transfer in transfers
+    )
+    approved_after = Counter(_hash_tuple(transfer["after"]) for transfer in transfers)
+    transferred_names = {transfer["before"]["name"] for transfer in transfers}
+    actual_transferred = Counter(
+        _hash_tuple(entry)
+        for entry in current_hashes
+        if entry["name"] in transferred_names
+    )
+    phase9_owners = {
+        owner["id"]: Counter(
+            _hash_tuple(entry) for entry in owner["cpp_body_hash_multiset"]
+        )
+        for owner in inventory["owners"]
+    }
+    current_owners = {
+        entry["symbol"]: entry["numerical_owner"]
+        for entry in current_inventory["symbols"]
+    }
 
-    assert not expected - actual
+    assert migration["current_phase"] == current_inventory["current_phase"] == 3
+    assert len(transfers) == len(transferred_names)
+    assert expected - actual == approved_before
+    assert actual_transferred == approved_after
+    for transfer in transfers:
+        assert set(transfer) == {
+            "owner_id",
+            "binding_symbol",
+            "owner_before",
+            "owner_after",
+            "transfer_kind",
+            "before",
+            "after",
+        }
+        assert set(transfer["before"]) == set(HASH_FIELDS)
+        assert set(transfer["after"]) == set(HASH_FIELDS)
+        assert transfer["before"]["name"] == transfer["after"]["name"]
+        assert transfer["owner_before"] == "Channel Native"
+        assert current_owners[transfer["binding_symbol"]] == transfer["owner_after"]
+        assert phase9_owners[transfer["owner_id"]][
+            _hash_tuple(transfer["before"])
+        ] == 1
     for entry in (
         entry
         for owner in inventory["owners"]

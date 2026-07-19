@@ -1,4 +1,4 @@
-"""Structure UV fields, planar_uv helper, and RayDN forwarding."""
+"""Structure UV fields, planar_uv helper, and RayD forwarding."""
 
 import math
 
@@ -126,7 +126,7 @@ def test_structure_uv_validation():
     )
     assert structure.uv.dtype == torch.float32
     assert structure.face_uv.dtype == torch.int32
-    # Structures without UV keep None fields (empty per-mesh UV in RayDN).
+    # Structures without UV keep None fields (empty per-mesh UV in RayD).
     bare = Structure(vertices=vertices, faces=faces, material=material)
     assert bare.uv is None and bare.face_uv is None
 
@@ -143,35 +143,35 @@ def _uv_scene(with_uv: bool) -> Scene:
 @pytest.mark.parametrize("with_uv", [True, False])
 def test_scene_with_uv_builds_and_traces(with_uv):
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN native scene construction")
+        pytest.skip("CUDA is required for RayD native scene construction")
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
 
     from witwin.channel_native.propagation.geometry.kernels.bridge import (
         bdpt_intersect_forward,
     )
 
     scene = _uv_scene(with_uv)
-    raydn = scene.raydn_scene()
-    assert raydn.available
+    rayd = scene.rayd_scene()
+    assert rayd.available
     ray_o = torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
     ray_d = torch.tensor([[1.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
     ray_tmax = torch.tensor([10.0], dtype=torch.float32, device="cuda")
     active = torch.tensor([True], dtype=torch.bool, device="cuda")
-    hit = bdpt_intersect_forward(raydn, ray_o, ray_d, ray_tmax, active, flags=7)
+    hit = bdpt_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
     torch.testing.assert_close(
         hit["t"].cpu(), torch.tensor([2.5], dtype=torch.float32)
     )
-    # Scene compile keeps working on top of the UV-carrying RayDN scene.
+    # Scene compile keeps working on top of the UV-carrying RayD scene.
     compiled = scene.compile()
-    assert compiled.raydn is raydn
+    assert compiled.rayd is rayd
 
 
 def test_compiled_scene_lazy_scattering_caches():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN native scene construction")
+        pytest.skip("CUDA is required for RayD native scene construction")
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
 
     frequency = 6.0e9
     sigma_e = 0.1 * 2.0 * math.pi * frequency * 8.8541878128e-12

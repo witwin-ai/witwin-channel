@@ -33,7 +33,7 @@ def test_basic_benchmark_outputs_required_json_fields():
     assert payload["launch_count"] >= 0
     assert payload["intermediate_bytes"] >= 0
     assert payload["output_bytes"] > 0
-    assert isinstance(payload["raydn_native"], bool)
+    assert isinstance(payload["rayd_native"], bool)
     assert payload["accumulation_strategy"] == "atomic_add"
     assert "performance_budget_ms" not in payload
 

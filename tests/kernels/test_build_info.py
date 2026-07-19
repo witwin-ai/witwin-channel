@@ -12,7 +12,7 @@ def test_build_info_contract():
 
     assert info["backend"] == "channel-native"
     assert info["uses_dr_jit"] is False
-    assert isinstance(info["uses_raydn_native"], bool)
+    assert isinstance(info["uses_rayd_native"], bool)
     assert isinstance(info["uses_path_native"], bool)
     assert isinstance(info["cuda_available"], bool)
     assert isinstance(info["optix_available"], bool)
@@ -20,16 +20,16 @@ def test_build_info_contract():
     assert len(info["channel_native_git_sha"]) == 40
     assert isinstance(info["channel_native_git_dirty"], bool)
     assert info["rayd_repository_url"] == "https://github.com/Asixa/RayD.git"
-    assert info["rayd_commit"] == "408a086f392c9400e1ea6deaabf32dc907f5fa26"
+    assert info["rayd_commit"] == "adf0ea2d1481f7548c5ef30c31b4adbaf831f963"
     assert isinstance(info["rayd_dirty"], bool)
     assert info["rayd_integration_abi_kind"] == "source-header-sha256"
     assert (
         info["rayd_integration_abi_path"]
-        == "backends/torch/include/rayd/torch/integration.h"
+        == "backends/torch/include/rayd/torch/integration_v2.h"
     )
     assert (
         info["rayd_integration_abi_sha256"]
-        == "fa50bb457abd1a2c45f3d2e710c573a9e9b6f7df04adfa4d36f6e6fdcafbef56"
+        == "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928"
     )
     assert isinstance(info["torch_version"], str) and info["torch_version"]
     assert isinstance(info["cuda_version"], str) and info["cuda_version"]

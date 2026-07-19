@@ -11,13 +11,13 @@ from witwin.channel_native.propagation.geometry import (
 )
 
 
-class _Raydn:
+class _Rayd:
     available = True
 
     def __init__(self, events):
         self.events = events
 
-    def require_handle(self):
+    def require_resource(self):
         self.events.append("handle")
         return 41
 
@@ -48,9 +48,9 @@ def test_transmission_fake_march_preserves_events_guards_offsets_and_padding(
     monkeypatch,
 ):
     events: list[str] = []
-    raydn = _Raydn(events)
+    rayd = _Rayd(events)
     compiled = SimpleNamespace(
-        raydn=raydn,
+        rayd=rayd,
         assignments=SimpleNamespace(
             face_material_id=torch.tensor([0, 1], dtype=torch.int64)
         ),

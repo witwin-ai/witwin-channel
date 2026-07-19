@@ -244,21 +244,21 @@ pybind11::dict cn_path_filter_block(
 }
 
 pybind11::dict cn_path_diffraction_block(
-    pybind11::sequence raydn_output,
+    pybind11::sequence rayd_output,
     int64_t tx_index) {
-    TORCH_CHECK(pybind11::len(raydn_output) == 18, "RayDN diffraction path output must contain 18 tensors");
+    TORCH_CHECK(pybind11::len(rayd_output) == 18, "RayD diffraction path output must contain 18 tensors");
     return path_block_dict(cn_path_diffraction_block_cuda(
-        raydn_output[1].cast<at::Tensor>(),
-        raydn_output[3].cast<at::Tensor>(),
-        raydn_output[4].cast<at::Tensor>(),
-        raydn_output[5].cast<at::Tensor>(),
-        raydn_output[8].cast<at::Tensor>(),
-        raydn_output[9].cast<at::Tensor>(),
-        raydn_output[10].cast<at::Tensor>(),
-        raydn_output[11].cast<at::Tensor>(),
-        raydn_output[12].cast<at::Tensor>(),
-        raydn_output[13].cast<at::Tensor>(),
-        raydn_output[14].cast<at::Tensor>(),
+        rayd_output[1].cast<at::Tensor>(),
+        rayd_output[3].cast<at::Tensor>(),
+        rayd_output[4].cast<at::Tensor>(),
+        rayd_output[5].cast<at::Tensor>(),
+        rayd_output[8].cast<at::Tensor>(),
+        rayd_output[9].cast<at::Tensor>(),
+        rayd_output[10].cast<at::Tensor>(),
+        rayd_output[11].cast<at::Tensor>(),
+        rayd_output[12].cast<at::Tensor>(),
+        rayd_output[13].cast<at::Tensor>(),
+        rayd_output[14].cast<at::Tensor>(),
         tx_index));
 }
 

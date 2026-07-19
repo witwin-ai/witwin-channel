@@ -81,8 +81,8 @@ def test_path_and_deterministic_share_complex_field_geometry_and_delay(
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for Phase B analytic acceptance")
-    if components != {"los"} and not build_info()["uses_raydn_native"]:
-        pytest.skip(f"RayDN native capability is required for {name}")
+    if components != {"los"} and not build_info()["uses_rayd_native"]:
+        pytest.skip(f"RayD native capability is required for {name}")
 
     scene = scene_factory()
     path = solve_paths(scene, PathConfig(components=components, max_depth=max_depth))
@@ -197,8 +197,8 @@ def test_monte_carlo_supported_scenarios_are_finite_and_reference_bounded(
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for Phase B Monte Carlo acceptance")
-    if components != {"los"} and not build_info()["uses_raydn_native"]:
-        pytest.skip(f"RayDN native capability is required for {name}")
+    if components != {"los"} and not build_info()["uses_rayd_native"]:
+        pytest.skip(f"RayD native capability is required for {name}")
 
     point_scene = _single_point_scene(scene_factory())
     solve_scene = _single_cell_grid_scene(point_scene) if use_grid else point_scene

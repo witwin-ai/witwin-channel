@@ -57,7 +57,7 @@ REQUIRED_METADATA_FIELDS = (
     "shared_memory_bytes",
     "occupancy_estimate",
     "spill_bytes",
-    "raydn_native",
+    "rayd_native",
     "ad_status",
 )
 
@@ -77,7 +77,7 @@ def make_metadata(
     shared_memory_bytes: int = 0,
     occupancy_estimate: float = 0.0,
     spill_bytes: int = 0,
-    raydn_native: bool = False,
+    rayd_native: bool = False,
     ad_status: str = "none",
     forward_time_ms: float = 0.0,
     peak_memory_bytes: int = 0,
@@ -97,7 +97,7 @@ def make_metadata(
         "shared_memory_bytes": shared_memory_bytes,
         "occupancy_estimate": occupancy_estimate,
         "spill_bytes": spill_bytes,
-        "raydn_native": raydn_native,
+        "rayd_native": rayd_native,
         "ad_status": ad_status,
         # Wall-clock (CUDA-synchronized) solve duration and the amount the
         # solve raised the process CUDA high-water mark. A jvp solve carries
@@ -167,8 +167,8 @@ def validate_metadata(metadata: Mapping[str, object]) -> None:
     if not isinstance(occupancy, int | float) or occupancy < 0.0:
         raise ValueError("metadata occupancy_estimate must be non-negative")
 
-    if not isinstance(metadata["raydn_native"], bool):
-        raise ValueError("metadata raydn_native must be a boolean")
+    if not isinstance(metadata["rayd_native"], bool):
+        raise ValueError("metadata rayd_native must be a boolean")
 
     for field in ("forward_time_ms", "peak_memory_bytes"):
         value = metadata.get(field, 0)

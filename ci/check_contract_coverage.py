@@ -28,7 +28,7 @@ PYTHON_PACKAGE_PATH = Path("src/witwin/channel_native")
 EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # 174 phase-0 symbols + 5 ADR-010 native scattering/rough-reflection kernels
 # + 2 ADR-013 coupled double-diffraction forward symbols (field_coupled_dd,
-# raydn_coupled_dd_geometry_forward) + their 2 AD companions
+# coupled_dd_geometry_forward) + their 2 AD companions
 # (field_coupled_dd_backward/jvp): 179 -> 183.
 # + 2 ADR-017 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply):
 # 183 -> 185.
@@ -211,7 +211,7 @@ BOOTSTRAP_E2E_SCENARIOS = {
     ),
     "scene-native": (
         "tests/scene/test_rayd_scene_kernels.py::"
-        "test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
     ),
 }
 
@@ -482,9 +482,9 @@ def _initial_native_scenario(name: str) -> str:
         if "los" in name:
             return "path-los"
         return "path-reflection"
-    if name.startswith("raydn_scene_"):
+    if name.startswith("rayd_scene_"):
         return "scene-native"
-    if name.startswith("raydn_"):
+    if name.startswith("rayd_"):
         if "coupled" in name:
             return "path-coupled"
         if "diffraction" in name or "edge" in name:
@@ -570,10 +570,10 @@ def _initial_native_contract(name: str) -> str:
         return "native-bdpt-paths"
     if name.startswith("path_") or name.startswith("core_"):
         return "native-path-topology"
-    if name.startswith("raydn_scene_"):
-        return "native-raydn-scene"
-    if name.startswith("raydn_"):
-        return "native-raydn-geometry"
+    if name.startswith("rayd_scene_"):
+        return "native-rayd-scene"
+    if name.startswith("rayd_"):
+        return "native-rayd-geometry"
     raise ValueError(f"native binding has no runtime contract rule: {name}")
 
 
@@ -705,11 +705,11 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
                 "tests/kernels/test_ops_facade.py::"
                 "test_path_diffraction_block_and_merge_use_native_compaction"
             ),
-            "native-raydn-geometry": (
+            "native-rayd-geometry": (
                 "tests/propagation/geometry/test_kernel_bridge.py::"
                 "test_intersection_returns_the_named_tensor_contract"
             ),
-            "native-raydn-scene": (
+            "native-rayd-scene": (
                 "tests/scene/test_rayd_scene_kernels.py::"
                 "test_scene_create_preserves_native_argument_order"
             ),
@@ -809,14 +809,6 @@ def check_contract_coverage(repo: Path, manifest: dict[str, Any]) -> list[str]:
             "native binding coverage", set(native_entries), set(current_names)
         )
     )
-
-    phase10 = _load_json_object(repo / PHASE10_AUDIT_PATH)
-    phase10_ownership = phase10["binding_ownership"]
-    if (
-        phase10_ownership.get("expected_count") != EXPECTED_NATIVE_BINDING_COUNT
-        or phase10_ownership.get("symbols") != current_names
-    ):
-        issues.append("Phase10 binding ownership audit differs from current bindings")
 
     used_contracts: set[str] = set()
     used_scenarios: set[str] = set()

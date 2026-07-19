@@ -82,8 +82,8 @@ def component_status(
         config.components,
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
-        reflection_error="BDPT reflection requires RayDN native capability",
-        diffraction_error="BDPT diffraction requires RayDN native capability",
+        reflection_error="BDPT reflection requires RayD native capability",
+        diffraction_error="BDPT diffraction requires RayD native capability",
     )
 
 
@@ -134,7 +134,7 @@ def make_solver_metadata(
     effective_max_depth: int,
     ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
-    raydn_component_enabled = (
+    rayd_component_enabled = (
         "reflection" in config.components and reflection_available
     ) or ("diffraction" in config.components and diffraction_available)
     # ADR-022: ad_mode='none' wires no companions and retains no tape (bitwise
@@ -150,13 +150,13 @@ def make_solver_metadata(
         backward_launch_count=backward_launch_count,
         jvp_launch_count=jvp_launch_count,
         tape_bytes=tape_bytes,
-        fused_stages=1 if raydn_component_enabled else 0,
+        fused_stages=1 if rayd_component_enabled else 0,
         intermediate_bytes=int(workspace_bytes),
         accumulation_strategy=_KERNEL_ACCUMULATION[selected_accumulation_strategy],
         scheduling_strategy="native_fused"
-        if raydn_component_enabled
+        if rayd_component_enabled
         else "native_cuda",
-        raydn_native=reflection_available or diffraction_available,
+        rayd_native=reflection_available or diffraction_available,
         ad_status=config.ad_mode if ad_active else "none",
     )
     requested_config = serialize_config(config)
@@ -186,12 +186,12 @@ def make_solver_metadata(
         ),
         "native_capabilities": {
             "cuda": bool(cuda_available),
-            "raydn": bool(reflection_available or diffraction_available),
+            "rayd": bool(reflection_available or diffraction_available),
             "reflection": bool(reflection_available),
             "diffraction": bool(diffraction_available),
             "optix": bool(optix_available),
         },
-        "raydn": {
+        "rayd": {
             "reflection": bool(reflection_available),
             "diffraction": bool(diffraction_available),
         },

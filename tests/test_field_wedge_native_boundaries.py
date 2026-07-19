@@ -13,6 +13,9 @@ KERNEL_ROOT = REPOSITORY_ROOT / "native/channel_native/kernels"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
+MIGRATION_DELTA_PATH = (
+    REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
+)
 
 TRANSLATION_UNITS = {
     "diffraction": KERNEL_ROOT / "field_wedge_ad_diffraction.cu",
@@ -70,11 +73,15 @@ def test_field_wedge_abi_has_one_semantic_translation_unit_owner() -> None:
 
 def test_field_wedge_split_preserves_launch_and_sync_multisets() -> None:
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    migration_delta = json.loads(MIGRATION_DELTA_PATH.read_text(encoding="utf-8"))
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
         if entry["path"] == "native/channel_native/kernels/field_wedge_ad.cu"
     )
+    approved_additions = migration_delta["phase3_current"][
+        "approved_post_phase9_field_wedge_launch_additions"
+    ]
     source_by_owner = {
         owner: path.read_text(encoding="utf-8-sig")
         for owner, path in TRANSLATION_UNITS.items()
@@ -89,12 +96,28 @@ def test_field_wedge_split_preserves_launch_and_sync_multisets() -> None:
     expected_launches = Counter(
         site["kernel"] for site in source_evidence["kernel_launch_sites"]
     )
+    expected_launches.update(
+        {
+            addition["kernel"]: addition["launch_count"]
+            for addition in approved_additions
+        }
+    )
 
     assert actual_launches == expected_launches
     assert sources.count("cudaStreamSynchronize(") == 0
+    expected_launch_counts_by_owner = {
+        "diffraction": 3,
+        "coupled": 2,
+        "project": 2,
+        "prepare": 2,
+    }
+    for addition in approved_additions:
+        expected_launch_counts_by_owner[addition["split_owner"]] += addition[
+            "launch_count"
+        ]
     assert {
         owner: source.count("<<<") for owner, source in source_by_owner.items()
-    } == {"diffraction": 3, "coupled": 2, "project": 2, "prepare": 2}
+    } == expected_launch_counts_by_owner
 
 
 def test_field_wedge_common_and_owner_local_plumbing_are_isolated() -> None:

@@ -10,8 +10,8 @@ from witwin.channel_native.propagation.enumerated.engine import evaluate_enumera
 def test_diffraction_topology_uses_selected_edge_ids():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
     paths, _ = evaluate_enumerated_paths(scene, Config(components={"diffraction"}))

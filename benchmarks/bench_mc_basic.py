@@ -50,7 +50,7 @@ def run_benchmark(*, scene_name: str, samples: int) -> dict[str, Any]:
         "launch_count": kernel["launch_count"],
         "intermediate_bytes": kernel["intermediate_bytes"],
         "output_bytes": _output_bytes(result),
-        "raydn_native": kernel["raydn_native"],
+        "rayd_native": kernel["rayd_native"],
         "accumulation_strategy": kernel["accumulation_strategy"],
     }
 

@@ -70,8 +70,8 @@ def test_topology_supports_explicit_per_pair_max_paths_scope():
 def test_reflection_topology_exports_interaction_metadata():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic topology export")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     paths, _ = evaluate_enumerated_paths(
         same_side_wall_reflection_scene(),

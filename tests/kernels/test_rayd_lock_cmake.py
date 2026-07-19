@@ -110,11 +110,11 @@ def test_rayd_lock_is_machine_readable_and_complete():
     assert lock == {
         "schema_version": 1,
         "repository_url": "https://github.com/Asixa/RayD.git",
-        "commit": "408a086f392c9400e1ea6deaabf32dc907f5fa26",
+        "commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
         "integration_abi": {
             "kind": "source-header-sha256",
-            "path": "backends/torch/include/rayd/torch/integration.h",
-            "sha256": "fa50bb457abd1a2c45f3d2e710c573a9e9b6f7df04adfa4d36f6e6fdcafbef56",
+            "path": "backends/torch/include/rayd/torch/integration_v2.h",
+            "sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
         },
     }
 

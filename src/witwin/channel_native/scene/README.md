@@ -4,8 +4,9 @@
 
 `scene` owns scene/endpoint/structure models, Mitsuba loading, compilation,
 canonical geometry/material/assignment stores, cache invalidation, lazy
-scattering resources, and RayD lifetime. `core.scene` and `core.runtime` are
-identity-preserving compatibility facades only.
+scattering resources, and typed RayD resource lifetime. `core.scene` retains
+the stable public scene identity; the RayD lifecycle owner is exclusively
+`scene.kernels.rayd_scene` and has no compatibility re-export.
 
 ## Public entry points
 
@@ -18,13 +19,14 @@ by `scene.models`. Compile, stores, and kernels are internal.
 
 Scene may depend on runtime resources, material encoding, scattering resource
 types, and narrow topology/geometry primitives needed during compilation. It
-must not import a solver or solver pipeline. Mutable handles/caches remain
-private; propagation topology and geometry kernels may not import scene back.
+must not import a solver or solver pipeline. Typed resources and mutable caches
+remain private; propagation topology and geometry kernels may not import scene
+back.
 
 ## Numerical and AD contract
 
 Compilation and cache invalidation must preserve tensor storage, device,
-ordering, material ABI, geometry identity, and RayD handle lifetime. SI units,
+ordering, material ABI, geometry identity, and RayD resource lifetime. SI units,
 endpoint ordering, face/edge IDs, winding, and UV conventions are contractual.
 Boundary moves may not add copies or launches.
 

@@ -3,7 +3,6 @@ from pathlib import Path
 
 from witwin.channel_native.core.kernels import extension
 from witwin.channel_native.propagation.geometry.kernels import bridge as ops
-from witwin.channel_native.core.runtime import raydn as raydn_runtime
 from witwin.channel_native.runtime import symbols
 from witwin.channel_native.scene.kernels import rayd_scene
 
@@ -29,7 +28,7 @@ def test_rayd_uses_the_validated_fail_loud_native_loader():
 def test_bdpt_visibility_uses_channel_native_bridge():
     source = inspect.getsource(ops.bdpt_visibility_forward)
 
-    assert "_required_raydn_op" not in source
+    assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
     assert "_required_native_op" in source
     assert "bdpt_visibility_forward" in source
@@ -38,17 +37,17 @@ def test_bdpt_visibility_uses_channel_native_bridge():
 def test_bdpt_intersection_uses_channel_native_bridge():
     source = inspect.getsource(ops.bdpt_intersect_forward)
 
-    assert "_required_raydn_op" not in source
+    assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
     assert "_required_native_op" in source
     assert "bdpt_intersect_forward" in source
-    assert "_raydn_module_handle" not in ops.__dict__
+    assert "_rayd_resource" not in ops.__dict__
 
 
 def test_bdpt_reflection_accumulation_uses_channel_native_bridge():
     source = inspect.getsource(ops.bdpt_reflection_accumulation_forward)
 
-    assert "_required_raydn_op" not in source
+    assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
     assert "_required_native_op" in source
     assert "bdpt_reflection_accumulation_forward" in source
@@ -61,18 +60,18 @@ def test_bdpt_diffraction_uses_channel_native_bridge():
         ops.bdpt_diffraction_accumulation_forward,
     ):
         source = inspect.getsource(fn)
-        assert "_required_raydn_op" not in source
+        assert "_required_rayd_op" not in source
         assert "torch.ops" not in source
         assert "_required_native_op" in source
 
 
-def test_raydn_path_exports_use_channel_native_bridge():
+def test_rayd_path_exports_use_channel_native_bridge():
     for fn in (
-        ops.raydn_reflection_epc_paths_forward,
-        ops.raydn_diffraction_paths_order1_forward,
+        ops.rayd_reflection_epc_paths_forward,
+        ops.rayd_diffraction_paths_order1_forward,
     ):
         source = inspect.getsource(fn)
-        assert "_required_raydn_op" not in source
+        assert "_required_rayd_op" not in source
         assert "torch.ops" not in source
         assert "_required_native_op" in source
 
@@ -85,29 +84,25 @@ def test_simplified_coherent_diffraction_grid_api_is_not_public():
     )
 
 
-def test_raydn_scene_builder_uses_channel_native_scene_bridge():
-    assert raydn_runtime.build_scene_from_structures is (
-        rayd_scene.build_scene_from_structures
-    )
-    assert raydn_runtime.RayDNScene is rayd_scene.RayDNScene
+def test_rayd_scene_builder_uses_channel_native_scene_bridge():
     source = inspect.getsource(rayd_scene.build_scene_from_structures)
-    edge_source = inspect.getsource(rayd_scene.RayDNScene.edge_records)
+    edge_source = inspect.getsource(rayd_scene.RayDSceneResource.edge_records)
 
     assert "torch.classes" not in source
-    assert "raydn_backend" not in source
-    assert "raydn_scene_create" in source
-    assert "raydn_scene_edge_records" in edge_source
+    assert "rayd_backend" not in source
+    assert "rayd_scene_create" in source
+    assert "rayd_scene_edge_records" in edge_source
 
 
-def test_production_sources_have_no_raydn_dispatch_or_loader_fallbacks():
+def test_production_sources_have_no_rayd_dispatch_or_loader_fallbacks():
     repo = Path(__file__).resolve().parents[2]
     roots = (
         repo / "src" / "witwin" / "channel_native",
         repo / "native" / "channel_native",
     )
     forbidden = (
-        "torch.ops.raydn",
-        "_required_raydn_op",
+        "torch.ops.rayd",
+        "_required_rayd_op",
         "allow_python_fallback",
         "python_fallback",
         "LoadLibrary",
@@ -219,7 +214,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
         / "channel_native"
         / "montecarlo"
         / "basic"
-        / "raydn_components.py",
+        / "rayd_components.py",
         repo
         / "src"
         / "witwin"
@@ -247,7 +242,7 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
     # Plan 07 AD-3: materials come from the compiled store in BOTH
     # ad_mode="none" and the AD modes (one source, same values); the old
     # host-float flattening cannot carry a gradient and is gone.
-    assert "scene.raydn_scene()" in solve_source
+    assert "scene.rayd_scene()" in solve_source
     assert "_host_material_tensors" not in module_source
     assert "bdpt_face_material_tensors_from_host" not in module_source
     assert "face_material_field_bundle" in module_source
@@ -294,7 +289,7 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
 def test_rayd_bridge_is_source_linked_without_dso_lookup():
     repo = Path(__file__).resolve().parents[2]
     bridge_root = repo / "native" / "channel_native" / "rayd"
-    bridge_paths = [bridge_root / "bridge.h", *sorted(bridge_root.glob("*.cpp"))]
+    bridge_paths = [bridge_root / "resource.h", *sorted(bridge_root.glob("*.cpp"))]
     bridge_source = "\n".join(path.read_text() for path in bridge_paths)
 
     assert "LoadLibrary" not in bridge_source
@@ -302,4 +297,6 @@ def test_rayd_bridge_is_source_linked_without_dso_lookup():
     assert "GetProcAddress" not in bridge_source
     assert "dlsym" not in bridge_source
     assert "module_handle" not in bridge_source
-    assert "rayd_torch_native_scene_create" in bridge_source
+    assert "rayd::torch::create_scene" in bridge_source
+    assert "rayd_torch_native_" not in bridge_source
+    assert not (bridge_root / "bridge.h").exists()

@@ -23,7 +23,8 @@ def _patch_field_stages(monkeypatch, events: list[str]) -> None:
         events.append("los")
         for value, tensor in enumerate(args[8:15], start=1):
             tensor.add_(value)
-        return args[-1] + 1
+        # ``launch_count`` precedes the compiled/taper metadata arguments.
+        return args[15] + 1
 
     def fake_reflection(*args):
         events.append("reflection")

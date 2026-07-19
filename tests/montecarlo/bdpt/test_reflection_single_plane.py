@@ -33,8 +33,8 @@ def _grid() -> ReceiverGrid:
 def test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     result = solve(same_side_wall_reflection_scene().add(_grid()), Config(samples=2048, seed=5, components={"reflection"}))
 
@@ -51,8 +51,8 @@ def test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_avai
 def test_bdpt_point_receiver_reflection_returns_native_component_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT point reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     result = solve(
         same_side_wall_reflection_scene(),
@@ -70,8 +70,8 @@ def test_bdpt_point_receiver_reflection_returns_native_component_when_available(
 def test_bdpt_point_reflection_solver_does_not_use_image_source_path_export():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     assert not hasattr(bdpt_solver, "reflection_paths_order1")
 
@@ -84,8 +84,8 @@ def test_bdpt_point_reflection_solver_does_not_use_image_source_path_export():
 def test_bdpt_grid_reflection_solver_does_not_use_image_source_path_export():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     assert not hasattr(bdpt_solver, "reflection_paths_order1")
 
@@ -107,8 +107,8 @@ def test_bdpt_grid_reflection_solver_does_not_use_image_source_path_export():
 def test_bdpt_single_plane_reflection_converges_to_maintained_reference(samples, relative_tolerance):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection convergence")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     base = same_side_wall_reflection_scene()
     grid = _grid()
@@ -135,8 +135,8 @@ def test_bdpt_point_delta_reflection_uses_unfolded_distance_and_fresnel_bound():
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     scene = same_side_wall_reflection_scene()
     samples = 2048
@@ -174,8 +174,8 @@ def test_bdpt_grid_reflection_map_does_not_change_when_export_paths_enabled():
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     scene = same_side_wall_reflection_scene().add(_grid())
     plain = solve(scene, Config(samples=1024, seed=5, components={"reflection"}))
@@ -190,8 +190,8 @@ def test_bdpt_grid_reflection_map_does_not_change_when_export_paths_enabled():
 def test_bdpt_grid_reflection_map_scales_linearly_with_tx_power():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     config = Config(samples=2048, seed=5, components={"reflection"})
     unit = solve(_scene_with_tx_power(1.0).add(_grid()), config)
@@ -208,8 +208,8 @@ def test_bdpt_grid_reflection_map_scales_linearly_with_tx_power():
 def test_bdpt_point_and_single_cell_grid_reflection_are_identical():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     point_scene = same_side_wall_reflection_scene()
     point = solve(

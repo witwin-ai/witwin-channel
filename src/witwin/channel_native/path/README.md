@@ -55,7 +55,7 @@ import them directly.
 ## Numerical and AD contract
 
 - Solving requires CUDA and channel-native path kernels. Reflection and
-  diffraction additionally require the RayDN-native scene capability.
+  diffraction additionally require the typed RayD-native scene capability.
 - `PathResult.a` has shape
   `(rx, rx_ant, tx, tx_ant, path, time)` and dtype `complex64`.
   Path scalars and Cartesian geometry use `float32`; interaction, primitive,
@@ -93,7 +93,7 @@ import them directly.
 
 ## Forbidden fallback
 
-Missing CUDA, path-native kernels, required native symbols, or requested RayDN
+Missing CUDA, path-native kernels, required native symbols, or requested RayD
 capabilities is a hard error. Do not add CPU/Python/Torch geometry
 recomputation, finite differences, legacy RayD/DrJit dispatch, silent empty
 paths, or reference-oracle execution as a fallback. A legitimately empty scene

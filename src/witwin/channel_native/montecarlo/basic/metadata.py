@@ -24,8 +24,8 @@ def component_status(
         config.components,
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
-        reflection_error="reflection requires RayDN native capability",
-        diffraction_error="diffraction requires RayDN native capability",
+        reflection_error="reflection requires RayD native capability",
+        diffraction_error="diffraction requires RayD native capability",
     )
 
 
@@ -46,7 +46,7 @@ def make_solver_metadata(
     backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
     jvp_launch_count = ledger.launches if config.ad_mode == "jvp" else 0
     tape_bytes = ledger.tape_bytes if config.ad_mode == "vjp" else 0
-    raydn_component_enabled = (
+    rayd_component_enabled = (
         ("reflection" in config.components and reflection_available)
         or ("diffraction" in config.components and diffraction_available)
     )
@@ -56,10 +56,10 @@ def make_solver_metadata(
         backward_launch_count=backward_launch_count,
         jvp_launch_count=jvp_launch_count,
         tape_bytes=tape_bytes,
-        fused_stages=1 if raydn_component_enabled else 0,
+        fused_stages=1 if rayd_component_enabled else 0,
         accumulation_strategy="atomic_add",
-        scheduling_strategy="native_fused" if raydn_component_enabled else "native_cuda",
-        raydn_native=reflection_available or diffraction_available,
+        scheduling_strategy="native_fused" if rayd_component_enabled else "native_cuda",
+        rayd_native=reflection_available or diffraction_available,
         ad_status=config.ad_mode if config.ad_mode != "none" else "none",
     )
     requested_config = serialize_config(config)
@@ -76,7 +76,7 @@ def make_solver_metadata(
             reflection_available=reflection_available,
             diffraction_available=diffraction_available,
         ),
-        "raydn": {
+        "rayd": {
             "reflection": reflection_available,
             "diffraction": diffraction_available,
         },

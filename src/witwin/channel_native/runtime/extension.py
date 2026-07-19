@@ -28,7 +28,7 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _DEFAULT_BUILD_INFO: dict[str, bool | str] = {
     "backend": "channel-native",
     "uses_dr_jit": False,
-    "uses_raydn_native": False,
+    "uses_rayd_native": False,
     "rayd_integration": "unavailable",
     "uses_path_native": False,
     "cuda_available": False,
@@ -193,7 +193,7 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
     )
     boolean_fields = (
         "uses_dr_jit",
-        "uses_raydn_native",
+        "uses_rayd_native",
         "uses_path_native",
         "cuda_available",
         "optix_available",

@@ -18,7 +18,7 @@ def test_deterministic_metadata_reports_effective_component_depths():
     metadata = deterministic_metadata(
         config=DeterministicConfig(max_depth=3, components={"los", "reflection"}),
         native_info={
-            "uses_raydn_native": True,
+            "uses_rayd_native": True,
             "uses_path_native": True,
             "cuda_available": True,
             "optix_available": True,
@@ -84,9 +84,9 @@ def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
     )
 
     def fail_scene_build():
-        raise AssertionError("raydn_scene must not run for invalid receiver config")
+        raise AssertionError("rayd_scene must not run for invalid receiver config")
 
-    scene = SimpleNamespace(receivers=[grid], raydn_scene=fail_scene_build)
+    scene = SimpleNamespace(receivers=[grid], rayd_scene=fail_scene_build)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
 
     with pytest.raises(RuntimeError, match="requires point receivers"):

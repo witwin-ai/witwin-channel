@@ -35,8 +35,8 @@ def test_basic_solver_los_smoke_returns_cuda_result():
 def test_basic_point_receiver_los_is_occluded_by_wall():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native visibility is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native visibility is not built")
 
     from tests.support.scenes import single_wall_reflection_scene
 
@@ -48,24 +48,24 @@ def test_basic_point_receiver_los_is_occluded_by_wall():
     assert result.component_power["los"].item() == 0.0
 
 
-def test_basic_solver_does_not_import_python_raydn():
+def test_basic_solver_does_not_import_python_rayd():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
 
-    sys.modules.pop("raydn", None)
+    sys.modules.pop("rayd", None)
 
     solve(_empty_space_scene(), Config(samples=16, components={"los"}))
 
-    assert "raydn" not in sys.modules
+    assert "rayd" not in sys.modules
 
 
 def test_basic_solver_reflection_component_requires_native_capability():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic solver")
 
-    if build_info()["uses_raydn_native"]:
+    if build_info()["uses_rayd_native"]:
         result = solve(_empty_space_scene(), Config(components={"reflection"}))
         assert result.metadata["components"]["reflection"] == "enabled"
     else:
-        with pytest.raises(RuntimeError, match="reflection.*RayDN"):
+        with pytest.raises(RuntimeError, match="reflection.*RayD"):
             solve(_empty_space_scene(), Config(components={"reflection"}))

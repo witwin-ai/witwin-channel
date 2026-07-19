@@ -59,7 +59,7 @@ def test_bdpt_config_accepts_adr022_ad_modes(ad_mode):
     from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
     from witwin.channel_native.montecarlo.bdpt.metadata import make_solver_metadata
 
-    # components={"los"} keeps the metadata assembly free of a RayDN capability
+    # components={"los"} keeps the metadata assembly free of a RayD capability
     # requirement so this stays a pure config/metadata contract check.
     config = Config(ad_mode=ad_mode, components={"los"})
     assert config.ad_mode == ad_mode

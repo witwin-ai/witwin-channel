@@ -33,7 +33,7 @@
           "name": "Scene",
           "kind": "class",
           "target": "witwin.channel_native.core.scene.Scene",
-          "contract_sha256": "b8f0e941fd94308145c09e443ef45680dfb1f25022b20bf0dce5941a9e3e626d"
+          "contract_sha256": "90db0e5b4902936caa7dae21f5e93971ee018449942b614e949b5069ecd6d042"
         },
         {
           "name": "Structure",

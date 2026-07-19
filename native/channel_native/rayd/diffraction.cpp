@@ -1,11 +1,21 @@
-#include "bridge.h"
+#include "resource.h"
 #include "../path_block.h"
 #include "../tensor_checks.h"
 
-#include <array>
 #include <cstdint>
-#include <stdexcept>
 #include <vector>
+
+extern "C" void channel_native_diffraction_discover_edges(
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, at::Tensor *);
+extern "C" void channel_native_diffraction_discover_edges_counted(
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    const at::Tensor *, const at::Tensor *, const at::Tensor *, const at::Tensor *,
+    at::Tensor *);
 
 std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
     at::Tensor selected,
@@ -53,11 +63,26 @@ namespace {
 
 using channel_native::check_flat_tensor;
 using channel_native::check_vec3_table;
-using channel_native::rayd_bridge::optional_tensor;
-using channel_native::rayd_bridge::raydn_diffraction_accumulation_forward_fn;
-using channel_native::rayd_bridge::raydn_diffraction_discover_edges_counted_fn;
-using channel_native::rayd_bridge::raydn_diffraction_discover_edges_fn;
-using channel_native::rayd_bridge::raydn_diffraction_paths_order1_forward_fn;
+
+pybind11::tuple diffraction_path_tuple(const rayd::torch::DiffractionPathResult &result) {
+    return pybind11::make_tuple(
+        result.count, result.valid, result.tx_id, result.rx_id, result.order,
+        result.edge0, result.edge1, result.edge2, result.delay,
+        result.field_x_re, result.field_x_im, result.field_y_re, result.field_y_im,
+        result.field_z_re, result.field_z_im, result.p0, result.p1, result.p2);
+}
+
+pybind11::tuple diffraction_accumulation_tuple(
+    const rayd::torch::DiffractionAccumulationResult &result) {
+    return pybind11::make_tuple(
+        result.power, result.field_x_re, result.field_x_im, result.field_y_re,
+        result.field_y_im, result.field_z_re, result.field_z_im,
+        result.direct_count, result.keller_count, result.suffix_count,
+        result.visibility_rejects, result.edge_visibility_rejects,
+        result.utd_rejects, result.edge_uses, result.tape_active,
+        result.tape_state_idx, result.tape_cell, result.tape_material_idx,
+        result.tape_edge_u);
+}
 
 }  // namespace
 
@@ -78,7 +103,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges(
     torch::Tensor edge_line_max,
     torch::Tensor edge_adjacent_face1) {
     at::Tensor out;
-    raydn_diffraction_discover_edges_fn()(
+    channel_native_diffraction_discover_edges(
         &tx_pos,
         &ray_dir,
         &prim_index,
@@ -116,7 +141,7 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
     torch::Tensor edge_line_max,
     torch::Tensor edge_adjacent_face1) {
     at::Tensor out;
-    raydn_diffraction_discover_edges_counted_fn()(
+    channel_native_diffraction_discover_edges_counted(
         &tx_pos,
         &ray_dir,
         &prim_index,
@@ -137,8 +162,8 @@ torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
     return out;
 }
 
-pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
+    RayDSceneResource &scene,
     torch::Tensor tx_pos,
     torch::Tensor tx_pol,
     torch::Tensor rx_pos,
@@ -164,54 +189,32 @@ pybind11::tuple cn_raydn_diffraction_paths_order1_forward(
     int64_t capacity,
     double wavelength,
     double isb_taper_width_scale) {
-    at::Tensor active_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
     // tx_pol is the scene transmitter polarization threaded from the caller
     // (R5 fix). The RayD UTD op consumes it as the incident field basis.
     TORCH_CHECK(
         tx_pol.sizes() == tx_pos.sizes(),
         "tx_pol must match tx_pos shape (N, 3)");
-    constexpr int64_t kOutputCount = 18;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_diffraction_paths_order1_forward_fn()(
-        scene_handle,
-        &tx_pos,
-        &tx_pol,
-        &rx_pos,
-        active_ptr,
-        &state_edge_index,
-        &state_edge_pos,
-        &state_edge_dir,
-        &state_edge_t_min,
-        &state_edge_t_max,
-        &state_n0,
-        &state_n1,
-        &state_prim0,
-        &state_prim1,
-        &state_exterior_angle,
-        &state_src,
-        &state_src_power,
-        &material_eta_r,
-        &material_sigma,
-        &material_mu_r,
-        &material_gain,
-        &material_valid,
+    rayd::torch::DiffractionPathConfig config{
+        tx_pos,
+        tx_pol,
+        rx_pos,
+        optional_tensor(active),
+        {state_edge_index, state_edge_pos, state_edge_dir, state_edge_t_min,
+         state_edge_t_max, state_n0, state_n1, state_prim0, state_prim1,
+         state_exterior_angle, state_src, state_src_power, std::nullopt,
+         std::nullopt},
+        {material_eta_r, material_sigma, material_mu_r, material_gain,
+         material_valid},
         state_limit,
         capacity,
         wavelength,
-        isb_taper_width_scale,
-        outputs.data(),
-        kOutputCount);
-    if (output_count < 0 || output_count > kOutputCount)
-        throw std::runtime_error("RayDN diffraction order-1 path export returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+        isb_taper_width_scale};
+    return diffraction_path_tuple(
+        rayd::torch::diffraction_paths_order1_forward(scene.resource(), config));
 }
 
 pybind11::dict cn_path_diffraction_paths_order1(
-    int64_t scene_handle,
+    RayDSceneResource &scene,
     torch::Tensor tx_positions,
     torch::Tensor tx_polarizations,
     torch::Tensor tx_power,
@@ -290,7 +293,6 @@ pybind11::dict cn_path_diffraction_paths_order1(
     PathBlockLists blocks;
     blocks.reserve(static_cast<size_t>(tx_count));
 
-    constexpr int64_t kOutputCount = 18;
     for (int64_t tx_index = 0; tx_index < tx_count; ++tx_index) {
         at::Tensor tx = tx_positions.select(0, tx_index);
         std::vector<at::Tensor> states = cn_deterministic_diffraction_state_pack_selected_cuda(
@@ -315,54 +317,39 @@ pybind11::dict cn_path_diffraction_paths_order1(
         at::Tensor tx_pol = tx_polarizations.narrow(0, tx_index, 1);
         const int64_t state_limit = states[0].size(0);
         const int64_t capacity = rx_positions.size(0) * state_limit;
-        std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-        const int64_t output_count = raydn_diffraction_paths_order1_forward_fn()(
-            scene_handle,
-            &tx_view,
-            &tx_pol,
-            &rx_positions,
+        rayd::torch::DiffractionPathConfig config{
+            tx_view,
+            tx_pol,
+            rx_positions,
             // The packed state table keeps one row per edge; the selection
             // mask must gate the launch so deselected (e.g. merged duplicate)
             // records never emit paths.
-            &selected,
-            &states[0],
-            &states[1],
-            &states[2],
-            &states[3],
-            &states[4],
-            &states[5],
-            &states[6],
-            &states[7],
-            &states[8],
-            &states[9],
-            &states[10],
-            &states[11],
-            &material_eta_r,
-            &material_sigma,
-            &material_mu_r,
-            &material_gain,
-            &material_valid,
+            selected,
+            {states[0], states[1], states[2], states[3], states[4], states[5],
+             states[6], states[7], states[8], states[9], states[10], states[11],
+             std::nullopt, std::nullopt},
+            {material_eta_r, material_sigma, material_mu_r, material_gain,
+             material_valid},
             state_limit,
             capacity,
             wavelength,
             // ADR-017 ISB taper is not wired through this legacy per-tx path
             // table (no live solver caller); pass 0 to keep the hard GO step.
-            0.0,
-            outputs.data(),
-            kOutputCount);
-        TORCH_CHECK(output_count == kOutputCount, "RayDN order-1 diffraction path export returned an unexpected output count");
+            0.0};
+        const rayd::torch::DiffractionPathResult output =
+            rayd::torch::diffraction_paths_order1_forward(scene.resource(), config);
         PathBlockTuple block = cn_path_diffraction_block_cuda(
-            outputs[1],
-            outputs[3],
-            outputs[4],
-            outputs[5],
-            outputs[8],
-            outputs[9],
-            outputs[10],
-            outputs[11],
-            outputs[12],
-            outputs[13],
-            outputs[14],
+            output.valid,
+            output.rx_id,
+            output.order,
+            output.edge0,
+            output.delay,
+            output.field_x_re,
+            output.field_x_im,
+            output.field_y_re,
+            output.field_y_im,
+            output.field_z_re,
+            output.field_z_im,
             tx_index);
         blocks.append(block);
     }
@@ -384,7 +371,7 @@ pybind11::dict cn_path_diffraction_paths_order1(
 }
 
 pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
-    int64_t scene_handle,
+    RayDSceneResource &scene,
     pybind11::object active,
     torch::Tensor state_edge_index,
     torch::Tensor state_edge_pos,
@@ -436,111 +423,45 @@ pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
     int64_t export_tape,
     pybind11::object sample_state_index,
     pybind11::object sample_edge_weight) {
-    at::Tensor active_storage;
-    at::Tensor state_wi_storage;
-    at::Tensor state_d0_storage;
-    at::Tensor recursive_active_storage;
-    at::Tensor recursive_state_edge_index_storage;
-    at::Tensor recursive_state_edge_pos_storage;
-    at::Tensor recursive_state_edge_dir_storage;
-    at::Tensor recursive_state_edge_t_min_storage;
-    at::Tensor recursive_state_edge_t_max_storage;
-    at::Tensor recursive_state_n0_storage;
-    at::Tensor recursive_state_n1_storage;
-    at::Tensor recursive_state_prim0_storage;
-    at::Tensor recursive_state_prim1_storage;
-    at::Tensor recursive_state_exterior_angle_storage;
-    at::Tensor sample_state_index_storage;
-    at::Tensor sample_edge_weight_storage;
+    std::optional<rayd::torch::RecursiveDiffractionState> recursive_state;
+    if (!recursive_state_edge_index.is_none()) {
+        recursive_state.emplace(rayd::torch::RecursiveDiffractionState{
+            optional_tensor(recursive_active),
+            recursive_state_edge_index.cast<at::Tensor>(),
+            recursive_state_edge_pos.cast<at::Tensor>(),
+            recursive_state_edge_dir.cast<at::Tensor>(),
+            recursive_state_edge_t_min.cast<at::Tensor>(),
+            recursive_state_edge_t_max.cast<at::Tensor>(),
+            recursive_state_n0.cast<at::Tensor>(),
+            recursive_state_n1.cast<at::Tensor>(),
+            recursive_state_prim0.cast<at::Tensor>(),
+            recursive_state_prim1.cast<at::Tensor>(),
+            recursive_state_exterior_angle.cast<at::Tensor>(),
+            recursive_state_limit});
+    }
 
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    const at::Tensor *state_wi_ptr = optional_tensor(std::move(state_wi), state_wi_storage);
-    const at::Tensor *state_d0_ptr = optional_tensor(std::move(state_d0), state_d0_storage);
-    const at::Tensor *recursive_active_ptr = optional_tensor(std::move(recursive_active), recursive_active_storage);
-    const at::Tensor *recursive_state_edge_index_ptr =
-        optional_tensor(std::move(recursive_state_edge_index), recursive_state_edge_index_storage);
-    const at::Tensor *recursive_state_edge_pos_ptr =
-        optional_tensor(std::move(recursive_state_edge_pos), recursive_state_edge_pos_storage);
-    const at::Tensor *recursive_state_edge_dir_ptr =
-        optional_tensor(std::move(recursive_state_edge_dir), recursive_state_edge_dir_storage);
-    const at::Tensor *recursive_state_edge_t_min_ptr =
-        optional_tensor(std::move(recursive_state_edge_t_min), recursive_state_edge_t_min_storage);
-    const at::Tensor *recursive_state_edge_t_max_ptr =
-        optional_tensor(std::move(recursive_state_edge_t_max), recursive_state_edge_t_max_storage);
-    const at::Tensor *recursive_state_n0_ptr = optional_tensor(std::move(recursive_state_n0), recursive_state_n0_storage);
-    const at::Tensor *recursive_state_n1_ptr = optional_tensor(std::move(recursive_state_n1), recursive_state_n1_storage);
-    const at::Tensor *recursive_state_prim0_ptr =
-        optional_tensor(std::move(recursive_state_prim0), recursive_state_prim0_storage);
-    const at::Tensor *recursive_state_prim1_ptr =
-        optional_tensor(std::move(recursive_state_prim1), recursive_state_prim1_storage);
-    const at::Tensor *recursive_state_exterior_angle_ptr =
-        optional_tensor(std::move(recursive_state_exterior_angle), recursive_state_exterior_angle_storage);
-    const at::Tensor *sample_state_index_ptr =
-        optional_tensor(std::move(sample_state_index), sample_state_index_storage);
-    const at::Tensor *sample_edge_weight_ptr =
-        optional_tensor(std::move(sample_edge_weight), sample_edge_weight_storage);
-
-    constexpr int64_t kOutputCount = 19;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_diffraction_accumulation_forward_fn()(
-        scene_handle,
-        active_ptr,
-        &state_edge_index,
-        &state_edge_pos,
-        &state_edge_dir,
-        &state_edge_t_min,
-        &state_edge_t_max,
-        &state_n0,
-        &state_n1,
-        &state_prim0,
-        &state_prim1,
-        &state_exterior_angle,
-        &state_src,
-        &state_src_power,
-        state_wi_ptr,
-        state_d0_ptr,
-        &material_eta_r,
-        &material_sigma,
-        &material_mu_r,
-        &material_gain,
-        &material_valid,
+    rayd::torch::DiffractionAccumulationConfig config{
+        optional_tensor(active),
+        {state_edge_index, state_edge_pos, state_edge_dir, state_edge_t_min,
+         state_edge_t_max, state_n0, state_n1, state_prim0, state_prim1,
+         state_exterior_angle, state_src, state_src_power,
+         optional_tensor(state_wi), optional_tensor(state_d0)},
+        {material_eta_r, material_sigma, material_mu_r, material_gain,
+         material_valid},
         state_limit,
-        grid_axis,
-        grid_position,
-        grid_coord0_min,
-        grid_coord0_max,
-        grid_coord1_min,
-        grid_coord1_max,
-        grid_resolution0,
-        grid_resolution1,
-        grid_cell_area,
+        {grid_axis, grid_position, grid_coord0_min, grid_coord0_max,
+         grid_coord1_min, grid_coord1_max, grid_resolution0, grid_resolution1,
+         grid_cell_area},
         wavelength,
         direct_samples,
         keller_samples,
         suffix_samples,
         seed,
         max_order,
-        recursive_state_limit,
-        recursive_active_ptr,
-        recursive_state_edge_index_ptr,
-        recursive_state_edge_pos_ptr,
-        recursive_state_edge_dir_ptr,
-        recursive_state_edge_t_min_ptr,
-        recursive_state_edge_t_max_ptr,
-        recursive_state_n0_ptr,
-        recursive_state_n1_ptr,
-        recursive_state_prim0_ptr,
-        recursive_state_prim1_ptr,
-        recursive_state_exterior_angle_ptr,
-        export_tape,
-        sample_state_index_ptr,
-        sample_edge_weight_ptr,
-        outputs.data(),
-        kOutputCount);
-    if (output_count < 0 || output_count > kOutputCount)
-        throw std::runtime_error("RayDN diffraction accumulation returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+        std::move(recursive_state),
+        export_tape != 0,
+        optional_tensor(sample_state_index),
+        optional_tensor(sample_edge_weight)};
+    return diffraction_accumulation_tuple(
+        rayd::torch::diffraction_accumulation_forward(scene.resource(), config));
 }

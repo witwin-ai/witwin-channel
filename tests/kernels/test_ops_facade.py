@@ -1054,7 +1054,7 @@ def test_deterministic_sort_order_matches_topology_key_priority():
     torch.testing.assert_close(order, torch.tensor([3, 2, 1, 0], device="cuda", dtype=torch.long))
 
 
-def test_deterministic_diffraction_order1_compact_selects_valid_raydn_rows():
+def test_deterministic_diffraction_order1_compact_selects_valid_rayd_rows():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction compaction")
 
@@ -1967,9 +1967,9 @@ def test_mc_diffraction_state_pack_requires_native_cuda_kernel(monkeypatch):
         )
 
 
-def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
+def test_rayd_diffraction_discover_edges_counted_uses_gpu_hit_count():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN counted diffraction edge discovery")
+        pytest.skip("CUDA is required for RayD counted diffraction edge discovery")
 
     symbols.native_extension()
     tx_pos = torch.tensor([0.0, 0.0, 0.0], device="cuda", dtype=torch.float32)
@@ -2007,7 +2007,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
     line_max = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     face1 = torch.tensor([-1], device="cuda", dtype=torch.int32)
 
-    sliced = geometry_bridge.raydn_diffraction_discover_edges(
+    sliced = geometry_bridge.rayd_diffraction_discover_edges(
         tx_pos,
         ray_dir[:2].contiguous(),
         prim_index[:2].contiguous(),
@@ -2024,7 +2024,7 @@ def test_raydn_diffraction_discover_edges_counted_uses_gpu_hit_count():
         line_max,
         face1,
     )
-    counted = geometry_bridge.raydn_diffraction_discover_edges_counted(
+    counted = geometry_bridge.rayd_diffraction_discover_edges_counted(
         tx_pos,
         ray_dir,
         prim_index,

@@ -6,7 +6,7 @@ import torch
 from witwin.channel_native.propagation.geometry.kernels import bridge as ops
 from witwin.channel_native.propagation.geometry import kernels
 from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.runtime import native_handles, symbols, tensor_contracts
+from witwin.channel_native.runtime import native_resources, symbols, tensor_contracts
 
 
 _CANONICAL_FUNCTION_NAMES = (
@@ -16,25 +16,25 @@ _CANONICAL_FUNCTION_NAMES = (
     "bdpt_intersect_forward",
     "bdpt_reflection_accumulation_forward",
     "bdpt_visibility_forward",
-    "raydn_coupled_rd_geometry_forward",
-    "raydn_diffraction_paths_order1_forward",
-    "raydn_reflection_epc_paths_forward",
-    "raydn_trace_reflections_forward",
+    "coupled_rd_geometry_forward",
+    "rayd_diffraction_paths_order1_forward",
+    "rayd_reflection_epc_paths_forward",
+    "rayd_trace_reflections_forward",
 )
 
 _ALIASES = (
-    ("raydn_visibility_forward", "bdpt_visibility_forward"),
+    ("rayd_visibility_forward", "bdpt_visibility_forward"),
     (
-        "raydn_reflection_accumulation_forward",
+        "rayd_reflection_accumulation_forward",
         "bdpt_reflection_accumulation_forward",
     ),
-    ("raydn_diffraction_discover_edges", "bdpt_diffraction_discover_edges"),
+    ("rayd_diffraction_discover_edges", "bdpt_diffraction_discover_edges"),
     (
-        "raydn_diffraction_discover_edges_counted",
+        "rayd_diffraction_discover_edges_counted",
         "bdpt_diffraction_discover_edges_counted",
     ),
     (
-        "raydn_diffraction_accumulation_forward",
+        "rayd_diffraction_accumulation_forward",
         "bdpt_diffraction_accumulation_forward",
     ),
 )
@@ -50,7 +50,7 @@ def test_geometry_bridge_is_the_single_body_owner(name: str):
 
 
 @pytest.mark.parametrize(("alias", "canonical"), _ALIASES)
-def test_raydn_aliases_remain_same_object(alias: str, canonical: str):
+def test_rayd_aliases_remain_same_object(alias: str, canonical: str):
     owner = getattr(bridge, canonical)
 
     assert getattr(bridge, alias) is owner
@@ -61,8 +61,8 @@ def test_raydn_aliases_remain_same_object(alias: str, canonical: str):
 def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
     assert bridge._required_native_op is symbols.required_symbol
     assert bridge.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
-    assert "_raydn_module_handle" not in bridge.__dict__
-    assert bridge._raydn_scene_handle_id is native_handles._raydn_scene_handle_id
+    assert "_rayd_resource" not in bridge.__dict__
+    assert bridge._rayd_scene_resource is native_resources._rayd_scene_resource
 
 
 def test_intersection_returns_the_named_tensor_contract(
@@ -97,7 +97,10 @@ def test_intersection_returns_the_named_tensor_contract(
     monkeypatch.setattr(bridge, "_required_native_op", required_symbol)
     monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
 
-    result = bridge.bdpt_intersect_forward(17, ray_o, ray_d, ray_tmax, None, flags=5)
+    resource = object()
+    result = bridge.bdpt_intersect_forward(
+        resource, ray_o, ray_d, ray_tmax, None, flags=5
+    )
 
     assert tuple(result) == (
         "t",
@@ -112,4 +115,4 @@ def test_intersection_returns_the_named_tensor_contract(
         "global_prim_id",
     )
     assert all(actual is expected for actual, expected in zip(result.values(), outputs))
-    assert native_calls == [(17, ray_o, ray_d, ray_tmax, None, 5)]
+    assert native_calls == [(resource, ray_o, ray_d, ray_tmax, None, 5)]

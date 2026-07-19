@@ -23,7 +23,7 @@ def _native_single_triangle_scene():
         receivers=[],
         frequency=3.0e9,
     )
-    return scene.raydn_scene()
+    return scene.rayd_scene()
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
@@ -40,7 +40,7 @@ def test_reflection_accumulation_exports_wedge_events_when_requested():
     material_gain = torch.ones((1,), device="cuda", dtype=torch.float32)
     material_valid = torch.ones((1,), device="cuda", dtype=torch.bool)
 
-    out = ops.raydn_reflection_accumulation_forward(
+    out = ops.rayd_reflection_accumulation_forward(
         scene,
         ray_o,
         ray_d,

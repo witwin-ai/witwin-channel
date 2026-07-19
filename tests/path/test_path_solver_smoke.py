@@ -32,8 +32,8 @@ def test_path_solver_reflection_is_capability_gated():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
 
-    if not build_info()["uses_raydn_native"]:
-        with pytest.raises(RuntimeError, match="reflection paths require RayDN native capability"):
+    if not build_info()["uses_rayd_native"]:
+        with pytest.raises(RuntimeError, match="reflection paths require RayD native capability"):
             solve(single_wall_reflection_scene(), Config(components={"reflection"}))
     else:
         result = solve(single_wall_reflection_scene(), Config(components={"reflection"}))
@@ -44,8 +44,8 @@ def test_path_solver_reflection_is_capability_gated():
 def test_path_solver_exports_native_reflection_paths_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}))
 
@@ -58,8 +58,8 @@ def test_path_solver_exports_native_reflection_paths_when_available():
 def test_path_solver_exports_native_diffraction_paths_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     result = solve(wedge_diffraction_scene(), Config(components={"diffraction"}))
 

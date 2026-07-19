@@ -324,32 +324,32 @@ def path_filter_block(
 
 
 def path_diffraction_block(
-    raydn_output: tuple[torch.Tensor, ...],
+    rayd_output: tuple[torch.Tensor, ...],
     *,
     tx_index: int,
 ) -> dict[str, torch.Tensor]:
-    if not isinstance(raydn_output, tuple) or len(raydn_output) != 18:
+    if not isinstance(rayd_output, tuple) or len(rayd_output) != 18:
         raise TypeError(
-            "raydn_output must be the 18-tensor RayDN diffraction path tuple"
+            "rayd_output must be the 18-tensor RayD diffraction path tuple"
         )
     for index in (1, 3, 4, 5):
         validate_cuda_tensor(
-            f"raydn_output[{index}]",
-            raydn_output[index],
+            f"rayd_output[{index}]",
+            rayd_output[index],
             dtype=torch.int32 if index != 1 else torch.bool,
             ndim=1,
         )
     for index in (8, 9, 10, 11, 12, 13, 14):
         validate_cuda_tensor(
-            f"raydn_output[{index}]", raydn_output[index], dtype=torch.float32, ndim=1
+            f"rayd_output[{index}]", rayd_output[index], dtype=torch.float32, ndim=1
         )
-    capacity = raydn_output[1].shape
+    capacity = rayd_output[1].shape
     for index in (3, 4, 5, 8, 9, 10, 11, 12, 13, 14):
-        if raydn_output[index].shape != capacity:
-            raise ValueError("RayDN diffraction path tensors must share capacity")
+        if rayd_output[index].shape != capacity:
+            raise ValueError("RayD diffraction path tensors must share capacity")
     if tx_index < 0:
         raise ValueError("tx_index must be non-negative")
-    out = _required_native_op("path_diffraction_block")(raydn_output, int(tx_index))
+    out = _required_native_op("path_diffraction_block")(rayd_output, int(tx_index))
     if not isinstance(out, dict):
         raise TypeError("_channel_native.path_diffraction_block must return a dict")
     _validate_path_block("path_diffraction_block", out)

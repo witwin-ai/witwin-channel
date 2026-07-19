@@ -16,9 +16,9 @@ def test_path_solver_metadata_reports_counts_and_capabilities():
     validate_metadata(result.metadata["kernel"])
     assert result.metadata["path_count"] == 4
     path_native = build_info()["uses_path_native"]
-    raydn_native = build_info()["uses_raydn_native"]
+    rayd_native = build_info()["uses_rayd_native"]
     assert result.metadata["native_capabilities"]["path_native"] is path_native
-    assert result.metadata["native_capabilities"]["raydn_native"] is raydn_native
+    assert result.metadata["native_capabilities"]["rayd_native"] is rayd_native
     assert result.metadata["components"]["los"] == "enabled"
     assert result.metadata["components"]["reflection"] == "not_requested"
     assert result.metadata["components"]["diffraction"] == "not_requested"

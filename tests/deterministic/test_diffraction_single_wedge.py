@@ -11,8 +11,8 @@ from witwin.channel_native.path import solve as solve_paths
 def test_single_wedge_diffraction_matches_path_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
     result = solve(scene, Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False))
@@ -71,8 +71,8 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     from witwin.channel_native.core.edge_policy import EdgePolicy
 
@@ -99,8 +99,8 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
 def test_diffraction_path_field_export_uses_native_complex_fields():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
     result = solve(scene, Config(components={"diffraction"}, coherent=True, export_paths=True))

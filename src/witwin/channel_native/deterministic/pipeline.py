@@ -212,17 +212,17 @@ def _metadata(
     scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     capability = {
-        "raydn_native": bool(native_info["uses_raydn_native"]),
+        "rayd_native": bool(native_info["uses_rayd_native"]),
         "path_native": bool(native_info.get("uses_path_native", False)),
         "cuda_available": bool(native_info["cuda_available"]),
         "optix_available": bool(native_info["optix_available"]),
     }
     components = component_availability_status(
         config.components,
-        reflection_available=capability["raydn_native"],
-        diffraction_available=capability["raydn_native"],
-        reflection_error="deterministic reflection requires RayDN native capability",
-        diffraction_error="deterministic diffraction requires RayDN native capability",
+        reflection_available=capability["rayd_native"],
+        diffraction_available=capability["rayd_native"],
+        reflection_error="deterministic reflection requires RayD native capability",
+        diffraction_error="deterministic diffraction requires RayD native capability",
     )
     # transmission carries specular wall-penetration paths since wave 2 and
     # scattering carries Kirchhoff rough-surface patch paths since wave 3.
@@ -236,9 +236,9 @@ def _metadata(
         else:
             components[name] = "enabled_no_paths"
     if "transmission" in config.components:
-        if not capability["raydn_native"]:
+        if not capability["rayd_native"]:
             raise RuntimeError(
-                "deterministic transmission requires RayDN native capability"
+                "deterministic transmission requires RayD native capability"
             )
         # Endpoint-connection thin_sheet contract (plan 05 section 4).
         metadata_transmission = {
@@ -247,7 +247,7 @@ def _metadata(
         }
     else:
         metadata_transmission = None
-    raydn_component_enabled = (
+    rayd_component_enabled = (
         components["reflection"] == "enabled" or components["diffraction"] == "enabled"
     )
     requested_config = serialize_config(config)
@@ -284,9 +284,9 @@ def _metadata(
             tape_bytes=ad_tape_bytes if config.ad_mode == "vjp" else 0,
             accumulation_strategy="atomic_add",
             scheduling_strategy="native_fused"
-            if raydn_component_enabled
+            if rayd_component_enabled
             else "native_cuda",
-            raydn_native=capability["raydn_native"],
+            rayd_native=capability["rayd_native"],
             ad_status=config.ad_mode,
             forward_time_ms=forward_time_ms,
             peak_memory_bytes=peak_memory_bytes,
@@ -348,10 +348,10 @@ def solve(scene: Scene, config: Config) -> Result:
 
     native_info = build_info()
     _validate_requested_components(config)
-    if "reflection" in config.components and not native_info["uses_raydn_native"]:
-        raise RuntimeError("deterministic reflection requires RayDN native capability")
-    if "diffraction" in config.components and not native_info["uses_raydn_native"]:
-        raise RuntimeError("deterministic diffraction requires RayDN native capability")
+    if "reflection" in config.components and not native_info["uses_rayd_native"]:
+        raise RuntimeError("deterministic reflection requires RayD native capability")
+    if "diffraction" in config.components and not native_info["uses_rayd_native"]:
+        raise RuntimeError("deterministic diffraction requires RayD native capability")
     has_grid = any(
         receiver.__class__.__name__ == "ReceiverGrid" for receiver in scene.receivers
     )

@@ -51,8 +51,8 @@ _RX = torch.tensor([0.5, 1.0, 0.3])
 
 
 def _require_native() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scattering is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scattering is not built")
 
 
 def _roughness(sigma_h: float = _SIGMA_H) -> Roughness:

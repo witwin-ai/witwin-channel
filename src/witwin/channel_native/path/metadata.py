@@ -23,13 +23,13 @@ def _component_status(
     }
     if "reflection" in config.components:
         if not reflection_available:
-            raise RuntimeError("reflection paths require RayDN native capability")
+            raise RuntimeError("reflection paths require RayD native capability")
         if config.max_depth < 1:
             raise RuntimeError("reflection paths require max_depth >= 1")
         status["reflection"] = "enabled"
     if "diffraction" in config.components:
         if not diffraction_available:
-            raise RuntimeError("diffraction paths require RayDN native capability")
+            raise RuntimeError("diffraction paths require RayD native capability")
         if config.max_depth < 1:
             raise RuntimeError("diffraction paths require max_depth >= 1")
         status["diffraction"] = "enabled"
@@ -81,14 +81,14 @@ def _metadata(
         tape_bytes=ad_tape_bytes if config.ad_mode == "vjp" else 0,
         accumulation_strategy="none",
         scheduling_strategy="native_cuda",
-        raydn_native=reflection_available or diffraction_available,
+        rayd_native=reflection_available or diffraction_available,
         ad_status=config.ad_mode,
         forward_time_ms=forward_time_ms,
         peak_memory_bytes=peak_memory_bytes,
     )
     capability = {
         "path_native": path_native_available,
-        "raydn_native": reflection_available or diffraction_available,
+        "rayd_native": reflection_available or diffraction_available,
         "reflection": reflection_available,
         "diffraction": diffraction_available,
     }

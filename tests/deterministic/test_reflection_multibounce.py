@@ -155,8 +155,8 @@ def two_wall_multibounce_scene() -> Scene:
 def test_two_bounce_reflection_exports_depth_two_fields():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     scene = two_wall_multibounce_scene()
     result = solve(
@@ -272,8 +272,8 @@ def parallel_wall_corridor_scene() -> Scene:
 def test_three_bounce_reflection_mixes_depth_two_and_three_blocks():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     result = solve(
         parallel_wall_corridor_scene(),
@@ -310,8 +310,8 @@ def test_three_bounce_reflection_mixes_depth_two_and_three_blocks():
 def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     original = deterministic_fields.deterministic_reflection_sequence_field
     calls = 0
@@ -341,8 +341,8 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
 def test_two_bounce_reflection_does_not_use_python_product():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     assert not hasattr(topology, "product")
     result = solve(
@@ -356,17 +356,17 @@ def test_two_bounce_reflection_does_not_use_python_product():
     assert bool((result.paths.depth == 2).any())
 
 
-def test_two_bounce_reflection_uses_raydn_epc_path_export(monkeypatch):
+def test_two_bounce_reflection_uses_rayd_epc_path_export(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     from witwin.channel_native.propagation.geometry.kernels import (
         bridge as geometry_bridge,
     )
 
-    original = geometry_bridge.raydn_reflection_epc_paths_forward
+    original = geometry_bridge.rayd_reflection_epc_paths_forward
     calls = {"count": 0}
 
     def counted(*args, **kwargs):
@@ -374,7 +374,7 @@ def test_two_bounce_reflection_uses_raydn_epc_path_export(monkeypatch):
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
-        geometry_bridge, "raydn_reflection_epc_paths_forward", counted
+        geometry_bridge, "rayd_reflection_epc_paths_forward", counted
     )
     result = solve(
         two_wall_multibounce_scene(),
@@ -391,8 +391,8 @@ def test_two_bounce_reflection_uses_raydn_epc_path_export(monkeypatch):
 def test_two_bounce_reflection_respects_max_paths_before_candidate_guardrail():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     face_count = 400
     base = torch.arange(face_count, dtype=torch.float32)
@@ -447,8 +447,8 @@ def test_two_bounce_reflection_respects_max_paths_before_candidate_guardrail():
 def test_two_bounce_reflection_plans_by_surface_groups_before_face_guardrail():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     face_count = 400
     base = torch.arange(face_count, dtype=torch.float32)

@@ -28,7 +28,7 @@ from witwin.channel_native.montecarlo.basic.kernels.maps import (
 from .backend import apply_point_los_visibility, los_path_gain
 from .config import Config
 from .metadata import AdLaunchLedger, make_solver_metadata
-from .raydn_components import (
+from .rayd_components import (
     component_grid_shape,
     diffraction_component_map,
     los_component_map,
@@ -113,7 +113,7 @@ def _face_material_tensors(
 
 def _mc_scattering_component(
     scene: Scene,
-    raydn,
+    rayd,
     grid,
     config: Config,
     *,
@@ -132,7 +132,7 @@ def _mc_scattering_component(
     if scene.structures:
         component_map, stats = scattering_component_map(
             scene,
-            raydn,
+            rayd,
             grid,
             samples=config.samples,
             seed=config.seed,
@@ -171,22 +171,22 @@ def solve_pipeline(
         )
 
     info = build_info_fn()
-    reflection_available = bool(info["uses_raydn_native"])
-    diffraction_available = bool(info["uses_raydn_native"])
-    transmission_available = bool(info["uses_raydn_native"])
-    scattering_available = bool(info["uses_raydn_native"])
+    reflection_available = bool(info["uses_rayd_native"])
+    diffraction_available = bool(info["uses_rayd_native"])
+    transmission_available = bool(info["uses_rayd_native"])
+    scattering_available = bool(info["uses_rayd_native"])
     if "reflection" in config.components and not reflection_available:
-        raise RuntimeError("reflection requires RayDN native capability")
+        raise RuntimeError("reflection requires RayD native capability")
     if "diffraction" in config.components and not diffraction_available:
-        raise RuntimeError("diffraction requires RayDN native capability")
+        raise RuntimeError("diffraction requires RayD native capability")
     if "transmission" in config.components and not transmission_available:
-        raise RuntimeError("transmission requires RayDN native capability")
+        raise RuntimeError("transmission requires RayD native capability")
     if "scattering" in config.components and not scattering_available:
-        raise RuntimeError("scattering requires RayDN native capability")
+        raise RuntimeError("scattering requires RayD native capability")
 
     device = torch.device("cuda")
     make_cuda_generator_fn(config.seed)
-    raydn = scene.raydn_scene()
+    rayd = scene.rayd_scene()
     grid = first_receiver_grid(scene)
     ledger = AdLaunchLedger()
     if "los" in config.components:
@@ -194,7 +194,7 @@ def solve_pipeline(
             scene, device=device, ad=ad, ledger=ledger if ad else None
         )
         if grid is None:
-            los = apply_point_los_visibility(scene, raydn, los, device=device)
+            los = apply_point_los_visibility(scene, rayd, los, device=device)
         path_count = config.samples
         valid_contribution_count = config.samples
     else:
@@ -224,7 +224,7 @@ def solve_pipeline(
         if "los" in config.components:
             component_maps["los"] = los_component_map(
                 scene,
-                raydn,
+                rayd,
                 grid,
                 device=device,
                 los=los,
@@ -251,7 +251,7 @@ def solve_pipeline(
             reflection_ad = ad and "reflection" in config.components
             reflection_result = reflection_component_maps_with_wedges(
                 scene,
-                raydn,
+                rayd,
                 grid,
                 samples=config.samples,
                 max_depth=config.max_depth,
@@ -272,7 +272,7 @@ def solve_pipeline(
                 raise RuntimeError("material tensors are required for native diffraction")
             component_maps["diffraction"] = diffraction_component_map(
                 scene,
-                raydn,
+                rayd,
                 grid,
                 samples=config.samples,
                 seed=config.seed,
@@ -293,7 +293,7 @@ def solve_pipeline(
         if "transmission" in config.components and scene.structures:
             component_maps["transmission"] = transmission_component_map(
                 scene,
-                raydn,
+                rayd,
                 grid,
                 max_depth=config.max_depth,
                 device=device,
@@ -315,7 +315,7 @@ def solve_pipeline(
                 scattering_valid_delta,
             ) = _mc_scattering_component(
                 scene,
-                raydn,
+                rayd,
                 grid,
                 config,
                 device=device,

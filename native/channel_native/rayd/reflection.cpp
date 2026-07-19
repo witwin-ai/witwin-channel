@@ -1,56 +1,24 @@
-#include "bridge.h"
+#include "resource.h"
 
-#include <array>
 #include <cstdint>
 #include <stdexcept>
 
-namespace {
-
-using channel_native::rayd_bridge::optional_tensor;
-using channel_native::rayd_bridge::raydn_reflection_accumulation_forward_fn;
-using channel_native::rayd_bridge::raydn_reflection_epc_paths_backward_fn;
-using channel_native::rayd_bridge::raydn_reflection_epc_paths_forward_fn;
-using channel_native::rayd_bridge::raydn_reflection_epc_paths_jvp_fn;
-using channel_native::rayd_bridge::raydn_scene_face_normals_backward_fn;
-using channel_native::rayd_bridge::raydn_scene_face_normals_jvp_fn;
-using channel_native::rayd_bridge::raydn_trace_reflections_backward_fn;
-using channel_native::rayd_bridge::raydn_trace_reflections_forward_fn;
-using channel_native::rayd_bridge::raydn_trace_reflections_forward_tape_fn;
-using channel_native::rayd_bridge::raydn_trace_reflections_jvp_fn;
-using channel_native::rayd_bridge::tensor_or_none;
-
-}  // namespace
-
-pybind11::tuple cn_raydn_trace_reflections_forward(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_trace_reflections_forward(
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
     int64_t max_bounces) {
-    at::Tensor active_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    constexpr int64_t kOutputCount = 3;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_forward_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        &ray_tmax,
-        active_ptr,
-        max_bounces,
-        outputs.data(),
-        kOutputCount);
-    if (output_count < 0 || output_count > kOutputCount)
-        throw std::runtime_error("RayDN reflection trace returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+    rayd::torch::ReflectionTraceResult out = rayd::torch::trace_reflections_forward(
+        scene.resource(),
+        rayd::torch::ReflectionTraceRequest{
+            {ray_o, ray_d, ray_tmax, optional_tensor(active)}, max_bounces});
+    return pybind11::make_tuple(out.valid, out.t, out.prim_ids);
 }
 
-pybind11::tuple cn_raydn_reflection_epc_paths_forward(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_reflection_epc_paths_forward(
+    RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
     pybind11::object active,
@@ -62,64 +30,56 @@ pybind11::tuple cn_raydn_reflection_epc_paths_forward(
     torch::Tensor surface_group_members,
     int64_t max_bounces,
     int64_t visibility_ignore_mode) {
-    at::Tensor active_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    constexpr int64_t kOutputCount = 6;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_epc_paths_forward_fn()(
-        scene_handle,
-        &source,
-        &receiver,
-        active_ptr,
-        &expected_prim_ids,
-        &direct_plane_points,
-        &direct_plane_normals,
-        &surface_group_id,
-        &surface_group_size,
-        &surface_group_members,
-        max_bounces,
-        visibility_ignore_mode,
-        1.0e-3,
-        outputs.data(),
-        kOutputCount);
-    if (output_count < 0 || output_count > kOutputCount)
-        throw std::runtime_error("RayDN reflection EPC path export returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+    rayd::torch::ReflectionEpcRequest request;
+    request.source = source;
+    request.receiver = receiver;
+    request.active = optional_tensor(active);
+    request.expected_prim_ids = expected_prim_ids;
+    request.direct_plane_points = direct_plane_points;
+    request.direct_plane_normals = direct_plane_normals;
+    request.surface_group_id = surface_group_id;
+    request.surface_group_size = surface_group_size;
+    request.surface_group_members = surface_group_members;
+    request.max_bounces = max_bounces;
+    request.visibility_ignore_mode = visibility_ignore_mode;
+    request.plane_tolerance = 1.0e-3;
+    rayd::torch::ReflectionEpcResult out =
+        rayd::torch::reflection_epc_paths_forward(scene.resource(), request);
+    return pybind11::make_tuple(
+        out.valid,
+        out.path_length,
+        out.resolved_prim_ids,
+        out.surface_group_ids,
+        out.hit_positions,
+        out.normals);
 }
 
-pybind11::tuple cn_raydn_trace_reflections_forward_tape(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_trace_reflections_forward_tape(
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
     int64_t max_bounces) {
-    at::Tensor active_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    constexpr int64_t kOutputCount = 9;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_forward_tape_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        &ray_tmax,
-        active_ptr,
-        max_bounces,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN tape reflection trace returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+    rayd::torch::ReflectionTraceTapeResult out =
+        rayd::torch::trace_reflections_forward_tape(
+            scene.resource(),
+            rayd::torch::ReflectionTraceRequest{
+                {ray_o, ray_d, ray_tmax, optional_tensor(active)}, max_bounces});
+    return pybind11::make_tuple(
+        out.valid,
+        out.t,
+        out.image_sources,
+        out.prim_ids,
+        out.tape_prim_id,
+        out.tape_barycentric,
+        out.tape_hit_points,
+        out.tape_normals,
+        out.active_ctx);
 }
 
-pybind11::tuple cn_raydn_trace_reflections_backward(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_trace_reflections_backward(
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
@@ -131,40 +91,26 @@ pybind11::tuple cn_raydn_trace_reflections_backward(
     torch::Tensor image_sources,
     pybind11::object grad_t,
     pybind11::object grad_image_sources) {
-    at::Tensor active_storage;
-    at::Tensor grad_t_storage;
-    at::Tensor grad_image_sources_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    const at::Tensor *grad_t_ptr = optional_tensor(std::move(grad_t), grad_t_storage);
-    const at::Tensor *grad_image_sources_ptr =
-        optional_tensor(std::move(grad_image_sources), grad_image_sources_storage);
-    constexpr int64_t kOutputCount = 4;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_backward_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        &ray_tmax,
-        active_ptr,
-        &tape_prim_id,
-        &tape_barycentric,
-        &tape_hit_points,
-        &tape_normals,
-        &image_sources,
-        grad_t_ptr,
-        grad_image_sources_ptr,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN reflection backward returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
-    return result;
+    rayd::torch::ReflectionTraceBackwardRequest request;
+    request.rays = {ray_o, ray_d, ray_tmax, optional_tensor(active)};
+    request.tape_prim_id = tape_prim_id;
+    request.tape_barycentric = tape_barycentric;
+    request.tape_hit_points = tape_hit_points;
+    request.tape_normals = tape_normals;
+    request.image_sources = image_sources;
+    request.grad_t = optional_tensor(grad_t);
+    request.grad_image_sources = optional_tensor(grad_image_sources);
+    rayd::torch::ReflectionTraceBackwardResult out =
+        rayd::torch::trace_reflections_backward(scene.resource(), request);
+    return pybind11::make_tuple(
+        tensor_or_none(out.grad_vertices),
+        tensor_or_none(out.grad_ray_o),
+        tensor_or_none(out.grad_ray_d),
+        tensor_or_none(out.grad_ray_tmax));
 }
 
-pybind11::tuple cn_raydn_trace_reflections_jvp(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_trace_reflections_jvp(
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     pybind11::object active,
@@ -176,44 +122,25 @@ pybind11::tuple cn_raydn_trace_reflections_jvp(
     pybind11::object tangent_ray_o,
     pybind11::object tangent_ray_d,
     torch::Tensor image_sources) {
-    at::Tensor active_storage;
-    at::Tensor tangent_vertices_storage;
-    at::Tensor tangent_ray_o_storage;
-    at::Tensor tangent_ray_d_storage;
-    const at::Tensor *active_ptr = optional_tensor(std::move(active), active_storage);
-    const at::Tensor *tangent_vertices_ptr =
-        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
-    const at::Tensor *tangent_ray_o_ptr =
-        optional_tensor(std::move(tangent_ray_o), tangent_ray_o_storage);
-    const at::Tensor *tangent_ray_d_ptr =
-        optional_tensor(std::move(tangent_ray_d), tangent_ray_d_storage);
-    constexpr int64_t kOutputCount = 2;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_trace_reflections_jvp_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        active_ptr,
-        &tape_prim_id,
-        &tape_barycentric,
-        &tape_hit_points,
-        &tape_normals,
-        tangent_vertices_ptr,
-        tangent_ray_o_ptr,
-        tangent_ray_d_ptr,
-        &image_sources,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN reflection jvp returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+    rayd::torch::ReflectionTraceJvpRequest request;
+    request.ray_o = ray_o;
+    request.ray_d = ray_d;
+    request.active = optional_tensor(active);
+    request.tape_prim_id = tape_prim_id;
+    request.tape_barycentric = tape_barycentric;
+    request.tape_hit_points = tape_hit_points;
+    request.tape_normals = tape_normals;
+    request.tangent_vertices = optional_tensor(tangent_vertices);
+    request.tangent_ray_o = optional_tensor(tangent_ray_o);
+    request.tangent_ray_d = optional_tensor(tangent_ray_d);
+    request.image_sources = image_sources;
+    rayd::torch::ReflectionTraceJvpResult out =
+        rayd::torch::trace_reflections_jvp(scene.resource(), request);
+    return pybind11::make_tuple(out.tangent_t, out.tangent_image_sources);
 }
 
-pybind11::tuple cn_raydn_reflection_epc_paths_backward(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_reflection_epc_paths_backward(
+    RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
     torch::Tensor sequence,
@@ -227,44 +154,30 @@ pybind11::tuple cn_raydn_reflection_epc_paths_backward(
     bool need_grad_vertices,
     bool need_grad_source,
     bool need_grad_receiver) {
-    at::Tensor grad_points_storage;
-    at::Tensor grad_normals_storage;
-    at::Tensor grad_path_length_storage;
-    const at::Tensor *grad_points_ptr =
-        optional_tensor(std::move(grad_points), grad_points_storage);
-    const at::Tensor *grad_normals_ptr =
-        optional_tensor(std::move(grad_normals), grad_normals_storage);
-    const at::Tensor *grad_path_length_ptr =
-        optional_tensor(std::move(grad_path_length), grad_path_length_storage);
-    constexpr int64_t kOutputCount = 3;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_epc_paths_backward_fn()(
-        scene_handle,
-        &source,
-        &receiver,
-        &sequence,
-        &plane_points,
-        &plane_normals,
-        &valid,
-        &bounce_count,
-        grad_points_ptr,
-        grad_normals_ptr,
-        grad_path_length_ptr,
-        need_grad_vertices,
-        need_grad_source,
-        need_grad_receiver,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN reflection EPC paths backward returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = tensor_or_none(outputs[static_cast<size_t>(i)]);
-    return result;
+    rayd::torch::ReflectionEpcBackwardRequest request;
+    request.source = source;
+    request.receiver = receiver;
+    request.sequence = sequence;
+    request.plane_points = plane_points;
+    request.plane_normals = plane_normals;
+    request.valid = valid;
+    request.bounce_count = bounce_count;
+    request.grad_points = optional_tensor(grad_points);
+    request.grad_normals = optional_tensor(grad_normals);
+    request.grad_path_length = optional_tensor(grad_path_length);
+    request.need_grad_vertices = need_grad_vertices;
+    request.need_grad_source = need_grad_source;
+    request.need_grad_receiver = need_grad_receiver;
+    rayd::torch::ReflectionEpcBackwardResult out =
+        rayd::torch::reflection_epc_paths_backward(scene.resource(), request);
+    return pybind11::make_tuple(
+        tensor_or_none(out.grad_vertices),
+        tensor_or_none(out.grad_source),
+        tensor_or_none(out.grad_receiver));
 }
 
-pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
-    int64_t scene_handle,
+pybind11::tuple cn_rayd_reflection_epc_paths_jvp(
+    RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
     torch::Tensor sequence,
@@ -275,71 +188,39 @@ pybind11::tuple cn_raydn_reflection_epc_paths_jvp(
     pybind11::object tangent_vertices,
     pybind11::object tangent_source,
     pybind11::object tangent_receiver) {
-    at::Tensor tangent_vertices_storage;
-    at::Tensor tangent_source_storage;
-    at::Tensor tangent_receiver_storage;
-    const at::Tensor *tangent_vertices_ptr =
-        optional_tensor(std::move(tangent_vertices), tangent_vertices_storage);
-    const at::Tensor *tangent_source_ptr =
-        optional_tensor(std::move(tangent_source), tangent_source_storage);
-    const at::Tensor *tangent_receiver_ptr =
-        optional_tensor(std::move(tangent_receiver), tangent_receiver_storage);
-    constexpr int64_t kOutputCount = 3;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_epc_paths_jvp_fn()(
-        scene_handle,
-        &source,
-        &receiver,
-        &sequence,
-        &plane_points,
-        &plane_normals,
-        &valid,
-        &bounce_count,
-        tangent_vertices_ptr,
-        tangent_source_ptr,
-        tangent_receiver_ptr,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN reflection EPC paths jvp returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+    rayd::torch::ReflectionEpcJvpRequest request;
+    request.source = source;
+    request.receiver = receiver;
+    request.sequence = sequence;
+    request.plane_points = plane_points;
+    request.plane_normals = plane_normals;
+    request.valid = valid;
+    request.bounce_count = bounce_count;
+    request.tangent_vertices = optional_tensor(tangent_vertices);
+    request.tangent_source = optional_tensor(tangent_source);
+    request.tangent_receiver = optional_tensor(tangent_receiver);
+    rayd::torch::ReflectionEpcJvpResult out =
+        rayd::torch::reflection_epc_paths_jvp(scene.resource(), request);
+    return pybind11::make_tuple(
+        out.tangent_points, out.tangent_normals, out.tangent_path_length);
 }
 
-at::Tensor cn_raydn_scene_face_normals_backward(
-    int64_t scene_handle,
+at::Tensor cn_rayd_scene_face_normals_backward(
+    RayDSceneResource &scene,
     torch::Tensor grad_face_normals) {
-    constexpr int64_t kOutputCount = 1;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_scene_face_normals_backward_fn()(
-        scene_handle,
-        &grad_face_normals,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN scene face normals backward returned an invalid output count");
-    return outputs[0];
+    return rayd::torch::scene_face_normals_backward(
+        scene.resource(), grad_face_normals);
 }
 
-at::Tensor cn_raydn_scene_face_normals_jvp(
-    int64_t scene_handle,
+at::Tensor cn_rayd_scene_face_normals_jvp(
+    RayDSceneResource &scene,
     torch::Tensor tangent_vertices) {
-    constexpr int64_t kOutputCount = 1;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_scene_face_normals_jvp_fn()(
-        scene_handle,
-        &tangent_vertices,
-        outputs.data(),
-        kOutputCount);
-    if (output_count != kOutputCount)
-        throw std::runtime_error("RayDN scene face normals jvp returned an invalid output count");
-    return outputs[0];
+    return rayd::torch::scene_face_normals_jvp(
+        scene.resource(), tangent_vertices);
 }
 
 pybind11::tuple cn_bdpt_reflection_accumulation_forward(
-    int64_t scene_handle,
+    RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
@@ -407,22 +288,14 @@ pybind11::tuple cn_bdpt_reflection_accumulation_forward(
         accumulation_strategy = 1;
         procedural_sample_count = 0;
     }
-    constexpr int64_t kOutputCount = 18;
-    std::array<at::Tensor, static_cast<size_t>(kOutputCount)> outputs;
-    int64_t output_count = raydn_reflection_accumulation_forward_fn()(
-        scene_handle,
-        &ray_o,
-        &ray_d,
-        &ray_tmax,
-        &active,
-        &tx,
-        &tx_pol,
-        &material_eta_r,
-        &material_sigma,
-        &material_mu_r,
-        &material_gain,
-        &material_valid,
-        max_bounces,
+    rayd::torch::ReflectionAccumulationConfig config;
+    config.rays = {ray_o, ray_d, ray_tmax, active};
+    config.tx = tx;
+    config.tx_pol = tx_pol;
+    config.material = {
+        material_eta_r, material_sigma, material_mu_r, material_gain, material_valid};
+    config.max_bounces = max_bounces;
+    config.grid = {
         grid_axis,
         grid_position,
         grid_coord0_min,
@@ -431,23 +304,37 @@ pybind11::tuple cn_bdpt_reflection_accumulation_forward(
         grid_coord1_max,
         grid_resolution0,
         grid_resolution1,
-        wavelength,
-        solid_angle_per_ray,
-        collect_wedges,
-        collect_wedge_prefixes,
-        wedge_capacity,
-        wedge_sample_stride,
-        accumulation_strategy,
-        compact_min_samples,
-        staged_min_samples_per_cell,
-        procedural_sample_count,
-        streaming_los_enabled,
-        outputs.data(),
-        kOutputCount);
-    if (output_count < 0 || output_count > kOutputCount)
-        throw std::runtime_error("RayDN reflection accumulation returned an invalid output count");
-    pybind11::tuple result(static_cast<size_t>(output_count));
-    for (int64_t i = 0; i < output_count; ++i)
-        result[static_cast<size_t>(i)] = outputs[static_cast<size_t>(i)];
-    return result;
+        0.0};
+    config.wavelength = wavelength;
+    config.solid_angle_per_ray = solid_angle_per_ray;
+    config.collect_wedges = collect_wedges;
+    config.collect_wedge_prefixes = collect_wedge_prefixes;
+    config.wedge_capacity = wedge_capacity;
+    config.wedge_sample_stride = wedge_sample_stride;
+    config.accumulation_strategy = accumulation_strategy;
+    config.compact_min_samples = compact_min_samples;
+    config.staged_min_samples_per_cell = staged_min_samples_per_cell;
+    config.procedural_sample_count = procedural_sample_count;
+    config.include_los = streaming_los_enabled;
+    rayd::torch::ReflectionAccumulationResult out =
+        rayd::torch::reflection_accumulation_forward(scene.resource(), config);
+    return pybind11::make_tuple(
+        out.power,
+        out.field_x_re,
+        out.field_x_im,
+        out.field_y_re,
+        out.field_y_im,
+        out.field_z_re,
+        out.field_z_im,
+        out.reflection_count,
+        out.wedge_count,
+        out.wedge_ray_index,
+        out.wedge_hit,
+        out.wedge_normal,
+        out.wedge_prim_id,
+        out.wedge_direction,
+        out.wedge_source,
+        out.wedge_source_power,
+        out.wedge_initial_direction,
+        out.wedge_bounce_depth);
 }

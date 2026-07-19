@@ -59,7 +59,7 @@ def _reflection_topology_order1(
     )
 
     device = tx_positions.device
-    raydn = compiled.raydn
+    rayd = compiled.rayd
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return _ensure_topology_fields(
             {
@@ -75,12 +75,12 @@ def _reflection_topology_order1(
                 "path_gain": torch.empty((0,), device=device, dtype=torch.float32),
             }
         ), 0
-    if not raydn.available:
+    if not rayd.available:
         raise RuntimeError(
-            "deterministic reflection requires RayDN native scene capability"
+            "deterministic reflection requires RayD native scene capability"
         )
 
-    records = raydn.edge_records()
+    records = rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
     normals = geometry_primitives.deterministic_normalize_vec3(
@@ -118,7 +118,7 @@ def _reflection_topology_order1(
     # every planar facade (not one representative per structure) is covered.
     # The EPC kernel resolves the actual containing triangle per path.
     groups = _cached_coplanar_face_groups(
-        raydn,
+        rayd,
         tri_a,
         normals,
         compiled.geometry.face_surface_id.to(
@@ -147,7 +147,7 @@ def _reflection_topology_order1(
     ) -> torch.Tensor:
         nonlocal launch_count
         chains = _discovered_group_chains(
-            raydn, tx, face_group_id=face_group_id, max_depth=max_depth
+            rayd, tx, face_group_id=face_group_id, max_depth=max_depth
         )
         launch_count += 1
         return chains
@@ -165,7 +165,7 @@ def _reflection_topology_order1(
         epc_inputs = request.epc_inputs
         epc = query_reflection_epc(
             ReflectionEpcQuery(
-                raydn=raydn,
+                rayd=rayd,
                 source=epc_inputs["tx_batch"],
                 receiver=epc_inputs["rx_batch"],
                 active=None,
@@ -247,7 +247,7 @@ def _reflection_topology_order1(
 
 
 def _discovered_group_chains(
-    raydn: object,
+    rayd: object,
     tx: torch.Tensor,
     *,
     face_group_id: torch.Tensor,
@@ -266,8 +266,8 @@ def _discovered_group_chains(
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
     ray_d = mc_sample_directions(ray_count, tx.reshape(1, 3))
     ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
-    out = geometry_bridge.raydn_trace_reflections_forward(
-        raydn.require_handle(),
+    out = geometry_bridge.rayd_trace_reflections_forward(
+        rayd.require_resource(),
         ray_o,
         ray_d,
         ray_tmax,
@@ -298,7 +298,7 @@ def _reflection_topology_multibounce(
     )
 
     device = tx_positions.device
-    raydn = compiled.raydn
+    rayd = compiled.rayd
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return (
             _ensure_topology_fields(
@@ -320,12 +320,12 @@ def _reflection_topology_multibounce(
             0,
             0,
         )
-    if not raydn.available:
+    if not rayd.available:
         raise RuntimeError(
-            "deterministic multibounce reflection requires RayDN native scene capability"
+            "deterministic multibounce reflection requires RayD native scene capability"
         )
 
-    records = raydn.edge_records()
+    records = rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
     normals = geometry_primitives.deterministic_normalize_vec3(
@@ -371,7 +371,7 @@ def _reflection_topology_multibounce(
     # the planning guard, enumerate it exactly; otherwise discover reachable
     # plane chains by tracing rays from the transmitter and validate only
     # those, matching the original discovery-based implementation.
-    groups = _cached_coplanar_face_groups(raydn, tri_a, normals, face_group_source)
+    groups = _cached_coplanar_face_groups(rayd, tri_a, normals, face_group_source)
     group_count = int(groups["group_count"])
     representative_faces = groups["representative_faces"].contiguous()
     surface_group_id = groups["surface_group_id"]
@@ -394,7 +394,7 @@ def _reflection_topology_multibounce(
     ) -> torch.Tensor:
         nonlocal launch_count
         chains = _discovered_group_chains(
-            raydn, tx, face_group_id=face_group_id, max_depth=max_depth
+            rayd, tx, face_group_id=face_group_id, max_depth=max_depth
         )
         launch_count += 1
         return chains
@@ -419,7 +419,7 @@ def _reflection_topology_multibounce(
         epc_inputs = request.epc_inputs
         epc = query_reflection_epc(
             ReflectionEpcQuery(
-                raydn=raydn,
+                rayd=rayd,
                 source=epc_inputs["tx_batch"],
                 receiver=epc_inputs["rx_batch"],
                 active=None,

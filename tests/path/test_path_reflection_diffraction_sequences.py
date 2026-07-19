@@ -12,8 +12,8 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 def _require_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for native diffraction topology")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
 
 def test_single_wedge_sequence_length_and_delay_match_deterministic():
@@ -106,7 +106,7 @@ def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypat
     _require_native()
     monkeypatch.setattr(
         geometry_bridge,
-        "raydn_coupled_rd_geometry_forward",
+        "coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail("coupled kernel launched before guard"),
     )
     config = Config(

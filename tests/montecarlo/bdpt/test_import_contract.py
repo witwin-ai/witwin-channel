@@ -3,7 +3,7 @@ import sys
 
 
 FORBIDDEN_MODULES = (
-    "raydn",
+    "rayd",
     "drjit",
     "mitsuba",
     "sionna",

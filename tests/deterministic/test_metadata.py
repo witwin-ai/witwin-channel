@@ -26,7 +26,7 @@ def test_metadata_reports_deterministic_solver_decisions():
     assert metadata["kernel"]["ad_status"] == "none"
     assert metadata["kernel"]["launch_count"] >= 1
     assert set(metadata["capability"]) >= {
-        "raydn_native",
+        "rayd_native",
         "path_native",
         "cuda_available",
         "optix_available",

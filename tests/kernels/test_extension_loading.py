@@ -22,7 +22,7 @@ def _valid_build_info() -> dict[str, object]:
     info: dict[str, object] = {
         "backend": "channel-native",
         "uses_dr_jit": False,
-        "uses_raydn_native": True,
+        "uses_rayd_native": True,
         "rayd_integration": "source-linked",
         "uses_path_native": True,
         "material_abi_version": 3,
@@ -40,7 +40,7 @@ def _valid_build_info() -> dict[str, object]:
         "rayd_commit": "2" * 40,
         "rayd_integration_abi_sha256": "3" * 64,
         "rayd_integration_abi_kind": "source-header-sha256",
-        "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration.h",
+        "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration_v2.h",
         "rayd_repository_url": "https://example.invalid/RayD.git",
         "torch_version": "2.10.0",
         "build_type": "Release",
@@ -58,7 +58,7 @@ def _configure_identity_checks(monkeypatch: pytest.MonkeyPatch) -> None:
             "commit": "2" * 40,
             "integration_abi": {
                 "kind": "source-header-sha256",
-                "path": "backends/torch/include/rayd/torch/integration.h",
+                "path": "backends/torch/include/rayd/torch/integration_v2.h",
                 "sha256": "3" * 64,
             },
         },

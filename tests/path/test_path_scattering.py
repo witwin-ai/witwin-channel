@@ -22,9 +22,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _require_raydn() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+def _require_rayd() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 def _scene(rms_height_m: float = 0.015) -> Scene:
@@ -56,7 +56,7 @@ def _scattering_mask(result):
 
 
 def test_scattering_paths_export_result():
-    _require_raydn()
+    _require_rayd()
     result = solve(_scene(), _config())
     scattering = _scattering_mask(result)
     count = int(scattering.sum())
@@ -72,7 +72,7 @@ def test_scattering_paths_export_result():
 
 
 def test_scattering_paths_export_contract():
-    _require_raydn()
+    _require_rayd()
     scene = _scene()
     result = solve(scene, _config())
     types = result.interaction_type
@@ -107,7 +107,7 @@ def test_scattering_paths_export_contract():
 
 
 def test_scattering_path_cap_keeps_strongest():
-    _require_raydn()
+    _require_rayd()
     full = solve(_scene(), _config())
     capped = solve(_scene(), _config(scattering_max_paths_per_pair=8))
     full_rows = _scattering_mask(full)
@@ -123,7 +123,7 @@ def test_scattering_path_cap_keeps_strongest():
 
 
 def test_scattering_power_threshold_filters_rows():
-    _require_raydn()
+    _require_rayd()
     full = solve(_scene(), _config())
     full_rows = _scattering_mask(full)
     gains = full.a[full_rows, 0].abs().square()
@@ -136,14 +136,14 @@ def test_scattering_power_threshold_filters_rows():
 
 
 def test_smooth_scene_reports_no_scattering_paths():
-    _require_raydn()
+    _require_rayd()
     result = solve(_scene(0.0), _config())
     assert int(_scattering_mask(result).sum()) == 0
     assert result.metadata["components"]["scattering"] == "enabled_no_paths"
 
 
 def test_out_of_domain_roughness_raises():
-    _require_raydn()
+    _require_rayd()
     wall = rough_wall_structure(
         2.5, rms_height_m=0.008, corr_length_m=0.05, half_size=2.0
     )

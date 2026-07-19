@@ -21,8 +21,8 @@ def _grid() -> ReceiverGrid:
 def test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     result = solve(wedge_diffraction_scene().add(_grid()), Config(samples=512, seed=7, components={"diffraction"}))
 
@@ -39,8 +39,8 @@ def test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_avai
 def test_bdpt_single_wedge_diffraction_does_not_use_path_block_sampler():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     assert not hasattr(bdpt_solver, "bdpt_sample_path_block")
 
@@ -52,8 +52,8 @@ def test_bdpt_single_wedge_diffraction_does_not_use_path_block_sampler():
 def test_bdpt_single_wedge_diffraction_fixed_seed_is_stable():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction reproducibility")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene().add(_grid())
     first = solve(scene, Config(samples=512, seed=7, components={"diffraction"}))
@@ -70,8 +70,8 @@ def test_bdpt_single_wedge_diffraction_fixed_seed_is_stable():
 def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     from witwin.channel_native.deterministic import Config as DeterministicConfig
     from witwin.channel_native.deterministic import solve as deterministic_solve
@@ -109,8 +109,8 @@ def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges():
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     from witwin.channel_native import Scene, Structure, Transmitter
     from witwin.channel_native.core.materials import PerfectConductor
@@ -158,8 +158,8 @@ def test_bdpt_grid_diffraction_is_seed_stable():
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene().add(_grid())
     values = [
@@ -195,8 +195,8 @@ def test_bdpt_diffraction_mis_none_uses_one_unbiased_strategy():
 def test_bdpt_diffraction_point_receiver_returns_native_component_without_path_block_fallback():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     assert not hasattr(bdpt_solver, "bdpt_sample_path_block")
 

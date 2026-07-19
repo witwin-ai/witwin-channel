@@ -1,10 +1,10 @@
 """Scene-leaf plumbing for the plan 07 AD-2 geometry seam.
 
-Topology discovery stays native and detached: RayDN finds the winner (face
+Topology discovery stays native and detached: RayD finds the winner (face
 sequence, validity, visibility) and channel_native freezes it. Geometry
 derivatives under that frozen winner come from RayD's own fixed-winner chain
-companions (``ops.raydn_reflection_epc_paths_ad`` for reflection hit
-geometry, ``ops.raydn_face_normals_ad`` for the transmission wall normals),
+companions (``ops.rayd_reflection_epc_paths_ad`` for reflection hit
+geometry, ``ops.rayd_face_normals_ad`` for the transmission wall normals),
 so no hit geometry is ever re-derived on the torch side. What remains here
 is pure tensor passing: the live scene tensors (mesh vertices, transmitter
 and receiver positions) that anchor the autograd graph the native kernels
@@ -19,7 +19,7 @@ import torch
 def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
     """Live global vertex table matching ``compiled.geometry.vertices``.
 
-    RayDN concatenates structure meshes in scene order, so the live table is
+    RayD concatenates structure meshes in scene order, so the live table is
     the concatenation of the structure vertex tensors. Returning the live
     tensors (rather than the native export) is what lets mesh-vertex
     gradients exist at all.

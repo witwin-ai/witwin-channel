@@ -10,29 +10,28 @@ import weakref
 import pytest
 import torch
 
-from witwin.channel_native.runtime import native_handles as ops
+from witwin.channel_native.runtime import native_resources as ops
 from witwin.channel_native.core import scene as core_scene
 from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled
-from witwin.channel_native.core.runtime import raydn as legacy_raydn
-from witwin.channel_native.runtime import native_handles as runtime_native_handles
+from witwin.channel_native.scene.kernels import rayd_scene as legacy_rayd
+from witwin.channel_native.runtime import native_resources as runtime_native_resources
 from witwin.channel_native.runtime import symbols
-from witwin.channel_native.scene import native_handles as scene_native_handles
 from witwin.channel_native.scene import kernels
 from witwin.channel_native.scene import compiled
 from witwin.channel_native.scene.kernels import rayd_scene
 
 
 _SCENE_KERNEL_NAMES = (
-    "raydn_scene_create",
-    "raydn_scene_edge_records",
+    "rayd_scene_create",
+    "rayd_scene_edge_records",
 )
 
-_RAYDN_LIFECYCLE_AST_DIGESTS = {
-    "RayDNEdgeRecords": "16dd24f8e2a79f43454e4a609d68c608ed64546e5f03ad0d30db4b9580682b50",
-    "RayDNScene": "7d11e7c30592c857b6468cf6a9d8741565295b5dd58d9bf0fc65b5aa79c87b5e",
+_RAYD_LIFECYCLE_AST_DIGESTS = {
+    "RayDEdgeRecords": "a4296830bde075e538eda13f45214ee312002948ef301301308560de7cd0c5e7",
+    "RayDSceneResource": "e883a145c6a9ce177d63a1055e4d189aba5f57e82961bf83df0b72e47a89ac8e",
     "_empty_tensor": "23843cfd3570ca0ed7fc050e97f9cc27c5b24af88ae0cf079bd0d60ea0a609c2",
     "_mesh_flags": "ab687287bfec1c541820f1eb9f115be95a63ecc04d48e6d2e982012e09dbdd7b",
-    "build_scene_from_structures": "eab42344fde4f7b8af977298bb07bb5e32655a87a0c201c2ceb8154fea32f051",
+    "build_scene_from_structures": "b2f83ad9853f9e71789999bf0a21a8213e00eb1cfa4da9c3de4ce98768969560",
 }
 
 
@@ -49,27 +48,27 @@ def _definition_ast_digest(definition: object) -> str:
     return hashlib.sha256(source).hexdigest()
 
 
-def test_raydn_scene_lifecycle_has_one_canonical_owner_and_legacy_identity():
+def test_rayd_scene_lifecycle_has_one_canonical_owner_and_legacy_identity():
     assert (
-        rayd_scene.RayDNScene
-        is legacy_raydn.RayDNScene
-        is core_scene.RayDNScene
-        is compiled.RayDNScene
-        is legacy_compiled.RayDNScene
+        rayd_scene.RayDSceneResource
+        is legacy_rayd.RayDSceneResource
+        is core_scene.RayDSceneResource
+        is compiled.RayDSceneResource
+        is legacy_compiled.RayDSceneResource
     )
-    assert rayd_scene.RayDNEdgeRecords is legacy_raydn.RayDNEdgeRecords
+    assert rayd_scene.RayDEdgeRecords is legacy_rayd.RayDEdgeRecords
     assert rayd_scene.build_scene_from_structures is (
-        legacy_raydn.build_scene_from_structures
+        legacy_rayd.build_scene_from_structures
     )
     assert rayd_scene.build_scene_from_structures is (
         core_scene.build_scene_from_structures
     )
-    assert rayd_scene.RayDNScene.__module__ == legacy_raydn.__name__
-    assert rayd_scene.RayDNEdgeRecords.__module__ == legacy_raydn.__name__
+    assert rayd_scene.RayDSceneResource.__module__ == legacy_rayd.__name__
+    assert rayd_scene.RayDEdgeRecords.__module__ == legacy_rayd.__name__
 
 
-@pytest.mark.parametrize("name, expected", _RAYDN_LIFECYCLE_AST_DIGESTS.items())
-def test_raydn_scene_lifecycle_move_preserves_frozen_definition_ast(
+@pytest.mark.parametrize("name, expected", _RAYD_LIFECYCLE_AST_DIGESTS.items())
+def test_rayd_scene_lifecycle_move_preserves_frozen_definition_ast(
     name: str,
     expected: str,
 ):
@@ -84,30 +83,27 @@ def test_scene_kernel_package_reexports_canonical_owner(name: str):
     assert getattr(kernels, name) is owner
 
 
-def test_scene_handle_normalizer_preserves_all_compatibility_identities():
-    owner = runtime_native_handles._raydn_scene_handle_id
+def test_scene_resource_normalizer_has_one_runtime_owner():
+    owner = runtime_native_resources._rayd_scene_resource
 
-    assert owner.__module__ == runtime_native_handles.__name__
-    assert scene_native_handles._raydn_scene_handle_id is owner
-    assert rayd_scene._raydn_scene_handle_id is owner
-    assert kernels._raydn_scene_handle_id is owner
-    assert ops._raydn_scene_handle_id is owner
+    assert owner.__module__ == runtime_native_resources.__name__
+    assert ops._rayd_scene_resource is owner
 
 
 def test_scene_kernel_uses_canonical_required_symbol():
     assert rayd_scene._required_native_op is symbols.required_symbol
 
 
-def test_raydn_edge_records_preserve_order_cache_identity_and_owner_lifetime(
+def test_rayd_edge_records_preserve_order_cache_identity_and_owner_lifetime(
     monkeypatch: pytest.MonkeyPatch,
 ):
     values = tuple(torch.tensor([index]) for index in range(12))
     packed = torch.tensor([[2.0, 3.0, 4.0]])
-    calls: list[int] = []
+    calls: list[object] = []
     pack_calls: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = []
 
-    def edge_records(handle: int) -> tuple[torch.Tensor, ...]:
-        calls.append(handle)
+    def edge_records(resource: object) -> tuple[torch.Tensor, ...]:
+        calls.append(resource)
         return values
 
     def pack(
@@ -119,23 +115,23 @@ def test_raydn_edge_records_preserve_order_cache_identity_and_owner_lifetime(
         return packed
 
     class Owner:
-        pass
+        available = True
 
     owner = Owner()
     owner_ref = weakref.ref(owner)
-    scene = rayd_scene.RayDNScene(handle=17, owner=owner)
+    scene = rayd_scene.RayDSceneResource(resource=owner)
     del owner
     gc.collect()
     assert owner_ref() is not None
 
-    monkeypatch.setattr(rayd_scene, "raydn_scene_edge_records", edge_records)
+    monkeypatch.setattr(rayd_scene, "rayd_scene_edge_records", edge_records)
     monkeypatch.setattr(rayd_scene, "mc_pack_vec3", pack)
     first = scene.edge_records()
     second = scene.edge_records()
 
     assert second is first
     assert scene.runtime_cache["edge_records"] is first
-    assert calls == [17]
+    assert calls == [owner_ref()]
     assert pack_calls == [(values[2], values[3], values[4])]
     assert (
         first.vertices,
@@ -161,12 +157,13 @@ def test_raydn_edge_records_preserve_order_cache_identity_and_owner_lifetime(
         values[11],
     )
 
+    calls.clear()
     del scene, first, second
     gc.collect()
     assert owner_ref() is None
 
 
-def test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive(
+def test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive(
     monkeypatch: pytest.MonkeyPatch,
 ):
     real_device = torch.device
@@ -185,21 +182,23 @@ def test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive(
         ),
     )
     captured: list[tuple[object, ...]] = []
-    native_owner = object()
+    class NativeResource:
+        available = True
 
-    def create(*args: object) -> tuple[int, object]:
+    native_owner = NativeResource()
+
+    def create(*args: object) -> object:
         captured.append(args)
-        return 23, native_owner
+        return native_owner
 
     monkeypatch.setattr(rayd_scene.torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(rayd_scene.torch, "device", lambda _name: real_device("cpu"))
-    monkeypatch.setattr(rayd_scene, "raydn_scene_create", create)
+    monkeypatch.setattr(rayd_scene, "rayd_scene_create", create)
 
     scene = rayd_scene.build_scene_from_structures(structures)
     vertices, faces, exported_uv, exported_face_uv, left, right, flags = captured[0]
 
-    assert scene.handle == 23
-    assert scene.owner is native_owner
+    assert scene.resource is native_owner
     assert len(captured) == 1
     assert flags == [2, 2]
     assert len(scene.mesh_tensors) == 2
@@ -223,7 +222,7 @@ def test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive(
     assert left[0].shape == right[0].shape == (0, 4)
 
 
-def test_raydn_scene_builder_preserves_unavailable_reasons(
+def test_rayd_scene_builder_preserves_unavailable_reasons(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(rayd_scene.torch.cuda, "is_available", lambda: False)
@@ -238,14 +237,17 @@ def test_raydn_scene_builder_preserves_unavailable_reasons(
 
 def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.MonkeyPatch):
     captured: list[tuple[object, ...]] = []
-    owner = object()
+    class NativeResource:
+        available = True
+
+    owner = NativeResource()
 
     def required_symbol(name: str):
-        assert name == "raydn_scene_create"
+        assert name == "rayd_scene_create"
 
-        def create(*args: object) -> tuple[int, object]:
+        def create(*args: object) -> object:
             captured.append(args)
-            return 7, owner
+            return owner
 
         return create
 
@@ -254,7 +256,7 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
     vertices, faces, uv, face_uv, to_world_left, to_world_right = inputs
     mesh_flags = [3]
 
-    result = rayd_scene.raydn_scene_create(
+    result = rayd_scene.rayd_scene_create(
         vertices,
         faces,
         uv,
@@ -264,7 +266,7 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
         mesh_flags,
     )
 
-    assert result == (7, owner)
+    assert result is owner
     assert captured == [
         (
             vertices,
@@ -278,14 +280,14 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
     ]
 
 
-def test_scene_edge_records_normalizes_handle_and_tuple(
+def test_scene_edge_records_preserves_typed_resource_and_tuple(
     monkeypatch: pytest.MonkeyPatch,
 ):
     record = torch.empty(0)
     calls: list[tuple[object, ...]] = []
 
     def required_symbol(name: str):
-        assert name == "raydn_scene_edge_records"
+        assert name == "rayd_scene_edge_records"
 
         def edge_records(*args: object) -> list[torch.Tensor]:
             calls.append(args)
@@ -293,11 +295,9 @@ def test_scene_edge_records_normalizes_handle_and_tuple(
 
         return edge_records
 
-    class Handle:
-        def handle(self) -> int:
-            return 11
+    resource = object()
 
     monkeypatch.setattr(rayd_scene, "_required_native_op", required_symbol)
 
-    assert rayd_scene.raydn_scene_edge_records(Handle()) == (record,)
-    assert calls == [(11,)]
+    assert rayd_scene.rayd_scene_edge_records(resource) == (record,)
+    assert calls == [(resource,)]

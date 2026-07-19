@@ -10,8 +10,8 @@ from witwin.channel_native.montecarlo.bdpt import Config, solve
 def test_bdpt_exports_coupled_paths_with_bidirectional_discrete_mass():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for coupled BDPT")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native coupling is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native coupling is not built")
 
     result = solve(
         coupled_wall_wedge_scene(),

@@ -20,17 +20,17 @@ def _fake_coupled_inputs(monkeypatch):
     handle = object()
     handle_calls: list[object] = []
 
-    def require_handle():
+    def require_resource():
         handle_calls.append(handle)
         return handle
 
-    raydn = SimpleNamespace(
+    rayd = SimpleNamespace(
         available=True,
         edge_records=lambda: records,
-        require_handle=require_handle,
+        require_resource=require_resource,
     )
     compiled = SimpleNamespace(
-        raydn=raydn,
+        rayd=rayd,
         geometry=SimpleNamespace(face_surface_id=torch.tensor([0])),
         assignments=SimpleNamespace(
             face_material_id=torch.tensor([41], dtype=torch.int32)
@@ -68,7 +68,7 @@ def _fake_coupled_inputs(monkeypatch):
     monkeypatch.setattr(
         coupled,
         "_cached_diffraction_edge_geometry",
-        lambda _raydn: (
+        lambda _rayd: (
             torch.tensor([True, True]),
             edge_position,
             edge_direction,
@@ -170,8 +170,8 @@ def test_consumer_candidate_guard_precedes_handle_and_geometry_launch(monkeypatc
         monkeypatch
     )
     monkeypatch.setattr(
-        compiled.raydn,
-        "require_handle",
+        compiled.rayd,
+        "require_resource",
         lambda: pytest.fail("native handle requested before candidate guard"),
     )
     monkeypatch.setattr(

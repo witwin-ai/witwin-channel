@@ -176,7 +176,7 @@ def transmission_event_probability(
 
 
 def straight_transmission_chains(
-    raydn: Any,
+    rayd: Any,
     origins: torch.Tensor,
     targets: torch.Tensor,
     *,
@@ -215,7 +215,7 @@ def straight_transmission_chains(
         # One host read of a tensor frequency for the whole march; every
         # per-wall em_layer_stack_ad below reuses this scalar (audit M3).
         frequency_value = _ad_frequency_value(frequency_hz)
-    handle = raydn.require_handle()
+    handle = rayd.require_resource()
     delta = targets - origins
     distance = delta.norm(dim=-1)
     direction = (delta / distance.clamp_min(_MIN_EPSILON_M)[:, None]).contiguous()

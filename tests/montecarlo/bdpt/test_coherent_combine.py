@@ -56,8 +56,8 @@ def _diffraction(result) -> torch.Tensor:
 def _skip_unless_native() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT coherent combine")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
 
 # --- config-level (no CUDA) -------------------------------------------------

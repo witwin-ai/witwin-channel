@@ -76,8 +76,8 @@ _SAMPLES = 8192
 
 
 def _require_native() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction/scattering is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction/scattering is not built")
 
 
 # ---------------------------------------------------------------------------

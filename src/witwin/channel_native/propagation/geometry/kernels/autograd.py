@@ -15,17 +15,17 @@ from witwin.channel_native.runtime.autograd_contracts import (
 )
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel_native.runtime.native_handles import _raydn_scene_handle_id
+from witwin.channel_native.runtime.native_resources import _rayd_scene_resource
 
 from .bridge import _BDPT_INTERSECTION_FIELDS
 from .primitives import deterministic_normalize_vec3
 
 
-_RAYDN_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
+_RAYD_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
 
 
-def raydn_intersect_backward(
-    handle: object,
+def rayd_intersect_backward(
+    scene_resource: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     ray_tmax: torch.Tensor,
@@ -72,8 +72,8 @@ def raydn_intersect_backward(
     _ad_check_optional_grad("grad_geo_n", grad_geo_n, ((rows, 3),))
     _ad_check_optional_grad("grad_uv", grad_uv, ((rows, 2),))
     _ad_check_optional_grad("grad_barycentric", grad_barycentric, ((rows, 3),))
-    out = _required_native_op("raydn_intersect_backward")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_intersect_backward")(
+        _rayd_scene_resource(scene_resource),
         ray_o,
         ray_d,
         ray_tmax,
@@ -93,13 +93,13 @@ def raydn_intersect_backward(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
         raise TypeError(
-            "_channel_native.raydn_intersect_backward must return 4 gradients"
+            "_channel_native.rayd_intersect_backward must return 4 gradients"
         )
     return tuple(out)
 
 
-def raydn_intersect_jvp(
-    handle: object,
+def rayd_intersect_jvp(
+    scene_resource: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     active: torch.Tensor | None,
@@ -109,7 +109,7 @@ def raydn_intersect_jvp(
     tangent_vertices: torch.Tensor | None = None,
     tangent_ray_o: torch.Tensor | None = None,
     tangent_ray_d: torch.Tensor | None = None,
-    flags: int = _RAYDN_RAY_FLAGS_ALL,
+    flags: int = _RAYD_RAY_FLAGS_ALL,
 ) -> tuple[torch.Tensor, ...]:
     validate_cuda_tensor(
         "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -134,8 +134,8 @@ def raydn_intersect_jvp(
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     _ad_check_tangent_vec3("tangent_ray_o", tangent_ray_o, rows)
     _ad_check_tangent_vec3("tangent_ray_d", tangent_ray_d, rows)
-    out = _required_native_op("raydn_intersect_jvp")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_intersect_jvp")(
+        _rayd_scene_resource(scene_resource),
         ray_o,
         ray_d,
         active,
@@ -147,28 +147,28 @@ def raydn_intersect_jvp(
         int(flags),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 6:
-        raise TypeError("_channel_native.raydn_intersect_jvp must return 6 tangents")
+        raise TypeError("_channel_native.rayd_intersect_jvp must return 6 tangents")
     return tuple(out)
 
 
-def raydn_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, ...]:
+def rayd_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
-            "raydn_trace_reflections_forward_tape requires a RayDN scene handle"
+            "rayd_trace_reflections_forward_tape requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_trace_reflections_forward_tape")(
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
+    out = _required_native_op("rayd_trace_reflections_forward_tape")(
         *native_args,
     )
     if not isinstance(out, (tuple, list)) or len(out) != 9:
         raise TypeError(
-            "_channel_native.raydn_trace_reflections_forward_tape must return 9 tensors"
+            "_channel_native.rayd_trace_reflections_forward_tape must return 9 tensors"
         )
     return tuple(out)
 
 
-def raydn_trace_reflections_backward(
-    handle: object,
+def rayd_trace_reflections_backward(
+    scene_resource: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     ray_tmax: torch.Tensor,
@@ -232,8 +232,8 @@ def raydn_trace_reflections_backward(
     _ad_check_optional_grad(
         "grad_image_sources", grad_image_sources, ((rows, bounces, 3),)
     )
-    out = _required_native_op("raydn_trace_reflections_backward")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_trace_reflections_backward")(
+        _rayd_scene_resource(scene_resource),
         ray_o,
         ray_d,
         ray_tmax,
@@ -248,13 +248,13 @@ def raydn_trace_reflections_backward(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
         raise TypeError(
-            "_channel_native.raydn_trace_reflections_backward must return 4 gradients"
+            "_channel_native.rayd_trace_reflections_backward must return 4 gradients"
         )
     return tuple(out)
 
 
-def raydn_trace_reflections_jvp(
-    handle: object,
+def rayd_trace_reflections_jvp(
+    scene_resource: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     active: torch.Tensor | None,
@@ -314,8 +314,8 @@ def raydn_trace_reflections_jvp(
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     _ad_check_tangent_vec3("tangent_ray_o", tangent_ray_o, rows)
     _ad_check_tangent_vec3("tangent_ray_d", tangent_ray_d, rows)
-    out = _required_native_op("raydn_trace_reflections_jvp")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_trace_reflections_jvp")(
+        _rayd_scene_resource(scene_resource),
         ray_o,
         ray_d,
         active,
@@ -330,36 +330,36 @@ def raydn_trace_reflections_jvp(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 2:
         raise TypeError(
-            "_channel_native.raydn_trace_reflections_jvp must return 2 tangents"
+            "_channel_native.rayd_trace_reflections_jvp must return 2 tangents"
         )
     return tuple(out)
 
 
-class _RaydnIntersectAdFunction(torch.autograd.Function):
-    """Fixed-winner differentiable RayDN intersect over the C bridge.
+class _RaydIntersectAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayD intersect through the direct typed C++ boundary.
 
-    Inputs: (scene_handle, vertices, ray_o, ray_d, ray_tmax, active).
+    Inputs: (scene_resource, vertices, ray_o, ray_d, ray_tmax, active).
     ``vertices`` must be the scene's global vertex table (single-structure
     scenes in AD-A0); the forward reads geometry from the native scene and
     the tensor only routes vertex gradients/tangents.
     """
 
     @staticmethod
-    def forward(scene_handle, vertices, ray_o, ray_d, ray_tmax, active):
+    def forward(scene_resource, vertices, ray_o, ray_d, ray_tmax, active):
         out = _required_native_op("bdpt_intersect_forward")(
-            int(scene_handle),
+            scene_resource,
             ray_o,
             ray_d,
             ray_tmax,
             active,
-            _RAYDN_RAY_FLAGS_ALL,
+            _RAYD_RAY_FLAGS_ALL,
         )
         return tuple(out)
 
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        scene_handle, vertices, ray_o, ray_d, ray_tmax, active = inputs
+        scene_resource, vertices, ray_o, ray_d, ray_tmax, active = inputs
         barycentric = output[5]
         shape_id, prim_id, local_prim_id, global_prim_id = output[6:10]
         vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
@@ -367,7 +367,7 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
         ray_d = torch.autograd.forward_ad.unpack_dual(ray_d).primal
         ray_tmax = torch.autograd.forward_ad.unpack_dual(ray_tmax).primal
         active_ctx = _ad_active_ctx(active, ray_o)
-        ctx.scene = int(scene_handle)
+        ctx.scene_resource = scene_resource
         ctx.vertices_shape = tuple(vertices.shape)
         ctx.save_for_backward(
             ray_o, ray_d, ray_tmax, active_ctx, global_prim_id, barycentric
@@ -400,8 +400,8 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
             or need_grad_ray_tmax
         ):
             return none_grads
-        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = raydn_intersect_backward(
-            ctx.scene,
+        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = rayd_intersect_backward(
+            ctx.scene_resource,
             ray_o,
             ray_d,
             ray_tmax,
@@ -421,7 +421,7 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
         )
         if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
-                "raydn_intersect_ad vertices must be the scene global vertex table"
+                "rayd_intersect_ad vertices must be the scene global vertex table"
             )
         return (
             None,
@@ -444,42 +444,42 @@ class _RaydnIntersectAdFunction(torch.autograd.Function):
     ):
         ray_o, ray_d, active_ctx, tape_prim_id, tape_barycentric = ctx.saved_tensors
         with torch_compat.disable_functorch():
-            values = raydn_intersect_jvp(
-                ctx.scene,
+            values = rayd_intersect_jvp(
+                ctx.scene_resource,
                 _ad_native_tensor(ray_o),
                 _ad_native_tensor(ray_d),
                 _ad_native_tensor(active_ctx),
                 _ad_native_tensor(tape_prim_id),
                 _ad_native_tensor(tape_barycentric),
                 tangent_vertices=_ad_checked_tangent(
-                    "raydn_intersect_ad tangent_vertices",
+                    "rayd_intersect_ad tangent_vertices",
                     _ad_native_tangent_or_none(grad_vertices),
                     ctx.vertices_shape,
                 ),
                 tangent_ray_o=_ad_checked_tangent(
-                    "raydn_intersect_ad tangent_ray_o",
+                    "rayd_intersect_ad tangent_ray_o",
                     _ad_native_tangent_or_none(grad_ray_o),
                     tuple(ray_o.shape),
                 ),
                 tangent_ray_d=_ad_checked_tangent(
-                    "raydn_intersect_ad tangent_ray_d",
+                    "rayd_intersect_ad tangent_ray_d",
                     _ad_native_tangent_or_none(grad_ray_d),
                     tuple(ray_d.shape),
                 ),
-                flags=_RAYDN_RAY_FLAGS_ALL,
+                flags=_RAYD_RAY_FLAGS_ALL,
             )
         return (*values, None, None, None, None)
 
 
-def raydn_intersect_ad(
-    handle: object,
+def rayd_intersect_ad(
+    scene_resource: object,
     vertices: torch.Tensor,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     ray_tmax: torch.Tensor,
     active: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable RayDN intersect under the fixed-winner contract.
+    """Differentiable RayD intersect under the fixed-winner contract.
 
     Returns the same fields as :func:`bdpt_intersect_forward`; ``t``/``p``/
     ``n``/``geo_n``/``uv``/``barycentric`` participate in reverse- and
@@ -487,19 +487,19 @@ def raydn_intersect_ad(
     ``ray_d``. Winner ids stay detached.
     """
 
-    values = _RaydnIntersectAdFunction.apply(
-        _raydn_scene_handle_id(handle), vertices, ray_o, ray_d, ray_tmax, active
+    values = _RaydIntersectAdFunction.apply(
+        _rayd_scene_resource(scene_resource), vertices, ray_o, ray_d, ray_tmax, active
     )
     return dict(zip(_BDPT_INTERSECTION_FIELDS, values, strict=True))
 
 
-class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
-    """Fixed-winner differentiable RayDN reflection chain over the C bridge."""
+class _RaydTraceReflectionsAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayD reflection chain through the direct typed C++ boundary."""
 
     @staticmethod
-    def forward(scene_handle, vertices, ray_o, ray_d, ray_tmax, active, max_bounces):
-        out = _required_native_op("raydn_trace_reflections_forward_tape")(
-            int(scene_handle),
+    def forward(scene_resource, vertices, ray_o, ray_d, ray_tmax, active, max_bounces):
+        out = _required_native_op("rayd_trace_reflections_forward_tape")(
+            scene_resource,
             ray_o,
             ray_d,
             ray_tmax,
@@ -530,7 +530,7 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        scene_handle, vertices, ray_o, ray_d, ray_tmax, active, _max_bounces = inputs
+        scene_resource, vertices, ray_o, ray_d, ray_tmax, active, _max_bounces = inputs
         (
             valid,
             _t,
@@ -545,7 +545,7 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
         ray_d = torch.autograd.forward_ad.unpack_dual(ray_d).primal
         ray_tmax = torch.autograd.forward_ad.unpack_dual(ray_tmax).primal
         active_ctx = _ad_active_ctx(active, ray_o)
-        ctx.scene = int(scene_handle)
+        ctx.scene_resource = scene_resource
         ctx.vertices_shape = tuple(vertices.shape)
         ctx.save_for_backward(
             ray_o,
@@ -603,8 +603,8 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
         ):
             return none_grads
         grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = (
-            raydn_trace_reflections_backward(
-                ctx.scene,
+            rayd_trace_reflections_backward(
+                ctx.scene_resource,
                 ray_o,
                 ray_d,
                 ray_tmax,
@@ -620,7 +620,7 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
         )
         if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
-                "raydn_trace_reflections_ad vertices must be the scene global"
+                "rayd_trace_reflections_ad vertices must be the scene global"
                 " vertex table"
             )
         return (
@@ -655,8 +655,8 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
             image_sources,
         ) = ctx.saved_tensors
         with torch_compat.disable_functorch():
-            tangent_t, tangent_image_sources = raydn_trace_reflections_jvp(
-                ctx.scene,
+            tangent_t, tangent_image_sources = rayd_trace_reflections_jvp(
+                ctx.scene_resource,
                 _ad_native_tensor(ray_o),
                 _ad_native_tensor(ray_d),
                 _ad_native_tensor(active_ctx),
@@ -666,17 +666,17 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
                 _ad_native_tensor(tape_normals),
                 _ad_native_tensor(image_sources),
                 tangent_vertices=_ad_checked_tangent(
-                    "raydn_trace_reflections_ad tangent_vertices",
+                    "rayd_trace_reflections_ad tangent_vertices",
                     _ad_native_tangent_or_none(grad_vertices),
                     ctx.vertices_shape,
                 ),
                 tangent_ray_o=_ad_checked_tangent(
-                    "raydn_trace_reflections_ad tangent_ray_o",
+                    "rayd_trace_reflections_ad tangent_ray_o",
                     _ad_native_tangent_or_none(grad_ray_o),
                     tuple(ray_o.shape),
                 ),
                 tangent_ray_d=_ad_checked_tangent(
-                    "raydn_trace_reflections_ad tangent_ray_d",
+                    "rayd_trace_reflections_ad tangent_ray_d",
                     _ad_native_tangent_or_none(grad_ray_d),
                     tuple(ray_d.shape),
                 ),
@@ -684,7 +684,7 @@ class _RaydnTraceReflectionsAdFunction(torch.autograd.Function):
         return (None, tangent_t, tangent_image_sources, None, None, None, None)
 
 
-_RAYDN_TRACE_REFLECTIONS_AD_FIELDS = (
+_RAYD_TRACE_REFLECTIONS_AD_FIELDS = (
     "valid",
     "t",
     "image_sources",
@@ -695,8 +695,8 @@ _RAYDN_TRACE_REFLECTIONS_AD_FIELDS = (
 )
 
 
-def raydn_trace_reflections_ad(
-    handle: object,
+def rayd_trace_reflections_ad(
+    scene_resource: object,
     vertices: torch.Tensor,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
@@ -704,15 +704,15 @@ def raydn_trace_reflections_ad(
     active: torch.Tensor | None,
     max_bounces: int,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable RayDN reflection chain under the fixed-winner contract.
+    """Differentiable RayD reflection chain under the fixed-winner contract.
 
     ``t`` and ``image_sources`` participate in reverse- and forward-mode
     torch AD with respect to ``vertices``, ``ray_o`` and ``ray_d``; the
     reflection chain (prim ids and tape tensors) stays detached.
     """
 
-    values = _RaydnTraceReflectionsAdFunction.apply(
-        _raydn_scene_handle_id(handle),
+    values = _RaydTraceReflectionsAdFunction.apply(
+        _rayd_scene_resource(scene_resource),
         vertices,
         ray_o,
         ray_d,
@@ -720,7 +720,7 @@ def raydn_trace_reflections_ad(
         active,
         int(max_bounces),
     )
-    return dict(zip(_RAYDN_TRACE_REFLECTIONS_AD_FIELDS, values, strict=True))
+    return dict(zip(_RAYD_TRACE_REFLECTIONS_AD_FIELDS, values, strict=True))
 
 
 def _epc_paths_frozen_winner_checks(
@@ -766,8 +766,8 @@ def _epc_paths_frozen_winner_checks(
     return rows, bounces
 
 
-def raydn_reflection_epc_paths_backward(
-    handle: object,
+def rayd_reflection_epc_paths_backward(
+    scene_resource: object,
     source: torch.Tensor,
     receiver: torch.Tensor,
     sequence: torch.Tensor,
@@ -789,8 +789,8 @@ def raydn_reflection_epc_paths_backward(
     _ad_check_optional_grad("grad_points", grad_points, ((rows, bounces, 3),))
     _ad_check_optional_grad("grad_normals", grad_normals, ((rows, bounces, 3),))
     _ad_check_optional_grad("grad_path_length", grad_path_length, ((rows,),))
-    out = _required_native_op("raydn_reflection_epc_paths_backward")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_reflection_epc_paths_backward")(
+        _rayd_scene_resource(scene_resource),
         source,
         receiver,
         sequence,
@@ -807,14 +807,14 @@ def raydn_reflection_epc_paths_backward(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 3:
         raise TypeError(
-            "_channel_native.raydn_reflection_epc_paths_backward must return"
+            "_channel_native.rayd_reflection_epc_paths_backward must return"
             " 3 gradients"
         )
     return tuple(out)
 
 
-def raydn_reflection_epc_paths_jvp(
-    handle: object,
+def rayd_reflection_epc_paths_jvp(
+    scene_resource: object,
     source: torch.Tensor,
     receiver: torch.Tensor,
     sequence: torch.Tensor,
@@ -833,8 +833,8 @@ def raydn_reflection_epc_paths_jvp(
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     _ad_check_tangent_vec3("tangent_source", tangent_source, rows)
     _ad_check_tangent_vec3("tangent_receiver", tangent_receiver, rows)
-    out = _required_native_op("raydn_reflection_epc_paths_jvp")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_reflection_epc_paths_jvp")(
+        _rayd_scene_resource(scene_resource),
         source,
         receiver,
         sequence,
@@ -848,13 +848,13 @@ def raydn_reflection_epc_paths_jvp(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 3:
         raise TypeError(
-            "_channel_native.raydn_reflection_epc_paths_jvp must return 3 tangents"
+            "_channel_native.rayd_reflection_epc_paths_jvp must return 3 tangents"
         )
     return tuple(out)
 
 
-class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
-    """Fixed-winner differentiable RayDN reflection EPC paths over the C bridge.
+class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
+    """Fixed-winner differentiable RayD reflection EPC paths through the direct typed C++ boundary.
 
     Forward IS the discovery entry (direct-plane mode) re-launched on the
     frozen winner sequence, so the primal hit points, normals and path length
@@ -865,7 +865,7 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        scene_handle,
+        scene_resource,
         vertices,
         source,
         receiver,
@@ -878,8 +878,8 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
         max_bounces,
         visibility_ignore_mode,
     ):
-        out = _required_native_op("raydn_reflection_epc_paths_forward")(
-            int(scene_handle),
+        out = _required_native_op("rayd_reflection_epc_paths_forward")(
+            scene_resource,
             source,
             receiver,
             None,
@@ -898,7 +898,7 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
         (
-            scene_handle,
+            scene_resource,
             vertices,
             source,
             receiver,
@@ -924,7 +924,7 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
             device=source.device,
             dtype=torch.int32,
         )
-        ctx.scene = int(scene_handle)
+        ctx.scene_resource = scene_resource
         ctx.vertices_shape = tuple(vertices.shape)
         ctx.save_for_backward(
             source,
@@ -969,8 +969,8 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
         need_grad_receiver = bool(ctx.needs_input_grad[3])
         if not (need_grad_vertices or need_grad_source or need_grad_receiver):
             return none_grads
-        grad_vertices, grad_source, grad_receiver = raydn_reflection_epc_paths_backward(
-            ctx.scene,
+        grad_vertices, grad_source, grad_receiver = rayd_reflection_epc_paths_backward(
+            ctx.scene_resource,
             source,
             receiver,
             sequence,
@@ -987,7 +987,7 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
         )
         if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
-                "raydn_reflection_epc_paths_ad vertices must be the scene"
+                "rayd_reflection_epc_paths_ad vertices must be the scene"
                 " global vertex table"
             )
         return (
@@ -1024,8 +1024,8 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
             bounce_count,
         ) = ctx.saved_tensors
         with torch_compat.disable_functorch():
-            tangents = raydn_reflection_epc_paths_jvp(
-                ctx.scene,
+            tangents = rayd_reflection_epc_paths_jvp(
+                ctx.scene_resource,
                 _ad_native_tensor(source),
                 _ad_native_tensor(receiver),
                 _ad_native_tensor(sequence),
@@ -1034,17 +1034,17 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
                 _ad_native_tensor(valid),
                 _ad_native_tensor(bounce_count),
                 tangent_vertices=_ad_checked_tangent(
-                    "raydn_reflection_epc_paths_ad tangent_vertices",
+                    "rayd_reflection_epc_paths_ad tangent_vertices",
                     _ad_native_tangent_or_none(grad_vertices),
                     ctx.vertices_shape,
                 ),
                 tangent_source=_ad_checked_tangent(
-                    "raydn_reflection_epc_paths_ad tangent_source",
+                    "rayd_reflection_epc_paths_ad tangent_source",
                     _ad_native_tangent_or_none(grad_source),
                     tuple(source.shape),
                 ),
                 tangent_receiver=_ad_checked_tangent(
-                    "raydn_reflection_epc_paths_ad tangent_receiver",
+                    "rayd_reflection_epc_paths_ad tangent_receiver",
                     _ad_native_tangent_or_none(grad_receiver),
                     tuple(receiver.shape),
                 ),
@@ -1060,7 +1060,7 @@ class _RaydnReflectionEpcPathsAdFunction(torch.autograd.Function):
         )
 
 
-_RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS = (
+_RAYD_REFLECTION_EPC_PATHS_AD_FIELDS = (
     "valid",
     "path_length",
     "resolved_prim_ids",
@@ -1070,8 +1070,8 @@ _RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS = (
 )
 
 
-def raydn_reflection_epc_paths_ad(
-    handle: object,
+def rayd_reflection_epc_paths_ad(
+    scene_resource: object,
     vertices: torch.Tensor,
     source: torch.Tensor,
     receiver: torch.Tensor,
@@ -1084,7 +1084,7 @@ def raydn_reflection_epc_paths_ad(
     max_bounces: int,
     visibility_ignore_mode: int,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable RayDN reflection EPC paths under the fixed-winner contract.
+    """Differentiable RayD reflection EPC paths under the fixed-winner contract.
 
     ``hit_positions``, ``normals`` and ``path_length`` participate in
     reverse- and forward-mode torch AD with respect to ``vertices``,
@@ -1113,8 +1113,8 @@ def raydn_reflection_epc_paths_ad(
     )
     if int(sequence.shape[1]) != int(max_bounces):
         raise ValueError("sequence width must equal max_bounces")
-    values = _RaydnReflectionEpcPathsAdFunction.apply(
-        _raydn_scene_handle_id(handle),
+    values = _RaydReflectionEpcPathsAdFunction.apply(
+        _rayd_scene_resource(scene_resource),
         vertices,
         source,
         receiver,
@@ -1127,11 +1127,11 @@ def raydn_reflection_epc_paths_ad(
         int(max_bounces),
         int(visibility_ignore_mode),
     )
-    return dict(zip(_RAYDN_REFLECTION_EPC_PATHS_AD_FIELDS, values, strict=True))
+    return dict(zip(_RAYD_REFLECTION_EPC_PATHS_AD_FIELDS, values, strict=True))
 
 
-def raydn_scene_face_normals_backward(
-    handle: object, grad_face_normals: torch.Tensor
+def rayd_scene_face_normals_backward(
+    scene_resource: object, grad_face_normals: torch.Tensor
 ) -> torch.Tensor:
     # Cotangents from autograd may be strided views; the native kernel
     # consumes explicit strides, so contiguity is deliberately not required.
@@ -1143,35 +1143,35 @@ def raydn_scene_face_normals_backward(
         raise ValueError("grad_face_normals must be a CUDA tensor")
     if grad_face_normals.ndim != 2 or grad_face_normals.shape[1] != 3:
         raise ValueError("grad_face_normals must have shape (F, 3)")
-    out = _required_native_op("raydn_scene_face_normals_backward")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_scene_face_normals_backward")(
+        _rayd_scene_resource(scene_resource),
         grad_face_normals,
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.raydn_scene_face_normals_backward must return a tensor"
+            "_channel_native.rayd_scene_face_normals_backward must return a tensor"
         )
     return out
 
 
-def raydn_scene_face_normals_jvp(
-    handle: object, tangent_vertices: torch.Tensor
+def rayd_scene_face_normals_jvp(
+    scene_resource: object, tangent_vertices: torch.Tensor
 ) -> torch.Tensor:
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     if tangent_vertices is None:
         raise ValueError("tangent_vertices is required")
-    out = _required_native_op("raydn_scene_face_normals_jvp")(
-        _raydn_scene_handle_id(handle),
+    out = _required_native_op("rayd_scene_face_normals_jvp")(
+        _rayd_scene_resource(scene_resource),
         tangent_vertices,
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.raydn_scene_face_normals_jvp must return a tensor"
+            "_channel_native.rayd_scene_face_normals_jvp must return a tensor"
         )
     return out
 
 
-class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
+class _RaydFaceNormalsAdFunction(torch.autograd.Function):
     """Scene unit face-normal table with a graph to the vertex table.
 
     Forward normalizes the native face-normal export with the same kernel the
@@ -1181,15 +1181,15 @@ class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(scene_handle, vertices, raw_face_normals):
+    def forward(scene_resource, vertices, raw_face_normals):
         return deterministic_normalize_vec3(raw_face_normals, eps=1.0e-6)
 
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        scene_handle, vertices, _raw_face_normals = inputs
+        scene_resource, vertices, _raw_face_normals = inputs
         vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
-        ctx.scene = int(scene_handle)
+        ctx.scene_resource = scene_resource
         ctx.vertices_shape = tuple(vertices.shape)
 
     @staticmethod
@@ -1197,15 +1197,15 @@ class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
     def backward(ctx, grad_face_normals):
         if ctx.needs_input_grad[2]:
             raise RuntimeError(
-                "raydn_face_normals_ad differentiates the vertex table only;"
+                "rayd_face_normals_ad differentiates the vertex table only;"
                 " the raw face-normal export is a detached scene record"
             )
         if grad_face_normals is None or not ctx.needs_input_grad[1]:
             return (None, None, None)
-        grad_vertices = raydn_scene_face_normals_backward(ctx.scene, grad_face_normals)
+        grad_vertices = rayd_scene_face_normals_backward(ctx.scene_resource, grad_face_normals)
         if tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
-                "raydn_face_normals_ad vertices must be the scene global vertex table"
+                "rayd_face_normals_ad vertices must be the scene global vertex table"
             )
         return (None, grad_vertices, None)
 
@@ -1215,18 +1215,18 @@ class _RaydnFaceNormalsAdFunction(torch.autograd.Function):
         if tangent_vertices is None:
             return None
         with torch_compat.disable_functorch():
-            return raydn_scene_face_normals_jvp(
-                ctx.scene,
+            return rayd_scene_face_normals_jvp(
+                ctx.scene_resource,
                 _ad_checked_tangent(
-                    "raydn_face_normals_ad tangent_vertices",
+                    "rayd_face_normals_ad tangent_vertices",
                     tangent_vertices,
                     ctx.vertices_shape,
                 ),
             )
 
 
-def raydn_face_normals_ad(
-    handle: object, vertices: torch.Tensor, raw_face_normals: torch.Tensor
+def rayd_face_normals_ad(
+    scene_resource: object, vertices: torch.Tensor, raw_face_normals: torch.Tensor
 ) -> torch.Tensor:
     """Scene unit face-normal table, differentiable in the vertex table.
 
@@ -1243,6 +1243,6 @@ def raydn_face_normals_ad(
         ndim=2,
         trailing_shape=(3,),
     )
-    return _RaydnFaceNormalsAdFunction.apply(
-        _raydn_scene_handle_id(handle), vertices, raw_face_normals
+    return _RaydFaceNormalsAdFunction.apply(
+        _rayd_scene_resource(scene_resource), vertices, raw_face_normals
     )

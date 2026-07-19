@@ -4,11 +4,11 @@ import torch
 
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel_native.runtime.native_handles import _raydn_scene_handle_id
+from witwin.channel_native.runtime.native_resources import _rayd_scene_resource
 
 
 def bdpt_visibility_forward(
-    handle: int,
+    scene_resource: object,
     start: torch.Tensor,
     end: torch.Tensor,
     active: torch.Tensor | None,
@@ -20,7 +20,7 @@ def bdpt_visibility_forward(
     if active is not None:
         validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
     out = _required_native_op("bdpt_visibility_forward")(
-        _raydn_scene_handle_id(handle),
+        _rayd_scene_resource(scene_resource),
         start,
         end,
         active,
@@ -47,7 +47,7 @@ _BDPT_INTERSECTION_FIELDS = (
 
 
 def bdpt_intersect_forward(
-    handle: object,
+    scene_resource: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     ray_tmax: torch.Tensor,
@@ -80,7 +80,7 @@ def bdpt_intersect_forward(
     if flags < 0:
         raise ValueError("flags must be non-negative")
     out = _required_native_op("bdpt_intersect_forward")(
-        _raydn_scene_handle_id(handle),
+        _rayd_scene_resource(scene_resource),
         ray_o,
         ray_d,
         ray_tmax,
@@ -108,9 +108,9 @@ def bdpt_intersect_forward(
 def bdpt_reflection_accumulation_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
-            "bdpt_reflection_accumulation_forward requires a RayDN scene handle"
+            "bdpt_reflection_accumulation_forward requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
     out = _required_native_op("bdpt_reflection_accumulation_forward")(
         *native_args,
     )
@@ -146,9 +146,9 @@ def bdpt_diffraction_discover_edges_counted(*args: object) -> torch.Tensor:
 def bdpt_diffraction_accumulation_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
-            "bdpt_diffraction_accumulation_forward requires a RayDN scene handle"
+            "bdpt_diffraction_accumulation_forward requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
     out = _required_native_op("bdpt_diffraction_accumulation_forward")(
         *native_args,
     )
@@ -159,48 +159,48 @@ def bdpt_diffraction_accumulation_forward(*args: object) -> tuple[torch.Tensor, 
     return tuple(out)
 
 
-raydn_visibility_forward = bdpt_visibility_forward
-raydn_reflection_accumulation_forward = bdpt_reflection_accumulation_forward
-raydn_diffraction_discover_edges = bdpt_diffraction_discover_edges
-raydn_diffraction_discover_edges_counted = bdpt_diffraction_discover_edges_counted
-raydn_diffraction_accumulation_forward = bdpt_diffraction_accumulation_forward
+rayd_visibility_forward = bdpt_visibility_forward
+rayd_reflection_accumulation_forward = bdpt_reflection_accumulation_forward
+rayd_diffraction_discover_edges = bdpt_diffraction_discover_edges
+rayd_diffraction_discover_edges_counted = bdpt_diffraction_discover_edges_counted
+rayd_diffraction_accumulation_forward = bdpt_diffraction_accumulation_forward
 
 
-def raydn_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
+def rayd_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
-        raise TypeError("raydn_trace_reflections_forward requires a RayDN scene handle")
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_trace_reflections_forward")(
+        raise TypeError("rayd_trace_reflections_forward requires a typed RayD scene resource")
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
+    out = _required_native_op("rayd_trace_reflections_forward")(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.raydn_trace_reflections_forward must return a tensor sequence"
+            "_channel_native.rayd_trace_reflections_forward must return a tensor sequence"
         )
     return tuple(out)
 
 
-def raydn_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]:
+def rayd_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
-            "raydn_reflection_epc_paths_forward requires a RayDN scene handle"
+            "rayd_reflection_epc_paths_forward requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_reflection_epc_paths_forward")(
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
+    out = _required_native_op("rayd_reflection_epc_paths_forward")(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.raydn_reflection_epc_paths_forward must return a tensor sequence"
+            "_channel_native.rayd_reflection_epc_paths_forward must return a tensor sequence"
         )
     return tuple(out)
 
 
-def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+def coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
 
-    The native operation uses image-source edge stationarity, RayDN reflection
-    EPC, and RayDN segment visibility. ``reverse=True`` constructs D->R by
+    The native operation uses image-source edge stationarity, RayD reflection
+    EPC, and RayD segment visibility. ``reverse=True`` constructs D->R by
     exchanging endpoints and reversing the interaction sequence. The returned
     dictionary intentionally has no ``path_gain`` or ``field`` entry; coupled
     complex/Jones transport belongs to the unified field phase.
@@ -208,15 +208,15 @@ def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
 
     if not args:
         raise TypeError(
-            "raydn_coupled_rd_geometry_forward requires a RayDN scene handle"
+            "coupled_rd_geometry_forward requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_coupled_rd_geometry_forward")(
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
+    out = _required_native_op("coupled_rd_geometry_forward")(
         *native_args,
     )
     if not isinstance(out, dict):
         raise TypeError(
-            "_channel_native.raydn_coupled_rd_geometry_forward must return a dict"
+            "_channel_native.coupled_rd_geometry_forward must return a dict"
         )
     required = {
         "valid": (torch.bool, 1),
@@ -258,11 +258,11 @@ def raydn_coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     return out
 
 
-def raydn_coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct two-edge (double) diffraction geometry without a coefficient.
 
     The native operation runs an alternating-projection Fermat solve for the
-    two-edge Keller point pair (Q1 on e1, Q2 on e2) and three RayDN segment
+    two-edge Keller point pair (Q1 on e1, Q2 on e2) and three RayD segment
     visibility queries (tx->Q1, Q1->Q2, Q2->rx). Both edge ids are recoverable
     from ``edge_sequence`` (slot 0 = e1, slot 1 = e2); ``primitive_sequence`` is
     fully ``-1`` because a double-diffraction row touches no face. The returned
@@ -272,15 +272,15 @@ def raydn_coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
 
     if not args:
         raise TypeError(
-            "raydn_coupled_dd_geometry_forward requires a RayDN scene handle"
+            "coupled_dd_geometry_forward requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_coupled_dd_geometry_forward")(
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
+    out = _required_native_op("coupled_dd_geometry_forward")(
         *native_args,
     )
     if not isinstance(out, dict):
         raise TypeError(
-            "_channel_native.raydn_coupled_dd_geometry_forward must return a dict"
+            "_channel_native.coupled_dd_geometry_forward must return a dict"
         )
     required = {
         "valid": (torch.bool, 1),
@@ -320,18 +320,18 @@ def raydn_coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     return out
 
 
-def raydn_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
+def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
-            "raydn_diffraction_paths_order1_forward requires a RayDN scene handle"
+            "rayd_diffraction_paths_order1_forward requires a typed RayD scene resource"
         )
-    native_args = (_raydn_scene_handle_id(args[0]), *args[1:])
-    out = _required_native_op("raydn_diffraction_paths_order1_forward")(
+    native_args = (_rayd_scene_resource(args[0]), *args[1:])
+    out = _required_native_op("rayd_diffraction_paths_order1_forward")(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.raydn_diffraction_paths_order1_forward must return a tensor sequence"
+            "_channel_native.rayd_diffraction_paths_order1_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -343,14 +343,14 @@ __all__ = [
     "bdpt_intersect_forward",
     "bdpt_reflection_accumulation_forward",
     "bdpt_visibility_forward",
-    "raydn_coupled_dd_geometry_forward",
-    "raydn_coupled_rd_geometry_forward",
-    "raydn_diffraction_accumulation_forward",
-    "raydn_diffraction_discover_edges",
-    "raydn_diffraction_discover_edges_counted",
-    "raydn_diffraction_paths_order1_forward",
-    "raydn_reflection_accumulation_forward",
-    "raydn_reflection_epc_paths_forward",
-    "raydn_trace_reflections_forward",
-    "raydn_visibility_forward",
+    "coupled_dd_geometry_forward",
+    "coupled_rd_geometry_forward",
+    "rayd_diffraction_accumulation_forward",
+    "rayd_diffraction_discover_edges",
+    "rayd_diffraction_discover_edges_counted",
+    "rayd_diffraction_paths_order1_forward",
+    "rayd_reflection_accumulation_forward",
+    "rayd_reflection_epc_paths_forward",
+    "rayd_trace_reflections_forward",
+    "rayd_visibility_forward",
 ]

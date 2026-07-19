@@ -52,9 +52,9 @@ _FD_STEP_TABLE = 1.0e-3
 _FD_STEP_HEIGHT = 1.0e-4
 
 
-def _require_raydn() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+def _require_rayd() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ def _loss(result) -> torch.Tensor:
 
 @pytest.mark.parametrize("solver", ["deterministic", "path"])
 def test_ensemble_frequency_grad_matches_fd(solver):
-    _require_raydn()
+    _require_rayd()
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
@@ -173,7 +173,7 @@ def test_ensemble_frequency_grad_matches_fd(solver):
 
 
 def test_ensemble_table_value_grad_is_nonzero_and_fd_consistent():
-    _require_raydn()
+    _require_rayd()
     scene = _ensemble_scene(_FREQUENCY_HZ)
     compiled = scene.compile()
     stack = compiled.kirchhoff_resources.stack
@@ -220,7 +220,7 @@ def test_realization_runtime_preserves_height_graph():
     # The autograd graph of a requires_grad height tensor must survive
     # PhaseScreenRuntime construction (ADR-014 wiring note). If it detaches,
     # this fails loudly instead of the height-gradient test silently zeroing.
-    _require_raydn()
+    _require_rayd()
     heights = _heights().requires_grad_(True)
     scene = _realization_scene(heights)
     compiled = scene.compile()
@@ -232,7 +232,7 @@ def test_realization_runtime_preserves_height_graph():
 
 
 def test_realization_height_grad_is_nonzero_and_fd_consistent():
-    _require_raydn()
+    _require_rayd()
     heights = _heights().requires_grad_(True)
     scene = _realization_scene(heights)
     result = _solve(scene, "deterministic", "vjp")
@@ -259,7 +259,7 @@ def test_realization_height_grad_is_nonzero_and_fd_consistent():
 
 
 def test_realization_frequency_grad_matches_fd():
-    _require_raydn()
+    _require_rayd()
     heights = _heights()
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
@@ -325,7 +325,7 @@ def _fd_material_gradient(
     "param", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m")
 )
 def test_realization_material_grad_is_nonzero_and_fd_consistent(param):
-    _require_raydn()
+    _require_rayd()
     scene = _realization_scene(_heights())
     leaf = _material_leaf(scene, param)
     expected = _fd_material_gradient(scene, leaf, _MATERIAL_FD_STEPS[param])
@@ -351,7 +351,7 @@ def test_realization_material_jvp_matches_vjp():
     # Forward/reverse duality of the layer_eps_r gradient through the coherent
     # realization patch integral: the JVP (em_layer_stack_ad forward mode) and
     # the VJP contraction on the same tangent must agree.
-    _require_raydn()
+    _require_rayd()
     scene = _realization_scene(_heights())
     leaf = _material_leaf(scene, "layer_eps_r")
     generator = torch.Generator(device="cpu").manual_seed(41)
@@ -381,7 +381,7 @@ def test_realization_material_jvp_matches_vjp():
 def test_realization_material_ad_mode_none_builds_no_graph():
     # A requires_grad material leaf must not create a graph when ad is off: the
     # plain em_layer_stack_eval path stays detached and bitwise-primal.
-    _require_raydn()
+    _require_rayd()
     scene = _realization_scene(_heights())
     leaf = _material_leaf(scene, "layer_eps_r")
     leaf.requires_grad_(True)
@@ -401,7 +401,7 @@ def test_realization_material_ad_mode_none_builds_no_graph():
 
 @pytest.mark.parametrize("scene_kind", ["ensemble", "realization"])
 def test_scattering_frequency_jvp_matches_vjp(scene_kind):
-    _require_raydn()
+    _require_rayd()
     heights = _heights()
 
     def build(freq):
@@ -437,7 +437,7 @@ def test_scattering_frequency_jvp_matches_vjp(scene_kind):
 
 @pytest.mark.parametrize("scene_kind", ["ensemble", "realization"])
 def test_scattering_ad_mode_none_stays_primal(scene_kind):
-    _require_raydn()
+    _require_rayd()
     if scene_kind == "ensemble":
         scene = _ensemble_scene()
     else:

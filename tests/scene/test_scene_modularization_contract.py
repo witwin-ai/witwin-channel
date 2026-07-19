@@ -26,7 +26,7 @@ from witwin.channel_native.core.runtime import assignments as legacy_assignments
 from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled
 from witwin.channel_native.core.runtime import geometry as legacy_geometry
 from witwin.channel_native.core.runtime import material_store as legacy_material_store
-from witwin.channel_native.core.runtime import raydn as legacy_raydn
+from witwin.channel_native.scene.kernels import rayd_scene as legacy_rayd
 from witwin.channel_native.deterministic.result import Result as DeterministicResult
 from witwin.channel_native.montecarlo.basic.result import Result as BasicResult
 from witwin.channel_native.montecarlo.bdpt.result import Result as BDPTResult
@@ -38,7 +38,7 @@ from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.scene import models as canonical_models
 from witwin.channel_native.scene import compiled as canonical_compiled
 from witwin.channel_native.scene import scattering_resources
-from witwin.channel_native.scene.kernels import rayd_scene as canonical_raydn
+from witwin.channel_native.scene.kernels import rayd_scene as canonical_rayd
 from witwin.channel_native.scene.stores import _validation as canonical_validation
 from witwin.channel_native.scene.stores import assignments as canonical_assignments
 from witwin.channel_native.scene.stores import geometry as canonical_geometry
@@ -74,16 +74,6 @@ _LEGACY_CLASS_CASES = (
         "AssignmentStore",
         canonical_assignments.AssignmentStore,
     ),
-    (
-        "witwin.channel_native.core.runtime.raydn",
-        "RayDNEdgeRecords",
-        legacy_raydn.RayDNEdgeRecords,
-    ),
-    (
-        "witwin.channel_native.core.runtime.raydn",
-        "RayDNScene",
-        legacy_raydn.RayDNScene,
-    ),
 )
 
 _FORBIDDEN_RESOURCE_FIELD_NAMES = {
@@ -98,7 +88,7 @@ _FORBIDDEN_RESOURCE_FIELD_NAMES = {
 _RESOURCE_TYPES = (
     legacy_scene.Scene,
     legacy_compiled.CompiledScene,
-    legacy_raydn.RayDNScene,
+    legacy_rayd.RayDSceneResource,
 )
 
 
@@ -382,13 +372,13 @@ def test_assignment_store_schema_type_hints_and_defaults_are_exact():
     (
         (
             "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
-            "from witwin.channel_native.core.runtime import raydn as legacy; "
+            "from witwin.channel_native.scene.kernels import rayd_scene as legacy; "
             "from witwin.channel_native.core import scene as core_scene; "
             "from witwin.channel_native.scene import compiled; "
             "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled"
         ),
         (
-            "from witwin.channel_native.core.runtime import raydn as legacy; "
+            "from witwin.channel_native.scene.kernels import rayd_scene as legacy; "
             "from witwin.channel_native.scene import compiled; "
             "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
             "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled; "
@@ -397,37 +387,31 @@ def test_assignment_store_schema_type_hints_and_defaults_are_exact():
         (
             "from witwin.channel_native.core import scene as core_scene; "
             "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled; "
-            "from witwin.channel_native.core.runtime import raydn as legacy; "
+            "from witwin.channel_native.scene.kernels import rayd_scene as legacy; "
             "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
             "from witwin.channel_native.scene import compiled"
         ),
     ),
 )
-def test_raydn_scene_fresh_import_order_type_hints_and_legacy_pickle_replay(
+def test_rayd_scene_fresh_import_order_type_hints_and_legacy_pickle_replay(
     imports: str,
 ):
     source = (
         f"{imports}; import pickle; import torch; from typing import get_type_hints; "
-        "scene_owner = canonical.RayDNScene; "
-        "edge_owner = canonical.RayDNEdgeRecords; "
-        "assert scene_owner is legacy.RayDNScene is core_scene.RayDNScene; "
-        "assert scene_owner is compiled.RayDNScene is legacy_compiled.RayDNScene; "
-        "assert edge_owner is legacy.RayDNEdgeRecords; "
+        "scene_owner = canonical.RayDSceneResource; "
+        "edge_owner = canonical.RayDEdgeRecords; "
+        "assert scene_owner is legacy.RayDSceneResource is core_scene.RayDSceneResource; "
+        "assert scene_owner is compiled.RayDSceneResource is legacy_compiled.RayDSceneResource; "
+        "assert edge_owner is legacy.RayDEdgeRecords; "
         "assert canonical.build_scene_from_structures is "
         "legacy.build_scene_from_structures is core_scene.build_scene_from_structures; "
         "assert scene_owner.__module__ == "
-        "'witwin.channel_native.core.runtime.raydn'; "
+        "'witwin.channel_native.scene.kernels.rayd_scene'; "
         "assert edge_owner.__module__ == "
-        "'witwin.channel_native.core.runtime.raydn'; "
+        "'witwin.channel_native.scene.kernels.rayd_scene'; "
         "assert get_type_hints(edge_owner)['vertices'] is torch.Tensor; "
         "assert get_type_hints(scene_owner)['mesh_tensors'] == "
         "tuple[tuple[torch.Tensor, ...], ...]; "
-        "assert pickle.loads("
-        "b'cwitwin.channel_native.core.runtime.raydn\\nRayDNScene\\n.'"
-        ") is scene_owner; "
-        "assert pickle.loads("
-        "b'cwitwin.channel_native.core.runtime.raydn\\nRayDNEdgeRecords\\n.'"
-        ") is edge_owner; "
         "assert pickle.loads(pickle.dumps(scene_owner)) is scene_owner; "
         "assert pickle.loads(pickle.dumps(edge_owner)) is edge_owner"
     )
@@ -616,12 +600,12 @@ def test_assignment_store_fresh_import_order_and_legacy_pickle_replay(imports: s
     )
 
 
-def test_raydn_scene_lifecycle_identity_schema_type_hints_and_defaults_are_exact():
-    edge_owner = canonical_raydn.RayDNEdgeRecords
+def test_rayd_scene_lifecycle_identity_schema_type_hints_and_defaults_are_exact():
+    edge_owner = canonical_rayd.RayDEdgeRecords
     edge_schema = fields(edge_owner)
 
-    assert edge_owner is legacy_raydn.RayDNEdgeRecords
-    assert edge_owner.__module__ == "witwin.channel_native.core.runtime.raydn"
+    assert edge_owner is legacy_rayd.RayDEdgeRecords
+    assert edge_owner.__module__ == "witwin.channel_native.scene.kernels.rayd_scene"
     assert tuple(item.name for item in edge_schema) == (
         "vertices",
         "faces",
@@ -640,40 +624,38 @@ def test_raydn_scene_lifecycle_identity_schema_type_hints_and_defaults_are_exact
         name: torch.Tensor for name in (item.name for item in edge_schema)
     }
 
-    scene_owner = canonical_raydn.RayDNScene
+    scene_owner = canonical_rayd.RayDSceneResource
     scene_schema = fields(scene_owner)
     assert (
         scene_owner
-        is legacy_raydn.RayDNScene
-        is legacy_scene.RayDNScene
-        is canonical_compiled.RayDNScene
-        is legacy_compiled.RayDNScene
+        is legacy_rayd.RayDSceneResource
+        is legacy_scene.RayDSceneResource
+        is canonical_compiled.RayDSceneResource
+        is legacy_compiled.RayDSceneResource
     )
-    assert scene_owner.__module__ == "witwin.channel_native.core.runtime.raydn"
+    assert scene_owner.__module__ == "witwin.channel_native.scene.kernels.rayd_scene"
     assert tuple(item.name for item in scene_schema) == (
-        "handle",
-        "owner",
+        "resource",
         "mesh_tensors",
         "reason",
         "runtime_cache",
     )
-    assert tuple(item.default for item in scene_schema[:-1]) == (None, None, (), None)
+    assert tuple(item.default for item in scene_schema[:-1]) == (None, (), None)
     assert all(item.default_factory is MISSING for item in scene_schema[:-1])
     assert scene_schema[-1].default is MISSING
     assert scene_schema[-1].default_factory is dict
     assert not scene_schema[-1].compare and not scene_schema[-1].repr
     assert get_type_hints(scene_owner) == {
-        "handle": int | None,
-        "owner": object | None,
+        "resource": object | None,
         "mesh_tensors": tuple[tuple[torch.Tensor, ...], ...],
         "reason": str | None,
         "runtime_cache": dict[str, object],
     }
     assert legacy_scene.build_scene_from_structures is (
-        canonical_raydn.build_scene_from_structures
+        canonical_rayd.build_scene_from_structures
     )
-    assert legacy_raydn.build_scene_from_structures is (
-        canonical_raydn.build_scene_from_structures
+    assert legacy_rayd.build_scene_from_structures is (
+        canonical_rayd.build_scene_from_structures
     )
 
 
@@ -687,7 +669,7 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "geometry",
         "materials",
         "assignments",
-        "raydn",
+        "rayd",
         "geometry_version",
         "material_version",
         "assignment_version",
@@ -702,7 +684,7 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "geometry": legacy_geometry.GeometryStore,
         "materials": legacy_material_store.MaterialStore,
         "assignments": legacy_assignments.AssignmentStore,
-        "raydn": legacy_raydn.RayDNScene,
+        "rayd": legacy_rayd.RayDSceneResource,
         "geometry_version": int,
         "material_version": int,
         "assignment_version": int,
@@ -780,7 +762,7 @@ def test_compile_cache_invalidation_and_material_storage_are_exact():
     compiled = scene.compile()
 
     assert scene.compile() is compiled
-    assert scene.raydn_scene() is compiled.raydn
+    assert scene.rayd_scene() is compiled.rayd
     assert compiled.materials.layer_offset.tolist() == [0]
     assert compiled.materials.layer_count.tolist() == [1]
     for item in fields(compiled.materials):
@@ -1085,7 +1067,7 @@ def test_solver_results_do_not_retain_compiled_scene_or_native_owner():
     compiled = scene.compile()
     owner = _FakeNativeOwner()
     owner_ref = weakref.ref(owner)
-    compiled.raydn = legacy_raydn.RayDNScene(handle=17, owner=owner)
+    compiled.rayd = legacy_rayd.RayDSceneResource(resource=owner)
     del owner
     gc.collect()
     assert owner_ref() is not None

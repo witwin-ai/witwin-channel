@@ -29,14 +29,14 @@ class DiffractionEdgeGeometry:
 
 
 def query_diffraction_edges(
-    raydn: object,
+    rayd: object,
     *,
     preserve_imported_edges: bool,
 ) -> DiffractionEdgeGeometry:
     raw = (
-        _diffraction_edge_geometry(raydn.edge_records())
+        _diffraction_edge_geometry(rayd.edge_records())
         if preserve_imported_edges
-        else _cached_diffraction_edge_geometry(raydn)
+        else _cached_diffraction_edge_geometry(rayd)
     )
     return DiffractionEdgeGeometry(
         selected=raw[0],
@@ -92,7 +92,7 @@ _DIFFRACTION_PREFILTER_EDGE_FRACTIONS = (0.02, 1.0 / 3.0, 2.0 / 3.0, 0.98)
 
 
 def _tx_visible_diffraction_states(
-    raydn: object,
+    rayd: object,
     states: tuple[torch.Tensor, ...],
     tx: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
@@ -117,8 +117,8 @@ def _tx_visible_diffraction_states(
     for fraction in _DIFFRACTION_PREFILTER_EDGE_FRACTIONS:
         t = line_min + fraction * (line_max - line_min)
         point = (edge_anchor + t.unsqueeze(1) * edge_dir).contiguous()
-        visible |= geometry_bridge.raydn_visibility_forward(
-            raydn.require_handle(), starts, point, None
+        visible |= geometry_bridge.rayd_visibility_forward(
+            rayd.require_resource(), starts, point, None
         )[0]
     if bool(visible.all()):
         return states
@@ -170,7 +170,7 @@ def query_diffraction_order1(
     query: DiffractionOrder1Query,
 ) -> DiffractionOrder1Geometry:
     states = query.states
-    raw = geometry_bridge.raydn_diffraction_paths_order1_forward(
+    raw = geometry_bridge.rayd_diffraction_paths_order1_forward(
         query.handle,
         query.tx_position,
         query.tx_polarization,

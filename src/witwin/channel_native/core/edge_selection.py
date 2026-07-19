@@ -75,7 +75,7 @@ def _duplicate_boundary_pairs(
 
 
 def refine_edge_geometry(
-    raydn: object,
+    rayd: object,
     geometry: tuple[torch.Tensor, ...],
     *,
     policy: EdgePolicy | None = None,
@@ -85,9 +85,9 @@ def refine_edge_geometry(
     (selected, edge_pos, edge_dir, lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle) = geometry
     if int(selected.numel()) == 0:
         return geometry
-    records = raydn.edge_records()
+    records = rayd.edge_records()
     if policy is None:
-        policy = raydn.runtime_cache.get("edge_policy")
+        policy = rayd.runtime_cache.get("edge_policy")
     if not isinstance(policy, EdgePolicy):
         policy = DEFAULT_EDGE_POLICY
 

@@ -27,7 +27,6 @@ files = [
     "src/witwin/channel_native/capabilities.py",
     "src/witwin/channel_native/deployment.py",
     "src/witwin/channel_native/runtime/native_buffers.py",
-    "src/witwin/channel_native/runtime/native_handles.py",
     "src/witwin/channel_native/runtime/tensor_contracts.py",
     "src/witwin/channel_native/runtime/torch_compat.py",
     "src/witwin/channel_native/deterministic/config.py",

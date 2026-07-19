@@ -6,7 +6,7 @@ import torch
 
 from witwin.channel_native.scattering.phase_screen import PhaseScreenRuntime
 from witwin.channel_native.scattering.tables import KirchhoffTable
-from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
+from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 from witwin.channel_native.scene.scattering_resources import (
     KirchhoffRuntimeResources,
     PhaseScreenRuntimeResources,
@@ -25,7 +25,7 @@ class CompiledScene:
     geometry: GeometryStore
     materials: MaterialStore
     assignments: AssignmentStore
-    raydn: RayDNScene
+    rayd: RayDSceneResource
     geometry_version: int
     material_version: int
     assignment_version: int

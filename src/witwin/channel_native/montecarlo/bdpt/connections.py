@@ -59,7 +59,7 @@ _MASK_TRANSMISSION = 8
 
 
 def _native_los_connection_samples(
-    raydn: Any,
+    rayd: Any,
     light: dict[str, torch.Tensor],
     sensor: dict[str, torch.Tensor],
     *,
@@ -117,8 +117,8 @@ def _native_los_connection_samples(
         sensor,
         sample_count=int(samples["valid"].shape[0]),
     )
-    visible = geometry_bridge.raydn_visibility_forward(
-        raydn.require_handle(),
+    visible = geometry_bridge.rayd_visibility_forward(
+        rayd.require_resource(),
         visibility_inputs["start"],
         visibility_inputs["end"],
         visibility_inputs["active"],
@@ -246,7 +246,7 @@ def _select_surface_events(
 
 def _emit_scatter_nee(
     *,
-    raydn: Any,
+    rayd: Any,
     sensor: dict[str, torch.Tensor],
     state: dict[str, torch.Tensor],
     hit: dict[str, torch.Tensor],
@@ -363,7 +363,7 @@ def _emit_scatter_nee(
                     live_source_power - live_source_power.detach()
                 )
             nee_block = scattering_nee_connection_samples(
-                raydn,
+                rayd,
                 sensor,
                 runtimes,
                 position=hit["p"].index_select(0, rows),
@@ -398,7 +398,7 @@ def _emit_scatter_nee(
 
 def _emit_mixed_transmission(
     *,
-    raydn: Any,
+    rayd: Any,
     sensor: dict[str, torch.Tensor],
     merged: dict[str, torch.Tensor],
     choose_scatter: torch.Tensor,
@@ -472,8 +472,8 @@ def _emit_mixed_transmission(
             sensor,
             sample_count=int(samples_out["valid"].shape[0]),
         )
-        visible = geometry_bridge.raydn_visibility_forward(
-            raydn.require_handle(),
+        visible = geometry_bridge.rayd_visibility_forward(
+            rayd.require_resource(),
             visibility_inputs["start"],
             visibility_inputs["end"],
             visibility_inputs["active"],
@@ -519,7 +519,7 @@ def _apply_scatter_continuation(
 
 
 def _transmission_sampled_connection_samples(
-    raydn: Any,
+    rayd: Any,
     tx_positions: torch.Tensor,
     tx_power: torch.Tensor,
     tx_polarization: torch.Tensor,
@@ -630,7 +630,7 @@ def _transmission_sampled_connection_samples(
         )
         for bounce in range(max(1, int(max_depth))):
             hit = geometry_bridge.bdpt_intersect_forward(
-                raydn.require_handle(),
+                rayd.require_resource(),
                 ray_inputs["ray_o"],
                 ray_inputs["ray_d"],
                 ray_inputs["ray_tmax"],
@@ -779,7 +779,7 @@ def _transmission_sampled_connection_samples(
                 )
 
             merged, scattered_valid, scatter_nee_rows = _emit_scatter_nee(
-                raydn=raydn,
+                rayd=rayd,
                 sensor=sensor,
                 state=state,
                 hit=hit,
@@ -810,7 +810,7 @@ def _transmission_sampled_connection_samples(
                 (~choose_transmit & ~choose_scatter & merged["valid"]).sum()
             )
             _emit_mixed_transmission(
-                raydn=raydn,
+                rayd=rayd,
                 sensor=sensor,
                 merged=merged,
                 choose_scatter=choose_scatter,

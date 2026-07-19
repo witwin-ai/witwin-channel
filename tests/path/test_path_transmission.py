@@ -19,9 +19,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _require_raydn() -> None:
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+def _require_rayd() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
 
 
 def _scene(structures: list, rx_position: list[float]) -> Scene:
@@ -46,7 +46,7 @@ def _lossy_wall() -> PhysicalSurface:
 
 
 def test_transmission_path_result_events_and_delay():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     result = solve(
@@ -77,7 +77,7 @@ def test_transmission_path_result_events_and_delay():
 
 
 def test_transmission_complex_a_matches_empty_scene_los_for_vacuum_wall():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 5.0, 0.0]  # 45 degree oblique incidence
     wall = solve(
@@ -94,7 +94,7 @@ def test_transmission_complex_a_matches_empty_scene_los_for_vacuum_wall():
 
 
 def test_transmission_depth2_sequence_and_type_filter():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     structures = [
@@ -122,7 +122,7 @@ def test_transmission_depth2_sequence_and_type_filter():
 
 
 def test_transmission_solver_exports_complex_path():
-    _require_raydn()
+    _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
     result = solve(

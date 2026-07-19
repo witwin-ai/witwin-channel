@@ -2,7 +2,7 @@
 
 from .geometry import GeometryStore  # noqa: F401 - annotation compatibility
 from witwin.channel_native.scene.kernels.rayd_scene import (  # noqa: F401
-    RayDNScene,
+    RayDSceneResource,
 )
 from witwin.channel_native.scene.stores.assignments import (  # noqa: F401
     AssignmentStore,

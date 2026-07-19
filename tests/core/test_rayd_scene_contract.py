@@ -17,38 +17,38 @@ def _source_linked_rayd_available() -> bool:
         return False
 
 
-def test_raydn_scene_wrapper_does_not_import_python_raydn():
-    sys.modules.pop("raydn", None)
+def test_rayd_scene_wrapper_does_not_import_python_rayd():
+    sys.modules.pop("rayd", None)
 
-    from witwin.channel_native.core.runtime.raydn import RayDNScene
+    from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 
-    assert RayDNScene.__name__ == "RayDNScene"
-    assert "raydn" not in sys.modules
-
-
-def test_raydn_scene_exposes_opaque_handle():
-    from witwin.channel_native.core.runtime.raydn import RayDNScene
-
-    handle = object()
-    scene = RayDNScene(handle)
-
-    assert scene.handle is handle
+    assert RayDSceneResource.__name__ == "RayDSceneResource"
+    assert "rayd" not in sys.modules
 
 
-def test_validated_native_loader_does_not_import_python_raydn():
-    sys.modules.pop("raydn", None)
+def test_rayd_scene_exposes_typed_resource():
+    from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
+
+    resource = object()
+    scene = RayDSceneResource(resource)
+
+    assert scene.resource is resource
+
+
+def test_validated_native_loader_does_not_import_python_rayd():
+    sys.modules.pop("rayd", None)
 
     symbols.native_extension()
 
-    assert "raydn" not in sys.modules
+    assert "rayd" not in sys.modules
 
 
-def test_compile_builds_raydn_scene_handle_when_backend_available():
+def test_compile_builds_rayd_scene_handle_when_backend_available():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN native scene construction")
+        pytest.skip("CUDA is required for RayD native scene construction")
 
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
 
     scene = Scene(
         structures=[
@@ -68,17 +68,17 @@ def test_compile_builds_raydn_scene_handle_when_backend_available():
 
     compiled = scene.compile()
 
-    assert compiled.raydn.available
-    assert compiled.raydn.require_handle() is not None
-    assert "raydn" not in sys.modules
+    assert compiled.rayd.available
+    assert compiled.rayd.require_resource() is not None
+    assert "rayd" not in sys.modules
 
 
-def test_scene_reuses_cached_raydn_scene_handle_when_backend_available():
+def test_scene_reuses_cached_rayd_scene_handle_when_backend_available():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN native scene construction")
+        pytest.skip("CUDA is required for RayD native scene construction")
 
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
 
     scene = Scene(
         structures=[
@@ -96,20 +96,20 @@ def test_scene_reuses_cached_raydn_scene_handle_when_backend_available():
         frequency=3.5e9,
     )
 
-    first = scene.raydn_scene()
-    second = scene.raydn_scene()
+    first = scene.rayd_scene()
+    second = scene.rayd_scene()
     compiled = scene.compile()
 
     assert first is second
-    assert compiled.raydn is first
+    assert compiled.rayd is first
 
 
-def test_raydn_scene_exports_non_manifold_edge_records_when_backend_available():
+def test_rayd_scene_exports_non_manifold_edge_records_when_backend_available():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN native scene construction")
+        pytest.skip("CUDA is required for RayD native scene construction")
 
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
 
     scene = Scene(
         structures=[
@@ -140,7 +140,7 @@ def test_raydn_scene_exports_non_manifold_edge_records_when_backend_available():
         frequency=3.5e9,
     )
 
-    records = scene.compile().raydn.edge_records()
+    records = scene.compile().rayd.edge_records()
 
     assert records.edge_v0.is_cuda
     assert records.edge_v0.dtype == torch.int32
@@ -150,16 +150,16 @@ def test_raydn_scene_exports_non_manifold_edge_records_when_backend_available():
     assert bool((records.face1.cpu()[central] >= 0).all())
 
 
-def test_bdpt_intersect_forward_uses_native_raydn_scene_bridge_when_available():
+def test_bdpt_intersect_forward_uses_native_rayd_scene_bridge_when_available():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for RayDN native intersection")
+        pytest.skip("CUDA is required for RayD native intersection")
 
     from witwin.channel_native.propagation.geometry.kernels.bridge import (
         bdpt_intersect_forward,
     )
 
     if not _source_linked_rayd_available():
-        pytest.skip("RayDN native extension is not built")
+        pytest.skip("RayD native extension is not built")
 
     scene = Scene(
         structures=[
@@ -176,16 +176,16 @@ def test_bdpt_intersect_forward_uses_native_raydn_scene_bridge_when_available():
         receivers=[],
         frequency=3.5e9,
     )
-    raydn = scene.raydn_scene()
+    rayd = scene.rayd_scene()
     ray_o = torch.tensor([[0.25, 0.25, 1.0]], dtype=torch.float32, device="cuda")
     ray_d = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
     ray_tmax = torch.tensor([10.0], dtype=torch.float32, device="cuda")
     active = torch.tensor([True], dtype=torch.bool, device="cuda")
 
-    hit = bdpt_intersect_forward(raydn, ray_o, ray_d, ray_tmax, active, flags=7)
+    hit = bdpt_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
 
     torch.testing.assert_close(hit["t"].cpu(), torch.tensor([1.0], dtype=torch.float32))
     torch.testing.assert_close(hit["p"].cpu(), torch.tensor([[0.25, 0.25, 0.0]], dtype=torch.float32))
     assert int(hit["prim_id"].cpu()[0].item()) == 0
     assert int(hit["global_prim_id"].cpu()[0].item()) == 0
-    assert "raydn" not in sys.modules
+    assert "rayd" not in sys.modules

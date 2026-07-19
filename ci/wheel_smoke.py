@@ -173,8 +173,8 @@ if build_info.get(\"backend\") != \"channel-native\":
     raise RuntimeError(f\"unexpected native backend: {{build_info.get('backend')!r}}\")
 if build_info.get(\"uses_dr_jit\") is not False:
     raise RuntimeError(\"wheel native extension must report uses_dr_jit=false\")
-if build_info.get(\"uses_raydn_native\") is not True:
-    raise RuntimeError(\"wheel native extension must report uses_raydn_native=true\")
+if build_info.get(\"uses_rayd_native\") is not True:
+    raise RuntimeError(\"wheel native extension must report uses_rayd_native=true\")
 
 print(json.dumps({{
     \"wheel_smoke\": True,

@@ -183,21 +183,21 @@ __global__ void bdpt_diffraction_connection_samples_from_tape_kernel(
         !lane_direct && static_cast<int>(lane) < total_samples;
     const int strategy_samples = lane_direct ? direct_samples : (lane_keller ? keller_samples : 0);
     const int state_idx = tape_state_idx[lane];
-    const int raydn_cell = tape_cell[lane];
+    const int rayd_cell = tape_cell[lane];
     const int material_idx = tape_material_idx[lane];
     const int cell_count = grid_resolution0 * grid_resolution1;
     const bool row_valid = tape_active[lane] &&
         strategy_samples > 0 &&
         state_idx >= 0 &&
         state_idx < state_count &&
-        raydn_cell >= 0 &&
-        raydn_cell < cell_count &&
+        rayd_cell >= 0 &&
+        rayd_cell < cell_count &&
         material_idx >= 0 &&
         material_idx < material_count &&
         material_valid[material_idx];
 
-    const int row = raydn_cell % grid_resolution0;
-    const int col = raydn_cell / grid_resolution0;
+    const int row = rayd_cell % grid_resolution0;
+    const int col = rayd_cell / grid_resolution0;
     const int bdpt_cell = row_valid ? row * grid_resolution1 + col : -1;
     float row_contribution = 0.0f;
     float row_pdf = 0.0f;
@@ -214,7 +214,7 @@ __global__ void bdpt_diffraction_connection_samples_from_tape_kernel(
         const float3 edge_point = bdpt_add3(edge_origin, bdpt_scale3(edge_dir, edge_t));
         const float3 source = bdpt_vec3_at(state_src, state_idx);
         const float3 target = bdpt_grid_cell_center(
-            raydn_cell,
+            rayd_cell,
             grid_axis,
             grid_position,
             grid_coord0_min,

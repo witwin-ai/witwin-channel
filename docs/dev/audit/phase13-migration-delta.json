@@ -19,14 +19,175 @@
       }
     }
   },
-  "current_phase": 0,
-  "transfers_applied": [],
-  "renames_applied": [],
-  "deletions_applied": [],
+  "current_phase": 3,
+  "transfers_applied": [
+    {
+      "phase": 3,
+      "scope": "RayD integration boundary",
+      "from": "copied extern-C signatures, getter indirection, integer scene handles",
+      "to": "source-linked rayd::torch integration_v2 typed API and RAII SceneResource",
+      "numerical_owner_changed": false
+    }
+  ],
+  "renames_applied": [
+    {
+      "phase": 3,
+      "from": "raydn_scene_create",
+      "to": "rayd_scene_create"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_scene_edge_records",
+      "to": "rayd_scene_edge_records"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_intersect_backward",
+      "to": "rayd_intersect_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_intersect_jvp",
+      "to": "rayd_intersect_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_forward",
+      "to": "rayd_trace_reflections_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_forward_tape",
+      "to": "rayd_trace_reflections_forward_tape"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_backward",
+      "to": "rayd_trace_reflections_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_jvp",
+      "to": "rayd_trace_reflections_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_reflection_epc_paths_forward",
+      "to": "rayd_reflection_epc_paths_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_reflection_epc_paths_backward",
+      "to": "rayd_reflection_epc_paths_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_reflection_epc_paths_jvp",
+      "to": "rayd_reflection_epc_paths_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_scene_face_normals_backward",
+      "to": "rayd_scene_face_normals_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_scene_face_normals_jvp",
+      "to": "rayd_scene_face_normals_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_diffraction_paths_order1_forward",
+      "to": "rayd_diffraction_paths_order1_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_coupled_rd_geometry_forward",
+      "to": "coupled_rd_geometry_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_coupled_dd_geometry_forward",
+      "to": "coupled_dd_geometry_forward"
+    }
+  ],
+  "deletions_applied": [
+    {
+      "phase": 3,
+      "path": "native/channel_native/rayd/bridge.h"
+    },
+    {
+      "phase": 3,
+      "path": "native/channel_native/rayd/common.cpp"
+    },
+    {
+      "phase": 3,
+      "path": "src/witwin/channel_native/runtime/native_handles.py"
+    },
+    {
+      "phase": 3,
+      "path": "src/witwin/channel_native/core/runtime/raydn.py"
+    }
+  ],
   "binding_count_delta": 0,
   "implementation_owner_delta": {
     "Channel Native": 0,
     "RayD": 0
   },
-  "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory."
+  "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory.",
+  "phase3_current": {
+    "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
+    "binding_count": 211,
+    "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
+    "typed_scene_resource": "RayDSceneResource",
+    "coupled_layered_owner_names": [
+      "coupled_rd_geometry_forward",
+      "coupled_dd_geometry_forward"
+    ],
+    "approved_post_phase9_field_wedge_launch_additions": [
+      {
+        "adr": "ADR-013",
+        "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
+        "split_owner": "coupled",
+        "binding_symbol": "field_coupled_dd_backward",
+        "kernel": "coupled_dd_backward_kernel",
+        "launch_count": 1,
+        "numerical_owner": "Channel Native",
+        "plan13_disposition": "retained complete coupled-DD family"
+      },
+      {
+        "adr": "ADR-013",
+        "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
+        "split_owner": "coupled",
+        "binding_symbol": "field_coupled_dd_jvp",
+        "kernel": "coupled_dd_jvp_kernel",
+        "launch_count": 1,
+        "numerical_owner": "Channel Native",
+        "plan13_disposition": "retained complete coupled-DD family"
+      }
+    ],
+    "approved_phase9_body_hash_transfer_multiset": [
+      {
+        "owner_id": "bdpt.diffraction_connection",
+        "binding_symbol": "bdpt_diffraction_connection_samples_from_tape",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transfer_kind": "phase3-identifier-normalization",
+        "before": {
+          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+          "token_count": 656,
+          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+          "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1"
+        },
+        "after": {
+          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+          "token_count": 656,
+          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+          "body_sha256": "3300f3fc73a33e8dbc17522dc4f2ab434f9344fc2d224288ee752e2113f83885"
+        }
+      }
+    ]
+  }
 }

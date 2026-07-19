@@ -11,7 +11,7 @@ from witwin.channel_native.propagation.geometry.kernels import bridge as geometr
 
 @dataclass(frozen=True, slots=True)
 class ReflectionEpcQuery:
-    raydn: object
+    rayd: object
     source: torch.Tensor
     receiver: torch.Tensor
     active: torch.Tensor | None
@@ -36,8 +36,8 @@ class ReflectionEpcGeometry:
 
 
 def query_reflection_epc(query: ReflectionEpcQuery) -> ReflectionEpcGeometry:
-    raw = geometry_bridge.raydn_reflection_epc_paths_forward(
-        query.raydn.require_handle(),
+    raw = geometry_bridge.rayd_reflection_epc_paths_forward(
+        query.rayd.require_resource(),
         query.source,
         query.receiver,
         query.active,

@@ -14,13 +14,13 @@ def test_bdpt_reflection_errors_when_capability_missing(monkeypatch):
         bdpt_solver,
         "build_info",
         lambda: {
-            "uses_raydn_native": False,
+            "uses_rayd_native": False,
             "cuda_available": True,
             "optix_available": False,
         },
     )
 
-    with pytest.raises(RuntimeError, match="reflection.*RayDN"):
+    with pytest.raises(RuntimeError, match="reflection.*RayD"):
         solve(single_wall_reflection_scene(), Config(components={"reflection"}))
 
 
@@ -32,7 +32,7 @@ def test_bdpt_los_only_skips_reflection_capability(monkeypatch):
         bdpt_solver,
         "build_info",
         lambda: {
-            "uses_raydn_native": False,
+            "uses_rayd_native": False,
             "cuda_available": True,
             "optix_available": False,
         },

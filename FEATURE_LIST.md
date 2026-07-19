@@ -11,6 +11,19 @@ Defaults remain `{los, reflection, diffraction}`; transmission and scattering
 are opt-in. Component power reporting uses an exclusive path class with
 priority `scattering > diffraction > transmission > reflection > los`.
 
+## Native runtime boundary
+
+- `_channel_native` is the single production extension. It source-links RayD
+  `adf0ea2d1481f7548c5ef30c31b4adbaf831f963` and calls the typed
+  `rayd::torch` v2 C++ API directly; no RayD Python module, second dispatcher,
+  copied C ABI, getter table, or dynamic symbol lookup participates.
+- Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
+  handles and the former bridge/common indirection are removed. RayD-owned ABI
+  names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
+- The locked integration header is
+  `backends/torch/include/rayd/torch/integration_v2.h` with SHA-256
+  `d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928`.
+
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.
 - **Specular transmission (thin_sheet)**: finite-thickness multilayer walls

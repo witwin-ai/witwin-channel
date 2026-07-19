@@ -179,7 +179,7 @@ __device__ Float3 initial_transverse_polarization(Float3 incident) {
 
 /// Reflect a complex field 3-vector at a planar interface: decompose into
 /// s/p components, apply the Fresnel coefficients, and recompose on the
-/// rotated outgoing basis (mirrors RayDN's epc_field.cu reflect_field_vector).
+/// rotated outgoing basis (mirrors RayD's epc_field.cu reflect_field_vector).
 __device__ Complex3 reflect_field_vector(
     Complex3 field,
     Float3 incident_direction,

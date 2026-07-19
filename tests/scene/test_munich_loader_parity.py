@@ -83,7 +83,7 @@ scene = Scene.load_mitsuba(
     boundary_edge_policy="half_plane",
 )
 print(json.dumps({{
-    "bad_modules": {{name: name in sys.modules for name in ("drjit", "mitsuba", "sionna", "raydn")}},
+    "bad_modules": {{name: name in sys.modules for name in ("drjit", "mitsuba", "sionna", "rayd")}},
     "structures": len(scene.structures),
     "faces": sum(int(structure.faces.shape[0]) for structure in scene.structures),
     "edges": scene.diffraction_edge_count(
@@ -103,7 +103,7 @@ print(json.dumps({{
         "drjit": False,
         "mitsuba": False,
         "sionna": False,
-        "raydn": False,
+        "rayd": False,
     }
     assert payload["structures"] == 11
     assert payload["faces"] == 38936

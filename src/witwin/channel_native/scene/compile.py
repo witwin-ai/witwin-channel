@@ -20,7 +20,7 @@ from witwin.channel_native.propagation.topology.kernels import (
 )
 from witwin.channel_native.runtime.native_buffers import bdpt_zero_matrix
 from witwin.channel_native.scene.compiled import CompiledScene
-from witwin.channel_native.scene.kernels.rayd_scene import RayDNScene
+from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 from witwin.channel_native.scene.models import Structure
 from witwin.channel_native.scene.stores.assignments import AssignmentStore
 from witwin.channel_native.scene.stores.geometry import GeometryStore
@@ -54,9 +54,9 @@ def compile_scene(scene: Any) -> CompiledScene:
         and cached.materials.cache_token == material_cache_token
     ):
         return cached
-    raydn = scene.raydn_scene()
+    rayd = scene.rayd_scene()
     geometry = _compile_geometry(
-        scene.structures, scene._geometry_version, raydn=raydn
+        scene.structures, scene._geometry_version, rayd=rayd
     )
     materials = _compile_materials(
         material_records,
@@ -79,7 +79,7 @@ def compile_scene(scene: Any) -> CompiledScene:
         geometry=geometry,
         materials=materials,
         assignments=assignments,
-        raydn=raydn,
+        rayd=rayd,
         geometry_version=geometry.version,
         material_version=materials.version,
         assignment_version=assignments.version,
@@ -89,7 +89,7 @@ def compile_scene(scene: Any) -> CompiledScene:
 
 
 def _compile_geometry(
-    structures: tuple[Structure, ...], version: int, *, raydn: RayDNScene
+    structures: tuple[Structure, ...], version: int, *, rayd: RayDSceneResource
 ) -> GeometryStore:
     if not structures:
         empty_vertices = torch.empty((0, 3), dtype=torch.float32)
@@ -107,9 +107,9 @@ def _compile_geometry(
             version=version,
         )
 
-    if not raydn.available:
-        raydn.require_handle()
-    records = raydn.edge_records()
+    if not rayd.available:
+        rayd.require_resource()
+    records = rayd.edge_records()
     face_structure_id = []
     face_surface_id = []
     for structure_id, structure in enumerate(structures):

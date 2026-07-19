@@ -584,36 +584,36 @@ def _prepare_workspace_and_capabilities(
         raise RuntimeError("witwin.channel_native.montecarlo.bdpt requires CUDA")
 
     info = build_info_fn()
-    raydn = scene.raydn_scene()
-    raydn_available = bool(info["uses_raydn_native"]) and raydn.available
-    reflection_available = raydn_available
-    diffraction_available = raydn_available and config.max_diffraction_order > 0
-    transmission_available = raydn_available
+    rayd = scene.rayd_scene()
+    rayd_available = bool(info["uses_rayd_native"]) and rayd.available
+    reflection_available = rayd_available
+    diffraction_available = rayd_available and config.max_diffraction_order > 0
+    transmission_available = rayd_available
     if (
         "reflection" in config.components
         and scene.structures
         and not reflection_available
     ):
-        raise RuntimeError("reflection requires RayDN native capability")
+        raise RuntimeError("reflection requires RayD native capability")
     if (
         "diffraction" in config.components
         and scene.structures
         and not diffraction_available
     ):
-        raise RuntimeError("diffraction requires RayDN native capability")
+        raise RuntimeError("diffraction requires RayD native capability")
     if (
         "transmission" in config.components
         and scene.structures
         and not transmission_available
     ):
-        raise RuntimeError("transmission requires RayDN native capability")
+        raise RuntimeError("transmission requires RayD native capability")
     return _SolvePrep(
         native_samples=native_samples,
         native_max_depth=native_max_depth,
         selected_accumulation=selected_accumulation,
         workspace_bytes=workspace_bytes,
         info=info,
-        raydn=raydn,
+        rayd=rayd,
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
         transmission_available=transmission_available,
@@ -656,7 +656,7 @@ def _collect_connection_samples(
         return _collect_coherent_connection_samples(
             scene, config, prep=prep, workspace=workspace, ledger=ledger
         )
-    raydn = prep.raydn
+    rayd = prep.rayd
     native_samples = prep.native_samples
     native_max_depth = prep.native_max_depth
     selected_accumulation = prep.selected_accumulation
@@ -688,7 +688,7 @@ def _collect_connection_samples(
         if los_light_state is not None:
             sample_blocks.append(
                 _native_los_connection_samples(
-                    raydn,
+                    rayd,
                     los_light_state,
                     endpoint_subpaths["sensor"],
                     scene_has_structures=bool(scene.structures),
@@ -783,7 +783,7 @@ def _collect_connection_samples(
         if sampler_requested:
             ad = config.ad_mode != "none"
             mixed_blocks, event_counts = _transmission_sampled_connection_samples(
-                raydn,
+                rayd,
                 tx_reference,
                 tx_power,
                 tx_polarization,

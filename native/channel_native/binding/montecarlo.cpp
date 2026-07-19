@@ -257,11 +257,11 @@ void register_montecarlo(pybind11::module_ &module) {
     module.def(
         "mc_apply_los_visibility",
         &cn_mc_apply_los_visibility,
-        "Apply RayDN LoS visibility to one transmitter component map with a CUDA kernel.");
+        "Apply RayD LoS visibility to one transmitter component map with a CUDA kernel.");
     module.def(
         "mc_los_visibility_inputs",
         &cn_mc_los_visibility_inputs,
-        "Prepare RayDN LoS visibility start and active tensors with a CUDA kernel.");
+        "Prepare RayD LoS visibility start and active tensors with a CUDA kernel.");
     module.def(
         "mc_receiver_grid_points",
         &cn_mc_receiver_grid_points,
@@ -269,11 +269,11 @@ void register_montecarlo(pybind11::module_ &module) {
     module.def(
         "mc_reflection_launch_inputs",
         &cn_mc_reflection_launch_inputs,
-        "Prepare RayDN reflection launch tensors with a CUDA kernel.");
+        "Prepare RayD reflection launch tensors with a CUDA kernel.");
     module.def(
         "mc_sionna_reflection_accumulate",
         &cn_mc_sionna_reflection_accumulate,
-        "Accumulate finite-thickness Sionna/ITU specular reflections from RayDN traces.");
+        "Accumulate finite-thickness Sionna/ITU specular reflections from RayD traces.");
     module.def(
         "mc_reflection_ad_max_depth",
         &cn_mc_reflection_ad_max_depth_cuda,

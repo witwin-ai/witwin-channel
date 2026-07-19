@@ -17,7 +17,7 @@ from witwin.channel_native.propagation.topology.discovery import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
 _DIGESTS = {
-    "_tx_visible_diffraction_states": "ea7600e59670741cc8d1d162b3de52f4d2232c27eaec50f45d679970b4e153df",
+    "_tx_visible_diffraction_states": "1c9433ceded093f33aeb956fc6e63739e7b0f943028f48db023819a7d55a28c9",
 }
 
 
@@ -165,4 +165,4 @@ def test_diffraction_owner_has_no_core_path_dependency_or_scc():
         assert core not in seen
         if owner == "witwin.channel_native.propagation.geometry.diffraction":
             assert discovery_owner not in seen
-    assert not hasattr(diffraction, "_raydn_visibility_mask")
+    assert not hasattr(diffraction, "_rayd_visibility_mask")

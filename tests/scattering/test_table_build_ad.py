@@ -406,8 +406,8 @@ def test_primal_bitwise_pre_balance_lobe_exported():
 def test_end_to_end_roughness_gradient_is_nonzero():
     from witwin.channel_native.core.kernels.extension import build_info
 
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
     from tests.support.scenes import rough_wall_structure
     from witwin.channel_native import ReceiverPoint, Scene, Transmitter
     from witwin.channel_native.deterministic import Config as DeterministicConfig

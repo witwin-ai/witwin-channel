@@ -64,7 +64,7 @@ def axis_aligned_grid_spec(grid: ReceiverGrid) -> AxisAlignedGridSpec:
     axis = ({0, 1, 2} - {axis0, axis1}).pop()
     expected = (1, 2) if axis == 0 else (0, 2) if axis == 1 else (0, 1)
     if (axis0, axis1) != expected:
-        raise ValueError("ReceiverGrid axes must match RayDN grid coordinate order")
+        raise ValueError("ReceiverGrid axes must match RayD grid coordinate order")
 
     step0 = float(grid.spacing[0]) * sign0
     step1 = float(grid.spacing[1]) * sign1

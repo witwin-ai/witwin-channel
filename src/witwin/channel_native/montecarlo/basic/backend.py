@@ -71,21 +71,21 @@ def los_path_gain(
     return exported["path_gain_matrix"]
 
 
-def apply_point_los_visibility(scene: Scene, raydn: object, los: torch.Tensor, *, device: torch.device) -> torch.Tensor:
+def apply_point_los_visibility(scene: Scene, rayd: object, los: torch.Tensor, *, device: torch.device) -> torch.Tensor:
     """Zero occluded (tx, rx) entries of a point-receiver LoS matrix."""
 
     if not scene.structures or los.numel() == 0:
         return los
-    if not raydn.available:
-        raise RuntimeError("LoS visibility requires RayDN native scene capability")
-    handle = raydn.require_handle()
+    if not rayd.available:
+        raise RuntimeError("LoS visibility requires RayD native scene capability")
+    handle = rayd.require_resource()
     tx_pos, _ = transmitter_positions(scene, device=device)
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
     masks: list[torch.Tensor] = []
     for tx_index in range(int(tx_pos.shape[0])):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=int(rx_pos.shape[0]))
         masks.append(
-            geometry_bridge.raydn_visibility_forward(
+            geometry_bridge.rayd_visibility_forward(
                 handle, inputs["start"], rx_pos, inputs["active"]
             )[0]
         )

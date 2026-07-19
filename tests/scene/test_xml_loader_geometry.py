@@ -139,8 +139,8 @@ def test_instance_geometry_builds_edges_and_real_reflection_paths(tmp_path):
         pytest.skip("CUDA is required for native edge/path acceptance")
     from witwin.channel_native.core.kernels.extension import build_info
 
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scene capability is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scene capability is not built")
     _write_ply(
         tmp_path / "wall.ply",
         [(2.5, -3.0, -1.0), (2.5, 3.0, -1.0), (2.5, -3.0, 2.0), (2.5, 3.0, 2.0)],

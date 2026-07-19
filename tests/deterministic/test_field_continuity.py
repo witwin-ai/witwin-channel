@@ -54,8 +54,8 @@ _SUPPORT_FLOOR_DB = -80.0  # matches verify-e1e support_active gate
 def _require_cuda() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for the deterministic field continuity tests")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
 
 def _cube_mesh() -> tuple[torch.Tensor, torch.Tensor]:

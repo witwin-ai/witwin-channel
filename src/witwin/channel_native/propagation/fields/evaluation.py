@@ -404,9 +404,9 @@ def _evaluate_transmission_fields(
             # against the incident ray internally, so the table's sign
             # convention does not matter. Invalid slots gather face 0 but are
             # skipped by the kernel, so they receive a zero cotangent.
-            records = compiled.raydn.edge_records()
-            face_normal_table = geometry_autograd.raydn_face_normals_ad(
-                compiled.raydn.require_handle(),
+            records = compiled.rayd.edge_records()
+            face_normal_table = geometry_autograd.rayd_face_normals_ad(
+                compiled.rayd.require_resource(),
                 vertices,
                 records.face_normals.contiguous(),
             )
@@ -491,9 +491,9 @@ def _evaluate_diffraction_fields(
                 and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
             )
             edge_geometry = (
-                _diffraction_edge_geometry(compiled.raydn.edge_records())
+                _diffraction_edge_geometry(compiled.rayd.edge_records())
                 if preserve_imported_edges
-                else _cached_diffraction_edge_geometry(compiled.raydn)
+                else _cached_diffraction_edge_geometry(compiled.rayd)
             )
             edge_id = topology.edge_id[diffraction_rows].to(dtype=torch.int64)
             face0 = edge_geometry[8].to(dtype=torch.int64)[edge_id]
@@ -514,7 +514,7 @@ def _evaluate_diffraction_fields(
                 # the edge tables from them on the dual row. The integer
                 # winner extraction below runs on detached tables; only the
                 # vertex gathers touch the live table.
-                records = compiled.raydn.edge_records()
+                records = compiled.rayd.edge_records()
                 edge_v0_ids = records.edge_v0.to(dtype=torch.int64)[edge_id]
                 edge_v1_ids = records.edge_v1.to(dtype=torch.int64)[edge_id]
                 faces_table = records.faces.to(dtype=torch.int64)
@@ -631,8 +631,8 @@ def _evaluate_coupled_fields(
     if int(coupled_rows.shape[0]) > 0:
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
-        raydn = compiled.raydn
-        records = raydn.edge_records()
+        rayd = compiled.rayd
+        records = rayd.edge_records()
         preserve_imported_edges = bool(
             isinstance(scene.metadata.get("mitsuba", {}), dict)
             and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
@@ -640,7 +640,7 @@ def _evaluate_coupled_fields(
         edge_geometry = (
             _diffraction_edge_geometry(records)
             if preserve_imported_edges
-            else _cached_diffraction_edge_geometry(raydn)
+            else _cached_diffraction_edge_geometry(rayd)
         )
         edge_n0 = edge_geometry[6]
         edge_n1 = edge_geometry[7]

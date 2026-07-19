@@ -6,7 +6,7 @@ from witwin.channel_native import ReceiverGrid, Transmitter
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.montecarlo.basic import Config, solve
 import witwin.channel_native.montecarlo.basic.backend as basic_backend
-import witwin.channel_native.montecarlo.basic.raydn_components as raydn_components
+import witwin.channel_native.montecarlo.basic.rayd_components as rayd_components
 
 _REFERENCE_EDGE_INFO_PLANE_TOL = 1.34e-5
 
@@ -281,8 +281,8 @@ def test_basic_solver_reuses_los_export_for_single_receiver_grid(monkeypatch):
 def test_basic_solver_returns_native_reflection_component_map_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic component maps")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native reflection is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
 
     scene = single_wall_reflection_scene().add(_grid_at_x(5.0))
     result = solve(scene, Config(samples=2048, seed=5, components={"reflection"}))
@@ -308,8 +308,8 @@ def test_basic_solver_returns_native_reflection_component_map_when_available():
 def test_basic_solver_returns_native_diffraction_component_map_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic component maps")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene().add(_grid_at_x(3.0))
     result = solve(scene, Config(samples=512, seed=7, components={"diffraction"}))
@@ -332,17 +332,17 @@ def test_basic_solver_returns_native_diffraction_component_map_when_available():
     )
 
 
-def test_basic_solver_reports_native_fused_schedule_for_raydn_components():
+def test_basic_solver_reports_native_fused_schedule_for_rayd_components():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic component maps")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native components are not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native components are not built")
 
     scene = wedge_diffraction_scene().add(_grid_at_x(3.0))
     result = solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
 
     kernel = result.metadata["kernel"]
-    assert kernel["raydn_native"] is True
+    assert kernel["rayd_native"] is True
     assert kernel["scheduling_strategy"] == "native_fused"
     assert kernel["fused_stages"] >= 1
 
@@ -350,14 +350,14 @@ def test_basic_solver_reports_native_fused_schedule_for_raydn_components():
 def test_diffraction_edge_geometry_native_matches_torch_reference():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
-    records = scene.compile().raydn.edge_records()
+    records = scene.compile().rayd.edge_records()
 
     reference = _torch_diffraction_edge_geometry(records)
-    native = raydn_components._diffraction_edge_geometry(records)
+    native = rayd_components._diffraction_edge_geometry(records)
 
     torch.testing.assert_close(native[0], reference[0], rtol=0.0, atol=0.0)
     torch.testing.assert_close(native[8], reference[8], rtol=0.0, atol=0.0)
@@ -369,8 +369,8 @@ def test_diffraction_edge_geometry_native_matches_torch_reference():
 def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmitters(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     base = wedge_diffraction_scene()
     scene = type(base)(
@@ -383,14 +383,14 @@ def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmi
         frequency=base.frequency,
     )
     call_count = 0
-    original = raydn_components._native_surface_group_edge_candidates
+    original = rayd_components._native_surface_group_edge_candidates
 
     def counted(*args, **kwargs):
         nonlocal call_count
         call_count += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(raydn_components, "_native_surface_group_edge_candidates", counted)
+    monkeypatch.setattr(rayd_components, "_native_surface_group_edge_candidates", counted)
 
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
 
@@ -400,19 +400,19 @@ def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmi
 def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native diffraction is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene().add(_grid_at_x(3.0))
     call_count = 0
-    original = raydn_components._native_surface_group_edge_candidates
+    original = rayd_components._native_surface_group_edge_candidates
 
     def counted(*args, **kwargs):
         nonlocal call_count
         call_count += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(raydn_components, "_native_surface_group_edge_candidates", counted)
+    monkeypatch.setattr(rayd_components, "_native_surface_group_edge_candidates", counted)
 
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
     solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))

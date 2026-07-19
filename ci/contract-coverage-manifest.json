@@ -35,8 +35,8 @@
     "native-mc-maps": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
     "native-mc-sampling": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
     "native-path-topology": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
-    "native-raydn-geometry": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
-    "native-raydn-scene": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
+    "native-rayd-geometry": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+    "native-rayd-scene": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
     "native-scattering": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
     "native-field-rough-scale": "tests/kernels/test_field_rough_reflection_scale.py::test_rough_reflection_scale_contract_shapes_and_dtypes",
     "native-scattering-ensemble": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
@@ -81,7 +81,7 @@
     "public-core": "tests/core/test_public_scene.py::test_public_scene_objects_capture_structured_inputs",
     "public-deployment": "tests/performance/test_deployment_contract.py::test_pipeline_cache_key_is_stable_and_invalidates_all_contract_inputs",
     "public-materials": "tests/core/test_public_scene.py::test_materials_compile_scalar_parameters",
-    "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_raydn_scene_builder_preserves_native_order_flags_uv_and_keepalive",
+    "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive",
     "deterministic-rough-reflection-ad": "tests/ad/test_solver_rough_reflection_ad.py::test_rough_reflection_frequency_grad_matches_fd",
     "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
     "deterministic-scattering-realization": "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection",
@@ -1951,8 +1951,8 @@
       ]
     ],
     [
-      "raydn_coupled_dd_geometry_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_dd_geometry_forward",
+      "coupled_dd_geometry_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_dd_geometry_forward",
       "named_wrapper",
       "native-coupled-dd-geometry",
       [
@@ -1960,136 +1960,136 @@
       ]
     ],
     [
-      "raydn_coupled_rd_geometry_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_coupled_rd_geometry_forward",
+      "coupled_rd_geometry_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_rd_geometry_forward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-coupled"
       ]
     ],
     [
-      "raydn_diffraction_paths_order1_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_diffraction_paths_order1_forward",
+      "rayd_diffraction_paths_order1_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_diffraction_paths_order1_forward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-diffraction"
       ]
     ],
     [
-      "raydn_intersect_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_intersect_backward",
+      "rayd_intersect_backward",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_intersect_backward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_intersect_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_intersect_jvp",
+      "rayd_intersect_jvp",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_intersect_jvp",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_reflection_epc_paths_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_reflection_epc_paths_backward",
+      "rayd_reflection_epc_paths_backward",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_backward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_reflection_epc_paths_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_reflection_epc_paths_forward",
+      "rayd_reflection_epc_paths_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_reflection_epc_paths_forward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_reflection_epc_paths_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_reflection_epc_paths_jvp",
+      "rayd_reflection_epc_paths_jvp",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_jvp",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_scene_create",
-      "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_create",
+      "rayd_scene_create",
+      "witwin.channel_native.scene.kernels.rayd_scene.rayd_scene_create",
       "named_wrapper",
-      "native-raydn-scene",
+      "native-rayd-scene",
       [
         "scene-native"
       ]
     ],
     [
-      "raydn_scene_edge_records",
-      "witwin.channel_native.scene.kernels.rayd_scene.raydn_scene_edge_records",
+      "rayd_scene_edge_records",
+      "witwin.channel_native.scene.kernels.rayd_scene.rayd_scene_edge_records",
       "named_wrapper",
-      "native-raydn-scene",
+      "native-rayd-scene",
       [
         "scene-native"
       ]
     ],
     [
-      "raydn_scene_face_normals_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_scene_face_normals_backward",
+      "rayd_scene_face_normals_backward",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_scene_face_normals_backward",
       "named_wrapper",
-      "native-raydn-scene",
+      "native-rayd-scene",
       [
         "scene-native"
       ]
     ],
     [
-      "raydn_scene_face_normals_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_scene_face_normals_jvp",
+      "rayd_scene_face_normals_jvp",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_scene_face_normals_jvp",
       "named_wrapper",
-      "native-raydn-scene",
+      "native-rayd-scene",
       [
         "scene-native"
       ]
     ],
     [
-      "raydn_trace_reflections_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_backward",
+      "rayd_trace_reflections_backward",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_backward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_trace_reflections_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.raydn_trace_reflections_forward",
+      "rayd_trace_reflections_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_trace_reflections_forward",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_trace_reflections_forward_tape",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_forward_tape",
+      "rayd_trace_reflections_forward_tape",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_forward_tape",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]
     ],
     [
-      "raydn_trace_reflections_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.raydn_trace_reflections_jvp",
+      "rayd_trace_reflections_jvp",
+      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_jvp",
       "named_wrapper",
-      "native-raydn-geometry",
+      "native-rayd-geometry",
       [
         "path-reflection"
       ]

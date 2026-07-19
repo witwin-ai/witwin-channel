@@ -57,11 +57,11 @@ def _los_topology(
     )
     visible = None
     if bool(scene.structures) and plan.candidate_count > 0:
-        # ISB boundary taper (ADR-017), LoS member. When on, the hard RayDN
+        # ISB boundary taper (ADR-017), LoS member. When on, the hard RayD
         # occlusion gate is replaced by the C1 membership predicate tau > 0: LoS
         # rows within one taper margin of the shadow boundary survive and carry
         # the clearance factor (re-derived and applied in the field stage). The
-        # off path (the default) is untouched and stays the exact RayDN gate.
+        # off path (the default) is untouched and stays the exact RayD gate.
         taper_boxes = (
             occluder_boxes(compiled) if isb_boundary_taper else None
         )
@@ -86,7 +86,7 @@ def _los_topology(
             )
             visible = run_visibility_query(
                 VisibilityQuery(
-                    raydn=compiled.raydn,
+                    rayd=compiled.rayd,
                     start=visibility_inputs["start"],
                     end=visibility_inputs["end"],
                     active=visibility_inputs["active"],

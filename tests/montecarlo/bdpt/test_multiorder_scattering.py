@@ -103,8 +103,8 @@ def _require_cuda() -> None:
 
 def _require_native() -> None:
     _require_cuda()
-    if not build_info()["uses_raydn_native"]:
-        pytest.skip("RayDN native scattering is not built")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native scattering is not built")
 
 
 # --------------------------------------------------------------------------- #
