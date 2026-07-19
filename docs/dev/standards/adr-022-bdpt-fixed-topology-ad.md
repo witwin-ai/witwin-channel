@@ -1,6 +1,7 @@
 # ADR-022: BDPT full fixed-topology AD
 
-- **Status:** Proposed (worktree `wt/scattering-v2`; acceptance evidence pending)
+- **Status:** Accepted (2026-07-18; implemented on `wt/scattering-v2`, 24
+  companion-lockstep + 22 solver-level AD gates green, user-accepted)
 - **Date:** 2026-07-18
 - **Kind:** New native derivative companions + solver AD wiring. Every primal
   path bitwise unchanged; `ad_mode="none"` remains the default and builds no

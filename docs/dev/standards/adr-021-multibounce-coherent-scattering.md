@@ -1,6 +1,7 @@
 # ADR-021: Multi-bounce coherent polarimetric diffuse scattering
 
-- **Status:** Proposed (worktree `wt/scattering-v2`; acceptance evidence pending)
+- **Status:** Accepted (2026-07-18; implemented on `wt/scattering-v2`, final
+  verification 1037 tests / 0 failures on the 211-binding build, user-accepted)
 - **Date:** 2026-07-18
 - **Kind:** New numerical capability (new native ops + AD companions + path
   class). Every existing primal path stays bitwise unchanged: all new behavior
