@@ -72,13 +72,20 @@ def test_canonical_engine_has_no_legacy_batch_or_adapter_dependency():
 
 
 def test_typed_engine_remains_before_optional_scattering_append():
-    path_solve = _function(path_pipeline, "_solve_base")
-    deterministic_solve = _function(deterministic_pipeline, "solve")
-
-    for definition in (path_solve, deterministic_solve):
+    # ADR-021 budget refactor: the deterministic pipeline now routes the
+    # optional scattering append through a single-purpose ``_append_scattering``
+    # stage (it wraps ``append_scattering_evaluated_paths`` and the coherent
+    # combine gate), while the path pipeline still calls the append inline. In
+    # both, the typed engine (``evaluate_enumerated_paths``) still runs before
+    # the optional scattering append, and neither uses the legacy exports.
+    cases = (
+        (_function(path_pipeline, "_solve_base"), "append_scattering_evaluated_paths"),
+        (_function(deterministic_pipeline, "solve"), "_append_scattering"),
+    )
+    for definition, append_call in cases:
         assert (
             _call_line(definition, "evaluate_enumerated_paths")
-            < _call_line(definition, "append_scattering_evaluated_paths")
+            < _call_line(definition, append_call)
         )
         call_names = {
             node.func.id

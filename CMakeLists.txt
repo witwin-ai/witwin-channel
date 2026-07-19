@@ -470,6 +470,7 @@ Python_add_library(
     native/channel_native/binding/bdpt.cpp
     native/channel_native/build_info.cpp
     native/channel_native/bdpt.cpp
+    native/channel_native/bdpt_ad_dispatch.cpp
     native/channel_native/rayd/common.cpp
     native/channel_native/rayd/scene.cpp
     native/channel_native/rayd/geometry.cpp

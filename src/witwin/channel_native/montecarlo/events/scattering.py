@@ -616,7 +616,7 @@ def scattered_subpath_state(
 
     Post-scatter carrier semantics (ADR-021 D4): the scattered subpath's
     ``throughput_real`` is seeded from the FIELD-BASED incident power at this
-    vertex (``sqrt(p_te + p_tm)``, which excludes ``source_power`` — the
+    vertex (``sqrt(p_te + p_tm)``, which excludes ``source_power`` - the
     connection convention multiplies ``source_power`` separately), times the
     unbiased continuation amplitude ``sqrt(f_weighted * cos_o / (pdf * p))``.
     From this vertex on, ``|throughput|^2`` IS the authoritative unpolarized

@@ -367,7 +367,7 @@
     ],
     [
       "bdpt_accumulate_connection_samples_backward",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_accumulate_connection_samples_backward",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_accumulate_connection_samples_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -376,7 +376,7 @@
     ],
     [
       "bdpt_accumulate_connection_samples_jvp",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_accumulate_connection_samples_jvp",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_accumulate_connection_samples_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -529,7 +529,7 @@
     ],
     [
       "bdpt_endpoint_connection_samples_backward",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_endpoint_connection_samples_backward",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_endpoint_connection_samples_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -538,7 +538,7 @@
     ],
     [
       "bdpt_endpoint_connection_samples_jvp",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_endpoint_connection_samples_jvp",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_endpoint_connection_samples_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -745,7 +745,7 @@
     ],
     [
       "bdpt_reflected_light_subpath_state_backward",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_reflected_light_subpath_state_backward",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_reflected_light_subpath_state_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -754,7 +754,7 @@
     ],
     [
       "bdpt_reflected_light_subpath_state_jvp",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_reflected_light_subpath_state_jvp",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_reflected_light_subpath_state_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -853,7 +853,7 @@
     ],
     [
       "bdpt_transmitted_light_subpath_state_backward",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_transmitted_light_subpath_state_backward",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_transmitted_light_subpath_state_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -862,7 +862,7 @@
     ],
     [
       "bdpt_transmitted_light_subpath_state_jvp",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_transmitted_light_subpath_state_jvp",
+      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_transmitted_light_subpath_state_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [

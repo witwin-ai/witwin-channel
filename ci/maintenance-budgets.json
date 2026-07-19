@@ -7,7 +7,7 @@
       "reason": "Existing file-size debt scheduled for decomposition; grew by the MC-basic transmitter-polarization threading (F1/R5) and is frozen at the new surface pending that decomposition."
     },
     "src/witwin/channel_native/propagation/fields/kernels/autograd.py": {
-      "ceiling": 1857,
+      "ceiling": 1780,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "Existing file-size debt scheduled for decomposition; grew by the coupled R-D/D-R AD companions (ADR-011) and is frozen at the new surface pending that decomposition."
@@ -33,7 +33,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel_native/deterministic/pipeline.py::solve": {
-      "ceiling": 26,
+      "ceiling": 25,
       "expires_on": "2027-01-31",
       "owner": "deterministic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
@@ -81,7 +81,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel_native/montecarlo/bdpt/pipeline.py::_collect_connection_samples": {
-      "ceiling": 38,
+      "ceiling": 37,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
@@ -129,7 +129,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel_native/propagation/fields/evaluation.py::_evaluate_coupled_fields": {
-      "ceiling": 22,
+      "ceiling": 17,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."

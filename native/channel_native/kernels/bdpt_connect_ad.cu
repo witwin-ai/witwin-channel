@@ -414,7 +414,7 @@ pybind11::dict cn_bdpt_endpoint_connection_samples_backward_cuda(
         grad_light_field_imag = connect_zero({light_count, 3}, light_origin.options());
         grad_sensor_field_real = connect_zero({sensor_count, 3}, light_origin.options());
         // The sensor imaginary field never enters the forward; its derivative is
-        // exactly zero (reported, not a fallback silent-zero).
+        // exactly zero (reported explicitly, not a silent-zero substitute).
         grad_sensor_field_imag = connect_zero({sensor_count, 3}, light_origin.options());
     }
     if (need_grad_frequency) {

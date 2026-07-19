@@ -67,6 +67,16 @@ def _validate_ad_readiness(ad_mode: str, components: frozenset[str]) -> None:
     # companions; the readiness contract is enforced loudly at dispatch.
 
 
+def _validate_scattering_order(max_scattering_order: int) -> None:
+    """ADR-021 D4: the diffuse multi-order cap must be a positive bounce count.
+
+    Extracted to a module-level validator mirroring ``_validate_coherent_combine``
+    so ``__post_init__`` stays within its maintenance-complexity budget.
+    """
+    if max_scattering_order < 1:
+        raise ValueError("max_scattering_order must be >= 1")
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
     samples: int = 4096
@@ -123,8 +133,7 @@ class Config:
             raise ValueError("max_light_depth must be non-negative")
         if self.max_diffraction_order not in {0, 1}:
             raise ValueError("max_diffraction_order must be 0 or 1")
-        if self.max_scattering_order < 1:
-            raise ValueError("max_scattering_order must be >= 1")
+        _validate_scattering_order(self.max_scattering_order)
         components = validated_components(
             self.components,
             error_message="components must be a non-empty subset of {valid}",

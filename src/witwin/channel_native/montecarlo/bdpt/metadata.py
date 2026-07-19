@@ -87,6 +87,37 @@ def component_status(
     )
 
 
+def _ad_launch_accounting(
+    config: Config, ad_ledger: AdLaunchLedger | None
+) -> tuple[int, int, int]:
+    """ADR-022 companion accounting: backward/jvp launch counts and tape bytes.
+
+    ad_mode='none' wires no companions and retains no tape (bitwise default).
+    Under jvp/vjp report the companion launches this solve registered in the
+    AdLaunchLedger, exactly as montecarlo.basic does."""
+
+    ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
+    backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
+    jvp_launch_count = ledger.launches if config.ad_mode == "jvp" else 0
+    tape_bytes = ledger.tape_bytes if config.ad_mode == "vjp" else 0
+    return backward_launch_count, jvp_launch_count, tape_bytes
+
+
+def _component_max_depth(
+    config: Config, effective_max_depth: int
+) -> dict[str, int]:
+    depth = int(effective_max_depth)
+    return {
+        "los": 0 if "los" in config.components else -1,
+        "reflection": depth if "reflection" in config.components else -1,
+        "diffraction": min(1, depth) if "diffraction" in config.components else -1,
+        # transmission chains are capped like reflection; scattering is
+        # single-bounce in v1 and carries zero paths until its wave.
+        "transmission": depth if "transmission" in config.components else -1,
+        "scattering": min(1, depth) if "scattering" in config.components else -1,
+    }
+
+
 def make_solver_metadata(
     *,
     config: Config,
@@ -109,11 +140,10 @@ def make_solver_metadata(
     # ADR-022: ad_mode='none' wires no companions and retains no tape (bitwise
     # default). Under jvp/vjp report the companion launches this solve
     # registered in the AdLaunchLedger, exactly as montecarlo.basic does.
-    ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
     ad_active = config.ad_mode != "none"
-    backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
-    jvp_launch_count = ledger.launches if config.ad_mode == "jvp" else 0
-    tape_bytes = ledger.tape_bytes if config.ad_mode == "vjp" else 0
+    backward_launch_count, jvp_launch_count, tape_bytes = _ad_launch_accounting(
+        config, ad_ledger
+    )
     kernel_metadata = make_metadata(
         primitive="montecarlo_bdpt_primal",
         forward_launch_count=max(1, int(launch_count)),
@@ -216,23 +246,7 @@ def make_solver_metadata(
         config_metadata(
             requested=requested_config,
             effective=effective_config,
-            component_max_depth={
-                "los": 0 if "los" in config.components else -1,
-                "reflection": int(effective_max_depth)
-                if "reflection" in config.components
-                else -1,
-                "diffraction": min(1, int(effective_max_depth))
-                if "diffraction" in config.components
-                else -1,
-                # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1 and carries zero paths until its wave.
-                "transmission": int(effective_max_depth)
-                if "transmission" in config.components
-                else -1,
-                "scattering": min(1, int(effective_max_depth))
-                if "scattering" in config.components
-                else -1,
-            },
+            component_max_depth=_component_max_depth(config, effective_max_depth),
         )
     )
     metadata["semantic_capabilities"] = capabilities()["solvers"]["montecarlo_bdpt"]

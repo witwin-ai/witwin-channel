@@ -164,6 +164,360 @@ def _merge_scattered_state(
     return out
 
 
+def _select_surface_events(
+    *,
+    cos_theta: torch.Tensor,
+    material_id: torch.Tensor,
+    hit_ok: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor],
+    layer_csr: dict[str, torch.Tensor],
+    runtimes: dict[int, Any],
+    frequency_value: float,
+    samples: int,
+    seed: int,
+    tx_index: int,
+    bounce: int,
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    """Three-way (scatter / transmit / reflect) event selection at a surface hit.
+
+    Pure lift of plan section 7.1's frozen event-probability stack: the smooth
+    two-way split, the rough three-way budget overlay on rough rows, and the
+    single seeded uniform that partitions scatter/transmit/reflect. Returns the
+    per-row selection masks plus the probabilities the unbiased weighting reads.
+    """
+
+    stack = em_layer_stack_eval(
+        cos_theta,
+        material_id.clamp_min(0),
+        layer_csr["layer_offset"],
+        layer_csr["layer_count"],
+        layer_csr["layer_thickness_m"],
+        layer_csr["layer_eps_r"],
+        layer_csr["layer_sigma_e"],
+        layer_csr["layer_mu_r"],
+        frequency_hz=frequency_value,
+    )
+    r_eff, t_eff = unpolarized_power_budgets(stack)
+    p_transmit = transmission_event_probability(r_eff, t_eff)
+    uniforms = event_uniforms(
+        int(samples), seed=seed, tx_index=tx_index, depth=bounce, device=device
+    )
+    if runtimes:
+        rough_probs = three_way_rough_probabilities(
+            cos_theta,
+            material_id,
+            material_bundle,
+            stack,
+            frequency_hz=frequency_value,
+        )
+        rough = rough_probs["rough"] & hit_ok
+        p_scatter = torch.where(
+            rough, rough_probs["p_scatter"], torch.zeros_like(p_transmit)
+        )
+        # Smooth rows keep the exact wave-2 two-way probability;
+        # rough rows switch to the three-way budget split.
+        p_transmit = torch.where(rough, rough_probs["p_transmit"], p_transmit)
+        coherent_amplitude = torch.where(
+            rough,
+            rough_probs["r_coh_amplitude"],
+            torch.ones_like(p_transmit),
+        )
+    else:
+        rough = torch.zeros_like(hit_ok)
+        p_scatter = torch.zeros_like(p_transmit)
+        coherent_amplitude = torch.ones_like(p_transmit)
+    # One uniform partitions the three events: [0, p_s) scatter,
+    # [p_s, p_s + p_t) transmit, else reflect. Smooth faces have
+    # p_s = 0 exactly, so their transmit test u < p_t is unchanged.
+    choose_scatter = hit_ok & (uniforms < p_scatter)
+    choose_transmit = (
+        hit_ok & ~choose_scatter & (uniforms < p_scatter + p_transmit)
+    )
+    return {
+        "choose_scatter": choose_scatter,
+        "choose_transmit": choose_transmit,
+        "rough": rough,
+        "p_scatter": p_scatter,
+        "p_transmit": p_transmit,
+        "coherent_amplitude": coherent_amplitude,
+    }
+
+
+def _emit_scatter_nee(
+    *,
+    raydn: Any,
+    sensor: dict[str, torch.Tensor],
+    state: dict[str, torch.Tensor],
+    hit: dict[str, torch.Tensor],
+    merged: dict[str, torch.Tensor],
+    choose_scatter: torch.Tensor,
+    p_scatter: torch.Tensor,
+    material_id: torch.Tensor,
+    material_axis_rad: torch.Tensor,
+    runtimes: dict[int, Any],
+    max_scattering_order: int,
+    samples: int,
+    seed: int,
+    tx_index: int,
+    bounce: int,
+    device: torch.device,
+    scene_diagonal: float,
+    frequency_hz: float | torch.Tensor,
+    frequency_value: float,
+    tx_power: torch.Tensor,
+    ad: bool,
+    ledger: object | None,
+    sample_blocks: list[dict[str, torch.Tensor]],
+) -> tuple[dict[str, torch.Tensor], torch.Tensor, int]:
+    """Scatter branch: local frames, the scattered subpath overlay, and NEE rows.
+
+    Pure lift of the scatter-selected emission block (plan section 7.1, ADR-021
+    D4). Appends the NEE connection block (when any) to ``sample_blocks`` and
+    returns the (possibly overlaid) merged state, the scattered-valid mask, and
+    the count of emitted NEE rows."""
+
+    scattered_valid = torch.zeros_like(choose_scatter)
+    nee_rows = 0
+    if runtimes and bool(choose_scatter.any()):
+        # Local roughness frames from the shading normal flipped
+        # toward the incident side (roughness applies to whichever
+        # side is illuminated in v1; the store carries front-surface
+        # statistics only).
+        direction = state["direction"]
+        hit_normal = hit["n"]
+        normal_flipped = torch.where(
+            ((direction * hit_normal).sum(dim=-1) > 0.0)[:, None],
+            -hit_normal,
+            hit_normal,
+        )
+        axis_rad = material_axis_rad.index_select(
+            0, material_id.clamp_min(0).to(torch.int64)
+        )
+        frame_t1, frame_t2 = local_frames(normal_flipped, axis_rad)
+        wi_world = -direction
+        wi_local = world_to_local(wi_world, frame_t1, frame_t2, normal_flipped)
+        p_te, p_tm = te_tm_incident_power(
+            state["field_real"],
+            state["field_imag"],
+            direction,
+            normal_flipped,
+        )
+        if int(max_scattering_order) > 1:
+            # A subpath that has ALREADY scattered carries no Complex3
+            # field (cleared at the previous scatter vertex); its
+            # incident power lives in the scalar throughput. Route that
+            # unpolarized power into the local TE/TM channels so both
+            # the NEE row and the continuation weight see the correct
+            # incident power at this vertex. Order 1 never reaches here
+            # (no subpath is ever a continued scatter), so the default
+            # stays bitwise the field-based decomposition above.
+            already_scattered = (
+                state["component_mask"] & MASK_SCATTERING
+            ) != 0
+            carried_te, carried_tm = scatter_carried_incident_power(
+                state["throughput_real"], state["throughput_imag"]
+            )
+            p_te = torch.where(already_scattered, carried_te, p_te)
+            p_tm = torch.where(already_scattered, carried_tm, p_tm)
+        direction_uniforms = scatter_direction_uniforms(
+            int(samples),
+            seed=seed,
+            tx_index=tx_index,
+            depth=bounce,
+            device=device,
+        )
+        scattered = scattered_subpath_state(
+            state,
+            hit,
+            choose_scatter=choose_scatter,
+            normal=normal_flipped,
+            frame_t1=frame_t1,
+            frame_t2=frame_t2,
+            wi_local=wi_local,
+            p_te=p_te,
+            p_tm=p_tm,
+            p_scatter=p_scatter,
+            material_id=material_id,
+            runtimes=runtimes,
+            uniforms=direction_uniforms,
+            scene_diagonal=scene_diagonal,
+            ad=ad,
+            ledger=ledger,
+        )
+        scattered_valid = scattered["valid"]
+        merged = _merge_scattered_state(merged, scattered, choose_scatter)
+        rows = torch.nonzero(scattered_valid, as_tuple=False).flatten()
+        if int(rows.numel()):
+            scatter_source_power = state["source_power"].index_select(0, rows)
+            if ad:
+                # ADR-022 tx_power threading: reattach the live per-tx
+                # power's gradient onto the detached native source power
+                # for the scatter-selected rows (values bitwise-identical,
+                # so the scattering NEE primal is unchanged).
+                scatter_tx_id = (
+                    state["tx_id"].index_select(0, rows).to(torch.int64)
+                )
+                live_source_power = tx_power.index_select(0, scatter_tx_id)
+                scatter_source_power = scatter_source_power + (
+                    live_source_power - live_source_power.detach()
+                )
+            nee_block = scattering_nee_connection_samples(
+                raydn,
+                sensor,
+                runtimes,
+                position=hit["p"].index_select(0, rows),
+                normal=normal_flipped.index_select(0, rows),
+                frame_t1=frame_t1.index_select(0, rows),
+                frame_t2=frame_t2.index_select(0, rows),
+                wi_local=wi_local.index_select(0, rows),
+                p_te=p_te.index_select(0, rows),
+                p_tm=p_tm.index_select(0, rows),
+                p_scatter=p_scatter.index_select(0, rows),
+                material_id=material_id.index_select(0, rows),
+                source_power=scatter_source_power,
+                tx_id=state["tx_id"].index_select(0, rows),
+                light_depth=scattered["depth"].index_select(0, rows),
+                path_length_at_vertex=scattered["path_length"].index_select(
+                    0, rows
+                ),
+                # ADR-015 Part A: hand the live frequency tensor to the
+                # radiometric factor under ad; frequency_value stays the
+                # host scalar for the sampling/pdf paths.
+                frequency_hz=frequency_hz if ad else frequency_value,
+                samples=int(samples),
+                scene_diagonal=scene_diagonal,
+                ad=ad,
+                ledger=ledger,
+            )
+            if nee_block is not None:
+                sample_blocks.append(nee_block)
+                nee_rows += int(nee_block["valid"].sum())
+    return merged, scattered_valid, nee_rows
+
+
+def _emit_mixed_transmission(
+    *,
+    raydn: Any,
+    sensor: dict[str, torch.Tensor],
+    merged: dict[str, torch.Tensor],
+    choose_scatter: torch.Tensor,
+    emit_mixed_transmission: bool,
+    sensor_count: int,
+    samples: int,
+    tx_power: torch.Tensor,
+    frequency_hz: float | torch.Tensor,
+    frequency_value: float,
+    mis: str,
+    beta: float,
+    ad: bool,
+    ledger: object | None,
+    sample_blocks: list[dict[str, torch.Tensor]],
+) -> None:
+    """Emit the MIXED reflection+transmission endpoint connection (component 5).
+
+    Pure lift of the mixed-transmission emission block (wave 2): connects only the
+    reflect-and-transmit subpaths through the native endpoint kernel, filters by
+    visibility, and appends the resulting block to ``sample_blocks``."""
+
+    mask = merged["component_mask"]
+    mixed = (
+        merged["valid"]
+        & ~choose_scatter
+        & ((mask & _MASK_REFLECTION) != 0)
+        & ((mask & _MASK_TRANSMISSION) != 0)
+        # Post-scatter subpaths carry no Complex3 field (cleared at
+        # the scatter vertex); their |F|^2 = 0 endpoint rows would
+        # contribute nothing while contaminating the component-5
+        # sample statistics. Their path class (S -> ... -> T) is
+        # explicitly not covered in v1 (ADR-021 D4). At order 1 no
+        # subpath survives with the scattering bit, so this term is
+        # structurally inert for the default.
+        & ((mask & MASK_SCATTERING) == 0)
+    )
+    if emit_mixed_transmission and bool(mixed.any()):
+        if ad:
+            samples_out = bdpt_endpoint_connection_samples_ad(
+                merged,
+                sensor,
+                tx_power,
+                frequency=frequency_hz,
+                frequency_value=frequency_value,
+                samples_per_tx=int(samples),
+                max_paths=None,
+                mis=mis,
+                beta=beta,
+                strategy_count=1,
+            )
+            if ledger is not None:
+                ledger.add(
+                    merged["field_real"],
+                    merged["field_imag"],
+                    sensor["field_real"],
+                    sensor["field_imag"],
+                )
+        else:
+            samples_out = bdpt_endpoint_connection_samples(
+                merged,
+                sensor,
+                frequency_hz=frequency_value,
+                samples_per_tx=int(samples),
+                max_paths=None,
+                mis=mis,
+                beta=beta,
+                strategy_count=1,
+            )
+        visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
+            merged,
+            sensor,
+            sample_count=int(samples_out["valid"].shape[0]),
+        )
+        visible = geometry_bridge.raydn_visibility_forward(
+            raydn.require_handle(),
+            visibility_inputs["start"],
+            visibility_inputs["end"],
+            visibility_inputs["active"],
+        )[0]
+        keep = visible & mixed.repeat_interleave(sensor_count)
+        sample_blocks.append(bdpt_filter_connection_samples(samples_out, keep))
+
+
+def _apply_scatter_continuation(
+    *,
+    merged: dict[str, torch.Tensor],
+    scatter_count: torch.Tensor | None,
+    choose_scatter: torch.Tensor,
+    scattered_valid: torch.Tensor,
+    max_scattering_order: int,
+) -> torch.Tensor | None:
+    """Terminate (order 1) or continue (order > 1) scattered subpaths.
+
+    Pure lift of the continuation/kill logic (ADR-021 D4). Mutates
+    ``merged['valid']`` in place and returns the updated scatter-event tally."""
+
+    if scatter_count is None:
+        # order 1 (default): scattered subpaths connected above and
+        # terminate here; reflection/transmission never follow them.
+        merged["valid"] = merged["valid"] & ~choose_scatter
+        return None
+    # order > 1 (ADR-021 D4): a successfully scattered subpath
+    # CONTINUES (its new direction/origin/throughput are already
+    # overlaid in ``merged`` by _merge_scattered_state) until it
+    # reaches the scatter-event cap. NEE rows were emitted above at
+    # this vertex exactly as at order 1. Count only successful
+    # scatter events; a subpath that just hit the cap terminates
+    # (its NEE is already recorded), and a scatter selection whose
+    # direction sample failed is dropped.
+    scatter_count = scatter_count + scattered_valid.to(scatter_count.dtype)
+    reached_cap = scatter_count >= int(max_scattering_order)
+    merged["valid"] = (
+        merged["valid"]
+        & ~(choose_scatter & ~scattered_valid)
+        & ~reached_cap
+    )
+    return scatter_count
+
+
 def _transmission_sampled_connection_samples(
     raydn: Any,
     tx_positions: torch.Tensor,
@@ -296,53 +650,26 @@ def _transmission_sampled_connection_samples(
             # frozen under ADR-022): always the non-AD primal evaluation with the
             # host scalar. Material/layer gradients ride the subpath _ad kernels
             # below, not this selection stack.
-            stack = em_layer_stack_eval(
-                cos_theta,
-                material_id.clamp_min(0),
-                layer_csr["layer_offset"],
-                layer_csr["layer_count"],
-                layer_csr["layer_thickness_m"],
-                layer_csr["layer_eps_r"],
-                layer_csr["layer_sigma_e"],
-                layer_csr["layer_mu_r"],
-                frequency_hz=frequency_value,
+            events = _select_surface_events(
+                cos_theta=cos_theta,
+                material_id=material_id,
+                hit_ok=hit_ok,
+                material_bundle=material_bundle,
+                layer_csr=layer_csr,
+                runtimes=runtimes,
+                frequency_value=frequency_value,
+                samples=samples,
+                seed=seed,
+                tx_index=tx_index,
+                bounce=bounce,
+                device=device,
             )
-            r_eff, t_eff = unpolarized_power_budgets(stack)
-            p_transmit = transmission_event_probability(r_eff, t_eff)
-            uniforms = event_uniforms(
-                int(samples), seed=seed, tx_index=tx_index, depth=bounce, device=device
-            )
-            if runtimes:
-                rough_probs = three_way_rough_probabilities(
-                    cos_theta,
-                    material_id,
-                    material_bundle,
-                    stack,
-                    frequency_hz=frequency_value,
-                )
-                rough = rough_probs["rough"] & hit_ok
-                p_scatter = torch.where(
-                    rough, rough_probs["p_scatter"], torch.zeros_like(p_transmit)
-                )
-                # Smooth rows keep the exact wave-2 two-way probability;
-                # rough rows switch to the three-way budget split.
-                p_transmit = torch.where(rough, rough_probs["p_transmit"], p_transmit)
-                coherent_amplitude = torch.where(
-                    rough,
-                    rough_probs["r_coh_amplitude"],
-                    torch.ones_like(p_transmit),
-                )
-            else:
-                rough = torch.zeros_like(hit_ok)
-                p_scatter = torch.zeros_like(p_transmit)
-                coherent_amplitude = torch.ones_like(p_transmit)
-            # One uniform partitions the three events: [0, p_s) scatter,
-            # [p_s, p_s + p_t) transmit, else reflect. Smooth faces have
-            # p_s = 0 exactly, so their transmit test u < p_t is unchanged.
-            choose_scatter = hit_ok & (uniforms < p_scatter)
-            choose_transmit = (
-                hit_ok & ~choose_scatter & (uniforms < p_scatter + p_transmit)
-            )
+            choose_scatter = events["choose_scatter"]
+            choose_transmit = events["choose_transmit"]
+            rough = events["rough"]
+            p_scatter = events["p_scatter"]
+            p_transmit = events["p_transmit"]
+            coherent_amplitude = events["coherent_amplitude"]
             if ad:
                 if ledger is not None:
                     ledger.add(
@@ -451,206 +778,61 @@ def _transmission_sampled_connection_samples(
                     merged["valid"], merged[key] * p_event, torch.zeros_like(p_event)
                 )
 
-            scattered_valid = torch.zeros_like(choose_scatter)
-            if runtimes and bool(choose_scatter.any()):
-                # Local roughness frames from the shading normal flipped
-                # toward the incident side (roughness applies to whichever
-                # side is illuminated in v1; the store carries front-surface
-                # statistics only).
-                direction = state["direction"]
-                hit_normal = hit["n"]
-                normal_flipped = torch.where(
-                    ((direction * hit_normal).sum(dim=-1) > 0.0)[:, None],
-                    -hit_normal,
-                    hit_normal,
-                )
-                axis_rad = material_axis_rad.index_select(
-                    0, material_id.clamp_min(0).to(torch.int64)
-                )
-                frame_t1, frame_t2 = local_frames(normal_flipped, axis_rad)
-                wi_world = -direction
-                wi_local = world_to_local(wi_world, frame_t1, frame_t2, normal_flipped)
-                p_te, p_tm = te_tm_incident_power(
-                    state["field_real"],
-                    state["field_imag"],
-                    direction,
-                    normal_flipped,
-                )
-                if int(max_scattering_order) > 1:
-                    # A subpath that has ALREADY scattered carries no Complex3
-                    # field (cleared at the previous scatter vertex); its
-                    # incident power lives in the scalar throughput. Route that
-                    # unpolarized power into the local TE/TM channels so both
-                    # the NEE row and the continuation weight see the correct
-                    # incident power at this vertex. Order 1 never reaches here
-                    # (no subpath is ever a continued scatter), so the default
-                    # stays bitwise the field-based decomposition above.
-                    already_scattered = (
-                        state["component_mask"] & MASK_SCATTERING
-                    ) != 0
-                    carried_te, carried_tm = scatter_carried_incident_power(
-                        state["throughput_real"], state["throughput_imag"]
-                    )
-                    p_te = torch.where(already_scattered, carried_te, p_te)
-                    p_tm = torch.where(already_scattered, carried_tm, p_tm)
-                direction_uniforms = scatter_direction_uniforms(
-                    int(samples),
-                    seed=seed,
-                    tx_index=tx_index,
-                    depth=bounce,
-                    device=device,
-                )
-                scattered = scattered_subpath_state(
-                    state,
-                    hit,
-                    choose_scatter=choose_scatter,
-                    normal=normal_flipped,
-                    frame_t1=frame_t1,
-                    frame_t2=frame_t2,
-                    wi_local=wi_local,
-                    p_te=p_te,
-                    p_tm=p_tm,
-                    p_scatter=p_scatter,
-                    material_id=material_id,
-                    runtimes=runtimes,
-                    uniforms=direction_uniforms,
-                    scene_diagonal=scene_diagonal,
-                    ad=ad,
-                    ledger=ledger,
-                )
-                scattered_valid = scattered["valid"]
-                merged = _merge_scattered_state(merged, scattered, choose_scatter)
-                rows = torch.nonzero(scattered_valid, as_tuple=False).flatten()
-                if int(rows.numel()):
-                    scatter_source_power = state["source_power"].index_select(0, rows)
-                    if ad:
-                        # ADR-022 tx_power threading: reattach the live per-tx
-                        # power's gradient onto the detached native source power
-                        # for the scatter-selected rows (values bitwise-identical,
-                        # so the scattering NEE primal is unchanged).
-                        scatter_tx_id = (
-                            state["tx_id"].index_select(0, rows).to(torch.int64)
-                        )
-                        live_source_power = tx_power.index_select(0, scatter_tx_id)
-                        scatter_source_power = scatter_source_power + (
-                            live_source_power - live_source_power.detach()
-                        )
-                    nee_block = scattering_nee_connection_samples(
-                        raydn,
-                        sensor,
-                        runtimes,
-                        position=hit["p"].index_select(0, rows),
-                        normal=normal_flipped.index_select(0, rows),
-                        frame_t1=frame_t1.index_select(0, rows),
-                        frame_t2=frame_t2.index_select(0, rows),
-                        wi_local=wi_local.index_select(0, rows),
-                        p_te=p_te.index_select(0, rows),
-                        p_tm=p_tm.index_select(0, rows),
-                        p_scatter=p_scatter.index_select(0, rows),
-                        material_id=material_id.index_select(0, rows),
-                        source_power=scatter_source_power,
-                        tx_id=state["tx_id"].index_select(0, rows),
-                        light_depth=scattered["depth"].index_select(0, rows),
-                        path_length_at_vertex=scattered["path_length"].index_select(
-                            0, rows
-                        ),
-                        # ADR-015 Part A: hand the live frequency tensor to the
-                        # radiometric factor under ad; frequency_value stays the
-                        # host scalar for the sampling/pdf paths.
-                        frequency_hz=frequency_hz if ad else frequency_value,
-                        samples=int(samples),
-                        scene_diagonal=scene_diagonal,
-                        ad=ad,
-                        ledger=ledger,
-                    )
-                    if nee_block is not None:
-                        sample_blocks.append(nee_block)
-                        nee_rows += int(nee_block["valid"].sum())
+            merged, scattered_valid, scatter_nee_rows = _emit_scatter_nee(
+                raydn=raydn,
+                sensor=sensor,
+                state=state,
+                hit=hit,
+                merged=merged,
+                choose_scatter=choose_scatter,
+                p_scatter=p_scatter,
+                material_id=material_id,
+                material_axis_rad=material_axis_rad,
+                runtimes=runtimes,
+                max_scattering_order=max_scattering_order,
+                samples=samples,
+                seed=seed,
+                tx_index=tx_index,
+                bounce=bounce,
+                device=device,
+                scene_diagonal=scene_diagonal,
+                frequency_hz=frequency_hz,
+                frequency_value=frequency_value,
+                tx_power=tx_power,
+                ad=ad,
+                ledger=ledger,
+                sample_blocks=sample_blocks,
+            )
+            nee_rows += scatter_nee_rows
             transmit_events += int((choose_transmit & merged["valid"]).sum())
             scatter_events += int(scattered_valid.sum())
             reflect_events += int(
                 (~choose_transmit & ~choose_scatter & merged["valid"]).sum()
             )
-            mask = merged["component_mask"]
-            mixed = (
-                merged["valid"]
-                & ~choose_scatter
-                & ((mask & _MASK_REFLECTION) != 0)
-                & ((mask & _MASK_TRANSMISSION) != 0)
-                # Post-scatter subpaths carry no Complex3 field (cleared at
-                # the scatter vertex); their |F|^2 = 0 endpoint rows would
-                # contribute nothing while contaminating the component-5
-                # sample statistics. Their path class (S -> ... -> T) is
-                # explicitly not covered in v1 (ADR-021 D4). At order 1 no
-                # subpath survives with the scattering bit, so this term is
-                # structurally inert for the default.
-                & ((mask & MASK_SCATTERING) == 0)
+            _emit_mixed_transmission(
+                raydn=raydn,
+                sensor=sensor,
+                merged=merged,
+                choose_scatter=choose_scatter,
+                emit_mixed_transmission=emit_mixed_transmission,
+                sensor_count=sensor_count,
+                samples=samples,
+                tx_power=tx_power,
+                frequency_hz=frequency_hz,
+                frequency_value=frequency_value,
+                mis=mis,
+                beta=beta,
+                ad=ad,
+                ledger=ledger,
+                sample_blocks=sample_blocks,
             )
-            if emit_mixed_transmission and bool(mixed.any()):
-                if ad:
-                    samples_out = bdpt_endpoint_connection_samples_ad(
-                        merged,
-                        sensor,
-                        tx_power,
-                        frequency=frequency_hz,
-                        frequency_value=frequency_value,
-                        samples_per_tx=int(samples),
-                        max_paths=None,
-                        mis=mis,
-                        beta=beta,
-                        strategy_count=1,
-                    )
-                    if ledger is not None:
-                        ledger.add(
-                            merged["field_real"],
-                            merged["field_imag"],
-                            sensor["field_real"],
-                            sensor["field_imag"],
-                        )
-                else:
-                    samples_out = bdpt_endpoint_connection_samples(
-                        merged,
-                        sensor,
-                        frequency_hz=frequency_value,
-                        samples_per_tx=int(samples),
-                        max_paths=None,
-                        mis=mis,
-                        beta=beta,
-                        strategy_count=1,
-                    )
-                visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
-                    merged,
-                    sensor,
-                    sample_count=int(samples_out["valid"].shape[0]),
-                )
-                visible = geometry_bridge.raydn_visibility_forward(
-                    raydn.require_handle(),
-                    visibility_inputs["start"],
-                    visibility_inputs["end"],
-                    visibility_inputs["active"],
-                )[0]
-                keep = visible & mixed.repeat_interleave(sensor_count)
-                sample_blocks.append(bdpt_filter_connection_samples(samples_out, keep))
-            if scatter_count is None:
-                # order 1 (default): scattered subpaths connected above and
-                # terminate here; reflection/transmission never follow them.
-                merged["valid"] = merged["valid"] & ~choose_scatter
-            else:
-                # order > 1 (ADR-021 D4): a successfully scattered subpath
-                # CONTINUES (its new direction/origin/throughput are already
-                # overlaid in ``merged`` by _merge_scattered_state) until it
-                # reaches the scatter-event cap. NEE rows were emitted above at
-                # this vertex exactly as at order 1. Count only successful
-                # scatter events; a subpath that just hit the cap terminates
-                # (its NEE is already recorded), and a scatter selection whose
-                # direction sample failed is dropped.
-                scatter_count = scatter_count + scattered_valid.to(scatter_count.dtype)
-                reached_cap = scatter_count >= int(max_scattering_order)
-                merged["valid"] = (
-                    merged["valid"]
-                    & ~(choose_scatter & ~scattered_valid)
-                    & ~reached_cap
-                )
+            scatter_count = _apply_scatter_continuation(
+                merged=merged,
+                scatter_count=scatter_count,
+                choose_scatter=choose_scatter,
+                scattered_valid=scattered_valid,
+                max_scattering_order=max_scattering_order,
+            )
             if not bool(merged["valid"].any()):
                 break
             state = merged

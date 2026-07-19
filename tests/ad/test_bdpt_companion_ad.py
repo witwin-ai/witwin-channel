@@ -23,7 +23,7 @@ under-specified for the Python facade spelling; the native ABI symbol names are
 normative):
 
 * The ``_backward`` / ``_jvp`` FACADES live beside their forwards in
-  ``montecarlo.bdpt.kernels.paths`` / ``.maps`` (the ``scattering`` chain
+  ``montecarlo.bdpt.paths_ad`` / ``.maps`` (the ``scattering`` chain
   precedent: ``functional.*_backward``), named ``<forward>_backward`` /
   ``<forward>_jvp``, taking the forward's positional/keyword args plus
   ``grad_*`` / ``need_grad_*`` (backward) or ``tangent_*`` (jvp) keywords.
@@ -47,6 +47,7 @@ from tests.ad._tolerances import ABS_TOL
 from tests.reference import bdpt_ad_oracles as O
 from witwin.channel_native.montecarlo.bdpt.kernels import maps as M
 from witwin.channel_native.montecarlo.bdpt.kernels import paths as P
+from witwin.channel_native.montecarlo.bdpt import paths_ad as PA
 from witwin.channel_native.runtime import symbols
 
 pytestmark = pytest.mark.skipif(
@@ -269,7 +270,7 @@ def test_reflected_backward_matches_oracle():
         "grad_throughput_real": rc(fx["rows"]),
         "grad_throughput_imag": rc(fx["rows"]),
     }
-    native = P.bdpt_reflected_light_subpath_state_backward(
+    native = PA.bdpt_reflected_light_subpath_state_backward(
         light, inter, **material, frequency_hz=_FREQ, **grads,
         need_grad_material=True, need_grad_field_in=True, need_grad_frequency=True,
     )
@@ -320,7 +321,7 @@ def test_reflected_jvp_matches_oracle():
         "tangent_light_throughput_imag": rc(fx["rows"]),
     }
     t_freq = float(rc(1))
-    native = P.bdpt_reflected_light_subpath_state_jvp(
+    native = PA.bdpt_reflected_light_subpath_state_jvp(
         light, inter, **material, frequency_hz=_FREQ, tangent_frequency=t_freq,
         **tangents,
     )
@@ -377,7 +378,7 @@ def test_reflected_jvp_vjp_duality():
         "tangent_light_throughput_real": rc(fx["rows"]),
         "tangent_light_throughput_imag": rc(fx["rows"]),
     }
-    jvp = P.bdpt_reflected_light_subpath_state_jvp(
+    jvp = PA.bdpt_reflected_light_subpath_state_jvp(
         light, inter, **material, frequency_hz=_FREQ, tangent_frequency=0.0, **tangents
     )
     cot = {k: rc(*jvp[k].shape) for k in (
@@ -386,7 +387,7 @@ def test_reflected_jvp_vjp_duality():
     )}
     lhs = sum((cot[k].double() * jvp[k].double()).sum() for k in cot)
 
-    vjp = P.bdpt_reflected_light_subpath_state_backward(
+    vjp = PA.bdpt_reflected_light_subpath_state_backward(
         light, inter, **material, frequency_hz=_FREQ,
         grad_field_real=cot["tangent_field_real"],
         grad_field_imag=cot["tangent_field_imag"],
@@ -412,7 +413,7 @@ def test_reflected_backward_need_flag_gating():
     light, inter, material = _reflect_native(fx)
     zeros3 = torch.zeros(fx["rows"], 3, device="cuda")
     zeros1 = torch.zeros(fx["rows"], device="cuda")
-    out = P.bdpt_reflected_light_subpath_state_backward(
+    out = PA.bdpt_reflected_light_subpath_state_backward(
         light, inter, **material, frequency_hz=_FREQ,
         grad_field_real=zeros3.clone(), grad_field_imag=zeros3.clone(),
         grad_throughput_real=zeros1.clone(), grad_throughput_imag=zeros1.clone(),
@@ -531,7 +532,7 @@ def test_transmitted_backward_matches_oracle():
         "grad_field_real": rc(fx["rows"], 3), "grad_field_imag": rc(fx["rows"], 3),
         "grad_throughput_real": rc(fx["rows"]), "grad_throughput_imag": rc(fx["rows"]),
     }
-    native = P.bdpt_transmitted_light_subpath_state_backward(
+    native = PA.bdpt_transmitted_light_subpath_state_backward(
         light, inter, **csr, frequency_hz=_FREQ, **grads,
         need_grad_layers=True, need_grad_field_in=True, need_grad_frequency=True,
     )
@@ -583,7 +584,7 @@ def test_transmitted_jvp_vjp_duality():
         "tangent_light_throughput_real": rc(fx["rows"]),
         "tangent_light_throughput_imag": rc(fx["rows"]),
     }
-    jvp = P.bdpt_transmitted_light_subpath_state_jvp(
+    jvp = PA.bdpt_transmitted_light_subpath_state_jvp(
         light, inter, **csr, frequency_hz=_FREQ, tangent_frequency=0.0, **tangents
     )
     cot = {k: rc(*jvp[k].shape) for k in (
@@ -592,7 +593,7 @@ def test_transmitted_jvp_vjp_duality():
     )}
     lhs = sum((cot[k].double() * jvp[k].double()).sum() for k in cot)
 
-    vjp = P.bdpt_transmitted_light_subpath_state_backward(
+    vjp = PA.bdpt_transmitted_light_subpath_state_backward(
         light, inter, **csr, frequency_hz=_FREQ,
         grad_field_real=cot["tangent_field_real"],
         grad_field_imag=cot["tangent_field_imag"],
@@ -617,7 +618,7 @@ def test_transmitted_backward_need_flag_gating():
     light, inter, csr = _transmit_native(fx)
     zeros3 = torch.zeros(fx["rows"], 3, device="cuda")
     zeros1 = torch.zeros(fx["rows"], device="cuda")
-    out = P.bdpt_transmitted_light_subpath_state_backward(
+    out = PA.bdpt_transmitted_light_subpath_state_backward(
         light, inter, **csr, frequency_hz=_FREQ,
         grad_field_real=zeros3.clone(), grad_field_imag=zeros3.clone(),
         grad_throughput_real=zeros1.clone(), grad_throughput_imag=zeros1.clone(),
@@ -731,7 +732,7 @@ def test_endpoint_backward_matches_oracle():
     grad_contribution = torch.randn(
         fx["tx"] * fx["rx"], generator=g, device="cuda", dtype=torch.float32
     )
-    native = P.bdpt_endpoint_connection_samples_backward(
+    native = PA.bdpt_endpoint_connection_samples_backward(
         light, sensor, frequency_hz=_FREQ, samples_per_tx=spt, mis="none",
         beta=2.0, strategy_count=1, max_paths=None,
         grad_contribution=grad_contribution,
@@ -780,7 +781,7 @@ def test_endpoint_jvp_vjp_duality():
         "tangent_light_field_imag": rc(fx["tx"], 3),
         "tangent_tx_power": rc(fx["tx"]),
     }
-    jvp = P.bdpt_endpoint_connection_samples_jvp(
+    jvp = PA.bdpt_endpoint_connection_samples_jvp(
         light, sensor, frequency_hz=_FREQ, samples_per_tx=spt, mis="none",
         beta=2.0, strategy_count=1, max_paths=None,
         tangent_frequency=0.0, **tangents,
@@ -788,7 +789,7 @@ def test_endpoint_jvp_vjp_duality():
     cot = rc(*jvp["tangent_contribution"].shape)
     lhs = (cot.double() * jvp["tangent_contribution"].double()).sum()
 
-    vjp = P.bdpt_endpoint_connection_samples_backward(
+    vjp = PA.bdpt_endpoint_connection_samples_backward(
         light, sensor, frequency_hz=_FREQ, samples_per_tx=spt, mis="none",
         beta=2.0, strategy_count=1, max_paths=None,
         grad_contribution=cot,
@@ -806,7 +807,7 @@ def test_endpoint_backward_need_flag_gating():
     fx = _endpoint_fixture(59)
     light, sensor = _endpoint_native(fx)
     grad_contribution = torch.zeros(fx["tx"] * fx["rx"], device="cuda")
-    out = P.bdpt_endpoint_connection_samples_backward(
+    out = PA.bdpt_endpoint_connection_samples_backward(
         light, sensor, frequency_hz=_FREQ, samples_per_tx=4, mis="none",
         beta=2.0, strategy_count=1, max_paths=None,
         grad_contribution=grad_contribution,
@@ -888,7 +889,7 @@ def test_accumulate_power_backward_matches_oracle():
         for name in ("grad_path_gain", "grad_los", "grad_reflection",
                      "grad_diffraction", "grad_transmission", "grad_scattering")
     }
-    native = P.bdpt_accumulate_connection_samples_backward(
+    native = PA.bdpt_accumulate_connection_samples_backward(
         samples, tx_count=fx["tx"], rx_count=fx["rx"], combine_domain="power",
         **cot, need_grad_contribution=True, need_grad_coeff=False,
     )
@@ -922,12 +923,12 @@ def test_accumulate_coherent_backward_matches_oracle():
     # ADR-022 spec 6.4: the coherent forward retains the ten phasor bin sums
     # S_b; the backward reads them (no in-backward re-reduction, no sample
     # coefficients) to form grad_c_r = 2 grad_P[b] S_b.
-    _matrices, bin_sums = P.bdpt_accumulate_connection_samples_forward_ad(
+    _matrices, bin_sums = PA.bdpt_accumulate_connection_samples_forward_ad(
         samples, tx_count=fx["tx"], rx_count=fx["rx"],
         accumulation_strategy="atomic", combine_domain="coherent",
         coeff_real=fx["coeff_real"], coeff_imag=fx["coeff_imag"],
     )
-    native = P.bdpt_accumulate_connection_samples_backward(
+    native = PA.bdpt_accumulate_connection_samples_backward(
         samples, tx_count=fx["tx"], rx_count=fx["rx"], combine_domain="coherent",
         bin_sums=bin_sums,
         **cot, need_grad_contribution=False, need_grad_coeff=True,
@@ -959,7 +960,7 @@ def test_accumulate_power_jvp_vjp_duality():
     samples = _accum_samples(fx)
     g = torch.Generator(device="cuda").manual_seed(98)
     tangent_contribution = torch.randn(fx["rows"], generator=g, device="cuda")
-    jvp = P.bdpt_accumulate_connection_samples_jvp(
+    jvp = PA.bdpt_accumulate_connection_samples_jvp(
         samples, tx_count=fx["tx"], rx_count=fx["rx"], combine_domain="power",
         tangent_contribution=tangent_contribution,
     )
@@ -970,7 +971,7 @@ def test_accumulate_power_jvp_vjp_duality():
     }
     lhs = sum((cot[k].double() * jvp[k].double()).sum() for k in cot)
 
-    vjp = P.bdpt_accumulate_connection_samples_backward(
+    vjp = PA.bdpt_accumulate_connection_samples_backward(
         samples, tx_count=fx["tx"], rx_count=fx["rx"], combine_domain="power",
         grad_path_gain=cot["tangent_path_gain"], grad_los=cot["tangent_los"],
         grad_reflection=cot["tangent_reflection"], grad_diffraction=cot["tangent_diffraction"],
@@ -989,12 +990,12 @@ def test_accumulate_coherent_jvp_vjp_duality():
     t_ci = torch.randn(fx["rows"], generator=g, device="cuda")
     # Retain the coherent forward bin sums S_b; both the JVP and VJP read them
     # (ADR-022 spec 6.4), so neither companion re-derives them from coeff.
-    _matrices, bin_sums = P.bdpt_accumulate_connection_samples_forward_ad(
+    _matrices, bin_sums = PA.bdpt_accumulate_connection_samples_forward_ad(
         samples, tx_count=fx["tx"], rx_count=fx["rx"],
         accumulation_strategy="atomic", combine_domain="coherent",
         coeff_real=fx["coeff_real"], coeff_imag=fx["coeff_imag"],
     )
-    jvp = P.bdpt_accumulate_connection_samples_jvp(
+    jvp = PA.bdpt_accumulate_connection_samples_jvp(
         samples, tx_count=fx["tx"], rx_count=fx["rx"], combine_domain="coherent",
         bin_sums=bin_sums,
         tangent_coeff_real=t_cr, tangent_coeff_imag=t_ci,
@@ -1006,7 +1007,7 @@ def test_accumulate_coherent_jvp_vjp_duality():
     }
     lhs = sum((cot[k].double() * jvp[k].double()).sum() for k in cot)
 
-    vjp = P.bdpt_accumulate_connection_samples_backward(
+    vjp = PA.bdpt_accumulate_connection_samples_backward(
         samples, tx_count=fx["tx"], rx_count=fx["rx"], combine_domain="coherent",
         bin_sums=bin_sums,
         grad_path_gain=cot["tangent_path_gain"], grad_los=cot["tangent_los"],

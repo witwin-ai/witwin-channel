@@ -16,6 +16,13 @@ import torch
 
 from witwin.channel_native.propagation.enumerated import scattering as scattering_mod
 from witwin.channel_native.propagation.enumerated import scattering_chain as sc
+
+# ADR-021 refactor: the chain-append path (topology slots, ensemble scatter face
+# selection) moved out of scattering.py into scattering_chain_append.py to meet
+# the file-size maintenance budget; the single-bounce path stays in scattering.
+from witwin.channel_native.propagation.enumerated import (
+    scattering_chain_append as scattering_append,
+)
 from witwin.channel_native.deterministic import Config as DeterministicConfig
 from witwin.channel_native.path.config import Config as PathConfig
 
@@ -195,7 +202,7 @@ def test_chain_topology_slot_layout():
     vertex_face = torch.tensor([7, 8], dtype=torch.int32)
     vertex_normal = torch.zeros(2, 3)
     width = int((disc.d1 + 1 + disc.d2).max().item())
-    slots = scattering_mod._chain_topology_slots(disc, vertex_face, vertex_normal, width)
+    slots = scattering_append._chain_topology_slots(disc, vertex_face, vertex_normal, width)
     # interaction_type: REFLECTION=1, SCATTERING=8, inactive=0.
     assert slots["interaction_type"][0].tolist() == [1, 8, 1]
     assert slots["interaction_type"][1].tolist() == [8, 1, 0]
@@ -265,7 +272,7 @@ def _run_discovery(scene, config):
     device = torch.device("cuda")
     compiled = scene.compile()
     screens = scattering_mod._realization_structures(compiled)
-    ensemble_faces = scattering_mod._ensemble_scatter_faces(
+    ensemble_faces = scattering_append._ensemble_scatter_faces(
         compiled, screens, device=device
     )
     samples = sc.build_chain_samples(compiled, config, ensemble_faces, device=device)

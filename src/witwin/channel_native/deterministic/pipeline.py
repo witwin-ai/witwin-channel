@@ -96,6 +96,26 @@ def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -
         )
 
 
+def _scattering_metadata(
+    scattering_info: dict[str, Any] | None, config: Config
+) -> dict[str, Any] | None:
+    """Scattering metadata sub-dict for the deterministic result (plan 05 wave 3).
+
+    Returns ``None`` when no scattering rows were requested. Extracted as a
+    sub-dict builder so ``_metadata`` stays within its complexity budget.
+    Incoherent Kirchhoff patch quadrature means per-path phases are NOT physical
+    for ensemble rows; ADR-021 D3 records how scattering rows combine together.
+    """
+
+    if scattering_info is None:
+        return None
+    block = dict(scattering_info)
+    block["combine_domain"] = (
+        "coherent" if config.scattering_coherent else "incoherent_power"
+    )
+    return block
+
+
 def _coupled_paths_metadata(
     config: Config, component_counts: dict[str, int] | None = None
 ) -> dict[str, Any]:
@@ -152,6 +172,30 @@ def _register_coupled_component(
         (component_id == 7).sum().item()
     )
     return extra_components + ("coupled",)
+
+
+def _append_scattering(
+    scene: Scene, config: Config, evaluated: Any, sidecars: Any
+) -> tuple[Any, Any, dict[str, Any] | None]:
+    """Append Kirchhoff scattering rows and gate the coherent combine.
+
+    Single-purpose solve stage (plan 05 wave 3 + ADR-021 D3). When scattering is
+    not requested it returns the inputs unchanged with ``scattering_info=None``.
+    When ``scattering_coherent`` is set, the D3 solve-time gate refuses an
+    ensemble-only or empty-realization solve before any accumulation runs.
+    """
+
+    if "scattering" not in config.components:
+        return evaluated, sidecars, None
+    evaluated, sidecars, scattering_info = append_scattering_evaluated_paths(
+        scene,
+        config,
+        evaluated,
+        sidecars,
+    )
+    if config.scattering_coherent:
+        _validate_scattering_coherent_mode(scattering_info)
+    return evaluated, sidecars, scattering_info
 
 
 def _metadata(
@@ -256,14 +300,9 @@ def _metadata(
     }
     if metadata_transmission is not None:
         metadata["transmission"] = metadata_transmission
-    if scattering_info is not None:
-        # Incoherent Kirchhoff patch quadrature (plan 05 wave 3); the flag
-        # documents that per-path phases are NOT physical for ensemble rows.
-        metadata["scattering"] = dict(scattering_info)
-        # ADR-021 D3: record how scattering rows combine with each other.
-        metadata["scattering"]["combine_domain"] = (
-            "coherent" if config.scattering_coherent else "incoherent_power"
-        )
+    scattering_metadata = _scattering_metadata(scattering_info, config)
+    if scattering_metadata is not None:
+        metadata["scattering"] = scattering_metadata
     metadata.update(
         config_metadata(
             requested=requested_config,
@@ -335,18 +374,9 @@ def solve(scene: Scene, config: Config) -> Result:
         # stays under the per-block candidate budget (ADR-011).
         coupled_rx_streaming=config.coupled_paths,
     )
-    scattering_info = None
-    if "scattering" in config.components:
-        evaluated, sidecars, scattering_info = append_scattering_evaluated_paths(
-            scene,
-            config,
-            evaluated,
-            sidecars,
-        )
-        if config.scattering_coherent:
-            # ADR-021 D3: refuse the coherent combine on ensemble-only or
-            # empty-realization solves before any accumulation runs.
-            _validate_scattering_coherent_mode(scattering_info)
+    evaluated, sidecars, scattering_info = _append_scattering(
+        scene, config, evaluated, sidecars
+    )
     topology = evaluated.topology
     path_count = evaluated.row_count
     component_counts = deterministic_component_counts(topology.component_id)

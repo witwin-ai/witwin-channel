@@ -51,6 +51,23 @@ def _validate_scatter_chain(
         )
 
 
+def _validate_scattering_coherent(
+    *, scattering_coherent: bool, components: frozenset[str]
+) -> None:
+    """Validate the ADR-021 D3 coherent-scattering combine precondition."""
+
+    if scattering_coherent and "scattering" not in components:
+        # ADR-021 D3: the coherent combine only applies to scattering rows.
+        # The scene-level requirement (realization-coherent phase screens,
+        # not ensemble surfaces) is enforced at solve time where the scene
+        # is known; here we reject the config-level precondition loudly.
+        raise RuntimeError(
+            "scattering_coherent=True requires the 'scattering' component "
+            "(ADR-021 D3 combines scattering rows coherently and has no "
+            "effect on any other component)"
+        )
+
+
 def _validate_isb_boundary_taper(width: float) -> None:
     """Validate the ADR-017 ISB boundary taper width bound."""
 
@@ -167,16 +184,9 @@ class Config:
             self.components,
             error_message="components must be a non-empty subset of {valid}",
         )
-        if self.scattering_coherent and "scattering" not in components:
-            # ADR-021 D3: the coherent combine only applies to scattering rows.
-            # The scene-level requirement (realization-coherent phase screens,
-            # not ensemble surfaces) is enforced at solve time where the scene
-            # is known; here we reject the config-level precondition loudly.
-            raise RuntimeError(
-                "scattering_coherent=True requires the 'scattering' component "
-                "(ADR-021 D3 combines scattering rows coherently and has no "
-                "effect on any other component)"
-            )
+        _validate_scattering_coherent(
+            scattering_coherent=self.scattering_coherent, components=components
+        )
         _validate_scatter_chain(
             max_depth=self.scattering_chain_max_depth,
             samples_per_m2=self.scattering_chain_samples_per_m2,
