@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "baseline_binding_count": 211,
-  "applied_count_delta": 0,
-  "projected_final_count": null,
-  "projected_count_formula": "211 minus only those legacy candidates later proven dead by all four reachability checks",
+  "applied_count_delta": -9,
+  "projected_final_count": 202,
+  "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
   "actions": [
     {
       "symbol": "raydn_scene_create",
@@ -138,7 +138,7 @@
       "action": "rename",
       "replacement": "rayd_intersect_forward",
       "count_delta": 0,
-      "status": "planned",
+      "status": "applied in Phase 4",
       "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
     },
     {
@@ -146,7 +146,7 @@
       "action": "rename",
       "replacement": "rayd_visibility_forward",
       "count_delta": 0,
-      "status": "planned",
+      "status": "applied in Phase 4",
       "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
     },
     {
@@ -162,7 +162,7 @@
       "action": "rename",
       "replacement": "mc_diffraction_discover_edges",
       "count_delta": 0,
-      "status": "planned",
+      "status": "applied in Phase 4",
       "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
     },
     {
@@ -170,7 +170,7 @@
       "action": "rename",
       "replacement": "mc_diffraction_discover_edges_counted",
       "count_delta": 0,
-      "status": "planned",
+      "status": "applied in Phase 4",
       "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
     },
     {
@@ -383,43 +383,75 @@
     },
     {
       "symbol": "bdpt_diffraction_connection_samples_from_tape",
-      "action": "four-part-reachability-audit",
+      "action": "delete",
       "replacement": null,
-      "count_delta": null,
-      "status": "unresolved; deletion is not authorized by static scan alone",
-      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
     },
     {
       "symbol": "bdpt_diffraction_point_connection_samples",
-      "action": "four-part-reachability-audit",
+      "action": "delete",
       "replacement": null,
-      "count_delta": null,
-      "status": "unresolved; deletion is not authorized by static scan alone",
-      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
     },
     {
       "symbol": "bdpt_diffraction_state_pack",
-      "action": "four-part-reachability-audit",
+      "action": "delete",
       "replacement": null,
-      "count_delta": null,
-      "status": "unresolved; deletion is not authorized by static scan alone",
-      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
     },
     {
       "symbol": "bdpt_diffraction_state_wi",
-      "action": "four-part-reachability-audit",
+      "action": "delete",
       "replacement": null,
-      "count_delta": null,
-      "status": "unresolved; deletion is not authorized by static scan alone",
-      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
     },
     {
       "symbol": "bdpt_diffraction_edge_geometry",
-      "action": "four-part-reachability-audit",
+      "action": "delete",
       "replacement": null,
-      "count_delta": null,
-      "status": "unresolved; deletion is not authorized by static scan alone",
-      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_reflection_accumulation_forward",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_selected_edge_indices",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_surface_group_edge_candidates",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "path_diffraction_paths_order1",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
     }
   ]
 }

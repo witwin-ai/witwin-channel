@@ -629,7 +629,7 @@ def _transmission_sampled_connection_samples(
             else None
         )
         for bounce in range(max(1, int(max_depth))):
-            hit = geometry_bridge.bdpt_intersect_forward(
+            hit = geometry_bridge.rayd_intersect_forward(
                 rayd.require_resource(),
                 ray_inputs["ray_o"],
                 ray_inputs["ray_d"],

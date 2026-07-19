@@ -15,8 +15,8 @@ WRAPPERS_BY_SOURCE = {
         "cn_rayd_scene_edge_records",
     },
     "geometry.cpp": {
-        "cn_bdpt_intersect_forward",
-        "cn_bdpt_visibility_forward",
+        "cn_rayd_intersect_forward",
+        "cn_rayd_visibility_forward",
         "cn_rayd_intersect_backward",
         "cn_rayd_intersect_jvp",
         "cn_coupled_rd_geometry_forward",
@@ -32,13 +32,9 @@ WRAPPERS_BY_SOURCE = {
         "cn_rayd_reflection_epc_paths_jvp",
         "cn_rayd_scene_face_normals_backward",
         "cn_rayd_scene_face_normals_jvp",
-        "cn_bdpt_reflection_accumulation_forward",
     },
     "diffraction.cpp": {
-        "cn_bdpt_diffraction_discover_edges",
-        "cn_bdpt_diffraction_discover_edges_counted",
         "cn_rayd_diffraction_paths_order1_forward",
-        "cn_path_diffraction_paths_order1",
         "cn_bdpt_diffraction_accumulation_forward",
     },
 }
@@ -89,12 +85,12 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
 
-    assert len(expected_wrappers) == 23
+    assert len(expected_wrappers) == 19
     assert set(owners) == expected_wrappers
     assert all(len(source_names) == 1 for source_names in owners.values())
 
 
-def test_cmake_builds_every_rayd_source_and_scopes_legacy_exception_boundary():
+def test_cmake_builds_every_rayd_source_without_legacy_exception_boundary():
     cmake = (_repo_root() / "CMakeLists.txt").read_text()
     source_paths = tuple(
         f"native/channel_native/rayd/{source_name}"
@@ -116,11 +112,4 @@ def test_cmake_builds_every_rayd_source_and_scopes_legacy_exception_boundary():
         cmake,
         re.DOTALL,
     )
-    assert len(exception_source_groups) == 1
-    exception_group = exception_source_groups[0]
-    assert "native/channel_native/rayd/diffraction.cpp" in exception_group
-    assert all(
-        source_path not in exception_group
-        for source_path in source_paths
-        if not source_path.endswith("diffraction.cpp")
-    )
+    assert exception_source_groups == []

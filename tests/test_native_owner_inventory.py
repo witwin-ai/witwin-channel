@@ -163,11 +163,26 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     transfers = migration["phase3_current"][
         "approved_phase9_body_hash_transfer_multiset"
     ]
-    approved_before = Counter(
-        _hash_tuple(transfer["before"]) for transfer in transfers
+    phase4 = migration["phase4_current"]
+    deleted_bindings = set(phase4["deleted_bindings"])
+    approved_deletions = Counter(
+        _hash_tuple(entry)
+        for entry in phase4["approved_phase9_body_hash_deletions"]
     )
-    approved_after = Counter(_hash_tuple(transfer["after"]) for transfer in transfers)
-    transferred_names = {transfer["before"]["name"] for transfer in transfers}
+    live_transfers = [
+        transfer
+        for transfer in transfers
+        if transfer["binding_symbol"] not in deleted_bindings
+    ]
+    approved_before = Counter(
+        _hash_tuple(transfer["before"]) for transfer in live_transfers
+    )
+    approved_after = Counter(
+        _hash_tuple(transfer["after"]) for transfer in live_transfers
+    )
+    transferred_names = {
+        transfer["before"]["name"] for transfer in live_transfers
+    }
     actual_transferred = Counter(
         _hash_tuple(entry)
         for entry in current_hashes
@@ -184,9 +199,9 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for entry in current_inventory["symbols"]
     }
 
-    assert migration["current_phase"] == current_inventory["current_phase"] == 3
-    assert len(transfers) == len(transferred_names)
-    assert expected - actual == approved_before
+    assert migration["current_phase"] == current_inventory["current_phase"] == 4
+    assert len(live_transfers) == len(transferred_names)
+    assert expected - actual == approved_before + approved_deletions
     assert actual_transferred == approved_after
     for transfer in transfers:
         assert set(transfer) == {
@@ -202,7 +217,10 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         assert set(transfer["after"]) == set(HASH_FIELDS)
         assert transfer["before"]["name"] == transfer["after"]["name"]
         assert transfer["owner_before"] == "Channel Native"
-        assert current_owners[transfer["binding_symbol"]] == transfer["owner_after"]
+        if transfer["binding_symbol"] in deleted_bindings:
+            assert _hash_tuple(transfer["before"]) in approved_deletions
+        else:
+            assert current_owners[transfer["binding_symbol"]] == transfer["owner_after"]
         assert phase9_owners[transfer["owner_id"]][
             _hash_tuple(transfer["before"])
         ] == 1

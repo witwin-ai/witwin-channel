@@ -21,11 +21,7 @@ FUNCTIONS_BY_UNIT = {
     },
     "bdpt_connect_samples.cu": {
         "bdpt_endpoint_connection_samples_kernel",
-        "bdpt_diffraction_connection_samples_from_tape_kernel",
-        "bdpt_diffraction_point_connection_samples_kernel",
         "cn_bdpt_endpoint_connection_samples_cuda",
-        "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
-        "cn_bdpt_diffraction_point_connection_samples_cuda",
     },
     "bdpt_connect_visibility.cu": {
         "bdpt_endpoint_connection_visibility_inputs_kernel",
@@ -67,18 +63,14 @@ FUNCTIONS_BY_UNIT = {
 COMMON_HELPERS = {
     "bdpt_component_from_mask",
     "bdpt_component_accumulable",
-    "bdpt_splitmix64",
-    "bdpt_uniform01_from_u64",
     "check_float_cuda",
     "check_int_cuda",
     "check_bool_cuda",
     "check_vec3_cuda",
     "check_same_device",
     "check_mis_args",
-    "check_diffraction_mis_args",
     "bdpt_connection_mis_weight_from_sums",
     "bdpt_single_strategy_mis_weight",
-    "bdpt_diffraction_strategy_mis_weight",
     "bdpt_free_space_gain",
     "bdpt_make_float3",
     "bdpt_add3",
@@ -87,8 +79,6 @@ COMMON_HELPERS = {
     "bdpt_norm3",
     "bdpt_normalize3",
     "bdpt_vec3_at",
-    "bdpt_grid_cell_center",
-    "bdpt_diffraction_contribution",
     "allocate_connection_samples",
     "zero_double_tensor",
     "zero_int_tensor",
@@ -117,8 +107,8 @@ def test_bdpt_functions_have_one_physical_translation_unit_owner() -> None:
         assert names[relative] == expected
 
     all_abi = set().union(*ABI_BY_UNIT.values())
-    # ADR-022 added the accumulate backward/jvp ABI companions (11 -> 13).
-    assert len(all_abi) == 13
+    # Phase 4 retires two audited-dead crude diffraction sample ABIs.
+    assert len(all_abi) == 11
     for unit, expected in ABI_BY_UNIT.items():
         relative = f"native/channel_native/kernels/{unit}"
         assert expected == (all_abi & names[relative])
@@ -158,11 +148,17 @@ def test_bdpt_split_preserves_launch_and_sync_multisets() -> None:
     expected_launches = Counter(
         site["kernel"] for site in source_evidence["kernel_launch_sites"]
     )
+    expected_launches.subtract(
+        {
+            "bdpt_diffraction_connection_samples_from_tape_kernel": 1,
+            "bdpt_diffraction_point_connection_samples_kernel": 1,
+        }
+    )
+    expected_launches += Counter()
 
     assert actual_launches == expected_launches
-    # ADR-019 coherent (2) + ADR-022 coherent/power AD (4) launches on the
-    # accumulate TU lifted the total from 17 to 23; syncs are unchanged.
-    assert sum(actual_launches.values()) == 23
+    # Phase 4 removes two audited-dead crude diffraction launches; syncs stay fixed.
+    assert sum(actual_launches.values()) == 21
     assert combined.count("cudaStreamSynchronize(") == 2
     assert {
         unit: (
@@ -172,7 +168,7 @@ def test_bdpt_split_preserves_launch_and_sync_multisets() -> None:
         for unit, source in sources.items()
     } == {
         "bdpt_connect_mis.cu": (1, 0),
-        "bdpt_connect_samples.cu": (3, 0),
+        "bdpt_connect_samples.cu": (1, 0),
         "bdpt_connect_visibility.cu": (6, 2),
         "bdpt_connect_accumulation.cu": (13, 0),
     }

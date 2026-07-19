@@ -11,32 +11,12 @@ from witwin.channel_native.runtime import native_resources, symbols, tensor_cont
 
 _CANONICAL_FUNCTION_NAMES = (
     "bdpt_diffraction_accumulation_forward",
-    "bdpt_diffraction_discover_edges",
-    "bdpt_diffraction_discover_edges_counted",
-    "bdpt_intersect_forward",
-    "bdpt_reflection_accumulation_forward",
-    "bdpt_visibility_forward",
     "coupled_rd_geometry_forward",
     "rayd_diffraction_paths_order1_forward",
+    "rayd_intersect_forward",
     "rayd_reflection_epc_paths_forward",
     "rayd_trace_reflections_forward",
-)
-
-_ALIASES = (
-    ("rayd_visibility_forward", "bdpt_visibility_forward"),
-    (
-        "rayd_reflection_accumulation_forward",
-        "bdpt_reflection_accumulation_forward",
-    ),
-    ("rayd_diffraction_discover_edges", "bdpt_diffraction_discover_edges"),
-    (
-        "rayd_diffraction_discover_edges_counted",
-        "bdpt_diffraction_discover_edges_counted",
-    ),
-    (
-        "rayd_diffraction_accumulation_forward",
-        "bdpt_diffraction_accumulation_forward",
-    ),
+    "rayd_visibility_forward",
 )
 
 
@@ -47,15 +27,6 @@ def test_geometry_bridge_is_the_single_body_owner(name: str):
     assert owner.__module__ == bridge.__name__
     assert getattr(kernels, name) is owner
     assert getattr(ops, name) is owner
-
-
-@pytest.mark.parametrize(("alias", "canonical"), _ALIASES)
-def test_rayd_aliases_remain_same_object(alias: str, canonical: str):
-    owner = getattr(bridge, canonical)
-
-    assert getattr(bridge, alias) is owner
-    assert getattr(kernels, alias) is owner
-    assert getattr(ops, alias) is owner
 
 
 def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
@@ -86,7 +57,7 @@ def test_intersection_returns_the_named_tensor_contract(
     native_calls: list[tuple[object, ...]] = []
 
     def required_symbol(name: str):
-        assert name == "bdpt_intersect_forward"
+        assert name == "rayd_intersect_forward"
 
         def intersect(*args: object) -> tuple[torch.Tensor, ...]:
             native_calls.append(args)
@@ -98,7 +69,7 @@ def test_intersection_returns_the_named_tensor_contract(
     monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
 
     resource = object()
-    result = bridge.bdpt_intersect_forward(
+    result = bridge.rayd_intersect_forward(
         resource, ray_o, ray_d, ray_tmax, None, flags=5
     )
 

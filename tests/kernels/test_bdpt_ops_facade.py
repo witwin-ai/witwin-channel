@@ -360,7 +360,6 @@ def test_bdpt_reflected_light_subpath_state_applies_native_material_gain_and_val
     )
     torch.testing.assert_close(reflected["valid"].cpu(), torch.tensor([True, False], dtype=torch.bool))
 
-
 def test_bdpt_subpath_intersection_inputs_expose_native_rayd_ray_schema():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT subpath intersection inputs")
@@ -672,6 +671,8 @@ def test_legacy_bdpt_matrix_export_facades_are_not_public():
         "bdpt_variance_estimate",
         "bdpt_connection_samples_from_path_block",
         "bdpt_sample_path_block",
+        "bdpt_diffraction_connection_samples_from_tape",
+        "bdpt_diffraction_point_connection_samples",
     ):
         assert not hasattr(ops, name)
 
@@ -687,207 +688,10 @@ def test_legacy_bdpt_matrix_export_facades_are_not_public():
             "bdpt_variance_estimate",
             "bdpt_connection_samples_from_path_block",
             "bdpt_sample_path_block",
+        "bdpt_diffraction_connection_samples_from_tape",
+        "bdpt_diffraction_point_connection_samples",
         ):
             assert not hasattr(native, name)
-
-
-def test_bdpt_diffraction_connection_samples_from_tape_emits_native_schema():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for BDPT diffraction tape connections")
-
-    tape = {
-        "active": torch.tensor([True, False], device="cuda", dtype=torch.bool),
-        "state_idx": torch.tensor([0, -1], device="cuda", dtype=torch.int32),
-        "cell": torch.tensor([0, -1], device="cuda", dtype=torch.int32),
-        "material_idx": torch.tensor([0, -1], device="cuda", dtype=torch.int32),
-        "edge_u": torch.tensor([0.5, 0.0], device="cuda", dtype=torch.float32),
-    }
-    states = (
-        torch.tensor([7], device="cuda", dtype=torch.int32),
-        torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([0.0], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-        torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([[0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([0], device="cuda", dtype=torch.int32),
-        torch.tensor([1], device="cuda", dtype=torch.int32),
-        torch.tensor([math.pi], device="cuda", dtype=torch.float32),
-        torch.tensor([[-1.0, 0.0, 0.5]], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-    )
-
-    samples = ops.bdpt_diffraction_connection_samples_from_tape(
-        tape,
-        states,
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-        torch.tensor([True], device="cuda", dtype=torch.bool),
-        tx_index=3,
-        state_count=1,
-        grid_axis=0,
-        grid_position=1.0,
-        grid_coord0_min=-0.5,
-        grid_coord0_max=0.5,
-        grid_coord1_min=0.0,
-        grid_coord1_max=1.0,
-        grid_resolution0=1,
-        grid_resolution1=1,
-        grid_cell_area=1.0,
-        wavelength=0.125,
-        direct_samples=2,
-        keller_samples=0,
-        mis="none",
-        beta=2.0,
-        strategy_count=1,
-    )
-
-    assert set(samples) == {
-        "topology",
-        "contribution",
-        "pdf",
-        "mis_weight",
-        "component_id",
-        "valid",
-        "tx_id",
-        "rx_id",
-        "grid_linear_id",
-        "light_depth",
-        "sensor_depth",
-        "path_length_m",
-    }
-    torch.testing.assert_close(samples["tx_id"], torch.tensor([3, 3], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(samples["rx_id"], torch.tensor([0, -1], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(samples["grid_linear_id"], samples["rx_id"])
-    torch.testing.assert_close(samples["component_id"], torch.full((2,), 2, device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(
-        samples["topology"],
-        torch.tensor([[3, 0, 2, 1], [3, -1, 2, 1]], device="cuda", dtype=torch.int32),
-    )
-    torch.testing.assert_close(samples["light_depth"], torch.ones(2, device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(samples["sensor_depth"], torch.zeros(2, device="cuda", dtype=torch.int32))
-    assert samples["valid"][0].item() is True
-    assert samples["valid"][1].item() is False
-    assert samples["contribution"][0].item() > 0.0
-    assert samples["pdf"][0].item() > 0.0
-    assert samples["path_length_m"][0].item() > 0.0
-
-
-def test_bdpt_diffraction_tape_mis_uses_direct_keller_pdf_sums():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for BDPT diffraction tape connections")
-
-    tape = {
-        "active": torch.tensor([True, True, True], device="cuda", dtype=torch.bool),
-        "state_idx": torch.tensor([0, 0, 0], device="cuda", dtype=torch.int32),
-        "cell": torch.tensor([0, 0, 0], device="cuda", dtype=torch.int32),
-        "material_idx": torch.tensor([0, 0, 0], device="cuda", dtype=torch.int32),
-        "edge_u": torch.tensor([0.25, 0.5, 0.75], device="cuda", dtype=torch.float32),
-    }
-    states = (
-        torch.tensor([7], device="cuda", dtype=torch.int32),
-        torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([0.0], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-        torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([[0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([0], device="cuda", dtype=torch.int32),
-        torch.tensor([1], device="cuda", dtype=torch.int32),
-        torch.tensor([math.pi], device="cuda", dtype=torch.float32),
-        torch.tensor([[-1.0, 0.0, 0.5]], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-    )
-
-    def export(mis: str) -> dict[str, torch.Tensor]:
-        return ops.bdpt_diffraction_connection_samples_from_tape(
-            tape,
-            states,
-            torch.tensor([1.0], device="cuda", dtype=torch.float32),
-            torch.tensor([True], device="cuda", dtype=torch.bool),
-            tx_index=3,
-            state_count=1,
-            grid_axis=0,
-            grid_position=1.0,
-            grid_coord0_min=-0.5,
-            grid_coord0_max=0.5,
-            grid_coord1_min=0.0,
-            grid_coord1_max=1.0,
-            grid_resolution0=1,
-            grid_resolution1=1,
-            grid_cell_area=1.0,
-            wavelength=0.125,
-            direct_samples=1,
-            keller_samples=2,
-            mis=mis,
-            beta=2.0,
-            strategy_count=2,
-        )
-
-    balance = export("balance")
-    power = export("power_heuristic")
-
-    torch.testing.assert_close(
-        balance["mis_weight"],
-        torch.tensor([1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0], device="cuda", dtype=torch.float32),
-    )
-    torch.testing.assert_close(
-        power["mis_weight"],
-        torch.tensor([1.0 / 5.0, 4.0 / 5.0, 4.0 / 5.0], device="cuda", dtype=torch.float32),
-    )
-    assert not torch.allclose(balance["mis_weight"], torch.full((3,), 0.5, device="cuda"))
-
-
-def test_bdpt_diffraction_point_connection_samples_emits_native_schema_and_visibility_segments():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for BDPT point diffraction connections")
-
-    states = (
-        torch.tensor([7], device="cuda", dtype=torch.int32),
-        torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([0.0], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-        torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([[0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32),
-        torch.tensor([0], device="cuda", dtype=torch.int32),
-        torch.tensor([1], device="cuda", dtype=torch.int32),
-        torch.tensor([math.pi], device="cuda", dtype=torch.float32),
-        torch.tensor([[-1.0, 0.0, 0.5]], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-    )
-
-    exported = ops.bdpt_diffraction_point_connection_samples(
-        torch.tensor([[1.0, 0.0, 0.5]], device="cuda", dtype=torch.float32),
-        states,
-        torch.tensor([1.0], device="cuda", dtype=torch.float32),
-        torch.tensor([True], device="cuda", dtype=torch.bool),
-        tx_index=3,
-        state_count=1,
-        direct_samples=2,
-        keller_samples=0,
-        seed=123,
-        wavelength=0.125,
-        mis="none",
-        beta=2.0,
-        strategy_count=1,
-    )
-    assert set(exported) == {"samples", "source_start", "source_end", "target_start", "target_end", "visibility_active"}
-    samples = exported["samples"]
-    assert isinstance(samples, dict)
-    torch.testing.assert_close(samples["tx_id"], torch.tensor([3, 3], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(samples["rx_id"], torch.tensor([0, 0], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(samples["component_id"], torch.full((2,), 2, device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(
-        samples["topology"],
-        torch.tensor([[3, 0, 2, 1], [3, 0, 2, 1]], device="cuda", dtype=torch.int32),
-    )
-    assert samples["valid"].all()
-    assert samples["contribution"][0].item() > 0.0
-    assert samples["pdf"][0].item() > 0.0
-    for name in ("source_start", "source_end", "target_start", "target_end"):
-        assert exported[name].shape == (2, 3)
-    torch.testing.assert_close(exported["source_end"], exported["target_start"])
-    assert exported["visibility_active"].all()
 
 
 @pytest.mark.parametrize("accumulation_strategy", ["atomic", "staged", "compact"])

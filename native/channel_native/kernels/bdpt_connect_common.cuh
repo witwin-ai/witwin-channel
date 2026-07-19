@@ -60,17 +60,6 @@ __device__ bool bdpt_component_accumulable(int component) {
         component == kComponentScattering;
 }
 
-__device__ unsigned long long bdpt_splitmix64(unsigned long long x) {
-    x += 0x9e3779b97f4a7c15ULL;
-    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
-    return x ^ (x >> 31);
-}
-
-__device__ float bdpt_uniform01_from_u64(unsigned long long x) {
-    return static_cast<float>((x >> 40) & 0xffffffULL) / 16777216.0f;
-}
-
 void check_float_cuda(const at::Tensor& tensor, const char* name, int64_t dim) {
     TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
     TORCH_CHECK(tensor.scalar_type() == at::kFloat, name, " must be float32");
@@ -106,19 +95,6 @@ void check_mis_args(int64_t mode_id, int64_t strategy_count) {
     TORCH_CHECK(strategy_count > 0, "strategy_count must be positive");
 }
 
-void check_diffraction_mis_args(
-    int64_t mode_id,
-    int64_t strategy_count,
-    int64_t direct_samples,
-    int64_t keller_samples) {
-    check_mis_args(mode_id, strategy_count);
-    const int64_t actual = (direct_samples > 0 ? 1 : 0) + (keller_samples > 0 ? 1 : 0);
-    TORCH_CHECK(
-        strategy_count == actual,
-        "strategy_count must match enabled direct/Keller proposals");
-    TORCH_CHECK(mode_id != 0 || actual == 1, "MIS none requires exactly one diffraction proposal");
-}
-
 __device__ float bdpt_connection_mis_weight_from_sums(
     float pdf,
     float balance_pdf_sum,
@@ -139,23 +115,6 @@ __device__ float bdpt_connection_mis_weight_from_sums(
 
 __device__ float bdpt_single_strategy_mis_weight(float pdf, int mode_id, float beta) {
     return bdpt_connection_mis_weight_from_sums(pdf, pdf, powf(pdf, beta), mode_id, beta);
-}
-
-__device__ float bdpt_diffraction_strategy_mis_weight(
-    float pdf,
-    float direct_pdf,
-    float keller_pdf,
-    int strategy_count,
-    int mode_id,
-    float beta) {
-    if (strategy_count <= 1) {
-        return bdpt_single_strategy_mis_weight(pdf, mode_id, beta);
-    }
-    const float balance_sum = fmaxf(direct_pdf, 0.0f) + fmaxf(keller_pdf, 0.0f);
-    const float power_sum =
-        powf(fmaxf(direct_pdf, 0.0f), beta) +
-        powf(fmaxf(keller_pdf, 0.0f), beta);
-    return bdpt_connection_mis_weight_from_sums(pdf, balance_sum, power_sum, mode_id, beta);
 }
 
 __device__ float bdpt_free_space_gain(float tx_power, float distance, float frequency_hz) {
@@ -196,50 +155,6 @@ __device__ float3 bdpt_normalize3(float3 a) {
 __device__ float3 bdpt_vec3_at(const float* values, int index) {
     const float* row = values + static_cast<int64_t>(index) * 3;
     return bdpt_make_float3(row[0], row[1], row[2]);
-}
-
-__device__ float3 bdpt_grid_cell_center(
-    int cell,
-    int grid_axis,
-    float grid_position,
-    float coord0_min,
-    float coord0_max,
-    float coord1_min,
-    float coord1_max,
-    int resolution0,
-    int resolution1) {
-    const int i = cell % resolution0;
-    const int j = cell / resolution0;
-    const float u = coord0_min + (static_cast<float>(i) + 0.5f) *
-        (coord0_max - coord0_min) / fmaxf(static_cast<float>(resolution0), 1.0f);
-    const float v = coord1_min + (static_cast<float>(j) + 0.5f) *
-        (coord1_max - coord1_min) / fmaxf(static_cast<float>(resolution1), 1.0f);
-    if (grid_axis == 0) {
-        return bdpt_make_float3(grid_position, u, v);
-    }
-    if (grid_axis == 1) {
-        return bdpt_make_float3(u, grid_position, v);
-    }
-    return bdpt_make_float3(u, v, grid_position);
-}
-
-__device__ float bdpt_diffraction_contribution(
-    float src_power,
-    float material_gain,
-    float wavelength,
-    float edge_measure_weight,
-    float grid_cell_area,
-    float exterior_angle,
-    float3 source,
-    float3 edge_point,
-    float3 target) {
-    const float source_distance = fmaxf(bdpt_norm3(bdpt_sub3(edge_point, source)), 1.0e-6f);
-    const float target_distance = fmaxf(bdpt_norm3(bdpt_sub3(target, edge_point)), 1.0e-6f);
-    const float wave = wavelength * (1.0f / (4.0f * kPi));
-    const float wedge_scale = fminf(fmaxf(exterior_angle, 0.25f * kPi) / (2.0f * kPi), 2.0f);
-    return src_power * material_gain * wave * wave * fmaxf(edge_measure_weight, 0.0f) *
-        grid_cell_area * wedge_scale /
-        (source_distance * source_distance * target_distance * target_distance);
 }
 
 std::tuple<

@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "plan": "Plan 13",
+  "phase": 4,
+  "binding_count_before": 211,
+  "binding_count_after": 202,
+  "audit_axes": [
+    "static_production_caller",
+    "dynamic_binding",
+    "public_import",
+    "real_bdpt_e2e"
+  ],
+  "records": [
+    {
+      "symbol": "bdpt_diffraction_connection_samples_from_tape",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_diffraction_connection_samples_from_tape"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_diffraction_connection_samples_from_tape"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_diffraction_connection_samples_from_tape"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_diffraction_connection_samples_from_tape"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_diffraction_edge_geometry",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_diffraction_edge_geometry"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_diffraction_edge_geometry"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_diffraction_edge_geometry"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_diffraction_edge_geometry"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_diffraction_point_connection_samples",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_diffraction_point_connection_samples"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_diffraction_point_connection_samples"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_diffraction_point_connection_samples"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_diffraction_point_connection_samples"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_pack",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_diffraction_state_pack"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_diffraction_state_pack"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_diffraction_state_pack"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_diffraction_state_pack"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_wi",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_diffraction_state_wi"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_diffraction_state_wi"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_diffraction_state_wi"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_diffraction_state_wi"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_reflection_accumulation_forward",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_reflection_accumulation_forward"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_reflection_accumulation_forward"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_reflection_accumulation_forward"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_reflection_accumulation_forward"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_selected_edge_indices",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_selected_edge_indices"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_selected_edge_indices"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_selected_edge_indices"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_selected_edge_indices"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "bdpt_surface_group_edge_candidates",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: bdpt_surface_group_edge_candidates"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: bdpt_surface_group_edge_candidates"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: bdpt_surface_group_edge_candidates"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: bdpt_surface_group_edge_candidates"
+        }
+      },
+      "disposition": "deleted"
+    },
+    {
+      "symbol": "path_diffraction_paths_order1",
+      "axes": {
+        "static_production_caller": {
+          "reachable": false,
+          "evidence": "shared_evidence.static_production_caller; exact symbol: path_diffraction_paths_order1"
+        },
+        "dynamic_binding": {
+          "reachable": false,
+          "evidence": "shared_evidence.dynamic_binding; exact symbol: path_diffraction_paths_order1"
+        },
+        "public_import": {
+          "reachable": false,
+          "evidence": "shared_evidence.public_import; exact symbol: path_diffraction_paths_order1"
+        },
+        "real_bdpt_e2e": {
+          "reachable": false,
+          "evidence": "shared_evidence.real_bdpt_e2e; exact symbol: path_diffraction_paths_order1"
+        }
+      },
+      "disposition": "deleted"
+    }
+  ],
+  "implementation_cleanup": [
+    "bdpt_diffraction_contribution",
+    "bdpt_diffraction_connection_samples_from_tape_kernel",
+    "bdpt_diffraction_point_connection_samples_kernel",
+    "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
+    "cn_bdpt_diffraction_point_connection_samples_cuda",
+    "bdpt_splitmix64",
+    "bdpt_uniform01_from_u64",
+    "check_diffraction_mis_args",
+    "bdpt_diffraction_strategy_mis_weight",
+    "bdpt_grid_cell_center"
+  ],
+  "historical_exclusions": [
+    "docs/dev/audit/phase9-native-owner-inventory.json",
+    "docs/dev/audit/phase10-legacy-dead-binding.json",
+    "docs/dev/audit/phase13-phase0-*",
+    "accepted ADR and migration-plan history"
+  ],
+  "result": "all nine bindings failed every reachability axis and were deleted",
+  "shared_evidence": {
+    "static_production_caller": {
+      "roots": [
+        "E:/Code/witwin-platform",
+        "E:/Code/RayDi"
+      ],
+      "query": "exact-symbol ripgrep over production source plus Python import/call sites",
+      "result": "zero static production callers outside each binding's own facade/registration before deletion"
+    },
+    "dynamic_binding": {
+      "query": "literal/computed required_symbol, getattr, importlib, registry, GetProcAddress, dlsym and manifest lookup audit",
+      "result": "no computed or external registry consumer; literal facade lookup disappeared with each deleted manifest row"
+    },
+    "public_import": {
+      "files": [
+        "ci/public-api-snapshot.json",
+        "src/witwin/channel_native/__init__.py",
+        "the four stable solver entry packages"
+      ],
+      "result": "none of the nine internal native bindings is a stable public import or snapshot export"
+    },
+    "real_bdpt_e2e": {
+      "extension": "artifacts/cmake-plan13-baseline/_channel_native.cp311-win_amd64.pyd",
+      "build_fingerprint": "5d4e0f290aab28f6a719c15b2487183ce14c46d930a6845ba1348967df04a0ae",
+      "status": "passed 2026-07-19",
+      "tests": [
+        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available",
+        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available",
+        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
+        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+      ],
+      "result": "4 passed in 25.12s against the rebuilt Phase 4 extension"
+    }
+  }
+}

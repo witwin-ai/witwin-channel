@@ -12,8 +12,9 @@ differentiable float64 oracle in ``tests.reference.bdpt_ad_oracles``:
 * fixed-input loud rejection through the plan-07 autograd wrapper,
 * missing-symbol loud failure.
 
-These run after the supervisor rebuilds the extension with the ADR-022 companions
-(``EXPECTED_NATIVE_BINDING_COUNT`` 211). Every convention below is frozen by
+These were introduced when ADR-022 raised ``EXPECTED_NATIVE_BINDING_COUNT`` to
+211; Plan 13 Phase 4 later removes nine audited-dead bindings, so the current
+count is 202. Every convention below is frozen by
 plan 10a section 6 and the ADR-022 derivative specs; the pair convention
 (``d/dF = 2 conj(F) rest`` for ``|F|^2``, pairwise real adjoints elsewhere) matches
 ``fold_output_cotangents`` (ADR-014).

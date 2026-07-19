@@ -58,7 +58,7 @@ def test_diffraction_accumulation_accepts_sample_state_slots_and_weights():
     sample_state_index = torch.tensor([1], device="cuda", dtype=torch.int32)
     sample_edge_weight = torch.tensor([1.0], device="cuda", dtype=torch.float32)
 
-    out = ops.rayd_diffraction_accumulation_forward(
+    out = ops.bdpt_diffraction_accumulation_forward(
         scene,
         active,
         state_edge_index,

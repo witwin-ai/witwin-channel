@@ -79,42 +79,6 @@ torch::Tensor cn_bdpt_mis_weights(
     torch::Tensor strategy_pdf_sum,
     int64_t mode_id,
     double beta);
-pybind11::dict cn_bdpt_diffraction_connection_samples_from_tape(
-    pybind11::dict tape,
-    pybind11::tuple states,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    int64_t tx_index,
-    int64_t state_count,
-    int64_t grid_axis,
-    double grid_position,
-    double grid_coord0_min,
-    double grid_coord0_max,
-    double grid_coord1_min,
-    double grid_coord1_max,
-    int64_t grid_resolution0,
-    int64_t grid_resolution1,
-    double grid_cell_area,
-    double wavelength,
-    int64_t direct_samples,
-    int64_t keller_samples,
-    int64_t mode_id,
-    double beta,
-    int64_t strategy_count);
-pybind11::dict cn_bdpt_diffraction_point_connection_samples(
-    torch::Tensor rx_positions,
-    pybind11::tuple states,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    int64_t tx_index,
-    int64_t state_count,
-    int64_t direct_samples,
-    int64_t keller_samples,
-    int64_t seed,
-    double wavelength,
-    int64_t mode_id,
-    double beta,
-    int64_t strategy_count);
 torch::Tensor cn_bdpt_zero_matrix(torch::Tensor reference, int64_t rows, int64_t cols);
 pybind11::dict cn_bdpt_point_component_power(torch::Tensor path_gain, bool include_los);
 torch::Tensor cn_bdpt_store_point_component_column(
@@ -188,40 +152,6 @@ pybind11::dict cn_bdpt_reflection_launch_inputs(
     torch::Tensor tx_positions,
     int64_t tx_index,
     int64_t sample_count);
-torch::Tensor cn_bdpt_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src);
-torch::Tensor cn_bdpt_selected_edge_indices(torch::Tensor selected);
-pybind11::tuple cn_bdpt_diffraction_state_pack(
-    torch::Tensor edge_indices,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor line_min,
-    torch::Tensor line_max,
-    torch::Tensor n0,
-    torch::Tensor n1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor exterior_angle,
-    torch::Tensor tx,
-    torch::Tensor tx_power);
-pybind11::tuple cn_bdpt_diffraction_edge_geometry(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor edge_v0,
-    torch::Tensor edge_v1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    double plane_tol);
-pybind11::tuple cn_bdpt_surface_group_edge_candidates(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor edge_v0,
-    torch::Tensor edge_v1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor selected,
-    double plane_tol);
 pybind11::dict cn_bdpt_face_material_tensors(
     torch::Tensor material_eps_r,
     torch::Tensor material_sigma_e,
@@ -531,14 +461,6 @@ void register_bdpt_connections(pybind11::module_ &module) {
         &cn_bdpt_mis_weights,
         "Evaluate BDPT MIS weights with a CUDA kernel.");
     module.def(
-        "bdpt_diffraction_connection_samples_from_tape",
-        &cn_bdpt_diffraction_connection_samples_from_tape,
-        "Replay RayD diffraction tape into BDPT native connection samples.");
-    module.def(
-        "bdpt_diffraction_point_connection_samples",
-        &cn_bdpt_diffraction_point_connection_samples,
-        "Sample point-receiver diffraction paths into BDPT native connection samples and visibility segments.");
-    module.def(
         "bdpt_zero_matrix",
         &cn_bdpt_zero_matrix,
         "Allocate and zero a BDPT float matrix with a CUDA kernel.");
@@ -632,29 +554,9 @@ void register_bdpt_diffraction_support(pybind11::module_ &module) {
         "bdpt_reflection_launch_inputs",
         &cn_bdpt_reflection_launch_inputs,
         "Prepare RayD reflection launch tensors for BDPT with a CUDA kernel.");
-    module.def(
-        "bdpt_diffraction_state_wi",
-        &cn_bdpt_diffraction_state_wi,
-        "Compute BDPT diffraction incident directions with a CUDA kernel.");
-    module.def(
-        "bdpt_selected_edge_indices",
-        &cn_bdpt_selected_edge_indices,
-        "Compact a selected BDPT edge mask into deterministic int32 indices with native CUDA kernels.");
-    module.def(
-        "bdpt_diffraction_state_pack",
-        &cn_bdpt_diffraction_state_pack,
-        "Pack BDPT diffraction edge states with a fused CUDA kernel.");
 }
 
 void register_bdpt_material_helpers(pybind11::module_ &module) {
-    module.def(
-        "bdpt_diffraction_edge_geometry",
-        &cn_bdpt_diffraction_edge_geometry,
-        "Build BDPT diffraction edge geometry tensors with a fused CUDA kernel.");
-    module.def(
-        "bdpt_surface_group_edge_candidates",
-        &cn_bdpt_surface_group_edge_candidates,
-        "Build BDPT surface-group diffraction edge candidate tables with native CUDA kernels.");
     module.def(
         "bdpt_face_material_tensors",
         &cn_bdpt_face_material_tensors,

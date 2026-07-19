@@ -10,7 +10,7 @@ from witwin.channel_native.runtime.native_buffers import (  # noqa: F401
     mc_receiver_grid_points,
     mc_transmitter_tensors,
 )
-from witwin.channel_native.runtime.symbols import native_extension
+from witwin.channel_native.runtime.symbols import native_extension, required_symbol
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 
@@ -46,6 +46,71 @@ def mc_reflection_launch_inputs(
         "tx_pol", exported["tx_pol"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
     return exported
+
+
+def _validate_mc_diffraction_discovery_args(
+    args: tuple[torch.Tensor, ...], *, counted: bool
+) -> None:
+    expected = 16 if counted else 15
+    if len(args) != expected:
+        raise TypeError(f"MC diffraction discovery expects {expected} tensors")
+    hit_count_index = 6 if counted else None
+    offset = 1 if counted else 0
+    names = (
+        "tx_pos", "ray_dir", "prim_index", "hit_p", "hit_n", "hit_geo_n"
+    )
+    for index, name in enumerate(names):
+        trailing_shape = (3,) if name not in {"prim_index"} else None
+        validate_cuda_tensor(
+            name,
+            args[index],
+            dtype=torch.int32 if name == "prim_index" else torch.float32,
+            ndim=1 if name in {"tx_pos", "prim_index"} else 2,
+            trailing_shape=trailing_shape,
+        )
+    if hit_count_index is not None:
+        validate_cuda_tensor("hit_count", args[hit_count_index], dtype=torch.int32, ndim=1)
+    table_start = 6 + offset
+    validate_cuda_tensor(
+        "triangle_edge_count", args[table_start], dtype=torch.int32, ndim=1
+    )
+    validate_cuda_tensor(
+        "triangle_edge_indices", args[table_start + 1], dtype=torch.int32, ndim=2
+    )
+    for index, name in enumerate(("edge_pos", "edge_dir", "edge_n0", "edge_n1"), start=2):
+        validate_cuda_tensor(
+            name,
+            args[table_start + index],
+            dtype=torch.float32,
+            ndim=2,
+            trailing_shape=(3,),
+        )
+    for index, name, dtype in (
+        (6, "edge_line_min", torch.float32),
+        (7, "edge_line_max", torch.float32),
+        (8, "edge_adjacent_face1", torch.int32),
+    ):
+        validate_cuda_tensor(name, args[table_start + index], dtype=dtype, ndim=1)
+
+
+def mc_diffraction_discover_edges(*args: torch.Tensor) -> torch.Tensor:
+    _validate_mc_diffraction_discovery_args(args, counted=False)
+    out = required_symbol("mc_diffraction_discover_edges")(*args)
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_diffraction_discover_edges must return a tensor"
+        )
+    return out
+
+
+def mc_diffraction_discover_edges_counted(*args: torch.Tensor) -> torch.Tensor:
+    _validate_mc_diffraction_discovery_args(args, counted=True)
+    out = required_symbol("mc_diffraction_discover_edges_counted")(*args)
+    if not isinstance(out, torch.Tensor):
+        raise TypeError(
+            "_channel_native.mc_diffraction_discover_edges_counted must return a tensor"
+        )
+    return out
 
 
 def mc_diffraction_state_wi(

@@ -579,7 +579,7 @@ def _discover_diffraction_edges_from_wedges(
         edge_candidates = _cached_primitive_edge_candidates(rayd, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
     if wedges.event_count is not None:
-        return geometry_bridge.rayd_diffraction_discover_edges_counted(
+        return sampling_kernels.mc_diffraction_discover_edges_counted(
             wedges.tx_pos,
             wedges.ray_dir,
             wedges.prim_id,
@@ -597,7 +597,7 @@ def _discover_diffraction_edges_from_wedges(
             line_max,
             face1,
         )
-    return geometry_bridge.rayd_diffraction_discover_edges(
+    return sampling_kernels.mc_diffraction_discover_edges(
         wedges.tx_pos,
         wedges.ray_dir,
         wedges.prim_id,
@@ -828,7 +828,7 @@ def diffraction_component_map(
             dtype=torch.float32,
         )
         state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
-        sampled = geometry_bridge.rayd_diffraction_accumulation_forward(
+        sampled = geometry_bridge.bdpt_diffraction_accumulation_forward(
             handle, None, *states, state_wi, state_wi,
             material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
             state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),

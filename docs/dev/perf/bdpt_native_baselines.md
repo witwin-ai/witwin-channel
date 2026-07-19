@@ -24,12 +24,12 @@ Initial native BDPT gates use `benchmarks/bench_bdpt_basic.py` and
   open two-triangle plane scene. Strict gates require matching radiomap shape,
   nonzero native/original maps, and native median solve time faster than original
   with at least the configured minimum speedup.
-- Receiver-grid diffraction path export uses native RayDN direct/Keller tape
-  replay through `_channel_native.bdpt_diffraction_connection_samples_from_tape`.
-  Point receiver diffraction uses native point-target connection samples plus
-  RayDN native visibility filtering. These export/point paths do not change the
-  non-export receiver-grid solve timings below and need separate point-receiver
-  timing baselines.
+- The former crude receiver-grid and point diffraction connection exporters
+  were removed by Plan 13 Phase 4 after failing the four-axis reachability
+  audit. Standalone BDPT diffraction now uses the opaque enumerated-path oracle;
+  MC Basic retains the fused RayD sample-tape producer plus the Channel Sionna
+  tape accumulator. The historical timings below predate that cleanup and are
+  retained as baseline evidence, not as a live ABI contract.
 
 Regenerate local numbers with:
 

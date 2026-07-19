@@ -1,7 +1,10 @@
 import inspect
 from pathlib import Path
 
+import pytest
+
 from witwin.channel_native.core.kernels import extension
+from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
 from witwin.channel_native.propagation.geometry.kernels import bridge as ops
 from witwin.channel_native.runtime import symbols
 from witwin.channel_native.scene.kernels import rayd_scene
@@ -25,44 +28,62 @@ def test_rayd_uses_the_validated_fail_loud_native_loader():
     assert symbols.native_extension() is not None
 
 
-def test_bdpt_visibility_uses_channel_native_bridge():
-    source = inspect.getsource(ops.bdpt_visibility_forward)
+def test_rayd_visibility_uses_channel_native_bridge():
+    source = inspect.getsource(ops.rayd_visibility_forward)
 
     assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
     assert "_required_native_op" in source
-    assert "bdpt_visibility_forward" in source
+    assert "rayd_visibility_forward" in source
 
 
-def test_bdpt_intersection_uses_channel_native_bridge():
-    source = inspect.getsource(ops.bdpt_intersect_forward)
+def test_rayd_intersection_uses_channel_native_bridge():
+    source = inspect.getsource(ops.rayd_intersect_forward)
 
     assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
     assert "_required_native_op" in source
-    assert "bdpt_intersect_forward" in source
+    assert "rayd_intersect_forward" in source
     assert "_rayd_resource" not in ops.__dict__
 
 
-def test_bdpt_reflection_accumulation_uses_channel_native_bridge():
-    source = inspect.getsource(ops.bdpt_reflection_accumulation_forward)
-
-    assert "_required_rayd_op" not in source
-    assert "torch.ops" not in source
-    assert "_required_native_op" in source
-    assert "bdpt_reflection_accumulation_forward" in source
-
-
 def test_bdpt_diffraction_uses_channel_native_bridge():
-    for fn in (
-        ops.bdpt_diffraction_discover_edges,
-        ops.bdpt_diffraction_discover_edges_counted,
-        ops.bdpt_diffraction_accumulation_forward,
-    ):
+    for fn in (ops.bdpt_diffraction_accumulation_forward,):
         source = inspect.getsource(fn)
         assert "_required_rayd_op" not in source
         assert "torch.ops" not in source
         assert "_required_native_op" in source
+
+
+def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
+    for fn in (
+        mc_sampling.mc_diffraction_discover_edges,
+        mc_sampling.mc_diffraction_discover_edges_counted,
+    ):
+        source = inspect.getsource(fn)
+        assert "required_symbol" in source
+        assert "optional_symbol" not in source
+        assert "torch.ops" not in source
+
+    monkeypatch.setattr(
+        mc_sampling,
+        "_validate_mc_diffraction_discovery_args",
+        lambda *args, **kwargs: None,
+    )
+
+    def missing(name: str):
+        raise symbols.NativeSymbolError(
+            f"_channel_native.{name} CUDA kernel is required"
+        )
+
+    monkeypatch.setattr(mc_sampling, "required_symbol", missing)
+    with pytest.raises(symbols.NativeSymbolError, match="mc_diffraction_discover_edges"):
+        mc_sampling.mc_diffraction_discover_edges()
+    with pytest.raises(
+        symbols.NativeSymbolError,
+        match="mc_diffraction_discover_edges_counted",
+    ):
+        mc_sampling.mc_diffraction_discover_edges_counted()
 
 
 def test_rayd_path_exports_use_channel_native_bridge():

@@ -6,7 +6,7 @@
       "name": "bdpt_accumulate_connection_samples",
       "target": "cn_bdpt_accumulate_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 482,
+      "line": 412,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -82,7 +82,7 @@
       "name": "bdpt_accumulate_connection_samples_backward",
       "target": "cn_bdpt_accumulate_connection_samples_backward",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 501,
+      "line": 431,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -204,7 +204,7 @@
       "name": "bdpt_accumulate_connection_samples_jvp",
       "target": "cn_bdpt_accumulate_connection_samples_jvp",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 505,
+      "line": 435,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -301,7 +301,7 @@
       "name": "bdpt_apply_los_visibility",
       "target": "cn_bdpt_apply_los_visibility",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 616,
+      "line": 538,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -333,7 +333,7 @@
       "name": "bdpt_compact_connection_samples",
       "target": "cn_bdpt_compact_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 517,
+      "line": 447,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -355,7 +355,7 @@
       "name": "bdpt_component_map_buffer",
       "target": "cn_bdpt_component_map_buffer",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 584,
+      "line": 506,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -387,7 +387,7 @@
       "name": "bdpt_concat_connection_samples",
       "target": "cn_bdpt_concat_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 521,
+      "line": 451,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -404,7 +404,7 @@
       "name": "bdpt_connection_variance",
       "target": "cn_bdpt_connection_variance",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 525,
+      "line": 455,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -436,7 +436,7 @@
       "name": "bdpt_count_valid_connection_samples",
       "target": "cn_bdpt_count_valid_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 513,
+      "line": 443,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -453,7 +453,7 @@
       "name": "bdpt_diffraction_accumulation_forward",
       "target": "cn_bdpt_diffraction_accumulation_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 419,
+      "line": 341,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -722,529 +722,10 @@
       "doc": "Call typed RayD diffraction accumulation."
     },
     {
-      "name": "bdpt_diffraction_connection_samples_from_tape",
-      "target": "cn_bdpt_diffraction_connection_samples_from_tape",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 533,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "tape",
-          "type": "pybind11::dict",
-          "default": null
-        },
-        {
-          "name": "states",
-          "type": "pybind11::tuple",
-          "default": null
-        },
-        {
-          "name": "material_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_index",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "state_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_axis",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_position",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord0_min",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord0_max",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord1_min",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord1_max",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_resolution0",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_resolution1",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_cell_area",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "direct_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "keller_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "mode_id",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "beta",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "strategy_count",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Replay RayD diffraction tape into BDPT native connection samples."
-    },
-    {
-      "name": "bdpt_diffraction_discover_edges",
-      "target": "cn_bdpt_diffraction_discover_edges",
-      "path": "native/channel_native/binding/rayd.cpp",
-      "line": 407,
-      "return_type": "torch::Tensor",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "tx_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "ray_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_p",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_n",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_geo_n",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "triangle_edge_count",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "triangle_edge_indices",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_nn",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_line_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_line_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_adjacent_face1",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Call Channel Native diffraction edge discovery."
-    },
-    {
-      "name": "bdpt_diffraction_discover_edges_counted",
-      "target": "cn_bdpt_diffraction_discover_edges_counted",
-      "path": "native/channel_native/binding/rayd.cpp",
-      "line": 411,
-      "return_type": "torch::Tensor",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "tx_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "ray_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_p",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_n",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_geo_n",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "hit_count",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "triangle_edge_count",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "triangle_edge_indices",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_nn",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_line_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_line_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_adjacent_face1",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Call Channel Native counted diffraction edge discovery."
-    },
-    {
-      "name": "bdpt_diffraction_edge_geometry",
-      "target": "cn_bdpt_diffraction_edge_geometry",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 650,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "vertices",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "faces",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_v0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_v1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "plane_tol",
-          "type": "double",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Build BDPT diffraction edge geometry tensors with a fused CUDA kernel."
-    },
-    {
-      "name": "bdpt_diffraction_point_connection_samples",
-      "target": "cn_bdpt_diffraction_point_connection_samples",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 537,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "rx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "states",
-          "type": "pybind11::tuple",
-          "default": null
-        },
-        {
-          "name": "material_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_index",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "state_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "direct_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "keller_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "seed",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "mode_id",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "beta",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "strategy_count",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Sample point-receiver diffraction paths into BDPT native connection samples and visibility segments."
-    },
-    {
-      "name": "bdpt_diffraction_state_pack",
-      "target": "cn_bdpt_diffraction_state_pack",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 643,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "edge_indices",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "line_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "line_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "exterior_angle",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_power",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Pack BDPT diffraction edge states with a fused CUDA kernel."
-    },
-    {
-      "name": "bdpt_diffraction_state_wi",
-      "target": "cn_bdpt_diffraction_state_wi",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 635,
-      "return_type": "torch::Tensor",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "state_edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_src",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Compute BDPT diffraction incident directions with a CUDA kernel."
-    },
-    {
       "name": "bdpt_empty_subpath_state",
       "target": "cn_bdpt_empty_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 435,
+      "line": 365,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1261,7 +742,7 @@
       "name": "bdpt_endpoint_connection_samples",
       "target": "cn_bdpt_endpoint_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 474,
+      "line": 404,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1313,7 +794,7 @@
       "name": "bdpt_endpoint_connection_samples_backward",
       "target": "cn_bdpt_endpoint_connection_samples_backward_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 493,
+      "line": 423,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1385,7 +866,7 @@
       "name": "bdpt_endpoint_connection_samples_jvp",
       "target": "cn_bdpt_endpoint_connection_samples_jvp_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 497,
+      "line": 427,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1467,7 +948,7 @@
       "name": "bdpt_endpoint_connection_visibility_inputs",
       "target": "cn_bdpt_endpoint_connection_visibility_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 478,
+      "line": 408,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1494,7 +975,7 @@
       "name": "bdpt_endpoint_subpath_state",
       "target": "cn_bdpt_endpoint_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 439,
+      "line": 369,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1541,7 +1022,7 @@
       "name": "bdpt_face_material_tensors",
       "target": "cn_bdpt_face_material_tensors",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 658,
+      "line": 560,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1573,7 +1054,7 @@
       "name": "bdpt_face_material_tensors_from_host",
       "target": "cn_bdpt_face_material_tensors_from_host",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 662,
+      "line": 564,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1605,7 +1086,7 @@
       "name": "bdpt_filter_connection_samples",
       "target": "cn_bdpt_filter_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 509,
+      "line": 439,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1627,7 +1108,7 @@
       "name": "bdpt_finalize_component_maps",
       "target": "cn_bdpt_finalize_component_maps",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 564,
+      "line": 486,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1664,7 +1145,7 @@
       "name": "bdpt_finalize_component_maps_backward",
       "target": "cn_bdpt_finalize_component_maps_backward_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 576,
+      "line": 498,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1736,7 +1217,7 @@
       "name": "bdpt_finalize_component_maps_jvp",
       "target": "cn_bdpt_finalize_component_maps_jvp_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 580,
+      "line": 502,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1798,7 +1279,7 @@
       "name": "bdpt_finalize_point_components",
       "target": "cn_bdpt_finalize_point_components",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 556,
+      "line": 478,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1835,7 +1316,7 @@
       "name": "bdpt_finalize_point_components_backward",
       "target": "cn_bdpt_finalize_point_components_backward_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 568,
+      "line": 490,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1907,7 +1388,7 @@
       "name": "bdpt_finalize_point_components_jvp",
       "target": "cn_bdpt_finalize_point_components_jvp_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 572,
+      "line": 494,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1966,52 +1447,10 @@
       "doc": "ADR-022 JVP of the BDPT point-receiver finalize map (native CUDA companion)."
     },
     {
-      "name": "bdpt_intersect_forward",
-      "target": "cn_bdpt_intersect_forward",
-      "path": "native/channel_native/binding/rayd.cpp",
-      "line": 340,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "scene",
-          "type": "RayDSceneResource &",
-          "default": null
-        },
-        {
-          "name": "ray_o",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "ray_d",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "ray_tmax",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "active",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "flags",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Call typed RayD ray/scene intersection."
-    },
-    {
       "name": "bdpt_launch_state",
       "target": "cn_bdpt_launch_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 431,
+      "line": 361,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2048,7 +1487,7 @@
       "name": "bdpt_los_component_maps",
       "target": "cn_bdpt_los_component_maps",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 608,
+      "line": 530,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2065,7 +1504,7 @@
       "name": "bdpt_los_component_maps_from_matrix",
       "target": "cn_bdpt_los_component_maps_from_matrix",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 612,
+      "line": 534,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2092,7 +1531,7 @@
       "name": "bdpt_los_export",
       "target": "cn_bdpt_los_export",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 560,
+      "line": 482,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2129,7 +1568,7 @@
       "name": "bdpt_los_visibility_inputs",
       "target": "cn_bdpt_los_visibility_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 620,
+      "line": 542,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2156,7 +1595,7 @@
       "name": "bdpt_mis_weights",
       "target": "cn_bdpt_mis_weights",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 529,
+      "line": 459,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2188,7 +1627,7 @@
       "name": "bdpt_pack_vec3",
       "target": "cn_bdpt_pack_vec3",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 604,
+      "line": 526,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2215,7 +1654,7 @@
       "name": "bdpt_point_component_power",
       "target": "cn_bdpt_point_component_power",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 548,
+      "line": 470,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2237,7 +1676,7 @@
       "name": "bdpt_receiver_grid_points",
       "target": "cn_bdpt_receiver_grid_points",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 627,
+      "line": 549,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2319,7 +1758,7 @@
       "name": "bdpt_reflected_light_subpath_state",
       "target": "cn_bdpt_reflected_light_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 447,
+      "line": 377,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2376,7 +1815,7 @@
       "name": "bdpt_reflected_light_subpath_state_backward",
       "target": "cn_bdpt_reflected_light_subpath_state_backward_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 455,
+      "line": 385,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2468,7 +1907,7 @@
       "name": "bdpt_reflected_light_subpath_state_jvp",
       "target": "cn_bdpt_reflected_light_subpath_state_jvp_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 459,
+      "line": 389,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2567,182 +2006,10 @@
       "doc": "ADR-022 JVP of BDPT reflected light subpath advance (native CUDA companion)."
     },
     {
-      "name": "bdpt_reflection_accumulation_forward",
-      "target": "cn_bdpt_reflection_accumulation_forward",
-      "path": "native/channel_native/binding/rayd.cpp",
-      "line": 403,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "scene",
-          "type": "RayDSceneResource &",
-          "default": null
-        },
-        {
-          "name": "ray_o",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "ray_d",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "ray_tmax",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "active",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_pol",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_eta_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sigma",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_mu_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "max_bounces",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_axis",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_position",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord0_min",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord0_max",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord1_min",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord1_max",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_resolution0",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_resolution1",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "solid_angle_per_ray",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "collect_wedges",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "collect_wedge_prefixes",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "wedge_capacity",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "wedge_sample_stride",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "accumulation_strategy",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "compact_min_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "staged_min_samples_per_cell",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "procedural_sample_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "streaming_los_enabled",
-          "type": "bool",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Call typed RayD reflection accumulation."
-    },
-    {
       "name": "bdpt_reflection_launch_inputs",
       "target": "cn_bdpt_reflection_launch_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 631,
+      "line": 553,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2769,7 +2036,7 @@
       "name": "bdpt_sample_directions",
       "target": "cn_bdpt_sample_directions",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 596,
+      "line": 518,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2793,27 +2060,10 @@
       "doc": "Generate seeded BDPT sphere sample directions with a fused CUDA kernel."
     },
     {
-      "name": "bdpt_selected_edge_indices",
-      "target": "cn_bdpt_selected_edge_indices",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 639,
-      "return_type": "torch::Tensor",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "selected",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Compact a selected BDPT edge mask into deterministic int32 indices with native CUDA kernels."
-    },
-    {
       "name": "bdpt_store_component_map",
       "target": "cn_bdpt_store_component_map",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 588,
+      "line": 510,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2840,7 +2090,7 @@
       "name": "bdpt_store_point_component_column",
       "target": "cn_bdpt_store_point_component_column",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 552,
+      "line": 474,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2867,7 +2117,7 @@
       "name": "bdpt_store_scaled_component_map",
       "target": "cn_bdpt_store_scaled_component_map",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 592,
+      "line": 514,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2904,7 +2154,7 @@
       "name": "bdpt_subpath_intersection_inputs",
       "target": "cn_bdpt_subpath_intersection_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 443,
+      "line": 373,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2918,67 +2168,10 @@
       "doc": "Expose BDPT subpath state as RayD intersection ray inputs with native tensor storage."
     },
     {
-      "name": "bdpt_surface_group_edge_candidates",
-      "target": "cn_bdpt_surface_group_edge_candidates",
-      "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 654,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "vertices",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "faces",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_v0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_v1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "plane_tol",
-          "type": "double",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Build BDPT surface-group diffraction edge candidate tables with native CUDA kernels."
-    },
-    {
       "name": "bdpt_transmitted_light_subpath_state",
       "target": "cn_bdpt_transmitted_light_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 451,
+      "line": 381,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3040,7 +2233,7 @@
       "name": "bdpt_transmitted_light_subpath_state_backward",
       "target": "cn_bdpt_transmitted_light_subpath_state_backward_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 463,
+      "line": 393,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3137,7 +2330,7 @@
       "name": "bdpt_transmitted_light_subpath_state_jvp",
       "target": "cn_bdpt_transmitted_light_subpath_state_jvp_dispatch",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 467,
+      "line": 397,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3239,7 +2432,7 @@
       "name": "bdpt_transmitter_tensors",
       "target": "cn_bdpt_transmitter_tensors",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 600,
+      "line": 522,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3258,42 +2451,10 @@
       "doc": "Create BDPT transmitter/host position CUDA tensors through native code."
     },
     {
-      "name": "bdpt_visibility_forward",
-      "target": "cn_bdpt_visibility_forward",
-      "path": "native/channel_native/binding/rayd.cpp",
-      "line": 344,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "scene",
-          "type": "RayDSceneResource &",
-          "default": null
-        },
-        {
-          "name": "start",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "end",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "active",
-          "type": "pybind11::object",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Call typed RayD segment visibility."
-    },
-    {
       "name": "bdpt_zero_matrix",
       "target": "cn_bdpt_zero_matrix",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 541,
+      "line": 463,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3331,7 +2492,7 @@
       "name": "core_diffraction_edge_count",
       "target": "cn_core_diffraction_edge_count",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 375,
+      "line": 352,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -3398,7 +2559,7 @@
       "name": "core_pack_int2",
       "target": "cn_core_pack_int2",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 371,
+      "line": 348,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3420,7 +2581,7 @@
       "name": "coupled_dd_geometry_forward",
       "target": "cn_coupled_dd_geometry_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 396,
+      "line": 330,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3497,7 +2658,7 @@
       "name": "coupled_rd_geometry_forward",
       "target": "cn_coupled_rd_geometry_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 392,
+      "line": 326,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3760,7 +2921,7 @@
       "name": "deterministic_accumulate_flat",
       "target": "cn_deterministic_accumulate_flat",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 574,
+      "line": 547,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3863,7 +3024,7 @@
       "name": "deterministic_accumulate_flat_backward",
       "target": "cn_deterministic_accumulate_flat_backward",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 602,
+      "line": 575,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4038,7 +3199,7 @@
       "name": "deterministic_accumulate_flat_fwd64",
       "target": "cn_deterministic_accumulate_flat_fwd64",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 588,
+      "line": 561,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4141,7 +3302,7 @@
       "name": "deterministic_accumulate_flat_jvp",
       "target": "cn_deterministic_accumulate_flat_jvp",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 624,
+      "line": 597,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4271,7 +3432,7 @@
       "name": "deterministic_component_counts",
       "target": "cn_deterministic_component_counts",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 433,
+      "line": 406,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4288,7 +3449,7 @@
       "name": "deterministic_concat_topology_blocks",
       "target": "cn_deterministic_concat_topology_blocks",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 554,
+      "line": 527,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4310,7 +3471,7 @@
       "name": "deterministic_delay_to_path_length",
       "target": "cn_deterministic_delay_to_path_length",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 470,
+      "line": 443,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4327,7 +3488,7 @@
       "name": "deterministic_diffraction_order1_compact",
       "target": "cn_deterministic_diffraction_order1_compact",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 542,
+      "line": 515,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4399,7 +3560,7 @@
       "name": "deterministic_diffraction_state_pack",
       "target": "cn_deterministic_diffraction_state_pack",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 382,
+      "line": 359,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -4476,7 +3637,7 @@
       "name": "deterministic_diffraction_state_pack_selected",
       "target": "cn_deterministic_diffraction_state_pack_selected",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 386,
+      "line": 363,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -4553,7 +3714,7 @@
       "name": "deterministic_diffraction_vector_field",
       "target": "cn_deterministic_diffraction_vector_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 458,
+      "line": 431,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4595,7 +3756,7 @@
       "name": "deterministic_face_anchor_points",
       "target": "cn_deterministic_face_anchor_points",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 518,
+      "line": 491,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4617,7 +3778,7 @@
       "name": "deterministic_face_groups",
       "target": "cn_deterministic_face_groups",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 562,
+      "line": 535,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4649,7 +3810,7 @@
       "name": "deterministic_face_sequence_chunk",
       "target": "cn_deterministic_face_sequence_chunk",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 526,
+      "line": 499,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4691,7 +3852,7 @@
       "name": "deterministic_field_from_power_phase",
       "target": "cn_deterministic_field_from_power_phase",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 490,
+      "line": 463,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4713,7 +3874,7 @@
       "name": "deterministic_gather_topology_block",
       "target": "cn_deterministic_gather_topology_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 558,
+      "line": 531,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4745,7 +3906,7 @@
       "name": "deterministic_los_field",
       "target": "cn_deterministic_los_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 444,
+      "line": 417,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4772,7 +3933,7 @@
       "name": "deterministic_los_topology_block",
       "target": "cn_deterministic_los_topology_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 494,
+      "line": 467,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4824,7 +3985,7 @@
       "name": "deterministic_los_topology_block_all_visible",
       "target": "cn_deterministic_los_topology_block_all_visible",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 498,
+      "line": 471,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4871,7 +4032,7 @@
       "name": "deterministic_mapped_face_sequence_chunk",
       "target": "cn_deterministic_mapped_face_sequence_chunk",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 530,
+      "line": 503,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4908,7 +4069,7 @@
       "name": "deterministic_normalize_vec3",
       "target": "cn_deterministic_normalize_vec3",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 546,
+      "line": 519,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4930,7 +4091,7 @@
       "name": "deterministic_pack_complex",
       "target": "cn_deterministic_pack_complex",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 474,
+      "line": 447,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4952,7 +4113,7 @@
       "name": "deterministic_pad_topology_sequences",
       "target": "cn_deterministic_pad_topology_sequences",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 506,
+      "line": 479,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5014,7 +4175,7 @@
       "name": "deterministic_phase_from_field",
       "target": "cn_deterministic_phase_from_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 478,
+      "line": 451,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5036,7 +4197,7 @@
       "name": "deterministic_phase_from_length",
       "target": "cn_deterministic_phase_from_length",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 486,
+      "line": 459,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5058,7 +4219,7 @@
       "name": "deterministic_reflect_points",
       "target": "cn_deterministic_reflect_points",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 550,
+      "line": 523,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5085,7 +4246,7 @@
       "name": "deterministic_reflection_epc_input_batch",
       "target": "cn_deterministic_reflection_epc_input_batch",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 522,
+      "line": 495,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5132,7 +4293,7 @@
       "name": "deterministic_reflection_field",
       "target": "cn_deterministic_reflection_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 462,
+      "line": 435,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5194,7 +4355,7 @@
       "name": "deterministic_reflection_order1_compact",
       "target": "cn_deterministic_reflection_order1_compact",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 534,
+      "line": 507,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5286,7 +4447,7 @@
       "name": "deterministic_reflection_sequence_compact",
       "target": "cn_deterministic_reflection_sequence_compact",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 538,
+      "line": 511,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5373,7 +4534,7 @@
       "name": "deterministic_reflection_sequence_field",
       "target": "cn_deterministic_reflection_sequence_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 466,
+      "line": 439,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5435,7 +4596,7 @@
       "name": "deterministic_repeat_range",
       "target": "cn_deterministic_repeat_range",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 514,
+      "line": 487,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5467,7 +4628,7 @@
       "name": "deterministic_selected_edge_count",
       "target": "cn_deterministic_selected_edge_count",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 437,
+      "line": 410,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -5484,7 +4645,7 @@
       "name": "deterministic_sort_order",
       "target": "cn_deterministic_sort_order",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 570,
+      "line": 543,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5536,7 +4697,7 @@
       "name": "deterministic_surface_face_groups",
       "target": "cn_deterministic_surface_face_groups",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 566,
+      "line": 539,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5553,7 +4714,7 @@
       "name": "deterministic_topology_base_fields",
       "target": "cn_deterministic_topology_base_fields",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 510,
+      "line": 483,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5625,7 +4786,7 @@
       "name": "deterministic_topology_default_fields",
       "target": "cn_deterministic_topology_default_fields",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 502,
+      "line": 475,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5642,7 +4803,7 @@
       "name": "deterministic_zero_field_phase",
       "target": "cn_deterministic_zero_field_phase",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 482,
+      "line": 455,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9309,7 +8470,7 @@
       "name": "los_silhouette_clearance",
       "target": "cn_los_silhouette_clearance",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 448,
+      "line": 421,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9351,7 +8512,7 @@
       "name": "los_taper_apply",
       "target": "cn_los_taper_apply",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 453,
+      "line": 426,
       "return_type": "std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>",
       "return_arity": 4,
       "parameters": [
@@ -9388,7 +8549,7 @@
       "name": "mc_apply_los_visibility",
       "target": "cn_mc_apply_los_visibility",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 257,
+      "line": 298,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9420,7 +8581,7 @@
       "name": "mc_component_map_buffer",
       "target": "cn_mc_component_map_buffer",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 213,
+      "line": 246,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9449,10 +8610,189 @@
       "doc": "Allocate a zero-filled MC component map buffer."
     },
     {
+      "name": "mc_diffraction_discover_edges",
+      "target": "cn_mc_diffraction_discover_edges",
+      "path": "native/channel_native/binding/montecarlo.cpp",
+      "line": 262,
+      "return_type": "torch::Tensor",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "tx_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "ray_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "prim_index",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_p",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_n",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_geo_n",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "triangle_edge_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "triangle_edge_indices",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_n0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_n1",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_line_min",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_line_max",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_adjacent_face1",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Discover MC diffraction support edges with a native CUDA kernel."
+    },
+    {
+      "name": "mc_diffraction_discover_edges_counted",
+      "target": "cn_mc_diffraction_discover_edges_counted",
+      "path": "native/channel_native/binding/montecarlo.cpp",
+      "line": 266,
+      "return_type": "torch::Tensor",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "tx_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "ray_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "prim_index",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_p",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_n",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_geo_n",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "hit_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "triangle_edge_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "triangle_edge_indices",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_n0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_n1",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_line_min",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_line_max",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_adjacent_face1",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Discover MC diffraction support edges from a counted RayD hit buffer."
+    },
+    {
       "name": "mc_diffraction_edge_geometry",
       "target": "cn_mc_diffraction_edge_geometry",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 313,
+      "line": 354,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -9504,7 +8844,7 @@
       "name": "mc_diffraction_state_pack",
       "target": "cn_mc_diffraction_state_pack",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 309,
+      "line": 350,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -9576,7 +8916,7 @@
       "name": "mc_diffraction_state_wi",
       "target": "cn_mc_diffraction_state_wi",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 289,
+      "line": 330,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9598,7 +8938,7 @@
       "name": "mc_face_material_tensors",
       "target": "cn_mc_face_material_tensors",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 321,
+      "line": 362,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9630,7 +8970,7 @@
       "name": "mc_finalize_component_maps",
       "target": "cn_mc_finalize_component_maps",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 201,
+      "line": 234,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9667,7 +9007,7 @@
       "name": "mc_los_component_maps",
       "target": "cn_mc_los_component_maps",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 237,
+      "line": 278,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9684,7 +9024,7 @@
       "name": "mc_los_component_maps_adjoint",
       "target": "cn_mc_los_component_maps_adjoint",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 253,
+      "line": 294,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9706,7 +9046,7 @@
       "name": "mc_los_component_maps_from_matrix",
       "target": "cn_mc_los_component_maps_from_matrix",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 241,
+      "line": 282,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9733,7 +9073,7 @@
       "name": "mc_los_path_gain_backward",
       "target": "cn_mc_los_path_gain_backward",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 245,
+      "line": 286,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -9775,7 +9115,7 @@
       "name": "mc_los_path_gain_jvp",
       "target": "cn_mc_los_path_gain_jvp",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 249,
+      "line": 290,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9847,7 +9187,7 @@
       "name": "mc_los_visibility_inputs",
       "target": "cn_mc_los_visibility_inputs",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 261,
+      "line": 302,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9874,7 +9214,7 @@
       "name": "mc_pack_vec3",
       "target": "cn_mc_pack_vec3",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 233,
+      "line": 274,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9901,7 +9241,7 @@
       "name": "mc_point_component_power",
       "target": "cn_bdpt_point_component_power",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 209,
+      "line": 242,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9923,7 +9263,7 @@
       "name": "mc_receiver_grid_points",
       "target": "cn_mc_receiver_grid_points",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 265,
+      "line": 306,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10005,7 +9345,7 @@
       "name": "mc_reflection_ad_max_depth",
       "target": "cn_mc_reflection_ad_max_depth_cuda",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 277,
+      "line": 318,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [],
@@ -10016,7 +9356,7 @@
       "name": "mc_reflection_launch_inputs",
       "target": "cn_mc_reflection_launch_inputs",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 269,
+      "line": 310,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10043,7 +9383,7 @@
       "name": "mc_sample_directions",
       "target": "cn_mc_sample_directions",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 225,
+      "line": 258,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10065,7 +9405,7 @@
       "name": "mc_selected_edge_indices",
       "target": "cn_mc_selected_edge_indices",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 305,
+      "line": 346,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10082,7 +9422,7 @@
       "name": "mc_sionna_diffraction_tape_accumulate",
       "target": "cn_mc_sionna_diffraction_tape_accumulate",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 293,
+      "line": 334,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10264,7 +9604,7 @@
       "name": "mc_sionna_diffraction_tape_accumulate_backward",
       "target": "cn_mc_sionna_diffraction_tape_accumulate_backward",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 297,
+      "line": 338,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -10451,7 +9791,7 @@
       "name": "mc_sionna_diffraction_tape_accumulate_jvp",
       "target": "cn_mc_sionna_diffraction_tape_accumulate_jvp",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 301,
+      "line": 342,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10668,7 +10008,7 @@
       "name": "mc_sionna_reflection_accumulate",
       "target": "cn_mc_sionna_reflection_accumulate",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 273,
+      "line": 314,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10800,7 +10140,7 @@
       "name": "mc_sionna_reflection_accumulate_backward",
       "target": "cn_mc_sionna_reflection_accumulate_backward",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 281,
+      "line": 322,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -10952,7 +10292,7 @@
       "name": "mc_sionna_reflection_accumulate_jvp",
       "target": "cn_mc_sionna_reflection_accumulate_jvp",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 285,
+      "line": 326,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11129,7 +10469,7 @@
       "name": "mc_store_component_map",
       "target": "cn_mc_store_component_map",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 217,
+      "line": 250,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11156,7 +10496,7 @@
       "name": "mc_store_scaled_component_map",
       "target": "cn_mc_store_scaled_component_map",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 221,
+      "line": 254,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11193,7 +10533,7 @@
       "name": "mc_surface_group_edge_candidates",
       "target": "cn_mc_surface_group_edge_candidates",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 317,
+      "line": 358,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11250,7 +10590,7 @@
       "name": "mc_transmitter_tensors",
       "target": "cn_mc_transmitter_tensors",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 229,
+      "line": 270,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11272,7 +10612,7 @@
       "name": "mc_zero_matrix",
       "target": "cn_bdpt_zero_matrix",
       "path": "native/channel_native/binding/montecarlo.cpp",
-      "line": 205,
+      "line": 238,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11299,7 +10639,7 @@
       "name": "path_concat_vec3",
       "target": "cn_path_concat_vec3",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 397,
+      "line": 374,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11316,7 +10656,7 @@
       "name": "path_diffraction_block",
       "target": "cn_path_diffraction_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 417,
+      "line": 394,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11335,127 +10675,10 @@
       "doc": "Convert RayD order-1 diffraction outputs into a compact path block with native CUDA kernels."
     },
     {
-      "name": "path_diffraction_paths_order1",
-      "target": "cn_path_diffraction_paths_order1",
-      "path": "native/channel_native/binding/path.cpp",
-      "line": 421,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "scene",
-          "type": "RayDSceneResource &",
-          "default": null
-        },
-        {
-          "name": "tx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_polarizations",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_power",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "line_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "line_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "exterior_angle",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_eta_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sigma",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_mu_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Build compact order-1 diffraction path blocks through native CUDA/RayD without Python tensor loops."
-    },
-    {
       "name": "path_filter_block",
       "target": "cn_path_filter_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 413,
+      "line": 390,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11482,7 +10705,7 @@
       "name": "path_filter_los",
       "target": "cn_path_filter_los",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 405,
+      "line": 382,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11524,7 +10747,7 @@
       "name": "path_finalize_blocks",
       "target": "cn_path_finalize_blocks",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 429,
+      "line": 402,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11566,7 +10789,7 @@
       "name": "path_los_export",
       "target": "cn_path_los_export",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 393,
+      "line": 370,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11603,7 +10826,7 @@
       "name": "path_los_visibility_inputs",
       "target": "cn_path_los_visibility_inputs",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 401,
+      "line": 378,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11635,7 +10858,7 @@
       "name": "path_merge_blocks",
       "target": "cn_path_merge_blocks",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 425,
+      "line": 398,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11662,7 +10885,7 @@
       "name": "path_reflection_candidates",
       "target": "cn_path_reflection_candidates",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 409,
+      "line": 386,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11714,7 +10937,7 @@
       "name": "rayd_diffraction_paths_order1_forward",
       "target": "cn_rayd_diffraction_paths_order1_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 415,
+      "line": 337,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11856,7 +11079,7 @@
       "name": "rayd_intersect_backward",
       "target": "cn_rayd_intersect_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 356,
+      "line": 290,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11950,10 +11173,52 @@
       "doc": "Call the typed RayD fixed-winner intersect VJP."
     },
     {
+      "name": "rayd_intersect_forward",
+      "target": "cn_rayd_intersect_forward",
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 274,
+      "return_type": "pybind11::tuple",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "scene",
+          "type": "RayDSceneResource &",
+          "default": null
+        },
+        {
+          "name": "ray_o",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "ray_d",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "ray_tmax",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "active",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "flags",
+          "type": "int64_t",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Call typed RayD ray/scene intersection."
+    },
+    {
       "name": "rayd_intersect_jvp",
       "target": "cn_rayd_intersect_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 360,
+      "line": 294,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12015,7 +11280,7 @@
       "name": "rayd_reflection_epc_paths_backward",
       "target": "cn_rayd_reflection_epc_paths_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 376,
+      "line": 310,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12097,7 +11362,7 @@
       "name": "rayd_reflection_epc_paths_forward",
       "target": "cn_rayd_reflection_epc_paths_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 352,
+      "line": 286,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12169,7 +11434,7 @@
       "name": "rayd_reflection_epc_paths_jvp",
       "target": "cn_rayd_reflection_epc_paths_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 380,
+      "line": 314,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12236,7 +11501,7 @@
       "name": "rayd_scene_create",
       "target": "cn_rayd_scene_create",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 332,
+      "line": 266,
       "return_type": "std::shared_ptr<RayDSceneResource>",
       "return_arity": 1,
       "parameters": [
@@ -12283,7 +11548,7 @@
       "name": "rayd_scene_edge_records",
       "target": "cn_rayd_scene_edge_records",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 336,
+      "line": 270,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12300,7 +11565,7 @@
       "name": "rayd_scene_face_normals_backward",
       "target": "cn_rayd_scene_face_normals_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 384,
+      "line": 318,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12322,7 +11587,7 @@
       "name": "rayd_scene_face_normals_jvp",
       "target": "cn_rayd_scene_face_normals_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 388,
+      "line": 322,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12344,7 +11609,7 @@
       "name": "rayd_trace_reflections_backward",
       "target": "cn_rayd_trace_reflections_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 368,
+      "line": 302,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12416,7 +11681,7 @@
       "name": "rayd_trace_reflections_forward",
       "target": "cn_rayd_trace_reflections_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 348,
+      "line": 282,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12458,7 +11723,7 @@
       "name": "rayd_trace_reflections_forward_tape",
       "target": "cn_rayd_trace_reflections_forward_tape",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 364,
+      "line": 298,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12500,7 +11765,7 @@
       "name": "rayd_trace_reflections_jvp",
       "target": "cn_rayd_trace_reflections_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 372,
+      "line": 306,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12567,6 +11832,38 @@
       ],
       "pybind_arguments": [],
       "doc": "Call the typed RayD fixed-winner reflection chain JVP."
+    },
+    {
+      "name": "rayd_visibility_forward",
+      "target": "cn_rayd_visibility_forward",
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 278,
+      "return_type": "pybind11::tuple",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "scene",
+          "type": "RayDSceneResource &",
+          "default": null
+        },
+        {
+          "name": "start",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "end",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "active",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Call typed RayD segment visibility."
     },
     {
       "name": "scattering_chain_ensemble_eval",

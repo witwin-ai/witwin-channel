@@ -118,14 +118,13 @@ const at::Tensor &required(const at::Tensor *t,const char *name){
     return *t;
 }
 
-void discover(
+at::Tensor discover(
     const at::Tensor *tx,const at::Tensor *ray_dir,const at::Tensor *prim,
     const at::Tensor *hit_p,const at::Tensor *hit_n,const at::Tensor *hit_geo_n,
     const at::Tensor *hit_count,const at::Tensor *tri_count,const at::Tensor *tri_edges,
     const at::Tensor *edge_pos,const at::Tensor *edge_dir,const at::Tensor *n0,
     const at::Tensor *n1,const at::Tensor *tmin,const at::Tensor *tmax,
-    const at::Tensor *face1,at::Tensor *out){
-    if(!out) throw std::runtime_error("channel diffraction discovery received null output");
+    const at::Tensor *face1){
     const auto &rd=required(ray_dir,"ray_dir"); const auto &ep=required(edge_pos,"edge_pos");
     int64_t capacity=rd.size(0),edges=ep.size(0);
     at::Tensor seen=at::empty({edges},ep.options().dtype(at::kInt));
@@ -149,26 +148,28 @@ void discover(
             static_cast<int>(edges),seen.data_ptr<int>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    *out=at::nonzero(seen).reshape({-1}).to(at::kInt).contiguous();
+    return at::nonzero(seen).reshape({-1}).to(at::kInt).contiguous();
 }
 
 } // namespace
 
-extern "C" void channel_native_diffraction_discover_edges(
-    const at::Tensor *tx,const at::Tensor *ray_dir,const at::Tensor *prim,
-    const at::Tensor *hit_p,const at::Tensor *hit_n,const at::Tensor *hit_geo_n,
-    const at::Tensor *tri_count,const at::Tensor *tri_edges,const at::Tensor *edge_pos,
-    const at::Tensor *edge_dir,const at::Tensor *n0,const at::Tensor *n1,
-    const at::Tensor *tmin,const at::Tensor *tmax,const at::Tensor *face1,at::Tensor *out){
-    discover(tx,ray_dir,prim,hit_p,hit_n,hit_geo_n,nullptr,tri_count,tri_edges,edge_pos,edge_dir,n0,n1,tmin,tmax,face1,out);
+at::Tensor cn_mc_diffraction_discover_edges_cuda(
+    at::Tensor tx,at::Tensor ray_dir,at::Tensor prim,
+    at::Tensor hit_p,at::Tensor hit_n,at::Tensor hit_geo_n,
+    at::Tensor tri_count,at::Tensor tri_edges,at::Tensor edge_pos,
+    at::Tensor edge_dir,at::Tensor n0,at::Tensor n1,
+    at::Tensor tmin,at::Tensor tmax,at::Tensor face1){
+    return discover(&tx,&ray_dir,&prim,&hit_p,&hit_n,&hit_geo_n,nullptr,&tri_count,
+        &tri_edges,&edge_pos,&edge_dir,&n0,&n1,&tmin,&tmax,&face1);
 }
 
-extern "C" void channel_native_diffraction_discover_edges_counted(
-    const at::Tensor *tx,const at::Tensor *ray_dir,const at::Tensor *prim,
-    const at::Tensor *hit_p,const at::Tensor *hit_n,const at::Tensor *hit_geo_n,
-    const at::Tensor *hit_count,const at::Tensor *tri_count,const at::Tensor *tri_edges,
-    const at::Tensor *edge_pos,const at::Tensor *edge_dir,const at::Tensor *n0,
-    const at::Tensor *n1,const at::Tensor *tmin,const at::Tensor *tmax,
-    const at::Tensor *face1,at::Tensor *out){
-    discover(tx,ray_dir,prim,hit_p,hit_n,hit_geo_n,hit_count,tri_count,tri_edges,edge_pos,edge_dir,n0,n1,tmin,tmax,face1,out);
+at::Tensor cn_mc_diffraction_discover_edges_counted_cuda(
+    at::Tensor tx,at::Tensor ray_dir,at::Tensor prim,
+    at::Tensor hit_p,at::Tensor hit_n,at::Tensor hit_geo_n,
+    at::Tensor hit_count,at::Tensor tri_count,at::Tensor tri_edges,
+    at::Tensor edge_pos,at::Tensor edge_dir,at::Tensor n0,
+    at::Tensor n1,at::Tensor tmin,at::Tensor tmax,
+    at::Tensor face1){
+    return discover(&tx,&ray_dir,&prim,&hit_p,&hit_n,&hit_geo_n,&hit_count,&tri_count,
+        &tri_edges,&edge_pos,&edge_dir,&n0,&n1,&tmin,&tmax,&face1);
 }

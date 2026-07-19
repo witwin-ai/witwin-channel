@@ -39,7 +39,7 @@ EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
 # _backward/_jvp companions): 193 -> 199;
 # ADR-022 added the 12 BDPT fixed-topology AD companions: 199 -> 211.
-EXPECTED_NATIVE_BINDING_COUNT = 211
+EXPECTED_NATIVE_BINDING_COUNT = 202
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",
@@ -529,6 +529,8 @@ def _initial_native_contract(name: str) -> str:
             return "native-deterministic-fields"
         return "native-deterministic-topology"
     if name.startswith("mc_"):
+        if name.startswith("mc_diffraction_discover_edges"):
+            return "native-mc-discovery"
         if any(
             token in name
             for token in (
@@ -696,6 +698,10 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
             "native-mc-maps": (
                 "tests/kernels/test_ops_facade.py::"
                 "test_mc_component_map_buffer_and_store_kernels_write_tx_slots"
+            ),
+            "native-mc-discovery": (
+                "tests/montecarlo/basic/test_diffraction_discovery.py::"
+                "test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter"
             ),
             "native-mc-sampling": (
                 "tests/kernels/test_ops_facade.py::"

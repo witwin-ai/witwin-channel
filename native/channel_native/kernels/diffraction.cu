@@ -1480,48 +1480,11 @@ at::Tensor cn_mc_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor
     return diffraction_state_wi_cuda_impl(state_edge_pos, state_src);
 }
 
-at::Tensor cn_bdpt_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor state_src) {
-    return diffraction_state_wi_cuda_impl(state_edge_pos, state_src);
-}
-
 at::Tensor cn_mc_selected_edge_indices_cuda(at::Tensor selected) {
     return selected_edge_indices_cuda_impl(selected);
 }
 
-at::Tensor cn_bdpt_selected_edge_indices_cuda(at::Tensor selected) {
-    return selected_edge_indices_cuda_impl(selected);
-}
-
 std::vector<at::Tensor> cn_mc_diffraction_state_pack_cuda(
-    at::Tensor edge_indices,
-    at::Tensor edge_pos,
-    at::Tensor edge_dir,
-    at::Tensor line_min,
-    at::Tensor line_max,
-    at::Tensor n0,
-    at::Tensor n1,
-    at::Tensor face0,
-    at::Tensor face1,
-    at::Tensor exterior_angle,
-    at::Tensor tx,
-    at::Tensor tx_power) {
-    return diffraction_state_pack_cuda_impl(
-        edge_indices,
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-        tx,
-        tx_power,
-        0);
-}
-
-std::vector<at::Tensor> cn_bdpt_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
     at::Tensor edge_pos,
     at::Tensor edge_dir,
@@ -1630,49 +1593,7 @@ std::vector<at::Tensor> cn_mc_diffraction_edge_geometry_cuda(
         plane_tol);
 }
 
-std::vector<at::Tensor> cn_bdpt_diffraction_edge_geometry_cuda(
-    at::Tensor vertices,
-    at::Tensor faces,
-    at::Tensor face_normals,
-    at::Tensor edge_v0,
-    at::Tensor edge_v1,
-    at::Tensor face0,
-    at::Tensor face1,
-    double plane_tol) {
-    return diffraction_edge_geometry_cuda_impl(
-        vertices,
-        faces,
-        face_normals,
-        edge_v0,
-        edge_v1,
-        face0,
-        face1,
-        plane_tol);
-}
-
 std::vector<at::Tensor> cn_mc_surface_group_edge_candidates_cuda(
-    at::Tensor vertices,
-    at::Tensor faces,
-    at::Tensor face_normals,
-    at::Tensor edge_v0,
-    at::Tensor edge_v1,
-    at::Tensor face0,
-    at::Tensor face1,
-    at::Tensor selected,
-    double plane_tol) {
-    return surface_group_edge_candidates_cuda_impl(
-        vertices,
-        faces,
-        face_normals,
-        edge_v0,
-        edge_v1,
-        face0,
-        face1,
-        selected,
-        plane_tol);
-}
-
-std::vector<at::Tensor> cn_bdpt_surface_group_edge_candidates_cuda(
     at::Tensor vertices,
     at::Tensor faces,
     at::Tensor face_normals,

@@ -1,6 +1,24 @@
 # ADR-018: BDPT standalone diffraction realignment
 
-Status: Accepted.
+Status: Superseded by Plan 13 Phase 4 for native binding disposition; the
+standalone-diffraction numerical decision remains accepted.
+
+## Supersession note
+
+Plan 13 Phase 4 performed the follow-up governance work that this ADR deferred.
+Its four-axis reachability audit covered static production callers, dynamic
+binding lookup, public imports, and real BDPT end-to-end execution. Both crude
+bindings, `bdpt_diffraction_point_connection_samples` and
+`bdpt_diffraction_connection_samples_from_tape`, failed all four axes and were
+deleted together with their two kernels and the now-dead
+`bdpt_diffraction_contribution` helper. The evidence is recorded in
+`docs/dev/audit/phase13-phase4-dead-binding-reachability.json`.
+
+This supersession changes only the later native binding disposition. The
+historical reasoning below is retained verbatim as the record of why ADR-018 did
+not perform that native surgery in its original commit. In particular, the
+frozen Phase 9 owner inventory remains an immutable historical artifact; Phase
+4 records its approved current-state delta separately.
 
 ## Context
 

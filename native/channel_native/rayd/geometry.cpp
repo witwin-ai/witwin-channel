@@ -53,7 +53,7 @@ using channel_native::check_vec3_table;
 
 }  // namespace
 
-pybind11::tuple cn_bdpt_intersect_forward(
+pybind11::tuple cn_rayd_intersect_forward(
     RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
@@ -77,7 +77,7 @@ pybind11::tuple cn_bdpt_intersect_forward(
         out.global_prim_id);
 }
 
-pybind11::tuple cn_bdpt_visibility_forward(
+pybind11::tuple cn_rayd_visibility_forward(
     RayDSceneResource &scene,
     torch::Tensor start,
     torch::Tensor end,

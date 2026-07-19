@@ -30,7 +30,7 @@ class TransmissionClosestHitResult:
 def query_transmission_closest_hit(
     query: TransmissionClosestHitQuery,
 ) -> TransmissionClosestHitResult:
-    raw = geometry_bridge.bdpt_intersect_forward(
+    raw = geometry_bridge.rayd_intersect_forward(
         query.handle,
         query.origin,
         query.direction,

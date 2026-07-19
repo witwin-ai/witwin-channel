@@ -51,7 +51,8 @@
     "native-scattering-chain-ensemble-ad": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
     "native-scattering-chain-realization": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
     "native-scattering-chain-realization-ad": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
-    "native-bdpt-ad-companions": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle"
+    "native-bdpt-ad-companions": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle",
+    "native-mc-discovery": "tests/montecarlo/basic/test_diffraction_discovery.py::test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -447,66 +448,21 @@
       ]
     ],
     [
-      "bdpt_diffraction_connection_samples_from_tape",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_diffraction_connection_samples_from_tape",
+      "mc_diffraction_discover_edges",
+      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges",
       "named_wrapper",
-      "native-bdpt-paths",
+      "native-mc-discovery",
       [
-        "bdpt-diffraction"
+        "mc-basic-diffraction"
       ]
     ],
     [
-      "bdpt_diffraction_discover_edges",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_discover_edges",
+      "mc_diffraction_discover_edges_counted",
+      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges_counted",
       "named_wrapper",
-      "native-bdpt-paths",
+      "native-mc-discovery",
       [
-        "bdpt-diffraction"
-      ]
-    ],
-    [
-      "bdpt_diffraction_discover_edges_counted",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_discover_edges_counted",
-      "named_wrapper",
-      "native-bdpt-paths",
-      [
-        "bdpt-diffraction"
-      ]
-    ],
-    [
-      "bdpt_diffraction_edge_geometry",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.bdpt_diffraction_edge_geometry",
-      "named_wrapper",
-      "native-bdpt-paths",
-      [
-        "bdpt-diffraction"
-      ]
-    ],
-    [
-      "bdpt_diffraction_point_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_diffraction_point_connection_samples",
-      "named_wrapper",
-      "native-bdpt-paths",
-      [
-        "bdpt-diffraction"
-      ]
-    ],
-    [
-      "bdpt_diffraction_state_pack",
-      "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_diffraction_state_pack",
-      "named_wrapper",
-      "native-bdpt-sampling",
-      [
-        "bdpt-diffraction"
-      ]
-    ],
-    [
-      "bdpt_diffraction_state_wi",
-      "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_diffraction_state_wi",
-      "named_wrapper",
-      "native-bdpt-sampling",
-      [
-        "bdpt-diffraction"
+        "mc-basic-diffraction"
       ]
     ],
     [
@@ -645,8 +601,8 @@
       ]
     ],
     [
-      "bdpt_intersect_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_intersect_forward",
+      "rayd_intersect_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_intersect_forward",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -762,15 +718,6 @@
       ]
     ],
     [
-      "bdpt_reflection_accumulation_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_reflection_accumulation_forward",
-      "named_wrapper",
-      "native-bdpt-paths",
-      [
-        "bdpt-reflection"
-      ]
-    ],
-    [
       "bdpt_reflection_launch_inputs",
       "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_reflection_launch_inputs",
       "named_wrapper",
@@ -786,15 +733,6 @@
       "native-bdpt-sampling",
       [
         "bdpt-reflection"
-      ]
-    ],
-    [
-      "bdpt_selected_edge_indices",
-      "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_selected_edge_indices",
-      "named_wrapper",
-      "native-bdpt-sampling",
-      [
-        "bdpt-diffraction"
       ]
     ],
     [
@@ -834,15 +772,6 @@
       ]
     ],
     [
-      "bdpt_surface_group_edge_candidates",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.bdpt_surface_group_edge_candidates",
-      "named_wrapper",
-      "native-bdpt-paths",
-      [
-        "bdpt-diffraction"
-      ]
-    ],
-    [
       "bdpt_transmitted_light_subpath_state",
       "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_transmitted_light_subpath_state",
       "named_wrapper",
@@ -879,8 +808,8 @@
       ]
     ],
     [
-      "bdpt_visibility_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_visibility_forward",
+      "rayd_visibility_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_visibility_forward",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -1872,15 +1801,6 @@
     [
       "path_diffraction_block",
       "witwin.channel_native.propagation.topology.kernels.blocks.path_diffraction_block",
-      "named_wrapper",
-      "native-path-topology",
-      [
-        "path-diffraction"
-      ]
-    ],
-    [
-      "path_diffraction_paths_order1",
-      "witwin.channel_native.propagation.topology.kernels.candidates.path_diffraction_paths_order1",
       "named_wrapper",
       "native-path-topology",
       [

@@ -1,4 +1,5 @@
 #include <torch/extension.h>
+#include "tensor_checks.h"
 #include <vector>
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_finalize_component_maps_cuda(
@@ -23,6 +24,111 @@ at::Tensor cn_mc_store_scaled_component_map_cuda(
     int64_t tx_index,
     int64_t scale_index);
 at::Tensor cn_mc_sample_directions_cuda(int64_t count, at::Tensor reference);
+at::Tensor cn_mc_diffraction_discover_edges_cuda(
+    at::Tensor tx_pos,
+    at::Tensor ray_dir,
+    at::Tensor prim_index,
+    at::Tensor hit_p,
+    at::Tensor hit_n,
+    at::Tensor hit_geo_n,
+    at::Tensor triangle_edge_count,
+    at::Tensor triangle_edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_n0,
+    at::Tensor edge_n1,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
+    at::Tensor edge_adjacent_face1);
+at::Tensor cn_mc_diffraction_discover_edges_counted_cuda(
+    at::Tensor tx_pos,
+    at::Tensor ray_dir,
+    at::Tensor prim_index,
+    at::Tensor hit_p,
+    at::Tensor hit_n,
+    at::Tensor hit_geo_n,
+    at::Tensor hit_count,
+    at::Tensor triangle_edge_count,
+    at::Tensor triangle_edge_indices,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_n0,
+    at::Tensor edge_n1,
+    at::Tensor edge_line_min,
+    at::Tensor edge_line_max,
+    at::Tensor edge_adjacent_face1);
+
+namespace {
+
+void check_mc_diffraction_discovery_inputs(
+    const at::Tensor &tx_pos,
+    const at::Tensor &ray_dir,
+    const at::Tensor &prim_index,
+    const at::Tensor &hit_p,
+    const at::Tensor &hit_n,
+    const at::Tensor &hit_geo_n,
+    const at::Tensor *hit_count,
+    const at::Tensor &triangle_edge_count,
+    const at::Tensor &triangle_edge_indices,
+    const at::Tensor &edge_pos,
+    const at::Tensor &edge_dir,
+    const at::Tensor &edge_n0,
+    const at::Tensor &edge_n1,
+    const at::Tensor &edge_line_min,
+    const at::Tensor &edge_line_max,
+    const at::Tensor &edge_adjacent_face1) {
+    using channel_native::check_flat_tensor;
+    using channel_native::check_tensor;
+    using channel_native::check_vec3_table;
+    check_tensor(tx_pos, "tx_pos", at::kFloat, 1);
+    check_vec3_table(ray_dir, "ray_dir");
+    check_flat_tensor(prim_index, "prim_index", at::kInt);
+    check_vec3_table(hit_p, "hit_p");
+    check_vec3_table(hit_n, "hit_n");
+    check_vec3_table(hit_geo_n, "hit_geo_n");
+    check_flat_tensor(triangle_edge_count, "triangle_edge_count", at::kInt);
+    check_tensor(triangle_edge_indices, "triangle_edge_indices", at::kInt, 2);
+    check_vec3_table(edge_pos, "edge_pos");
+    check_vec3_table(edge_dir, "edge_dir");
+    check_vec3_table(edge_n0, "edge_n0");
+    check_vec3_table(edge_n1, "edge_n1");
+    check_flat_tensor(edge_line_min, "edge_line_min", at::kFloat);
+    check_flat_tensor(edge_line_max, "edge_line_max", at::kFloat);
+    check_flat_tensor(edge_adjacent_face1, "edge_adjacent_face1", at::kInt);
+    if (hit_count != nullptr) {
+        check_flat_tensor(*hit_count, "hit_count", at::kInt);
+        TORCH_CHECK(hit_count->numel() == 1, "hit_count must contain one element");
+    }
+    TORCH_CHECK(tx_pos.numel() == 3, "tx_pos must have shape (3,)");
+    const int64_t capacity = ray_dir.size(0);
+    for (const auto &tensor : {prim_index, hit_p, hit_n, hit_geo_n}) {
+        TORCH_CHECK(tensor.size(0) == capacity,
+                    "ray hit tensors must match ray_dir capacity");
+    }
+    TORCH_CHECK(triangle_edge_indices.size(0) == triangle_edge_count.size(0),
+                "triangle edge tables must have matching face rows");
+    const int64_t edge_count = edge_pos.size(0);
+    for (const auto &tensor : {edge_dir, edge_n0, edge_n1, edge_line_min,
+                               edge_line_max, edge_adjacent_face1}) {
+        TORCH_CHECK(tensor.size(0) == edge_count,
+                    "edge tensors must match edge_pos rows");
+    }
+    const int device = ray_dir.get_device();
+    for (const auto &tensor : {tx_pos, prim_index, hit_p, hit_n, hit_geo_n,
+                               triangle_edge_count, triangle_edge_indices,
+                               edge_pos, edge_dir, edge_n0, edge_n1,
+                               edge_line_min, edge_line_max,
+                               edge_adjacent_face1}) {
+        TORCH_CHECK(tensor.get_device() == device,
+                    "MC diffraction discovery tensors must share one CUDA device");
+    }
+    if (hit_count != nullptr) {
+        TORCH_CHECK(hit_count->get_device() == device,
+                    "hit_count must share the discovery CUDA device");
+    }
+}
+
+}  // namespace
 at::Tensor cn_mc_los_component_maps_cuda(at::Tensor los);
 at::Tensor cn_mc_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_mc_los_path_gain_backward_cuda(
@@ -473,6 +579,59 @@ torch::Tensor cn_mc_sionna_reflection_accumulate_jvp(
         coord0_min, coord0_max, coord1_min, coord1_max,
         resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
         wavelength_tangent, tx_pol.contiguous());
+}
+
+torch::Tensor cn_mc_diffraction_discover_edges(
+    torch::Tensor tx_pos,
+    torch::Tensor ray_dir,
+    torch::Tensor prim_index,
+    torch::Tensor hit_p,
+    torch::Tensor hit_n,
+    torch::Tensor hit_geo_n,
+    torch::Tensor triangle_edge_count,
+    torch::Tensor triangle_edge_indices,
+    torch::Tensor edge_pos,
+    torch::Tensor edge_dir,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
+    torch::Tensor edge_line_min,
+    torch::Tensor edge_line_max,
+    torch::Tensor edge_adjacent_face1) {
+    check_mc_diffraction_discovery_inputs(
+        tx_pos, ray_dir, prim_index, hit_p, hit_n, hit_geo_n, nullptr,
+        triangle_edge_count, triangle_edge_indices, edge_pos, edge_dir,
+        edge_n0, edge_n1, edge_line_min, edge_line_max, edge_adjacent_face1);
+    return cn_mc_diffraction_discover_edges_cuda(
+        tx_pos, ray_dir, prim_index, hit_p, hit_n, hit_geo_n,
+        triangle_edge_count, triangle_edge_indices, edge_pos, edge_dir,
+        edge_n0, edge_n1, edge_line_min, edge_line_max, edge_adjacent_face1);
+}
+
+torch::Tensor cn_mc_diffraction_discover_edges_counted(
+    torch::Tensor tx_pos,
+    torch::Tensor ray_dir,
+    torch::Tensor prim_index,
+    torch::Tensor hit_p,
+    torch::Tensor hit_n,
+    torch::Tensor hit_geo_n,
+    torch::Tensor hit_count,
+    torch::Tensor triangle_edge_count,
+    torch::Tensor triangle_edge_indices,
+    torch::Tensor edge_pos,
+    torch::Tensor edge_dir,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
+    torch::Tensor edge_line_min,
+    torch::Tensor edge_line_max,
+    torch::Tensor edge_adjacent_face1) {
+    check_mc_diffraction_discovery_inputs(
+        tx_pos, ray_dir, prim_index, hit_p, hit_n, hit_geo_n, &hit_count,
+        triangle_edge_count, triangle_edge_indices, edge_pos, edge_dir,
+        edge_n0, edge_n1, edge_line_min, edge_line_max, edge_adjacent_face1);
+    return cn_mc_diffraction_discover_edges_counted_cuda(
+        tx_pos, ray_dir, prim_index, hit_p, hit_n, hit_geo_n, hit_count,
+        triangle_edge_count, triangle_edge_indices, edge_pos, edge_dir,
+        edge_n0, edge_n1, edge_line_min, edge_line_max, edge_adjacent_face1);
 }
 
 torch::Tensor cn_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src) {

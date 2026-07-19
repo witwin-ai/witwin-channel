@@ -1,6 +1,5 @@
 #include <torch/extension.h>
 
-#include "../rayd/resource.h"
 #include "registry.h"
 
 #include <cstdint>
@@ -21,28 +20,6 @@ int64_t cn_core_diffraction_edge_count(
     double vertical_ratio,
     bool boundary_half_plane,
     double plane_tol);
-pybind11::dict cn_path_diffraction_paths_order1(
-    RayDSceneResource &scene,
-    torch::Tensor tx_positions,
-    torch::Tensor tx_polarizations,
-    torch::Tensor tx_power,
-    torch::Tensor rx_positions,
-    torch::Tensor selected,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor line_min,
-    torch::Tensor line_max,
-    torch::Tensor n0,
-    torch::Tensor n1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor exterior_angle,
-    torch::Tensor material_eta_r,
-    torch::Tensor material_sigma,
-    torch::Tensor material_mu_r,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    double wavelength);
 pybind11::tuple cn_deterministic_diffraction_state_pack(
     torch::Tensor edge_indices,
     torch::Tensor edge_pos,
@@ -418,10 +395,6 @@ void register_path(pybind11::module_ &module) {
         "path_diffraction_block",
         &cn_path_diffraction_block,
         "Convert RayD order-1 diffraction outputs into a compact path block with native CUDA kernels.");
-    module.def(
-        "path_diffraction_paths_order1",
-        &cn_path_diffraction_paths_order1,
-        "Build compact order-1 diffraction path blocks through native CUDA/RayD without Python tensor loops.");
     module.def(
         "path_merge_blocks",
         &cn_path_merge_blocks,

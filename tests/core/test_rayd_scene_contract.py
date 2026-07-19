@@ -150,12 +150,12 @@ def test_rayd_scene_exports_non_manifold_edge_records_when_backend_available():
     assert bool((records.face1.cpu()[central] >= 0).all())
 
 
-def test_bdpt_intersect_forward_uses_native_rayd_scene_bridge_when_available():
+def test_rayd_intersect_forward_uses_native_rayd_scene_bridge_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayD native intersection")
 
     from witwin.channel_native.propagation.geometry.kernels.bridge import (
-        bdpt_intersect_forward,
+        rayd_intersect_forward,
     )
 
     if not _source_linked_rayd_available():
@@ -182,7 +182,7 @@ def test_bdpt_intersect_forward_uses_native_rayd_scene_bridge_when_available():
     ray_tmax = torch.tensor([10.0], dtype=torch.float32, device="cuda")
     active = torch.tensor([True], dtype=torch.bool, device="cuda")
 
-    hit = bdpt_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
+    hit = rayd_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
 
     torch.testing.assert_close(hit["t"].cpu(), torch.tensor([1.0], dtype=torch.float32))
     torch.testing.assert_close(hit["p"].cpu(), torch.tensor([[0.25, 0.25, 0.0]], dtype=torch.float32))

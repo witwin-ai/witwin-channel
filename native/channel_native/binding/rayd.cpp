@@ -16,14 +16,14 @@ std::shared_ptr<RayDSceneResource> cn_rayd_scene_create(
     std::vector<torch::Tensor> to_world_right,
     std::vector<int64_t> mesh_flags);
 pybind11::tuple cn_rayd_scene_edge_records(RayDSceneResource &scene);
-pybind11::tuple cn_bdpt_intersect_forward(
+pybind11::tuple cn_rayd_intersect_forward(
     RayDSceneResource &scene,
     torch::Tensor ray_o,
     torch::Tensor ray_d,
     torch::Tensor ray_tmax,
     pybind11::object active,
     int64_t flags);
-pybind11::tuple cn_bdpt_visibility_forward(
+pybind11::tuple cn_rayd_visibility_forward(
     RayDSceneResource &scene,
     torch::Tensor start,
     torch::Tensor end,
@@ -173,72 +173,6 @@ pybind11::dict cn_coupled_dd_geometry_forward(
     torch::Tensor edge2_dir,
     torch::Tensor edge2_t_min,
     torch::Tensor edge2_t_max);
-pybind11::tuple cn_bdpt_reflection_accumulation_forward(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    torch::Tensor active,
-    torch::Tensor tx,
-    torch::Tensor tx_pol,
-    torch::Tensor material_eta_r,
-    torch::Tensor material_sigma,
-    torch::Tensor material_mu_r,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    int64_t max_bounces,
-    int64_t grid_axis,
-    double grid_position,
-    double grid_coord0_min,
-    double grid_coord0_max,
-    double grid_coord1_min,
-    double grid_coord1_max,
-    int64_t grid_resolution0,
-    int64_t grid_resolution1,
-    double wavelength,
-    double solid_angle_per_ray,
-    bool collect_wedges,
-    bool collect_wedge_prefixes,
-    int64_t wedge_capacity,
-    int64_t wedge_sample_stride,
-    int64_t accumulation_strategy,
-    int64_t compact_min_samples,
-    int64_t staged_min_samples_per_cell,
-    int64_t procedural_sample_count,
-    bool streaming_los_enabled);
-torch::Tensor cn_bdpt_diffraction_discover_edges(
-    torch::Tensor tx_pos,
-    torch::Tensor ray_dir,
-    torch::Tensor prim_index,
-    torch::Tensor hit_p,
-    torch::Tensor hit_n,
-    torch::Tensor hit_geo_n,
-    torch::Tensor triangle_edge_count,
-    torch::Tensor triangle_edge_indices,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor edge_n0,
-    torch::Tensor edge_nn,
-    torch::Tensor edge_line_min,
-    torch::Tensor edge_line_max,
-    torch::Tensor edge_adjacent_face1);
-torch::Tensor cn_bdpt_diffraction_discover_edges_counted(
-    torch::Tensor tx_pos,
-    torch::Tensor ray_dir,
-    torch::Tensor prim_index,
-    torch::Tensor hit_p,
-    torch::Tensor hit_n,
-    torch::Tensor hit_geo_n,
-    torch::Tensor hit_count,
-    torch::Tensor triangle_edge_count,
-    torch::Tensor triangle_edge_indices,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor edge_n0,
-    torch::Tensor edge_nn,
-    torch::Tensor edge_line_min,
-    torch::Tensor edge_line_max,
-    torch::Tensor edge_adjacent_face1);
 pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
     RayDSceneResource &scene,
     torch::Tensor tx_pos,
@@ -338,12 +272,12 @@ void register_rayd_geometry(pybind11::module_ &module) {
         &cn_rayd_scene_edge_records,
         "Read edge records from a typed RayD scene resource.");
     module.def(
-        "bdpt_intersect_forward",
-        &cn_bdpt_intersect_forward,
+        "rayd_intersect_forward",
+        &cn_rayd_intersect_forward,
         "Call typed RayD ray/scene intersection.");
     module.def(
-        "bdpt_visibility_forward",
-        &cn_bdpt_visibility_forward,
+        "rayd_visibility_forward",
+        &cn_rayd_visibility_forward,
         "Call typed RayD segment visibility.");
     module.def(
         "rayd_trace_reflections_forward",
@@ -400,18 +334,6 @@ void register_rayd_geometry(pybind11::module_ &module) {
 }
 
 void register_rayd_accumulation(pybind11::module_ &module) {
-    module.def(
-        "bdpt_reflection_accumulation_forward",
-        &cn_bdpt_reflection_accumulation_forward,
-        "Call typed RayD reflection accumulation.");
-    module.def(
-        "bdpt_diffraction_discover_edges",
-        &cn_bdpt_diffraction_discover_edges,
-        "Call Channel Native diffraction edge discovery.");
-    module.def(
-        "bdpt_diffraction_discover_edges_counted",
-        &cn_bdpt_diffraction_discover_edges_counted,
-        "Call Channel Native counted diffraction edge discovery.");
     module.def(
         "rayd_diffraction_paths_order1_forward",
         &cn_rayd_diffraction_paths_order1_forward,

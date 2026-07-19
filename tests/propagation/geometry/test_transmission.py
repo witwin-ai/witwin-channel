@@ -27,7 +27,7 @@ def test_closest_hit_query_names_raw_result_without_copies(monkeypatch):
 
     monkeypatch.setattr(
         transmission.geometry_bridge,
-        "bdpt_intersect_forward",
+        "rayd_intersect_forward",
         fake_forward,
     )
     query = transmission.TransmissionClosestHitQuery(

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan": "Plan 13 Phase 3",
+  "plan": "Plan 13 Phase 4",
   "baseline": {
     "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
     "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
@@ -27,10 +27,114 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 211,
-    "rayd_numerical": 18,
+    "bindings": 202,
+    "rayd_numerical": 17,
     "layered": 2,
-    "channel_numerical": 191
+    "channel_numerical": 183
+  },
+  "current_phase": 4,
+  "phase3_direct_typed_boundary": {
+    "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
+    "scene_resource": "RayDSceneResource",
+    "edge_records": "RayDEdgeRecords",
+    "legacy_bridge_files_removed": [
+      "native/channel_native/rayd/bridge.h",
+      "native/channel_native/rayd/common.cpp"
+    ],
+    "strict_renames": [
+      {
+        "from": "raydn_scene_create",
+        "to": "rayd_scene_create"
+      },
+      {
+        "from": "raydn_scene_edge_records",
+        "to": "rayd_scene_edge_records"
+      },
+      {
+        "from": "raydn_intersect_backward",
+        "to": "rayd_intersect_backward"
+      },
+      {
+        "from": "raydn_intersect_jvp",
+        "to": "rayd_intersect_jvp"
+      },
+      {
+        "from": "raydn_trace_reflections_forward",
+        "to": "rayd_trace_reflections_forward"
+      },
+      {
+        "from": "raydn_trace_reflections_forward_tape",
+        "to": "rayd_trace_reflections_forward_tape"
+      },
+      {
+        "from": "raydn_trace_reflections_backward",
+        "to": "rayd_trace_reflections_backward"
+      },
+      {
+        "from": "raydn_trace_reflections_jvp",
+        "to": "rayd_trace_reflections_jvp"
+      },
+      {
+        "from": "raydn_reflection_epc_paths_forward",
+        "to": "rayd_reflection_epc_paths_forward"
+      },
+      {
+        "from": "raydn_reflection_epc_paths_backward",
+        "to": "rayd_reflection_epc_paths_backward"
+      },
+      {
+        "from": "raydn_reflection_epc_paths_jvp",
+        "to": "rayd_reflection_epc_paths_jvp"
+      },
+      {
+        "from": "raydn_scene_face_normals_backward",
+        "to": "rayd_scene_face_normals_backward"
+      },
+      {
+        "from": "raydn_scene_face_normals_jvp",
+        "to": "rayd_scene_face_normals_jvp"
+      },
+      {
+        "from": "raydn_diffraction_paths_order1_forward",
+        "to": "rayd_diffraction_paths_order1_forward"
+      },
+      {
+        "from": "raydn_coupled_rd_geometry_forward",
+        "to": "coupled_rd_geometry_forward"
+      },
+      {
+        "from": "raydn_coupled_dd_geometry_forward",
+        "to": "coupled_dd_geometry_forward"
+      }
+    ],
+    "binding_count": 211,
+    "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
+    "coupled_ownership": "Channel-composed layered owner using RayD typed EPC/visibility primitives"
+  },
+  "phase4_generic_geometry_and_dead_bridge_cleanup": {
+    "binding_count": 202,
+    "binding_manifest_sha256": "283b7ea04fe8eaeeb5c4b8e4316856a099d5a31f7750e38acb2bfb810fd4b205",
+    "renames": {
+      "bdpt_intersect_forward": "rayd_intersect_forward",
+      "bdpt_visibility_forward": "rayd_visibility_forward",
+      "bdpt_diffraction_discover_edges": "mc_diffraction_discover_edges",
+      "bdpt_diffraction_discover_edges_counted": "mc_diffraction_discover_edges_counted"
+    },
+    "deleted_bindings": [
+      "bdpt_diffraction_connection_samples_from_tape",
+      "bdpt_diffraction_edge_geometry",
+      "bdpt_diffraction_point_connection_samples",
+      "bdpt_diffraction_state_pack",
+      "bdpt_diffraction_state_wi",
+      "bdpt_reflection_accumulation_forward",
+      "bdpt_selected_edge_indices",
+      "bdpt_surface_group_edge_candidates",
+      "path_diffraction_paths_order1"
+    ],
+    "reachability_audit": "docs/dev/audit/phase13-phase4-dead-binding-reachability.json",
+    "public_api_delta": false
   },
   "symbols": [
     {
@@ -39,7 +143,7 @@
       "binding_target": "cn_bdpt_accumulate_connection_samples",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 482
+        "line": 412
       },
       "target_source_evidence": [
         {
@@ -82,9 +186,9 @@
           "line": 461
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -96,7 +200,7 @@
       "binding_target": "cn_bdpt_accumulate_connection_samples_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 501
+        "line": 431
       },
       "target_source_evidence": [
         {
@@ -135,9 +239,9 @@
           "line": 516
         }
       ],
-      "contract_test": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle",
+      "contract_test": "native-bdpt-ad-companions",
       "e2e_callers": [
-        "tests/ad/test_bdpt_solver_ad.py::test_primal_under_ad_equals_none_bitwise"
+        "bdpt-solver-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -149,7 +253,7 @@
       "binding_target": "cn_bdpt_accumulate_connection_samples_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 505
+        "line": 435
       },
       "target_source_evidence": [
         {
@@ -188,9 +292,9 @@
           "line": 567
         }
       ],
-      "contract_test": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle",
+      "contract_test": "native-bdpt-ad-companions",
       "e2e_callers": [
-        "tests/ad/test_bdpt_solver_ad.py::test_primal_under_ad_equals_none_bitwise"
+        "bdpt-solver-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -202,7 +306,7 @@
       "binding_target": "cn_bdpt_apply_los_visibility",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 616
+        "line": 538
       },
       "target_source_evidence": [
         {
@@ -236,9 +340,9 @@
           "line": 288
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout",
+      "contract_test": "native-bdpt-maps",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_los_empty_space.py::test_bdpt_los_empty_space_matches_analytic_reference"
+        "bdpt-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -250,7 +354,7 @@
       "binding_target": "cn_bdpt_compact_connection_samples",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 517
+        "line": 447
       },
       "target_source_evidence": [
         {
@@ -289,9 +393,9 @@
           "line": 739
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -303,7 +407,7 @@
       "binding_target": "cn_bdpt_component_map_buffer",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 584
+        "line": 506
       },
       "target_source_evidence": [
         {
@@ -337,9 +441,9 @@
           "line": 309
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout",
+      "contract_test": "native-bdpt-maps",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -351,7 +455,7 @@
       "binding_target": "cn_bdpt_concat_connection_samples",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 521
+        "line": 451
       },
       "target_source_evidence": [
         {
@@ -394,9 +498,9 @@
           "line": 761
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -408,7 +512,7 @@
       "binding_target": "cn_bdpt_connection_variance",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 525
+        "line": 455
       },
       "target_source_evidence": [
         {
@@ -447,9 +551,9 @@
           "line": 780
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -461,7 +565,7 @@
       "binding_target": "cn_bdpt_count_valid_connection_samples",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 513
+        "line": 443
       },
       "target_source_evidence": [
         {
@@ -500,9 +604,9 @@
           "line": 718
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -514,7 +618,7 @@
       "binding_target": "cn_bdpt_diffraction_accumulation_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 419
+        "line": 341
       },
       "target_source_evidence": [
         {
@@ -554,361 +658,13 @@
           "line": 152
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
+        "bdpt-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "rename/replace legacy integration identity"
-    },
-    {
-      "symbol": "bdpt_diffraction_connection_samples_from_tape",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_connection_samples_from_tape",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 533
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            915
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            82
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_diffraction_connection_samples_from_tape",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
-          "line": 823
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
-          "line": 884
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
-      "symbol": "bdpt_diffraction_discover_edges",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_discover_edges",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 407
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            209
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/diffraction.cpp",
-          "lines": [
-            64
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel CUDA implementation registered through rayd bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_discover_edges",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 124
-        }
-      ],
-      "production_callers": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
-          "line": 600,
-          "via_alias": "raydn_diffraction_discover_edges"
-        }
-      ],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 125
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
-    },
-    {
-      "symbol": "bdpt_diffraction_discover_edges_counted",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_discover_edges_counted",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 411
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            225
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/diffraction.cpp",
-          "lines": [
-            101
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel CUDA implementation registered through rayd bridge",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_discover_edges_counted",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 135
-        }
-      ],
-      "production_callers": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
-          "line": 582,
-          "via_alias": "raydn_diffraction_discover_edges_counted"
-        }
-      ],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 136
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
-    },
-    {
-      "symbol": "bdpt_diffraction_edge_geometry",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_edge_geometry",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 650
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            1382
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            206
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.primitives.bdpt_diffraction_edge_geometry",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
-          "line": 62
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
-          "line": 84
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
-      "symbol": "bdpt_diffraction_point_connection_samples",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_point_connection_samples",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 537
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            973
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            104
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_diffraction_point_connection_samples",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
-          "line": 915
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
-          "line": 958
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
-      "symbol": "bdpt_diffraction_state_pack",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_state_pack",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 643
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            1294
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            193
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_diffraction_state_pack",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
-          "line": 98
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
-          "line": 128
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_launch_state_returns_stable_cuda_tensors",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
-      "symbol": "bdpt_diffraction_state_wi",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_state_wi",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 635
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            1286
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            191
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_diffraction_state_wi",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
-          "line": 61
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
-          "line": 74
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_launch_state_returns_stable_cuda_tensors",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
     },
     {
       "symbol": "bdpt_empty_subpath_state",
@@ -916,7 +672,7 @@
       "binding_target": "cn_bdpt_empty_subpath_state",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 435
+        "line": 365
       },
       "target_source_evidence": [
         {
@@ -955,9 +711,9 @@
           "line": 212
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -969,7 +725,7 @@
       "binding_target": "cn_bdpt_endpoint_connection_samples",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 474
+        "line": 404
       },
       "target_source_evidence": [
         {
@@ -1024,9 +780,9 @@
           "line": 533
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -1038,7 +794,7 @@
       "binding_target": "cn_bdpt_endpoint_connection_samples_backward_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 493
+        "line": 423
       },
       "target_source_evidence": [
         {
@@ -1077,9 +833,9 @@
           "line": 363
         }
       ],
-      "contract_test": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle",
+      "contract_test": "native-bdpt-ad-companions",
       "e2e_callers": [
-        "tests/ad/test_bdpt_solver_ad.py::test_primal_under_ad_equals_none_bitwise"
+        "bdpt-solver-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -1091,7 +847,7 @@
       "binding_target": "cn_bdpt_endpoint_connection_samples_jvp_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 497
+        "line": 427
       },
       "target_source_evidence": [
         {
@@ -1130,9 +886,9 @@
           "line": 415
         }
       ],
-      "contract_test": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle",
+      "contract_test": "native-bdpt-ad-companions",
       "e2e_callers": [
-        "tests/ad/test_bdpt_solver_ad.py::test_primal_under_ad_equals_none_bitwise"
+        "bdpt-solver-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -1144,7 +900,7 @@
       "binding_target": "cn_bdpt_endpoint_connection_visibility_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 478
+        "line": 408
       },
       "target_source_evidence": [
         {
@@ -1187,9 +943,9 @@
           "line": 562
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -1201,7 +957,7 @@
       "binding_target": "cn_bdpt_endpoint_subpath_state",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 439
+        "line": 369
       },
       "target_source_evidence": [
         {
@@ -1248,9 +1004,9 @@
           "line": 261
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -1262,7 +1018,7 @@
       "binding_target": "cn_bdpt_face_material_tensors",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 658
+        "line": 560
       },
       "target_source_evidence": [
         {
@@ -1296,9 +1052,9 @@
           "line": 26
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout",
+      "contract_test": "native-bdpt-maps",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -1310,7 +1066,7 @@
       "binding_target": "cn_bdpt_face_material_tensors_from_host",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 662
+        "line": 564
       },
       "target_source_evidence": [
         {
@@ -1344,9 +1100,9 @@
           "line": 56
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout",
+      "contract_test": "native-bdpt-maps",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -1358,7 +1114,7 @@
       "binding_target": "cn_bdpt_filter_connection_samples",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 509
+        "line": 439
       },
       "target_source_evidence": [
         {
@@ -1401,9 +1157,9 @@
           "line": 709
         }
       ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
+      "contract_test": "native-bdpt-paths",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
+        "bdpt-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -1415,7 +1171,7 @@
       "binding_target": "cn_bdpt_finalize_component_maps",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 564
+        "line": 486
       },
       "target_source_evidence": [
         {
@@ -1463,7 +1219,7 @@
       "binding_target": "cn_bdpt_finalize_component_maps_backward_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 576
+        "line": 498
       },
       "target_source_evidence": [
         {
@@ -1506,7 +1262,7 @@
       "binding_target": "cn_bdpt_finalize_component_maps_jvp_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 580
+        "line": 502
       },
       "target_source_evidence": [
         {
@@ -1549,7 +1305,7 @@
       "binding_target": "cn_bdpt_finalize_point_components",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 556
+        "line": 478
       },
       "target_source_evidence": [
         {
@@ -1597,7 +1353,7 @@
       "binding_target": "cn_bdpt_finalize_point_components_backward_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 568
+        "line": 490
       },
       "target_source_evidence": [
         {
@@ -1640,7 +1396,7 @@
       "binding_target": "cn_bdpt_finalize_point_components_jvp_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 572
+        "line": 494
       },
       "target_source_evidence": [
         {
@@ -1678,77 +1434,12 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "bdpt_intersect_forward",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_intersect_forward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 340
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            19
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/geometry.cpp",
-          "lines": [
-            65
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through typed RayD C++ API",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_intersect_forward",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 49
-        }
-      ],
-      "production_callers": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
-          "line": 632
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/events/transmission.py",
-          "line": 236
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/transmission.py",
-          "line": 33
-        }
-      ],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
-          "line": 349
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 82
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
-    },
-    {
       "symbol": "bdpt_launch_state",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_bdpt_launch_state",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 431
+        "line": 361
       },
       "target_source_evidence": [
         {
@@ -1800,7 +1491,7 @@
       "binding_target": "cn_bdpt_los_component_maps",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 608
+        "line": 530
       },
       "target_source_evidence": [
         {
@@ -1848,7 +1539,7 @@
       "binding_target": "cn_bdpt_los_component_maps_from_matrix",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 612
+        "line": 534
       },
       "target_source_evidence": [
         {
@@ -1905,7 +1596,7 @@
       "binding_target": "cn_bdpt_los_export",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 560
+        "line": 482
       },
       "target_source_evidence": [
         {
@@ -1953,7 +1644,7 @@
       "binding_target": "cn_bdpt_los_visibility_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 620
+        "line": 542
       },
       "target_source_evidence": [
         {
@@ -2001,7 +1692,7 @@
       "binding_target": "cn_bdpt_mis_weights",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 529
+        "line": 459
       },
       "target_source_evidence": [
         {
@@ -2053,7 +1744,7 @@
       "binding_target": "cn_bdpt_pack_vec3",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 604
+        "line": 526
       },
       "target_source_evidence": [
         {
@@ -2101,7 +1792,7 @@
       "binding_target": "cn_bdpt_point_component_power",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 548
+        "line": 470
       },
       "target_source_evidence": [
         {
@@ -2156,7 +1847,7 @@
       "binding_target": "cn_bdpt_receiver_grid_points",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 627
+        "line": 549
       },
       "target_source_evidence": [
         {
@@ -2209,7 +1900,7 @@
       "binding_target": "cn_bdpt_reflected_light_subpath_state",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 447
+        "line": 377
       },
       "target_source_evidence": [
         {
@@ -2266,7 +1957,7 @@
       "binding_target": "cn_bdpt_reflected_light_subpath_state_backward_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 455
+        "line": 385
       },
       "target_source_evidence": [
         {
@@ -2319,7 +2010,7 @@
       "binding_target": "cn_bdpt_reflected_light_subpath_state_jvp_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 459
+        "line": 389
       },
       "target_source_evidence": [
         {
@@ -2367,60 +2058,12 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "bdpt_reflection_accumulation_forward",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_reflection_accumulation_forward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 403
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            176
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/reflection.cpp",
-          "lines": [
-            341
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through typed RayD C++ API",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_reflection_accumulation_forward",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 108
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 114
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
-    },
-    {
       "symbol": "bdpt_reflection_launch_inputs",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_bdpt_reflection_launch_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 631
+        "line": 553
       },
       "target_source_evidence": [
         {
@@ -2473,7 +2116,7 @@
       "binding_target": "cn_bdpt_sample_directions",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 596
+        "line": 518
       },
       "target_source_evidence": [
         {
@@ -2521,60 +2164,12 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "bdpt_selected_edge_indices",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_selected_edge_indices",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 639
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            1290
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            192
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_selected_edge_indices",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
-          "line": 87
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
-          "line": 89
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_launch_state_returns_stable_cuda_tensors",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
       "symbol": "bdpt_store_component_map",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_bdpt_store_component_map",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 588
+        "line": 510
       },
       "target_source_evidence": [
         {
@@ -2622,7 +2217,7 @@
       "binding_target": "cn_bdpt_store_point_component_column",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 552
+        "line": 474
       },
       "target_source_evidence": [
         {
@@ -2670,7 +2265,7 @@
       "binding_target": "cn_bdpt_store_scaled_component_map",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 592
+        "line": 514
       },
       "target_source_evidence": [
         {
@@ -2718,7 +2313,7 @@
       "binding_target": "cn_bdpt_subpath_intersection_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 443
+        "line": 373
       },
       "target_source_evidence": [
         {
@@ -2766,60 +2361,12 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "bdpt_surface_group_edge_candidates",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_surface_group_edge_candidates",
-      "binding_registration": {
-        "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 654
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/bdpt.cpp",
-          "lines": [
-            1402
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/binding/bdpt.cpp",
-          "lines": [
-            215
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.primitives.bdpt_surface_group_edge_candidates",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
-          "line": 120
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
-          "line": 144
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
       "symbol": "bdpt_transmitted_light_subpath_state",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_bdpt_transmitted_light_subpath_state",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 451
+        "line": 381
       },
       "target_source_evidence": [
         {
@@ -2876,7 +2423,7 @@
       "binding_target": "cn_bdpt_transmitted_light_subpath_state_backward_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 463
+        "line": 393
       },
       "target_source_evidence": [
         {
@@ -2929,7 +2476,7 @@
       "binding_target": "cn_bdpt_transmitted_light_subpath_state_jvp_dispatch",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 467
+        "line": 397
       },
       "target_source_evidence": [
         {
@@ -2982,7 +2529,7 @@
       "binding_target": "cn_bdpt_transmitter_tensors",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 600
+        "line": 522
       },
       "target_source_evidence": [
         {
@@ -3034,126 +2581,12 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "bdpt_visibility_forward",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_visibility_forward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 344
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            26
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/geometry.cpp",
-          "lines": [
-            93
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "RayD",
-      "owner_kind": "RayD native implementation through typed RayD C++ API",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_visibility_forward",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 10
-        }
-      ],
-      "production_callers": [
-        {
-          "path": "src/witwin/channel_native/montecarlo/basic/backend.py",
-          "line": 88,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
-          "line": 178,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
-          "line": 137,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
-          "line": 120,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
-          "line": 475,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
-          "line": 536,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
-          "line": 799,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
-          "line": 841,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
-          "line": 146,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/enumerated/scattering_chain.py",
-          "line": 522,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/diffraction.py",
-          "line": 120,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/visibility.py",
-          "line": 41,
-          "via_alias": "raydn_visibility_forward"
-        },
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/visibility.py",
-          "line": 27,
-          "via_alias": "raydn_visibility_forward"
-        }
-      ],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 22
-        }
-      ],
-      "contract_test": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
-      "e2e_callers": [
-        "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
-    },
-    {
       "symbol": "bdpt_zero_matrix",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_bdpt_zero_matrix",
       "binding_registration": {
         "path": "native/channel_native/binding/bdpt.cpp",
-        "line": 541
+        "line": 463
       },
       "target_source_evidence": [
         {
@@ -3288,7 +2721,7 @@
       "binding_target": "cn_core_diffraction_edge_count",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 375
+        "line": 352
       },
       "target_source_evidence": [
         {
@@ -3341,7 +2774,7 @@
       "binding_target": "cn_core_pack_int2",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 371
+        "line": 348
       },
       "target_source_evidence": [
         {
@@ -3391,6 +2824,112 @@
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "unaffected by Plan 13"
+    },
+    {
+      "symbol": "coupled_dd_geometry_forward",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_coupled_dd_geometry_forward",
+      "binding_registration": {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "line": 330
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/rayd.cpp",
+          "lines": [
+            162
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/rayd/geometry.cpp",
+          "lines": [
+            340
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel operation / RayD primitives",
+      "owner_kind": "composed owner using typed RayD primitives",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_dd_geometry_forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 261
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/coupled.py",
+          "line": 119
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 278
+        }
+      ],
+      "contract_test": "tests/propagation/geometry/test_coupled.py::test_coupled_dd_query_names_raw_geometry_and_preserves_identity",
+      "e2e_callers": [
+        "tests/deterministic/test_coupled_paths.py::test_coupled_on_exports_finite_nonzero_coupled_component"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Phase 3 neutral layered owner name complete"
+    },
+    {
+      "symbol": "coupled_rd_geometry_forward",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_coupled_rd_geometry_forward",
+      "binding_registration": {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "line": 326
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/rayd.cpp",
+          "lines": [
+            146
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/rayd/geometry.cpp",
+          "lines": [
+            223
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel operation / RayD primitives",
+      "owner_kind": "composed owner using typed RayD primitives",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_rd_geometry_forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 199
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/coupled.py",
+          "line": 83
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 214
+        }
+      ],
+      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "e2e_callers": [
+        "tests/path/test_path_reflection_diffraction_sequences.py::test_solve_exports_bounded_reflection_diffraction_sequences"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Phase 3 neutral layered owner name complete"
     },
     {
       "symbol": "coupled_rd_prepare",
@@ -3542,7 +3081,7 @@
       "binding_target": "cn_deterministic_accumulate_flat",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 574
+        "line": 547
       },
       "target_source_evidence": [
         {
@@ -3594,7 +3133,7 @@
       "binding_target": "cn_deterministic_accumulate_flat_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 602
+        "line": 575
       },
       "target_source_evidence": [
         {
@@ -3647,7 +3186,7 @@
       "binding_target": "cn_deterministic_accumulate_flat_fwd64",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 588
+        "line": 561
       },
       "target_source_evidence": [
         {
@@ -3685,7 +3224,7 @@
       "binding_target": "cn_deterministic_accumulate_flat_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 624
+        "line": 597
       },
       "target_source_evidence": [
         {
@@ -3738,7 +3277,7 @@
       "binding_target": "cn_deterministic_component_counts",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 433
+        "line": 406
       },
       "target_source_evidence": [
         {
@@ -3791,7 +3330,7 @@
       "binding_target": "cn_deterministic_concat_topology_blocks",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 554
+        "line": 527
       },
       "target_source_evidence": [
         {
@@ -3844,7 +3383,7 @@
       "binding_target": "cn_deterministic_delay_to_path_length",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 470
+        "line": 443
       },
       "target_source_evidence": [
         {
@@ -3896,7 +3435,7 @@
       "binding_target": "cn_deterministic_diffraction_order1_compact",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 542
+        "line": 515
       },
       "target_source_evidence": [
         {
@@ -3949,7 +3488,7 @@
       "binding_target": "cn_deterministic_diffraction_state_pack",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 382
+        "line": 359
       },
       "target_source_evidence": [
         {
@@ -4006,7 +3545,7 @@
       "binding_target": "cn_deterministic_diffraction_state_pack_selected",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 386
+        "line": 363
       },
       "target_source_evidence": [
         {
@@ -4059,7 +3598,7 @@
       "binding_target": "cn_deterministic_diffraction_vector_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 458
+        "line": 431
       },
       "target_source_evidence": [
         {
@@ -4111,7 +3650,7 @@
       "binding_target": "cn_deterministic_face_anchor_points",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 518
+        "line": 491
       },
       "target_source_evidence": [
         {
@@ -4184,7 +3723,7 @@
       "binding_target": "cn_deterministic_face_groups",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 562
+        "line": 535
       },
       "target_source_evidence": [
         {
@@ -4237,7 +3776,7 @@
       "binding_target": "cn_deterministic_face_sequence_chunk",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 526
+        "line": 499
       },
       "target_source_evidence": [
         {
@@ -4290,7 +3829,7 @@
       "binding_target": "cn_deterministic_field_from_power_phase",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 490
+        "line": 463
       },
       "target_source_evidence": [
         {
@@ -4338,7 +3877,7 @@
       "binding_target": "cn_deterministic_gather_topology_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 558
+        "line": 531
       },
       "target_source_evidence": [
         {
@@ -4391,7 +3930,7 @@
       "binding_target": "cn_deterministic_los_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 444
+        "line": 417
       },
       "target_source_evidence": [
         {
@@ -4439,7 +3978,7 @@
       "binding_target": "cn_deterministic_los_topology_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 494
+        "line": 467
       },
       "target_source_evidence": [
         {
@@ -4492,7 +4031,7 @@
       "binding_target": "cn_deterministic_los_topology_block_all_visible",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 498
+        "line": 471
       },
       "target_source_evidence": [
         {
@@ -4535,7 +4074,7 @@
       "binding_target": "cn_deterministic_mapped_face_sequence_chunk",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 530
+        "line": 503
       },
       "target_source_evidence": [
         {
@@ -4592,7 +4131,7 @@
       "binding_target": "cn_deterministic_normalize_vec3",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 546
+        "line": 519
       },
       "target_source_evidence": [
         {
@@ -4685,7 +4224,7 @@
       "binding_target": "cn_deterministic_pack_complex",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 474
+        "line": 447
       },
       "target_source_evidence": [
         {
@@ -4753,7 +4292,7 @@
       "binding_target": "cn_deterministic_pad_topology_sequences",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 506
+        "line": 479
       },
       "target_source_evidence": [
         {
@@ -4806,7 +4345,7 @@
       "binding_target": "cn_deterministic_phase_from_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 478
+        "line": 451
       },
       "target_source_evidence": [
         {
@@ -4858,7 +4397,7 @@
       "binding_target": "cn_deterministic_phase_from_length",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 486
+        "line": 459
       },
       "target_source_evidence": [
         {
@@ -4906,7 +4445,7 @@
       "binding_target": "cn_deterministic_reflect_points",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 550
+        "line": 523
       },
       "target_source_evidence": [
         {
@@ -4959,7 +4498,7 @@
       "binding_target": "cn_deterministic_reflection_epc_input_batch",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 522
+        "line": 495
       },
       "target_source_evidence": [
         {
@@ -5020,7 +4559,7 @@
       "binding_target": "cn_deterministic_reflection_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 462
+        "line": 435
       },
       "target_source_evidence": [
         {
@@ -5072,7 +4611,7 @@
       "binding_target": "cn_deterministic_reflection_order1_compact",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 534
+        "line": 507
       },
       "target_source_evidence": [
         {
@@ -5129,7 +4668,7 @@
       "binding_target": "cn_deterministic_reflection_sequence_compact",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 538
+        "line": 511
       },
       "target_source_evidence": [
         {
@@ -5186,7 +4725,7 @@
       "binding_target": "cn_deterministic_reflection_sequence_field",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 466
+        "line": 439
       },
       "target_source_evidence": [
         {
@@ -5238,7 +4777,7 @@
       "binding_target": "cn_deterministic_repeat_range",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 514
+        "line": 487
       },
       "target_source_evidence": [
         {
@@ -5286,7 +4825,7 @@
       "binding_target": "cn_deterministic_selected_edge_count",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 437
+        "line": 410
       },
       "target_source_evidence": [
         {
@@ -5339,7 +4878,7 @@
       "binding_target": "cn_deterministic_sort_order",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 570
+        "line": 543
       },
       "target_source_evidence": [
         {
@@ -5392,7 +4931,7 @@
       "binding_target": "cn_deterministic_surface_face_groups",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 566
+        "line": 539
       },
       "target_source_evidence": [
         {
@@ -5440,7 +4979,7 @@
       "binding_target": "cn_deterministic_topology_base_fields",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 510
+        "line": 483
       },
       "target_source_evidence": [
         {
@@ -5501,7 +5040,7 @@
       "binding_target": "cn_deterministic_topology_default_fields",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 502
+        "line": 475
       },
       "target_source_evidence": [
         {
@@ -5558,7 +5097,7 @@
       "binding_target": "cn_deterministic_zero_field_phase",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 482
+        "line": 455
       },
       "target_source_evidence": [
         {
@@ -7050,9 +6589,9 @@
           "line": 99
         }
       ],
-      "contract_test": "tests/scattering/test_table_build_ad.py::test_backward_matches_oracle",
+      "contract_test": "native-kirchhoff-table-build-ad",
       "e2e_callers": [
-        "tests/scattering/test_table_build_ad.py::test_end_to_end_roughness_gradient_is_nonzero"
+        "scattering-table-build-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7103,9 +6642,9 @@
           "line": 163
         }
       ],
-      "contract_test": "tests/scattering/test_table_build_ad.py::test_backward_matches_oracle",
+      "contract_test": "native-kirchhoff-table-build-ad",
       "e2e_callers": [
-        "tests/scattering/test_table_build_ad.py::test_end_to_end_roughness_gradient_is_nonzero"
+        "scattering-table-build-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7117,7 +6656,7 @@
       "binding_target": "cn_los_silhouette_clearance",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 448
+        "line": 421
       },
       "target_source_evidence": [
         {
@@ -7146,9 +6685,9 @@
           "line": 105
         }
       ],
-      "contract_test": "tests/kernels/test_los_silhouette_clearance.py::test_silhouette_clearance_matches_reference_formulas",
+      "contract_test": "native-isb-taper",
       "e2e_callers": [
-        "tests/deterministic/test_isb_boundary_taper.py::test_isb_boundary_taper_on_softens_los_shadow_boundary"
+        "isb-boundary-taper"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -7160,7 +6699,7 @@
       "binding_target": "cn_los_taper_apply",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 453
+        "line": 426
       },
       "target_source_evidence": [
         {
@@ -7189,9 +6728,9 @@
           "line": 132
         }
       ],
-      "contract_test": "tests/kernels/test_los_silhouette_clearance.py::test_silhouette_clearance_matches_reference_formulas",
+      "contract_test": "native-isb-taper",
       "e2e_callers": [
-        "tests/deterministic/test_isb_boundary_taper.py::test_isb_boundary_taper_on_softens_los_shadow_boundary"
+        "isb-boundary-taper"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -7203,7 +6742,7 @@
       "binding_target": "cn_mc_apply_los_visibility",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 257
+        "line": 274
       },
       "target_source_evidence": [
         {
@@ -7249,9 +6788,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_solver_smoke.py::test_basic_solver_los_smoke_returns_cuda_result"
+        "mc-basic-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7263,7 +6802,7 @@
       "binding_target": "cn_mc_component_map_buffer",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 213
+        "line": 222
       },
       "target_source_evidence": [
         {
@@ -7329,13 +6868,93 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "unaffected by Plan 13"
+    },
+    {
+      "symbol": "mc_diffraction_discover_edges",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_mc_diffraction_discover_edges",
+      "binding_registration": {
+        "path": "native/channel_native/binding/montecarlo.cpp",
+        "line": 262
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/montecarlo_basic.cpp",
+          "symbol": "cn_mc_diffraction_discover_edges"
+        },
+        {
+          "path": "native/channel_native/kernels/diffraction_discovery.cu",
+          "symbol": "cn_mc_diffraction_discover_edges_cuda"
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel CUDA implementation owned by montecarlo.basic",
+      "python_owner": "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges",
+      "python_definitions": [
+        "src/witwin/channel_native/montecarlo/basic/kernels/sampling.py"
+      ],
+      "production_callers": [
+        "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
+      ],
+      "native_dispatch_evidence": [
+        "native/channel_native/binding/montecarlo.cpp",
+        "native/channel_native/montecarlo_basic.cpp",
+        "native/channel_native/kernels/diffraction_discovery.cu"
+      ],
+      "contract_test": "native-mc-discovery",
+      "e2e_callers": [
+        "mc-basic-diffraction"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "rename/replace legacy integration identity"
+    },
+    {
+      "symbol": "mc_diffraction_discover_edges_counted",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_mc_diffraction_discover_edges_counted",
+      "binding_registration": {
+        "path": "native/channel_native/binding/montecarlo.cpp",
+        "line": 266
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/montecarlo_basic.cpp",
+          "symbol": "cn_mc_diffraction_discover_edges_counted"
+        },
+        {
+          "path": "native/channel_native/kernels/diffraction_discovery.cu",
+          "symbol": "cn_mc_diffraction_discover_edges_counted_cuda"
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel CUDA implementation owned by montecarlo.basic",
+      "python_owner": "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges_counted",
+      "python_definitions": [
+        "src/witwin/channel_native/montecarlo/basic/kernels/sampling.py"
+      ],
+      "production_callers": [
+        "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
+      ],
+      "native_dispatch_evidence": [
+        "native/channel_native/binding/montecarlo.cpp",
+        "native/channel_native/montecarlo_basic.cpp",
+        "native/channel_native/kernels/diffraction_discovery.cu"
+      ],
+      "contract_test": "native-mc-discovery",
+      "e2e_callers": [
+        "mc-basic-diffraction"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "rename/replace legacy integration identity"
     },
     {
       "symbol": "mc_diffraction_edge_geometry",
@@ -7343,7 +6962,7 @@
       "binding_target": "cn_mc_diffraction_edge_geometry",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 313
+        "line": 330
       },
       "target_source_evidence": [
         {
@@ -7381,9 +7000,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7395,7 +7014,7 @@
       "binding_target": "cn_mc_diffraction_state_pack",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 309
+        "line": 326
       },
       "target_source_evidence": [
         {
@@ -7429,9 +7048,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
+      "contract_test": "native-mc-sampling",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7443,7 +7062,7 @@
       "binding_target": "cn_mc_diffraction_state_wi",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 289
+        "line": 306
       },
       "target_source_evidence": [
         {
@@ -7481,9 +7100,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
+      "contract_test": "native-mc-sampling",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7495,7 +7114,7 @@
       "binding_target": "cn_mc_face_material_tensors",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 321
+        "line": 338
       },
       "target_source_evidence": [
         {
@@ -7533,9 +7152,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7547,7 +7166,7 @@
       "binding_target": "cn_mc_finalize_component_maps",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 201
+        "line": 210
       },
       "target_source_evidence": [
         {
@@ -7589,9 +7208,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7603,7 +7222,7 @@
       "binding_target": "cn_mc_los_component_maps",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 237
+        "line": 254
       },
       "target_source_evidence": [
         {
@@ -7637,9 +7256,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_solver_smoke.py::test_basic_solver_los_smoke_returns_cuda_result"
+        "mc-basic-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7651,7 +7270,7 @@
       "binding_target": "cn_mc_los_component_maps_adjoint",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 253
+        "line": 270
       },
       "target_source_evidence": [
         {
@@ -7690,9 +7309,9 @@
           "line": 168
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7704,7 +7323,7 @@
       "binding_target": "cn_mc_los_component_maps_from_matrix",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 241
+        "line": 258
       },
       "target_source_evidence": [
         {
@@ -7759,9 +7378,9 @@
           "line": 385
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_solver_smoke.py::test_basic_solver_los_smoke_returns_cuda_result"
+        "mc-basic-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7773,7 +7392,7 @@
       "binding_target": "cn_mc_los_path_gain_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 245
+        "line": 262
       },
       "target_source_evidence": [
         {
@@ -7811,9 +7430,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7825,7 +7444,7 @@
       "binding_target": "cn_mc_los_path_gain_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 249
+        "line": 266
       },
       "target_source_evidence": [
         {
@@ -7863,9 +7482,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7877,7 +7496,7 @@
       "binding_target": "cn_mc_los_visibility_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 261
+        "line": 278
       },
       "target_source_evidence": [
         {
@@ -7923,9 +7542,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_solver_smoke.py::test_basic_solver_los_smoke_returns_cuda_result"
+        "mc-basic-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7937,7 +7556,7 @@
       "binding_target": "cn_mc_pack_vec3",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 233
+        "line": 250
       },
       "target_source_evidence": [
         {
@@ -7975,9 +7594,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
+      "contract_test": "native-mc-sampling",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -7989,7 +7608,7 @@
       "binding_target": "cn_bdpt_point_component_power",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 209
+        "line": 218
       },
       "target_source_evidence": [
         {
@@ -8035,9 +7654,9 @@
           "line": 270
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8049,7 +7668,7 @@
       "binding_target": "cn_mc_receiver_grid_points",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 265
+        "line": 282
       },
       "target_source_evidence": [
         {
@@ -8087,9 +7706,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8101,7 +7720,7 @@
       "binding_target": "cn_mc_reflection_ad_max_depth_cuda",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 277
+        "line": 294
       },
       "target_source_evidence": [
         {
@@ -8140,9 +7759,9 @@
           "line": 817
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8154,7 +7773,7 @@
       "binding_target": "cn_mc_reflection_launch_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 269
+        "line": 286
       },
       "target_source_evidence": [
         {
@@ -8192,9 +7811,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8206,7 +7825,7 @@
       "binding_target": "cn_mc_sample_directions",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 225
+        "line": 234
       },
       "target_source_evidence": [
         {
@@ -8252,9 +7871,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
+      "contract_test": "native-mc-sampling",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8266,7 +7885,7 @@
       "binding_target": "cn_mc_selected_edge_indices",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 305
+        "line": 322
       },
       "target_source_evidence": [
         {
@@ -8308,9 +7927,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
+      "contract_test": "native-mc-sampling",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8322,7 +7941,7 @@
       "binding_target": "cn_mc_sionna_diffraction_tape_accumulate",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 293
+        "line": 310
       },
       "target_source_evidence": [
         {
@@ -8364,9 +7983,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8378,7 +7997,7 @@
       "binding_target": "cn_mc_sionna_diffraction_tape_accumulate_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 297
+        "line": 314
       },
       "target_source_evidence": [
         {
@@ -8417,9 +8036,9 @@
           "line": 1378
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8431,7 +8050,7 @@
       "binding_target": "cn_mc_sionna_diffraction_tape_accumulate_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 301
+        "line": 318
       },
       "target_source_evidence": [
         {
@@ -8470,9 +8089,9 @@
           "line": 1436
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8484,7 +8103,7 @@
       "binding_target": "cn_mc_sionna_reflection_accumulate",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 273
+        "line": 290
       },
       "target_source_evidence": [
         {
@@ -8526,9 +8145,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8540,7 +8159,7 @@
       "binding_target": "cn_mc_sionna_reflection_accumulate_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 281
+        "line": 298
       },
       "target_source_evidence": [
         {
@@ -8579,9 +8198,9 @@
           "line": 851
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8593,7 +8212,7 @@
       "binding_target": "cn_mc_sionna_reflection_accumulate_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 285
+        "line": 302
       },
       "target_source_evidence": [
         {
@@ -8632,9 +8251,9 @@
           "line": 921
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_ad.py::test_frequency_grad_matches_fd"
+        "mc-basic-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8646,7 +8265,7 @@
       "binding_target": "cn_mc_store_component_map",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 217
+        "line": 226
       },
       "target_source_evidence": [
         {
@@ -8684,9 +8303,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8698,7 +8317,7 @@
       "binding_target": "cn_mc_store_scaled_component_map",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 221
+        "line": 230
       },
       "target_source_evidence": [
         {
@@ -8736,9 +8355,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8750,7 +8369,7 @@
       "binding_target": "cn_mc_surface_group_edge_candidates",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 317
+        "line": 334
       },
       "target_source_evidence": [
         {
@@ -8788,9 +8407,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8802,7 +8421,7 @@
       "binding_target": "cn_mc_transmitter_tensors",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 229
+        "line": 246
       },
       "target_source_evidence": [
         {
@@ -8848,9 +8467,9 @@
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8862,7 +8481,7 @@
       "binding_target": "cn_bdpt_zero_matrix",
       "binding_registration": {
         "path": "native/channel_native/binding/montecarlo.cpp",
-        "line": 205
+        "line": 214
       },
       "target_source_evidence": [
         {
@@ -8920,9 +8539,9 @@
           "line": 257
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+      "contract_test": "native-mc-maps",
       "e2e_callers": [
-        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available"
+        "mc-basic-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8934,7 +8553,7 @@
       "binding_target": "cn_path_concat_vec3",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 397
+        "line": 374
       },
       "target_source_evidence": [
         {
@@ -8973,9 +8592,9 @@
           "line": 231
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -8987,7 +8606,7 @@
       "binding_target": "cn_path_diffraction_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 417
+        "line": 394
       },
       "target_source_evidence": [
         {
@@ -9021,57 +8640,9 @@
           "line": 352
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
-      "symbol": "path_diffraction_paths_order1",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_path_diffraction_paths_order1",
-      "binding_registration": {
-        "path": "native/channel_native/binding/path.cpp",
-        "line": 421
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/path.cpp",
-          "lines": [
-            23
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/diffraction.cpp",
-          "lines": [
-            213
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
-      "python_owner": "witwin.channel_native.propagation.topology.kernels.candidates.path_diffraction_paths_order1",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/topology/kernels/candidates.py",
-          "line": 60
-        }
-      ],
-      "production_callers": [],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/topology/kernels/candidates.py",
-          "line": 131
-        }
-      ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
-      "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available"
+        "path-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -9083,7 +8654,7 @@
       "binding_target": "cn_path_filter_block",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 413
+        "line": 390
       },
       "target_source_evidence": [
         {
@@ -9117,9 +8688,9 @@
           "line": 319
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -9131,7 +8702,7 @@
       "binding_target": "cn_path_filter_los",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 405
+        "line": 382
       },
       "target_source_evidence": [
         {
@@ -9165,9 +8736,9 @@
           "line": 280
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_empty_space_los_returns_one_path_per_pair"
+        "path-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -9179,7 +8750,7 @@
       "binding_target": "cn_path_finalize_blocks",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 429
+        "line": 402
       },
       "target_source_evidence": [
         {
@@ -9213,9 +8784,9 @@
           "line": 401
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -9227,7 +8798,7 @@
       "binding_target": "cn_path_los_export",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 393
+        "line": 370
       },
       "target_source_evidence": [
         {
@@ -9274,9 +8845,9 @@
           "line": 38
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_empty_space_los_returns_one_path_per_pair"
+        "path-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9288,7 +8859,7 @@
       "binding_target": "cn_path_los_visibility_inputs",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 401
+        "line": 378
       },
       "target_source_evidence": [
         {
@@ -9327,9 +8898,9 @@
           "line": 238
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_empty_space_los_returns_one_path_per_pair"
+        "path-los"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9341,7 +8912,7 @@
       "binding_target": "cn_path_merge_blocks",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 425
+        "line": 398
       },
       "target_source_evidence": [
         {
@@ -9375,9 +8946,9 @@
           "line": 373
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -9389,7 +8960,7 @@
       "binding_target": "cn_path_reflection_candidates",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 409
+        "line": 386
       },
       "target_source_evidence": [
         {
@@ -9423,119 +8994,13 @@
           "line": 44
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
+      "contract_test": "native-path-topology",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
       "plan13_disposition": "unaffected by Plan 13"
-    },
-    {
-      "symbol": "coupled_dd_geometry_forward",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_coupled_dd_geometry_forward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 396
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            162
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/geometry.cpp",
-          "lines": [
-            340
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel operation / RayD primitives",
-      "owner_kind": "composed owner using typed RayD primitives",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_dd_geometry_forward",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 261
-        }
-      ],
-      "production_callers": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/coupled.py",
-          "line": 119
-        }
-      ],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 278
-        }
-      ],
-      "contract_test": "tests/propagation/geometry/test_coupled.py::test_coupled_dd_query_names_raw_geometry_and_preserves_identity",
-      "e2e_callers": [
-        "tests/deterministic/test_coupled_paths.py::test_coupled_on_exports_finite_nonzero_coupled_component"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "live-static-production-consumer",
-      "plan13_disposition": "Phase 3 neutral layered owner name complete"
-    },
-    {
-      "symbol": "coupled_rd_geometry_forward",
-      "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_coupled_rd_geometry_forward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/rayd.cpp",
-        "line": 392
-      },
-      "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/rayd.cpp",
-          "lines": [
-            146
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/rayd/geometry.cpp",
-          "lines": [
-            223
-          ],
-          "count": 1
-        }
-      ],
-      "numerical_owner": "Channel operation / RayD primitives",
-      "owner_kind": "composed owner using typed RayD primitives",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_rd_geometry_forward",
-      "python_definitions": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 199
-        }
-      ],
-      "production_callers": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/coupled.py",
-          "line": 83
-        }
-      ],
-      "native_dispatch_evidence": [
-        {
-          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 214
-        }
-      ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
-      "e2e_callers": [
-        "tests/path/test_path_reflection_diffraction_sequences.py::test_solve_exports_bounded_reflection_diffraction_sequences"
-      ],
-      "surface": "internal-native-ABI",
-      "liveness": "live-static-production-consumer",
-      "plan13_disposition": "Phase 3 neutral layered owner name complete"
     },
     {
       "symbol": "rayd_diffraction_paths_order1_forward",
@@ -9543,7 +9008,7 @@
       "binding_target": "cn_rayd_diffraction_paths_order1_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 415
+        "line": 337
       },
       "target_source_evidence": [
         {
@@ -9582,9 +9047,9 @@
           "line": 329
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available"
+        "path-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9596,7 +9061,7 @@
       "binding_target": "cn_rayd_intersect_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 356
+        "line": 290
       },
       "target_source_evidence": [
         {
@@ -9635,13 +9100,78 @@
           "line": 75
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "Phase 3 direct typed boundary complete"
+    },
+    {
+      "symbol": "rayd_intersect_forward",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_rayd_intersect_forward",
+      "binding_registration": {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "line": 274
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/rayd.cpp",
+          "lines": [
+            19
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/rayd/geometry.cpp",
+          "lines": [
+            65
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD native implementation through typed RayD C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_intersect_forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 49
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
+          "line": 632
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/transmission.py",
+          "line": 236
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/transmission.py",
+          "line": 33
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "line": 349
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 82
+        }
+      ],
+      "contract_test": "native-rayd-geometry",
+      "e2e_callers": [
+        "bdpt-reflection"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "rename/replace legacy integration identity"
     },
     {
       "symbol": "rayd_intersect_jvp",
@@ -9649,7 +9179,7 @@
       "binding_target": "cn_rayd_intersect_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 360
+        "line": 294
       },
       "target_source_evidence": [
         {
@@ -9688,9 +9218,9 @@
           "line": 137
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9702,7 +9232,7 @@
       "binding_target": "cn_rayd_reflection_epc_paths_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 376
+        "line": 310
       },
       "target_source_evidence": [
         {
@@ -9741,9 +9271,9 @@
           "line": 792
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9755,7 +9285,7 @@
       "binding_target": "cn_rayd_reflection_epc_paths_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 352
+        "line": 286
       },
       "target_source_evidence": [
         {
@@ -9798,9 +9328,9 @@
           "line": 189
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9812,7 +9342,7 @@
       "binding_target": "cn_rayd_reflection_epc_paths_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 380
+        "line": 314
       },
       "target_source_evidence": [
         {
@@ -9851,9 +9381,9 @@
           "line": 836
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9865,7 +9395,7 @@
       "binding_target": "cn_rayd_scene_create",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 332
+        "line": 266
       },
       "target_source_evidence": [
         {
@@ -9904,9 +9434,9 @@
           "line": 21
         }
       ],
-      "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
+      "contract_test": "native-rayd-scene",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "scene-native"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9918,7 +9448,7 @@
       "binding_target": "cn_rayd_scene_edge_records",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 336
+        "line": 270
       },
       "target_source_evidence": [
         {
@@ -9957,9 +9487,9 @@
           "line": 43
         }
       ],
-      "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
+      "contract_test": "native-rayd-scene",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "scene-native"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -9971,7 +9501,7 @@
       "binding_target": "cn_rayd_scene_face_normals_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 384
+        "line": 318
       },
       "target_source_evidence": [
         {
@@ -10010,9 +9540,9 @@
           "line": 1146
         }
       ],
-      "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
+      "contract_test": "native-rayd-scene",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "scene-native"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10024,7 +9554,7 @@
       "binding_target": "cn_rayd_scene_face_normals_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 388
+        "line": 322
       },
       "target_source_evidence": [
         {
@@ -10063,9 +9593,9 @@
           "line": 1163
         }
       ],
-      "contract_test": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
+      "contract_test": "native-rayd-scene",
       "e2e_callers": [
-        "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive"
+        "scene-native"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10077,7 +9607,7 @@
       "binding_target": "cn_rayd_trace_reflections_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 368
+        "line": 302
       },
       "target_source_evidence": [
         {
@@ -10116,9 +9646,9 @@
           "line": 235
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10130,7 +9660,7 @@
       "binding_target": "cn_rayd_trace_reflections_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 348
+        "line": 282
       },
       "target_source_evidence": [
         {
@@ -10177,9 +9707,9 @@
           "line": 173
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10191,7 +9721,7 @@
       "binding_target": "cn_rayd_trace_reflections_forward_tape",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 364
+        "line": 298
       },
       "target_source_evidence": [
         {
@@ -10229,9 +9759,9 @@
           "line": 501
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -10243,7 +9773,7 @@
       "binding_target": "cn_rayd_trace_reflections_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 372
+        "line": 306
       },
       "target_source_evidence": [
         {
@@ -10282,13 +9812,114 @@
           "line": 317
         }
       ],
-      "contract_test": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+      "contract_test": "native-rayd-geometry",
       "e2e_callers": [
-        "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available"
+        "path-reflection"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "Phase 3 direct typed boundary complete"
+    },
+    {
+      "symbol": "rayd_visibility_forward",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_rayd_visibility_forward",
+      "binding_registration": {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "line": 278
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/rayd.cpp",
+          "lines": [
+            26
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/rayd/geometry.cpp",
+          "lines": [
+            93
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD native implementation through typed RayD C++ API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_visibility_forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 10
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel_native/montecarlo/basic/backend.py",
+          "line": 88
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
+          "line": 178
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
+          "line": 137
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
+          "line": 120
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
+          "line": 475
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 536
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 799
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 841
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+          "line": 146
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering_chain.py",
+          "line": 522
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/diffraction.py",
+          "line": 120
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/visibility.py",
+          "line": 41
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/visibility.py",
+          "line": 27
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 22
+        }
+      ],
+      "contract_test": "native-rayd-geometry",
+      "e2e_callers": [
+        "bdpt-reflection"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "rename/replace legacy integration identity"
     },
     {
       "symbol": "scattering_chain_ensemble_eval",
@@ -10335,9 +9966,9 @@
           "line": 277
         }
       ],
-      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_forward_schema",
+      "contract_test": "native-scattering-chain-ensemble",
       "e2e_callers": [
-        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+        "scattering-chain-ensemble"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10388,9 +10019,9 @@
           "line": 406
         }
       ],
-      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "contract_test": "native-scattering-chain-ensemble-ad",
       "e2e_callers": [
-        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+        "scattering-chain-ensemble"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10441,9 +10072,9 @@
           "line": 545
         }
       ],
-      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "contract_test": "native-scattering-chain-ensemble-ad",
       "e2e_callers": [
-        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+        "scattering-chain-ensemble"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10493,9 +10124,9 @@
           "line": 736
         }
       ],
-      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
+      "contract_test": "native-scattering-chain-realization",
       "e2e_callers": [
-        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+        "scattering-chain-realization"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
@@ -10546,9 +10177,9 @@
           "line": 873
         }
       ],
-      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "contract_test": "native-scattering-chain-realization-ad",
       "e2e_callers": [
-        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+        "scattering-chain-realization"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10599,9 +10230,9 @@
           "line": 1018
         }
       ],
-      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "contract_test": "native-scattering-chain-realization-ad",
       "e2e_callers": [
-        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+        "scattering-chain-realization"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10656,9 +10287,9 @@
           "line": 265
         }
       ],
-      "contract_test": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
+      "contract_test": "native-scattering-ensemble",
       "e2e_callers": [
-        "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit"
+        "deterministic-scattering-ensemble"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10709,9 +10340,9 @@
           "line": 444
         }
       ],
-      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+      "contract_test": "native-scattering-ensemble-ad",
       "e2e_callers": [
-        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+        "deterministic-scattering-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10762,9 +10393,9 @@
           "line": 537
         }
       ],
-      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+      "contract_test": "native-scattering-ensemble-ad",
       "e2e_callers": [
-        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+        "deterministic-scattering-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10815,9 +10446,9 @@
           "line": 202
         }
       ],
-      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "contract_test": "native-scattering",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+        "bdpt-scattering"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10872,9 +10503,9 @@
           "line": 338
         }
       ],
-      "contract_test": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes",
+      "contract_test": "native-scattering-patch-integral",
       "e2e_callers": [
-        "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection"
+        "deterministic-scattering-realization"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10925,9 +10556,9 @@
           "line": 619
         }
       ],
-      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
+      "contract_test": "native-scattering-patch-integral-ad",
       "e2e_callers": [
-        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+        "deterministic-scattering-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -10978,9 +10609,9 @@
           "line": 690
         }
       ],
-      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
+      "contract_test": "native-scattering-patch-integral-ad",
       "e2e_callers": [
-        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+        "deterministic-scattering-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -11035,9 +10666,9 @@
           "line": 53
         }
       ],
-      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "contract_test": "native-scattering",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+        "bdpt-scattering"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -11088,9 +10719,9 @@
           "line": 87
         }
       ],
-      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
+      "contract_test": "native-scattering-table-eval-ad",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd"
+        "mc-basic-scattering-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -11141,9 +10772,9 @@
           "line": 128
         }
       ],
-      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
+      "contract_test": "native-scattering-table-eval-ad",
       "e2e_callers": [
-        "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd"
+        "mc-basic-scattering-ad"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -11198,9 +10829,9 @@
           "line": 157
         }
       ],
-      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "contract_test": "native-scattering",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+        "bdpt-scattering"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
@@ -11255,94 +10886,13 @@
           "line": 176
         }
       ],
-      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "contract_test": "native-scattering",
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+        "bdpt-scattering"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "move numerical owner to RayD as a complete family"
     }
-  ],
-  "current_phase": 3,
-  "phase3_direct_typed_boundary": {
-    "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
-    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-    "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
-    "scene_resource": "RayDSceneResource",
-    "edge_records": "RayDEdgeRecords",
-    "legacy_bridge_files_removed": [
-      "native/channel_native/rayd/bridge.h",
-      "native/channel_native/rayd/common.cpp"
-    ],
-    "strict_renames": [
-      {
-        "from": "raydn_scene_create",
-        "to": "rayd_scene_create"
-      },
-      {
-        "from": "raydn_scene_edge_records",
-        "to": "rayd_scene_edge_records"
-      },
-      {
-        "from": "raydn_intersect_backward",
-        "to": "rayd_intersect_backward"
-      },
-      {
-        "from": "raydn_intersect_jvp",
-        "to": "rayd_intersect_jvp"
-      },
-      {
-        "from": "raydn_trace_reflections_forward",
-        "to": "rayd_trace_reflections_forward"
-      },
-      {
-        "from": "raydn_trace_reflections_forward_tape",
-        "to": "rayd_trace_reflections_forward_tape"
-      },
-      {
-        "from": "raydn_trace_reflections_backward",
-        "to": "rayd_trace_reflections_backward"
-      },
-      {
-        "from": "raydn_trace_reflections_jvp",
-        "to": "rayd_trace_reflections_jvp"
-      },
-      {
-        "from": "raydn_reflection_epc_paths_forward",
-        "to": "rayd_reflection_epc_paths_forward"
-      },
-      {
-        "from": "raydn_reflection_epc_paths_backward",
-        "to": "rayd_reflection_epc_paths_backward"
-      },
-      {
-        "from": "raydn_reflection_epc_paths_jvp",
-        "to": "rayd_reflection_epc_paths_jvp"
-      },
-      {
-        "from": "raydn_scene_face_normals_backward",
-        "to": "rayd_scene_face_normals_backward"
-      },
-      {
-        "from": "raydn_scene_face_normals_jvp",
-        "to": "rayd_scene_face_normals_jvp"
-      },
-      {
-        "from": "raydn_diffraction_paths_order1_forward",
-        "to": "rayd_diffraction_paths_order1_forward"
-      },
-      {
-        "from": "raydn_coupled_rd_geometry_forward",
-        "to": "coupled_rd_geometry_forward"
-      },
-      {
-        "from": "raydn_coupled_dd_geometry_forward",
-        "to": "coupled_dd_geometry_forward"
-      }
-    ],
-    "binding_count": 211,
-    "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
-    "coupled_ownership": "Channel-composed layered owner using RayD typed EPC/visibility primitives"
-  }
+  ]
 }

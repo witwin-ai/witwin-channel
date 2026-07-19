@@ -288,93 +288,6 @@ at::Tensor cn_bdpt_connection_variance_cuda(
     int64_t tx_count,
     int64_t rx_count,
     int64_t samples_per_tx);
-std::tuple<
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor>
-cn_bdpt_diffraction_connection_samples_from_tape_cuda(
-    at::Tensor tape_active,
-    at::Tensor tape_state_idx,
-    at::Tensor tape_cell,
-    at::Tensor tape_material_idx,
-    at::Tensor tape_edge_u,
-    at::Tensor state_edge_index,
-    at::Tensor state_edge_pos,
-    at::Tensor state_edge_dir,
-    at::Tensor state_edge_t_min,
-    at::Tensor state_edge_t_max,
-    at::Tensor state_exterior_angle,
-    at::Tensor state_src,
-    at::Tensor state_src_power,
-    at::Tensor material_gain,
-    at::Tensor material_valid,
-    int64_t tx_index,
-    int64_t state_count,
-    int64_t grid_axis,
-    double grid_position,
-    double grid_coord0_min,
-    double grid_coord0_max,
-    double grid_coord1_min,
-    double grid_coord1_max,
-    int64_t grid_resolution0,
-    int64_t grid_resolution1,
-    double grid_cell_area,
-    double wavelength,
-    int64_t direct_samples,
-    int64_t keller_samples,
-    int64_t mode_id,
-    double beta,
-    int64_t strategy_count);
-std::tuple<
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor,
-    at::Tensor>
-cn_bdpt_diffraction_point_connection_samples_cuda(
-    at::Tensor rx_positions,
-    at::Tensor state_edge_index,
-    at::Tensor state_edge_pos,
-    at::Tensor state_edge_dir,
-    at::Tensor state_edge_t_min,
-    at::Tensor state_edge_t_max,
-    at::Tensor state_prim0,
-    at::Tensor state_prim1,
-    at::Tensor state_exterior_angle,
-    at::Tensor state_src,
-    at::Tensor state_src_power,
-    at::Tensor material_gain,
-    at::Tensor material_valid,
-    int64_t tx_index,
-    int64_t state_count,
-    int64_t direct_samples,
-    int64_t keller_samples,
-    int64_t seed,
-    double wavelength,
-    int64_t mode_id,
-    double beta,
-    int64_t strategy_count);
 at::Tensor cn_bdpt_zero_matrix_cuda(at::Tensor reference, int64_t rows, int64_t cols);
 at::Tensor cn_core_pack_int2_cuda(at::Tensor x, at::Tensor y);
 int64_t cn_core_diffraction_edge_count_cuda(
@@ -463,21 +376,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     at::Tensor tx_positions,
     int64_t tx_index,
     int64_t sample_count);
-at::Tensor cn_bdpt_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::Tensor state_src);
-at::Tensor cn_bdpt_selected_edge_indices_cuda(at::Tensor selected);
-std::vector<at::Tensor> cn_bdpt_diffraction_state_pack_cuda(
-    at::Tensor edge_indices,
-    at::Tensor edge_pos,
-    at::Tensor edge_dir,
-    at::Tensor line_min,
-    at::Tensor line_max,
-    at::Tensor n0,
-    at::Tensor n1,
-    at::Tensor face0,
-    at::Tensor face1,
-    at::Tensor exterior_angle,
-    at::Tensor tx,
-    at::Tensor tx_power);
 std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
     at::Tensor edge_pos,
@@ -506,25 +404,6 @@ std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
     at::Tensor tx,
     at::Tensor tx_power,
     int64_t tx_power_index);
-std::vector<at::Tensor> cn_bdpt_diffraction_edge_geometry_cuda(
-    at::Tensor vertices,
-    at::Tensor faces,
-    at::Tensor face_normals,
-    at::Tensor edge_v0,
-    at::Tensor edge_v1,
-    at::Tensor face0,
-    at::Tensor face1,
-    double plane_tol);
-std::vector<at::Tensor> cn_bdpt_surface_group_edge_candidates_cuda(
-    at::Tensor vertices,
-    at::Tensor faces,
-    at::Tensor face_normals,
-    at::Tensor edge_v0,
-    at::Tensor edge_v1,
-    at::Tensor face0,
-    at::Tensor face1,
-    at::Tensor selected,
-    double plane_tol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_face_material_tensors_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
@@ -912,142 +791,6 @@ pybind11::dict cn_bdpt_endpoint_connection_visibility_inputs(
     return out;
 }
 
-pybind11::dict cn_bdpt_diffraction_connection_samples_from_tape(
-    pybind11::dict tape,
-    pybind11::tuple states,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    int64_t tx_index,
-    int64_t state_count,
-    int64_t grid_axis,
-    double grid_position,
-    double grid_coord0_min,
-    double grid_coord0_max,
-    double grid_coord1_min,
-    double grid_coord1_max,
-    int64_t grid_resolution0,
-    int64_t grid_resolution1,
-    double grid_cell_area,
-    double wavelength,
-    int64_t direct_samples,
-    int64_t keller_samples,
-    int64_t mode_id,
-    double beta,
-    int64_t strategy_count) {
-    TORCH_CHECK(pybind11::len(states) == 12, "states must contain 12 tensors");
-    return connection_samples_to_dict(cn_bdpt_diffraction_connection_samples_from_tape_cuda(
-        tensor_from_dict(tape, "active"),
-        tensor_from_dict(tape, "state_idx"),
-        tensor_from_dict(tape, "cell"),
-        tensor_from_dict(tape, "material_idx"),
-        tensor_from_dict(tape, "edge_u"),
-        pybind11::cast<torch::Tensor>(states[0]),
-        pybind11::cast<torch::Tensor>(states[1]),
-        pybind11::cast<torch::Tensor>(states[2]),
-        pybind11::cast<torch::Tensor>(states[3]),
-        pybind11::cast<torch::Tensor>(states[4]),
-        pybind11::cast<torch::Tensor>(states[9]),
-        pybind11::cast<torch::Tensor>(states[10]),
-        pybind11::cast<torch::Tensor>(states[11]),
-        material_gain,
-        material_valid,
-        tx_index,
-        state_count,
-        grid_axis,
-        grid_position,
-        grid_coord0_min,
-        grid_coord0_max,
-        grid_coord1_min,
-        grid_coord1_max,
-        grid_resolution0,
-        grid_resolution1,
-        grid_cell_area,
-        wavelength,
-        direct_samples,
-        keller_samples,
-        mode_id,
-        beta,
-        strategy_count));
-}
-
-pybind11::dict cn_bdpt_diffraction_point_connection_samples(
-    torch::Tensor rx_positions,
-    pybind11::tuple states,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    int64_t tx_index,
-    int64_t state_count,
-    int64_t direct_samples,
-    int64_t keller_samples,
-    int64_t seed,
-    double wavelength,
-    int64_t mode_id,
-    double beta,
-    int64_t strategy_count) {
-    TORCH_CHECK(pybind11::len(states) == 12, "states must contain 12 tensors");
-    auto out = cn_bdpt_diffraction_point_connection_samples_cuda(
-        rx_positions,
-        pybind11::cast<torch::Tensor>(states[0]),
-        pybind11::cast<torch::Tensor>(states[1]),
-        pybind11::cast<torch::Tensor>(states[2]),
-        pybind11::cast<torch::Tensor>(states[3]),
-        pybind11::cast<torch::Tensor>(states[4]),
-        pybind11::cast<torch::Tensor>(states[7]),
-        pybind11::cast<torch::Tensor>(states[8]),
-        pybind11::cast<torch::Tensor>(states[9]),
-        pybind11::cast<torch::Tensor>(states[10]),
-        pybind11::cast<torch::Tensor>(states[11]),
-        material_gain,
-        material_valid,
-        tx_index,
-        state_count,
-        direct_samples,
-        keller_samples,
-        seed,
-        wavelength,
-        mode_id,
-        beta,
-        strategy_count);
-    auto [
-        topology,
-        contribution,
-        pdf,
-        mis_weight,
-        component_id,
-        valid,
-        tx_id,
-        rx_id,
-        grid_linear_id,
-        light_depth,
-        sensor_depth,
-        path_length_m,
-        source_start,
-        source_end,
-        target_start,
-        target_end,
-        visibility_active] = out;
-    pybind11::dict result;
-    result["samples"] = connection_samples_to_dict(std::make_tuple(
-        topology,
-        contribution,
-        pdf,
-        mis_weight,
-        component_id,
-        valid,
-        tx_id,
-        rx_id,
-        grid_linear_id,
-        light_depth,
-        sensor_depth,
-        path_length_m));
-    result["source_start"] = source_start;
-    result["source_end"] = source_end;
-    result["target_start"] = target_start;
-    result["target_end"] = target_end;
-    result["visibility_active"] = visibility_active;
-    return result;
-}
-
 torch::Tensor cn_bdpt_zero_matrix(torch::Tensor reference, int64_t rows, int64_t cols) {
     return cn_bdpt_zero_matrix_cuda(reference, rows, cols);
 }
@@ -1283,42 +1026,6 @@ pybind11::dict cn_bdpt_reflection_launch_inputs(
     return out;
 }
 
-torch::Tensor cn_bdpt_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src) {
-    return cn_bdpt_diffraction_state_wi_cuda(state_edge_pos, state_src);
-}
-
-torch::Tensor cn_bdpt_selected_edge_indices(torch::Tensor selected) {
-    return cn_bdpt_selected_edge_indices_cuda(selected);
-}
-
-pybind11::tuple cn_bdpt_diffraction_state_pack(
-    torch::Tensor edge_indices,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor line_min,
-    torch::Tensor line_max,
-    torch::Tensor n0,
-    torch::Tensor n1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor exterior_angle,
-    torch::Tensor tx,
-    torch::Tensor tx_power) {
-    return tensor_vector_to_tuple(cn_bdpt_diffraction_state_pack_cuda(
-        edge_indices,
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-        tx,
-        tx_power));
-}
-
 pybind11::tuple cn_deterministic_diffraction_state_pack(
     torch::Tensor edge_indices,
     torch::Tensor edge_pos,
@@ -1377,48 +1084,6 @@ pybind11::tuple cn_deterministic_diffraction_state_pack_selected(
         tx,
         tx_power,
         tx_power_index));
-}
-
-pybind11::tuple cn_bdpt_diffraction_edge_geometry(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor edge_v0,
-    torch::Tensor edge_v1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    double plane_tol) {
-    return tensor_vector_to_tuple(cn_bdpt_diffraction_edge_geometry_cuda(
-        vertices,
-        faces,
-        face_normals,
-        edge_v0,
-        edge_v1,
-        face0,
-        face1,
-        plane_tol));
-}
-
-pybind11::tuple cn_bdpt_surface_group_edge_candidates(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor edge_v0,
-    torch::Tensor edge_v1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor selected,
-    double plane_tol) {
-    return tensor_vector_to_tuple(cn_bdpt_surface_group_edge_candidates_cuda(
-        vertices,
-        faces,
-        face_normals,
-        edge_v0,
-        edge_v1,
-        face0,
-        face1,
-        selected,
-        plane_tol));
 }
 
 pybind11::dict cn_bdpt_face_material_tensors(

@@ -552,14 +552,6 @@ set_source_files_properties(
     native/channel_native/kernels/scattering_patch_integral_ad.cu
     native/channel_native/kernels/scattering_table_eval_ad.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
-if(MSVC)
-    # Channel Native's two diffraction discovery entries retain their existing
-    # extern "C" CUDA boundary until Phase 4. Keep validation exceptions
-    # catchable at those direct call sites.
-    set_source_files_properties(
-        native/channel_native/rayd/diffraction.cpp
-        PROPERTIES COMPILE_OPTIONS "/EHc-")
-endif()
 target_link_libraries(
     _channel_native
     PRIVATE

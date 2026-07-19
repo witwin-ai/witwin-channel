@@ -7,7 +7,7 @@ from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 from witwin.channel_native.runtime.native_resources import _rayd_scene_resource
 
 
-def bdpt_visibility_forward(
+def rayd_visibility_forward(
     scene_resource: object,
     start: torch.Tensor,
     end: torch.Tensor,
@@ -19,7 +19,7 @@ def bdpt_visibility_forward(
     validate_cuda_tensor("end", end, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if active is not None:
         validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
-    out = _required_native_op("bdpt_visibility_forward")(
+    out = _required_native_op("rayd_visibility_forward")(
         _rayd_scene_resource(scene_resource),
         start,
         end,
@@ -27,7 +27,7 @@ def bdpt_visibility_forward(
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.bdpt_visibility_forward must return a tensor sequence"
+            "_channel_native.rayd_visibility_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -46,7 +46,7 @@ _BDPT_INTERSECTION_FIELDS = (
 )
 
 
-def bdpt_intersect_forward(
+def rayd_intersect_forward(
     scene_resource: object,
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
@@ -79,7 +79,7 @@ def bdpt_intersect_forward(
         raise ValueError("intersection tensors must share one CUDA device")
     if flags < 0:
         raise ValueError("flags must be non-negative")
-    out = _required_native_op("bdpt_intersect_forward")(
+    out = _required_native_op("rayd_intersect_forward")(
         _rayd_scene_resource(scene_resource),
         ray_o,
         ray_d,
@@ -88,11 +88,11 @@ def bdpt_intersect_forward(
         int(flags),
     )
     if not isinstance(out, (tuple, list)) or len(out) != len(_BDPT_INTERSECTION_FIELDS):
-        raise TypeError("_channel_native.bdpt_intersect_forward must return 10 tensors")
+        raise TypeError("_channel_native.rayd_intersect_forward must return 10 tensors")
     exported = dict(zip(_BDPT_INTERSECTION_FIELDS, out, strict=True))
     validate_cuda_tensor("t", exported["t"], dtype=torch.float32, ndim=1)
     if exported["t"].shape != (ray_o.shape[0],):
-        raise ValueError("_channel_native.bdpt_intersect_forward returned bad t shape")
+        raise ValueError("_channel_native.rayd_intersect_forward returned bad t shape")
     for name in ("p", "n", "geo_n", "barycentric"):
         validate_cuda_tensor(
             name, exported[name], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -103,44 +103,6 @@ def bdpt_intersect_forward(
     for name in ("shape_id", "prim_id", "local_prim_id", "global_prim_id"):
         validate_cuda_tensor(name, exported[name], dtype=torch.int32, ndim=1)
     return exported
-
-
-def bdpt_reflection_accumulation_forward(*args: object) -> tuple[torch.Tensor, ...]:
-    if not args:
-        raise TypeError(
-            "bdpt_reflection_accumulation_forward requires a typed RayD scene resource"
-        )
-    native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("bdpt_reflection_accumulation_forward")(
-        *native_args,
-    )
-    if not isinstance(out, (tuple, list)):
-        raise TypeError(
-            "_channel_native.bdpt_reflection_accumulation_forward must return a tensor sequence"
-        )
-    return tuple(out)
-
-
-def bdpt_diffraction_discover_edges(*args: object) -> torch.Tensor:
-    out = _required_native_op("bdpt_diffraction_discover_edges")(
-        *args,
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel_native.bdpt_diffraction_discover_edges must return a tensor"
-        )
-    return out
-
-
-def bdpt_diffraction_discover_edges_counted(*args: object) -> torch.Tensor:
-    out = _required_native_op("bdpt_diffraction_discover_edges_counted")(
-        *args,
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel_native.bdpt_diffraction_discover_edges_counted must return a tensor"
-        )
-    return out
 
 
 def bdpt_diffraction_accumulation_forward(*args: object) -> tuple[torch.Tensor, ...]:
@@ -157,13 +119,6 @@ def bdpt_diffraction_accumulation_forward(*args: object) -> tuple[torch.Tensor, 
             "_channel_native.bdpt_diffraction_accumulation_forward must return a tensor sequence"
         )
     return tuple(out)
-
-
-rayd_visibility_forward = bdpt_visibility_forward
-rayd_reflection_accumulation_forward = bdpt_reflection_accumulation_forward
-rayd_diffraction_discover_edges = bdpt_diffraction_discover_edges
-rayd_diffraction_discover_edges_counted = bdpt_diffraction_discover_edges_counted
-rayd_diffraction_accumulation_forward = bdpt_diffraction_accumulation_forward
 
 
 def rayd_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
@@ -338,18 +293,10 @@ def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, 
 
 __all__ = [
     "bdpt_diffraction_accumulation_forward",
-    "bdpt_diffraction_discover_edges",
-    "bdpt_diffraction_discover_edges_counted",
-    "bdpt_intersect_forward",
-    "bdpt_reflection_accumulation_forward",
-    "bdpt_visibility_forward",
     "coupled_dd_geometry_forward",
     "coupled_rd_geometry_forward",
-    "rayd_diffraction_accumulation_forward",
-    "rayd_diffraction_discover_edges",
-    "rayd_diffraction_discover_edges_counted",
     "rayd_diffraction_paths_order1_forward",
-    "rayd_reflection_accumulation_forward",
+    "rayd_intersect_forward",
     "rayd_reflection_epc_paths_forward",
     "rayd_trace_reflections_forward",
     "rayd_visibility_forward",

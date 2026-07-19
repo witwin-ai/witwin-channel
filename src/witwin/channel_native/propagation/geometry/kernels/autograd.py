@@ -346,7 +346,7 @@ class _RaydIntersectAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(scene_resource, vertices, ray_o, ray_d, ray_tmax, active):
-        out = _required_native_op("bdpt_intersect_forward")(
+        out = _required_native_op("rayd_intersect_forward")(
             scene_resource,
             ray_o,
             ray_d,
@@ -481,7 +481,7 @@ def rayd_intersect_ad(
 ) -> dict[str, torch.Tensor]:
     """Differentiable RayD intersect under the fixed-winner contract.
 
-    Returns the same fields as :func:`bdpt_intersect_forward`; ``t``/``p``/
+    Returns the same fields as :func:`rayd_intersect_forward`; ``t``/``p``/
     ``n``/``geo_n``/``uv``/``barycentric`` participate in reverse- and
     forward-mode torch AD with respect to ``vertices``, ``ray_o`` and
     ``ray_d``. Winner ids stay detached.

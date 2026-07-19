@@ -10,8 +10,6 @@ from witwin.channel_native.runtime import symbols, tensor_contracts
 
 
 _OWNER_NAMES = (
-    "bdpt_diffraction_edge_geometry",
-    "bdpt_surface_group_edge_candidates",
     "core_diffraction_edge_count",
     "deterministic_face_groups",
     "deterministic_normalize_vec3",

@@ -30,6 +30,39 @@ torch::Tensor cn_mc_store_scaled_component_map(
     int64_t tx_index,
     int64_t scale_index);
 torch::Tensor cn_mc_sample_directions(int64_t count, torch::Tensor reference);
+torch::Tensor cn_mc_diffraction_discover_edges(
+    torch::Tensor tx_pos,
+    torch::Tensor ray_dir,
+    torch::Tensor prim_index,
+    torch::Tensor hit_p,
+    torch::Tensor hit_n,
+    torch::Tensor hit_geo_n,
+    torch::Tensor triangle_edge_count,
+    torch::Tensor triangle_edge_indices,
+    torch::Tensor edge_pos,
+    torch::Tensor edge_dir,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
+    torch::Tensor edge_line_min,
+    torch::Tensor edge_line_max,
+    torch::Tensor edge_adjacent_face1);
+torch::Tensor cn_mc_diffraction_discover_edges_counted(
+    torch::Tensor tx_pos,
+    torch::Tensor ray_dir,
+    torch::Tensor prim_index,
+    torch::Tensor hit_p,
+    torch::Tensor hit_n,
+    torch::Tensor hit_geo_n,
+    torch::Tensor hit_count,
+    torch::Tensor triangle_edge_count,
+    torch::Tensor triangle_edge_indices,
+    torch::Tensor edge_pos,
+    torch::Tensor edge_dir,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
+    torch::Tensor edge_line_min,
+    torch::Tensor edge_line_max,
+    torch::Tensor edge_adjacent_face1);
 pybind11::dict cn_mc_transmitter_tensors(
     pybind11::sequence flat_positions,
     pybind11::sequence powers);
@@ -226,6 +259,14 @@ void register_montecarlo(pybind11::module_ &module) {
         "mc_sample_directions",
         &cn_mc_sample_directions,
         "Generate MC sphere sample directions with a fused CUDA kernel.");
+    module.def(
+        "mc_diffraction_discover_edges",
+        &cn_mc_diffraction_discover_edges,
+        "Discover MC diffraction support edges with a native CUDA kernel.");
+    module.def(
+        "mc_diffraction_discover_edges_counted",
+        &cn_mc_diffraction_discover_edges_counted,
+        "Discover MC diffraction support edges from a counted RayD hit buffer.");
     module.def(
         "mc_transmitter_tensors",
         &cn_mc_transmitter_tensors,

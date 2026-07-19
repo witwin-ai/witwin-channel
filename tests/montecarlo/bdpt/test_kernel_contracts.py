@@ -30,8 +30,6 @@ _OWNER_NAMES = (
     "bdpt_concat_connection_samples",
     "bdpt_connection_variance",
     "bdpt_count_valid_connection_samples",
-    "bdpt_diffraction_connection_samples_from_tape",
-    "bdpt_diffraction_point_connection_samples",
     "bdpt_empty_subpath_state",
     "bdpt_endpoint_connection_samples",
     "bdpt_endpoint_connection_visibility_inputs",
@@ -63,12 +61,9 @@ _MAP_OWNER_NAMES = (
 )
 
 _SAMPLING_OWNER_NAMES = (
-    "bdpt_diffraction_state_pack",
-    "bdpt_diffraction_state_wi",
     "bdpt_pack_vec3",
     "bdpt_reflection_launch_inputs",
     "bdpt_sample_directions",
-    "bdpt_selected_edge_indices",
 )
 
 
@@ -129,11 +124,8 @@ def test_bdpt_sampling_uses_canonical_runtime_dependencies():
 
 def test_bdpt_solver_uses_canonical_sampling_owners():
     for name in (
-        "bdpt_diffraction_state_pack",
-        "bdpt_diffraction_state_wi",
         "bdpt_reflection_launch_inputs",
         "bdpt_sample_directions",
-        "bdpt_selected_edge_indices",
     ):
         assert getattr(bdpt_solver, name) is getattr(sampling, name)
 

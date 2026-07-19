@@ -40,12 +40,22 @@ mapping and current owner evidence live in
 `docs/dev/audit/phase13-migration-delta.json` and
 `docs/dev/audit/phase13-current-native-owner-inventory.json`.
 
-Phase 4 intentionally retains the native names `bdpt_intersect_forward`,
-`bdpt_visibility_forward`, `bdpt_reflection_accumulation_forward`,
-`bdpt_diffraction_accumulation_forward`, and the two
-`bdpt_diffraction_discover_edges*` entries. Their implementations no longer use
-the retired RayD bridge: RayD-backed entries dispatch typed C++, while edge
-discovery calls the existing Channel-owned CUDA entry directly.
+### Plan 13 Phase 4: generic geometry and dead-bridge cleanup
+
+Generic intersection and visibility now use `rayd_intersect_forward` and
+`rayd_visibility_forward`. MC edge discovery is owned by
+`montecarlo.basic` as `mc_diffraction_discover_edges{,_counted}` and dispatches
+the existing Channel CUDA implementation without a RayD bridge alias.
+
+A four-axis reachability audit deleted nine uncallable legacy bindings,
+including the crude BDPT diffraction connection exporters and the dead
+reflection/path wrappers. The binding count is therefore 202. The RayD fused
+diffraction sample-tape producer remains intentionally exposed as
+`bdpt_diffraction_accumulation_forward` until its Phase 8 semantic rename; the
+Channel `mc_sionna_diffraction_tape_accumulate` primal/JVP/VJP consumer family
+is unchanged. Exact deletion and body-hash evidence lives in
+`docs/dev/audit/phase13-phase4-dead-binding-reachability.json` and
+`docs/dev/audit/phase13-migration-delta.json`.
 
 ## API surface changes
 

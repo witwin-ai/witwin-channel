@@ -148,7 +148,7 @@ def test_scene_with_uv_builds_and_traces(with_uv):
         pytest.skip("RayD native extension is not built")
 
     from witwin.channel_native.propagation.geometry.kernels.bridge import (
-        bdpt_intersect_forward,
+        rayd_intersect_forward,
     )
 
     scene = _uv_scene(with_uv)
@@ -158,7 +158,7 @@ def test_scene_with_uv_builds_and_traces(with_uv):
     ray_d = torch.tensor([[1.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
     ray_tmax = torch.tensor([10.0], dtype=torch.float32, device="cuda")
     active = torch.tensor([True], dtype=torch.bool, device="cuda")
-    hit = bdpt_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
+    hit = rayd_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
     torch.testing.assert_close(
         hit["t"].cpu(), torch.tensor([2.5], dtype=torch.float32)
     )

@@ -17,7 +17,7 @@ from .blocks import (
     path_los_visibility_inputs,
     path_merge_blocks,
 )
-from .candidates import path_diffraction_paths_order1, path_reflection_candidates
+from .candidates import path_reflection_candidates
 from .compaction import (
     deterministic_diffraction_order1_compact,
     deterministic_reflection_order1_compact,
@@ -76,7 +76,6 @@ __all__ = [
     "mc_selected_edge_indices",
     "path_concat_vec3",
     "path_diffraction_block",
-    "path_diffraction_paths_order1",
     "path_filter_block",
     "path_filter_los",
     "path_finalize_blocks",

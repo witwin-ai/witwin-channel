@@ -7,7 +7,6 @@ from witwin.channel_native.core.kernels import metadata as kernel_metadata
 from witwin.channel_native.deterministic.kernels import (
     accumulation as deterministic_accumulation,
 )
-from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
@@ -1967,7 +1966,7 @@ def test_mc_diffraction_state_pack_requires_native_cuda_kernel(monkeypatch):
         )
 
 
-def test_rayd_diffraction_discover_edges_counted_uses_gpu_hit_count():
+def test_mc_diffraction_discover_edges_counted_uses_gpu_hit_count():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayD counted diffraction edge discovery")
 
@@ -2007,7 +2006,7 @@ def test_rayd_diffraction_discover_edges_counted_uses_gpu_hit_count():
     line_max = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     face1 = torch.tensor([-1], device="cuda", dtype=torch.int32)
 
-    sliced = geometry_bridge.rayd_diffraction_discover_edges(
+    sliced = mc_sampling.mc_diffraction_discover_edges(
         tx_pos,
         ray_dir[:2].contiguous(),
         prim_index[:2].contiguous(),
@@ -2024,7 +2023,7 @@ def test_rayd_diffraction_discover_edges_counted_uses_gpu_hit_count():
         line_max,
         face1,
     )
-    counted = geometry_bridge.rayd_diffraction_discover_edges_counted(
+    counted = mc_sampling.mc_diffraction_discover_edges_counted(
         tx_pos,
         ray_dir,
         prim_index,

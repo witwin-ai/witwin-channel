@@ -233,7 +233,7 @@ def straight_transmission_chains(
     for depth in range(int(max_depth) + 1):
         if not bool(active.any()):
             break
-        hit = geometry_bridge.bdpt_intersect_forward(
+        hit = geometry_bridge.rayd_intersect_forward(
             handle,
             origin.contiguous(),
             direction,

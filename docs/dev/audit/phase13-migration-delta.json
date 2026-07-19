@@ -1,193 +1,358 @@
 {
-  "schema_version": 1,
-  "baseline": {
-    "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
-    "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
-    "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-    "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-    "binding_count": 211,
-    "binding_manifest_sha256": "bcca1358baed39dfb95838bb4069b4b43b3ff62abf3d81859840c477a6fbaef7",
-    "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
-    "rayd_lock": {
-      "schema_version": 1,
-      "repository_url": "https://github.com/Asixa/RayD.git",
-      "commit": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-      "integration_abi": {
-        "kind": "source-header-sha256",
-        "path": "backends/torch/include/rayd/torch/integration.h",
-        "sha256": "13cf52d0d2e45638b3262faed249bded739887129ede09c2f8c5c0774f64d939"
-      }
-    }
-  },
-  "current_phase": 3,
-  "transfers_applied": [
-    {
-      "phase": 3,
-      "scope": "RayD integration boundary",
-      "from": "copied extern-C signatures, getter indirection, integer scene handles",
-      "to": "source-linked rayd::torch integration_v2 typed API and RAII SceneResource",
-      "numerical_owner_changed": false
-    }
-  ],
-  "renames_applied": [
-    {
-      "phase": 3,
-      "from": "raydn_scene_create",
-      "to": "rayd_scene_create"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_scene_edge_records",
-      "to": "rayd_scene_edge_records"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_intersect_backward",
-      "to": "rayd_intersect_backward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_intersect_jvp",
-      "to": "rayd_intersect_jvp"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_trace_reflections_forward",
-      "to": "rayd_trace_reflections_forward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_trace_reflections_forward_tape",
-      "to": "rayd_trace_reflections_forward_tape"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_trace_reflections_backward",
-      "to": "rayd_trace_reflections_backward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_trace_reflections_jvp",
-      "to": "rayd_trace_reflections_jvp"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_reflection_epc_paths_forward",
-      "to": "rayd_reflection_epc_paths_forward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_reflection_epc_paths_backward",
-      "to": "rayd_reflection_epc_paths_backward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_reflection_epc_paths_jvp",
-      "to": "rayd_reflection_epc_paths_jvp"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_scene_face_normals_backward",
-      "to": "rayd_scene_face_normals_backward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_scene_face_normals_jvp",
-      "to": "rayd_scene_face_normals_jvp"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_diffraction_paths_order1_forward",
-      "to": "rayd_diffraction_paths_order1_forward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_coupled_rd_geometry_forward",
-      "to": "coupled_rd_geometry_forward"
-    },
-    {
-      "phase": 3,
-      "from": "raydn_coupled_dd_geometry_forward",
-      "to": "coupled_dd_geometry_forward"
-    }
-  ],
-  "deletions_applied": [
-    {
-      "phase": 3,
-      "path": "native/channel_native/rayd/bridge.h"
-    },
-    {
-      "phase": 3,
-      "path": "native/channel_native/rayd/common.cpp"
-    },
-    {
-      "phase": 3,
-      "path": "src/witwin/channel_native/runtime/native_handles.py"
-    },
-    {
-      "phase": 3,
-      "path": "src/witwin/channel_native/core/runtime/raydn.py"
-    }
-  ],
-  "binding_count_delta": 0,
-  "implementation_owner_delta": {
-    "Channel Native": 0,
-    "RayD": 0
-  },
-  "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory.",
-  "phase3_current": {
-    "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
-    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-    "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
-    "binding_count": 211,
-    "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
-    "typed_scene_resource": "RayDSceneResource",
-    "coupled_layered_owner_names": [
-      "coupled_rd_geometry_forward",
-      "coupled_dd_geometry_forward"
-    ],
-    "approved_post_phase9_field_wedge_launch_additions": [
-      {
-        "adr": "ADR-013",
-        "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
-        "split_owner": "coupled",
-        "binding_symbol": "field_coupled_dd_backward",
-        "kernel": "coupled_dd_backward_kernel",
-        "launch_count": 1,
-        "numerical_owner": "Channel Native",
-        "plan13_disposition": "retained complete coupled-DD family"
-      },
-      {
-        "adr": "ADR-013",
-        "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
-        "split_owner": "coupled",
-        "binding_symbol": "field_coupled_dd_jvp",
-        "kernel": "coupled_dd_jvp_kernel",
-        "launch_count": 1,
-        "numerical_owner": "Channel Native",
-        "plan13_disposition": "retained complete coupled-DD family"
-      }
-    ],
-    "approved_phase9_body_hash_transfer_multiset": [
-      {
-        "owner_id": "bdpt.diffraction_connection",
-        "binding_symbol": "bdpt_diffraction_connection_samples_from_tape",
-        "owner_before": "Channel Native",
-        "owner_after": "Channel Native",
-        "transfer_kind": "phase3-identifier-normalization",
-        "before": {
-          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
-          "token_count": 656,
-          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
-          "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1"
-        },
-        "after": {
-          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
-          "token_count": 656,
-          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
-          "body_sha256": "3300f3fc73a33e8dbc17522dc4f2ab434f9344fc2d224288ee752e2113f83885"
+    "schema_version": 1,
+    "baseline": {
+        "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+        "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+        "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+        "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+        "binding_count": 211,
+        "binding_manifest_sha256": "bcca1358baed39dfb95838bb4069b4b43b3ff62abf3d81859840c477a6fbaef7",
+        "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
+        "rayd_lock": {
+            "schema_version": 1,
+            "repository_url": "https://github.com/Asixa/RayD.git",
+            "commit": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+            "integration_abi": {
+                "kind": "source-header-sha256",
+                "path": "backends/torch/include/rayd/torch/integration.h",
+                "sha256": "13cf52d0d2e45638b3262faed249bded739887129ede09c2f8c5c0774f64d939"
+            }
         }
-      }
-    ]
-  }
+    },
+    "current_phase": 4,
+    "transfers_applied": [
+        {
+            "phase": 3,
+            "scope": "RayD integration boundary",
+            "from": "copied extern-C signatures, getter indirection, integer scene handles",
+            "to": "source-linked rayd::torch integration_v2 typed API and RAII SceneResource",
+            "numerical_owner_changed": false
+        }
+    ],
+    "renames_applied": [
+        {
+            "phase": 3,
+            "from": "raydn_scene_create",
+            "to": "rayd_scene_create"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_scene_edge_records",
+            "to": "rayd_scene_edge_records"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_intersect_backward",
+            "to": "rayd_intersect_backward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_intersect_jvp",
+            "to": "rayd_intersect_jvp"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_trace_reflections_forward",
+            "to": "rayd_trace_reflections_forward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_trace_reflections_forward_tape",
+            "to": "rayd_trace_reflections_forward_tape"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_trace_reflections_backward",
+            "to": "rayd_trace_reflections_backward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_trace_reflections_jvp",
+            "to": "rayd_trace_reflections_jvp"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_reflection_epc_paths_forward",
+            "to": "rayd_reflection_epc_paths_forward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_reflection_epc_paths_backward",
+            "to": "rayd_reflection_epc_paths_backward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_reflection_epc_paths_jvp",
+            "to": "rayd_reflection_epc_paths_jvp"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_scene_face_normals_backward",
+            "to": "rayd_scene_face_normals_backward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_scene_face_normals_jvp",
+            "to": "rayd_scene_face_normals_jvp"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_diffraction_paths_order1_forward",
+            "to": "rayd_diffraction_paths_order1_forward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_coupled_rd_geometry_forward",
+            "to": "coupled_rd_geometry_forward"
+        },
+        {
+            "phase": 3,
+            "from": "raydn_coupled_dd_geometry_forward",
+            "to": "coupled_dd_geometry_forward"
+        },
+        {
+            "phase": 4,
+            "from": "bdpt_intersect_forward",
+            "to": "rayd_intersect_forward"
+        },
+        {
+            "phase": 4,
+            "from": "bdpt_visibility_forward",
+            "to": "rayd_visibility_forward"
+        },
+        {
+            "phase": 4,
+            "from": "bdpt_diffraction_discover_edges",
+            "to": "mc_diffraction_discover_edges"
+        },
+        {
+            "phase": 4,
+            "from": "bdpt_diffraction_discover_edges_counted",
+            "to": "mc_diffraction_discover_edges_counted"
+        }
+    ],
+    "deletions_applied": [
+        {
+            "phase": 3,
+            "path": "native/channel_native/rayd/bridge.h"
+        },
+        {
+            "phase": 3,
+            "path": "native/channel_native/rayd/common.cpp"
+        },
+        {
+            "phase": 3,
+            "path": "src/witwin/channel_native/runtime/native_handles.py"
+        },
+        {
+            "phase": 3,
+            "path": "src/witwin/channel_native/core/runtime/raydn.py"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_diffraction_connection_samples_from_tape",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_diffraction_edge_geometry",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_diffraction_point_connection_samples",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_diffraction_state_pack",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_diffraction_state_wi",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_reflection_accumulation_forward",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_selected_edge_indices",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "bdpt_surface_group_edge_candidates",
+            "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": 4,
+            "binding": "path_diffraction_paths_order1",
+            "reachability": "dead by four-axis audit"
+        }
+    ],
+    "binding_count_delta": -9,
+    "implementation_owner_delta": {
+        "Channel Native": 0,
+        "RayD": 0
+    },
+    "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory.",
+    "phase3_current": {
+        "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
+        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+        "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
+        "binding_count": 211,
+        "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
+        "typed_scene_resource": "RayDSceneResource",
+        "coupled_layered_owner_names": [
+            "coupled_rd_geometry_forward",
+            "coupled_dd_geometry_forward"
+        ],
+        "approved_post_phase9_field_wedge_launch_additions": [
+            {
+                "adr": "ADR-013",
+                "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
+                "split_owner": "coupled",
+                "binding_symbol": "field_coupled_dd_backward",
+                "kernel": "coupled_dd_backward_kernel",
+                "launch_count": 1,
+                "numerical_owner": "Channel Native",
+                "plan13_disposition": "retained complete coupled-DD family"
+            },
+            {
+                "adr": "ADR-013",
+                "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
+                "split_owner": "coupled",
+                "binding_symbol": "field_coupled_dd_jvp",
+                "kernel": "coupled_dd_jvp_kernel",
+                "launch_count": 1,
+                "numerical_owner": "Channel Native",
+                "plan13_disposition": "retained complete coupled-DD family"
+            }
+        ],
+        "approved_phase9_body_hash_transfer_multiset": [
+            {
+                "owner_id": "bdpt.diffraction_connection",
+                "binding_symbol": "bdpt_diffraction_connection_samples_from_tape",
+                "owner_before": "Channel Native",
+                "owner_after": "Channel Native",
+                "transfer_kind": "phase3-identifier-normalization",
+                "before": {
+                    "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+                    "token_count": 656,
+                    "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+                    "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1"
+                },
+                "after": {
+                    "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+                    "token_count": 656,
+                    "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+                    "body_sha256": "3300f3fc73a33e8dbc17522dc4f2ab434f9344fc2d224288ee752e2113f83885"
+                }
+            }
+        ]
+    },
+    "phase4_current": {
+        "binding_count": 202,
+        "binding_manifest_sha256": "283b7ea04fe8eaeeb5c4b8e4316856a099d5a31f7750e38acb2bfb810fd4b205",
+        "reachability_audit": "docs/dev/audit/phase13-phase4-dead-binding-reachability.json",
+        "renames": {
+            "bdpt_intersect_forward": "rayd_intersect_forward",
+            "bdpt_visibility_forward": "rayd_visibility_forward",
+            "bdpt_diffraction_discover_edges": "mc_diffraction_discover_edges",
+            "bdpt_diffraction_discover_edges_counted": "mc_diffraction_discover_edges_counted"
+        },
+        "deleted_bindings": [
+            "bdpt_diffraction_connection_samples_from_tape",
+            "bdpt_diffraction_edge_geometry",
+            "bdpt_diffraction_point_connection_samples",
+            "bdpt_diffraction_state_pack",
+            "bdpt_diffraction_state_wi",
+            "bdpt_reflection_accumulation_forward",
+            "bdpt_selected_edge_indices",
+            "bdpt_surface_group_edge_candidates",
+            "path_diffraction_paths_order1"
+        ],
+        "approved_phase9_body_hash_deletions": [
+            {
+                "owner_id": "bdpt.mis",
+                "name": "bdpt_diffraction_contribution",
+                "body_sha256": "6ba7b9ad09cd6f8d14fc6c4d1fe798c1c3638297669725fbb9f7ecb4d890d97d",
+                "signature_sha256": "f95a33e6fb6554ce82b2867cccc33d0980c6124d43cb264458f284fe623c8cef",
+                "token_count": 108
+            },
+            {
+                "owner_id": "bdpt.diffraction_connection",
+                "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+                "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1",
+                "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+                "token_count": 656
+            },
+            {
+                "owner_id": "bdpt.diffraction_connection",
+                "name": "bdpt_diffraction_point_connection_samples_kernel",
+                "body_sha256": "e59bbc0f522b41d301bd6c27596e6b93021b70d91077d4d706e89f7218496a73",
+                "signature_sha256": "ba55d4768e923178326ac6e990475c2773a0a212e77d812087e375faca340195",
+                "token_count": 943
+            },
+            {
+                "owner_id": "bdpt.diffraction_connection",
+                "name": "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
+                "body_sha256": "cdc2d5d1ea4eae7254c43d9a30cc11d299514910d4d5492238f214e59230fa90",
+                "signature_sha256": "d7db6402a4550f7e83ed8df859823a3710945bd3c43e1d4f57597c7a3bbe3698",
+                "token_count": 1150
+            },
+            {
+                "owner_id": "bdpt.diffraction_connection",
+                "name": "cn_bdpt_diffraction_point_connection_samples_cuda",
+                "body_sha256": "aca1c567d6f426d2b4928845dbd957a7ae5f9b79fc833dfd48b35aba59baa95b",
+                "signature_sha256": "9e38a2fe15edb0d87ba2ff720a9c003e2a141025482f40692765433e04787d05",
+                "token_count": 1154
+            },
+            {
+                "owner_id": "bdpt.mis",
+                "name": "bdpt_splitmix64",
+                "body_sha256": "55c55df8585edd4b09a922f9326568f5c31df7943189dc63754c2ad68015773a",
+                "signature_sha256": "5ec9989bbfbc9420d54e0aff654eb168a9ae801a2384dfbae2c18288408da810",
+                "token_count": 53
+            },
+            {
+                "owner_id": "bdpt.mis",
+                "name": "bdpt_uniform01_from_u64",
+                "body_sha256": "66302863fd5c5cc7b7aaa781abd208662220f47d8fde5d470409bce608ab1896",
+                "signature_sha256": "87bbdc5971b85d92943d990f745d60607c5685a816648e4c8ecaf36590f3ad04",
+                "token_count": 17
+            },
+            {
+                "owner_id": "bdpt.mis",
+                "name": "check_diffraction_mis_args",
+                "body_sha256": "1662dea83dc0719f642187f849d909ae1debfa5ed3ff9866e574615a3e46a76e",
+                "signature_sha256": "42893ecf04e441321790859f996fdbcb4e4ecb6f86f674741720f4f169e9b5fb",
+                "token_count": 53
+            },
+            {
+                "owner_id": "bdpt.mis",
+                "name": "bdpt_diffraction_strategy_mis_weight",
+                "body_sha256": "18757532b218208a0ab52f4f44ac018f38e6c9deaeb489bf4436c47aa452eb9a",
+                "signature_sha256": "89dabfe3e52a34d1322150d00206b6eef01369309bc23ac783cd9a58d080d82c",
+                "token_count": 78
+            },
+            {
+                "owner_id": "bdpt.mis",
+                "name": "bdpt_grid_cell_center",
+                "body_sha256": "7831a389c5d90ed1004e5f1d60e8a39335499e16f99bfb7e844bd298143da6cd",
+                "signature_sha256": "20c1065e77af3b129f19d9d81194d6fef2dc43f27fcedc24b2d594c40160c5ba",
+                "token_count": 136
+            }
+        ],
+        "mc_discovery_owner_move": {
+            "from": "RayD bridge extern-C pointer-output forwarder",
+            "to": "montecarlo.basic typed Tensor-returning CUDA facade",
+            "numerical_owner_changed": false
+        },
+        "public_api_delta": false
+    }
 }

@@ -22,11 +22,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # ADR-021 added the 6 multi-bounce chain scattering symbols (Op A/Op B forwards
 # scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
 # _backward/_jvp companions): 193 -> 199;
-# ADR-022 added the 12 BDPT fixed-topology AD companions (subpath
-# reflected/transmitted state, endpoint connection, accumulate power+coherent,
-# finalize point/maps, each _backward + _jvp): 199 -> 211).
+# ADR-022 added 12 BDPT fixed-topology AD companions: 199 -> 211. Plan 13
+# Phase 4 then retired 9 strictly unreachable legacy/duplicate bindings:
+# 211 -> 202.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 211
+EXPECTED_BINDING_COUNT = 202
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )
@@ -79,6 +79,11 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     parameter_name = retirement["parameter_name"]
     binding_names = set(retirement["bindings"])
     renames = migration["renames_applied"]
+    deletions = {
+        entry.get("binding", entry.get("symbol"))
+        for entry in migration["deletions_applied"]
+        if entry.get("binding", entry.get("symbol")) is not None
+    }
     rename_projection = {entry["from"]: entry["to"] for entry in renames}
     projected_binding_names = {
         rename_projection.get(name, name) for name in binding_names
@@ -97,19 +102,24 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert len(current_name_set) == EXPECTED_BINDING_COUNT
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
-    assert migration["current_phase"] == 3
-    assert len(renames) == len(rename_sources) == len(rename_targets) == 16
+    assert migration["current_phase"] == 4
+    assert len(renames) == len(rename_sources) == len(rename_targets) == 20
     assert rename_sources.isdisjoint(rename_targets)
     assert baseline_name_set & (rename_sources | rename_targets) == rename_targets
     assert current_name_set & (rename_sources | rename_targets) == rename_targets
     assert len(binding_names) == len(projected_binding_names) == 22
     assert rename_sources & binding_names == binding_names - projected_binding_names
     historical_projection_universe = binding_names | projected_binding_names
+    live_projected_binding_names = projected_binding_names - deletions
+    assert len(deletions) == 9
     assert (
         baseline_name_set & historical_projection_universe
-        == projected_binding_names
+        == live_projected_binding_names
     )
-    assert current_name_set & historical_projection_universe == projected_binding_names
+    assert (
+        current_name_set & historical_projection_universe
+        == live_projected_binding_names
+    )
     baseline_dummy_bindings = {
         symbol["name"]
         for symbol in baseline["symbols"]
