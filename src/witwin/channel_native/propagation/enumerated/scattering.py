@@ -11,52 +11,35 @@ Appends single-bounce ``component_id=6`` scattering rows to canonical typed
   ensemble lobe for that surface (contract 6.7.3 - the two models are never
   summed for one surface).
 
-Normalization derivation (ensemble). The repo's deterministic ``path_gain``
-is a received power for unit-gain antennas: LoS carries
-``path_gain = P_t * (lambda / (4*pi*d))^2`` and ``path_field`` carries the
-matching complex amplitude ``sqrt(P_t) * lambda/(4*pi) * e^{-j k d}/d``
-(``core.field_state.PHASE_CONVENTION``). Radiometrically, a patch of area
-``A`` receives the flux density ``P_t/(4*pi*r1^2) * cos_theta_i``, re-emits
-the radiance ``f * E_i`` (``f`` is the Kirchhoff power BSDF per steradian,
-hemispherically normalized to ``R_diff``), and the receiver collects through
-the effective aperture ``A_e = lambda^2/(4*pi)``:
+Normalization (ensemble). The repo's ``path_gain`` is a received power for
+unit-gain antennas (LoS ``P_t * (lambda / (4*pi*d))^2`` with the matching
+complex amplitude under ``core.field_state.PHASE_CONVENTION``). With the
+Kirchhoff power BSDF ``f`` (per steradian, hemispherically normalized to
+``R_diff``) and aperture ``A_e = lambda^2/(4*pi)``, a patch of area ``A`` yields
+the plan section 9 patch-quadrature power ``P_r = P_t * f * cos_theta_i *
+cos_theta_o * A * lambda^2 / ((4*pi)^2 * r1^2 * r2^2)`` (``gamma = 4*pi*f``).
+Cross-check (tested): the specular-delta limit collapses the patch sum over an
+infinite plane to the image-source ``P_t * R * (lambda/(4*pi*(r1+r2)))^2``.
 
-    P_r = P_t * f * cos_theta_i * cos_theta_o * A * lambda^2
-          / ((4*pi)^2 * r1^2 * r2^2)
-
-This is the plan section 9 patch-quadrature formula with ``gamma = 4*pi*f``
-and ``A_e = lambda^2/(4*pi)`` substituted, expressed in the repo's
-``path_gain`` units. Cross-check (tested): in the specular-delta limit the
-patch sum over an infinite plane collapses to the image-source result
-``P_t * R * (lambda/(4*pi*(r1+r2)))^2``, so scattering + C_r-attenuated
-specular reproduces the smooth-wall reflection power.
-
-Polarization (v1, documented): the tx polarization is projected onto the
-transverse plane of the incident propagation direction and decomposed in the
-local s/p basis (``s = normalize(n x d)``, ``p = s x d``, contract section
-2); the co-pol table channels are weighted by the squared projections and
-the receive side applies the outgoing s/p projections of the receiver
-polarization. Cross-pol arises only from this frame rotation (contract
-section 6).
+Polarization (v1): the tx polarization is projected onto the incident
+transverse plane, decomposed in the local s/p basis (``s = normalize(n x d)``,
+``p = s x d``, contract section 2), the co-pol table channels are weighted by
+the squared projections and the receive side applies the receiver's outgoing
+s/p projections. Cross-pol arises only from this frame rotation.
 
 Realization mode phase bookkeeping: ``patch_phase_integral`` computes
-``Int exp(-j*(q.x + q_n*h)) dA`` with ``q = k_s - k_i`` built from
-propagation wave vectors. The physical patch factor of the point-source
-Kirchhoff integral is ``e^{-j k0 (r1c + r2c)} * Int exp(+j*(q.delta +
-q_n*h)) dA`` (first-order expansion of ``k0*(r1(x) + r2(x))`` around the
-patch centroid ``c``, ``delta = x - c``). The ``+j`` integral is obtained
-losslessly by calling ``patch_phase_integral`` with SWAPPED wave vectors
-(``k_i <-> k_s`` flips ``q``), which also feeds heights with the physical
-``exp(+j*q_n*h)`` sign; the leftover absolute-position phase is removed with
-``exp(-j*q.c)``. The per-patch prefactor ``j*k0*F/(4*pi)`` with the
-Kirchhoff geometry factor ``F = |q|^2/(k0*q_n)`` makes the smooth
-(``h = 0``) large-plate limit collapse to the exact image-source reflection
-``r * e^{-j k0 (r1+r2)}/(r1+r2)`` by stationary phase (tested).
+``Int exp(-j*(q.x + q_n*h)) dA`` with ``q = k_s - k_i``. The physical patch
+factor ``e^{-j k0 (r1c + r2c)} * Int exp(+j*(q.delta + q_n*h)) dA`` (first-order
+expansion about centroid ``c``) is obtained losslessly by SWAPPING wave vectors
+(``k_i <-> k_s`` flips ``q`` and the ``exp(+j*q_n*h)`` height sign); the leftover
+absolute-position phase is removed with ``exp(-j*q.c)``. The prefactor
+``j*k0*F/(4*pi)``, ``F = |q|^2/(k0*q_n)``, makes the smooth large-plate limit
+collapse to the exact image-source reflection by stationary phase (tested).
 
-Scattering rows accumulate in the POWER domain (plan 7.3): ensemble rows
-carry ``path_field = sqrt(path_gain)`` with zero phase (metadata flag
-``scattering_paths_incoherent``); realization rows keep their physical
-complex field in the row but still fold into totals as power.
+Scattering rows accumulate in the POWER domain (plan 7.3): ensemble rows carry
+``path_field = sqrt(path_gain)`` with zero phase (metadata flag
+``scattering_paths_incoherent``); realization rows keep their physical complex
+field in the row but still fold into totals as power.
 """
 
 from __future__ import annotations
@@ -1043,6 +1026,10 @@ def _scattering_info() -> dict[str, Any]:
         "visibility_launch_count": 0,
         "path_count": 0,
         "capped_path_count": 0,
+        # ADR-021 D1 enumerated scatter-chain diagnostics (0 when default-OFF).
+        "chain_sample_count": 0,
+        "chain_row_count": 0,
+        "chain_kept_count": 0,
     }
 
 
@@ -1182,15 +1169,32 @@ def append_scattering_evaluated_paths(
         info=info,
         ad_mode=ad_mode,
     )
-    if rows is None:
-        return evaluated, sidecars, info
+    if rows is not None:
+        evaluated, sidecars = _extend_evaluated_paths(
+            evaluated,
+            sidecars,
+            rows,
+            launch_count_delta=launch_delta,
+            candidate_count_delta=candidate_delta,
+            guardrail_count_delta=guardrail_delta,
+        )
+    # ADR-021 D1 enumerated scatter-chain rows. DEFAULT-OFF: the branch is only
+    # entered when scattering_chain_max_depth >= 1, so the single-bounce pipeline
+    # above stays byte-identical when the new config is absent/0. The chain append
+    # path lives in the sibling scattering_chain_append module (imported lazily so
+    # that module can reuse this module's single-bounce frame helpers without a
+    # module-load import cycle).
+    if int(getattr(config, "scattering_chain_max_depth", 0)) >= 1:
+        from witwin.channel_native.propagation.enumerated.scattering_chain_append import (
+            append_chain_scattering_paths,
+        )
 
-    evaluated, sidecars = _extend_evaluated_paths(
-        evaluated,
-        sidecars,
-        rows,
-        launch_count_delta=launch_delta,
-        candidate_count_delta=candidate_delta,
-        guardrail_count_delta=guardrail_delta,
-    )
+        evaluated, sidecars = append_chain_scattering_paths(
+            scene,
+            config,
+            evaluated,
+            sidecars,
+            info,
+            ad_mode=ad_mode,
+        )
     return evaluated, sidecars, info

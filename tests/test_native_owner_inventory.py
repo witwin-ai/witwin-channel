@@ -176,7 +176,9 @@ def test_source_launch_and_sync_snapshot_is_complete_and_specific() -> None:
         "native/channel_native/kernels/path_trace.cu": (4270, 51, 11),
         "native/channel_native/kernels/field_transport_ad.cu": (2496, 9, 0),
         "native/channel_native/kernels/field_wedge_ad.cu": (2473, 9, 0),
-        "native/channel_native/kernels/bdpt_connect.cu": (2356, 17, 2),
+        # ADR-019 coherent (2) + ADR-022 coherent/power AD (4) launch sites
+        # extended the frozen bdpt_connect.cu ledger from 17 to 23.
+        "native/channel_native/kernels/bdpt_connect.cu": (2356, 23, 2),
     }
     for entry in evidence.values():
         assert all(site["kernel"].endswith("_kernel") for site in entry["kernel_launch_sites"])

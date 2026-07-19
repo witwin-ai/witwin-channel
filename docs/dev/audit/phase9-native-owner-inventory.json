@@ -1690,10 +1690,10 @@
           "token_count": 117
         },
         {
-          "body_sha256": "12d5648c234020e97630c52cc657decf80d5f86309cde46cc23e6f14e396e3b0",
+          "body_sha256": "6cfaf296a41a382bc6e14421bf72e57392d96264fe7cd24428e0c01515a8762e",
           "name": "cn_bdpt_accumulate_connection_samples_cuda",
-          "signature_sha256": "55d77d94d6b6f049ca28dbf90d0d893a383d61ba000e4e210fe42799d1ce41da",
-          "token_count": 2212
+          "signature_sha256": "4b2fca110625a05c1c3bf33f5301fe5aaaf0641073de43e58f3ed578f3579b50",
+          "token_count": 2355
         },
         {
           "body_sha256": "873c48e125a4ab0d3c05693e0ac72e211341c89c75c2340ed892402e06d44d43",
@@ -1736,6 +1736,42 @@
           "name": "bdpt_finalize_coherent_accumulation_kernel",
           "signature_sha256": "9ae27f3d26a1ba0cdc962360eac27e3aa20689750730a06cda10417f518f3a4e",
           "token_count": 237
+        },
+        {
+          "body_sha256": "3d384ef1f5481466b5f7e776de2b9dacae6615e98154708c50362502016ed5a3",
+          "name": "bdpt_accumulate_power_backward_kernel",
+          "signature_sha256": "14937fc06151ac69de4334b9e83a0dd864a626e673e032f42017359854a08a05",
+          "token_count": 178
+        },
+        {
+          "body_sha256": "1ebd9130cb58cbf909d831cc9b339d19928e3b5e1c62a15c5334b74f74b5eead",
+          "name": "bdpt_accumulate_power_jvp_kernel",
+          "signature_sha256": "33f989811cdca1b37b2a58e8c57ac7115e50e62f910e6123e1bb201fe9016a67",
+          "token_count": 332
+        },
+        {
+          "body_sha256": "1f62761cae28f59d9c6ea130d9553aa3363540b50a1fbeb907436b978e541ec4",
+          "name": "bdpt_accumulate_coherent_backward_kernel",
+          "signature_sha256": "e9046476a5928b20272fabc4c629944433a05af3010e57952968b8e568a8f740",
+          "token_count": 342
+        },
+        {
+          "body_sha256": "5508142ba4b6bcab92f80b36918f53a0eb3e83ab72d24fbe3682a3f5a9d4de72",
+          "name": "bdpt_accumulate_coherent_jvp_kernel",
+          "signature_sha256": "40e0a77941ffac917a99655dba55f7ea6c622e2f4b56a8d46b0ce9a88ce1f2d4",
+          "token_count": 485
+        },
+        {
+          "body_sha256": "ea4ab7d14ec99d8f3d25fce1405aaad201e6b652fde294ae46d45b9ef1b14cb3",
+          "name": "cn_bdpt_accumulate_connection_samples_backward_cuda",
+          "signature_sha256": "6772881dac2ac3cadfed8ec851182dfb26a4f19e0b78627ecb81a446f74d21a1",
+          "token_count": 1339
+        },
+        {
+          "body_sha256": "f5d456b7d6b36bd474545c606bc2334aeb933ae8c797e9cdca0a0de78ccf950e",
+          "name": "cn_bdpt_accumulate_connection_samples_jvp_cuda",
+          "signature_sha256": "2f361a34c51076189dca984330229985eefc9e7d37ef775a50ea8d1cd2462a66",
+          "token_count": 1319
         }
       ],
       "expiry_condition": "Split only along complete ABI operations with schema, launch, synchronization, precision, and body-hash parity.",
@@ -2531,6 +2567,30 @@
         {
           "kernel": "bdpt_connection_variance_finalize_double_kernel",
           "line": 2346
+        },
+        {
+          "kernel": "bdpt_accumulate_connection_samples_coherent_kernel",
+          "line": 447
+        },
+        {
+          "kernel": "bdpt_finalize_coherent_accumulation_kernel",
+          "line": 473
+        },
+        {
+          "kernel": "bdpt_accumulate_power_backward_kernel",
+          "line": 1114
+        },
+        {
+          "kernel": "bdpt_accumulate_coherent_backward_kernel",
+          "line": 1164
+        },
+        {
+          "kernel": "bdpt_accumulate_power_jvp_kernel",
+          "line": 1271
+        },
+        {
+          "kernel": "bdpt_accumulate_coherent_jvp_kernel",
+          "line": 1325
         }
       ],
       "line_count": 2356,
@@ -2544,5 +2604,5 @@
     "planned_owner_debt": {},
     "recommended_limit_lines": 2000
   },
-  "manifest_sha256": "f7763868115a711bb06ce2060877aa2afb37c03046e8a4ee3528af7895e1cf32"
+  "manifest_sha256": "7c649db11bb8adafab3892cf4c71683113c879e92dbc6c3e0cc5a3c23a7d13c0"
 }

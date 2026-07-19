@@ -6,6 +6,12 @@ from .autograd import (
     scattering_ensemble_eval_ad,
     scattering_patch_integral_eval_ad,
 )
+from .autograd_chain import (
+    _ScatteringChainEnsembleEvalAdFunction,
+    _ScatteringChainRealizationEvalAdFunction,
+    scattering_chain_ensemble_eval_ad,
+    scattering_chain_realization_eval_ad,
+)
 from .functional import (
     scattering_ensemble_eval_backward,
     scattering_ensemble_eval_jvp,
@@ -16,11 +22,29 @@ from .functional import (
     scattering_table_pdf,
     scattering_table_sample,
 )
+from .functional_chain import (
+    scattering_chain_ensemble_eval,
+    scattering_chain_ensemble_eval_backward,
+    scattering_chain_ensemble_eval_jvp,
+    scattering_chain_realization_eval,
+    scattering_chain_realization_eval_backward,
+    scattering_chain_realization_eval_jvp,
+)
 
 
 __all__ = [
+    "_ScatteringChainEnsembleEvalAdFunction",
+    "_ScatteringChainRealizationEvalAdFunction",
     "_ScatteringEnsembleEvalAdFunction",
     "_ScatteringPatchIntegralEvalAdFunction",
+    "scattering_chain_ensemble_eval",
+    "scattering_chain_ensemble_eval_ad",
+    "scattering_chain_ensemble_eval_backward",
+    "scattering_chain_ensemble_eval_jvp",
+    "scattering_chain_realization_eval",
+    "scattering_chain_realization_eval_ad",
+    "scattering_chain_realization_eval_backward",
+    "scattering_chain_realization_eval_jvp",
     "scattering_ensemble_eval_ad",
     "scattering_ensemble_eval_backward",
     "scattering_ensemble_eval_jvp",

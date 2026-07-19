@@ -3,6 +3,8 @@
 #include <array>
 #include <vector>
 
+#include "bdpt_dict_helpers.h"
+
 namespace {
 
 pybind11::tuple tensor_vector_to_tuple(const std::vector<at::Tensor>& tensors) {
@@ -26,11 +28,6 @@ pybind11::dict subpath_state_to_dict(const std::vector<at::Tensor>& tensors, con
         out[kFields[index]] = tensors[index];
     }
     return out;
-}
-
-at::Tensor tensor_from_dict(const pybind11::dict& values, const char* field) {
-    TORCH_CHECK(values.contains(field), "missing tensor field: ", field);
-    return pybind11::cast<at::Tensor>(values[pybind11::str(field)]);
 }
 
 pybind11::dict connection_samples_to_dict(
@@ -205,7 +202,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> cn_bdpt_endpoint_connection_visib
     at::Tensor sensor_rx_id,
     at::Tensor sensor_valid,
     int64_t sample_count);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+std::tuple<
+    at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor,
+    at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor,
+    at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 cn_bdpt_accumulate_connection_samples_cuda(
     at::Tensor contribution,
     at::Tensor mis_weight,
@@ -738,7 +738,10 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
     int64_t combine_domain,
     torch::Tensor coeff_real,
     torch::Tensor coeff_imag) {
-    auto [path_gain, los, reflection, diffraction, transmission, scattering] = cn_bdpt_accumulate_connection_samples_cuda(
+    auto [path_gain, los, reflection, diffraction, transmission, scattering,
+          los_re, los_im, reflection_re, reflection_im, diffraction_re,
+          diffraction_im, transmission_re, transmission_im, scattering_re,
+          scattering_im] = cn_bdpt_accumulate_connection_samples_cuda(
         tensor_from_dict(samples, "contribution"),
         tensor_from_dict(samples, "mis_weight"),
         tensor_from_dict(samples, "tx_id"),
@@ -762,8 +765,25 @@ pybind11::dict cn_bdpt_accumulate_connection_samples(
     out["diffraction"] = diffraction;
     out["transmission"] = transmission;
     out["scattering"] = scattering;
+    // ADR-022 ruling 6.4: the coherent forward additionally returns the per
+    // component phasor bin sums S_b so the accumulate backward reads them as
+    // explicit args. The power domain leaves them undefined; only publish them
+    // on the coherent branch so combine_domain == 0 stays byte-identical.
+    if (combine_domain == 1) {
+        out["los_re"] = los_re;
+        out["los_im"] = los_im;
+        out["reflection_re"] = reflection_re;
+        out["reflection_im"] = reflection_im;
+        out["diffraction_re"] = diffraction_re;
+        out["diffraction_im"] = diffraction_im;
+        out["transmission_re"] = transmission_re;
+        out["transmission_im"] = transmission_im;
+        out["scattering_re"] = scattering_re;
+        out["scattering_im"] = scattering_im;
+    }
     return out;
 }
+
 
 pybind11::dict cn_bdpt_filter_connection_samples(pybind11::dict samples, torch::Tensor visible) {
     cn_bdpt_filter_connection_samples_cuda(

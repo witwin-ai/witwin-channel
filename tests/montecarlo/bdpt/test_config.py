@@ -41,13 +41,46 @@ def test_bdpt_config_defaults_match_public_contract():
         ({"accumulation_strategy": "python_loop"}, "accumulation_strategy"),
         ({"sample_streams": 0}, "sample_streams"),
         ({"max_exported_paths": -1}, "max_exported_paths"),
-        ({"ad_mode": "vjp"}, "ad_mode"),
+        # ADR-022 lifted the vjp/jvp rejection (they are supported AD modes now),
+        # so an unknown ad_mode is the invalid case that must still be rejected.
+        ({"ad_mode": "bogus"}, "ad_mode"),
         ({"workspace_limit_bytes": -1}, "workspace_limit_bytes"),
     ],
 )
 def test_bdpt_config_rejects_invalid_values(kwargs, message):
     with pytest.raises(ValueError, match=message):
         Config(**kwargs)
+
+
+@pytest.mark.parametrize("ad_mode", ["vjp", "jvp"])
+def test_bdpt_config_accepts_adr022_ad_modes(ad_mode):
+    # ADR-022 wires native BDPT AD companions, so vjp/jvp are accepted AD modes
+    # and the solver metadata reports the active mode as ad_status.
+    from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
+    from witwin.channel_native.montecarlo.bdpt.metadata import make_solver_metadata
+
+    # components={"los"} keeps the metadata assembly free of a RayDN capability
+    # requirement so this stays a pure config/metadata contract check.
+    config = Config(ad_mode=ad_mode, components={"los"})
+    assert config.ad_mode == ad_mode
+
+    metadata = make_solver_metadata(
+        config=config,
+        selected_accumulation_strategy="atomic",
+        path_counts_by_strategy={},
+        valid_contribution_count=0,
+        reflection_available=False,
+        diffraction_available=False,
+        cuda_available=False,
+        optix_available=False,
+        workspace_bytes=0,
+        variance_enabled=False,
+        launch_count=1,
+        effective_max_depth=config.max_depth,
+        ad_ledger=AdLaunchLedger(),
+    )
+    assert metadata["ad_status"] == ad_mode
+    assert metadata["kernel"]["ad_status"] == ad_mode
 
 
 def test_bdpt_config_accepts_supported_variants_and_normalizes_components():

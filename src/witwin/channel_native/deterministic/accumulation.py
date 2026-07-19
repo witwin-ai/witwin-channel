@@ -62,9 +62,18 @@ def accumulate_flat_components(
     coherent: bool,
     extra_components: tuple[str, ...] = (),
     differentiable: bool = False,
+    scattering_coherent: bool = False,
 ) -> tuple[
     torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
 ]:
+    # ADR-021 D3 opt-in coherent scattering combine. Default OFF threads NO new
+    # argument to the native accumulator, so the call stays byte-identical to
+    # today; ON requests the native scattering_combine_domain=1 path where the
+    # scattering slot's summed complex field squares into its power instead of
+    # summing per-row powers (the ADR-019 per-component phasor precedent).
+    combine_kwargs = (
+        {"scattering_combine_domain": 1} if scattering_coherent else {}
+    )
     if differentiable:
         # AD modes (plan 07): the same native accumulator kernels run inside
         # a dispatch-only autograd.Function with native backward/jvp
@@ -80,6 +89,7 @@ def accumulate_flat_components(
             num_tx=int(num_tx),
             num_rx=int(num_rx),
             coherent=bool(coherent),
+            **combine_kwargs,
         )
         power_total = exported["power_total"]
         field_total = torch.complex(
@@ -100,6 +110,7 @@ def accumulate_flat_components(
             num_tx=int(num_tx),
             num_rx=int(num_rx),
             coherent=bool(coherent),
+            **combine_kwargs,
         )
         power_total = exported["power_total"]
         field_total = field_kernels.deterministic_pack_complex(
@@ -172,6 +183,7 @@ def accumulate_path_result(
     return_field: bool,
     extra_components: tuple[str, ...] = (),
     differentiable: bool = False,
+    scattering_coherent: bool = False,
 ) -> tuple[
     torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
 ]:
@@ -188,6 +200,7 @@ def accumulate_path_result(
         coherent=coherent,
         extra_components=extra_components,
         differentiable=differentiable,
+        scattering_coherent=scattering_coherent,
     )
     return apply_layout_to_accumulation(
         path_gain=power,

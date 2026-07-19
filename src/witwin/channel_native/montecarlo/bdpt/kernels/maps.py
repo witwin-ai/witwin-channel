@@ -404,3 +404,267 @@ def bdpt_finalize_component_maps(
     ):
         validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
     return exported
+
+
+# ---------------------------------------------------------------------------
+# ADR-022 finalize AD companion facades (plan 10a section 6.5 / 6.6). The
+# finalize map is linear (elementwise sum into path_gain + per-component 0-dim
+# power reductions), so the backward is the transpose scaling and the jvp is the
+# forward map on the tangents; both are deterministic with no atomics. Pure
+# dispatch, no Torch physics.
+# ---------------------------------------------------------------------------
+
+_BDPT_FINALIZE_COMPONENT_GRADS = (
+    "grad_los",
+    "grad_reflection",
+    "grad_diffraction",
+    "grad_transmission",
+    "grad_scattering",
+)
+_BDPT_FINALIZE_TANGENTS = (
+    "tangent_path_gain",
+    "tangent_los_power",
+    "tangent_reflection_power",
+    "tangent_diffraction_power",
+    "tangent_transmission_power",
+    "tangent_scattering_power",
+)
+
+
+def _bdpt_finalize_backward(
+    op_name: str,
+    ndim: int,
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+    *,
+    grad_path_gain: torch.Tensor | None,
+    grad_los_power: torch.Tensor | None,
+    grad_reflection_power: torch.Tensor | None,
+    grad_diffraction_power: torch.Tensor | None,
+    grad_transmission_power: torch.Tensor | None,
+    grad_scattering_power: torch.Tensor | None,
+    need_grad_components: bool,
+) -> dict[str, torch.Tensor | None]:
+    for name, tensor in (
+        ("los", los),
+        ("reflection", reflection),
+        ("diffraction", diffraction),
+        ("transmission", transmission),
+        ("scattering", scattering),
+    ):
+        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=ndim)
+        if tensor.shape != los.shape:
+            raise ValueError("component tensors must share shape")
+    if grad_path_gain is not None:
+        validate_cuda_tensor(
+            "grad_path_gain",
+            grad_path_gain,
+            dtype=torch.float32,
+            ndim=ndim,
+            require_contiguous=False,
+        )
+    for name, tensor in (
+        ("grad_los_power", grad_los_power),
+        ("grad_reflection_power", grad_reflection_power),
+        ("grad_diffraction_power", grad_diffraction_power),
+        ("grad_transmission_power", grad_transmission_power),
+        ("grad_scattering_power", grad_scattering_power),
+    ):
+        if tensor is not None:
+            validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=0)
+    exported = _required_native_op(op_name)(
+        los,
+        reflection,
+        diffraction,
+        transmission,
+        scattering,
+        grad_path_gain,
+        grad_los_power,
+        grad_reflection_power,
+        grad_diffraction_power,
+        grad_transmission_power,
+        grad_scattering_power,
+        bool(need_grad_components),
+    )
+    if not isinstance(exported, dict) or set(exported) != set(
+        _BDPT_FINALIZE_COMPONENT_GRADS
+    ):
+        raise TypeError(f"_channel_native.{op_name} returned unexpected fields")
+    return exported
+
+
+def _bdpt_finalize_jvp(
+    op_name: str,
+    ndim: int,
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+    *,
+    tangent_los: torch.Tensor | None,
+    tangent_reflection: torch.Tensor | None,
+    tangent_diffraction: torch.Tensor | None,
+    tangent_transmission: torch.Tensor | None,
+    tangent_scattering: torch.Tensor | None,
+) -> dict[str, torch.Tensor]:
+    for name, tensor in (
+        ("los", los),
+        ("reflection", reflection),
+        ("diffraction", diffraction),
+        ("transmission", transmission),
+        ("scattering", scattering),
+    ):
+        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=ndim)
+        if tensor.shape != los.shape:
+            raise ValueError("component tensors must share shape")
+    exported = _required_native_op(op_name)(
+        los,
+        reflection,
+        diffraction,
+        transmission,
+        scattering,
+        tangent_los,
+        tangent_reflection,
+        tangent_diffraction,
+        tangent_transmission,
+        tangent_scattering,
+    )
+    if not isinstance(exported, dict) or set(exported) != set(_BDPT_FINALIZE_TANGENTS):
+        raise TypeError(f"_channel_native.{op_name} returned unexpected fields")
+    return exported
+
+
+def bdpt_finalize_point_components_backward(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+    *,
+    grad_path_gain: torch.Tensor | None = None,
+    grad_los_power: torch.Tensor | None = None,
+    grad_reflection_power: torch.Tensor | None = None,
+    grad_diffraction_power: torch.Tensor | None = None,
+    grad_transmission_power: torch.Tensor | None = None,
+    grad_scattering_power: torch.Tensor | None = None,
+    need_grad_components: bool = False,
+) -> dict[str, torch.Tensor | None]:
+    """VJP of :func:`bdpt_finalize_point_components` (spec 6.5)."""
+
+    return _bdpt_finalize_backward(
+        "bdpt_finalize_point_components_backward",
+        2,
+        los,
+        reflection,
+        diffraction,
+        transmission,
+        scattering,
+        grad_path_gain=grad_path_gain,
+        grad_los_power=grad_los_power,
+        grad_reflection_power=grad_reflection_power,
+        grad_diffraction_power=grad_diffraction_power,
+        grad_transmission_power=grad_transmission_power,
+        grad_scattering_power=grad_scattering_power,
+        need_grad_components=need_grad_components,
+    )
+
+
+def bdpt_finalize_point_components_jvp(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+    *,
+    tangent_los: torch.Tensor | None = None,
+    tangent_reflection: torch.Tensor | None = None,
+    tangent_diffraction: torch.Tensor | None = None,
+    tangent_transmission: torch.Tensor | None = None,
+    tangent_scattering: torch.Tensor | None = None,
+) -> dict[str, torch.Tensor]:
+    """JVP of :func:`bdpt_finalize_point_components` (spec 6.5)."""
+
+    return _bdpt_finalize_jvp(
+        "bdpt_finalize_point_components_jvp",
+        2,
+        los,
+        reflection,
+        diffraction,
+        transmission,
+        scattering,
+        tangent_los=tangent_los,
+        tangent_reflection=tangent_reflection,
+        tangent_diffraction=tangent_diffraction,
+        tangent_transmission=tangent_transmission,
+        tangent_scattering=tangent_scattering,
+    )
+
+
+def bdpt_finalize_component_maps_backward(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+    *,
+    grad_path_gain: torch.Tensor | None = None,
+    grad_los_power: torch.Tensor | None = None,
+    grad_reflection_power: torch.Tensor | None = None,
+    grad_diffraction_power: torch.Tensor | None = None,
+    grad_transmission_power: torch.Tensor | None = None,
+    grad_scattering_power: torch.Tensor | None = None,
+    need_grad_components: bool = False,
+) -> dict[str, torch.Tensor | None]:
+    """VJP of :func:`bdpt_finalize_component_maps` (spec 6.6, 3-D maps)."""
+
+    return _bdpt_finalize_backward(
+        "bdpt_finalize_component_maps_backward",
+        3,
+        los,
+        reflection,
+        diffraction,
+        transmission,
+        scattering,
+        grad_path_gain=grad_path_gain,
+        grad_los_power=grad_los_power,
+        grad_reflection_power=grad_reflection_power,
+        grad_diffraction_power=grad_diffraction_power,
+        grad_transmission_power=grad_transmission_power,
+        grad_scattering_power=grad_scattering_power,
+        need_grad_components=need_grad_components,
+    )
+
+
+def bdpt_finalize_component_maps_jvp(
+    los: torch.Tensor,
+    reflection: torch.Tensor,
+    diffraction: torch.Tensor,
+    transmission: torch.Tensor,
+    scattering: torch.Tensor,
+    *,
+    tangent_los: torch.Tensor | None = None,
+    tangent_reflection: torch.Tensor | None = None,
+    tangent_diffraction: torch.Tensor | None = None,
+    tangent_transmission: torch.Tensor | None = None,
+    tangent_scattering: torch.Tensor | None = None,
+) -> dict[str, torch.Tensor]:
+    """JVP of :func:`bdpt_finalize_component_maps` (spec 6.6, 3-D maps)."""
+
+    return _bdpt_finalize_jvp(
+        "bdpt_finalize_component_maps_jvp",
+        3,
+        los,
+        reflection,
+        diffraction,
+        transmission,
+        scattering,
+        tangent_los=tangent_los,
+        tangent_reflection=tangent_reflection,
+        tangent_diffraction=tangent_diffraction,
+        tangent_transmission=tangent_transmission,
+        tangent_scattering=tangent_scattering,
+    )

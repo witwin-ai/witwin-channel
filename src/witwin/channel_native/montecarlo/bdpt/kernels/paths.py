@@ -142,6 +142,61 @@ def _validate_bdpt_connection_samples(
             raise ValueError(f"{name} returned bad {field} shape")
 
 
+# The six accumulate outputs, in the order every caller reads them. The set is
+# used for the ADR-022 subset key-set check (the coherent forward may add
+# bin-sum buffers as extra keys).
+_BDPT_COMPONENT_MATRIX_ORDER = (
+    "path_gain",
+    "los",
+    "reflection",
+    "diffraction",
+    "transmission",
+    "scattering",
+)
+_BDPT_COMPONENT_MATRIX_FIELDS = frozenset(_BDPT_COMPONENT_MATRIX_ORDER)
+
+# ADR-022 spec 6.4: the coherent forward returns the per-component phasor bin
+# sums S_b as non-differentiable outputs; the coherent backward reads them as
+# explicit args in this order (real/imag per accumulating component). Absent for
+# the power domain.
+_BDPT_ACCUMULATE_BIN_SUM_ORDER = (
+    "los_re",
+    "los_im",
+    "reflection_re",
+    "reflection_im",
+    "diffraction_re",
+    "diffraction_im",
+    "transmission_re",
+    "transmission_im",
+    "scattering_re",
+    "scattering_im",
+)
+
+
+def _bdpt_accumulate_bin_sum_args(
+    combine_domain: str, bin_sums: tuple[torch.Tensor, ...]
+) -> tuple[torch.Tensor | None, ...]:
+    """Expand the coherent forward's phasor bin sums into the ten positional
+    ``los_re..scattering_im`` args the native accumulate VJP/JVP consume.
+
+    ADR-022 spec 6.4 (supervisor ruling): the coherent backward/jvp read the
+    per-component bin sums ``S_b`` retained by the forward, so no in-backward
+    re-reduction and no sample coefficients are needed. The power domain takes
+    no bin sums; every slot is ``None``."""
+
+    bins = tuple(bin_sums)
+    if combine_domain == "coherent":
+        if len(bins) != len(_BDPT_ACCUMULATE_BIN_SUM_ORDER):
+            raise ValueError(
+                "coherent accumulate backward/jvp requires the ten forward "
+                "phasor bin sums"
+            )
+        return bins
+    if bins:
+        raise ValueError("power-domain accumulate takes no bin sums")
+    return (None,) * len(_BDPT_ACCUMULATE_BIN_SUM_ORDER)
+
+
 def _bdpt_mis_mode_id(mis: str) -> int:
     if mis == "none":
         return 0
@@ -537,6 +592,41 @@ def bdpt_endpoint_connection_visibility_inputs(
     return exported
 
 
+def _resolve_accumulate_coeffs(
+    samples: dict[str, torch.Tensor],
+    combine_domain: str,
+    coeff_real: torch.Tensor | None,
+    coeff_imag: torch.Tensor | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Validate (coherent) or synthesize (power) the phasor coefficient planes.
+
+    The coherent branch requires row-aligned ``coeff_real``/``coeff_imag`` and
+    validates them; the power branch ignores any coefficients and returns empty
+    placeholders. Split out of the forward to keep its complexity within budget.
+    """
+
+    if combine_domain != "coherent":
+        empty = torch.empty(
+            (0,), device=samples["contribution"].device, dtype=torch.float32
+        )
+        return empty, empty
+    if coeff_real is None or coeff_imag is None:
+        raise ValueError("coherent combine requires coeff_real and coeff_imag")
+    for name, tensor in (("coeff_real", coeff_real), ("coeff_imag", coeff_imag)):
+        # The coefficients arrive as .real/.imag strided views of the
+        # natively-computed complex path field; the one-time layout copy
+        # happens at the C++ ABI boundary (mc hot-path layout-copy rule),
+        # so contiguity is not required here.
+        validate_cuda_tensor(
+            name, tensor, dtype=torch.float32, ndim=1, require_contiguous=False
+        )
+        if tensor.shape != samples["contribution"].shape:
+            raise ValueError(f"{name} must match connection-sample rows")
+        if tensor.get_device() != samples["contribution"].get_device():
+            raise ValueError(f"{name} must share the connection-sample device")
+    return coeff_real, coeff_imag
+
+
 def bdpt_accumulate_connection_samples(
     samples: dict[str, torch.Tensor],
     *,
@@ -570,27 +660,9 @@ def bdpt_accumulate_connection_samples(
     combine_ids = {"power": 0, "coherent": 1}
     if combine_domain not in combine_ids:
         raise ValueError("combine_domain must be 'power' or 'coherent'")
-    if combine_domain == "coherent":
-        if coeff_real is None or coeff_imag is None:
-            raise ValueError("coherent combine requires coeff_real and coeff_imag")
-        for name, tensor in (("coeff_real", coeff_real), ("coeff_imag", coeff_imag)):
-            # The coefficients arrive as .real/.imag strided views of the
-            # natively-computed complex path field; the one-time layout copy
-            # happens at the C++ ABI boundary (mc hot-path layout-copy rule),
-            # so contiguity is not required here.
-            validate_cuda_tensor(
-                name, tensor, dtype=torch.float32, ndim=1, require_contiguous=False
-            )
-            if tensor.shape != samples["contribution"].shape:
-                raise ValueError(f"{name} must match connection-sample rows")
-            if tensor.get_device() != samples["contribution"].get_device():
-                raise ValueError(f"{name} must share the connection-sample device")
-    else:
-        empty = torch.empty(
-            (0,), device=samples["contribution"].device, dtype=torch.float32
-        )
-        coeff_real = empty
-        coeff_imag = empty
+    coeff_real, coeff_imag = _resolve_accumulate_coeffs(
+        samples, combine_domain, coeff_real, coeff_imag
+    )
     exported = _required_native_op("bdpt_accumulate_connection_samples")(
         samples,
         int(tx_count),
@@ -604,24 +676,24 @@ def bdpt_accumulate_connection_samples(
         raise TypeError(
             "_channel_native.bdpt_accumulate_connection_samples must return a dict"
         )
-    if set(exported) != {
-        "path_gain",
-        "los",
-        "reflection",
-        "diffraction",
-        "transmission",
-        "scattering",
-    }:
+    # ADR-022 spec 6.4 supervisor ruling: under combine_domain='coherent' the
+    # forward additionally returns its per-component phasor bin-sum buffers
+    # (``S_b``) as non-differentiable outputs so the coherent backward can read
+    # them without a second atomic-double reduction. The primal component
+    # matrices are unchanged bitwise; a subset check accepts the extra keys and
+    # keeps the public return the six component matrices only.
+    if not _BDPT_COMPONENT_MATRIX_FIELDS.issubset(exported):
         raise ValueError(
             "_channel_native.bdpt_accumulate_connection_samples returned unexpected fields"
         )
-    for name, tensor in exported.items():
+    for name in _BDPT_COMPONENT_MATRIX_ORDER:
+        tensor = exported[name]
         validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2)
         if tuple(tensor.shape) != (int(tx_count), int(rx_count)):
             raise ValueError(
                 f"_channel_native.bdpt_accumulate_connection_samples returned bad {name} shape"
             )
-    return exported
+    return {name: exported[name] for name in _BDPT_COMPONENT_MATRIX_ORDER}
 
 
 def bdpt_filter_connection_samples(

@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from witwin.channel_native.core.components import (
+    AD_MODES as _VALID_AD_MODES,
     BOUNCE_COMPONENTS as _BOUNCE_COMPONENTS,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
-    NO_AD_MODES as _VALID_AD_MODES,
     validated_components,
 )
 
@@ -23,15 +23,16 @@ _VALID_RECEIVER_STRATEGIES = frozenset({"grid_area", "point_sphere"})
 _VALID_ACCUMULATION_STRATEGIES = frozenset({"auto", "atomic", "staged", "compact"})
 
 
-def _validate_coherent_combine(
-    coherent: bool, components: frozenset[str], ad_mode: str
-) -> None:
+def _validate_coherent_combine(coherent: bool, components: frozenset[str]) -> None:
     """ADR-019: coherent combine is only defined for the enumerable delta/UTD
     family that carries a complex field. Refuse it loudly for the stochastic
     transmission/scattering samplers rather than silently combining Monte
-    Carlo power samples as phasors. The AD refusal mirrors ADR-017: the
-    coherent path refuses AD until its native companions exist (subsumed by
-    the release-wide ad_mode gate, kept explicit for the ADR-019 record)."""
+    Carlo power samples as phasors.
+
+    ADR-022 SUPERSEDES the former coherent+AD refusal: the coherent accumulate
+    now carries native backward/jvp companions
+    (``bdpt_accumulate_connection_samples_{backward,jvp}``, spec 6.4), so
+    coherent solves are differentiable exactly like the power-domain solves."""
     if not coherent:
         return
     refused = components & {"transmission", "scattering"}
@@ -40,8 +41,40 @@ def _validate_coherent_combine(
             "coherent combine supports only {los, reflection, diffraction} "
             f"components; refused for {sorted(refused)}"
         )
-    if ad_mode != "none":
-        raise RuntimeError("coherent combine does not support ad_mode != 'none'")
+
+
+def _validate_ad_readiness(ad_mode: str, components: frozenset[str]) -> None:
+    """ADR-022 per-feature AD readiness gate.
+
+    ``ad_mode='none'`` is the bitwise default and never builds a tape. Under
+    ``jvp``/``vjp`` every BDPT estimator block is differentiable: the frozen
+    material/EM/table/frequency/tx_power parameters ride the plan-07 field and
+    ADR-015 scattering companions plus the ADR-022 subpath / endpoint /
+    accumulate / finalize companions. ``max_scattering_order > 1`` is allowed:
+    its extra diffuse factors ride ``scattering_table_eval_ad`` and the subpath
+    ``_ad`` wrappers exactly as order 1 does. Any combination whose native
+    companions are not registered fails loudly where they are dispatched (a
+    missing-symbol error from ``runtime.required_symbol``); it is never silently
+    detached. No component combination is refused here in v1 because every
+    differentiable-parameter path has a registered companion; geometry
+    gradients through the stochastic sampler are refused at the autograd
+    boundary (``ad_geometry='enumerated_blocks_only'``), not here."""
+
+    if ad_mode == "none":
+        return
+    # Reserved for future features whose companions are not yet registered.
+    # None exist in v1, so every accepted ``ad_mode`` reaches its native
+    # companions; the readiness contract is enforced loudly at dispatch.
+
+
+def _validate_scattering_order(max_scattering_order: int) -> None:
+    """ADR-021 D4: the diffuse multi-order cap must be a positive bounce count.
+
+    Extracted to a module-level validator mirroring ``_validate_coherent_combine``
+    so ``__post_init__`` stays within its maintenance-complexity budget.
+    """
+    if max_scattering_order < 1:
+        raise ValueError("max_scattering_order must be >= 1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +84,14 @@ class Config:
     max_depth: int = 3
     max_light_depth: int | None = None
     max_diffraction_order: int = 1
+    # ADR-021 D4: maximum number of diffuse-scatter events a single BDPT light
+    # subpath may undergo. DEFAULT 1 is today's behavior BIT-IDENTICALLY: a
+    # scattered subpath emits its NEE connection and terminates (single-bounce
+    # terminal rule). >1 lifts the terminal rule so a scattered subpath
+    # continues in its sampled direction and may reflect/transmit/scatter again
+    # up to this cap, emitting an NEE row at every scatter vertex (power domain;
+    # scattering stays excluded from the ADR-019 coherent combine).
+    max_scattering_order: int = 1
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
@@ -92,6 +133,7 @@ class Config:
             raise ValueError("max_light_depth must be non-negative")
         if self.max_diffraction_order not in {0, 1}:
             raise ValueError("max_diffraction_order must be 0 or 1")
+        _validate_scattering_order(self.max_scattering_order)
         components = validated_components(
             self.components,
             error_message="components must be a non-empty subset of {valid}",
@@ -130,10 +172,12 @@ class Config:
             raise ValueError("max_exported_paths must be non-negative")
         if self.ad_mode not in _VALID_AD_MODES:
             raise ValueError(
-                "montecarlo_bdpt supports_ad=False in the first replacement release; "
-                "ad_mode must be 'none'"
+                "ad_mode must be one of "
+                f"{sorted(_VALID_AD_MODES)} (ADR-022 lifted the BDPT AD "
+                "refusal to fixed-topology jvp/vjp)"
             )
-        _validate_coherent_combine(self.coherent, components, self.ad_mode)
+        _validate_coherent_combine(self.coherent, components)
+        _validate_ad_readiness(self.ad_mode, components)
         if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
             raise ValueError("workspace_limit_bytes must be non-negative")
 

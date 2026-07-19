@@ -89,11 +89,13 @@ def test_every_solver_rejects_unknown_ad_modes(config_type, ad_mode):
 
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
-def test_bdpt_still_rejects_ad_modes(ad_mode):
-    # Plan 07 defers the BDPT gradient (coherent contributions plus
-    # material-dependent discrete event sampling) to its own later plan.
-    with pytest.raises((ValueError, RuntimeError), match="ad_mode"):
-        BdptConfig(ad_mode=ad_mode)
+def test_bdpt_now_accepts_fixed_topology_ad_modes(ad_mode):
+    # ADR-022 lifts the Plan 07 BDPT AD deferral: the solver wires native
+    # fixed-topology jvp/vjp companions, so the config accepts these modes.
+    # Unknown-mode rejection stays covered by
+    # test_every_solver_rejects_unknown_ad_modes (BdptConfig is in
+    # _CONFIG_TYPES).
+    assert BdptConfig(ad_mode=ad_mode).ad_mode == ad_mode
 
 
 def test_primal_metadata_reports_no_ad_for_every_solver():

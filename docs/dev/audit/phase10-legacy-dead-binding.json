@@ -9,8 +9,14 @@
       "definition": "src/witwin/channel_native/core/diffraction_geometry.py:27",
       "classification": "intentional",
       "decision": "retain",
-      "evidence": ["Aliased callers exist in geometry, fields, coupled, MC-basic, and BDPT pipelines."],
-      "tests": ["tests/propagation/geometry", "tests/montecarlo/basic", "tests/montecarlo/bdpt"],
+      "evidence": [
+        "Aliased callers exist in geometry, fields, coupled, MC-basic, and BDPT pipelines."
+      ],
+      "tests": [
+        "tests/propagation/geometry",
+        "tests/montecarlo/basic",
+        "tests/montecarlo/bdpt"
+      ],
       "compatibility_cycle": "not_required"
     },
     {
@@ -18,8 +24,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:13",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner for the frozen bdpt_store_point_component_column binding."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner for the frozen bdpt_store_point_component_column binding."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -27,8 +37,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:174",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner and compatibility facade export for the native binding."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner and compatibility facade export for the native binding."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -36,8 +50,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:206",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner and compatibility facade export for the native binding."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner and compatibility facade export for the native binding."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -45,8 +63,13 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:242",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner and no-fallback contract for the native binding."],
-      "tests": ["tests/kernels/test_native_loader_no_fallback.py", "tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner and no-fallback contract for the native binding."
+      ],
+      "tests": [
+        "tests/kernels/test_native_loader_no_fallback.py",
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -54,8 +77,13 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:265",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner and no-fallback contract for the native binding."],
-      "tests": ["tests/kernels/test_native_loader_no_fallback.py", "tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner and no-fallback contract for the native binding."
+      ],
+      "tests": [
+        "tests/kernels/test_native_loader_no_fallback.py",
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -63,8 +91,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:288",
       "classification": "intentional",
       "decision": "retain",
-      "evidence": ["Called by the BDPT solver and pipeline."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Called by the BDPT solver and pipeline."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "not_required"
     },
     {
@@ -72,8 +104,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:313",
       "classification": "intentional",
       "decision": "retain",
-      "evidence": ["Called by the BDPT solver and pipeline."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Called by the BDPT solver and pipeline."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "not_required"
     },
     {
@@ -81,8 +117,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py:328",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner and compatibility facade export for the native binding."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner and compatibility facade export for the native binding."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -90,8 +130,12 @@
       "definition": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py:62",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.geometry.kernels and the compatibility facade."],
-      "tests": ["tests/propagation/geometry/test_primitives.py"],
+      "evidence": [
+        "Exported by propagation.geometry.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/propagation/geometry/test_primitives.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -99,8 +143,12 @@
       "definition": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py:120",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.geometry.kernels and the compatibility facade."],
-      "tests": ["tests/propagation/geometry/test_primitives.py"],
+      "evidence": [
+        "Exported by propagation.geometry.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/propagation/geometry/test_primitives.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -108,8 +156,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py:171",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Canonical Python owner for the frozen bdpt_pack_vec3 binding."],
-      "tests": ["tests/montecarlo/bdpt/test_kernel_contracts.py"],
+      "evidence": [
+        "Canonical Python owner for the frozen bdpt_pack_vec3 binding."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -117,8 +169,12 @@
       "definition": "src/witwin/channel_native/materials/kernels/functional.py:12",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by materials.kernels and the compatibility facade."],
-      "tests": ["tests/materials/test_kernel_contracts.py"],
+      "evidence": [
+        "Exported by materials.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/materials/test_kernel_contracts.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -126,8 +182,13 @@
       "definition": "src/witwin/channel_native/propagation/fields/kernels/functional.py:739",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.fields and paired with the AD owner."],
-      "tests": ["tests/propagation/fields/test_functional_kernels.py", "tests/ad/test_solver_diffraction_coupled_ad.py"],
+      "evidence": [
+        "Exported by propagation.fields and paired with the AD owner."
+      ],
+      "tests": [
+        "tests/propagation/fields/test_functional_kernels.py",
+        "tests/ad/test_solver_diffraction_coupled_ad.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -135,8 +196,12 @@
       "definition": "src/witwin/channel_native/propagation/topology/kernels/blocks.py:247",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.topology.kernels and the compatibility facade."],
-      "tests": ["tests/propagation/topology/test_blocks.py"],
+      "evidence": [
+        "Exported by propagation.topology.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/propagation/topology/test_blocks.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -144,8 +209,12 @@
       "definition": "src/witwin/channel_native/propagation/topology/kernels/blocks.py:299",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.topology.kernels and the compatibility facade."],
-      "tests": ["tests/propagation/topology/test_blocks.py"],
+      "evidence": [
+        "Exported by propagation.topology.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/propagation/topology/test_blocks.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -153,8 +222,12 @@
       "definition": "src/witwin/channel_native/propagation/topology/kernels/candidates.py:63",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.topology.kernels and the compatibility facade."],
-      "tests": ["tests/propagation/topology/test_candidates.py"],
+      "evidence": [
+        "Exported by propagation.topology.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/propagation/topology/test_candidates.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -162,8 +235,12 @@
       "definition": "src/witwin/channel_native/propagation/topology/kernels/blocks.py:372",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Exported by propagation.topology.kernels and the compatibility facade."],
-      "tests": ["tests/propagation/topology/test_blocks.py"],
+      "evidence": [
+        "Exported by propagation.topology.kernels and the compatibility facade."
+      ],
+      "tests": [
+        "tests/propagation/topology/test_blocks.py"
+      ],
       "compatibility_cycle": "core.kernels.ops release cycle"
     },
     {
@@ -171,8 +248,12 @@
       "definition": "src/witwin/channel_native/materials/encoding.py:53",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Reachable through the core.material_runtime compatibility module."],
-      "tests": ["tests/physics/test_material_abi_v3.py"],
+      "evidence": [
+        "Reachable through the core.material_runtime compatibility module."
+      ],
+      "tests": [
+        "tests/physics/test_material_abi_v3.py"
+      ],
       "compatibility_cycle": "legacy material_runtime import cycle"
     },
     {
@@ -180,8 +261,13 @@
       "definition": "src/witwin/channel_native/propagation/geometry/visibility.py:46",
       "classification": "intentional",
       "decision": "retain_until_compatibility_cycle",
-      "evidence": ["core.path_topology compatibility re-export and frozen owner tests."],
-      "tests": ["tests/propagation/geometry/test_visibility.py", "tests/propagation/enumerated/test_los_owner.py"],
+      "evidence": [
+        "core.path_topology compatibility re-export and frozen owner tests."
+      ],
+      "tests": [
+        "tests/propagation/geometry/test_visibility.py",
+        "tests/propagation/enumerated/test_los_owner.py"
+      ],
       "compatibility_cycle": "one release cycle; delete in Phase 12"
     },
     {
@@ -189,8 +275,13 @@
       "definition": "src/witwin/channel_native/propagation/geometry/reevaluate.py:25",
       "classification": "intentional",
       "decision": "retain_until_compatibility_cycle",
-      "evidence": ["core.path_topology compatibility re-export and frozen owner/hash tests."],
-      "tests": ["tests/propagation/geometry/test_reevaluate_compat.py", "tests/propagation/enumerated/test_reflection_owner.py"],
+      "evidence": [
+        "core.path_topology compatibility re-export and frozen owner/hash tests."
+      ],
+      "tests": [
+        "tests/propagation/geometry/test_reevaluate_compat.py",
+        "tests/propagation/enumerated/test_reflection_owner.py"
+      ],
       "compatibility_cycle": "one release cycle; delete in Phase 12"
     },
     {
@@ -198,8 +289,12 @@
       "definition": "src/witwin/channel_native/deployment.py:140",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deployment API; absence of an internal caller is not dead-code evidence."],
-      "tests": ["tests/performance/test_deployment_contract.py"],
+      "evidence": [
+        "Non-private deployment API; absence of an internal caller is not dead-code evidence."
+      ],
+      "tests": [
+        "tests/performance/test_deployment_contract.py"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -207,8 +302,12 @@
       "definition": "src/witwin/channel_native/deterministic/accumulation.py:46",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deterministic helper; retain pending explicit API deprecation."],
-      "tests": ["tests/deterministic"],
+      "evidence": [
+        "Non-private deterministic helper; retain pending explicit API deprecation."
+      ],
+      "tests": [
+        "tests/deterministic"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -216,8 +315,12 @@
       "definition": "src/witwin/channel_native/deterministic/field.py:14",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deterministic field API."],
-      "tests": ["tests/deterministic"],
+      "evidence": [
+        "Non-private deterministic field API."
+      ],
+      "tests": [
+        "tests/deterministic"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -225,8 +328,12 @@
       "definition": "src/witwin/channel_native/deterministic/field.py:31",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deterministic field API."],
-      "tests": ["tests/deterministic"],
+      "evidence": [
+        "Non-private deterministic field API."
+      ],
+      "tests": [
+        "tests/deterministic"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -234,8 +341,12 @@
       "definition": "src/witwin/channel_native/deterministic/field.py:36",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deterministic field API."],
-      "tests": ["tests/deterministic"],
+      "evidence": [
+        "Non-private deterministic field API."
+      ],
+      "tests": [
+        "tests/deterministic"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -244,7 +355,9 @@
       "classification": "dead",
       "decision": "removed",
       "status": "removed",
-      "evidence": ["Private fail-loud stub has no static, dynamic, binding, or public caller."],
+      "evidence": [
+        "Private fail-loud stub has no static, dynamic, binding, or public caller."
+      ],
       "tests": [
         "tests/deterministic",
         "tests/acceptance",
@@ -257,8 +370,12 @@
       "definition": "src/witwin/channel_native/deterministic/field.py:68",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deterministic field API."],
-      "tests": ["tests/deterministic"],
+      "evidence": [
+        "Non-private deterministic field API."
+      ],
+      "tests": [
+        "tests/deterministic"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -266,8 +383,12 @@
       "definition": "src/witwin/channel_native/deterministic/field.py:97",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private deterministic field API."],
-      "tests": ["tests/deterministic"],
+      "evidence": [
+        "Non-private deterministic field API."
+      ],
+      "tests": [
+        "tests/deterministic"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -275,8 +396,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/mis.py:18",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private BDPT MIS API; native canonical replacement does not authorize removal."],
-      "tests": ["tests/montecarlo/bdpt/test_mis_weights.py"],
+      "evidence": [
+        "Non-private BDPT MIS API; native canonical replacement does not authorize removal."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt/test_mis_weights.py"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -285,8 +410,13 @@
       "classification": "dead",
       "decision": "removed",
       "status": "removed",
-      "evidence": ["Private superseded grid-map implementation has no static, dynamic, binding, or public caller."],
-      "tests": ["tests/montecarlo/bdpt", "tests/acceptance"],
+      "evidence": [
+        "Private superseded grid-map implementation has no static, dynamic, binding, or public caller."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt",
+        "tests/acceptance"
+      ],
       "compatibility_cycle": "not_required"
     },
     {
@@ -294,8 +424,12 @@
       "definition": "src/witwin/channel_native/montecarlo/bdpt/subpaths.py:35",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Non-private typed SubpathState constructor API."],
-      "tests": ["tests/montecarlo/bdpt"],
+      "evidence": [
+        "Non-private typed SubpathState constructor API."
+      ],
+      "tests": [
+        "tests/montecarlo/bdpt"
+      ],
       "compatibility_cycle": "deprecate before removal"
     },
     {
@@ -303,22 +437,30 @@
       "definition": "src/witwin/channel_native/scattering/energy.py:31",
       "classification": "public",
       "decision": "retain",
-      "evidence": ["Explicitly exported by scattering.energy.__all__."],
-      "tests": ["tests/scattering"],
+      "evidence": [
+        "Explicitly exported by scattering.energy.__all__."
+      ],
+      "tests": [
+        "tests/scattering"
+      ],
       "compatibility_cycle": "deprecate before removal"
     }
   ],
   "binding_ownership": {
-    "expected_count": 193,
+    "expected_count": 211,
     "baseline": "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/bindings.json",
     "evidence": {
       "kind": "python_source_reference",
-      "roots": ["src/witwin/channel_native"],
+      "roots": [
+        "src/witwin/channel_native"
+      ],
       "minimum_references_per_symbol": 1,
       "note": "The audit test requires every frozen binding name to have a Python owner reference; bindings are not inferred from tests alone."
     },
     "symbols": [
       "bdpt_accumulate_connection_samples",
+      "bdpt_accumulate_connection_samples_backward",
+      "bdpt_accumulate_connection_samples_jvp",
       "bdpt_apply_los_visibility",
       "bdpt_compact_connection_samples",
       "bdpt_component_map_buffer",
@@ -335,13 +477,19 @@
       "bdpt_diffraction_state_wi",
       "bdpt_empty_subpath_state",
       "bdpt_endpoint_connection_samples",
+      "bdpt_endpoint_connection_samples_backward",
+      "bdpt_endpoint_connection_samples_jvp",
       "bdpt_endpoint_connection_visibility_inputs",
       "bdpt_endpoint_subpath_state",
       "bdpt_face_material_tensors",
       "bdpt_face_material_tensors_from_host",
       "bdpt_filter_connection_samples",
       "bdpt_finalize_component_maps",
+      "bdpt_finalize_component_maps_backward",
+      "bdpt_finalize_component_maps_jvp",
       "bdpt_finalize_point_components",
+      "bdpt_finalize_point_components_backward",
+      "bdpt_finalize_point_components_jvp",
       "bdpt_intersect_forward",
       "bdpt_launch_state",
       "bdpt_los_component_maps",
@@ -353,6 +501,8 @@
       "bdpt_point_component_power",
       "bdpt_receiver_grid_points",
       "bdpt_reflected_light_subpath_state",
+      "bdpt_reflected_light_subpath_state_backward",
+      "bdpt_reflected_light_subpath_state_jvp",
       "bdpt_reflection_accumulation_forward",
       "bdpt_reflection_launch_inputs",
       "bdpt_sample_directions",
@@ -363,6 +513,8 @@
       "bdpt_subpath_intersection_inputs",
       "bdpt_surface_group_edge_candidates",
       "bdpt_transmitted_light_subpath_state",
+      "bdpt_transmitted_light_subpath_state_backward",
+      "bdpt_transmitted_light_subpath_state_jvp",
       "bdpt_transmitter_tensors",
       "bdpt_visibility_forward",
       "bdpt_zero_matrix",
@@ -499,6 +651,12 @@
       "raydn_trace_reflections_forward",
       "raydn_trace_reflections_forward_tape",
       "raydn_trace_reflections_jvp",
+      "scattering_chain_ensemble_eval",
+      "scattering_chain_ensemble_eval_backward",
+      "scattering_chain_ensemble_eval_jvp",
+      "scattering_chain_realization_eval",
+      "scattering_chain_realization_eval_backward",
+      "scattering_chain_realization_eval_jvp",
       "scattering_ensemble_eval",
       "scattering_ensemble_eval_backward",
       "scattering_ensemble_eval_jvp",
@@ -743,7 +901,9 @@
       "classification": "compute_path",
       "decision": "resolved",
       "status": "resolved",
-      "tests": ["tests/scene/test_compile_owner.py"]
+      "tests": [
+        "tests/scene/test_compile_owner.py"
+      ]
     }
   }
 }

@@ -49,6 +49,19 @@ FUNCTIONS_BY_UNIT = {
         "bdpt_connection_variance_finalize_double_kernel",
         "cn_bdpt_accumulate_connection_samples_cuda",
         "cn_bdpt_connection_variance_cuda",
+        # ADR-019 coherent combine + ADR-022 coherent/power AD companions and
+        # their private accumulate helpers, all owned by this accumulate TU.
+        "bdpt_accumulate_connection_samples_coherent_kernel",
+        "bdpt_finalize_coherent_accumulation_kernel",
+        "bdpt_accumulate_power_backward_kernel",
+        "bdpt_accumulate_power_jvp_kernel",
+        "bdpt_accumulate_coherent_backward_kernel",
+        "bdpt_accumulate_coherent_jvp_kernel",
+        "cn_bdpt_accumulate_connection_samples_backward_cuda",
+        "cn_bdpt_accumulate_connection_samples_jvp_cuda",
+        "accumulate_optional",
+        "accumulate_ptr",
+        "bdpt_component_matrix",
     },
 }
 COMMON_HELPERS = {
@@ -104,7 +117,8 @@ def test_bdpt_functions_have_one_physical_translation_unit_owner() -> None:
         assert names[relative] == expected
 
     all_abi = set().union(*ABI_BY_UNIT.values())
-    assert len(all_abi) == 11
+    # ADR-022 added the accumulate backward/jvp ABI companions (11 -> 13).
+    assert len(all_abi) == 13
     for unit, expected in ABI_BY_UNIT.items():
         relative = f"native/channel_native/kernels/{unit}"
         assert expected == (all_abi & names[relative])
@@ -146,7 +160,9 @@ def test_bdpt_split_preserves_launch_and_sync_multisets() -> None:
     )
 
     assert actual_launches == expected_launches
-    assert sum(actual_launches.values()) == 17
+    # ADR-019 coherent (2) + ADR-022 coherent/power AD (4) launches on the
+    # accumulate TU lifted the total from 17 to 23; syncs are unchanged.
+    assert sum(actual_launches.values()) == 23
     assert combined.count("cudaStreamSynchronize(") == 2
     assert {
         unit: (
@@ -158,7 +174,7 @@ def test_bdpt_split_preserves_launch_and_sync_multisets() -> None:
         "bdpt_connect_mis.cu": (1, 0),
         "bdpt_connect_samples.cu": (3, 0),
         "bdpt_connect_visibility.cu": (6, 2),
-        "bdpt_connect_accumulation.cu": (7, 0),
+        "bdpt_connect_accumulation.cu": (13, 0),
     }
 
 

@@ -470,6 +470,7 @@ Python_add_library(
     native/channel_native/binding/bdpt.cpp
     native/channel_native/build_info.cpp
     native/channel_native/bdpt.cpp
+    native/channel_native/bdpt_ad_dispatch.cpp
     native/channel_native/rayd/common.cpp
     native/channel_native/rayd/scene.cpp
     native/channel_native/rayd/geometry.cpp
@@ -481,8 +482,11 @@ Python_add_library(
     native/channel_native/kernels/bdpt_connect_samples.cu
     native/channel_native/kernels/bdpt_connect_visibility.cu
     native/channel_native/kernels/bdpt_connect_accumulation.cu
+    native/channel_native/kernels/bdpt_connect_ad.cu
     native/channel_native/kernels/bdpt_sampling.cu
     native/channel_native/kernels/bdpt_subpaths.cu
+    native/channel_native/kernels/bdpt_subpaths_ad.cu
+    native/channel_native/kernels/bdpt_maps.cu
     native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/em_debug.cu
     native/channel_native/kernels/field_transport.cu
@@ -509,6 +513,10 @@ Python_add_library(
     native/channel_native/kernels/scattering.cu
     native/channel_native/kernels/scattering_ensemble.cu
     native/channel_native/kernels/scattering_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_ensemble.cu
+    native/channel_native/kernels/scattering_chain_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_realization.cu
+    native/channel_native/kernels/scattering_chain_realization_ad.cu
     native/channel_native/kernels/scattering_patch_integral.cu
     native/channel_native/kernels/scattering_patch_integral_ad.cu
     native/channel_native/kernels/scattering_table_eval_ad.cu
@@ -537,6 +545,10 @@ set_source_files_properties(
     native/channel_native/kernels/kirchhoff_table_ad.cu
     native/channel_native/kernels/scattering_ensemble.cu
     native/channel_native/kernels/scattering_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_ensemble.cu
+    native/channel_native/kernels/scattering_chain_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_realization.cu
+    native/channel_native/kernels/scattering_chain_realization_ad.cu
     native/channel_native/kernels/scattering_patch_integral.cu
     native/channel_native/kernels/scattering_patch_integral_ad.cu
     native/channel_native/kernels/scattering_table_eval_ad.cu

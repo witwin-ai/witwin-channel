@@ -19,6 +19,53 @@ _DEPTH_CAPPED_COMPONENTS = frozenset({"reflection", "transmission"})
 _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
 _VALID_MAX_PATHS_SCOPES = frozenset({"global", "per_pair"})
 _MAX_COUPLED_CANDIDATES = 1_000_000
+# ADR-021 D1 chain-depth cap: each specular leg is bounded by the native
+# kMaxAdDepth = 8, so the public cap on d1 + d2 is 2 * 8 = 16.
+_MAX_SCATTER_CHAIN_DEPTH = 16
+
+
+def _validate_scatter_chain(
+    *,
+    max_depth: int,
+    samples_per_m2: float,
+    max_rows: int,
+    components: frozenset[str],
+) -> None:
+    """Validate the ADR-021 D1 enumerated scatter-chain config (shared)."""
+
+    if max_depth < 0:
+        raise ValueError("scattering_chain_max_depth must be non-negative")
+    if max_depth > _MAX_SCATTER_CHAIN_DEPTH:
+        raise ValueError(
+            "scattering_chain_max_depth cannot exceed 16 (2 * kMaxAdDepth); each "
+            "specular leg is bounded by the native kMaxAdDepth = 8"
+        )
+    if samples_per_m2 <= 0.0:
+        raise ValueError("scattering_chain_samples_per_m2 must be positive")
+    if max_rows <= 0:
+        raise ValueError("scattering_chain_max_rows must be positive")
+    if max_depth >= 1 and "scattering" not in components:
+        raise RuntimeError(
+            "scattering_chain_max_depth >= 1 requires the 'scattering' component "
+            "(ADR-021 D1 appends component_id=6 scatter-chain rows)"
+        )
+
+
+def _validate_scattering_coherent(
+    *, scattering_coherent: bool, components: frozenset[str]
+) -> None:
+    """Validate the ADR-021 D3 coherent-scattering combine precondition."""
+
+    if scattering_coherent and "scattering" not in components:
+        # ADR-021 D3: the coherent combine only applies to scattering rows.
+        # The scene-level requirement (realization-coherent phase screens,
+        # not ensemble surfaces) is enforced at solve time where the scene
+        # is known; here we reject the config-level precondition loudly.
+        raise RuntimeError(
+            "scattering_coherent=True requires the 'scattering' component "
+            "(ADR-021 D3 combines scattering rows coherently and has no "
+            "effect on any other component)"
+        )
 
 
 def _validate_isb_boundary_taper(width: float) -> None:
@@ -86,6 +133,27 @@ class Config:
     scattering_samples_per_m2: float = 8.0
     scattering_max_paths_per_pair: int = 4096
     scattering_power_threshold: float = 0.0
+    # Coherent scattering combine (ADR-021 D3). DEFAULT-OFF opt-in. OFF keeps
+    # the scattering slot an incoherent POWER sum bit-identical to today; ON
+    # sums the complex path_field of scattering rows per (tx, rx) and finalizes
+    # |sum|^2 (the ADR-019 per-component phasor precedent). It is physical only
+    # for realization-coherent phase-screen rows, which carry a true complex
+    # field; ensemble rows are zero-phase power rows, so the pipeline refuses an
+    # ensemble-only solve loudly. Requires the 'scattering' component.
+    scattering_coherent: bool = False
+    # Enumerated scatter-chain path class (ADR-021 D1). DEFAULT-OFF opt-in:
+    # scattering_chain_max_depth = 0 disables chain discovery so the pipeline is
+    # byte-identical to today. When >= 1 it is the cap on d1 + d2, the combined
+    # specular reflection depth of the two legs around the single diffuse vertex
+    # (TX --C1(d1)--> v_s --C2(d2)--> RX with 1 <= d1 + d2 <= cap). Each leg is
+    # independently bounded by the native kMaxAdDepth = 8, so the public cap is
+    # 2 * 8 = 16. The chain-sample vertices are drawn at a documented lower
+    # density (scattering_chain_samples_per_m2) than the single-bounce sampler,
+    # and only the strongest scattering_chain_max_rows joined rows per (tx, rx)
+    # survive. Requires the 'scattering' component.
+    scattering_chain_max_depth: int = 0
+    scattering_chain_samples_per_m2: float = 2.0
+    scattering_chain_max_rows: int = 256
     # ISB boundary taper (ADR-017). DEFAULT-OFF visual-continuity heuristic: the
     # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
     # and the compensating order-1 diffraction odd step spreads over the same
@@ -115,6 +183,15 @@ class Config:
         components = validated_components(
             self.components,
             error_message="components must be a non-empty subset of {valid}",
+        )
+        _validate_scattering_coherent(
+            scattering_coherent=self.scattering_coherent, components=components
+        )
+        _validate_scatter_chain(
+            max_depth=self.scattering_chain_max_depth,
+            samples_per_m2=self.scattering_chain_samples_per_m2,
+            max_rows=self.scattering_chain_max_rows,
+            components=components,
         )
         if self.max_depth > 5 and components & _DEPTH_CAPPED_COMPONENTS:
             raise RuntimeError(

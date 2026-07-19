@@ -317,7 +317,8 @@ pybind11::dict cn_deterministic_accumulate_flat(
     torch::Tensor field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent);
+    bool coherent,
+    int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_accumulate_flat_fwd64(
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -327,7 +328,8 @@ pybind11::dict cn_deterministic_accumulate_flat_fwd64(
     torch::Tensor field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent);
+    bool coherent,
+    int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_accumulate_flat_backward(
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -345,7 +347,8 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
     pybind11::object grad_component_field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent);
+    bool coherent,
+    int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_accumulate_flat_jvp(
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -358,7 +361,8 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
     pybind11::object tangent_field_imag,
     int64_t num_tx,
     int64_t num_rx,
-    bool coherent);
+    bool coherent,
+    int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_component_counts(torch::Tensor component_id);
 int64_t cn_deterministic_selected_edge_count(torch::Tensor edge_id);
 
@@ -569,17 +573,68 @@ void register_path_deterministic(pybind11::module_ &module) {
     module.def(
         "deterministic_accumulate_flat",
         &cn_deterministic_accumulate_flat,
-        "Accumulate deterministic flat path fields into per-component maps with a CUDA kernel.");
+        "Accumulate deterministic flat path fields into per-component maps with a CUDA kernel.",
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("component_id"),
+        pybind11::arg("path_gain"),
+        pybind11::arg("field_real"),
+        pybind11::arg("field_imag"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("coherent"),
+        pybind11::arg("scattering_combine_domain") = 0);
     module.def(
         "deterministic_accumulate_flat_fwd64",
         &cn_deterministic_accumulate_flat_fwd64,
-        "Float64 flat accumulation forward for the strict gradcheck AD path.");
+        "Float64 flat accumulation forward for the strict gradcheck AD path.",
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("component_id"),
+        pybind11::arg("path_gain"),
+        pybind11::arg("field_real"),
+        pybind11::arg("field_imag"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("coherent"),
+        pybind11::arg("scattering_combine_domain") = 0);
     module.def(
         "deterministic_accumulate_flat_backward",
         &cn_deterministic_accumulate_flat_backward,
-        "Fixed-gate VJP of the flat accumulation (per-path field and power cotangents).");
+        "Fixed-gate VJP of the flat accumulation (per-path field and power cotangents).",
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("component_id"),
+        pybind11::arg("component_field_real"),
+        pybind11::arg("component_field_imag"),
+        pybind11::arg("field_total_real"),
+        pybind11::arg("field_total_imag"),
+        pybind11::arg("power_total"),
+        pybind11::arg("grad_power_total"),
+        pybind11::arg("grad_field_total_real"),
+        pybind11::arg("grad_field_total_imag"),
+        pybind11::arg("grad_component_power"),
+        pybind11::arg("grad_component_field_real"),
+        pybind11::arg("grad_component_field_imag"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("coherent"),
+        pybind11::arg("scattering_combine_domain") = 0);
     module.def(
         "deterministic_accumulate_flat_jvp",
         &cn_deterministic_accumulate_flat_jvp,
-        "Fixed-gate JVP of the flat accumulation (per-path field and power tangents).");
+        "Fixed-gate JVP of the flat accumulation (per-path field and power tangents).",
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("component_id"),
+        pybind11::arg("component_field_real"),
+        pybind11::arg("component_field_imag"),
+        pybind11::arg("power_total"),
+        pybind11::arg("tangent_path_gain"),
+        pybind11::arg("tangent_field_real"),
+        pybind11::arg("tangent_field_imag"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("coherent"),
+        pybind11::arg("scattering_combine_domain") = 0);
 }

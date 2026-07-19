@@ -35,7 +35,11 @@ EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # + 4 ADR-014 native scattering JVP/VJP companions: 185 -> 189.
 # + 4 ADR-015 native scattering table-eval / table-build JVP/VJP companions:
 # 189 -> 193.
-EXPECTED_NATIVE_BINDING_COUNT = 193
+# + 6 ADR-021 multi-bounce chain scattering symbols (Op A/Op B forwards
+# scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
+# _backward/_jvp companions): 193 -> 199;
+# ADR-022 added the 12 BDPT fixed-topology AD companions: 199 -> 211.
+EXPECTED_NATIVE_BINDING_COUNT = 211
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",

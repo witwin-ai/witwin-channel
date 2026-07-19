@@ -233,6 +233,200 @@ pybind11::dict cn_bdpt_face_material_tensors_from_host(
     pybind11::sequence material_mu_r,
     pybind11::sequence face_material_id);
 
+// ADR-022 BDPT fixed-topology AD companions. The dispatch wrappers unpack the
+// subpath/intersection/light/sensor dicts; the accumulate pair unpacks the
+// connection-sample dict directly. All are defined in bdpt.cpp.
+pybind11::dict cn_bdpt_reflected_light_subpath_state_backward_dispatch(
+    pybind11::dict light,
+    pybind11::dict intersection,
+    torch::Tensor material_gain,
+    torch::Tensor material_valid,
+    torch::Tensor material_eps_r,
+    torch::Tensor material_sigma_e,
+    torch::Tensor material_mu_r,
+    torch::Tensor material_thickness,
+    double frequency_hz,
+    pybind11::object grad_field_real,
+    pybind11::object grad_field_imag,
+    pybind11::object grad_throughput_real,
+    pybind11::object grad_throughput_imag,
+    bool need_grad_material,
+    bool need_grad_field_in,
+    bool need_grad_frequency);
+pybind11::dict cn_bdpt_reflected_light_subpath_state_jvp_dispatch(
+    pybind11::dict light,
+    pybind11::dict intersection,
+    torch::Tensor material_gain,
+    torch::Tensor material_valid,
+    torch::Tensor material_eps_r,
+    torch::Tensor material_sigma_e,
+    torch::Tensor material_mu_r,
+    torch::Tensor material_thickness,
+    double frequency_hz,
+    pybind11::object tangent_eps_r,
+    pybind11::object tangent_sigma_e,
+    pybind11::object tangent_gain,
+    pybind11::object tangent_thickness,
+    double tangent_frequency,
+    pybind11::object tangent_light_field_real,
+    pybind11::object tangent_light_field_imag,
+    pybind11::object tangent_light_throughput_real,
+    pybind11::object tangent_light_throughput_imag);
+pybind11::dict cn_bdpt_transmitted_light_subpath_state_backward_dispatch(
+    pybind11::dict light,
+    pybind11::dict intersection,
+    torch::Tensor face_material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz,
+    pybind11::object grad_field_real,
+    pybind11::object grad_field_imag,
+    pybind11::object grad_throughput_real,
+    pybind11::object grad_throughput_imag,
+    bool need_grad_layers,
+    bool need_grad_field_in,
+    bool need_grad_frequency);
+pybind11::dict cn_bdpt_transmitted_light_subpath_state_jvp_dispatch(
+    pybind11::dict light,
+    pybind11::dict intersection,
+    torch::Tensor face_material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz,
+    pybind11::object tangent_layer_thickness,
+    pybind11::object tangent_layer_eps_r,
+    pybind11::object tangent_layer_sigma_e,
+    double tangent_frequency,
+    pybind11::object tangent_light_field_real,
+    pybind11::object tangent_light_field_imag,
+    pybind11::object tangent_light_throughput_real,
+    pybind11::object tangent_light_throughput_imag);
+pybind11::dict cn_bdpt_endpoint_connection_samples_backward_dispatch(
+    pybind11::dict light,
+    pybind11::dict sensor,
+    double frequency_hz,
+    int64_t samples_per_tx,
+    int64_t mode_id,
+    double beta,
+    int64_t strategy_count,
+    int64_t max_paths,
+    torch::Tensor grad_contribution,
+    bool need_grad_field,
+    bool need_grad_frequency,
+    bool need_grad_tx_power);
+pybind11::dict cn_bdpt_endpoint_connection_samples_jvp_dispatch(
+    pybind11::dict light,
+    pybind11::dict sensor,
+    double frequency_hz,
+    int64_t samples_per_tx,
+    int64_t mode_id,
+    double beta,
+    int64_t strategy_count,
+    int64_t max_paths,
+    pybind11::object tangent_light_field_real,
+    pybind11::object tangent_light_field_imag,
+    pybind11::object tangent_sensor_field_real,
+    pybind11::object tangent_sensor_field_imag,
+    double tangent_frequency,
+    pybind11::object tangent_tx_power);
+pybind11::dict cn_bdpt_accumulate_connection_samples_backward(
+    pybind11::dict samples,
+    int64_t tx_count,
+    int64_t rx_count,
+    int64_t combine_domain,
+    pybind11::object grad_path_gain,
+    pybind11::object grad_los,
+    pybind11::object grad_reflection,
+    pybind11::object grad_diffraction,
+    pybind11::object grad_transmission,
+    pybind11::object grad_scattering,
+    pybind11::object los_re,
+    pybind11::object los_im,
+    pybind11::object reflection_re,
+    pybind11::object reflection_im,
+    pybind11::object diffraction_re,
+    pybind11::object diffraction_im,
+    pybind11::object transmission_re,
+    pybind11::object transmission_im,
+    pybind11::object scattering_re,
+    pybind11::object scattering_im,
+    bool need_grad_contribution,
+    bool need_grad_coeff);
+pybind11::dict cn_bdpt_accumulate_connection_samples_jvp(
+    pybind11::dict samples,
+    int64_t tx_count,
+    int64_t rx_count,
+    int64_t combine_domain,
+    pybind11::object tangent_contribution,
+    pybind11::object tangent_coeff_real,
+    pybind11::object tangent_coeff_imag,
+    pybind11::object los_re,
+    pybind11::object los_im,
+    pybind11::object reflection_re,
+    pybind11::object reflection_im,
+    pybind11::object diffraction_re,
+    pybind11::object diffraction_im,
+    pybind11::object transmission_re,
+    pybind11::object transmission_im,
+    pybind11::object scattering_re,
+    pybind11::object scattering_im);
+pybind11::dict cn_bdpt_finalize_point_components_backward_dispatch(
+    torch::Tensor los,
+    torch::Tensor reflection,
+    torch::Tensor diffraction,
+    torch::Tensor transmission,
+    torch::Tensor scattering,
+    pybind11::object grad_path_gain,
+    pybind11::object grad_los_power,
+    pybind11::object grad_reflection_power,
+    pybind11::object grad_diffraction_power,
+    pybind11::object grad_transmission_power,
+    pybind11::object grad_scattering_power,
+    bool need_grad_components);
+pybind11::dict cn_bdpt_finalize_point_components_jvp_dispatch(
+    torch::Tensor los,
+    torch::Tensor reflection,
+    torch::Tensor diffraction,
+    torch::Tensor transmission,
+    torch::Tensor scattering,
+    pybind11::object tangent_los,
+    pybind11::object tangent_reflection,
+    pybind11::object tangent_diffraction,
+    pybind11::object tangent_transmission,
+    pybind11::object tangent_scattering);
+pybind11::dict cn_bdpt_finalize_component_maps_backward_dispatch(
+    torch::Tensor los,
+    torch::Tensor reflection,
+    torch::Tensor diffraction,
+    torch::Tensor transmission,
+    torch::Tensor scattering,
+    pybind11::object grad_path_gain,
+    pybind11::object grad_los_power,
+    pybind11::object grad_reflection_power,
+    pybind11::object grad_diffraction_power,
+    pybind11::object grad_transmission_power,
+    pybind11::object grad_scattering_power,
+    bool need_grad_components);
+pybind11::dict cn_bdpt_finalize_component_maps_jvp_dispatch(
+    torch::Tensor los,
+    torch::Tensor reflection,
+    torch::Tensor diffraction,
+    torch::Tensor transmission,
+    torch::Tensor scattering,
+    pybind11::object tangent_los,
+    pybind11::object tangent_reflection,
+    pybind11::object tangent_diffraction,
+    pybind11::object tangent_transmission,
+    pybind11::object tangent_scattering);
+
 void register_bdpt_subpaths(pybind11::module_ &module) {
     module.def(
         "bdpt_launch_state",
@@ -258,6 +452,22 @@ void register_bdpt_subpaths(pybind11::module_ &module) {
         "bdpt_transmitted_light_subpath_state",
         &cn_bdpt_transmitted_light_subpath_state,
         "Continue BDPT light subpaths through thin_sheet walls with CUDA layer-stack transmission.");
+    module.def(
+        "bdpt_reflected_light_subpath_state_backward",
+        &cn_bdpt_reflected_light_subpath_state_backward_dispatch,
+        "ADR-022 VJP of BDPT reflected light subpath advance (native CUDA companion).");
+    module.def(
+        "bdpt_reflected_light_subpath_state_jvp",
+        &cn_bdpt_reflected_light_subpath_state_jvp_dispatch,
+        "ADR-022 JVP of BDPT reflected light subpath advance (native CUDA companion).");
+    module.def(
+        "bdpt_transmitted_light_subpath_state_backward",
+        &cn_bdpt_transmitted_light_subpath_state_backward_dispatch,
+        "ADR-022 VJP of BDPT transmitted light subpath advance (native CUDA companion).");
+    module.def(
+        "bdpt_transmitted_light_subpath_state_jvp",
+        &cn_bdpt_transmitted_light_subpath_state_jvp_dispatch,
+        "ADR-022 JVP of BDPT transmitted light subpath advance (native CUDA companion).");
 }
 
 void register_bdpt_connections(pybind11::module_ &module) {
@@ -280,6 +490,22 @@ void register_bdpt_connections(pybind11::module_ &module) {
         pybind11::arg("combine_domain") = 0,
         pybind11::arg("coeff_real") = torch::Tensor(),
         pybind11::arg("coeff_imag") = torch::Tensor());
+    module.def(
+        "bdpt_endpoint_connection_samples_backward",
+        &cn_bdpt_endpoint_connection_samples_backward_dispatch,
+        "ADR-022 VJP of BDPT endpoint connection samples (native CUDA companion).");
+    module.def(
+        "bdpt_endpoint_connection_samples_jvp",
+        &cn_bdpt_endpoint_connection_samples_jvp_dispatch,
+        "ADR-022 JVP of BDPT endpoint connection samples (native CUDA companion).");
+    module.def(
+        "bdpt_accumulate_connection_samples_backward",
+        &cn_bdpt_accumulate_connection_samples_backward,
+        "ADR-022 VJP of BDPT connection-sample accumulation (native CUDA companion).");
+    module.def(
+        "bdpt_accumulate_connection_samples_jvp",
+        &cn_bdpt_accumulate_connection_samples_jvp,
+        "ADR-022 JVP of BDPT connection-sample accumulation (native CUDA companion).");
     module.def(
         "bdpt_filter_connection_samples",
         &cn_bdpt_filter_connection_samples,
@@ -339,6 +565,22 @@ void register_bdpt_components(pybind11::module_ &module) {
         "bdpt_finalize_component_maps",
         &cn_bdpt_finalize_component_maps,
         "Fuse BDPT component maps and component power reductions.");
+    module.def(
+        "bdpt_finalize_point_components_backward",
+        &cn_bdpt_finalize_point_components_backward_dispatch,
+        "ADR-022 VJP of the BDPT point-receiver finalize map (native CUDA companion).");
+    module.def(
+        "bdpt_finalize_point_components_jvp",
+        &cn_bdpt_finalize_point_components_jvp_dispatch,
+        "ADR-022 JVP of the BDPT point-receiver finalize map (native CUDA companion).");
+    module.def(
+        "bdpt_finalize_component_maps_backward",
+        &cn_bdpt_finalize_component_maps_backward_dispatch,
+        "ADR-022 VJP of the BDPT component-map finalize (native CUDA companion).");
+    module.def(
+        "bdpt_finalize_component_maps_jvp",
+        &cn_bdpt_finalize_component_maps_jvp_dispatch,
+        "ADR-022 JVP of the BDPT component-map finalize (native CUDA companion).");
     module.def(
         "bdpt_component_map_buffer",
         &cn_bdpt_component_map_buffer,
