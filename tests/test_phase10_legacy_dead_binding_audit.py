@@ -78,8 +78,11 @@ def test_phase10_binding_inventory_covers_all_current_symbols_and_python_owners(
     # + 4 ADR-015 scattering table-eval / table-build JVP/VJP companions = 193.
     # + 6 ADR-021 multi-bounce chain scattering symbols (Op A/Op B forwards plus
     # their _backward/_jvp companions) = 199.
-    assert ownership["expected_count"] == 199
-    assert len(audited_names) == len(set(audited_names)) == 199
+    # + 12 ADR-022 BDPT fixed-topology AD companions (subpath reflect/transmit
+    # state, endpoint connection, accumulate, finalize point/maps, each
+    # _backward + _jvp) = 211.
+    assert ownership["expected_count"] == 211
+    assert len(audited_names) == len(set(audited_names)) == 211
     assert audited_names == current_names
 
     sources = {

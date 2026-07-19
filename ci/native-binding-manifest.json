@@ -6,7 +6,7 @@
       "name": "bdpt_accumulate_connection_samples",
       "target": "cn_bdpt_accumulate_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 272,
+      "line": 482,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -79,10 +79,229 @@
       "doc": "Accumulate BDPT connection samples into component matrices."
     },
     {
+      "name": "bdpt_accumulate_connection_samples_backward",
+      "target": "cn_bdpt_accumulate_connection_samples_backward",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 501,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "tx_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "rx_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "combine_domain",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grad_path_gain",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_los",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_reflection",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_diffraction",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_transmission",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_scattering",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "los_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "los_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "reflection_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "reflection_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "diffraction_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "diffraction_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "transmission_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "transmission_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "scattering_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "scattering_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "need_grad_contribution",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_coeff",
+          "type": "bool",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 VJP of BDPT connection-sample accumulation (native CUDA companion)."
+    },
+    {
+      "name": "bdpt_accumulate_connection_samples_jvp",
+      "target": "cn_bdpt_accumulate_connection_samples_jvp",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 505,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "tx_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "rx_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "combine_domain",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "tangent_contribution",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_coeff_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_coeff_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "los_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "los_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "reflection_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "reflection_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "diffraction_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "diffraction_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "transmission_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "transmission_im",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "scattering_re",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "scattering_im",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 JVP of BDPT connection-sample accumulation (native CUDA companion)."
+    },
+    {
       "name": "bdpt_apply_los_visibility",
       "target": "cn_bdpt_apply_los_visibility",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 374,
+      "line": 616,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -114,7 +333,7 @@
       "name": "bdpt_compact_connection_samples",
       "target": "cn_bdpt_compact_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 291,
+      "line": 517,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -136,7 +355,7 @@
       "name": "bdpt_component_map_buffer",
       "target": "cn_bdpt_component_map_buffer",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 342,
+      "line": 584,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -168,7 +387,7 @@
       "name": "bdpt_concat_connection_samples",
       "target": "cn_bdpt_concat_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 295,
+      "line": 521,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -185,7 +404,7 @@
       "name": "bdpt_connection_variance",
       "target": "cn_bdpt_connection_variance",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 299,
+      "line": 525,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -217,7 +436,7 @@
       "name": "bdpt_count_valid_connection_samples",
       "target": "cn_bdpt_count_valid_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 287,
+      "line": 513,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -511,7 +730,7 @@
       "name": "bdpt_diffraction_connection_samples_from_tape",
       "target": "cn_bdpt_diffraction_connection_samples_from_tape",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 307,
+      "line": 533,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -817,7 +1036,7 @@
       "name": "bdpt_diffraction_edge_geometry",
       "target": "cn_bdpt_diffraction_edge_geometry",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 408,
+      "line": 650,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -869,7 +1088,7 @@
       "name": "bdpt_diffraction_point_connection_samples",
       "target": "cn_bdpt_diffraction_point_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 311,
+      "line": 537,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -946,7 +1165,7 @@
       "name": "bdpt_diffraction_state_pack",
       "target": "cn_bdpt_diffraction_state_pack",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 401,
+      "line": 643,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -1018,7 +1237,7 @@
       "name": "bdpt_diffraction_state_wi",
       "target": "cn_bdpt_diffraction_state_wi",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 393,
+      "line": 635,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1040,7 +1259,7 @@
       "name": "bdpt_empty_subpath_state",
       "target": "cn_bdpt_empty_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 241,
+      "line": 435,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1057,7 +1276,7 @@
       "name": "bdpt_endpoint_connection_samples",
       "target": "cn_bdpt_endpoint_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 264,
+      "line": 474,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1106,10 +1325,164 @@
       "doc": "Connect BDPT endpoint subpaths and emit native connection samples."
     },
     {
+      "name": "bdpt_endpoint_connection_samples_backward",
+      "target": "cn_bdpt_endpoint_connection_samples_backward_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 493,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "light",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "sensor",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "samples_per_tx",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "mode_id",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "beta",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "strategy_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "max_paths",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grad_contribution",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "need_grad_field",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_frequency",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_tx_power",
+          "type": "bool",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 VJP of BDPT endpoint connection samples (native CUDA companion)."
+    },
+    {
+      "name": "bdpt_endpoint_connection_samples_jvp",
+      "target": "cn_bdpt_endpoint_connection_samples_jvp_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 497,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "light",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "sensor",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "samples_per_tx",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "mode_id",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "beta",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "strategy_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "max_paths",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "tangent_light_field_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_field_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_sensor_field_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_sensor_field_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_frequency",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tangent_tx_power",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 JVP of BDPT endpoint connection samples (native CUDA companion)."
+    },
+    {
       "name": "bdpt_endpoint_connection_visibility_inputs",
       "target": "cn_bdpt_endpoint_connection_visibility_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 268,
+      "line": 478,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1136,7 +1509,7 @@
       "name": "bdpt_endpoint_subpath_state",
       "target": "cn_bdpt_endpoint_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 245,
+      "line": 439,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1183,7 +1556,7 @@
       "name": "bdpt_face_material_tensors",
       "target": "cn_bdpt_face_material_tensors",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 416,
+      "line": 658,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1215,7 +1588,7 @@
       "name": "bdpt_face_material_tensors_from_host",
       "target": "cn_bdpt_face_material_tensors_from_host",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 420,
+      "line": 662,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1247,7 +1620,7 @@
       "name": "bdpt_filter_connection_samples",
       "target": "cn_bdpt_filter_connection_samples",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 283,
+      "line": 509,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1269,7 +1642,7 @@
       "name": "bdpt_finalize_component_maps",
       "target": "cn_bdpt_finalize_component_maps",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 338,
+      "line": 564,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1303,10 +1676,144 @@
       "doc": "Fuse BDPT component maps and component power reductions."
     },
     {
+      "name": "bdpt_finalize_component_maps_backward",
+      "target": "cn_bdpt_finalize_component_maps_backward_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 576,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "los",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reflection",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "diffraction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "transmission",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "scattering",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "grad_path_gain",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_los_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_reflection_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_diffraction_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_transmission_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_scattering_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "need_grad_components",
+          "type": "bool",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 VJP of the BDPT component-map finalize (native CUDA companion)."
+    },
+    {
+      "name": "bdpt_finalize_component_maps_jvp",
+      "target": "cn_bdpt_finalize_component_maps_jvp_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 580,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "los",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reflection",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "diffraction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "transmission",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "scattering",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_los",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_reflection",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_diffraction",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_transmission",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_scattering",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 JVP of the BDPT component-map finalize (native CUDA companion)."
+    },
+    {
       "name": "bdpt_finalize_point_components",
       "target": "cn_bdpt_finalize_point_components",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 330,
+      "line": 556,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1338,6 +1845,140 @@
       ],
       "pybind_arguments": [],
       "doc": "Fuse BDPT point-receiver component matrices and reduce component powers."
+    },
+    {
+      "name": "bdpt_finalize_point_components_backward",
+      "target": "cn_bdpt_finalize_point_components_backward_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 568,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "los",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reflection",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "diffraction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "transmission",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "scattering",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "grad_path_gain",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_los_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_reflection_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_diffraction_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_transmission_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_scattering_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "need_grad_components",
+          "type": "bool",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 VJP of the BDPT point-receiver finalize map (native CUDA companion)."
+    },
+    {
+      "name": "bdpt_finalize_point_components_jvp",
+      "target": "cn_bdpt_finalize_point_components_jvp_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 572,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "los",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reflection",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "diffraction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "transmission",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "scattering",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_los",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_reflection",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_diffraction",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_transmission",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_scattering",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 JVP of the BDPT point-receiver finalize map (native CUDA companion)."
     },
     {
       "name": "bdpt_intersect_forward",
@@ -1390,7 +2031,7 @@
       "name": "bdpt_launch_state",
       "target": "cn_bdpt_launch_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 237,
+      "line": 431,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1427,7 +2068,7 @@
       "name": "bdpt_los_component_maps",
       "target": "cn_bdpt_los_component_maps",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 366,
+      "line": 608,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1444,7 +2085,7 @@
       "name": "bdpt_los_component_maps_from_matrix",
       "target": "cn_bdpt_los_component_maps_from_matrix",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 370,
+      "line": 612,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1471,7 +2112,7 @@
       "name": "bdpt_los_export",
       "target": "cn_bdpt_los_export",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 334,
+      "line": 560,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1508,7 +2149,7 @@
       "name": "bdpt_los_visibility_inputs",
       "target": "cn_bdpt_los_visibility_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 378,
+      "line": 620,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1535,7 +2176,7 @@
       "name": "bdpt_mis_weights",
       "target": "cn_bdpt_mis_weights",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 303,
+      "line": 529,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1567,7 +2208,7 @@
       "name": "bdpt_pack_vec3",
       "target": "cn_bdpt_pack_vec3",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 362,
+      "line": 604,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1594,7 +2235,7 @@
       "name": "bdpt_point_component_power",
       "target": "cn_bdpt_point_component_power",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 322,
+      "line": 548,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1616,7 +2257,7 @@
       "name": "bdpt_receiver_grid_points",
       "target": "cn_bdpt_receiver_grid_points",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 385,
+      "line": 627,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1698,7 +2339,7 @@
       "name": "bdpt_reflected_light_subpath_state",
       "target": "cn_bdpt_reflected_light_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 253,
+      "line": 447,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1750,6 +2391,200 @@
       ],
       "pybind_arguments": [],
       "doc": "Propagate BDPT light subpaths through native RayDN hit geometry with CUDA reflection."
+    },
+    {
+      "name": "bdpt_reflected_light_subpath_state_backward",
+      "target": "cn_bdpt_reflected_light_subpath_state_backward_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 455,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "light",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "intersection",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "material_gain",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_thickness",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grad_field_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_field_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_throughput_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_throughput_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "need_grad_material",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_field_in",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_frequency",
+          "type": "bool",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 VJP of BDPT reflected light subpath advance (native CUDA companion)."
+    },
+    {
+      "name": "bdpt_reflected_light_subpath_state_jvp",
+      "target": "cn_bdpt_reflected_light_subpath_state_jvp_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 459,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "light",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "intersection",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "material_gain",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_thickness",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tangent_eps_r",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_sigma_e",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_gain",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_thickness",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_frequency",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tangent_light_field_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_field_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_throughput_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_throughput_imag",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 JVP of BDPT reflected light subpath advance (native CUDA companion)."
     },
     {
       "name": "bdpt_reflection_accumulation_forward",
@@ -1932,7 +2767,7 @@
       "name": "bdpt_reflection_launch_inputs",
       "target": "cn_bdpt_reflection_launch_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 389,
+      "line": 631,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1959,7 +2794,7 @@
       "name": "bdpt_sample_directions",
       "target": "cn_bdpt_sample_directions",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 354,
+      "line": 596,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1986,7 +2821,7 @@
       "name": "bdpt_selected_edge_indices",
       "target": "cn_bdpt_selected_edge_indices",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 397,
+      "line": 639,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2003,7 +2838,7 @@
       "name": "bdpt_store_component_map",
       "target": "cn_bdpt_store_component_map",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 346,
+      "line": 588,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2030,7 +2865,7 @@
       "name": "bdpt_store_point_component_column",
       "target": "cn_bdpt_store_point_component_column",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 326,
+      "line": 552,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2057,7 +2892,7 @@
       "name": "bdpt_store_scaled_component_map",
       "target": "cn_bdpt_store_scaled_component_map",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 350,
+      "line": 592,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2094,7 +2929,7 @@
       "name": "bdpt_subpath_intersection_inputs",
       "target": "cn_bdpt_subpath_intersection_inputs",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 249,
+      "line": 443,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2111,7 +2946,7 @@
       "name": "bdpt_surface_group_edge_candidates",
       "target": "cn_bdpt_surface_group_edge_candidates",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 412,
+      "line": 654,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -2168,7 +3003,7 @@
       "name": "bdpt_transmitted_light_subpath_state",
       "target": "cn_bdpt_transmitted_light_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 257,
+      "line": 451,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2227,10 +3062,209 @@
       "doc": "Continue BDPT light subpaths through thin_sheet walls with CUDA layer-stack transmission."
     },
     {
+      "name": "bdpt_transmitted_light_subpath_state_backward",
+      "target": "cn_bdpt_transmitted_light_subpath_state_backward_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 463,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "light",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "intersection",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "face_material_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_offset",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_thickness_m",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grad_field_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_field_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_throughput_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_throughput_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "need_grad_layers",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_field_in",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_grad_frequency",
+          "type": "bool",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 VJP of BDPT transmitted light subpath advance (native CUDA companion)."
+    },
+    {
+      "name": "bdpt_transmitted_light_subpath_state_jvp",
+      "target": "cn_bdpt_transmitted_light_subpath_state_jvp_dispatch",
+      "path": "native/channel_native/binding/bdpt.cpp",
+      "line": 467,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "light",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "intersection",
+          "type": "pybind11::dict",
+          "default": null
+        },
+        {
+          "name": "face_material_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_offset",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_thickness_m",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tangent_layer_thickness",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_layer_eps_r",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_layer_sigma_e",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_frequency",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tangent_light_field_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_field_imag",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_throughput_real",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_light_throughput_imag",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "ADR-022 JVP of BDPT transmitted light subpath advance (native CUDA companion)."
+    },
+    {
       "name": "bdpt_transmitter_tensors",
       "target": "cn_bdpt_transmitter_tensors",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 358,
+      "line": 600,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2289,7 +3323,7 @@
       "name": "bdpt_zero_matrix",
       "target": "cn_bdpt_zero_matrix",
       "path": "native/channel_native/binding/bdpt.cpp",
-      "line": 315,
+      "line": 541,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [

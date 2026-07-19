@@ -21,9 +21,12 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # companions: 189 -> 193;
 # ADR-021 added the 6 multi-bounce chain scattering symbols (Op A/Op B forwards
 # scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
-# _backward/_jvp companions): 193 -> 199).
+# _backward/_jvp companions): 193 -> 199;
+# ADR-022 added the 12 BDPT fixed-topology AD companions (subpath
+# reflected/transmitted state, endpoint connection, accumulate power+coherent,
+# finalize point/maps, each _backward + _jvp): 199 -> 211).
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 199
+EXPECTED_BINDING_COUNT = 211
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )
