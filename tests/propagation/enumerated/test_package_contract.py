@@ -202,6 +202,11 @@ def test_scattering_config_contract_is_minimal_protocol():
         "scattering_samples_per_m2",
         "scattering_power_threshold",
         "scattering_max_paths_per_pair",
+        # ADR-021 D1 enumerated scatter-chain path class (intentional
+        # protocol extension; public-api snapshot updated in the same change).
+        "scattering_chain_max_depth",
+        "scattering_chain_samples_per_m2",
+        "scattering_chain_max_rows",
     }
 
 

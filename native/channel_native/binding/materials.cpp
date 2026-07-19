@@ -270,6 +270,131 @@ pybind11::dict cn_kirchhoff_table_build_jvp(
     pybind11::object t_layer_eps_r, pybind11::object t_layer_sigma_e,
     double t_sigma_h, double t_corr_x, double t_corr_y, double t_frequency);
 
+// ADR-021 Op A (scattering_chain_ensemble.cu / _ad.cu). NOTE: the argument set
+// follows the committed float64 oracle tests/reference/chain_ensemble.py and the
+// existing native op-1 convention (weights + L1,L2 spreading; frozen wi_local;
+// explicit source/vertex/target endpoints), reconciling the plan-10a section 3.1
+// sketch against the oracle per the "existing native op conventions win" rule
+// (see the change report / open issues).
+pybind11::dict cn_scattering_chain_ensemble_eval(
+    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source, at::Tensor vertex,
+    at::Tensor target, at::Tensor c1_positions, at::Tensor c1_normals,
+    at::Tensor c1_eps_r, at::Tensor c1_sigma_e, at::Tensor c1_mu_r,
+    at::Tensor c1_gain, at::Tensor c1_thickness, at::Tensor c1_depth,
+    at::Tensor c2_positions, at::Tensor c2_normals, at::Tensor c2_eps_r,
+    at::Tensor c2_sigma_e, at::Tensor c2_mu_r, at::Tensor c2_gain,
+    at::Tensor c2_thickness, at::Tensor c2_depth, at::Tensor n_o, at::Tensor t1r,
+    at::Tensor t2r, at::Tensor backup_axis, at::Tensor wi_local, at::Tensor cos_i,
+    at::Tensor cos_o, at::Tensor d_i, at::Tensor d_o, at::Tensor l1, at::Tensor l2,
+    at::Tensor weights, at::Tensor material_id, at::Tensor fte_flat,
+    at::Tensor ftm_flat, at::Tensor table_offset, at::Tensor table_dims,
+    at::Tensor material_slot, double coef, double threshold, double frequency_hz);
+pybind11::dict cn_scattering_chain_ensemble_eval_backward(
+    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source, at::Tensor vertex,
+    at::Tensor target, at::Tensor c1_positions, at::Tensor c1_normals,
+    at::Tensor c1_eps_r, at::Tensor c1_sigma_e, at::Tensor c1_mu_r,
+    at::Tensor c1_gain, at::Tensor c1_thickness, at::Tensor c1_depth,
+    at::Tensor c2_positions, at::Tensor c2_normals, at::Tensor c2_eps_r,
+    at::Tensor c2_sigma_e, at::Tensor c2_mu_r, at::Tensor c2_gain,
+    at::Tensor c2_thickness, at::Tensor c2_depth, at::Tensor n_o, at::Tensor t1r,
+    at::Tensor t2r, at::Tensor backup_axis, at::Tensor wi_local, at::Tensor cos_i,
+    at::Tensor cos_o, at::Tensor d_i, at::Tensor d_o, at::Tensor l1, at::Tensor l2,
+    at::Tensor weights, at::Tensor material_id, at::Tensor fte_flat,
+    at::Tensor ftm_flat, at::Tensor table_offset, at::Tensor table_dims,
+    at::Tensor material_slot, double coef, double threshold, double frequency_hz,
+    pybind11::object grad_gain, pybind11::object grad_amplitude,
+    pybind11::object grad_length, bool need_grad_chain1, bool need_grad_chain2,
+    bool need_grad_tables, bool need_grad_geometry, bool need_grad_coef,
+    bool need_grad_frequency);
+pybind11::dict cn_scattering_chain_ensemble_eval_jvp(
+    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source, at::Tensor vertex,
+    at::Tensor target, at::Tensor c1_positions, at::Tensor c1_normals,
+    at::Tensor c1_eps_r, at::Tensor c1_sigma_e, at::Tensor c1_mu_r,
+    at::Tensor c1_gain, at::Tensor c1_thickness, at::Tensor c1_depth,
+    at::Tensor c2_positions, at::Tensor c2_normals, at::Tensor c2_eps_r,
+    at::Tensor c2_sigma_e, at::Tensor c2_mu_r, at::Tensor c2_gain,
+    at::Tensor c2_thickness, at::Tensor c2_depth, at::Tensor n_o, at::Tensor t1r,
+    at::Tensor t2r, at::Tensor backup_axis, at::Tensor wi_local, at::Tensor cos_i,
+    at::Tensor cos_o, at::Tensor d_i, at::Tensor d_o, at::Tensor l1, at::Tensor l2,
+    at::Tensor weights, at::Tensor material_id, at::Tensor fte_flat,
+    at::Tensor ftm_flat, at::Tensor table_offset, at::Tensor table_dims,
+    at::Tensor material_slot, double coef, double threshold, double frequency_hz,
+    pybind11::object tangent_c1_eps_r, pybind11::object tangent_c1_sigma_e,
+    pybind11::object tangent_c1_gain, pybind11::object tangent_c1_thickness,
+    pybind11::object tangent_c2_eps_r, pybind11::object tangent_c2_sigma_e,
+    pybind11::object tangent_c2_gain, pybind11::object tangent_c2_thickness,
+    pybind11::object tangent_f_te_flat, pybind11::object tangent_f_tm_flat,
+    pybind11::object tangent_c1_positions, pybind11::object tangent_c1_normals,
+    pybind11::object tangent_c2_positions, pybind11::object tangent_c2_normals,
+    pybind11::object tangent_d_i, pybind11::object tangent_d_o,
+    pybind11::object tangent_v_normal, pybind11::object tangent_l1,
+    pybind11::object tangent_l2, pybind11::object tangent_cos_i,
+    pybind11::object tangent_cos_o, double tangent_coef, double tangent_frequency);
+// ADR-021 Op B (scattering_chain_realization.cu / _ad.cu, sibling change).
+// Declared extern per plan-10a section 4; the definitions land with the sibling.
+pybind11::dict cn_scattering_chain_realization_eval(
+    at::Tensor patch_tris, at::Tensor patch_uvs, at::Tensor rows, at::Tensor d_i,
+    at::Tensor d_o, at::Tensor n_rows, at::Tensor source, at::Tensor vertex,
+    at::Tensor target, at::Tensor c1_positions,
+    at::Tensor c1_normals, at::Tensor c1_eps_r, at::Tensor c1_sigma_e,
+    at::Tensor c1_mu_r, at::Tensor c1_gain, at::Tensor c1_thickness,
+    at::Tensor c1_depth, at::Tensor c2_positions, at::Tensor c2_normals,
+    at::Tensor c2_eps_r, at::Tensor c2_sigma_e, at::Tensor c2_mu_r,
+    at::Tensor c2_gain, at::Tensor c2_thickness, at::Tensor c2_depth,
+    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor l1, at::Tensor l2,
+    at::Tensor sp1, at::Tensor sp2, at::Tensor centroids, at::Tensor heights,
+    at::Tensor cos_spec, at::Tensor material_id, at::Tensor layer_offset,
+    at::Tensor layer_count, at::Tensor layer_thickness_m, at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e, at::Tensor layer_mu_r, at::Tensor quad_a,
+    at::Tensor quad_b, at::Tensor quad_w, double k0, double frequency_hz);
+pybind11::dict cn_scattering_chain_realization_eval_backward(
+    at::Tensor patch_tris, at::Tensor patch_uvs, at::Tensor rows, at::Tensor d_i,
+    at::Tensor d_o, at::Tensor n_rows, at::Tensor source, at::Tensor vertex,
+    at::Tensor target, at::Tensor c1_positions,
+    at::Tensor c1_normals, at::Tensor c1_eps_r, at::Tensor c1_sigma_e,
+    at::Tensor c1_mu_r, at::Tensor c1_gain, at::Tensor c1_thickness,
+    at::Tensor c1_depth, at::Tensor c2_positions, at::Tensor c2_normals,
+    at::Tensor c2_eps_r, at::Tensor c2_sigma_e, at::Tensor c2_mu_r,
+    at::Tensor c2_gain, at::Tensor c2_thickness, at::Tensor c2_depth,
+    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor l1, at::Tensor l2,
+    at::Tensor sp1, at::Tensor sp2, at::Tensor centroids, at::Tensor heights,
+    at::Tensor cos_spec, at::Tensor material_id, at::Tensor layer_offset,
+    at::Tensor layer_count, at::Tensor layer_thickness_m, at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e, at::Tensor layer_mu_r, at::Tensor quad_a,
+    at::Tensor quad_b, at::Tensor quad_w, double k0, double frequency_hz,
+    at::Tensor grad_total, pybind11::object grad_path_field,
+    pybind11::object grad_path_gain, bool need_grad_heights, bool need_grad_layers,
+    bool need_grad_chain1, bool need_grad_chain2, bool need_grad_geometry,
+    bool need_grad_k0, bool need_grad_frequency);
+pybind11::dict cn_scattering_chain_realization_eval_jvp(
+    at::Tensor patch_tris, at::Tensor patch_uvs, at::Tensor rows, at::Tensor d_i,
+    at::Tensor d_o, at::Tensor n_rows, at::Tensor source, at::Tensor vertex,
+    at::Tensor target, at::Tensor c1_positions,
+    at::Tensor c1_normals, at::Tensor c1_eps_r, at::Tensor c1_sigma_e,
+    at::Tensor c1_mu_r, at::Tensor c1_gain, at::Tensor c1_thickness,
+    at::Tensor c1_depth, at::Tensor c2_positions, at::Tensor c2_normals,
+    at::Tensor c2_eps_r, at::Tensor c2_sigma_e, at::Tensor c2_mu_r,
+    at::Tensor c2_gain, at::Tensor c2_thickness, at::Tensor c2_depth,
+    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor l1, at::Tensor l2,
+    at::Tensor sp1, at::Tensor sp2, at::Tensor centroids, at::Tensor heights,
+    at::Tensor cos_spec, at::Tensor material_id, at::Tensor layer_offset,
+    at::Tensor layer_count, at::Tensor layer_thickness_m, at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e, at::Tensor layer_mu_r, at::Tensor quad_a,
+    at::Tensor quad_b, at::Tensor quad_w, double k0, double frequency_hz,
+    pybind11::object tangent_heights, pybind11::object tangent_layer_thickness,
+    pybind11::object tangent_layer_eps_r, pybind11::object tangent_layer_sigma_e,
+    pybind11::object tangent_c1_eps_r, pybind11::object tangent_c1_sigma_e,
+    pybind11::object tangent_c1_gain, pybind11::object tangent_c1_thickness,
+    pybind11::object tangent_c2_eps_r, pybind11::object tangent_c2_sigma_e,
+    pybind11::object tangent_c2_gain, pybind11::object tangent_c2_thickness,
+    pybind11::object tangent_d_i, pybind11::object tangent_d_o,
+    pybind11::object tangent_c1_positions, pybind11::object tangent_c1_normals,
+    pybind11::object tangent_c2_positions, pybind11::object tangent_c2_normals,
+    pybind11::object tangent_l1, pybind11::object tangent_l2,
+    pybind11::object tangent_sp1, pybind11::object tangent_sp2,
+    pybind11::object tangent_centroids, double tangent_k0,
+    double tangent_frequency);
+
 void register_materials(pybind11::module_ &module) {
     module.def(
         "em_layer_stack_eval",
@@ -307,6 +432,18 @@ void register_materials(pybind11::module_ &module) {
                "Fixed-topology VJP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).");
     module.def("scattering_table_eval_jvp", &cn_scattering_table_eval_jvp,
                "Fixed-topology JVP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).");
+    module.def("scattering_chain_ensemble_eval", &cn_scattering_chain_ensemble_eval,
+               "Evaluate the ADR-021 multi-bounce Kirchhoff ensemble scattering chain rows with native CUDA (Op A).");
+    module.def("scattering_chain_ensemble_eval_backward", &cn_scattering_chain_ensemble_eval_backward,
+               "Fixed-topology VJP of the ADR-021 ensemble scattering chain (chain1/chain2 materials, tables, coef, frequency).");
+    module.def("scattering_chain_ensemble_eval_jvp", &cn_scattering_chain_ensemble_eval_jvp,
+               "Fixed-topology JVP of the ADR-021 ensemble scattering chain rows (Op A).");
+    module.def("scattering_chain_realization_eval", &cn_scattering_chain_realization_eval,
+               "Evaluate the ADR-021 coherent phase-screen scattering chain rows with native CUDA (Op B).");
+    module.def("scattering_chain_realization_eval_backward", &cn_scattering_chain_realization_eval_backward,
+               "Fixed-topology VJP of the ADR-021 coherent scattering chain (heights, layers, chains, geometry, k0, frequency).");
+    module.def("scattering_chain_realization_eval_jvp", &cn_scattering_chain_realization_eval_jvp,
+               "Fixed-topology JVP of the ADR-021 coherent scattering chain rows (Op B).");
     module.def("kirchhoff_table_build_backward", &cn_kirchhoff_table_build_backward,
                "VJP of the offline Kirchhoff table build over roughness, layers and frequency (ADR-015).");
     module.def("kirchhoff_table_build_jvp", &cn_kirchhoff_table_build_jvp,

@@ -509,6 +509,10 @@ Python_add_library(
     native/channel_native/kernels/scattering.cu
     native/channel_native/kernels/scattering_ensemble.cu
     native/channel_native/kernels/scattering_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_ensemble.cu
+    native/channel_native/kernels/scattering_chain_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_realization.cu
+    native/channel_native/kernels/scattering_chain_realization_ad.cu
     native/channel_native/kernels/scattering_patch_integral.cu
     native/channel_native/kernels/scattering_patch_integral_ad.cu
     native/channel_native/kernels/scattering_table_eval_ad.cu
@@ -537,6 +541,10 @@ set_source_files_properties(
     native/channel_native/kernels/kirchhoff_table_ad.cu
     native/channel_native/kernels/scattering_ensemble.cu
     native/channel_native/kernels/scattering_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_ensemble.cu
+    native/channel_native/kernels/scattering_chain_ensemble_ad.cu
+    native/channel_native/kernels/scattering_chain_realization.cu
+    native/channel_native/kernels/scattering_chain_realization_ad.cu
     native/channel_native/kernels/scattering_patch_integral.cu
     native/channel_native/kernels/scattering_patch_integral_ad.cu
     native/channel_native/kernels/scattering_table_eval_ad.cu
