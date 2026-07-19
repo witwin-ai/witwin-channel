@@ -10,6 +10,11 @@ transmission numerical primal/backward/JVP family to RayD after the Phase 6B
 pin/switch, while row contracts, field facades, AD dispatch, topology, and
 result assembly remain owned here.
 
+The Phase 6A shared RF dependency closure is active: retained Channel field,
+coupled-diffraction, BDPT, and scattering kernels consume RayD public RF
+device headers directly. They do not retain or reconstruct a Channel-private
+copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

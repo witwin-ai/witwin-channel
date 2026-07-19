@@ -1,13 +1,21 @@
 {
   "schema_version": 1,
   "plan": "Plan 13",
-  "phase": 5,
+  "phase": "6A",
   "decision": "ADR-024 accepted 2026-07-19",
+  "phase6a_activation": {
+    "status": "active",
+    "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+    "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b",
+    "rayd_helpers": 112,
+    "channel_boundary_helpers": 10,
+    "channel_pending_adr026_helpers": 7
+  },
   "baseline": {
     "path": "docs/dev/audit/phase13-shared-rf-helper-ledger.json",
-    "sha256": "3fb2a616a0a0635320104b5311bd5def74a0c16797b81715eab023083bfb26c9",
+    "sha256": "975b75db559aa4facd46659f62dbd74053b0fdb60a9b3e9309ce520d3f1563f4",
     "helper_count": 129,
-    "status": "immutable Phase 0 extraction evidence"
+    "status": "Phase 0 helper identities and source extraction remain frozen; Phase 6A activation projection is appended"
   },
   "totals": {
     "helper_count": 129,
@@ -19,9 +27,9 @@
   "groups": [
     {
       "baseline_source": "native/channel_native/em/complex.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "shared/include/rayd/shared/rf/complex.cuh",
       "helpers": [
         "c_sqrt_passive",
@@ -32,9 +40,9 @@
     },
     {
       "baseline_source": "native/channel_native/em/medium.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "shared/include/rayd/shared/rf/medium.cuh",
       "helpers": [
         "make_medium",
@@ -43,9 +51,9 @@
     },
     {
       "baseline_source": "native/channel_native/em/fresnel.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "shared/include/rayd/shared/rf/fresnel.cuh",
       "helpers": [
         "kz_from_kpar",
@@ -57,9 +65,9 @@
     },
     {
       "baseline_source": "native/channel_native/em/layer_stack.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "shared/include/rayd/shared/rf/layer_stack.cuh",
       "helpers": [
         "layer_one_way_phase",
@@ -68,9 +76,9 @@
     },
     {
       "baseline_source": "native/channel_native/field_transport.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "shared/include/rayd/shared/rf/field_transport.cuh",
       "helpers": [
         "precise_neg_kd",
@@ -98,9 +106,9 @@
     },
     {
       "baseline_source": "native/channel_native/field_transport_ad.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh",
       "helpers": [
         "df_const",
@@ -183,9 +191,9 @@
     },
     {
       "baseline_source": "native/channel_native/kernels/field_transport_ad_common.cuh",
-      "current_owner": "Channel Native",
+      "current_owner": "RayD",
       "accepted_target_owner": "RayD",
-      "transfer_phase": "6A Channel pin/switch",
+      "transfer_phase": "completed in Phase 6A Channel pin/switch",
       "target_header": "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh",
       "classification": "numerical output-chain AD",
       "helpers": [
@@ -233,7 +241,7 @@
   "acceptance": [
     "every baseline helper appears exactly once",
     "no helper remains pending",
-    "current ownership is not changed until its Channel pin/switch commit",
+    "the first 112 ADR-024 helpers are active from RayD at the Phase 6A Channel pin/switch commit",
     "normalized body, compiler attributes, codegen and primal/dual lockstep are required before deletion",
     "RayD never includes a Channel-private header"
   ]

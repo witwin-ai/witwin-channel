@@ -1,10 +1,63 @@
 #include <torch/extension.h>
+#include <rayd/torch/integration_v2.h>
 
 #include "registry.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace {
+
+rayd::torch::LayerStackRequest layer_stack_request(
+    torch::Tensor cos_theta,
+    torch::Tensor material_id,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz) {
+    return {
+        std::move(cos_theta),
+        std::move(material_id),
+        std::move(layer_offset),
+        std::move(layer_count),
+        std::move(layer_thickness_m),
+        std::move(layer_eps_r),
+        std::move(layer_sigma_e),
+        std::move(layer_mu_r),
+        frequency_hz};
+}
+
+std::optional<at::Tensor> optional_tensor(pybind11::handle value) {
+    if (value.is_none())
+        return std::nullopt;
+    return pybind11::cast<at::Tensor>(value);
+}
+
+pybind11::dict layer_stack_result_dict(
+    const rayd::torch::LayerStackResult &result) {
+    pybind11::dict out;
+    out["r_te_real"] = result.r_te_real;
+    out["r_te_imag"] = result.r_te_imag;
+    out["r_tm_real"] = result.r_tm_real;
+    out["r_tm_imag"] = result.r_tm_imag;
+    out["t_te_real"] = result.t_te_real;
+    out["t_te_imag"] = result.t_te_imag;
+    out["t_tm_real"] = result.t_tm_real;
+    out["t_tm_imag"] = result.t_tm_imag;
+    out["cap_R_te"] = result.cap_r_te;
+    out["cap_R_tm"] = result.cap_r_tm;
+    out["cap_T_te"] = result.cap_t_te;
+    out["cap_T_tm"] = result.cap_t_tm;
+    return out;
+}
+
+}  // namespace
 
 pybind11::dict cn_em_layer_stack_eval(
     torch::Tensor cos_theta,
@@ -15,7 +68,20 @@ pybind11::dict cn_em_layer_stack_eval(
     torch::Tensor layer_eps_r,
     torch::Tensor layer_sigma_e,
     torch::Tensor layer_mu_r,
-    double frequency_hz);
+    double frequency_hz) {
+    return layer_stack_result_dict(rayd::torch::em_layer_stack_eval(
+        layer_stack_request(
+            std::move(cos_theta),
+            std::move(material_id),
+            std::move(layer_offset),
+            std::move(layer_count),
+            std::move(layer_thickness_m),
+            std::move(layer_eps_r),
+            std::move(layer_sigma_e),
+            std::move(layer_mu_r),
+            frequency_hz)));
+}
+
 pybind11::dict cn_em_layer_stack_backward(
     torch::Tensor cos_theta,
     torch::Tensor material_id,
@@ -29,7 +95,36 @@ pybind11::dict cn_em_layer_stack_backward(
     pybind11::sequence grad_outputs,
     bool need_cos_theta,
     bool need_layers,
-    bool need_frequency);
+    bool need_frequency) {
+    TORCH_CHECK(
+        grad_outputs.size() == 12,
+        "grad_outputs must carry the twelve stack output cotangents");
+    rayd::torch::LayerStackBackwardRequest request;
+    request.primal = layer_stack_request(
+        std::move(cos_theta),
+        std::move(material_id),
+        std::move(layer_offset),
+        std::move(layer_count),
+        std::move(layer_thickness_m),
+        std::move(layer_eps_r),
+        std::move(layer_sigma_e),
+        std::move(layer_mu_r),
+        frequency_hz);
+    for (std::size_t field = 0; field < request.grad_outputs.size(); ++field)
+        request.grad_outputs[field] = optional_tensor(grad_outputs[field]);
+    request.need_cos_theta = need_cos_theta;
+    request.need_layers = need_layers;
+    request.need_frequency = need_frequency;
+    const auto result = rayd::torch::em_layer_stack_backward(request);
+    pybind11::dict out;
+    out["grad_cos_theta"] = result.grad_cos_theta;
+    out["grad_layer_thickness_m"] = result.grad_layer_thickness_m;
+    out["grad_layer_eps_r"] = result.grad_layer_eps_r;
+    out["grad_layer_sigma_e"] = result.grad_layer_sigma_e;
+    out["grad_frequency"] = result.grad_frequency;
+    return out;
+}
+
 pybind11::dict cn_em_layer_stack_jvp(
     torch::Tensor cos_theta,
     torch::Tensor material_id,
@@ -44,7 +139,25 @@ pybind11::dict cn_em_layer_stack_jvp(
     pybind11::object tangent_layer_thickness,
     pybind11::object tangent_layer_eps_r,
     pybind11::object tangent_layer_sigma_e,
-    double tangent_frequency);
+    double tangent_frequency) {
+    rayd::torch::LayerStackJvpRequest request;
+    request.primal = layer_stack_request(
+        std::move(cos_theta),
+        std::move(material_id),
+        std::move(layer_offset),
+        std::move(layer_count),
+        std::move(layer_thickness_m),
+        std::move(layer_eps_r),
+        std::move(layer_sigma_e),
+        std::move(layer_mu_r),
+        frequency_hz);
+    request.tangent_cos_theta = optional_tensor(tangent_cos_theta);
+    request.tangent_layer_thickness_m = optional_tensor(tangent_layer_thickness);
+    request.tangent_layer_eps_r = optional_tensor(tangent_layer_eps_r);
+    request.tangent_layer_sigma_e = optional_tensor(tangent_layer_sigma_e);
+    request.tangent_frequency = tangent_frequency;
+    return layer_stack_result_dict(rayd::torch::em_layer_stack_jvp(request));
+}
 pybind11::dict cn_scattering_table_eval(
     torch::Tensor wi, torch::Tensor wo, torch::Tensor f_te, torch::Tensor f_tm);
 torch::Tensor cn_scattering_table_pdf(

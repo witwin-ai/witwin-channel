@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections import Counter
 from pathlib import Path
@@ -12,6 +13,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 KERNEL_ROOT = REPOSITORY_ROOT / "native/channel_native/kernels"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
+)
+RAYD_ROOT = Path(
+    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayDi")
+)
+RAYD_FIELD_TRANSPORT_AD = (
+    RAYD_ROOT
+    / "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh"
 )
 
 TRANSLATION_UNITS = {
@@ -41,12 +49,14 @@ COMMON_HELPERS = {
     "load_dual_sequence3f",
     "complex_of",
     "to_c10",
-    "fold_output_cotangents",
-    "write_output_tangents",
     "launch_blocks",
     "zero_filled",
     "optional_grad",
     "grad_ptr",
+}
+RAYD_NUMERICAL_HELPERS = {
+    "fold_output_cotangents",
+    "write_output_tangents",
 }
 
 
@@ -103,6 +113,21 @@ def test_field_transport_common_helpers_have_one_source() -> None:
         assert path.read_text(encoding="utf-8-sig").count(
             '#include "field_transport_ad_common.cuh"'
         ) == 1
+
+
+def test_output_chain_ad_helpers_are_defined_only_in_locked_rayd_header() -> None:
+    common_source = (
+        KERNEL_ROOT / "field_transport_ad_common.cuh"
+    ).read_text(encoding="utf-8-sig")
+    rayd_source = RAYD_FIELD_TRANSPORT_AD.read_text(encoding="utf-8-sig")
+
+    for helper in RAYD_NUMERICAL_HELPERS:
+        definition = re.compile(
+            rf"__device__\s+__forceinline__[^;{{}}]*\b{helper}\s*\("
+        )
+        assert len(definition.findall(rayd_source)) == 1
+        assert not definition.search(common_source)
+        assert common_source.count(f"using ad::{helper};") == 1
 
 
 def test_field_transport_split_is_registered_once_and_below_budget() -> None:

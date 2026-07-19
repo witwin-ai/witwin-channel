@@ -37,6 +37,9 @@ FROZEN_AUDIT_SHA256 = {
         "9a2de981a7543b32c3dbc8e3857290a4322a0a414402b4213efc7092b546640a"
     ),
 }
+PHASE4_BINDING_MANIFEST_SHA256 = (
+    "283b7ea04fe8eaeeb5c4b8e4316856a099d5a31f7750e38acb2bfb810fd4b205"
+)
 
 
 def _load(name: str) -> dict[str, object]:
@@ -96,8 +99,6 @@ def test_phase4_current_inventory_counts_and_manifest_hash_are_exact() -> None:
             "Channel Native",
         }
     }
-    manifest_path = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-    manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     migration = _load("phase13-migration-delta.json")
 
     assert inventory["counts"] == {
@@ -108,8 +109,11 @@ def test_phase4_current_inventory_counts_and_manifest_hash_are_exact() -> None:
     }
     assert inventory["phase4_generic_geometry_and_dead_bridge_cleanup"][
         "binding_manifest_sha256"
-    ] == manifest_sha256
-    assert migration["phase4_current"]["binding_manifest_sha256"] == manifest_sha256
+    ] == PHASE4_BINDING_MANIFEST_SHA256
+    assert (
+        migration["phase4_current"]["binding_manifest_sha256"]
+        == PHASE4_BINDING_MANIFEST_SHA256
+    )
 
 
 def test_phase4_does_not_rewrite_historical_audits() -> None:

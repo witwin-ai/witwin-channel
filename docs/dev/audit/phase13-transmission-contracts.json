@@ -1,6 +1,13 @@
 {
   "schema_version": 1,
   "contract_count": 6,
+  "phase6a_activation": {
+    "status": "active",
+    "activated_contract_count": 3,
+    "pending_phase6b_contract_count": 3,
+    "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+    "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b"
+  },
   "families": [
     "resident CSR layer-stack",
     "complete-row transmission field"
@@ -9,25 +16,26 @@
     {
       "symbol": "em_layer_stack_eval",
       "family": "resident CSR layer-stack",
-      "current_numerical_owner": "Channel Native",
-      "target_numerical_owner": "RayD after ADR-024",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD (activated under ADR-024 in Phase 6A)",
+      "activation_phase": "6A",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 399
+        "line": 513
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            9
+            62
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/em_debug.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu",
           "lines": [
-            309
+            310
           ],
           "count": 1
         }
@@ -67,25 +75,26 @@
     {
       "symbol": "em_layer_stack_backward",
       "family": "resident CSR layer-stack",
-      "current_numerical_owner": "Channel Native",
-      "target_numerical_owner": "RayD after ADR-024",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD (activated under ADR-024 in Phase 6A)",
+      "activation_phase": "6A",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 403
+        "line": 517
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            19
+            85
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/em_debug.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu",
           "lines": [
-            464
+            476
           ],
           "count": 1
         }
@@ -113,25 +122,26 @@
     {
       "symbol": "em_layer_stack_jvp",
       "family": "resident CSR layer-stack",
-      "current_numerical_owner": "Channel Native",
-      "target_numerical_owner": "RayD after ADR-024",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD (activated under ADR-024 in Phase 6A)",
+      "activation_phase": "6A",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 407
+        "line": 521
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            33
+            128
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/em_debug.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu",
           "lines": [
-            534
+            541
           ],
           "count": 1
         }

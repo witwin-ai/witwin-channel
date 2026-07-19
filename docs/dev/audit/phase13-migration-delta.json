@@ -19,7 +19,8 @@
             }
         }
     },
-    "current_phase": 4,
+    "current_phase": 6,
+    "current_subphase": "6A",
     "transfers_applied": [
         {
             "phase": 3,
@@ -27,6 +28,20 @@
             "from": "copied extern-C signatures, getter indirection, integer scene handles",
             "to": "source-linked rayd::torch integration_v2 typed API and RAII SceneResource",
             "numerical_owner_changed": false
+        },
+        {
+            "phase": "6A",
+            "scope": "resident CSR layer-stack primal/JVP/VJP family",
+            "symbols": [
+                "em_layer_stack_eval",
+                "em_layer_stack_backward",
+                "em_layer_stack_jvp"
+            ],
+            "from": "Channel Native numerical implementation",
+            "to": "RayD typed RF implementation with Channel Native ABI facade",
+            "numerical_owner_changed": true,
+            "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+            "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b"
         }
     ],
     "renames_applied": [
@@ -192,12 +207,47 @@
             "phase": 4,
             "binding": "path_diffraction_paths_order1",
             "reachability": "dead by four-axis audit"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/em/complex.cuh",
+            "replacement": "RayD:shared/include/rayd/shared/rf/complex.cuh"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/em/medium.cuh",
+            "replacement": "RayD:shared/include/rayd/shared/rf/medium.cuh"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/em/fresnel.cuh",
+            "replacement": "RayD:shared/include/rayd/shared/rf/fresnel.cuh"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/em/layer_stack.cuh",
+            "replacement": "RayD:shared/include/rayd/shared/rf/layer_stack.cuh"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/field_transport.cuh",
+            "replacement": "RayD:shared/include/rayd/shared/rf/field_transport.cuh"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/field_transport_ad.cuh",
+            "replacement": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh"
+        },
+        {
+            "phase": "6A",
+            "path": "native/channel_native/kernels/em_debug.cu",
+            "replacement": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu"
         }
     ],
     "binding_count_delta": -9,
     "implementation_owner_delta": {
-        "Channel Native": 0,
-        "RayD": 0
+        "Channel Native": -3,
+        "RayD": 3
     },
     "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory.",
     "phase3_current": {
@@ -354,5 +404,193 @@
             "numerical_owner_changed": false
         },
         "public_api_delta": false
+    },
+    "phase6a_current": {
+        "status": "complete",
+        "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+        "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b",
+        "binding_count": 202,
+        "binding_manifest_sha256": "c9fca37ed77bfbfe23eb035214269e0e1ec351d7b587137215f67c80b5fe292d",
+        "owner_counts": {
+            "RayD": 20,
+            "layered": 2,
+            "Channel Native": 180
+        },
+        "transferred_symbols": [
+            "em_layer_stack_eval",
+            "em_layer_stack_backward",
+            "em_layer_stack_jvp"
+        ],
+        "shared_rf_helper_ownership": {
+            "RayD ADR-024 active": 112,
+            "Channel boundary retained": 10,
+            "Channel pending ADR-026": 7
+        },
+        "approved_phase9_body_hash_deletions": [
+            {
+              "owner_id": "field_transport.free_space",
+              "name": "fold_output_cotangents",
+              "token_count": 249,
+              "signature_sha256": "e183ddaadbd34a377450726aeda25285f9e4d4024b33eb81b3c352b1320a1dd7",
+              "body_sha256": "3dcfa11e35a32673dda99ec6956182f3e1064f0b81b6a28c9a66de346d32a49b"
+            },
+            {
+              "owner_id": "field_transport.free_space",
+              "name": "write_output_tangents",
+              "token_count": 185,
+              "signature_sha256": "30e8ea97dd96bad2ce1b8bd931bf4bd104a59fce9f9c3f043aae54c057e5cf02",
+              "body_sha256": "91f2a90d220d03da83b0a468acdd6f3dfed8e92771155675f65036f5deb7ab20"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_add",
+              "token_count": 19,
+              "signature_sha256": "b47eb81386480eae6a8b0a0a5496b14b110f08892f4d08e9bfcce0fb9a4a9ac7",
+              "body_sha256": "d0d22f3046a2182ec921a0b9c67807f5cae23551132240fe40d11352b7774120"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_sub",
+              "token_count": 19,
+              "signature_sha256": "6fc5a295c04c76caeda50bafaaa11a191db6eea9e00a484a1c175c572ebb37b3",
+              "body_sha256": "6e6ad0d4dc6e0879d2c364a6d2b94618bccc3b0a8e5cfd023ffde440866fa263"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_mul",
+              "token_count": 35,
+              "signature_sha256": "5065ffe6ad33c58a0c195e6dc25f4b83015b9885ebfa5965e1b92687a76212a0",
+              "body_sha256": "f8835b07803fccee7b171d8fe42dd360db1d624b885fb97c72ab67881be47416"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_scale",
+              "token_count": 15,
+              "signature_sha256": "019d36b71db32806515f91a0151dc98ab44dabecd3aafe0da5ba50eaf5da8ab3",
+              "body_sha256": "dcdf72a3f8412047491720804b0ea90f04a535adbea425c2103ca5adffbc5d84"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_div",
+              "token_count": 68,
+              "signature_sha256": "c1a755fb048e1ff14f60c7a0227250ebc5f9eb47693105f93c7392ee72bdaa5d",
+              "body_sha256": "daf06092b1f1360af8e4b8a575cacaa9bd06837a7690f3a0e6f3fd1df750729a"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_div_floor",
+              "token_count": 68,
+              "signature_sha256": "986fbbbbdab33a495b47c40ebae1fd0e67a03962b574a2e7c3e1b0ec532a9f02",
+              "body_sha256": "9092337aab9d177fcc7c2932fad76680eb72968dd828792398bd27f9bf839b4b"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_sqrt",
+              "token_count": 73,
+              "signature_sha256": "877dad44857d87bce786dfddb4bd5eec1c9af49a0e77c487c26efdf1f9587987",
+              "body_sha256": "3dded7023a4f68bde90150028d002f6f06593d8fccfb6572d08d49842dbd8cc5"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_interface_sqrt",
+              "token_count": 83,
+              "signature_sha256": "afa3d60a35d960e6a41b9bb9b4bde07bcced6efe8a1c4ff3d8a3a36c1b558f6e",
+              "body_sha256": "a2e7639876f8e5d302ade1f394606be43784b1839e5bece0985ffc8e7f755668"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_interface_fresnel",
+              "token_count": 170,
+              "signature_sha256": "ea052aec3c75d7a69d947c2d610005dbd3238cf5501aadb00a2150e1966baee1",
+              "body_sha256": "a742c4f8298e50013b3262d4fb032ab0324672ce5679b0a52ae7025b45330ecf"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_exp_neg_2i",
+              "token_count": 51,
+              "signature_sha256": "7a9937061fe6bc3a004c04c8975dc6df705dc00e1eeba870b6133baec565d520",
+              "body_sha256": "e41285ac832d174fbddd5d4abb98b52f146370fbd859243fa481fe0894951d55"
+            },
+            {
+              "owner_id": "legacy_slab.primal",
+              "name": "legacy_sionna_slab_fresnel",
+              "token_count": 332,
+              "signature_sha256": "9d7bb17cda78996cbae3928c4cf0dabbe208429b2ceb56b4e82c94a8463055d1",
+              "body_sha256": "c9cd0be01a95967efab64ffc85004aa459ce37ac935560b991123f185039fff6"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_const",
+              "token_count": 15,
+              "signature_sha256": "d7a9771bd2b1a1e04e7ad728e8e460329920962ad964265a1eb975c70bb3b2f1",
+              "body_sha256": "34258cb9c4dfc6aa004daac912a8cd6f2d725809b6e2dffd122a718f9a533729"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_make",
+              "token_count": 15,
+              "signature_sha256": "c3f12e72e39fb405f37470e191d4ebaccbb3f7af2aa815d44d06c7e2432e698f",
+              "body_sha256": "1db2023c639bf43976f698c471c8c084c8eeff058bb529b10a4eecfc6bb4faf2"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_add",
+              "token_count": 29,
+              "signature_sha256": "eb0c849fe7dfb3f27b50b46b6a12986affeb33c84b0735910798fb081d28a1d8",
+              "body_sha256": "9f4ea2743602e873114a40d4f43d9df8086947ca4159f37693aec4a8d39fc3bb"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_sub",
+              "token_count": 29,
+              "signature_sha256": "c308a43bc0d88acb6fb30a5f3db9baf2d5c440ce3596ff10d3356f3270f27254",
+              "body_sha256": "992f6ec5ceb33a8063e0b4b8982a463faf8ad29a4ca31f776b2fc815f035336c"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_mul",
+              "token_count": 47,
+              "signature_sha256": "e02906b8da9c76632181ee287b89769ba0d47761f0e3dfda639d2640a2e9ef42",
+              "body_sha256": "bd98c786324306f88ec56879f2eeb4bbaf37a750562180c23f66962e64f1947b"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_scale_dual",
+              "token_count": 47,
+              "signature_sha256": "9574b7b3c044562552cacb568854dd51ba0616f5de57c98f3f1fbae652745cb8",
+              "body_sha256": "152d8bfecb71401f27a901c75e82d146d27cd7e45e4dc759b4f5ee98ab3575c2"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_div",
+              "token_count": 197,
+              "signature_sha256": "188141e8ac169fc3383ca792007a2a7950b6c0c35e1ca2e6d32a0a69678bae7d",
+              "body_sha256": "4068dc59d550ce72058b7be845688dd3368717b27a4a253e16b66cb04d3f5e53"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_sqrt",
+              "token_count": 146,
+              "signature_sha256": "a04cd1b061db7ff79d7277ed4120c1a18c1f9100dd131f5eeb72997e6babb92f",
+              "body_sha256": "cae8e025b4024b342feaf5767f701570d04ce75cde79d9906dc5bd91d7367b29"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "dlc_exp_neg_2i",
+              "token_count": 131,
+              "signature_sha256": "9a4d5cacd0f6db8cde838391d1233faec22e0456f87f78570e9f3007ef95de6d",
+              "body_sha256": "a648d9d062e768b5152a2c64f5fa3b744c76e87340a648fc9360fe6bd258dcf1"
+            },
+            {
+              "owner_id": "legacy_slab.dual",
+              "name": "legacy_sionna_slab_fresnel_dual",
+              "token_count": 531,
+              "signature_sha256": "e484e1b309567f92ee0da437641f920bc5d1930a7c679f777e37b97368683743",
+              "body_sha256": "a2869629125cea3e050edb1b2bdd8789058bb52fb961daa22a28fd7540b086f7"
+            }
+        ],
+        "public_api_delta": false,
+        "binding_count_delta": 0
     }
 }

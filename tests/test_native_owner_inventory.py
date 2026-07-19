@@ -164,10 +164,14 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         "approved_phase9_body_hash_transfer_multiset"
     ]
     phase4 = migration["phase4_current"]
+    phase6a = migration["phase6a_current"]
     deleted_bindings = set(phase4["deleted_bindings"])
     approved_deletions = Counter(
         _hash_tuple(entry)
-        for entry in phase4["approved_phase9_body_hash_deletions"]
+        for entry in (
+            phase4["approved_phase9_body_hash_deletions"]
+            + phase6a["approved_phase9_body_hash_deletions"]
+        )
     )
     live_transfers = [
         transfer
@@ -199,7 +203,8 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for entry in current_inventory["symbols"]
     }
 
-    assert migration["current_phase"] == current_inventory["current_phase"] == 4
+    assert migration["current_phase"] == current_inventory["current_phase"] == 6
+    assert migration["current_subphase"] == current_inventory["current_subphase"] == "6A"
     assert len(live_transfers) == len(transferred_names)
     assert expected - actual == approved_before + approved_deletions
     assert actual_transferred == approved_after

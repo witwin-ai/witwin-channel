@@ -2,6 +2,17 @@
   "schema_version": 1,
   "helper_count": 129,
   "extraction": "source-level inline/device function declarations from the Phase 0 shared-header closure",
+  "phase6a_activation": {
+    "status": "active",
+    "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+    "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b",
+    "ownership_projection": {
+      "RayD ADR-024 active": 112,
+      "Channel boundary retained": 10,
+      "Channel pending ADR-026": 7
+    },
+    "record_semantics": "helper records below preserve immutable Phase 0 source/line extraction; this projection is the authoritative current owner state"
+  },
   "helpers": [
     {
       "name": "c_sqrt_passive",

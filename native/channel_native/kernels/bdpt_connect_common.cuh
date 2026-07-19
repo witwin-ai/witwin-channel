@@ -5,7 +5,7 @@
 #include <cuda_runtime_api.h>
 #include <torch/extension.h>
 
-#include "../field_transport.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
 
 #include <algorithm>
 #include <cmath>
@@ -15,8 +15,8 @@
 
 namespace {
 
-namespace utd = witwin::channel::native_ext;
-namespace transport = channel_native::field_transport;
+namespace utd = rayd::shared::utd;
+namespace transport = rayd::shared::rf::field_transport;
 
 constexpr float kLightSpeedMPerS = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;

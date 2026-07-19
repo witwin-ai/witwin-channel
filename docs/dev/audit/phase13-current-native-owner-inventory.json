@@ -28,11 +28,12 @@
   },
   "counts": {
     "bindings": 202,
-    "rayd_numerical": 17,
+    "rayd_numerical": 20,
     "layered": 2,
-    "channel_numerical": 183
+    "channel_numerical": 180
   },
-  "current_phase": 4,
+  "current_phase": 6,
+  "current_subphase": "6A",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -134,6 +135,33 @@
       "path_diffraction_paths_order1"
     ],
     "reachability_audit": "docs/dev/audit/phase13-phase4-dead-binding-reachability.json",
+    "public_api_delta": false
+  },
+  "phase6a_shared_rf_and_layer_stack": {
+    "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b",
+    "binding_count": 202,
+    "binding_manifest_sha256": "c9fca37ed77bfbfe23eb035214269e0e1ec351d7b587137215f67c80b5fe292d",
+    "owner_transfer": [
+      "em_layer_stack_eval",
+      "em_layer_stack_backward",
+      "em_layer_stack_jvp"
+    ],
+    "helper_ownership": {
+      "rayd_adr024_active": 112,
+      "channel_boundary": 10,
+      "channel_pending_adr026": 7
+    },
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/em/complex.cuh",
+      "native/channel_native/em/medium.cuh",
+      "native/channel_native/em/fresnel.cuh",
+      "native/channel_native/em/layer_stack.cuh",
+      "native/channel_native/field_transport.cuh",
+      "native/channel_native/field_transport_ad.cuh",
+      "native/channel_native/kernels/em_debug.cu"
+    ],
     "public_api_delta": false
   },
   "symbols": [
@@ -5149,26 +5177,26 @@
       "binding_target": "cn_em_layer_stack_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 403
+        "line": 517
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            19
+            85
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/em_debug.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu",
           "lines": [
-            464
+            476
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD typed RF implementation / Channel ABI facade",
       "python_owner": "witwin.channel_native.materials.kernels.functional.em_layer_stack_backward",
       "python_definitions": [
         {
@@ -5194,7 +5222,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
+      "plan13_disposition": "numerical owner moved to RayD in Phase 6A; Channel ABI and materials facade retained"
     },
     {
       "symbol": "em_layer_stack_eval",
@@ -5202,26 +5230,26 @@
       "binding_target": "cn_em_layer_stack_eval",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 399
+        "line": 513
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            9
+            62
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/em_debug.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu",
           "lines": [
-            309
+            310
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD typed RF implementation / Channel ABI facade",
       "python_owner": "witwin.channel_native.materials.kernels.functional.em_layer_stack_eval",
       "python_definitions": [
         {
@@ -5259,7 +5287,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
+      "plan13_disposition": "numerical owner moved to RayD in Phase 6A; Channel ABI and materials facade retained"
     },
     {
       "symbol": "em_layer_stack_jvp",
@@ -5267,26 +5295,26 @@
       "binding_target": "cn_em_layer_stack_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 407
+        "line": 521
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            33
+            128
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/em_debug.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu",
           "lines": [
-            534
+            541
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD typed RF implementation / Channel ABI facade",
       "python_owner": "witwin.channel_native.materials.kernels.functional.em_layer_stack_jvp",
       "python_definitions": [
         {
@@ -5312,7 +5340,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
+      "plan13_disposition": "numerical owner moved to RayD in Phase 6A; Channel ABI and materials facade retained"
     },
     {
       "symbol": "field_coupled_dd",

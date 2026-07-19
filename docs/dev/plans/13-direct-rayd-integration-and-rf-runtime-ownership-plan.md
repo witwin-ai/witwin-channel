@@ -545,6 +545,17 @@ precise-math/fusion/tape、Channel保留内容和双仓 dormant-candidate切换�
 
 ### Phase 6A — Shared RF device headers + layer-stack family
 
+**状态：** COMPLETE（2026-07-19；RayD candidate
+`4cb400acbfcc2da7fda4110d1298d311816905f1` 已 push，Channel 已原子 pin/switch）
+
+**激活证据：** integration v2 header SHA-256
+`c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b`；
+202 个 Channel bindings 中 `em_layer_stack_eval/backward/jvp` 的 ABI/façade仍由
+Channel持有，numerical owner已迁为RayD。冻结的129-helper闭包中112个ADR-024
+numerical helpers已激活RayD唯一source owner，10个Channel boundary helpers继续留在
+Channel，7个scattering-table helpers继续等待ADR-026。Channel本地RF numerical
+headers与`em_debug.cu`已删除，无forwarding shim或双production owner。
+
 1. RayD 建立 complex/medium/Fresnel/layer-stack/Jones/slab primal/dual public device headers。
 2. Channel所有consumer切到同一 RayD header；exact/codegen/AD lockstep后删除本地副本。
 3. 整族迁 `em_layer_stack_eval/backward/jvp`，Channel materials façade和CSR owner保持。

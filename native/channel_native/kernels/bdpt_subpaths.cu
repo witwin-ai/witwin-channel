@@ -4,17 +4,17 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 
-#include "../em/layer_stack.cuh"
-#include "../field_transport.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/shared/rf/layer_stack.cuh>
 
 #include <vector>
 
 namespace {
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
-namespace em = channel_native::em;
-namespace utd = witwin::channel::native_ext;
-namespace transport = channel_native::field_transport;
+namespace em = rayd::shared::rf::em;
+namespace utd = rayd::shared::utd;
+namespace transport = rayd::shared::rf::field_transport;
 
 // Subpath event codes (event_type). Endpoint and specular events are delta
 // events: they never multiply the stored non-delta proposal densities.

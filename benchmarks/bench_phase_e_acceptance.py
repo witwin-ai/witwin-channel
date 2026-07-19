@@ -304,7 +304,7 @@ def run_case(
     scene_torch_before = _torch_memory_snapshot()
     scene_device_before = _device_memory()
     optix_started = time.perf_counter()
-    scene.raydn_scene()
+    scene.rayd_scene()
     torch.cuda.synchronize()
     optix_scene_build_ms = (time.perf_counter() - optix_started) * 1_000.0
     optix_device_after = _device_memory()

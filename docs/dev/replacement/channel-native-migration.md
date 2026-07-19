@@ -57,6 +57,26 @@ is unchanged. Exact deletion and body-hash evidence lives in
 `docs/dev/audit/phase13-phase4-dead-binding-reachability.json` and
 `docs/dev/audit/phase13-migration-delta.json`.
 
+### Plan 13 Phase 6A: shared RF and resident layer-stack ownership
+
+Channel Native now pins the pushed RayD candidate
+`4cb400acbfcc2da7fda4110d1298d311816905f1`; the locked
+`backends/torch/include/rayd/torch/integration_v2.h` SHA-256 is
+`c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b`.
+RayD is the unique numerical source owner of the ADR-024 shared RF
+complex/medium/Fresnel/layer-stack/Jones primal/dual closure and the complete
+`em_layer_stack_eval/backward/jvp` family. Channel still owns all three stable
+`_channel_native` names, the materials facade, Material ABI v3/CSR encoding,
+validation, caches and resources.
+
+All Channel native consumers include the versioned RayD public headers. The
+former Channel-private numerical headers and `kernels/em_debug.cu` are removed
+without forwarding aliases or a runtime fallback. Of the 129 frozen helper
+records, 112 now have RayD as their active unique source owner, 10 remain
+Channel boundary-only tensor/launch adapters, and 7 scattering-table helpers
+remain Channel-owned pending ADR-026. The live binding count remains 202; the
+current owner split is RayD 20, layered Channel/RayD 2, and Channel Native 180.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

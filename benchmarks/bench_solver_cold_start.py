@@ -33,7 +33,7 @@ def _child(solver: str) -> dict[str, Any]:
     torch.cuda.synchronize()
     optix_free_before, device_total = torch.cuda.mem_get_info()
     optix_started = time.perf_counter()
-    scene.raydn_scene()
+    scene.rayd_scene()
     torch.cuda.synchronize()
     optix_scene_build_ms = (time.perf_counter() - optix_started) * 1000.0
     optix_free_after, _ = torch.cuda.mem_get_info()

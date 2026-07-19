@@ -4820,7 +4820,7 @@
       "name": "em_layer_stack_backward",
       "target": "cn_em_layer_stack_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 403,
+      "line": 516,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4897,7 +4897,7 @@
       "name": "em_layer_stack_eval",
       "target": "cn_em_layer_stack_eval",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 399,
+      "line": 512,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4954,7 +4954,7 @@
       "name": "em_layer_stack_jvp",
       "target": "cn_em_layer_stack_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 407,
+      "line": 520,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8206,7 +8206,7 @@
       "name": "kirchhoff_table_build_backward",
       "target": "cn_kirchhoff_table_build_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 447,
+      "line": 560,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8333,7 +8333,7 @@
       "name": "kirchhoff_table_build_jvp",
       "target": "cn_kirchhoff_table_build_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 449,
+      "line": 562,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11869,7 +11869,7 @@
       "name": "scattering_chain_ensemble_eval",
       "target": "cn_scattering_chain_ensemble_eval",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 435,
+      "line": 548,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12091,7 +12091,7 @@
       "name": "scattering_chain_ensemble_eval_backward",
       "target": "cn_scattering_chain_ensemble_eval_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 437,
+      "line": 550,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12358,7 +12358,7 @@
       "name": "scattering_chain_ensemble_eval_jvp",
       "target": "cn_scattering_chain_ensemble_eval_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 439,
+      "line": 552,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12695,7 +12695,7 @@
       "name": "scattering_chain_realization_eval",
       "target": "cn_scattering_chain_realization_eval",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 441,
+      "line": 554,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12937,7 +12937,7 @@
       "name": "scattering_chain_realization_eval_backward",
       "target": "cn_scattering_chain_realization_eval_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 443,
+      "line": 556,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -13229,7 +13229,7 @@
       "name": "scattering_chain_realization_eval_jvp",
       "target": "cn_scattering_chain_realization_eval_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 445,
+      "line": 558,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -13596,7 +13596,7 @@
       "name": "scattering_ensemble_eval",
       "target": "cn_scattering_ensemble_eval",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 419,
+      "line": 532,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -13728,7 +13728,7 @@
       "name": "scattering_ensemble_eval_backward",
       "target": "cn_scattering_ensemble_eval_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 423,
+      "line": 536,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -13895,7 +13895,7 @@
       "name": "scattering_ensemble_eval_jvp",
       "target": "cn_scattering_ensemble_eval_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 425,
+      "line": 538,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14102,7 +14102,7 @@
       "name": "scattering_event_probabilities",
       "target": "cn_scattering_event_probabilities",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 417,
+      "line": 530,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14164,7 +14164,7 @@
       "name": "scattering_patch_integral_eval",
       "target": "cn_scattering_patch_integral_eval",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 421,
+      "line": 534,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14266,7 +14266,7 @@
       "name": "scattering_patch_integral_eval_backward",
       "target": "cn_scattering_patch_integral_eval_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 427,
+      "line": 540,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14393,7 +14393,7 @@
       "name": "scattering_patch_integral_eval_jvp",
       "target": "cn_scattering_patch_integral_eval_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 429,
+      "line": 542,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14540,7 +14540,7 @@
       "name": "scattering_table_eval",
       "target": "cn_scattering_table_eval",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 411,
+      "line": 524,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14572,7 +14572,7 @@
       "name": "scattering_table_eval_backward",
       "target": "cn_scattering_table_eval_backward",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 431,
+      "line": 544,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14624,7 +14624,7 @@
       "name": "scattering_table_eval_jvp",
       "target": "cn_scattering_table_eval_jvp",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 433,
+      "line": 546,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14676,7 +14676,7 @@
       "name": "scattering_table_pdf",
       "target": "cn_scattering_table_pdf",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 413,
+      "line": 526,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -14708,7 +14708,7 @@
       "name": "scattering_table_sample",
       "target": "cn_scattering_table_sample",
       "path": "native/channel_native/binding/materials.cpp",
-      "line": 415,
+      "line": 528,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [

@@ -1,6 +1,6 @@
 #include "bdpt_connect_common.cuh"
 
-#include "../field_transport_ad.cuh"
+#include <rayd/torch/rf/field_transport_ad.cuh>
 
 #include <algorithm>
 
@@ -21,7 +21,7 @@
 
 namespace {
 
-namespace ad = channel_native::field_transport_ad;
+namespace ad = rayd::torch::rf::field_transport_ad;
 
 // Recompute the frozen carrier for one connection row exactly as
 // bdpt_endpoint_connection_samples_kernel; returns whether the row contributes.

@@ -1,6 +1,6 @@
 #include "field_transport_ad_common.cuh"
 
-#include "../em/layer_stack.cuh"
+#include <rayd/shared/rf/layer_stack.cuh>
 
 // ADR-022 6.1 / 6.2: backward + jvp companions for the BDPT light-subpath
 // advance ops.
@@ -20,7 +20,7 @@
 
 namespace {
 
-namespace ad = channel_native::field_transport_ad;
+namespace ad = rayd::torch::rf::field_transport_ad;
 
 constexpr float kSubpathEps = 1.0e-9f;
 constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;

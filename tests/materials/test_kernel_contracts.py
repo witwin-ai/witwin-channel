@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 import pytest
+import torch
 import witwin.channel_native.materials as public_materials
 from witwin.channel_native.core import materials as core_materials
 from witwin.channel_native.materials import kernels
@@ -86,6 +87,44 @@ def test_material_autograd_uses_canonical_dependencies():
         "em_layer_stack_jvp",
     ):
         assert getattr(autograd, name) is getattr(functional, name)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
+def test_bdpt_face_material_tensor_facade_dispatches_and_validates_schema():
+    exported = functional.bdpt_face_material_tensors(
+        torch.tensor([2.5, 4.0], device="cuda", dtype=torch.float32),
+        torch.tensor([0.01, 0.02], device="cuda", dtype=torch.float32),
+        torch.tensor([1.0, 1.2], device="cuda", dtype=torch.float32),
+        torch.tensor([1, 0, 1], device="cuda", dtype=torch.int32),
+    )
+
+    assert set(exported) == {"eps_r", "sigma_e", "mu_r", "gain", "valid"}
+    assert all(value.shape == (3,) for value in exported.values())
+    assert exported["valid"].dtype == torch.bool
+
+
+def test_host_material_facade_rejects_inconsistent_contracts():
+    with pytest.raises(ValueError, match="must not be empty"):
+        functional.bdpt_face_material_tensors_from_host((), (), (), ())
+    with pytest.raises(ValueError, match="sigma_e must match"):
+        functional.bdpt_face_material_tensors_from_host((2.5,), (), (1.0,), (0,))
+    with pytest.raises(ValueError, match="mu_r must match"):
+        functional.bdpt_face_material_tensors_from_host((2.5,), (0.01,), (), (0,))
+    with pytest.raises(ValueError, match="entries must reference"):
+        functional.bdpt_face_material_tensors_from_host(
+            (2.5,), (0.01,), (1.0,), (1,)
+        )
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
+def test_mc_face_material_facade_rejects_mismatched_sigma_shape():
+    with pytest.raises(ValueError, match="sigma_e must match"):
+        functional.mc_face_material_tensors(
+            torch.tensor([2.5], device="cuda", dtype=torch.float32),
+            torch.tensor([0.01, 0.02], device="cuda", dtype=torch.float32),
+            torch.tensor([1.0], device="cuda", dtype=torch.float32),
+            torch.tensor([0], device="cuda", dtype=torch.int32),
+        )
 
 
 def test_materials_package_preserves_public_object_identity():

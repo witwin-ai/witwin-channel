@@ -5,7 +5,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
-#include "../field_transport.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
 
 #include <cmath>
 
@@ -18,8 +18,8 @@ constexpr float kPi = 3.14159265358979323846f;
 constexpr float kEps = 1.0e-6f;
 
 using channel_native::check_tensor;
-namespace transport = channel_native::field_transport;
-namespace utd = witwin::channel::native_ext;
+namespace transport = rayd::shared::rf::field_transport;
+namespace utd = rayd::shared::utd;
 
 struct Float3 {
     float x;

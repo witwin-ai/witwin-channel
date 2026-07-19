@@ -14,7 +14,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `adf0ea2d1481f7548c5ef30c31b4adbaf831f963` and calls the typed
+  `4cb400acbfcc2da7fda4110d1298d311816905f1` and calls the typed
   `rayd::torch` v2 C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
@@ -22,7 +22,13 @@ priority `scattering > diffraction > transmission > reflection > los`.
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration header is
   `backends/torch/include/rayd/torch/integration_v2.h` with SHA-256
-  `d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928`.
+  `c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b`.
+- RayD is the unique numerical source owner of the shared complex, medium,
+  Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
+  `em_layer_stack_eval/backward/jvp`. Channel retains the material ABI/CSR,
+  validation, cache, `_channel_native` binding, and Python facade contracts;
+  there is no Channel-private numerical copy or compatibility forwarding
+  header.
 
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.

@@ -1,4 +1,4 @@
-#include "field_transport_ad.cuh"
+#include <rayd/torch/rf/field_transport_ad.cuh>
 
 #include <cuda_runtime.h>
 
@@ -8,9 +8,9 @@
 
 namespace {
 
-namespace ad = channel_native::field_transport_ad;
-namespace transport = channel_native::field_transport;
-namespace utd = witwin::channel::native_ext;
+namespace ad = rayd::torch::rf::field_transport_ad;
+namespace transport = rayd::shared::rf::field_transport;
+namespace utd = rayd::shared::utd;
 
 struct SlabCase {
     const char* name;

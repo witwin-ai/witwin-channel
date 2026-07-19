@@ -4,8 +4,8 @@
 #include <cuda_runtime_api.h>
 
 #include "../tensor_checks.h"
-#include "../field_transport.cuh"
-#include "../field_transport_ad.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/torch/rf/field_transport_ad.cuh>
 
 #include <algorithm>
 #include <tuple>
@@ -16,8 +16,8 @@ constexpr int kReflectionBlockSize = 256;
 constexpr int kReflectionAdMaxDepth = 8;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kReflectionEpsilon = 1.0e-6f;
-namespace transport = channel_native::field_transport;
-namespace ad = channel_native::field_transport_ad;
+namespace transport = rayd::shared::rf::field_transport;
+namespace ad = rayd::torch::rf::field_transport_ad;
 
 struct Complex {
     float r;
@@ -83,8 +83,8 @@ __device__ __forceinline__ void slab_coefficients(
     float wavelength,
     Complex &r_te,
     Complex &r_tm) {
-    witwin::channel::native_ext::Complex shared_te;
-    witwin::channel::native_ext::Complex shared_tm;
+    rayd::shared::utd::Complex shared_te;
+    rayd::shared::utd::Complex shared_tm;
     transport::legacy_sionna_slab_fresnel(
         cos_theta,
         eta_r,
@@ -246,7 +246,7 @@ __device__ __forceinline__ ReflectionBounceFrame reflection_bounce_frame(
 
 // Real-pair contribution of a dual coefficient against a complex cotangent.
 __device__ __forceinline__ float adj_dot_local(
-    Complex g, witwin::channel::native_ext::Complex d) {
+    Complex g, rayd::shared::utd::Complex d) {
     return g.r * d.re + g.i * d.im;
 }
 

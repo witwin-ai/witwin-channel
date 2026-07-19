@@ -5,17 +5,17 @@
 #include <rayd/shared/utd/utd_math.h>
 
 #include "../tensor_checks.h"
-#include "../field_transport.cuh"
-#include "../field_transport_ad.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/torch/rf/field_transport_ad.cuh>
 #include <algorithm>
 #include <vector>
 
 namespace {
 
 constexpr int kDiffractionBlockSize = 256;
-namespace utd = witwin::channel::native_ext;
-namespace transport = channel_native::field_transport;
-namespace fad = channel_native::field_transport_ad;
+namespace utd = rayd::shared::utd;
+namespace transport = rayd::shared::rf::field_transport;
+namespace fad = rayd::torch::rf::field_transport_ad;
 
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;

@@ -15,7 +15,7 @@ namespace {
 constexpr int kBlockSize = 256;
 constexpr float kGeometryEpsilon = 1.0e-6f;
 constexpr float kSpeedOfLight = 299792458.0f;
-namespace utd = witwin::channel::native_ext;
+namespace utd = rayd::shared::utd;
 
 __device__ __forceinline__ float3 load3(const float *values, int64_t index) {
     const int64_t base = index * 3;

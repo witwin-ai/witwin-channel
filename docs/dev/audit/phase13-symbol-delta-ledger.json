@@ -178,7 +178,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "em_layer_stack_eval",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 6A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -186,7 +186,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "em_layer_stack_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 6A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -194,7 +194,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "em_layer_stack_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 6A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {

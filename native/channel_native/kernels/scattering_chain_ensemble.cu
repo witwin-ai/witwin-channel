@@ -40,7 +40,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <torch/extension.h>
 
-#include "../field_transport.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
 #include "../tensor_checks.h"
 #include "scattering_table.cuh"
 
@@ -48,8 +48,8 @@ namespace {
 
 constexpr int kBlockSize = 256;
 constexpr int kMaxAdDepth = 8;
-namespace field = witwin::channel::native_ext;
-namespace transport = channel_native::field_transport;
+namespace field = rayd::shared::utd;
+namespace transport = rayd::shared::rf::field_transport;
 namespace st = channel_native::scattering_tables;
 
 int launch_blocks(int64_t count) {

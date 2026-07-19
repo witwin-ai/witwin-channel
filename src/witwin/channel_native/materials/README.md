@@ -4,11 +4,11 @@
 
 `materials` owns material models, Material ABI v3 encoding, layer-CSR
 validation, frequency evaluation, loader parsing, and native electromagnetic
-layer-stack facades. Under ADR-024, RayD becomes the numerical source owner of
-the resident layer-stack primal/backward/JVP family only after the Phase 6A
-pin/switch; the model, ABI/CSR, cache, resource, validation, and facade
-contracts remain here. Scene stores cache encoded records; propagation and
-solvers consume them without redefining material semantics.
+layer-stack facades. Under ADR-024 and the completed Phase 6A pin/switch, RayD
+is the numerical source owner of the resident layer-stack
+primal/backward/JVP family; the model, ABI/CSR, cache, resource, validation,
+and facade contracts remain here. Scene stores cache encoded records;
+propagation and solvers consume them without redefining material semantics.
 
 ## Public entry points
 

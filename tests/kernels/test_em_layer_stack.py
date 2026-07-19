@@ -279,3 +279,88 @@ def test_zero_layer_material_is_transparent():
     assert _complex(out, "t_te") == 1.0 + 0j
     assert out["cap_T_te"][0].item() == 1.0
     assert out["cap_R_tm"][0].item() == 0.0
+
+
+def test_direct_native_ad_companions_preserve_schema_and_optional_contract():
+    frequency = 3.0e9
+    cos_theta = torch.tensor([0.7], device="cuda", dtype=torch.float32)
+    material_id = torch.tensor([0], device="cuda", dtype=torch.int32)
+    layers = _csr([[(0.1, 4.0, 0.02, 1.0)]])
+    primal = ops.em_layer_stack_eval(
+        cos_theta,
+        material_id,
+        **layers,
+        frequency_hz=frequency,
+    )
+    grad_outputs = tuple(
+        torch.ones_like(primal[name]) if index % 2 == 0 else None
+        for index, name in enumerate(ops._EM_LAYER_STACK_FIELDS)
+    )
+
+    backward = ops.em_layer_stack_backward(
+        cos_theta,
+        material_id,
+        **layers,
+        grad_outputs=grad_outputs,
+        frequency_hz=frequency,
+        need_cos_theta=True,
+        need_layers=True,
+        need_frequency=True,
+    )
+    assert set(backward) == {
+        "grad_cos_theta",
+        "grad_layer_thickness_m",
+        "grad_layer_eps_r",
+        "grad_layer_sigma_e",
+        "grad_frequency",
+    }
+    assert backward["grad_cos_theta"].shape == cos_theta.shape
+    assert backward["grad_layer_thickness_m"].shape == layers["layer_thickness_m"].shape
+    assert backward["grad_layer_eps_r"].shape == layers["layer_eps_r"].shape
+    assert backward["grad_layer_sigma_e"].shape == layers["layer_sigma_e"].shape
+    assert backward["grad_frequency"].shape == (1,)
+
+    jvp = ops.em_layer_stack_jvp(
+        cos_theta,
+        material_id,
+        **layers,
+        frequency_hz=frequency,
+        tangent_cos_theta=torch.full_like(cos_theta, 0.1),
+        tangent_layer_thickness=torch.full_like(layers["layer_thickness_m"], 0.01),
+        tangent_layer_eps_r=torch.full_like(layers["layer_eps_r"], 0.2),
+        tangent_layer_sigma_e=None,
+        tangent_frequency=1.0e6,
+    )
+    assert set(jvp) == set(ops._EM_LAYER_STACK_FIELDS)
+    assert all(value.shape == cos_theta.shape for value in jvp.values())
+
+    with pytest.raises(ValueError, match="one cotangent slot"):
+        ops.em_layer_stack_backward(
+            cos_theta,
+            material_id,
+            **layers,
+            grad_outputs=(None,),
+            frequency_hz=frequency,
+            need_cos_theta=False,
+            need_layers=False,
+            need_frequency=False,
+        )
+
+
+def test_layer_stack_facade_rejects_row_shape_and_nonpositive_frequency():
+    cos_theta = torch.tensor([0.7], device="cuda", dtype=torch.float32)
+    layers = _csr([[(0.1, 4.0, 0.02, 1.0)]])
+    with pytest.raises(ValueError, match="must match cos_theta length"):
+        ops.em_layer_stack_eval(
+            cos_theta,
+            torch.tensor([0, 0], device="cuda", dtype=torch.int32),
+            **layers,
+            frequency_hz=3.0e9,
+        )
+    with pytest.raises(ValueError, match="frequency_hz must be positive"):
+        ops.em_layer_stack_eval(
+            cos_theta,
+            torch.tensor([0], device="cuda", dtype=torch.int32),
+            **layers,
+            frequency_hz=0.0,
+        )

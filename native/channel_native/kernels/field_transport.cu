@@ -4,8 +4,8 @@
 #include <c10/util/complex.h>
 #include <torch/extension.h>
 
-#include "../em/layer_stack.cuh"
-#include "../field_transport.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/shared/rf/layer_stack.cuh>
 #include "../tensor_checks.h"
 
 #include <vector>
@@ -13,9 +13,9 @@
 namespace {
 
 constexpr int kBlockSize = 256;
-namespace em = channel_native::em;
-namespace field = witwin::channel::native_ext;
-namespace transport = channel_native::field_transport;
+namespace em = rayd::shared::rf::em;
+namespace field = rayd::shared::utd;
+namespace transport = rayd::shared::rf::field_transport;
 
 __device__ __forceinline__ field::float3a load3(const float* values, int64_t index) {
     const int64_t base = index * 3;

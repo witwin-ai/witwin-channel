@@ -487,7 +487,6 @@ Python_add_library(
     native/channel_native/kernels/bdpt_subpaths_ad.cu
     native/channel_native/kernels/bdpt_maps.cu
     native/channel_native/kernels/coupled_topology.cu
-    native/channel_native/kernels/em_debug.cu
     native/channel_native/kernels/field_transport.cu
     native/channel_native/kernels/field_transport_free_space.cu
     native/channel_native/kernels/field_transport_reflection.cu
@@ -620,6 +619,7 @@ if(BUILD_TESTING)
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/native/channel_native"
             "${RAYD_SOURCE_DIR}/shared/include"
+            "${RAYD_SOURCE_DIR}/backends/torch/include"
             "${TORCH_INSTALL_PREFIX}/include"
             "${TORCH_INSTALL_PREFIX}/include/torch/csrc/api/include")
     target_link_libraries(channel_native_legacy_slab_lockstep PRIVATE CUDA::cudart)

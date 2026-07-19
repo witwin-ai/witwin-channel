@@ -46,16 +46,16 @@
 #include <cusolverDn.h>
 #include <torch/extension.h>
 
-#include "../em/layer_stack.cuh"
-#include "../field_transport_ad.cuh"
+#include <rayd/shared/rf/layer_stack.cuh>
+#include <rayd/torch/rf/field_transport_ad.cuh>
 #include "../tensor_checks.h"
 
 namespace {
 
 constexpr int kBlockSize = 256;
-namespace em = channel_native::em;
-namespace ad = channel_native::field_transport_ad;
-namespace utd = witwin::channel::native_ext;
+namespace em = rayd::shared::rf::em;
+namespace ad = rayd::torch::rf::field_transport_ad;
+namespace utd = rayd::shared::utd;
 
 constexpr float kTwoPi = 6.283185307179586f;
 constexpr float kDkDf = kTwoPi / em::kSpeedOfLight;  // dk0/df
@@ -103,7 +103,7 @@ const T* opt_ptr(const at::Tensor* tensor) {
 }
 
 // --------------------------------------------------------------------------
-// Layer-stack seed functors (mirror em_debug.cu's private seeds; a private
+// Layer-stack seed functors (mirror the RayD typed layer-stack seeds; a private
 // copy keeps this TU self-contained).
 // --------------------------------------------------------------------------
 struct ZeroSeed {

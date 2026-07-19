@@ -18,7 +18,10 @@ domain APIs, not root exports. Kernel modules and energy helpers are internal.
 Scattering may depend on material value contracts, physics utilities, and
 domain kernel facades. It must not import a solver or acquire a mutable scene or
 native handle. Solvers consume scattering contracts through their owning
-pipeline stage.
+pipeline stage. After Plan 13 Phase 6A, retained scattering and chain kernels
+consume RayD's public shared RF device headers; the seven scattering-table
+helpers remain Channel-owned until ADR-026 and are not folded into the
+ADR-024 transfer.
 
 ## Numerical and AD contract
 

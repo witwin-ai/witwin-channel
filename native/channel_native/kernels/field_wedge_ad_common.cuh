@@ -6,8 +6,8 @@
 #include <c10/util/complex.h>
 #include <torch/extension.h>
 
-#include "../field_transport.cuh"
-#include "../field_transport_ad.cuh"
+#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/torch/rf/field_transport_ad.cuh>
 #include "../tensor_checks.h"
 
 #include <array>
@@ -16,9 +16,9 @@
 namespace {
 
 constexpr int kBlockSize = 128;
-namespace field = witwin::channel::native_ext;
-namespace transport = channel_native::field_transport;
-namespace ad = channel_native::field_transport_ad;
+namespace field = rayd::shared::utd;
+namespace transport = rayd::shared::rf::field_transport;
+namespace ad = rayd::torch::rf::field_transport_ad;
 
 using Dual = field::Dual;
 using DualV3 = field::Vec3T<Dual>;
