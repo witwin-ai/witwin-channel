@@ -202,7 +202,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "field_transmission_sequence",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 6B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -210,7 +210,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "field_transmission_sequence_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 6B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -218,7 +218,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "field_transmission_sequence_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 6B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {

@@ -8,6 +8,18 @@
     "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
     "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b"
   },
+  "phase6b_activation": {
+    "status": "active",
+    "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
+    "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence",
+    "activated_contract_count": 3,
+    "total_adr024_contract_count": 6,
+    "pending_contract_count": 0,
+    "binding_count_delta": 0,
+    "channel_abi_owner_retained": true,
+    "complete_family_move": true
+  },
   "families": [
     "resident CSR layer-stack",
     "complete-row transmission field"
@@ -22,7 +34,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 513
+        "line": 512
       },
       "implementation_evidence": [
         {
@@ -81,7 +93,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 517
+        "line": 516
       },
       "implementation_evidence": [
         {
@@ -128,7 +140,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 521
+        "line": 520
       },
       "implementation_evidence": [
         {
@@ -169,25 +181,26 @@
     {
       "symbol": "field_transmission_sequence",
       "family": "complete-row transmission field",
-      "current_numerical_owner": "Channel Native",
-      "target_numerical_owner": "RayD after ADR-024",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD (activated under ADR-024 in Phase 6B)",
+      "activation_phase": "6B",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 653
+        "line": 835
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/fields.cpp",
           "lines": [
-            364
+            445
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/field_transport.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu",
           "lines": [
-            957
+            288
           ],
           "count": 1
         }
@@ -210,25 +223,26 @@
     {
       "symbol": "field_transmission_sequence_backward",
       "family": "complete-row transmission field",
-      "current_numerical_owner": "Channel Native",
-      "target_numerical_owner": "RayD after ADR-024",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD (activated under ADR-024 in Phase 6B)",
+      "activation_phase": "6B",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 686
+        "line": 868
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/fields.cpp",
           "lines": [
-            462
+            563
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/field_transport_transmission.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
           "lines": [
-            619
+            764
           ],
           "count": 1
         }
@@ -256,25 +270,26 @@
     {
       "symbol": "field_transmission_sequence_jvp",
       "family": "complete-row transmission field",
-      "current_numerical_owner": "Channel Native",
-      "target_numerical_owner": "RayD after ADR-024",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD (activated under ADR-024 in Phase 6B)",
+      "activation_phase": "6B",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 690
+        "line": 872
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/fields.cpp",
           "lines": [
-            490
+            640
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/field_transport_transmission.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
           "lines": [
-            769
+            906
           ],
           "count": 1
         }

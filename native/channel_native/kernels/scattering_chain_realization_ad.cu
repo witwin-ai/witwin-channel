@@ -15,7 +15,7 @@
 // op-2's caller jones scalar, so its reverse/forward derivative rides the same
 // per-bounce reflect_frame / slab_fresnel machinery as
 // field_transport_reflection.cu and the em::stack_rt layer dual of
-// field_transport_transmission.cu.  Both companions recompute the forward
+// rayd/torch/rf/field_transport_ad.cuh.  Both companions recompute the forward
 // intermediates in primal expression order (ADR-004); this TU compiles
 // --fmad=false in lockstep with the forward.
 //

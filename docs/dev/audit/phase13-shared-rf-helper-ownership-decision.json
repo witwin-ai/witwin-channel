@@ -11,6 +11,20 @@
     "channel_boundary_helpers": 10,
     "channel_pending_adr026_helpers": 7
   },
+  "phase6b_activation": {
+    "status": "active",
+    "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
+    "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence",
+    "transmission_contracts_activated": 3,
+    "helper_count_delta": 0,
+    "helper_ownership": {
+      "RayD ADR-024 active": 112,
+      "Channel boundary retained": 10,
+      "Channel pending ADR-026": 7
+    },
+    "reason": "The complete transmission-sequence family consumes the already activated Phase 6A shared RF closure; Phase 6B moves operation ownership without adding, deleting, or reclassifying helper identities."
+  },
   "baseline": {
     "path": "docs/dev/audit/phase13-shared-rf-helper-ledger.json",
     "sha256": "975b75db559aa4facd46659f62dbd74053b0fdb60a9b3e9309ce520d3f1563f4",

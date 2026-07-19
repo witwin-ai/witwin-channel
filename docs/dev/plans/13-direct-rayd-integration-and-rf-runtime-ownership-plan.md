@@ -562,6 +562,20 @@ headers与`em_debug.cu`已删除，无forwarding shim或双production owner。
 
 ### Phase 6B — Transmission-sequence family
 
+**状态：** COMPLETE（2026-07-19；RayD candidate
+`3988f0934fec7b521ee5190b0defc0883c84b9e6` 已 push，Channel 已原子
+pin/switch/delete 本地 transmission-sequence source）
+
+**激活证据：** 202 个 Channel bindings 中
+`field_transmission_sequence/backward/jvp` 的 ABI/façade保持Channel持有，numerical
+owner整族迁为RayD；current owner split为RayD 23、layered 2、Channel Native 177。
+Channel删除`field_transport_transmission.cu`并从`field_transport.cu`移除primal owner，
+没有forwarding shim、第二launch或persistent tape。129-helper闭包保持112/10/7，BDPT
+transmitted-state三件套保持完整Channel owner。
+锁定integration v2 header SHA-256为
+`6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989`，identity为
+`rayd.torch.integration.v2.20260719.rf-transmission-sequence`。
+
 整族迁 `field_transmission_sequence/backward/jvp`；保持 complete-row fusion、atomic layer
 gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDPT transmitted-state
 继续在 Channel并改用 RayD shared primitives。

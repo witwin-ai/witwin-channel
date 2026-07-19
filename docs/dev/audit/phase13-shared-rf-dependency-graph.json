@@ -10,13 +10,25 @@
       "Channel pending ADR-026": 7
     }
   },
+  "phase6b_activation": {
+    "status": "active",
+    "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
+    "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence",
+    "transmission_contracts_activated": 3,
+    "helper_count_delta": 0,
+    "deleted_channel_consumer": "native/channel_native/kernels/field_transport_transmission.cu",
+    "reduced_channel_consumer": "native/channel_native/kernels/field_transport.cu",
+    "reverse_private_include_count": 0
+  },
   "roots": [
+    "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu",
+    "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
     "native/channel_native/kernels/scattering_chain_ensemble.cu",
     "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
     "native/channel_native/kernels/scattering_chain_realization.cu",
     "native/channel_native/kernels/scattering_chain_realization_ad.cu",
-    "native/channel_native/kernels/field_transport.cu",
-    "native/channel_native/kernels/field_transport_transmission.cu"
+    "native/channel_native/kernels/field_transport.cu"
   ],
   "nodes": [
     {
@@ -46,6 +58,8 @@
       "target_source_owner": "RayD",
       "direct_consumers": [
         "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh",
+        "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu",
+        "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
         "native/channel_native/kernels/bdpt_subpaths.cu",
         "native/channel_native/kernels/bdpt_subpaths_ad.cu",
         "native/channel_native/kernels/field_transport.cu",
@@ -59,6 +73,8 @@
       "target_source_owner": "RayD",
       "direct_consumers": [
         "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh",
+        "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu",
+        "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
         "native/channel_native/kernels/bdpt_connect_common.cuh",
         "native/channel_native/kernels/bdpt_subpaths.cu",
         "native/channel_native/kernels/deterministic_field.cu",
@@ -75,6 +91,7 @@
       "current_source_owner": "RayD",
       "target_source_owner": "RayD",
       "direct_consumers": [
+        "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
         "native/channel_native/kernels/bdpt_connect_ad.cu",
         "native/channel_native/kernels/diffraction.cu",
         "native/channel_native/kernels/field_transport_ad_common.cuh",
@@ -92,12 +109,25 @@
         "native/channel_native/kernels/bdpt_subpaths_ad.cu",
         "native/channel_native/kernels/field_transport_free_space.cu",
         "native/channel_native/kernels/field_transport_reflection.cu",
-        "native/channel_native/kernels/field_transport_transmission.cu",
         "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
         "native/channel_native/kernels/scattering_chain_realization.cu",
         "native/channel_native/kernels/scattering_chain_realization_ad.cu"
       ],
       "sha256": "e9692b9921b109c73baa69c90f3c48948eb769b3c0d3fdf81c9ffa17f5766924"
+    },
+    {
+      "id": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu",
+      "current_source_owner": "RayD",
+      "target_source_owner": "RayD",
+      "direct_consumers": ["native/channel_native/binding/fields.cpp"],
+      "sha256": "39e3d2dc90a0b3bdbecca041b73dd540125cd8c4087eaa38790f9f7ee39ef6aca"
+    },
+    {
+      "id": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
+      "current_source_owner": "RayD",
+      "target_source_owner": "RayD",
+      "direct_consumers": ["native/channel_native/binding/fields.cpp"],
+      "sha256": "58127199083a666a2027d74382e43194ae64e8a7c948ac8c229e9158c0be8640"
     },
     {
       "id": "native/channel_native/kernels/scattering_table.cuh",
@@ -134,6 +164,11 @@
     {"from": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "to": "RayD:include/rayd/shared/utd/utd_math.h", "line": 3},
     {"from": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 3},
     {"from": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "to": "RayD:shared/include/rayd/shared/rf/layer_stack.cuh", "line": 4},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 7},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu", "to": "RayD:shared/include/rayd/shared/rf/layer_stack.cuh", "line": 8},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 7},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu", "to": "RayD:shared/include/rayd/shared/rf/layer_stack.cuh", "line": 8},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "line": 10},
     {"from": "native/channel_native/kernels/bdpt_connect_ad.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "line": 3},
     {"from": "native/channel_native/kernels/bdpt_connect_common.cuh", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 8},
     {"from": "native/channel_native/kernels/bdpt_subpaths.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 7},
@@ -157,6 +192,8 @@
     "the 112 ADR-024 numerical helpers have exactly one active source owner in locked RayD",
     "the 10 Channel boundary helpers remain validation/allocation/launch adapters only",
     "the 7 scattering-table helpers remain Channel-owned until ADR-026 activation",
+    "the complete transmission-sequence primal/backward/JVP family has RayD as its unique numerical source owner",
+    "the removed Channel transmission TU is absent and field_transport.cu no longer owns transmission-sequence numerics",
     "RayD never includes a Channel-private header"
   ]
 }

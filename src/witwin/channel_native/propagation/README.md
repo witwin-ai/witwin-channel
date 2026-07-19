@@ -5,15 +5,17 @@
 This package owns row-aligned topology, continuous geometry, RF fields, and
 the enumerated propagation stages shared by Path and Deterministic solvers.
 `EvaluatedPaths` is the internal composition boundary; solver accumulation and
-public result types remain solver-owned. ADR-024 transfers the complete-row
-transmission numerical primal/backward/JVP family to RayD after the Phase 6B
-pin/switch, while row contracts, field facades, AD dispatch, topology, and
-result assembly remain owned here.
+public result types remain solver-owned. Under ADR-024 and the completed Phase
+6B pin/switch, RayD is the numerical source owner of the complete-row
+transmission primal/backward/JVP family, while row contracts, field facades, AD
+dispatch, topology, and result assembly remain owned here.
 
 The Phase 6A shared RF dependency closure is active: retained Channel field,
 coupled-diffraction, BDPT, and scattering kernels consume RayD public RF
 device headers directly. They do not retain or reconstruct a Channel-private
-copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math.
+copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math. The
+Phase 6B move did not split the complete-row fusion or move the BDPT
+transmitted-state family, which remains a complete Channel numerical owner.
 
 ## Public entry points
 

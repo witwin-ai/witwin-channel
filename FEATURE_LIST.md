@@ -14,7 +14,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `4cb400acbfcc2da7fda4110d1298d311816905f1` and calls the typed
+  `3988f0934fec7b521ee5190b0defc0883c84b9e6` and calls the typed
   `rayd::torch` v2 C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
@@ -22,13 +22,17 @@ priority `scattering > diffraction > transmission > reflection > los`.
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration header is
   `backends/torch/include/rayd/torch/integration_v2.h` with SHA-256
-  `c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b`.
+  `6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989`
+  and identity
+  `rayd.torch.integration.v2.20260719.rf-transmission-sequence`.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
-  `em_layer_stack_eval/backward/jvp`. Channel retains the material ABI/CSR,
-  validation, cache, `_channel_native` binding, and Python facade contracts;
-  there is no Channel-private numerical copy or compatibility forwarding
-  header.
+  `em_layer_stack_eval/backward/jvp` and
+  `field_transmission_sequence/backward/jvp`. Channel retains the material
+  ABI/CSR, field-row schemas, validation, cache, `_channel_native` bindings,
+  Python facades, and the fused BDPT transmitted-state family; there is no
+  Channel-private transmission-sequence numerical copy or compatibility
+  forwarding header.
 
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.
@@ -178,9 +182,10 @@ priority `scattering > diffraction > transmission > reflection > los`.
   0-d tensor; the scalar is read once per solve (one host sync), dispersive
   material records stay frozen at the primal frequency.
 - Implementation: native CUDA backward/jvp companion kernels for
-  `field_free_space` / `field_reflection_sequence` /
-  `field_transmission_sequence`, wrapped in thin `torch.autograd.Function`s
-  and wired into the shared deterministic/path field seam. `ad_mode="none"`
+  `field_free_space` / `field_reflection_sequence`, plus the typed RayD native
+  `field_transmission_sequence` family, wrapped in thin
+  `torch.autograd.Function`s and wired into the shared deterministic/path field
+  seam. `ad_mode="none"`
   keeps the exact primal behavior (no graph, no extra launches, zero tape).
 - UTD diffraction and coupled reflection-diffraction AD (plan 07 AD-4):
   under `ad_mode != "none"` the shared field seam re-evaluates RayD's

@@ -2745,7 +2745,7 @@
       "name": "coupled_rd_prepare",
       "target": "cn_coupled_rd_prepare_cuda",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 744,
+      "line": 926,
       "return_type": "std::vector<at::Tensor>",
       "return_arity": 1,
       "parameters": [
@@ -2797,7 +2797,7 @@
       "name": "coupled_rd_prepare_backward",
       "target": "cn_coupled_rd_prepare_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 748,
+      "line": 930,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2864,7 +2864,7 @@
       "name": "coupled_rd_prepare_jvp",
       "target": "cn_coupled_rd_prepare_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 752,
+      "line": 934,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5036,7 +5036,7 @@
       "name": "field_coupled_dd",
       "target": "cn_field_coupled_dd",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 661,
+      "line": 843,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5248,7 +5248,7 @@
       "name": "field_coupled_dd_backward",
       "target": "cn_field_coupled_dd_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 714,
+      "line": 896,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5510,7 +5510,7 @@
       "name": "field_coupled_dd_jvp",
       "target": "cn_field_coupled_dd_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 719,
+      "line": 901,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5757,7 +5757,7 @@
       "name": "field_coupled_rd",
       "target": "cn_field_coupled_rd",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 657,
+      "line": 839,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5924,7 +5924,7 @@
       "name": "field_coupled_rd_backward",
       "target": "cn_field_coupled_rd_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 706,
+      "line": 888,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6141,7 +6141,7 @@
       "name": "field_coupled_rd_jvp",
       "target": "cn_field_coupled_rd_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 710,
+      "line": 892,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6353,7 +6353,7 @@
       "name": "field_diffraction_wedge",
       "target": "cn_field_diffraction_wedge",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 694,
+      "line": 876,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6500,7 +6500,7 @@
       "name": "field_diffraction_wedge_backward",
       "target": "cn_field_diffraction_wedge_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 698,
+      "line": 880,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6677,7 +6677,7 @@
       "name": "field_diffraction_wedge_jvp",
       "target": "cn_field_diffraction_wedge_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 702,
+      "line": 884,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6889,7 +6889,7 @@
       "name": "field_free_space",
       "target": "cn_field_free_space",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 641,
+      "line": 823,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6931,7 +6931,7 @@
       "name": "field_free_space_backward",
       "target": "cn_field_free_space_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 670,
+      "line": 852,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7013,7 +7013,7 @@
       "name": "field_free_space_fwd64",
       "target": "cn_field_free_space_fwd64",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 666,
+      "line": 848,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7055,7 +7055,7 @@
       "name": "field_free_space_jvp",
       "target": "cn_field_free_space_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 674,
+      "line": 856,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7112,7 +7112,7 @@
       "name": "field_project_complex3",
       "target": "cn_field_project_complex3",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 645,
+      "line": 827,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7139,7 +7139,7 @@
       "name": "field_project_complex3_backward",
       "target": "cn_field_project_complex3_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 724,
+      "line": 906,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7186,7 +7186,7 @@
       "name": "field_project_complex3_jvp",
       "target": "cn_field_project_complex3_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 728,
+      "line": 910,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7223,7 +7223,7 @@
       "name": "field_reflection_sequence",
       "target": "cn_field_reflection_sequence",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 649,
+      "line": 831,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7300,7 +7300,7 @@
       "name": "field_reflection_sequence_backward",
       "target": "cn_field_reflection_sequence_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 678,
+      "line": 860,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7437,7 +7437,7 @@
       "name": "field_reflection_sequence_jvp",
       "target": "cn_field_reflection_sequence_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 682,
+      "line": 864,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7559,7 +7559,7 @@
       "name": "field_rough_reflection_scale",
       "target": "cn_field_rough_reflection_scale",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 732,
+      "line": 914,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7626,7 +7626,7 @@
       "name": "field_rough_reflection_scale_backward",
       "target": "cn_field_rough_reflection_scale_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 736,
+      "line": 918,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7728,7 +7728,7 @@
       "name": "field_rough_reflection_scale_jvp",
       "target": "cn_field_rough_reflection_scale_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 740,
+      "line": 922,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7835,7 +7835,7 @@
       "name": "field_transmission_sequence",
       "target": "cn_field_transmission_sequence",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 653,
+      "line": 835,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7927,7 +7927,7 @@
       "name": "field_transmission_sequence_backward",
       "target": "cn_field_transmission_sequence_backward",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 686,
+      "line": 868,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8074,7 +8074,7 @@
       "name": "field_transmission_sequence_jvp",
       "target": "cn_field_transmission_sequence_jvp",
       "path": "native/channel_native/binding/fields.cpp",
-      "line": 690,
+      "line": 872,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [

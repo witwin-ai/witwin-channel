@@ -77,6 +77,32 @@ Channel boundary-only tensor/launch adapters, and 7 scattering-table helpers
 remain Channel-owned pending ADR-026. The live binding count remains 202; the
 current owner split is RayD 20, layered Channel/RayD 2, and Channel Native 180.
 
+### Plan 13 Phase 6B: complete-row transmission ownership
+
+Channel Native now pins the pushed RayD candidate
+`3988f0934fec7b521ee5190b0defc0883c84b9e6`; the integration v2 header
+SHA-256 is
+`6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989`
+and its identity is
+`rayd.torch.integration.v2.20260719.rf-transmission-sequence`.
+
+The complete `field_transmission_sequence/backward/jvp` family now dispatches
+through the source-linked typed `rayd::torch` API. Channel retains the three
+stable `_channel_native` names, field-row schemas, Python/autograd facades and
+solver orchestration. RayD is the unique numerical source owner of the primal,
+backward and JVP kernels; the former Channel AD translation unit and the
+transmission primal section of `field_transport.cu` are removed without a
+forwarding shim or fallback.
+
+The move preserves one launch per active primal/JVP/backward entry, current
+stream affinity, precise math, CSR traversal, call-local recomputation and the
+existing shared-layer atomic accumulation order. The fused
+`bdpt_transmitted_light_subpath_state/backward/jvp` family remains a complete
+Channel owner and consumes the same RayD shared RF headers. The live binding
+count remains 202; the owner split is now RayD 23, layered Channel/RayD 2, and
+Channel Native 177. The frozen 129-helper partition remains 112/10/7 because
+Phase 6B moved an operation family, not a new helper source closure.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

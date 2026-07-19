@@ -1,10 +1,91 @@
 #include <torch/extension.h>
+#include <rayd/torch/integration_v2.h>
 
 #include "registry.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace {
+
+rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor interaction_material_id,
+    torch::Tensor interaction_valid,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
+    double frequency_hz) {
+    return {
+        std::move(source),
+        std::move(target),
+        std::move(interaction_positions),
+        std::move(interaction_normals),
+        std::move(interaction_material_id),
+        std::move(interaction_valid),
+        std::move(tx_power),
+        std::move(tx_polarization),
+        std::move(rx_polarization),
+        std::move(layer_offset),
+        std::move(layer_count),
+        std::move(layer_thickness_m),
+        std::move(layer_eps_r),
+        std::move(layer_sigma_e),
+        std::move(layer_mu_r),
+        frequency_hz};
+}
+
+std::optional<at::Tensor> optional_tensor(pybind11::handle value) {
+    if (value.is_none())
+        return std::nullopt;
+    return pybind11::cast<at::Tensor>(value);
+}
+
+pybind11::object optional_tensor_object(
+    const std::optional<at::Tensor> &value) {
+    if (!value.has_value())
+        return pybind11::none();
+    return pybind11::cast(*value);
+}
+
+pybind11::dict transmission_sequence_result_dict(
+    const rayd::torch::TransmissionSequenceResult &result) {
+    pybind11::dict out;
+    out["field_vector"] = result.field_vector;
+    out["coefficient"] = result.coefficient;
+    out["path_field"] = result.path_field;
+    out["path_gain"] = result.path_gain;
+    out["path_length_m"] = result.path_length_m;
+    out["delay_s"] = result.delay_s;
+    out["direction"] = result.direction;
+    return out;
+}
+
+pybind11::dict transmission_sequence_jvp_result_dict(
+    const rayd::torch::TransmissionSequenceJvpResult &result) {
+    pybind11::dict out;
+    out["field_vector"] = result.field_vector;
+    out["coefficient"] = result.coefficient;
+    out["path_field"] = result.path_field;
+    out["path_gain"] = result.path_gain;
+    out["path_length_m"] = result.path_length_m;
+    out["delay_s"] = result.delay_s;
+    return out;
+}
+
+}  // namespace
 
 std::vector<at::Tensor> cn_coupled_rd_prepare_cuda(
     at::Tensor source,
@@ -377,7 +458,27 @@ pybind11::dict cn_field_transmission_sequence(
     torch::Tensor layer_eps_r,
     torch::Tensor layer_sigma_e,
     torch::Tensor layer_mu_r,
-    double frequency_hz);
+    double frequency_hz) {
+    return transmission_sequence_result_dict(
+        rayd::torch::field_transmission_sequence(
+            transmission_sequence_request(
+                std::move(source),
+                std::move(target),
+                std::move(interaction_positions),
+                std::move(interaction_normals),
+                std::move(interaction_material_id),
+                std::move(interaction_valid),
+                std::move(tx_power),
+                std::move(tx_polarization),
+                std::move(rx_polarization),
+                std::move(layer_offset),
+                std::move(layer_count),
+                std::move(layer_thickness_m),
+                std::move(layer_eps_r),
+                std::move(layer_sigma_e),
+                std::move(layer_mu_r),
+                frequency_hz)));
+}
 pybind11::dict cn_field_free_space_fwd64(
     torch::Tensor source,
     torch::Tensor target,
@@ -486,7 +587,56 @@ pybind11::dict cn_field_transmission_sequence_backward(
     bool need_grad_layer_eps_r,
     bool need_grad_layer_sigma_e,
     bool need_grad_frequency,
-    bool need_grad_geometry);
+    bool need_grad_geometry) {
+    rayd::torch::TransmissionSequenceBackwardRequest request;
+    request.primal = transmission_sequence_request(
+        std::move(source),
+        std::move(target),
+        std::move(interaction_positions),
+        std::move(interaction_normals),
+        std::move(interaction_material_id),
+        std::move(interaction_valid),
+        std::move(tx_power),
+        std::move(tx_polarization),
+        std::move(rx_polarization),
+        std::move(layer_offset),
+        std::move(layer_count),
+        std::move(layer_thickness_m),
+        std::move(layer_eps_r),
+        std::move(layer_sigma_e),
+        std::move(layer_mu_r),
+        frequency_hz);
+    request.grad_field_vector = optional_tensor(grad_field_vector);
+    request.grad_coefficient = optional_tensor(grad_coefficient);
+    request.grad_path_field = optional_tensor(grad_path_field);
+    request.grad_path_gain = optional_tensor(grad_path_gain);
+    request.grad_path_length_m = optional_tensor(grad_path_length);
+    request.grad_delay_s = optional_tensor(grad_delay);
+    request.need_grad_layer_thickness_m = need_grad_layer_thickness;
+    request.need_grad_layer_eps_r = need_grad_layer_eps_r;
+    request.need_grad_layer_sigma_e = need_grad_layer_sigma_e;
+    request.need_grad_frequency = need_grad_frequency;
+    request.need_grad_geometry = need_grad_geometry;
+
+    const auto result =
+        rayd::torch::field_transmission_sequence_backward(request);
+    TORCH_CHECK(
+        !result.grad_interaction_positions.has_value(),
+        "RayD transmission backward must not materialize interaction-position gradients");
+    pybind11::dict out;
+    out["grad_layer_thickness_m"] =
+        optional_tensor_object(result.grad_layer_thickness_m);
+    out["grad_layer_eps_r"] = optional_tensor_object(result.grad_layer_eps_r);
+    out["grad_layer_sigma_e"] =
+        optional_tensor_object(result.grad_layer_sigma_e);
+    out["grad_frequency"] = optional_tensor_object(result.grad_frequency);
+    out["grad_source"] = optional_tensor_object(result.grad_source);
+    out["grad_target"] = optional_tensor_object(result.grad_target);
+    out["grad_interaction_positions"] = pybind11::none();
+    out["grad_interaction_normals"] =
+        optional_tensor_object(result.grad_interaction_normals);
+    return out;
+}
 pybind11::dict cn_field_transmission_sequence_jvp(
     torch::Tensor source,
     torch::Tensor target,
@@ -511,7 +661,39 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     pybind11::object tangent_source,
     pybind11::object tangent_target,
     pybind11::object tangent_interaction_positions,
-    pybind11::object tangent_interaction_normals);
+    pybind11::object tangent_interaction_normals) {
+    rayd::torch::TransmissionSequenceJvpRequest request;
+    request.primal = transmission_sequence_request(
+        std::move(source),
+        std::move(target),
+        std::move(interaction_positions),
+        std::move(interaction_normals),
+        std::move(interaction_material_id),
+        std::move(interaction_valid),
+        std::move(tx_power),
+        std::move(tx_polarization),
+        std::move(rx_polarization),
+        std::move(layer_offset),
+        std::move(layer_count),
+        std::move(layer_thickness_m),
+        std::move(layer_eps_r),
+        std::move(layer_sigma_e),
+        std::move(layer_mu_r),
+        frequency_hz);
+    request.tangent_layer_thickness_m =
+        optional_tensor(tangent_layer_thickness_m);
+    request.tangent_layer_eps_r = optional_tensor(tangent_layer_eps_r);
+    request.tangent_layer_sigma_e = optional_tensor(tangent_layer_sigma_e);
+    request.tangent_frequency = tangent_frequency;
+    request.tangent_source = optional_tensor(tangent_source);
+    request.tangent_target = optional_tensor(tangent_target);
+    request.tangent_interaction_positions =
+        optional_tensor(tangent_interaction_positions);
+    request.tangent_interaction_normals =
+        optional_tensor(tangent_interaction_normals);
+    return transmission_sequence_jvp_result_dict(
+        rayd::torch::field_transmission_sequence_jvp(request));
+}
 pybind11::dict cn_field_coupled_rd(
     torch::Tensor source,
     torch::Tensor target,

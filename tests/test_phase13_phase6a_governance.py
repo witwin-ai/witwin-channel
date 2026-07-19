@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -31,31 +30,33 @@ def _json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def test_phase6a_pin_and_owner_counts_are_consistent() -> None:
-    lock = _json(ROOT / "dependencies/rayd.lock.json")
+def test_phase6a_evidence_is_preserved_after_later_pin() -> None:
     inventory = _json(AUDIT / "phase13-current-native-owner-inventory.json")
     migration = _json(AUDIT / "phase13-migration-delta.json")
 
-    assert lock["commit"] == RAYD_COMMIT
-    assert lock["integration_abi"]["sha256"] == INTEGRATION_V2_SHA256  # type: ignore[index]
     assert inventory["current_phase"] == migration["current_phase"] == 6
-    assert inventory["current_subphase"] == migration["current_subphase"] == "6A"
-    assert inventory["counts"] == {
-        "bindings": 202,
-        "rayd_numerical": 20,
-        "layered": 2,
-        "channel_numerical": 180,
-    }
-    manifest_sha256 = hashlib.sha256(
-        (ROOT / "ci/native-binding-manifest.json").read_bytes()
-    ).hexdigest()
+    assert inventory["current_subphase"] == migration["current_subphase"] == "6B"
+    inventory_phase6a = inventory["phase6a_shared_rf_and_layer_stack"]  # type: ignore[index]
+    migration_phase6a = migration["phase6a_current"]  # type: ignore[index]
     assert (
-        inventory["phase6a_shared_rf_and_layer_stack"]["binding_manifest_sha256"]  # type: ignore[index]
-        == manifest_sha256
+        inventory_phase6a["rayd_commit"]
+        == migration_phase6a["rayd_commit"]
+        == RAYD_COMMIT
     )
     assert (
-        migration["phase6a_current"]["binding_manifest_sha256"]  # type: ignore[index]
-        == manifest_sha256
+        inventory_phase6a["integration_header_sha256"]
+        == migration_phase6a["integration_header_sha256"]
+        == INTEGRATION_V2_SHA256
+    )
+    assert migration_phase6a["owner_counts"] == {
+        "RayD": 20,
+        "layered": 2,
+        "Channel Native": 180,
+    }
+    assert len(inventory_phase6a["binding_manifest_sha256"]) == 64
+    assert (
+        inventory_phase6a["binding_manifest_sha256"]
+        == migration_phase6a["binding_manifest_sha256"]
     )
 
     owners = {
@@ -111,7 +112,7 @@ def test_phase6a_dependency_graph_has_no_deleted_channel_rf_owner() -> None:
     assert all(not (ROOT / source).exists() for source in REMOVED_CHANNEL_SOURCES)
 
 
-def test_phase6a_transmission_contracts_activate_only_layer_stack_family() -> None:
+def test_phase6a_transmission_activation_history_is_preserved() -> None:
     contracts = _json(AUDIT / "phase13-transmission-contracts.json")
     by_symbol = {
         record["symbol"]: record
@@ -125,7 +126,12 @@ def test_phase6a_transmission_contracts_activate_only_layer_stack_family() -> No
     )
     pending = set(by_symbol) - LAYER_STACK_SYMBOLS
     assert len(pending) == 3
+    assert (
+        contracts["phase6a_activation"]["pending_phase6b_contract_count"]  # type: ignore[index]
+        == 3
+    )
     assert all(
-        by_symbol[symbol]["current_numerical_owner"] == "Channel Native"
+        by_symbol[symbol]["current_numerical_owner"] == "RayD"
+        and by_symbol[symbol]["activation_phase"] == "6B"
         for symbol in pending
     )

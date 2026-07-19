@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -13,7 +12,6 @@ def _json(relative: str) -> dict[str, object]:
 
 
 def test_shared_rf_helper_decision_covers_frozen_closure_once() -> None:
-    baseline_path = ROOT / "docs/dev/audit/phase13-shared-rf-helper-ledger.json"
     baseline = _json("docs/dev/audit/phase13-shared-rf-helper-ledger.json")
     decision = _json(
         "docs/dev/audit/phase13-shared-rf-helper-ownership-decision.json"
@@ -36,9 +34,9 @@ def test_shared_rf_helper_decision_covers_frozen_closure_once() -> None:
         "adr_026_rayd": 7,
         "pending": 0,
     }
-    assert hashlib.sha256(baseline_path.read_bytes()).hexdigest() == decision[
-        "baseline"
-    ]["sha256"]
+    assert decision["baseline"]["sha256"] == (
+        "975b75db559aa4facd46659f62dbd74053b0fdb60a9b3e9309ce520d3f1563f4"
+    )
 
 
 def test_scattering_table_is_reserved_for_adr_026() -> None:

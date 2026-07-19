@@ -5,7 +5,6 @@
 #include <torch/extension.h>
 
 #include <rayd/shared/rf/field_transport.cuh>
-#include <rayd/shared/rf/layer_stack.cuh>
 #include "../tensor_checks.h"
 
 #include <vector>
@@ -13,7 +12,6 @@
 namespace {
 
 constexpr int kBlockSize = 256;
-namespace em = rayd::shared::rf::em;
 namespace field = rayd::shared::utd;
 namespace transport = rayd::shared::rf::field_transport;
 
@@ -197,140 +195,6 @@ __global__ void reflection_sequence_kernel(
         direction_out[base] = final_direction.x;
         direction_out[base + 1] = final_direction.y;
         direction_out[base + 2] = final_direction.z;
-    }
-}
-
-// Endpoint-connection specular transmission (contract section 4).
-//
-// The field travels along the straight source->target ray. Each wall applies
-// the layer-stack Jones operator diag(t_TE, t_TM) in the wall's s/p basis;
-// t_stack is interface-to-interface, so it already carries the interior
-// k_z*d phase and absorption. The exterior free-space carrier phase runs
-// over (L - sum_w d_w/cos(theta_w)) and each wall adds the lateral chord
-// phase exp(-j*k_par*d_w*tan(theta_w)) with k_par = k0*sin(theta_w). Both are
-// pure k0 phases, so they collapse to one carrier over the effective length
-//   L_eff = L - sum_w d_w/cos(theta_w) + sum_w d_w*sin^2(theta_w)/cos(theta_w)
-//         = L - sum_w d_w*cos(theta_w),
-// which is what this kernel accumulates. Amplitude spreading uses the FULL
-// straight length (1/(2*k*L), matching free_space_complex3), and
-// path_length_m/delay_s report the full straight length.
-//
-// Vacuum-wall identity: for a single vacuum layer t = exp(-j*k0*cos(theta)*d)
-// and L_eff = L - d*cos(theta), so t * exp(-j*k0*L_eff) = exp(-j*k0*L) and
-// the output equals the free-space field with no wall (unit tested).
-__global__ void transmission_sequence_kernel(
-    int64_t count,
-    int64_t depth,
-    const float* source,
-    const float* target,
-    const float* interaction_normals,
-    const int* interaction_material_id,
-    const bool* interaction_valid,
-    const float* tx_power,
-    const float* tx_polarization,
-    const float* rx_polarization,
-    const int* layer_offset,
-    const int* layer_count,
-    const float* layer_thickness_m,
-    const float* layer_eps_r,
-    const float* layer_sigma_e,
-    const float* layer_mu_r,
-    int64_t material_count,
-    float frequency_hz,
-    c10::complex<float>* field_vector,
-    c10::complex<float>* coefficient,
-    c10::complex<float>* path_field,
-    float* path_gain,
-    float* path_length,
-    float* delay,
-    float* direction_out) {
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        const field::float3a source_value = load3(source, index);
-        const field::float3a target_value = load3(target, index);
-        const field::float3a offset = field::f3_sub(target_value, source_value);
-        const float total_length = field::safe_length(offset);
-        const field::float3a direction = field::safe_normalize(
-            offset, field::make_f3(0.0f, 0.0f, 1.0f));
-        // F1: unnormalized transverse projection of the transmit polarization.
-        const field::float3a tx_axis = field::project_to_wedge_plane(
-            load3(tx_polarization, index), direction);
-        field::Complex3 value = field::cplx_scale_real(
-            tx_axis, field::cplx(1.0f, 0.0f));
-        float carrier_length = total_length;
-        bool path_valid = true;
-        for (int64_t wall = 0; wall < depth; ++wall) {
-            const int64_t scalar = index * depth + wall;
-            if (!interaction_valid[scalar])
-                continue;
-            const int material = interaction_material_id[scalar];
-            if (material < 0 || static_cast<int64_t>(material) >= material_count) {
-                path_valid = false;
-                break;
-            }
-            // s/p basis of the wall; outgoing direction equals incident
-            // direction, so the incident basis is also the exit basis. The
-            // alternate axis keeps the basis deterministic at normal
-            // incidence (same construction as reflect_complex3).
-            const transport::WallFrame frame = transport::wall_frame(
-                direction,
-                load_sequence3(interaction_normals, index, wall, depth));
-            em::LayerView layers{
-                layer_offset,
-                layer_count,
-                layer_thickness_m,
-                layer_eps_r,
-                layer_sigma_e,
-                layer_mu_r,
-                material,
-            };
-            const em::StackRT te = em::stack_rt(
-                frame.cos_theta, layers, frequency_hz, em::kPolTE);
-            const em::StackRT tm = em::stack_rt(
-                frame.cos_theta, layers, frequency_hz, em::kPolTM);
-            const field::Complex e_s = transport::complex3_dot_real(
-                value, frame.s_axis);
-            const field::Complex e_p = transport::complex3_dot_real(
-                value, frame.p_axis);
-            value = field::c3_add(
-                field::cplx_scale_real(frame.s_axis, field::cplx_mul(te.t, e_s)),
-                field::cplx_scale_real(frame.p_axis, field::cplx_mul(tm.t, e_p)));
-            float wall_thickness = 0.0f;
-            const int first = layer_offset[material];
-            const int layers_in_wall = layer_count[material];
-            for (int layer = 0; layer < layers_in_wall; ++layer)
-                wall_thickness += fmaxf(layer_thickness_m[first + layer], 0.0f);
-            carrier_length -= wall_thickness * frame.cos_theta;
-        }
-        const float wave_number =
-            2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
-        const float amplitude = 1.0f /
-                                (2.0f * wave_number *
-                                 fmaxf(total_length, field::UTD_EPS));
-        const field::Complex propagation = field::cplx_mul_real(
-            field::cplx_exp_phase(
-                transport::precise_neg_kd(wave_number, carrier_length)),
-            amplitude);
-        value = field::c3_scale(value, propagation);
-        if (!path_valid)
-            value = field::c3_zero();
-        const int64_t base = index * 3;
-        field_vector[base] = to_complex(value.x);
-        field_vector[base + 1] = to_complex(value.y);
-        field_vector[base + 2] = to_complex(value.z);
-        const field::Complex scalar_field = transport::project_receiver(
-            value, direction, load3(rx_polarization, index));
-        coefficient[index] = to_complex(scalar_field);
-        const field::Complex received = field::cplx_mul_real(
-            scalar_field, sqrtf(fmaxf(tx_power[index], 0.0f)));
-        path_field[index] = to_complex(received);
-        path_gain[index] = field::cplx_abs_sqr(received);
-        path_length[index] = total_length;
-        delay[index] = total_length / transport::kSpeedOfLight;
-        direction_out[base] = direction.x;
-        direction_out[base + 1] = direction.y;
-        direction_out[base + 2] = direction.z;
     }
 }
 
@@ -933,122 +797,6 @@ pybind11::dict cn_field_reflection_sequence(
             mu_r.data_ptr<float>(),
             gain.data_ptr<float>(),
             thickness.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            field_vector.data_ptr<c10::complex<float>>(),
-            coefficient.data_ptr<c10::complex<float>>(),
-            path_field.data_ptr<c10::complex<float>>(),
-            path_gain.data_ptr<float>(),
-            path_length.data_ptr<float>(),
-            delay.data_ptr<float>(),
-            direction.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    pybind11::dict out;
-    out["field_vector"] = field_vector;
-    out["coefficient"] = coefficient;
-    out["path_field"] = path_field;
-    out["path_gain"] = path_gain;
-    out["path_length_m"] = path_length;
-    out["delay_s"] = delay;
-    out["direction"] = direction;
-    return out;
-}
-
-pybind11::dict cn_field_transmission_sequence(
-    at::Tensor source,
-    at::Tensor target,
-    at::Tensor interaction_positions,
-    at::Tensor interaction_normals,
-    at::Tensor interaction_material_id,
-    at::Tensor interaction_valid,
-    at::Tensor tx_power,
-    at::Tensor tx_polarization,
-    at::Tensor rx_polarization,
-    at::Tensor layer_offset,
-    at::Tensor layer_count,
-    at::Tensor layer_thickness_m,
-    at::Tensor layer_eps_r,
-    at::Tensor layer_sigma_e,
-    at::Tensor layer_mu_r,
-    double frequency_hz) {
-    using channel_native::check_flat_tensor;
-    using channel_native::check_tensor;
-    using channel_native::check_vec3_table;
-    check_vec3_table(source, "source");
-    check_vec3_table(target, "target");
-    check_tensor(interaction_positions, "interaction_positions", at::kFloat, 3);
-    check_tensor(interaction_normals, "interaction_normals", at::kFloat, 3);
-    check_tensor(interaction_material_id, "interaction_material_id", at::kInt, 2);
-    check_tensor(interaction_valid, "interaction_valid", at::kBool, 2);
-    check_flat_tensor(tx_power, "tx_power", at::kFloat);
-    check_vec3_table(tx_polarization, "tx_polarization");
-    check_vec3_table(rx_polarization, "rx_polarization");
-    check_flat_tensor(layer_offset, "layer_offset", at::kInt);
-    check_flat_tensor(layer_count, "layer_count", at::kInt);
-    check_flat_tensor(layer_thickness_m, "layer_thickness_m", at::kFloat);
-    check_flat_tensor(layer_eps_r, "layer_eps_r", at::kFloat);
-    check_flat_tensor(layer_sigma_e, "layer_sigma_e", at::kFloat);
-    check_flat_tensor(layer_mu_r, "layer_mu_r", at::kFloat);
-    const int64_t count = source.size(0);
-    const int64_t depth = interaction_positions.size(1);
-    TORCH_CHECK(depth > 0 && interaction_positions.size(2) == 3,
-                "interaction_positions must have shape (N, D, 3) with D > 0");
-    TORCH_CHECK(interaction_positions.size(0) == count,
-                "interaction_positions must match source rows");
-    TORCH_CHECK(interaction_normals.sizes() == interaction_positions.sizes(),
-                "interaction_normals must match interaction_positions");
-    TORCH_CHECK(interaction_material_id.size(0) == count &&
-                    interaction_material_id.size(1) == depth,
-                "interaction_material_id must have shape (N, D)");
-    TORCH_CHECK(interaction_valid.size(0) == count && interaction_valid.size(1) == depth,
-                "interaction_valid must have shape (N, D)");
-    TORCH_CHECK(target.size(0) == count && tx_power.size(0) == count &&
-                    tx_polarization.size(0) == count && rx_polarization.size(0) == count,
-                "transmission endpoint tensors must match source rows");
-    const int64_t material_count = layer_offset.size(0);
-    const int64_t layer_total = layer_thickness_m.size(0);
-    TORCH_CHECK(layer_count.size(0) == material_count,
-                "layer_count must match layer_offset rows");
-    for (const auto& tensor : {layer_eps_r, layer_sigma_e, layer_mu_r})
-        TORCH_CHECK(tensor.size(0) == layer_total,
-                    "layer parameter tensors must match layer_thickness_m rows");
-    for (const auto& tensor : {target, interaction_positions, interaction_normals,
-                               interaction_material_id, interaction_valid, tx_power,
-                               tx_polarization, rx_polarization, layer_offset,
-                               layer_count, layer_thickness_m, layer_eps_r,
-                               layer_sigma_e, layer_mu_r})
-        TORCH_CHECK(tensor.get_device() == source.get_device(),
-                    "transmission tensors must share one CUDA device");
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-
-    auto complex_options = source.options().dtype(at::kComplexFloat);
-    auto field_vector = at::empty({count, 3}, complex_options);
-    auto coefficient = at::empty({count}, complex_options);
-    auto path_field = at::empty({count}, complex_options);
-    auto path_gain = at::empty({count}, source.options());
-    auto path_length = at::empty_like(path_gain);
-    auto delay = at::empty_like(path_gain);
-    auto direction = at::empty_like(source);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        transmission_sequence_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
-            count,
-            depth,
-            source.data_ptr<float>(),
-            target.data_ptr<float>(),
-            interaction_normals.data_ptr<float>(),
-            interaction_material_id.data_ptr<int>(),
-            interaction_valid.data_ptr<bool>(),
-            tx_power.data_ptr<float>(),
-            tx_polarization.data_ptr<float>(),
-            rx_polarization.data_ptr<float>(),
-            layer_offset.data_ptr<int>(),
-            layer_count.data_ptr<int>(),
-            layer_thickness_m.data_ptr<float>(),
-            layer_eps_r.data_ptr<float>(),
-            layer_sigma_e.data_ptr<float>(),
-            layer_mu_r.data_ptr<float>(),
-            material_count,
             static_cast<float>(frequency_hz),
             field_vector.data_ptr<c10::complex<float>>(),
             coefficient.data_ptr<c10::complex<float>>(),

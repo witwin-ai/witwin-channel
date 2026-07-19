@@ -490,7 +490,6 @@ Python_add_library(
     native/channel_native/kernels/field_transport.cu
     native/channel_native/kernels/field_transport_free_space.cu
     native/channel_native/kernels/field_transport_reflection.cu
-    native/channel_native/kernels/field_transport_transmission.cu
     native/channel_native/kernels/field_rough_scale.cu
     ${CHANNEL_NATIVE_FAST_MATH_WEDGE_TU}
     native/channel_native/kernels/field_wedge_ad_coupled.cu

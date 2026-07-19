@@ -21,11 +21,15 @@ RAYD_FIELD_TRANSPORT_AD = (
     RAYD_ROOT
     / "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh"
 )
+RAYD_TRANSMISSION_SOURCES = (
+    RAYD_ROOT / "backends/torch/src/torch_ext/rf/transmission_sequence.cu",
+    RAYD_ROOT / "backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
+)
+FIELDS_BINDING = REPOSITORY_ROOT / "native/channel_native/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
     "free_space": KERNEL_ROOT / "field_transport_free_space.cu",
     "reflection": KERNEL_ROOT / "field_transport_reflection.cu",
-    "transmission": KERNEL_ROOT / "field_transport_transmission.cu",
 }
 ABI_BY_OWNER = {
     "free_space": {
@@ -37,11 +41,13 @@ ABI_BY_OWNER = {
         "cn_field_reflection_sequence_backward",
         "cn_field_reflection_sequence_jvp",
     },
-    "transmission": {
-        "cn_field_transmission_sequence_backward",
-        "cn_field_transmission_sequence_jvp",
-    },
 }
+TRANSMISSION_ABI = {
+    "cn_field_transmission_sequence",
+    "cn_field_transmission_sequence_backward",
+    "cn_field_transmission_sequence_jvp",
+}
+REMOVED_TRANSMISSION_TU = KERNEL_ROOT / "field_transport_transmission.cu"
 COMMON_HELPERS = {
     "load3f",
     "load_sequence3f",
@@ -67,6 +73,25 @@ def _function_names_by_path() -> dict[str, set[str]]:
     return names
 
 
+def _function_body(source: str, name: str) -> str:
+    match = re.search(rf"\b{name}\s*\([^;]*?\)\s*\{{", source, re.DOTALL)
+    assert match is not None, f"missing function body: {name}"
+    start = source.index("{", match.start())
+    depth = 0
+    for index in range(start, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
+    raise AssertionError(f"unterminated function body: {name}")
+
+
+def _dict_keys(body: str) -> set[str]:
+    return set(re.findall(r'out\["([^"]+)"\]', body))
+
+
 def test_field_transport_abi_has_one_semantic_translation_unit_owner() -> None:
     names = _function_names_by_path()
     all_abi = set().union(*ABI_BY_OWNER.values())
@@ -75,6 +100,9 @@ def test_field_transport_abi_has_one_semantic_translation_unit_owner() -> None:
         relative = path.relative_to(REPOSITORY_ROOT).as_posix()
         assert ABI_BY_OWNER[owner] <= names[relative]
         assert not (all_abi - ABI_BY_OWNER[owner]) & names[relative]
+
+    binding = FIELDS_BINDING.relative_to(REPOSITORY_ROOT).as_posix()
+    assert TRANSMISSION_ABI <= names[binding]
 
 
 def test_field_transport_split_preserves_launch_and_sync_multisets() -> None:
@@ -95,11 +123,86 @@ def test_field_transport_split_preserves_launch_and_sync_multisets() -> None:
     )
     expected_launches = Counter(
         site["kernel"] for site in source_evidence["kernel_launch_sites"]
+        if not site["kernel"].startswith("transmission_sequence_")
     )
 
     assert actual_launches == expected_launches
-    assert sum(actual_launches.values()) == 9
+    assert sum(actual_launches.values()) == 7
     assert sources.count("cudaStreamSynchronize(") == 0
+
+
+def test_rayd_transmission_preserves_migrated_launch_budget() -> None:
+    inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    source_evidence = next(
+        entry
+        for entry in inventory["source_evidence"]
+        if entry["path"] == "native/channel_native/kernels/field_transport_ad.cu"
+    )
+    ad_source = RAYD_TRANSMISSION_SOURCES[1].read_text(encoding="utf-8-sig")
+    actual = Counter(
+        re.findall(
+            r"\b([A-Za-z_]\w*_kernel)(?:\s*<[^;{}]*?>)?\s*<<<",
+            ad_source,
+        )
+    )
+    expected = Counter(
+        site["kernel"]
+        for site in source_evidence["kernel_launch_sites"]
+        if site["kernel"].startswith("transmission_sequence_")
+    )
+    assert actual == expected
+    assert sum(actual.values()) == 2
+    assert ad_source.count("cudaStreamSynchronize(") == 0
+
+    primal_source = RAYD_TRANSMISSION_SOURCES[0].read_text(encoding="utf-8-sig")
+    assert len(re.findall(r"\btransmission_sequence_kernel\s*<<<", primal_source)) == 1
+    assert primal_source.count("cudaStreamSynchronize(") == 0
+
+
+def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None:
+    source = FIELDS_BINDING.read_text(encoding="utf-8-sig")
+    assert source.count("#include <rayd/torch/integration_v2.h>") == 1
+    for entry in (
+        "field_transmission_sequence",
+        "field_transmission_sequence_backward",
+        "field_transmission_sequence_jvp",
+    ):
+        assert source.count(f"rayd::torch::{entry}(") == 1
+    assert "<<<" not in source
+
+    assert _dict_keys(_function_body(source, "transmission_sequence_result_dict")) == {
+        "field_vector",
+        "coefficient",
+        "path_field",
+        "path_gain",
+        "path_length_m",
+        "delay_s",
+        "direction",
+    }
+    assert _dict_keys(
+        _function_body(source, "cn_field_transmission_sequence_backward")
+    ) == {
+        "grad_layer_thickness_m",
+        "grad_layer_eps_r",
+        "grad_layer_sigma_e",
+        "grad_frequency",
+        "grad_source",
+        "grad_target",
+        "grad_interaction_positions",
+        "grad_interaction_normals",
+    }
+    assert _dict_keys(
+        _function_body(source, "transmission_sequence_jvp_result_dict")
+    ) == {
+        "field_vector",
+        "coefficient",
+        "path_field",
+        "path_gain",
+        "path_length_m",
+        "delay_s",
+    }
+    backward = _function_body(source, "cn_field_transmission_sequence_backward")
+    assert 'out["grad_interaction_positions"] = pybind11::none();' in backward
 
 
 def test_field_transport_common_helpers_have_one_source() -> None:
@@ -135,8 +238,17 @@ def test_field_transport_split_is_registered_once_and_below_budget() -> None:
     common = "native/channel_native/kernels/field_transport_ad_common.cuh"
 
     assert "native/channel_native/kernels/field_transport_ad.cu" not in cmake
+    assert "native/channel_native/kernels/field_transport_transmission.cu" not in cmake
+    assert not REMOVED_TRANSMISSION_TU.exists()
     assert common not in cmake
     for path in TRANSLATION_UNITS.values():
         relative = path.relative_to(REPOSITORY_ROOT).as_posix()
         assert cmake.count(relative) == 1
         assert len(path.read_text(encoding="utf-8-sig").splitlines()) < 2000
+
+    rayd_cmake = (
+        RAYD_ROOT / "backends/torch/CMakeLists.txt"
+    ).read_text(encoding="utf-8-sig")
+    for source in RAYD_TRANSMISSION_SOURCES:
+        relative = source.relative_to(RAYD_ROOT / "backends/torch").as_posix()
+        assert rayd_cmake.count(relative) == 1
