@@ -21,7 +21,15 @@ from witwin.channel_native.core.receiver_geometry import (
     first_receiver_grid,
 )
 from witwin.channel_native.propagation import EvaluatedPaths, evaluate_enumerated_paths
+from witwin.channel_native.runtime.autograd_contracts import _ad_geometry_live
 from witwin.channel_native.scene.models import ReceiverGrid, Scene
+from witwin.channel_native.core.kernels.metadata import AdLaunchLedger
+from witwin.channel_native.montecarlo.bdpt.autograd import (
+    bdpt_accumulate_connection_samples_ad,
+    bdpt_endpoint_connection_samples_ad,
+    bdpt_finalize_component_maps_ad,
+    bdpt_finalize_point_components_ad,
+)
 from witwin.channel_native.montecarlo.bdpt.kernels.maps import (
     bdpt_finalize_component_maps,
     bdpt_finalize_point_components,
@@ -116,6 +124,42 @@ class _BDPTTopologyOptions:
             "transmission",
         }:
             raise RuntimeError("path reflection/transmission support max_depth <= 5")
+
+
+def _accumulate_connection_samples(
+    config: Config,
+    samples: dict[str, torch.Tensor],
+    *,
+    tx_count: int,
+    rx_count: int,
+    accumulation_strategy: str,
+    combine_domain: str = "power",
+    coeff_real: torch.Tensor | None = None,
+    coeff_imag: torch.Tensor | None = None,
+) -> dict[str, torch.Tensor]:
+    """Accumulate dispatcher: the differentiable twin under ad_mode != 'none',
+    else the bitwise primal. Both domains (power/coherent) route through the
+    ADR-022 accumulate companions when AD is active (spec 6.4)."""
+
+    if config.ad_mode != "none":
+        return bdpt_accumulate_connection_samples_ad(
+            samples,
+            tx_count=tx_count,
+            rx_count=rx_count,
+            accumulation_strategy=accumulation_strategy,
+            combine_domain=combine_domain,
+            coeff_real=coeff_real,
+            coeff_imag=coeff_imag,
+        )
+    return bdpt_accumulate_connection_samples(
+        samples,
+        tx_count=tx_count,
+        rx_count=rx_count,
+        accumulation_strategy=accumulation_strategy,
+        combine_domain=combine_domain,
+        coeff_real=coeff_real,
+        coeff_imag=coeff_imag,
+    )
 
 
 def _estimate_workspace_bytes(
@@ -227,7 +271,11 @@ def _reduced_light_endpoint_state(
 
 
 def _evaluated_connection_samples(
-    paths: EvaluatedPaths, selected: torch.Tensor, *, component_out: int
+    paths: EvaluatedPaths,
+    selected: torch.Tensor,
+    *,
+    component_out: int,
+    tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     if int(selected.numel()) == 0:
         return None
@@ -238,6 +286,28 @@ def _evaluated_connection_samples(
     rx_id = topology.rx_id.index_select(0, selected).to(torch.int32)
     depth = topology.depth.index_select(0, selected).to(torch.int32)
     contribution = fields.path_gain.index_select(0, selected)
+    if tx_power is not None:
+        # ADR-022 tx_power threading (ADR-014 coefficient precedent). The
+        # enumerated engine applies per-tx power as a frozen host scale, so each
+        # contribution row is EXACTLY LINEAR in P[tx_id]: path_gain = P * base,
+        # with base (geometry x |field|^2 / P) independent of P. Reattach the
+        # live power's gradient by the exact-primal ratio P_live / P_live.detach()
+        # -- x / x.detach() is exactly 1.0 in IEEE for finite nonzero P, so the
+        # primal is bitwise unchanged, and d(contribution)/dP = path_gain / P =
+        # base is exact by linearity. Any material/frequency gradient already on
+        # ``contribution`` (from the enumerated oracle) is preserved because the
+        # factor is 1.0. Zero-power rows (path_gain == 0) pass through untouched
+        # (denominator clamped, gradient there is 0 anyway).
+        power_rows = tx_power.index_select(0, tx_id.to(torch.int64))
+        power_detached = power_rows.detach()
+        safe_denominator = torch.where(
+            power_detached != 0.0, power_detached, torch.ones_like(power_detached)
+        )
+        contribution = torch.where(
+            power_detached != 0.0,
+            contribution * (power_rows / safe_denominator),
+            contribution,
+        )
     count = int(selected.numel())
     component_id = torch.full_like(tx_id, int(component_out))
     one = torch.ones((count,), device=tx_id.device, dtype=torch.float32)
@@ -265,6 +335,7 @@ def _single_class_discrete_connection_samples(
     *,
     component: str,
     component_id: int,
+    tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate one delta-like path class as unit-mass discrete connections.
 
@@ -282,26 +353,32 @@ def _single_class_discrete_connection_samples(
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
             components=frozenset({component}),
+            # ADR-022: thread ad_mode read-only through the ADR-008 oracle so
+            # the enumerated discrete block inherits the enumerated engine's
+            # fixed-winner geometry/material AD. 'none' is a no-op.
+            ad_mode=config.ad_mode,
         ),
     )
     selected = torch.nonzero(
         paths.topology.component_id == component_id, as_tuple=False
     ).flatten()
-    return _evaluated_connection_samples(paths, selected, component_out=component_id)
+    return _evaluated_connection_samples(
+        paths, selected, component_out=component_id, tx_power=tx_power
+    )
 
 
 def _reflection_discrete_connection_samples(
-    scene: Scene, config: Config
+    scene: Scene, config: Config, *, tx_power: torch.Tensor | None = None
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate delta-specular paths with unit forward/reverse discrete mass."""
 
     return _single_class_discrete_connection_samples(
-        scene, config, component="reflection", component_id=1
+        scene, config, component="reflection", component_id=1, tx_power=tx_power
     )
 
 
 def _diffraction_discrete_connection_samples(
-    scene: Scene, config: Config
+    scene: Scene, config: Config, *, tx_power: torch.Tensor | None = None
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate first-order UTD diffraction paths with unit discrete mass.
 
@@ -316,12 +393,12 @@ def _diffraction_discrete_connection_samples(
     """
 
     return _single_class_discrete_connection_samples(
-        scene, config, component="diffraction", component_id=2
+        scene, config, component="diffraction", component_id=2, tx_power=tx_power
     )
 
 
 def _transmission_discrete_connection_samples(
-    scene: Scene, config: Config
+    scene: Scene, config: Config, *, tx_power: torch.Tensor | None = None
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate pure straight-segment transmission paths with unit discrete mass.
 
@@ -334,12 +411,12 @@ def _transmission_discrete_connection_samples(
     """
 
     return _single_class_discrete_connection_samples(
-        scene, config, component="transmission", component_id=5
+        scene, config, component="transmission", component_id=5, tx_power=tx_power
     )
 
 
 def _coupled_discrete_connection_samples(
-    scene: Scene, config: Config
+    scene: Scene, config: Config, *, tx_power: torch.Tensor | None = None
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate mixed delta/UTD paths with unit bidirectional discrete mass."""
 
@@ -350,10 +427,13 @@ def _coupled_discrete_connection_samples(
             components=frozenset({"reflection", "diffraction"}),
             coupled_paths=True,
             coupled_candidate_limit=int(config.coupled_candidate_limit),
+            ad_mode=config.ad_mode,
         ),
     )
     selected = torch.nonzero(paths.topology.component_id >= 3, as_tuple=False).flatten()
-    return _evaluated_connection_samples(paths, selected, component_out=2)
+    return _evaluated_connection_samples(
+        paths, selected, component_out=2, tx_power=tx_power
+    )
 
 
 _COHERENT_ENUMERATED_COMPONENTS = (
@@ -385,6 +465,7 @@ def _enumerated_component_block_with_field(
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
             components=frozenset({component}),
+            ad_mode=config.ad_mode,
         ),
     )
     selected = torch.nonzero(
@@ -409,6 +490,7 @@ def _coupled_component_block_with_field(
             components=frozenset({"reflection", "diffraction"}),
             coupled_paths=True,
             coupled_candidate_limit=int(config.coupled_candidate_limit),
+            ad_mode=config.ad_mode,
         ),
     )
     selected = torch.nonzero(paths.topology.component_id >= 3, as_tuple=False).flatten()
@@ -425,6 +507,7 @@ def _collect_coherent_connection_samples(
     *,
     prep: _SolvePrep,
     workspace: _EndpointWorkspace,
+    ledger: AdLaunchLedger | None = None,
 ) -> tuple[
     dict[str, torch.Tensor],
     dict[str, torch.Tensor] | None,
@@ -508,7 +591,8 @@ def _collect_coherent_connection_samples(
     # native concat uses so the coefficient rows align 1:1 with the samples.
     coeff_real = coeff_reals[0] if len(coeff_reals) == 1 else torch.cat(coeff_reals, dim=0)
     coeff_imag = coeff_imags[0] if len(coeff_imags) == 1 else torch.cat(coeff_imags, dim=0)
-    accumulated = bdpt_accumulate_connection_samples(
+    accumulated = _accumulate_connection_samples(
+        config,
         estimate_samples,
         tx_count=tx_count,
         rx_count=rx_count,
@@ -544,7 +628,38 @@ def _validate(scene: Scene, config: Config) -> ReceiverGrid | None:
     validate_scalar_endpoint_features(
         scene.transmitters, scene.receivers, solver="BDPT"
     )
+    _reject_live_geometry_through_sampler(scene, config)
     return grid
+
+
+def _reject_live_geometry_through_sampler(scene: Scene, config: Config) -> None:
+    """ADR-022: mesh-vertex geometry is frozen for the stochastic sampler
+    (``ad_geometry='enumerated_blocks_only'``).
+
+    Reflection/diffraction/transmission (pure) and LoS route through the shared
+    enumerated engine, which owns geometry adjoints; but the mixed-transmission
+    shooting walk and the scattering NEE draw hit points from the stochastic
+    sampler, whose geometry is not differentiable in v1. If a mesh-vertex leaf
+    participates in AD and one of those stochastic blocks will run, refuse
+    loudly instead of silently detaching. Purely-enumerated component sets keep
+    their geometry gradients untouched."""
+
+    if config.ad_mode == "none":
+        return
+    sampler_active = bool(scene.structures) and bool(
+        {"transmission", "scattering"} & set(config.components)
+    )
+    if not sampler_active:
+        return
+    if _ad_geometry_live(*(structure.vertices for structure in scene.structures)):
+        raise RuntimeError(
+            "BDPT ad_geometry='enumerated_blocks_only' (ADR-022): a mesh-vertex "
+            "gradient would reach the stochastic transmission/scattering sampler, "
+            "whose hit-point geometry is frozen in v1; the geometry gradient is "
+            "refused loudly rather than silently detached. Restrict AD to a "
+            "purely-enumerated component set or to material/frequency/tx_power "
+            "leaves."
+        )
 
 
 
@@ -613,6 +728,34 @@ def _prepare_workspace_and_capabilities(
 
 
 
+def _live_tx_power(scene: Scene, *, reference: torch.Tensor) -> torch.Tensor:
+    """Reattach the live per-tx power leaves' gradient onto the native power pack.
+
+    ADR-022 tx_power threading: ``endpoints.transmitter_tensors`` reads
+    ``float(power_w)`` and detaches the leaf. Under ad we pack the same values
+    from the ``Transmitter.power_w`` tensors and add them (minus their detached
+    selves) to the native ``reference`` so the returned tensor is bitwise-equal
+    to the detached pack while carrying the leaves' gradient. A float ``power_w``
+    packs a plain constant, so a materials-only ad graph is unchanged. The
+    native endpoint kernels read the data pointer and detach on output, so the
+    live gradient reaches the differentiable inputs (endpoint-connection
+    companion, scattering-NEE source power) rather than the frozen subpaths."""
+
+    powers = []
+    for transmitter in scene.transmitters:
+        power = transmitter.power_w
+        if isinstance(power, torch.Tensor):
+            powers.append(power.to(device=reference.device, dtype=reference.dtype))
+        else:
+            powers.append(
+                torch.tensor(
+                    float(power), device=reference.device, dtype=reference.dtype
+                )
+            )
+    packed = torch.stack(powers)
+    return reference + (packed - packed.detach())
+
+
 def _build_endpoint_subpaths(
     scene: Scene,
     config: Config,
@@ -620,8 +763,11 @@ def _build_endpoint_subpaths(
     grid: ReceiverGrid | None,
     transmitter_tensors_fn: Callable[[Scene], tuple[torch.Tensor, torch.Tensor]],
     selected_accumulation: str,
+    ledger: AdLaunchLedger | None = None,
 ) -> _EndpointWorkspace:
     tx_reference, tx_power = transmitter_tensors_fn(scene)
+    if config.ad_mode != "none":
+        tx_power = _live_tx_power(scene, reference=tx_power)
     rx_positions = receiver_positions(scene, reference=tx_reference, grid=grid)
     topology_scene = (
         scene
@@ -664,17 +810,47 @@ def _build_endpoint_subpaths(
     endpoint_connection_samples = None
     endpoint_accumulation = None
     if los_light_state is not None and not scene.structures:
-        endpoint_connection_samples = bdpt_endpoint_connection_samples(
-            los_light_state,
-            endpoint_subpaths["sensor"],
-            frequency_hz=float(scene.frequency),
-            samples_per_tx=1,
-            max_paths=None,
-            mis=config.mis,
-            beta=config.power_heuristic_beta,
-            strategy_count=1,
-        )
-        endpoint_accumulation = bdpt_accumulate_connection_samples(
+        if config.ad_mode != "none":
+            # ADR-022: the endpoint-only (no-structures) LoS fast path threads the
+            # frequency and tx_power gradients through the endpoint-connection
+            # companion, exactly like _native_los_connection_samples; the
+            # accumulate dispatcher below chains the differentiable contribution.
+            endpoint_connection_samples = bdpt_endpoint_connection_samples_ad(
+                los_light_state,
+                endpoint_subpaths["sensor"],
+                tx_power,
+                frequency=scene.frequency,
+                frequency_value=(
+                    float(scene.frequency.detach())
+                    if isinstance(scene.frequency, torch.Tensor)
+                    else float(scene.frequency)
+                ),
+                samples_per_tx=1,
+                max_paths=None,
+                mis=config.mis,
+                beta=config.power_heuristic_beta,
+                strategy_count=1,
+            )
+            if ledger is not None:
+                ledger.add(
+                    los_light_state["field_real"],
+                    los_light_state["field_imag"],
+                    endpoint_subpaths["sensor"]["field_real"],
+                    endpoint_subpaths["sensor"]["field_imag"],
+                )
+        else:
+            endpoint_connection_samples = bdpt_endpoint_connection_samples(
+                los_light_state,
+                endpoint_subpaths["sensor"],
+                frequency_hz=float(scene.frequency),
+                samples_per_tx=1,
+                max_paths=None,
+                mis=config.mis,
+                beta=config.power_heuristic_beta,
+                strategy_count=1,
+            )
+        endpoint_accumulation = _accumulate_connection_samples(
+            config,
             endpoint_connection_samples,
             tx_count=len(scene.transmitters),
             rx_count=int(rx_positions.shape[0]),
@@ -713,6 +889,7 @@ def _collect_connection_samples(
     *,
     prep: _SolvePrep,
     workspace: _EndpointWorkspace,
+    ledger: AdLaunchLedger | None = None,
 ) -> tuple[
     dict[str, torch.Tensor],
     dict[str, torch.Tensor] | None,
@@ -740,7 +917,7 @@ def _collect_connection_samples(
         # component set is coherent-eligible; route the whole solve through the
         # enumerated delta/UTD collector with phasor accumulation.
         return _collect_coherent_connection_samples(
-            scene, config, prep=prep, workspace=workspace
+            scene, config, prep=prep, workspace=workspace, ledger=ledger
         )
     raydn = prep.raydn
     native_samples = prep.native_samples
@@ -766,6 +943,10 @@ def _collect_connection_samples(
         }
         estimate_samples = endpoint_connection_samples
     else:
+        ad = config.ad_mode != "none"
+        # Live per-tx power under ad reattaches the tx_power gradient onto the
+        # enumerated discrete blocks (linear coefficient) and the LoS companion.
+        enumerated_tx_power = tx_power if ad else None
         sample_blocks: list[dict[str, torch.Tensor]] = []
         if los_light_state is not None:
             sample_blocks.append(
@@ -774,10 +955,18 @@ def _collect_connection_samples(
                     los_light_state,
                     endpoint_subpaths["sensor"],
                     scene_has_structures=bool(scene.structures),
-                    frequency_hz=float(scene.frequency),
+                    frequency_hz=scene.frequency if ad else float(scene.frequency),
                     mis=config.mis,
                     beta=config.power_heuristic_beta,
                     strategy_count=1,
+                    ad=ad,
+                    tx_power=enumerated_tx_power,
+                    frequency_value=(
+                        float(scene.frequency.detach())
+                        if isinstance(scene.frequency, torch.Tensor)
+                        else float(scene.frequency)
+                    ),
+                    ledger=ledger,
                 )
             )
             launch_count += 2 if scene.structures else 1
@@ -795,7 +984,7 @@ def _collect_connection_samples(
         )
         if reflection_requested:
             reflection_samples = _reflection_discrete_connection_samples(
-                topology_scene, config
+                topology_scene, config, tx_power=enumerated_tx_power
             )
             if reflection_samples is not None:
                 sample_blocks.append(reflection_samples)
@@ -806,14 +995,14 @@ def _collect_connection_samples(
             # reflection above (ADR-008/ADR-018), replacing the retired crude
             # native power heuristic.
             diffraction_samples = _diffraction_discrete_connection_samples(
-                topology_scene, config
+                topology_scene, config, tx_power=enumerated_tx_power
             )
             if diffraction_samples is not None:
                 sample_blocks.append(diffraction_samples)
                 launch_count += 1
         if config.coupled_paths:
             coupled_samples = _coupled_discrete_connection_samples(
-                topology_scene, config
+                topology_scene, config, tx_power=enumerated_tx_power
             )
             if coupled_samples is not None:
                 sample_blocks.append(coupled_samples)
@@ -848,13 +1037,14 @@ def _collect_connection_samples(
             # layer-stack field. Mixed reflection+transmission chains are handled
             # separately by the event-selected shooting sampler below.
             transmission_samples = _transmission_discrete_connection_samples(
-                topology_scene, config
+                topology_scene, config, tx_power=enumerated_tx_power
             )
             if transmission_samples is not None:
                 sample_blocks.append(transmission_samples)
                 transmission_chain_count = int(transmission_samples["valid"].sum())
             launch_count += 1
         if sampler_requested:
+            ad = config.ad_mode != "none"
             mixed_blocks, event_counts = _transmission_sampled_connection_samples(
                 raydn,
                 tx_reference,
@@ -864,7 +1054,10 @@ def _collect_connection_samples(
                 rx_polarization,
                 endpoint_subpaths["sensor"],
                 material_bundle,
-                frequency_hz=float(scene.frequency),
+                # ADR-015 Part A / ADR-022: under AD the carrier stays a live
+                # tensor so lambda/frequency chains carry a gradient; the primal
+                # reads the detached host scalar and is bitwise unchanged.
+                frequency_hz=scene.frequency if ad else float(scene.frequency),
                 samples=native_samples,
                 max_depth=native_max_depth,
                 seed=int(config.seed),
@@ -873,6 +1066,8 @@ def _collect_connection_samples(
                 scattering_runtimes=scattering_runtimes,
                 emit_mixed_transmission=transmission_requested,
                 scene_diagonal=scene_diagonal,
+                ad=ad,
+                ledger=ledger,
             )
             sample_blocks.extend(mixed_blocks)
             launch_count += 3
@@ -882,7 +1077,8 @@ def _collect_connection_samples(
                 if len(sample_blocks) == 1
                 else bdpt_concat_connection_samples(tuple(sample_blocks))
             )
-            accumulated = bdpt_accumulate_connection_samples(
+            accumulated = _accumulate_connection_samples(
+                config,
                 estimate_samples,
                 tx_count=tx_count,
                 rx_count=rx_count,
@@ -939,6 +1135,11 @@ def _accumulate_and_finalize(
     rx_count = workspace.rx_count
     endpoint_only = workspace.endpoint_only
     native_samples = prep.native_samples
+    # ADR-022: the finalize is a linear map with native backward/jvp companions;
+    # dispatch the differentiable twin under ad_mode != 'none' so component
+    # gradients reach path_gain and the per-component powers. 'none' calls the
+    # identical primal symbol (bitwise).
+    ad = config.ad_mode != "none"
     component_maps: dict[str, torch.Tensor] | None = None
     point_component_matrices: dict[str, torch.Tensor] | None = None
     if grid is not None:
@@ -947,7 +1148,10 @@ def _accumulate_and_finalize(
             rows=grid.shape[0],
             cols=grid.shape[1],
         )
-        finalized = bdpt_finalize_component_maps(
+        finalize_maps = (
+            bdpt_finalize_component_maps_ad if ad else bdpt_finalize_component_maps
+        )
+        finalized = finalize_maps(
             component_maps["los"],
             component_maps["reflection"],
             component_maps["diffraction"],
@@ -956,7 +1160,12 @@ def _accumulate_and_finalize(
         )
     else:
         point_component_matrices = component_matrices
-        finalized = bdpt_finalize_point_components(
+        finalize_points = (
+            bdpt_finalize_point_components_ad
+            if ad
+            else bdpt_finalize_point_components
+        )
+        finalized = finalize_points(
             point_component_matrices["los"],
             point_component_matrices["reflection"],
             point_component_matrices["diffraction"],
@@ -1056,6 +1265,7 @@ def _build_metadata(
     event_counts: dict[str, int],
     scattering_runtimes: dict[int, Any],
     component_maps: dict[str, torch.Tensor] | None,
+    ledger: AdLaunchLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     launch_state = workspace.launch_state
     endpoint_subpaths = workspace.endpoint_subpaths
@@ -1084,6 +1294,7 @@ def _build_metadata(
         variance_enabled=variance is not None,
         launch_count=launch_count,
         effective_max_depth=native_max_depth,
+        ad_ledger=ledger,
     )
     if "transmission" in config.components:
         # component_mask bit 8 marks transmitted subpaths (contract section 1).
@@ -1144,12 +1355,17 @@ def solve(
     prep = _prepare_workspace_and_capabilities(
         scene, config, grid=grid, build_info_fn=build_info_fn
     )
+    # ADR-022 per-solve companion accounting (mirrors montecarlo.basic). Under
+    # ad_mode='none' no companion registers, so the ledger stays empty and the
+    # metadata reports zero backward/jvp launches and zero tape.
+    ledger = AdLaunchLedger()
     workspace = _build_endpoint_subpaths(
         scene,
         config,
         grid=grid,
         transmitter_tensors_fn=transmitter_tensors_fn,
         selected_accumulation=prep.selected_accumulation,
+        ledger=ledger,
     )
     (
         component_matrices,
@@ -1159,7 +1375,7 @@ def solve(
         scattering_runtimes,
         launch_count,
     ) = _collect_connection_samples(
-        scene, config, prep=prep, workspace=workspace
+        scene, config, prep=prep, workspace=workspace, ledger=ledger
     )
     component_maps, path_gain, component_power, variance = _accumulate_and_finalize(
         config,
@@ -1185,6 +1401,7 @@ def solve(
         event_counts=event_counts,
         scattering_runtimes=scattering_runtimes,
         component_maps=component_maps,
+        ledger=ledger,
     )
     return Result(
         path_gain=path_gain,

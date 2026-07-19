@@ -22,7 +22,15 @@ def transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
         for transmitter in scene.transmitters
         for component in _vector3_tuple(transmitter.position)
     )
-    powers = tuple(float(transmitter.power_w) for transmitter in scene.transmitters)
+    # Read the host value for the native pack; a live power_w leaf is detached
+    # here (its gradient is reattached under ad by the pipeline's _live_tx_power,
+    # ADR-022 tx_power threading) so this stays a plain host read.
+    powers = tuple(
+        float(transmitter.power_w.detach())
+        if isinstance(transmitter.power_w, torch.Tensor)
+        else float(transmitter.power_w)
+        for transmitter in scene.transmitters
+    )
     exported = bdpt_transmitter_tensors(flat_positions, powers)
     return exported["positions"], exported["power"]
 

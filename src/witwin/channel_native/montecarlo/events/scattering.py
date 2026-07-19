@@ -427,9 +427,11 @@ def scattering_nee_connection_samples(
     tx_id: torch.Tensor,
     light_depth: torch.Tensor,
     path_length_at_vertex: torch.Tensor,
-    frequency_hz: float,
+    frequency_hz: float | torch.Tensor,
     samples: int,
     scene_diagonal: float,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """NEE connection rows from scatter-selected vertices (component 6).
 
@@ -454,7 +456,11 @@ def scattering_nee_connection_samples(
     sensor_count = int(sensor["origin"].shape[0])
     if vertex_count == 0 or sensor_count == 0:
         return None
-    wavelength = LIGHT_SPEED_M_PER_S / float(frequency_hz)
+    # ADR-015 Part A: under ad the radiometric lambda factor is built from the
+    # live frequency tensor so its gradient flows through amplitude^2; the primal
+    # path reads the detached host scalar and is bitwise unchanged (mirrors
+    # scattering_map_matrix for MC-basic).
+    wavelength = LIGHT_SPEED_M_PER_S / (frequency_hz if ad else float(frequency_hz))
     # Light-major layout (vertex * sensor_count + sensor), matching the
     # native endpoint connection tables.
     rx_origin = sensor["origin"]  # [R, 3]
@@ -481,7 +487,14 @@ def scattering_nee_connection_samples(
     )
     wi_rows = flat(expand_rows(wi_local)).contiguous()
     material_rows = flat(expand_rows(material_id)).contiguous()
-    f_te, f_tm = eval_bsdf_rows(material_rows, wi_rows, wo_local.contiguous(), runtimes)
+    f_te, f_tm = eval_bsdf_rows(
+        material_rows,
+        wi_rows,
+        wo_local.contiguous(),
+        runtimes,
+        ad=ad,
+        ledger=ledger,
+    )
 
     p_te_rows = flat(expand_rows(p_te))
     p_tm_rows = flat(expand_rows(p_tm))
@@ -589,6 +602,8 @@ def scattered_subpath_state(
     runtimes: dict[int, Any],
     uniforms: torch.Tensor,
     scene_diagonal: float,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
     """Continued light subpath after a Kirchhoff scattering event.
 
@@ -616,7 +631,9 @@ def scattered_subpath_state(
     wo_local = sampled["wo_local"]
     pdf_forward = sampled["pdf_forward"]
     wo_world = local_to_world(wo_local, frame_t1, frame_t2, normal)
-    f_te, f_tm = eval_bsdf_rows(material_id, wi_local, wo_local, runtimes)
+    f_te, f_tm = eval_bsdf_rows(
+        material_id, wi_local, wo_local, runtimes, ad=ad, ledger=ledger
+    )
     incident_power = (p_te + p_tm).clamp_min(1.0e-20)
     f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power
     cos_o = wo_local[:, 2].clamp_min(0.0)

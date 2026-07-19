@@ -15,6 +15,11 @@ from typing import Any
 import torch
 
 from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
+from witwin.channel_native.montecarlo.bdpt.autograd import (
+    bdpt_endpoint_connection_samples_ad,
+    bdpt_reflected_light_subpath_state_ad,
+    bdpt_transmitted_light_subpath_state_ad,
+)
 from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_endpoint_connection_samples,
     bdpt_endpoint_connection_visibility_inputs,
@@ -24,6 +29,7 @@ from witwin.channel_native.montecarlo.bdpt.kernels.paths import (
     bdpt_subpath_intersection_inputs,
     bdpt_transmitted_light_subpath_state,
 )
+from witwin.channel_native.runtime.autograd_contracts import _ad_frequency_value
 from witwin.channel_native.montecarlo.bdpt.kernels.sampling import (
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,
@@ -58,21 +64,52 @@ def _native_los_connection_samples(
     sensor: dict[str, torch.Tensor],
     *,
     scene_has_structures: bool,
-    frequency_hz: float,
+    frequency_hz: float | torch.Tensor,
     mis: str,
     beta: float,
     strategy_count: int,
+    ad: bool = False,
+    tx_power: torch.Tensor | None = None,
+    frequency_value: float | None = None,
+    ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
-    samples = bdpt_endpoint_connection_samples(
-        light,
-        sensor,
-        frequency_hz=frequency_hz,
-        samples_per_tx=1,
-        max_paths=None,
-        mis=mis,
-        beta=beta,
-        strategy_count=strategy_count,
-    )
+    if ad:
+        # ADR-022: the LoS direct connection carries both a frequency gradient
+        # (the lambda^2 radiometric factor) and a tx_power gradient (P_src),
+        # dispatched natively through the endpoint-connection companion exactly
+        # like the mixed-transmission path. The live frequency tensor and the
+        # live tx_power leaf feed grad_frequency / grad_tx_power; the host scalar
+        # (frequency_value) threads the frozen sampling/pdf path.
+        samples = bdpt_endpoint_connection_samples_ad(
+            light,
+            sensor,
+            tx_power,
+            frequency=frequency_hz,
+            frequency_value=frequency_value,
+            samples_per_tx=1,
+            max_paths=None,
+            mis=mis,
+            beta=beta,
+            strategy_count=strategy_count,
+        )
+        if ledger is not None:
+            ledger.add(
+                light["field_real"],
+                light["field_imag"],
+                sensor["field_real"],
+                sensor["field_imag"],
+            )
+    else:
+        samples = bdpt_endpoint_connection_samples(
+            light,
+            sensor,
+            frequency_hz=frequency_hz,
+            samples_per_tx=1,
+            max_paths=None,
+            mis=mis,
+            beta=beta,
+            strategy_count=strategy_count,
+        )
     if not scene_has_structures:
         return samples
     visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
@@ -147,6 +184,8 @@ def _transmission_sampled_connection_samples(
     emit_mixed_transmission: bool = True,
     scene_diagonal: float = 0.0,
     max_scattering_order: int = 1,
+    ad: bool = False,
+    ledger: object | None = None,
 ) -> tuple[list[dict[str, torch.Tensor]], dict[str, int]]:
     """Shooting-context light subpaths with three-way event selection.
 
@@ -186,6 +225,14 @@ def _transmission_sampled_connection_samples(
     """
 
     device = tx_positions.device
+    # ADR-015 Part A: under AD the carrier crosses as a live 0-dim tensor
+    # (``frequency_hz``) while the host scalar (``frequency_value``) is read once
+    # and threaded to the frozen event-probability stack and every _ad facade.
+    # The primal path keeps ``frequency_hz`` a float, so ``frequency_value`` is
+    # exactly that float and every call is bitwise the pre-AD behaviour.
+    frequency_value = (
+        _ad_frequency_value(frequency_hz) if ad else float(frequency_hz)
+    )
     layer_csr = layer_csr_view(material_bundle)
     face_material_id = material_bundle["material_id"]
     material_axis_rad = material_bundle["rough_axis_rad"]
@@ -245,6 +292,10 @@ def _transmission_sampled_connection_samples(
             cos_theta = (
                 (state["direction"] * hit["n"]).sum(dim=-1).abs().clamp(1.0e-6, 1.0)
             )
+            # The event-probability stack is FROZEN (it drives sampling and MIS,
+            # frozen under ADR-022): always the non-AD primal evaluation with the
+            # host scalar. Material/layer gradients ride the subpath _ad kernels
+            # below, not this selection stack.
             stack = em_layer_stack_eval(
                 cos_theta,
                 material_id.clamp_min(0),
@@ -254,7 +305,7 @@ def _transmission_sampled_connection_samples(
                 layer_csr["layer_eps_r"],
                 layer_csr["layer_sigma_e"],
                 layer_csr["layer_mu_r"],
-                frequency_hz=frequency_hz,
+                frequency_hz=frequency_value,
             )
             r_eff, t_eff = unpolarized_power_budgets(stack)
             p_transmit = transmission_event_probability(r_eff, t_eff)
@@ -267,7 +318,7 @@ def _transmission_sampled_connection_samples(
                     material_id,
                     material_bundle,
                     stack,
-                    frequency_hz=float(frequency_hz),
+                    frequency_hz=frequency_value,
                 )
                 rough = rough_probs["rough"] & hit_ok
                 p_scatter = torch.where(
@@ -292,29 +343,72 @@ def _transmission_sampled_connection_samples(
             choose_transmit = (
                 hit_ok & ~choose_scatter & (uniforms < p_scatter + p_transmit)
             )
-            reflected = bdpt_reflected_light_subpath_state(
-                state,
-                hit,
-                material_gain=material_bundle["gain"],
-                material_valid=material_bundle["valid"],
-                material_eps_r=material_bundle["eps_r"],
-                material_sigma_e=material_bundle["sigma_e"],
-                material_mu_r=material_bundle["mu_r"],
-                material_thickness=material_bundle["thickness"],
-                frequency_hz=frequency_hz,
-            )
-            transmitted = bdpt_transmitted_light_subpath_state(
-                state,
-                hit,
-                face_material_id=face_material_id,
-                layer_offset=layer_csr["layer_offset"],
-                layer_count=layer_csr["layer_count"],
-                layer_thickness_m=layer_csr["layer_thickness_m"],
-                layer_eps_r=layer_csr["layer_eps_r"],
-                layer_sigma_e=layer_csr["layer_sigma_e"],
-                layer_mu_r=layer_csr["layer_mu_r"],
-                frequency_hz=frequency_hz,
-            )
+            if ad:
+                if ledger is not None:
+                    ledger.add(
+                        state["field_real"],
+                        state["field_imag"],
+                        material_bundle["eps_r"],
+                        material_bundle["sigma_e"],
+                        material_bundle["thickness"],
+                    )
+                reflected = bdpt_reflected_light_subpath_state_ad(
+                    state,
+                    hit,
+                    material_gain=material_bundle["gain"],
+                    material_valid=material_bundle["valid"],
+                    material_eps_r=material_bundle["eps_r"],
+                    material_sigma_e=material_bundle["sigma_e"],
+                    material_mu_r=material_bundle["mu_r"],
+                    material_thickness=material_bundle["thickness"],
+                    frequency=frequency_hz,
+                    frequency_value=frequency_value,
+                )
+                if ledger is not None:
+                    ledger.add(
+                        state["field_real"],
+                        state["field_imag"],
+                        layer_csr["layer_thickness_m"],
+                        layer_csr["layer_eps_r"],
+                        layer_csr["layer_sigma_e"],
+                    )
+                transmitted = bdpt_transmitted_light_subpath_state_ad(
+                    state,
+                    hit,
+                    face_material_id=face_material_id,
+                    layer_offset=layer_csr["layer_offset"],
+                    layer_count=layer_csr["layer_count"],
+                    layer_thickness_m=layer_csr["layer_thickness_m"],
+                    layer_eps_r=layer_csr["layer_eps_r"],
+                    layer_sigma_e=layer_csr["layer_sigma_e"],
+                    layer_mu_r=layer_csr["layer_mu_r"],
+                    frequency=frequency_hz,
+                    frequency_value=frequency_value,
+                )
+            else:
+                reflected = bdpt_reflected_light_subpath_state(
+                    state,
+                    hit,
+                    material_gain=material_bundle["gain"],
+                    material_valid=material_bundle["valid"],
+                    material_eps_r=material_bundle["eps_r"],
+                    material_sigma_e=material_bundle["sigma_e"],
+                    material_mu_r=material_bundle["mu_r"],
+                    material_thickness=material_bundle["thickness"],
+                    frequency_hz=frequency_value,
+                )
+                transmitted = bdpt_transmitted_light_subpath_state(
+                    state,
+                    hit,
+                    face_material_id=face_material_id,
+                    layer_offset=layer_csr["layer_offset"],
+                    layer_count=layer_csr["layer_count"],
+                    layer_thickness_m=layer_csr["layer_thickness_m"],
+                    layer_eps_r=layer_csr["layer_eps_r"],
+                    layer_sigma_e=layer_csr["layer_sigma_e"],
+                    layer_mu_r=layer_csr["layer_mu_r"],
+                    frequency_hz=frequency_value,
+                )
             merged = _merge_event_states(reflected, transmitted, choose_transmit)
             # Unbiased event split: every contribution downstream has the form
             # source_power * |field|^2 * (geometry terms), and branch e was
@@ -421,11 +515,26 @@ def _transmission_sampled_connection_samples(
                     runtimes=runtimes,
                     uniforms=direction_uniforms,
                     scene_diagonal=scene_diagonal,
+                    ad=ad,
+                    ledger=ledger,
                 )
                 scattered_valid = scattered["valid"]
                 merged = _merge_scattered_state(merged, scattered, choose_scatter)
                 rows = torch.nonzero(scattered_valid, as_tuple=False).flatten()
                 if int(rows.numel()):
+                    scatter_source_power = state["source_power"].index_select(0, rows)
+                    if ad:
+                        # ADR-022 tx_power threading: reattach the live per-tx
+                        # power's gradient onto the detached native source power
+                        # for the scatter-selected rows (values bitwise-identical,
+                        # so the scattering NEE primal is unchanged).
+                        scatter_tx_id = (
+                            state["tx_id"].index_select(0, rows).to(torch.int64)
+                        )
+                        live_source_power = tx_power.index_select(0, scatter_tx_id)
+                        scatter_source_power = scatter_source_power + (
+                            live_source_power - live_source_power.detach()
+                        )
                     nee_block = scattering_nee_connection_samples(
                         raydn,
                         sensor,
@@ -439,15 +548,20 @@ def _transmission_sampled_connection_samples(
                         p_tm=p_tm.index_select(0, rows),
                         p_scatter=p_scatter.index_select(0, rows),
                         material_id=material_id.index_select(0, rows),
-                        source_power=state["source_power"].index_select(0, rows),
+                        source_power=scatter_source_power,
                         tx_id=state["tx_id"].index_select(0, rows),
                         light_depth=scattered["depth"].index_select(0, rows),
                         path_length_at_vertex=scattered["path_length"].index_select(
                             0, rows
                         ),
-                        frequency_hz=float(frequency_hz),
+                        # ADR-015 Part A: hand the live frequency tensor to the
+                        # radiometric factor under ad; frequency_value stays the
+                        # host scalar for the sampling/pdf paths.
+                        frequency_hz=frequency_hz if ad else frequency_value,
                         samples=int(samples),
                         scene_diagonal=scene_diagonal,
+                        ad=ad,
+                        ledger=ledger,
                     )
                     if nee_block is not None:
                         sample_blocks.append(nee_block)
@@ -473,16 +587,37 @@ def _transmission_sampled_connection_samples(
                 & ((mask & MASK_SCATTERING) == 0)
             )
             if emit_mixed_transmission and bool(mixed.any()):
-                samples_out = bdpt_endpoint_connection_samples(
-                    merged,
-                    sensor,
-                    frequency_hz=frequency_hz,
-                    samples_per_tx=int(samples),
-                    max_paths=None,
-                    mis=mis,
-                    beta=beta,
-                    strategy_count=1,
-                )
+                if ad:
+                    samples_out = bdpt_endpoint_connection_samples_ad(
+                        merged,
+                        sensor,
+                        tx_power,
+                        frequency=frequency_hz,
+                        frequency_value=frequency_value,
+                        samples_per_tx=int(samples),
+                        max_paths=None,
+                        mis=mis,
+                        beta=beta,
+                        strategy_count=1,
+                    )
+                    if ledger is not None:
+                        ledger.add(
+                            merged["field_real"],
+                            merged["field_imag"],
+                            sensor["field_real"],
+                            sensor["field_imag"],
+                        )
+                else:
+                    samples_out = bdpt_endpoint_connection_samples(
+                        merged,
+                        sensor,
+                        frequency_hz=frequency_value,
+                        samples_per_tx=int(samples),
+                        max_paths=None,
+                        mis=mis,
+                        beta=beta,
+                        strategy_count=1,
+                    )
                 visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
                     merged,
                     sensor,

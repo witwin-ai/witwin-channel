@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from witwin.channel_native.core.kernels.metadata import make_metadata
+from witwin.channel_native.core.kernels.metadata import AdLaunchLedger, make_metadata
 from witwin.channel_native.capabilities import (
     capabilities,
     config_metadata,
@@ -11,6 +11,27 @@ from witwin.channel_native.capabilities import (
 from witwin.channel_native.core.components import component_availability_status
 
 from .config import Config
+
+
+# ADR-022 differentiable-parameter inventory: the parameters BDPT AD carries
+# gradients for, per estimator block. Reported in metadata so a caller can see
+# exactly what is on the graph and what stays frozen. Geometry is differentiable
+# only for the enumerated discrete blocks (fixed-winner endpoints / mesh
+# vertices, inherited from the enumerated engine); the stochastic sampler keeps
+# hit geometry frozen (ad_geometry='enumerated_blocks_only').
+_AD_DIFFERENTIABLE_PARAMETERS = (
+    "layer_eps_r",
+    "layer_sigma_e",
+    "layer_thickness",
+    "roughness_sigma_h",
+    "roughness_corr_x",
+    "roughness_corr_y",
+    "bsdf_table_values",
+    "phase_screen_heights",
+    "frequency",
+    "tx_power",
+)
+_AD_GEOMETRY_SCOPE = "enumerated_blocks_only"
 
 
 _KERNEL_ACCUMULATION = {
@@ -80,13 +101,25 @@ def make_solver_metadata(
     variance_enabled: bool,
     launch_count: int,
     effective_max_depth: int,
+    ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     raydn_component_enabled = (
         "reflection" in config.components and reflection_available
     ) or ("diffraction" in config.components and diffraction_available)
+    # ADR-022: ad_mode='none' wires no companions and retains no tape (bitwise
+    # default). Under jvp/vjp report the companion launches this solve
+    # registered in the AdLaunchLedger, exactly as montecarlo.basic does.
+    ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
+    ad_active = config.ad_mode != "none"
+    backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
+    jvp_launch_count = ledger.launches if config.ad_mode == "jvp" else 0
+    tape_bytes = ledger.tape_bytes if config.ad_mode == "vjp" else 0
     kernel_metadata = make_metadata(
         primitive="montecarlo_bdpt_primal",
         forward_launch_count=max(1, int(launch_count)),
+        backward_launch_count=backward_launch_count,
+        jvp_launch_count=jvp_launch_count,
+        tape_bytes=tape_bytes,
         fused_stages=1 if raydn_component_enabled else 0,
         intermediate_bytes=int(workspace_bytes),
         accumulation_strategy=_KERNEL_ACCUMULATION[selected_accumulation_strategy],
@@ -94,7 +127,7 @@ def make_solver_metadata(
         if raydn_component_enabled
         else "native_cuda",
         raydn_native=reflection_available or diffraction_available,
-        ad_status="none",
+        ad_status=config.ad_mode if ad_active else "none",
     )
     requested_config = serialize_config(config)
     effective_config = dict(requested_config)
@@ -170,7 +203,13 @@ def make_solver_metadata(
             "reflection_diffraction_coupled_bidirectional_pdf": True,
             "coupled_pdf_domain": "enumerated_bidirectional_discrete_mass",
         },
-        "ad_status": "none",
+        "ad_status": config.ad_mode if ad_active else "none",
+        # ADR-022: geometry gradients exist only for the enumerated discrete
+        # blocks (fixed-winner endpoints / mesh vertices); the stochastic
+        # sampler's hit geometry stays frozen in v1. Reported loudly so a caller
+        # never mistakes a zero geometry grad through the sampler for a bug.
+        "ad_geometry": _AD_GEOMETRY_SCOPE,
+        "ad_differentiable_parameters": list(_AD_DIFFERENTIABLE_PARAMETERS),
         "kernel": kernel_metadata,
     }
     metadata.update(
