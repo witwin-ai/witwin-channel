@@ -40,7 +40,38 @@
     "region_count": 178,
     "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
   },
+  "phase8a_refresh": {
+    "combined_duplicate_lines": 10661,
+    "combined_total_lines": 84347,
+    "coverage_percent": 12.639454,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Phase 8A removed the Channel pure-wedge numerical owner, pruned its stale binding/source region, and classified the typed RayD adapter packing regions without weakening the frozen maintenance budget.",
+    "region_count": 179,
+    "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  },
   "regions": {
+    "10bc8cf33736c565": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 8A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 190
+    },
+    "8238926b2e1e3356": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 8A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 133
+    },
     "a6bb7f491c236ca3": {
       "category": "fixture_boilerplate",
       "corpus": "python",
@@ -2121,18 +2152,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 217
-    },
-    "c830441d1b1c8722": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "field_wedge_ad_diffraction.cu",
-        "fields.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
-      "token_count": 303
     },
     "c96235a200940c25": {
       "category": "numeric_sensitive_exempt",

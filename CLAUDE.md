@@ -109,11 +109,12 @@ requires them.
   one end-to-end caller.
 - Native ownership follows ABI operation, fusion/launch contract, tape lifetime,
   device primitive, and numerical order—not the Python directory layout.
-- Under ADR-025, pure-wedge diffraction transfers only as one atomic
-  primal/backward/JVP pin/switch/delete. Until that activation Channel remains
-  its sole numerical owner. MC Sionna and coupled RD/DD diffraction stay
-  complete Channel owners; do not extract a UTD sub-launch or spread the
-  pure-wedge fast-math flag into their precise-math translation units.
+- Under ADR-025 and the completed Phase 8A atomic pin/switch/delete, RayD is
+  the sole numerical owner of pure-wedge diffraction primal/backward/JVP;
+  Channel retains only its `_channel_native` ABI and typed field/autograd
+  facades. MC Sionna and coupled RD/DD diffraction stay complete Channel
+  owners; do not extract a UTD sub-launch or spread the pure-wedge fast-math
+  flag into their precise-math translation units.
 - Do not split a fused native operation merely to mirror Python modules. A
   refactor must not add kernel launches, synchronizations, materialized
   intermediates, persistent tape, host/device transfers, or reduction-order

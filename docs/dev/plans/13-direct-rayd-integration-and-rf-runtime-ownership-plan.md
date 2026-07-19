@@ -598,8 +598,20 @@ native planning/selection operation替换Torch几何/loop/host Boolean，不得�
 
 ### Phase 8A — Pure-wedge family 迁入 RayD
 
-RayD 先合并 dormant完整三件套；Channel pin/switch/delete本地实现。保持 optional winner
-vertices、fixed-winner AD、三 launch、`--use_fast_math`、exported-field parity和AD duality。
+**状态：COMPLETE（2026-07-19）。** RayD提交
+`11e72526cdddf669678975c8921a9d44c6504e20` 已push；Channel已原子
+pin/switch/delete本地pure-wedge数值实现。integration v2 header SHA-256锁定为
+`7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef`，identity为
+`rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction`。
+
+202个bindings保持不变，`field_diffraction_wedge/backward/jvp`的ABI/façade仍由Channel
+持有，numerical owner整族迁为RayD；current owner split为RayD 26、layered 2、Channel
+Native 174。旧`field_wedge_ad_diffraction.cu`已删除且无forwarding source/fallback；
+optional winner vertices、fixed-winner AD、每个active entry单launch、zero-row no-launch、
+caller current stream和family-local `--use_fast_math`保持。数值体LF/UTF-8精确区域SHA-256为
+`09b4788ce1c39bb51a1c76f1a6f95269ae65cb8b04a501d174f355bd7bf53f3c`；RayD直接
+C++ contract测试及完整CTest 2/2通过。完整证据见
+`docs/dev/audit/phase13-diffraction-phase8a-evidence.json`。
 
 ### Phase 8B — Diffraction 名称、legacy 与 Torch geometry 收口
 

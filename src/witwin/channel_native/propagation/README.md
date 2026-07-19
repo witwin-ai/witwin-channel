@@ -17,15 +17,15 @@ copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math. The
 Phase 6B move did not split the complete-row fusion or move the BDPT
 transmitted-state family, which remains a complete Channel numerical owner.
 
-ADR-025 freezes diffraction ownership by complete operation. The pure-wedge
-fixed-winner primal/backward/JVP family is approved to move to RayD only through
-the atomic Phase 8A pin/switch/delete; until that activation, its current
-Channel implementation remains the sole production owner. MC Sionna fixed-tape
-and coupled R-D/D-D families stay complete Channel numerical owners and may use
-RayD public device primitives without adding a UTD sub-launch. Pure wedge keeps
-its exporter-locked fast-math contract; retained MC and coupled operations stay
-precise. Phase 8B separately owns the sample-tape semantic rename and native
-transmitter-visible state planning/selection cleanup.
+ADR-025 freezes diffraction ownership by complete operation. After the atomic
+Phase 8A pin/switch/delete, RayD is the sole numerical owner of the pure-wedge
+fixed-winner primal/backward/JVP family; this package retains the stable ABI,
+typed field/autograd facades, and solver orchestration only. MC Sionna
+fixed-tape and coupled R-D/D-D families stay complete Channel numerical owners
+and may use RayD public device primitives without adding a UTD sub-launch. Pure
+wedge keeps its exporter-locked fast-math contract; retained MC and coupled
+operations stay precise. Phase 8B separately owns the sample-tape semantic
+rename and native transmitter-visible state planning/selection cleanup.
 
 ## Public entry points
 
@@ -41,7 +41,8 @@ Geometry cannot choose winners; geometry kernel modules depend on runtime, not
 scene. Fields cannot discover topology. Enumerated propagation serves Path and
 Deterministic; Monte Carlo sampling, MIS, solver results, and deterministic
 accumulation remain outside this package. Field facades may call the typed RayD
-transmission entry but cannot reconstruct or fall back from its native math.
+transmission and pure-wedge entries but cannot reconstruct or fall back from
+their native math.
 
 Raw native tuples may exist only inside domain `kernels` modules. A kernel
 façade must validate and convert them to a named internal contract before any

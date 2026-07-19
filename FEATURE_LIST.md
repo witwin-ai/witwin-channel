@@ -14,7 +14,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `3988f0934fec7b521ee5190b0defc0883c84b9e6` and calls the typed
+  `11e72526cdddf669678975c8921a9d44c6504e20` and calls the typed
   `rayd::torch` v2 C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
@@ -22,9 +22,9 @@ priority `scattering > diffraction > transmission > reflection > los`.
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration header is
   `backends/torch/include/rayd/torch/integration_v2.h` with SHA-256
-  `6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989`
+  `7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef`
   and identity
-  `rayd.torch.integration.v2.20260719.rf-transmission-sequence`.
+  `rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction`.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and
@@ -33,15 +33,15 @@ priority `scattering > diffraction > transmission > reflection > los`.
   Python facades, and the fused BDPT transmitted-state family; there is no
   Channel-private transmission-sequence numerical copy or compatibility
   forwarding header.
-- ADR-025 accepts diffraction ownership by complete operation family. The
-  pure-wedge fixed-winner primal/backward/JVP family remains the sole Channel
-  implementation until the atomic Phase 8A pin/switch/delete, after which RayD
-  becomes its numerical owner. MC Sionna fixed-tape and coupled R-D/D-D
-  primal/backward/JVP families remain complete Channel owners. Pure wedge keeps
-  exporter-locked `--use_fast_math`; MC and coupled families remain precise.
-  Phase 8B will rename the MC sample-tape producer and replace the live Torch
-  transmitter-edge visibility loop with a complete native planning/selection
-  operation; neither change is active in this Phase 7 documentation commit.
+- ADR-025 assigns diffraction ownership by complete operation family. Phase 8A
+  atomically moved the pure-wedge fixed-winner primal/backward/JVP numerical
+  owner to RayD while preserving Channel ABI and typed field/autograd facades.
+  The former Channel numerical TU is deleted; there is no forwarding source,
+  fallback, second launch, or second compiled owner. MC Sionna fixed-tape and
+  coupled R-D/D-D primal/backward/JVP families remain complete Channel owners.
+  Pure wedge keeps exporter-locked `--use_fast_math`; MC and coupled families
+  remain precise. Phase 8B still owns the sample-tape rename and native
+  transmitter-edge visibility planning/selection operation.
 
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.

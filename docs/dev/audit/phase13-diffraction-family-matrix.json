@@ -4,7 +4,20 @@
   "decision_phase": 7,
   "adr": "docs/dev/standards/adr-025-diffraction-operation-family-ownership.md",
   "adr_status": "accepted 2026-07-19",
-  "activation_state": "decision accepted; Phase 8A and Phase 8B implementation not started",
+  "activation_state": "Phase 8A active; Phase 8B pending",
+  "phase8a_activation": {
+    "status": "active",
+    "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
+    "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction",
+    "symbols": [
+      "field_diffraction_wedge",
+      "field_diffraction_wedge_backward",
+      "field_diffraction_wedge_jvp"
+    ],
+    "current_numerical_owner": "RayD",
+    "phase7_historical_owner_preserved": "Channel Native"
+  },
   "family_count": 9,
   "families": [
     {

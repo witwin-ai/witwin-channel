@@ -290,7 +290,7 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
 
     // Evaluate through the shared RayD header template, identical in structure
     // to the primal's compute_pair_contribution and to the order-1 diffraction
-    // dual (field_wedge_ad_diffraction.cu). The header owns edge re-anchoring,
+    // dual (RayD's typed pure-wedge family). The header owns edge re-anchoring,
     // truncation and validity (it returns zero for a blocked/short geometry),
     // so the former manual pre-check and frozen-finite-factor inline are gone;
     // the T_mono / gamma / B derivatives now flow through the dual in lockstep
@@ -611,7 +611,7 @@ __global__ void coupled_rd_jvp_kernel(
 // bounds and the polarizations are frozen seeds (detached), so they are loaded
 // as dual constants and carry no gradient. The wedge face materials and the
 // frequency are differentiable. This file is a PRECISE-math translation unit
-// (only field_wedge_ad_diffraction.cu is fast-math), matching the primal.
+// (only RayD's pure-wedge translation unit is fast-math), matching the primal.
 // Edit coupled_dd_field_kernel and this mirror TOGETHER.
 // ---------------------------------------------------------------------------
 

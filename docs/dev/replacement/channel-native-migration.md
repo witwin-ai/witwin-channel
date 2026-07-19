@@ -125,6 +125,32 @@ selection. The accepted contracts and stop conditions are recorded in
 `docs/dev/audit/phase13-diffraction-family-matrix.json` and
 `docs/dev/audit/phase13-diffraction-legacy-audit.json`.
 
+### Plan 13 Phase 8A: pure-wedge diffraction ownership
+
+Channel Native now pins pushed RayD commit
+`11e72526cdddf669678975c8921a9d44c6504e20`. The locked integration v2 header
+SHA-256 is
+`7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef`,
+with identity
+`rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction`.
+
+The complete `field_diffraction_wedge/backward/jvp` family now dispatches
+through the source-linked typed `rayd::torch` API. Channel retains all three
+stable `_channel_native` names, field/autograd facades, row contracts and
+solver orchestration. RayD is the unique numerical source owner; the former
+Channel pure-wedge CUDA translation unit is deleted without a forwarding shim,
+fallback, or second compiled owner.
+
+The move preserves the exact `wedge_row_eval<T>` evaluation order, optional
+five-tensor winner-vertex bundle, fixed-winner AD, result schema, caller current
+CUDA stream, one launch per active entry and zero-row no-launch. Fast math is
+source-local to RayD's pure-wedge TU; MC Sionna, coupled R-D/D-D, transmission
+and the other retained Channel families remain precise. The live binding count
+remains 202; the owner split is RayD 26, layered Channel/RayD 2, and Channel
+Native 174. Evidence and deletion hashes live in
+`docs/dev/audit/phase13-diffraction-phase8a-evidence.json` and
+`docs/dev/audit/phase13-migration-delta.json`.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

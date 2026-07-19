@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "plan": "Plan 13",
+  "phase": "8A",
+  "adr": "docs/dev/standards/adr-025-diffraction-operation-family-ownership.md",
+  "status": "active; pushed RayD owner and Channel pin/switch/delete complete",
+  "activation_pin": {
+    "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction",
+    "binding_manifest_sha256": "fd42f559bebe3933360312a35fa839b72f94faeef49c88c28e06a83e896994a4"
+  },
+  "owner_transfer": {
+    "symbols": [
+      "field_diffraction_wedge",
+      "field_diffraction_wedge_backward",
+      "field_diffraction_wedge_jvp"
+    ],
+    "abi_owner": "Channel Native _channel_native",
+    "numerical_owner": "RayD",
+    "expected_active_owner_counts": {
+      "bindings": 202,
+      "rayd_numerical": 26,
+      "layered": 2,
+      "channel_numerical": 174
+    },
+    "binding_count_delta": 0,
+    "public_api_delta": false
+  },
+  "channel_switch": {
+    "typed_adapter": "native/channel_native/binding/fields.cpp",
+    "typed_call_lines": {
+      "field_diffraction_wedge": 227,
+      "field_diffraction_wedge_backward": 326,
+      "field_diffraction_wedge_jvp": 433
+    },
+    "deleted_numerical_source": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+    "deleted_source_sha256": "68ec3fe180cd900834f0263969ee75d54764ad014e5d22b7c0b57822ea8e975b",
+    "deleted_body_hash_count": 16,
+    "forwarding_source_allowed": false,
+    "runtime_fallback_allowed": false
+  },
+  "rayd_candidate": {
+    "typed_header": {
+      "path": "backends/torch/include/rayd/torch/rf/diffraction.h",
+      "sha256": "88f36a1c0b5c7ba7ed20f546aec52f18cc31f4830ea6ed6110831c1801d4fe7e"
+    },
+    "numerical_source": {
+      "path": "backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
+      "sha256": "f9114d39f561b8a46ac0a69b4cf7ef3df0d2b8c6ba13292039d308c499862ad1",
+      "typed_function_lines": {
+        "field_diffraction_wedge": 784,
+        "field_diffraction_wedge_backward": 807,
+        "field_diffraction_wedge_jvp": 931
+      }
+    },
+    "direct_contract_test": {
+      "path": "backends/torch/tests/cpp/diffraction_wedge_test.cpp",
+      "sha256": "91907422e51f715f6dd2a22bad4eeefebeabca955af7226cf9d8a64b507221c7",
+      "ctest_target": "rayd_torch_diffraction_wedge_test",
+      "status": "passed; full RayD CTest 2/2"
+    }
+  },
+  "dependency_contract": {
+    "rayd_source_includes": [
+      "rayd/torch/rf/diffraction.h",
+      "rayd/shared/rf/field_transport.cuh",
+      "rayd/torch/common/tensor_check.h",
+      "rayd/torch/rf/field_transport_ad.cuh"
+    ],
+    "channel_adapter_include": "rayd/torch/integration_v2.h",
+    "reverse_rayd_to_channel_private_edge_count": 0,
+    "second_dispatcher_count": 0
+  },
+  "launch_contract": {
+    "active_entry_launch_count": {
+      "field_diffraction_wedge": 1,
+      "field_diffraction_wedge_backward": 1,
+      "field_diffraction_wedge_jvp": 1
+    },
+    "zero_row_launch_count": 0,
+    "kernel_lines": {
+      "diffraction_wedge_forward_kernel": 795,
+      "diffraction_wedge_backward_kernel": 868,
+      "diffraction_wedge_jvp_kernel": 985
+    },
+    "explicit_sync_count": 0,
+    "persistent_tape": false,
+    "materialized_interlaunch_intermediate": false,
+    "active_stream": "caller current Torch CUDA stream"
+  },
+  "compile_contract": {
+    "rayd_cmake": "backends/torch/CMakeLists.txt",
+    "fast_math_source": "backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
+    "fast_math_option": "--use_fast_math",
+    "source_local_property": true,
+    "multiarch_compile_status": "passed for sm_120 and compute_120",
+    "channel_fast_math_registration_removed": true,
+    "precise_channel_families": [
+      "native/channel_native/kernels/field_wedge_ad_coupled.cu",
+      "native/channel_native/kernels/diffraction.cu",
+      "native/channel_native/kernels/field_transport.cu"
+    ],
+    "scattering_fmad_false_contract_unchanged": true
+  },
+  "codegen_resource_contract": {
+    "toolchain": "CUDA 12.9 cuobjdump, sm_120 fatbin",
+    "comparison": "deleted Channel object versus locked RayD object; source-specific C++ mangling normalized only",
+    "normalized_ptx_equal": true,
+    "normalized_ptx_sha256": "6c000d8e436baa55f8bf0b6581b4ff986e5177a863fed783f67a7a4b48a99134",
+    "normalized_sass_equal": true,
+    "normalized_sass_sha256": "0e11cab81644c867d34c4b33604e6d43cbfff822e93584325f64fe1ab6c7ed7c",
+    "resource_usage_equal": true,
+    "kernels": {
+      "diffraction_wedge_forward_kernel": {
+        "registers_per_thread": 127,
+        "stack_bytes": 0,
+        "shared_bytes": 0,
+        "local_bytes": 0,
+        "constant_bytes": 1136,
+        "threads_per_block": 128
+      },
+      "diffraction_wedge_backward_kernel": {
+        "registers_per_thread": 254,
+        "stack_bytes": 672,
+        "shared_bytes": 0,
+        "local_bytes": 0,
+        "constant_bytes": 1240,
+        "threads_per_block": 128
+      },
+      "diffraction_wedge_jvp_kernel": {
+        "registers_per_thread": 254,
+        "stack_bytes": 672,
+        "shared_bytes": 0,
+        "local_bytes": 0,
+        "constant_bytes": 1240,
+        "threads_per_block": 128
+      }
+    },
+    "occupancy_contract": "unchanged: normalized SASS, per-kernel resource usage, and 128-thread launch geometry are identical",
+    "command": "cuobjdump --dump-ptx/--dump-sass/--dump-resource-usage <object>"
+  },
+  "copy_memory_packaging_contract": {
+    "host_device_copy_count_delta": 0,
+    "explicit_sync_count_delta": 0,
+    "persistent_tape_bytes_delta": 0,
+    "materialized_intermediate_bytes_delta": 0,
+    "peak_output_storage_contract": "unchanged named outputs with the same shapes, dtypes, allocation count, and zero-row behavior; typed adapters only pack at::Tensor references",
+    "packaged_extension_build": "passed: artifacts/cmake-plan13-baseline/_channel_native.cp311-win_amd64.pyd linked the locked rayd_torch_native_core static target",
+    "packaged_extension_dependency_audit": "dumpbin /dependents passed; no RayD Python extension or RayD runtime DLL dependency is present",
+    "rayd_python_extension_built_or_imported": false,
+    "supported_architecture_build": "sm_120 plus compute_120 passed"
+  },
+  "exactness_contract": {
+    "evaluation_order": "wedge_row_eval<T> frozen move-only order",
+    "optional_winner_vertices": "all-or-none five-tensor bundle preserved",
+    "fixed_winner_ad": true,
+    "output_schema": "complex64 field_vector [N,3] and float32 direction [N,3]",
+    "numerical_region_sha256": "09b4788ce1c39bb51a1c76f1a6f95269ae65cb8b04a501d174f355bd7bf53f3c",
+    "numerical_region_hash_method": "LF-joined UTF-8 text; Channel range from struct WedgeRowInputs inclusive to void check_wedge_primal exclusive; RayD range from the same start to void require_same_device exclusive; character equality checked before SHA-256"
+  },
+  "stops": [
+    "do not activate before the RayD candidate is committed, pushed, hash-locked, and direct-tested",
+    "do not accept a second compiled owner, forwarding source, runtime flag, or fallback",
+    "do not accept a launch, stream, synchronization, tape, output, evaluation-order, or fast-math boundary change",
+    "do not move or change MC Sionna, coupled RD/DD, coupled prepare, or solver policy owners"
+  ]
+}

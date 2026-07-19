@@ -226,7 +226,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "field_diffraction_wedge",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 8A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -234,7 +234,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "field_diffraction_wedge_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 8A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -242,7 +242,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "field_diffraction_wedge_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 8A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {

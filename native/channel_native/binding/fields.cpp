@@ -47,6 +47,67 @@ rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
         frequency_hz};
 }
 
+std::optional<at::Tensor> optional_tensor(pybind11::handle value);
+
+rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
+    at::Tensor source,
+    at::Tensor target,
+    at::Tensor edge_position,
+    at::Tensor edge_direction,
+    at::Tensor edge_t_min,
+    at::Tensor edge_t_max,
+    at::Tensor edge_n0,
+    at::Tensor edge_n1,
+    at::Tensor exterior_angle,
+    at::Tensor face0_valid,
+    at::Tensor face0_eps_r,
+    at::Tensor face0_sigma_e,
+    at::Tensor face0_mu_r,
+    at::Tensor face0_gain,
+    at::Tensor face1_valid,
+    at::Tensor face1_eps_r,
+    at::Tensor face1_sigma_e,
+    at::Tensor face1_mu_r,
+    at::Tensor face1_gain,
+    at::Tensor tx_power,
+    double frequency_hz,
+    pybind11::object vertex_v0,
+    pybind11::object vertex_v1,
+    pybind11::object vertex_opp0,
+    pybind11::object vertex_opp1,
+    pybind11::object edge_boundary,
+    double isb_boundary_taper_width) {
+    rayd::torch::DiffractionWedgeRequest request;
+    request.source = std::move(source);
+    request.target = std::move(target);
+    request.edge_position = std::move(edge_position);
+    request.edge_direction = std::move(edge_direction);
+    request.edge_t_min = std::move(edge_t_min);
+    request.edge_t_max = std::move(edge_t_max);
+    request.edge_n0 = std::move(edge_n0);
+    request.edge_n1 = std::move(edge_n1);
+    request.exterior_angle = std::move(exterior_angle);
+    request.face0_valid = std::move(face0_valid);
+    request.face0_eps_r = std::move(face0_eps_r);
+    request.face0_sigma_e = std::move(face0_sigma_e);
+    request.face0_mu_r = std::move(face0_mu_r);
+    request.face0_gain = std::move(face0_gain);
+    request.face1_valid = std::move(face1_valid);
+    request.face1_eps_r = std::move(face1_eps_r);
+    request.face1_sigma_e = std::move(face1_sigma_e);
+    request.face1_mu_r = std::move(face1_mu_r);
+    request.face1_gain = std::move(face1_gain);
+    request.tx_power = std::move(tx_power);
+    request.frequency_hz = frequency_hz;
+    request.vertex_v0 = optional_tensor(vertex_v0);
+    request.vertex_v1 = optional_tensor(vertex_v1);
+    request.vertex_opp0 = optional_tensor(vertex_opp0);
+    request.vertex_opp1 = optional_tensor(vertex_opp1);
+    request.edge_boundary = optional_tensor(edge_boundary);
+    request.isb_boundary_taper_width = isb_boundary_taper_width;
+    return request;
+}
+
 std::optional<at::Tensor> optional_tensor(pybind11::handle value) {
     if (value.is_none())
         return std::nullopt;
@@ -82,6 +143,22 @@ pybind11::dict transmission_sequence_jvp_result_dict(
     out["path_gain"] = result.path_gain;
     out["path_length_m"] = result.path_length_m;
     out["delay_s"] = result.delay_s;
+    return out;
+}
+
+pybind11::dict diffraction_wedge_result_dict(
+    const rayd::torch::DiffractionWedgeResult &result) {
+    pybind11::dict out;
+    out["field_vector"] = result.field_vector;
+    out["direction"] = result.direction;
+    return out;
+}
+
+pybind11::dict diffraction_wedge_jvp_result_dict(
+    const rayd::torch::DiffractionWedgeJvpResult &result) {
+    pybind11::dict out;
+    out["tangent_field_vector"] = result.tangent_field_vector;
+    out["tangent_direction"] = result.tangent_direction;
     return out;
 }
 
@@ -145,7 +222,37 @@ pybind11::dict cn_field_diffraction_wedge(
     pybind11::object vertex_opp0,
     pybind11::object vertex_opp1,
     pybind11::object edge_boundary,
-    double isb_boundary_taper_width);
+    double isb_boundary_taper_width) {
+    return diffraction_wedge_result_dict(
+        rayd::torch::field_diffraction_wedge(diffraction_wedge_request(
+            std::move(source),
+            std::move(target),
+            std::move(edge_position),
+            std::move(edge_direction),
+            std::move(edge_t_min),
+            std::move(edge_t_max),
+            std::move(edge_n0),
+            std::move(edge_n1),
+            std::move(exterior_angle),
+            std::move(face0_valid),
+            std::move(face0_eps_r),
+            std::move(face0_sigma_e),
+            std::move(face0_mu_r),
+            std::move(face0_gain),
+            std::move(face1_valid),
+            std::move(face1_eps_r),
+            std::move(face1_sigma_e),
+            std::move(face1_mu_r),
+            std::move(face1_gain),
+            std::move(tx_power),
+            frequency_hz,
+            std::move(vertex_v0),
+            std::move(vertex_v1),
+            std::move(vertex_opp0),
+            std::move(vertex_opp1),
+            std::move(edge_boundary),
+            isb_boundary_taper_width)));
+}
 pybind11::dict cn_field_diffraction_wedge_backward(
     at::Tensor source,
     at::Tensor target,
@@ -179,7 +286,66 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     bool need_grad_frequency,
     bool need_grad_geometry,
     bool need_grad_vertices,
-    double isb_boundary_taper_width);
+    double isb_boundary_taper_width) {
+    rayd::torch::DiffractionWedgeBackwardRequest request;
+    request.primal = diffraction_wedge_request(
+        std::move(source),
+        std::move(target),
+        std::move(edge_position),
+        std::move(edge_direction),
+        std::move(edge_t_min),
+        std::move(edge_t_max),
+        std::move(edge_n0),
+        std::move(edge_n1),
+        std::move(exterior_angle),
+        std::move(face0_valid),
+        std::move(face0_eps_r),
+        std::move(face0_sigma_e),
+        std::move(face0_mu_r),
+        std::move(face0_gain),
+        std::move(face1_valid),
+        std::move(face1_eps_r),
+        std::move(face1_sigma_e),
+        std::move(face1_mu_r),
+        std::move(face1_gain),
+        std::move(tx_power),
+        frequency_hz,
+        std::move(vertex_v0),
+        std::move(vertex_v1),
+        std::move(vertex_opp0),
+        std::move(vertex_opp1),
+        std::move(edge_boundary),
+        isb_boundary_taper_width);
+    request.grad_field_vector = optional_tensor(grad_field_vector);
+    request.grad_direction = optional_tensor(grad_direction);
+    request.need_grad_material = need_grad_material;
+    request.need_grad_frequency = need_grad_frequency;
+    request.need_grad_geometry = need_grad_geometry;
+    request.need_grad_vertices = need_grad_vertices;
+
+    const auto result = rayd::torch::field_diffraction_wedge_backward(request);
+    pybind11::dict out;
+    out["grad_source"] = optional_tensor_object(result.grad_source);
+    out["grad_target"] = optional_tensor_object(result.grad_target);
+    out["grad_face0_eps_r"] =
+        optional_tensor_object(result.grad_face0_eps_r);
+    out["grad_face0_sigma_e"] =
+        optional_tensor_object(result.grad_face0_sigma_e);
+    out["grad_face0_gain"] = optional_tensor_object(result.grad_face0_gain);
+    out["grad_face1_eps_r"] =
+        optional_tensor_object(result.grad_face1_eps_r);
+    out["grad_face1_sigma_e"] =
+        optional_tensor_object(result.grad_face1_sigma_e);
+    out["grad_face1_gain"] = optional_tensor_object(result.grad_face1_gain);
+    out["grad_frequency"] = optional_tensor_object(result.grad_frequency);
+    out["grad_vertex_v0"] = optional_tensor_object(result.grad_vertex_v0);
+    out["grad_vertex_v1"] = optional_tensor_object(result.grad_vertex_v1);
+    out["grad_vertex_opp0"] =
+        optional_tensor_object(result.grad_vertex_opp0);
+    out["grad_vertex_opp1"] =
+        optional_tensor_object(result.grad_vertex_opp1);
+    return out;
+}
 pybind11::dict cn_field_diffraction_wedge_jvp(
     at::Tensor source,
     at::Tensor target,
@@ -220,7 +386,52 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     pybind11::object tangent_vertex_v1,
     pybind11::object tangent_vertex_opp0,
     pybind11::object tangent_vertex_opp1,
-    double isb_boundary_taper_width);
+    double isb_boundary_taper_width) {
+    rayd::torch::DiffractionWedgeJvpRequest request;
+    request.primal = diffraction_wedge_request(
+        std::move(source),
+        std::move(target),
+        std::move(edge_position),
+        std::move(edge_direction),
+        std::move(edge_t_min),
+        std::move(edge_t_max),
+        std::move(edge_n0),
+        std::move(edge_n1),
+        std::move(exterior_angle),
+        std::move(face0_valid),
+        std::move(face0_eps_r),
+        std::move(face0_sigma_e),
+        std::move(face0_mu_r),
+        std::move(face0_gain),
+        std::move(face1_valid),
+        std::move(face1_eps_r),
+        std::move(face1_sigma_e),
+        std::move(face1_mu_r),
+        std::move(face1_gain),
+        std::move(tx_power),
+        frequency_hz,
+        std::move(vertex_v0),
+        std::move(vertex_v1),
+        std::move(vertex_opp0),
+        std::move(vertex_opp1),
+        std::move(edge_boundary),
+        isb_boundary_taper_width);
+    request.tangent_source = optional_tensor(tangent_source);
+    request.tangent_target = optional_tensor(tangent_target);
+    request.tangent_face0_eps_r = optional_tensor(tangent_face0_eps_r);
+    request.tangent_face0_sigma_e = optional_tensor(tangent_face0_sigma_e);
+    request.tangent_face0_gain = optional_tensor(tangent_face0_gain);
+    request.tangent_face1_eps_r = optional_tensor(tangent_face1_eps_r);
+    request.tangent_face1_sigma_e = optional_tensor(tangent_face1_sigma_e);
+    request.tangent_face1_gain = optional_tensor(tangent_face1_gain);
+    request.tangent_frequency = tangent_frequency;
+    request.tangent_vertex_v0 = optional_tensor(tangent_vertex_v0);
+    request.tangent_vertex_v1 = optional_tensor(tangent_vertex_v1);
+    request.tangent_vertex_opp0 = optional_tensor(tangent_vertex_opp0);
+    request.tangent_vertex_opp1 = optional_tensor(tangent_vertex_opp1);
+    return diffraction_wedge_jvp_result_dict(
+        rayd::torch::field_diffraction_wedge_jvp(request));
+}
 pybind11::dict cn_field_coupled_rd_backward(
     at::Tensor source,
     at::Tensor target,

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan": "Plan 13 Phase 6B",
+  "plan": "Plan 13 Phase 8A",
   "baseline": {
     "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
     "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
@@ -28,12 +28,12 @@
   },
   "counts": {
     "bindings": 202,
-    "rayd_numerical": 23,
+    "rayd_numerical": 26,
     "layered": 2,
-    "channel_numerical": 177
+    "channel_numerical": 174
   },
-  "current_phase": 6,
-  "current_subphase": "6B",
+  "current_phase": 8,
+  "current_subphase": "8A",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -199,6 +199,32 @@
       "channel_boundary": 10,
       "channel_pending_adr026": 7
     },
+    "public_api_delta": false
+  },
+  "phase8a_pure_wedge_diffraction": {
+    "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction",
+    "binding_count": 202,
+    "binding_manifest_sha256": "fd42f559bebe3933360312a35fa839b72f94faeef49c88c28e06a83e896994a4",
+    "owner_transfer": [
+      "field_diffraction_wedge",
+      "field_diffraction_wedge_backward",
+      "field_diffraction_wedge_jvp"
+    ],
+    "rayd_typed_header": "backends/torch/include/rayd/torch/rf/diffraction.h",
+    "rayd_numerical_source": "backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/kernels/field_wedge_ad_diffraction.cu"
+    ],
+    "retained_channel_complete_owners": [
+      "mc_sionna_diffraction_tape_accumulate/backward/jvp",
+      "field_coupled_rd/backward/jvp",
+      "field_coupled_dd/backward/jvp",
+      "coupled_rd_prepare/backward/jvp"
+    ],
+    "activation_evidence": "docs/dev/audit/phase13-diffraction-phase8a-evidence.json",
     "public_api_delta": false
   },
   "symbols": [
@@ -3002,7 +3028,7 @@
       "binding_target": "cn_coupled_rd_prepare_cuda",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 926
+        "line": 1137
       },
       "target_source_evidence": [
         {
@@ -3060,7 +3086,7 @@
       "binding_target": "cn_coupled_rd_prepare_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 930
+        "line": 1141
       },
       "target_source_evidence": [
         {
@@ -3103,7 +3129,7 @@
       "binding_target": "cn_coupled_rd_prepare_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 934
+        "line": 1145
       },
       "target_source_evidence": [
         {
@@ -5385,7 +5411,7 @@
       "binding_target": "cn_field_coupled_dd",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 843
+        "line": 1054
       },
       "target_source_evidence": [
         {
@@ -5437,7 +5463,7 @@
       "binding_target": "cn_field_coupled_dd_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 896
+        "line": 1107
       },
       "target_source_evidence": [
         {
@@ -5480,7 +5506,7 @@
       "binding_target": "cn_field_coupled_dd_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 901
+        "line": 1112
       },
       "target_source_evidence": [
         {
@@ -5523,7 +5549,7 @@
       "binding_target": "cn_field_coupled_rd",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 839
+        "line": 1050
       },
       "target_source_evidence": [
         {
@@ -5576,7 +5602,7 @@
       "binding_target": "cn_field_coupled_rd_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 888
+        "line": 1099
       },
       "target_source_evidence": [
         {
@@ -5619,7 +5645,7 @@
       "binding_target": "cn_field_coupled_rd_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 892
+        "line": 1103
       },
       "target_source_evidence": [
         {
@@ -5662,26 +5688,26 @@
       "binding_target": "cn_field_diffraction_wedge",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 876
+        "line": 1087
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/fields.cpp",
           "lines": [
-            40
+            227
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
           "lines": [
-            700
+            784
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.propagation.fields.kernels.functional.field_diffraction_wedge",
       "python_definitions": [
         {
@@ -5706,7 +5732,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
+      "plan13_disposition": "applied in Phase 8A as a complete family"
     },
     {
       "symbol": "field_diffraction_wedge_backward",
@@ -5714,26 +5740,26 @@
       "binding_target": "cn_field_diffraction_wedge_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 880
+        "line": 1091
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/fields.cpp",
           "lines": [
-            68
+            326
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
           "lines": [
-            756
+            807
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.propagation.fields.kernels.autograd._FieldDiffractionWedgeAdFunction.backward",
       "python_definitions": [],
       "production_callers": [],
@@ -5749,7 +5775,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
+      "plan13_disposition": "applied in Phase 8A as a complete family"
     },
     {
       "symbol": "field_diffraction_wedge_jvp",
@@ -5757,26 +5783,26 @@
       "binding_target": "cn_field_diffraction_wedge_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 884
+        "line": 1095
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/fields.cpp",
           "lines": [
-            102
+            433
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+          "path": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
           "lines": [
-            930
+            931
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+      "numerical_owner": "RayD",
+      "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.propagation.fields.kernels.autograd._FieldDiffractionWedgeAdFunction.jvp",
       "python_definitions": [],
       "production_callers": [],
@@ -5792,7 +5818,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
+      "plan13_disposition": "applied in Phase 8A as a complete family"
     },
     {
       "symbol": "field_free_space",
@@ -5800,7 +5826,7 @@
       "binding_target": "cn_field_free_space",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 823
+        "line": 1034
       },
       "target_source_evidence": [
         {
@@ -5848,7 +5874,7 @@
       "binding_target": "cn_field_free_space_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 852
+        "line": 1063
       },
       "target_source_evidence": [
         {
@@ -5901,7 +5927,7 @@
       "binding_target": "cn_field_free_space_fwd64",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 848
+        "line": 1059
       },
       "target_source_evidence": [
         {
@@ -5939,7 +5965,7 @@
       "binding_target": "cn_field_free_space_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 856
+        "line": 1067
       },
       "target_source_evidence": [
         {
@@ -5992,7 +6018,7 @@
       "binding_target": "cn_field_project_complex3",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 827
+        "line": 1038
       },
       "target_source_evidence": [
         {
@@ -6049,7 +6075,7 @@
       "binding_target": "cn_field_project_complex3_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 906
+        "line": 1117
       },
       "target_source_evidence": [
         {
@@ -6092,7 +6118,7 @@
       "binding_target": "cn_field_project_complex3_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 910
+        "line": 1121
       },
       "target_source_evidence": [
         {
@@ -6135,7 +6161,7 @@
       "binding_target": "cn_field_reflection_sequence",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 831
+        "line": 1042
       },
       "target_source_evidence": [
         {
@@ -6187,7 +6213,7 @@
       "binding_target": "cn_field_reflection_sequence_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 860
+        "line": 1071
       },
       "target_source_evidence": [
         {
@@ -6240,7 +6266,7 @@
       "binding_target": "cn_field_reflection_sequence_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 864
+        "line": 1075
       },
       "target_source_evidence": [
         {
@@ -6293,7 +6319,7 @@
       "binding_target": "cn_field_rough_reflection_scale",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 914
+        "line": 1125
       },
       "target_source_evidence": [
         {
@@ -6351,7 +6377,7 @@
       "binding_target": "cn_field_rough_reflection_scale_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 918
+        "line": 1129
       },
       "target_source_evidence": [
         {
@@ -6404,7 +6430,7 @@
       "binding_target": "cn_field_rough_reflection_scale_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 922
+        "line": 1133
       },
       "target_source_evidence": [
         {
@@ -6457,7 +6483,7 @@
       "binding_target": "cn_field_transmission_sequence",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 835
+        "line": 1046
       },
       "target_source_evidence": [
         {
@@ -6509,7 +6535,7 @@
       "binding_target": "cn_field_transmission_sequence_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 868
+        "line": 1079
       },
       "target_source_evidence": [
         {
@@ -6562,7 +6588,7 @@
       "binding_target": "cn_field_transmission_sequence_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/fields.cpp",
-        "line": 872
+        "line": 1083
       },
       "target_source_evidence": [
         {

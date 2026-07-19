@@ -65,7 +65,7 @@ def _families() -> dict[str, dict[str, object]]:
     }
 
 
-def test_phase7_accepts_adr025_without_claiming_phase8_activation() -> None:
+def test_phase7_decision_history_is_preserved_after_phase8a_activation() -> None:
     adr = ADR.read_text(encoding="utf-8")
     plan = (
         ROOT / "docs/dev/plans/13-direct-rayd-integration-and-rf-runtime-ownership-plan.md"
@@ -86,7 +86,8 @@ def test_phase7_accepts_adr025_without_claiming_phase8_activation() -> None:
         assert "Phase 8A" in normalized
         assert "Phase 8B" in normalized
     assert "does not move production code" in migration
-    assert "until the atomic Phase 8A" in feature
+    assert "Phase 8A" in feature
+    assert "numerical owner to RayD" in " ".join(feature.split())
 
 
 def test_phase7_family_matrix_freezes_all_nine_complete_owners() -> None:
@@ -116,18 +117,27 @@ def test_phase7_family_matrix_freezes_all_nine_complete_owners() -> None:
         assert family["compile_contract"] == "precise math"
 
 
-def test_phase7_keeps_current_pure_wedge_source_and_isolates_fast_math() -> None:
+def test_phase7_pre_activation_pure_wedge_snapshot_is_preserved() -> None:
     source = ROOT / "native/channel_native/kernels/field_wedge_ad_diffraction.cu"
-    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    migration = _json(AUDIT / "phase13-migration-delta.json")
+    phase8a = migration["phase8a_current"]  # type: ignore[index]
     manifest = _manifest_symbols()
 
-    assert source.is_file()
+    assert not source.exists()
     assert PURE_WEDGE <= manifest
-    assert "set(CHANNEL_NATIVE_FAST_MATH_WEDGE_TU" in cmake
-    assert "native/channel_native/kernels/field_wedge_ad_diffraction.cu)" in cmake
-    assert cmake.count('PROPERTIES COMPILE_OPTIONS "--use_fast_math"') == 1
-    assert "field_wedge_ad_coupled.cu" in cmake
-    assert "native/channel_native/kernels/diffraction.cu" in cmake
+    assert phase8a["deleted_source_sha256"] == (  # type: ignore[index]
+        "68ec3fe180cd900834f0263969ee75d54764ad014e5d22b7c0b57822ea8e975b"
+    )
+    deletions = phase8a["approved_phase9_body_hash_deletions"]  # type: ignore[index]
+    assert len(deletions) == 16
+    assert {
+        "diffraction_wedge_forward_kernel",
+        "diffraction_wedge_backward_kernel",
+        "diffraction_wedge_jvp_kernel",
+        "cn_field_diffraction_wedge",
+        "cn_field_diffraction_wedge_backward",
+        "cn_field_diffraction_wedge_jvp",
+    } <= {entry["name"] for entry in deletions}
 
 
 def test_phase7_legacy_audit_closes_deletions_and_freezes_one_rename() -> None:
