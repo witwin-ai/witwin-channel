@@ -213,7 +213,34 @@ Device primitives reused: `field_transport.cuh`
 
 ### 3.1 Forward `scattering_chain_ensemble_eval`
 
-Facade signature (keyword block after the positional tensors, mirroring op 1):
+**SUPERVISOR RULING (2026-07-18, supersedes the table below):** the as-built
+bridge signature in `scattering_chain_ensemble.cu` is authoritative — it follows
+the committed float64 oracle and the op-1 conventions where this sketch
+diverged. Binding order:
+`tx_pol, rx_pol, source, vertex, target, c1_positions, c1_normals, c1_eps_r,
+c1_sigma_e, c1_mu_r, c1_gain, c1_thickness, c1_depth, c2_(same 8), n_o, t1r,
+t2r, backup_axis, wi_local, cos_i, cos_o, d_i, d_o, l1, l2, weights,
+material_id, fte_flat, ftm_flat, table_offset, table_dims, material_slot,
+coef: double, threshold: double, frequency_hz: double`.
+Deltas vs the sketch, all RULED accepted: (a) radiometric form is
+`gain = coef · (p^H J p) · cos_i · cos_o · weights / (L1² L2²)` — per-row
+`weights` (A_patch) replaces `sp1/sp2` (op-1/oracle convention); (b)
+`source/vertex/target` `[R,3]` added (structurally required by the leg
+transport, `field_reflection_sequence` parity); (c) vertex frame args use the
+op-1 names `n_o/t1r/t2r`; (d) `wi_local` is a FROZEN table-axis input
+(op-1 convention; the oracle's d_i-differentiated table chain is a documented
+gradient-convention divergence); (e) the reserved `f_sp/f_ps` cross-pol slots
+are dropped from the v1 ABI — they land with the 4-channel table builder
+change; (f) per-bounce rough `C_r` is NOT applied in-kernel: v1 chain bounces
+are evaluated smooth (native reflection-sequence parity); rough chain-bounce
+attenuation composes via the existing `field_rough_reflection_scale` op at the
+orchestration seam (two calls: source→C1 and reversed C2), deferred together
+with (g) reverse-mode chain geometry: `need_grad_geometry` is REJECTED LOUDLY
+by the backward in this wave (JVP covers geometry forward-mode); the reverse
+geometry adjoint is a documented staged follow-up, not a silent zero.
+`weights` carries no gradient/tangent (frozen, spec-consistent).
+
+Original sketch (historical, superseded where it conflicts with the ruling):
 
 | Arg | Shape | Dtype | Contig | Notes |
 |---|---|---|---|---|

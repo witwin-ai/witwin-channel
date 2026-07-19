@@ -46,7 +46,11 @@
   "native-scattering-ensemble-ad": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
   "native-scattering-patch-integral-ad": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
   "native-scattering-table-eval-ad": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
-  "native-kirchhoff-table-build-ad": "tests/scattering/test_table_build_ad.py::test_backward_matches_oracle"
+  "native-kirchhoff-table-build-ad": "tests/scattering/test_table_build_ad.py::test_backward_matches_oracle",
+  "native-scattering-chain-ensemble": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_forward_schema",
+  "native-scattering-chain-ensemble-ad": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+  "native-scattering-chain-realization": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
+  "native-scattering-chain-realization-ad": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating"
  },
  "e2e_scenarios": {
   "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -84,7 +88,9 @@
   "isb-boundary-taper": "tests/deterministic/test_isb_boundary_taper.py::test_isb_boundary_taper_on_softens_los_shadow_boundary",
   "deterministic-scattering-ad": "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd",
   "mc-basic-scattering-ad": "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd",
-  "scattering-table-build-ad": "tests/scattering/test_table_build_ad.py::test_end_to_end_roughness_gradient_is_nonzero"
+  "scattering-table-build-ad": "tests/scattering/test_table_build_ad.py::test_end_to_end_roughness_gradient_is_nonzero",
+  "scattering-chain-ensemble": "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection",
+  "scattering-chain-realization": "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
  },
  "public_exports": [
   [
@@ -2084,6 +2090,60 @@
    "native-kirchhoff-table-build-ad",
    [
     "scattering-table-build-ad"
+   ]
+  ],
+  [
+   "scattering_chain_ensemble_eval",
+   "witwin.channel_native.scattering.kernels.functional.scattering_chain_ensemble_eval",
+   "named_wrapper",
+   "native-scattering-chain-ensemble",
+   [
+    "scattering-chain-ensemble"
+   ]
+  ],
+  [
+   "scattering_chain_ensemble_eval_backward",
+   "witwin.channel_native.scattering.kernels.functional.scattering_chain_ensemble_eval_backward",
+   "named_wrapper",
+   "native-scattering-chain-ensemble-ad",
+   [
+    "scattering-chain-ensemble"
+   ]
+  ],
+  [
+   "scattering_chain_ensemble_eval_jvp",
+   "witwin.channel_native.scattering.kernels.functional.scattering_chain_ensemble_eval_jvp",
+   "named_wrapper",
+   "native-scattering-chain-ensemble-ad",
+   [
+    "scattering-chain-ensemble"
+   ]
+  ],
+  [
+   "scattering_chain_realization_eval",
+   "witwin.channel_native.scattering.kernels.functional.scattering_chain_realization_eval",
+   "named_wrapper",
+   "native-scattering-chain-realization",
+   [
+    "scattering-chain-realization"
+   ]
+  ],
+  [
+   "scattering_chain_realization_eval_backward",
+   "witwin.channel_native.scattering.kernels.functional.scattering_chain_realization_eval_backward",
+   "named_wrapper",
+   "native-scattering-chain-realization-ad",
+   [
+    "scattering-chain-realization"
+   ]
+  ],
+  [
+   "scattering_chain_realization_eval_jvp",
+   "witwin.channel_native.scattering.kernels.functional.scattering_chain_realization_eval_jvp",
+   "named_wrapper",
+   "native-scattering-chain-realization-ad",
+   [
+    "scattering-chain-realization"
    ]
   ]
  ]

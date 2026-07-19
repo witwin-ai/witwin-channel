@@ -309,7 +309,7 @@
     }
   ],
   "binding_ownership": {
-    "expected_count": 193,
+    "expected_count": 199,
     "baseline": "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/bindings.json",
     "evidence": {
       "kind": "python_source_reference",
@@ -499,6 +499,12 @@
       "raydn_trace_reflections_forward",
       "raydn_trace_reflections_forward_tape",
       "raydn_trace_reflections_jvp",
+      "scattering_chain_ensemble_eval",
+      "scattering_chain_ensemble_eval_backward",
+      "scattering_chain_ensemble_eval_jvp",
+      "scattering_chain_realization_eval",
+      "scattering_chain_realization_eval_backward",
+      "scattering_chain_realization_eval_jvp",
       "scattering_ensemble_eval",
       "scattering_ensemble_eval_backward",
       "scattering_ensemble_eval_jvp",

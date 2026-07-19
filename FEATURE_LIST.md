@@ -228,6 +228,39 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `ad_mode == "none"`; BDPT keeps rejecting every `ad_mode`. Bindings re-frozen
   183 -> 187 (locked by `tests/ad/test_mc_basic_scattering_ad.py`,
   `tests/scattering/test_table_build_ad.py`).
+- Multi-bounce chain scattering (ADR-021 D1/D2, default OFF): Deterministic and
+  Path gain an enumerated scatter-chain path class with exactly one diffuse
+  vertex and specular reflection chains on either side
+  (`TX --C1--> v_s --C2--> RX`, `1 <= d1 + d2 <= scattering_chain_max_depth`).
+  Two new fused native ops evaluate complete chain rows in one launch: Op A
+  `scattering_chain_ensemble_eval` (power domain, generalizes the ensemble op 1)
+  and Op B `scattering_chain_realization_eval` (coherent phase-screen, generalizes
+  the patch-integral op 2), each reusing the shared `field_transport.cuh` /
+  `scattering_table.cuh` device primitives with no host physics. Both are
+  born-differentiable: `scattering_chain_ensemble_eval_{backward,jvp}` and
+  `scattering_chain_realization_eval_{backward,jvp}`. New config on the
+  Deterministic and Path `Config`: `scattering_chain_max_depth: int = 0`
+  (0 disables discovery, bitwise no-op), `scattering_chain_samples_per_m2: float
+  = 2.0`, `scattering_chain_max_rows: int = 256`. The `d1 = d2 = 0` degenerate
+  row collapses symbol-for-symbol to op 1 / op 2 (lockstep-pinned, not
+  production-dispatched).
+- Coherent scattering combine (ADR-021 D3, default OFF): new Deterministic/Path
+  config `scattering_coherent: bool = False`. OFF is bit-identical to today (the
+  scattering slot stays the incoherent `SUM |field|^2` power term). ON (requires
+  realization / Op B rows, refuses ensemble-only solves loudly) sums the complex
+  `path_field` of scattering rows per (tx, rx) and finalizes `|sum|^2`, following
+  the ADR-019 per-component phasor precedent. It is implemented as a defaulted
+  `scattering_combine_domain` argument on the existing `deterministic_accumulate_flat`
+  op (no new primal ABI symbol); `combine == 0` never enters the branch and the
+  kernels stay byte-identical.
+- BDPT multi-order scattering (ADR-021 D4, default OFF): `montecarlo.bdpt.Config`
+  gains `max_scattering_order: int = 1` (default 1 keeps today's terminal
+  single-scatter behaviour, bitwise: seed consumption, event partition and NEE
+  rows untouched). For `> 1` a scatter-selected hit emits NEE rows as today and
+  continues the subpath via the resident reciprocal table CDF, in the power
+  domain (documented v1 carrier contract). MC-basic keeps its single-scatter
+  analytic deposit (`scattering max_depth = 1` metadata). Native binding count
+  re-frozen 193 -> 199 (the 6 ADR-021 chain symbols).
 - Explicit-failure policy: a montecarlo.basic reflection solve whose
   `max_depth` exceeds the native reflection AD depth cap
   (`ops.mc_reflection_ad_max_depth()`, mirrored from the kernel constant) is

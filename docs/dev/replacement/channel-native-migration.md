@@ -136,3 +136,37 @@ The public-api snapshot updates only the `montecarlo.bdpt.Config`
 `contract_sha256` (export count unchanged). No native ABI symbol is added; the
 `bdpt_accumulate_connection_samples` binding gains defaulted `combine_domain` /
 `coeff_real` / `coeff_imag` arguments (binding count unchanged at 193).
+
+### ADR-021: multi-bounce coherent scattering (2026-07-18)
+
+Three public `Config` classes gain purely additive, opt-in fields. Every default
+preserves the existing behaviour BIT-IDENTICALLY, so no existing caller,
+benchmark, or preset changes.
+
+- `witwin.channel_native.deterministic.Config` gains four fields:
+  `scattering_coherent: bool = False`, `scattering_chain_max_depth: int = 0`,
+  `scattering_chain_samples_per_m2: float = 2.0`,
+  `scattering_chain_max_rows: int = 256`.
+- `witwin.channel_native.path.Config` gains three fields:
+  `scattering_chain_max_depth: int = 0`,
+  `scattering_chain_samples_per_m2: float = 2.0`,
+  `scattering_chain_max_rows: int = 256`.
+- `witwin.channel_native.montecarlo.bdpt.Config` gains one field:
+  `max_scattering_order: int = 1`.
+
+`scattering_chain_max_depth = 0` disables chain discovery (no allocation, launch,
+or RNG); `scattering_coherent = False` keeps the incoherent power scattering
+slot; `max_scattering_order = 1` keeps BDPT's terminal single-scatter behaviour.
+See `docs/dev/standards/adr-021-multibounce-coherent-scattering.md` and
+`docs/dev/plans/10a-scattering-v2-native-interfaces.md`.
+
+The public-api snapshot updates three `contract_sha256` values only
+(`path.Config`, `deterministic.Config`, `montecarlo.bdpt.Config`); the public
+export count is unchanged at 37. Six new native ABI symbols are added (the ADR-021
+chain forwards `scattering_chain_ensemble_eval` / `scattering_chain_realization_eval`
+plus their `_backward`/`_jvp` companions), moving the binding count 193 -> 199
+(`EXPECTED_NATIVE_BINDING_COUNT`, `EXPECTED_BINDING_COUNT`, and the phase-10
+binding-ownership audit `expected_count`). ADR-021's D3 coherent combine adds NO
+new primal symbol: it rides a defaulted `scattering_combine_domain` argument on
+the existing `deterministic_accumulate_flat` op (and its `_backward`/`_jvp`),
+mirroring ADR-019's `combine_domain`.
