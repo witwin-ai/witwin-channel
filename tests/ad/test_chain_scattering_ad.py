@@ -37,9 +37,7 @@ from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL
 from tests.reference import chain_ensemble as ref_a
 from tests.reference import chain_realization as ref_b
-from tests.reference.kirchhoff_ensemble import _sp_basis
 from witwin.channel_native.materials.kernels import functional as materials_functional
-from witwin.channel_native.runtime import symbols
 from witwin.channel_native.scattering.kernels import autograd_chain as chain_autograd
 from witwin.channel_native.scattering.kernels import functional as F
 
@@ -642,7 +640,6 @@ def test_chain_realization_jvp_matches_forward_fd():
     geo = _realization_geo(seed=51)
     csr = _layer_csr(geo["device"])
     args = _realization_native_args(geo, csr)
-    generator = torch.Generator(device="cuda").manual_seed(321)
     t_heights = torch.randn_like(args["heights"])
     t_centroids = torch.randn_like(args["centroids"])
 
