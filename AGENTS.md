@@ -85,6 +85,20 @@ requires them.
 
 ## Native boundary and fusion
 
+- `_channel_native` is the only production Python extension. It source-links
+  the locked RayD target and calls the versioned `rayd::torch` typed C++ API
+  directly; do not build/import a RayD Python extension, add a second
+  dispatcher/registry, or route through copied `extern "C"` signatures,
+  function-pointer getters, compatibility shims, or dynamic symbol lookup.
+- RayD scene ownership crosses the boundary as an RAII `SceneResource` held by
+  a typed `RayDSceneResource` holder. Never encode a native pointer as an
+  integer handle or add dummy/stale-handle plumbing. Typed operations use
+  `at::Tensor`, `std::optional<at::Tensor>`, named result structs, the caller's
+  active CUDA stream, and fail-loud device/ABI/exception contracts.
+- Generic RayD-owned primitives use `rayd_*` names. Channel-owned composed
+  coupled RD/DD geometry uses neutral `coupled_*` owner names even when it
+  invokes RayD primitives; do not blanket-rename composed operations to
+  `rayd_*` or retain historical `RayDN/raydn` aliases.
 - Python domain `kernels/` packages are thin facades: validate contracts,
   request a required symbol through `runtime`, dispatch the native operation,
   and convert its result to a named typed contract.
@@ -172,6 +186,10 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-008-enumerated-propagation.md`
 - `docs/dev/standards/adr-009-native-fusion-ownership.md`
 - `docs/dev/standards/adr-010-native-scattering-kernels.md`
+- `docs/dev/standards/adr-020-mc-transmission-polarization-unification.md`
+- `docs/dev/standards/adr-021-multibounce-coherent-scattering.md`
+- `docs/dev/standards/adr-022-bdpt-fixed-topology-ad.md`
+- `docs/dev/standards/adr-023-direct-rayd-typed-integration.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or
