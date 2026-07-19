@@ -481,8 +481,11 @@ Python_add_library(
     native/channel_native/kernels/bdpt_connect_samples.cu
     native/channel_native/kernels/bdpt_connect_visibility.cu
     native/channel_native/kernels/bdpt_connect_accumulation.cu
+    native/channel_native/kernels/bdpt_connect_ad.cu
     native/channel_native/kernels/bdpt_sampling.cu
     native/channel_native/kernels/bdpt_subpaths.cu
+    native/channel_native/kernels/bdpt_subpaths_ad.cu
+    native/channel_native/kernels/bdpt_maps.cu
     native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/em_debug.cu
     native/channel_native/kernels/field_transport.cu
