@@ -17,6 +17,16 @@ copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math. The
 Phase 6B move did not split the complete-row fusion or move the BDPT
 transmitted-state family, which remains a complete Channel numerical owner.
 
+ADR-025 freezes diffraction ownership by complete operation. The pure-wedge
+fixed-winner primal/backward/JVP family is approved to move to RayD only through
+the atomic Phase 8A pin/switch/delete; until that activation, its current
+Channel implementation remains the sole production owner. MC Sionna fixed-tape
+and coupled R-D/D-D families stay complete Channel numerical owners and may use
+RayD public device primitives without adding a UTD sub-launch. Pure wedge keeps
+its exporter-locked fast-math contract; retained MC and coupled operations stay
+precise. Phase 8B separately owns the sample-tape semantic rename and native
+transmitter-visible state planning/selection cleanup.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

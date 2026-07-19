@@ -33,6 +33,15 @@ priority `scattering > diffraction > transmission > reflection > los`.
   Python facades, and the fused BDPT transmitted-state family; there is no
   Channel-private transmission-sequence numerical copy or compatibility
   forwarding header.
+- ADR-025 accepts diffraction ownership by complete operation family. The
+  pure-wedge fixed-winner primal/backward/JVP family remains the sole Channel
+  implementation until the atomic Phase 8A pin/switch/delete, after which RayD
+  becomes its numerical owner. MC Sionna fixed-tape and coupled R-D/D-D
+  primal/backward/JVP families remain complete Channel owners. Pure wedge keeps
+  exporter-locked `--use_fast_math`; MC and coupled families remain precise.
+  Phase 8B will rename the MC sample-tape producer and replace the live Torch
+  transmitter-edge visibility loop with a complete native planning/selection
+  operation; neither change is active in this Phase 7 documentation commit.
 
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.

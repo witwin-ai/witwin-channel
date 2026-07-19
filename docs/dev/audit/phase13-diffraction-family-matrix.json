@@ -1,430 +1,233 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "plan": "Plan 13",
+  "decision_phase": 7,
+  "adr": "docs/dev/standards/adr-025-diffraction-operation-family-ownership.md",
+  "adr_status": "accepted 2026-07-19",
+  "activation_state": "decision accepted; Phase 8A and Phase 8B implementation not started",
   "family_count": 9,
   "families": [
     {
-      "family": "RayD order-1 path exporter / visibility",
+      "family_id": "rayd-order1-export-and-tape",
+      "family": "RayD order-1 path export / visibility and sample-tape production",
       "symbols": [
-        "raydn_diffraction_paths_order1_forward",
+        "rayd_diffraction_paths_order1_forward",
         "bdpt_diffraction_accumulation_forward"
       ],
-      "current_owner": "RayD",
-      "target_owner": "RayD",
-      "action": "typed direct API and semantic rename; discrete winner remains frozen",
+      "phase7_current_owner": "RayD",
+      "accepted_authoritative_owner": "RayD",
+      "activation_phase": "8B semantic rename only",
+      "action": "keep exporter and sample-tape producer as distinct typed operations; rename the producer to rayd_diffraction_sample_tape_forward",
       "compile_contract": "RayD OptiX --use_fast_math",
-      "fusion_tape": "path discovery/export or MC sampling tape producer; not the Channel estimator",
-      "binding_evidence": [
-        {
-          "symbol": "raydn_diffraction_paths_order1_forward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/rayd.cpp",
-            "line": 407
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/propagation/geometry/diffraction.py",
-              "line": 173
-            }
-          ]
-        },
-        {
-          "symbol": "bdpt_diffraction_accumulation_forward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/rayd.cpp",
-            "line": 411
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
-              "line": 831,
-              "via_alias": "raydn_diffraction_accumulation_forward"
-            }
-          ]
-        }
+      "fusion_tape_contract": "preserve the fused sample-tape output and exporter discovery boundary; discrete winners are not differentiated",
+      "forbidden": [
+        "trim unconsumed sample-tape columns",
+        "merge exporter discovery with fixed-winner reevaluation",
+        "retain the bdpt_diffraction_accumulation_forward alias after Phase 8B"
       ]
     },
     {
-      "family": "pure wedge fixed-winner field",
+      "family_id": "pure-wedge-fixed-winner-field",
+      "family": "pure-wedge fixed-winner field",
       "symbols": [
         "field_diffraction_wedge",
         "field_diffraction_wedge_backward",
         "field_diffraction_wedge_jvp"
       ],
-      "current_owner": "Channel Native",
-      "target_owner": "RayD after ADR-025",
-      "action": "move primal/backward/JVP together",
-      "compile_contract": "--use_fast_math restricted to field_wedge_ad_diffraction.cu equivalent",
-      "fusion_tape": "preserve three launches, wedge_row_eval order, optional winner vertices and fixed-winner AD",
-      "binding_evidence": [
-        {
-          "symbol": "field_diffraction_wedge",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 694
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "field_diffraction_wedge_backward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 698
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "field_diffraction_wedge_jvp",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 702
-          },
-          "production_callers": []
-        }
+      "phase7_current_owner": "Channel Native",
+      "accepted_authoritative_owner": "RayD",
+      "activation_phase": "8A atomic pin/switch/delete",
+      "action": "move primal, backward, and JVP together while retaining Channel ABI and Python facades",
+      "compile_contract": "--use_fast_math restricted to this family and locked to the RayD OptiX exporter",
+      "fusion_tape_contract": "preserve wedge_row_eval order, optional winner vertices, fixed-winner AD, one launch per active entry, and zero-row no-launch",
+      "forbidden": [
+        "split numerical owner",
+        "second compiled production implementation",
+        "forwarding source or runtime fallback",
+        "fusion with the discrete exporter"
       ]
     },
     {
+      "family_id": "mc-sionna-fixed-tape-estimator",
       "family": "MC Sionna fixed-tape estimator",
       "symbols": [
         "mc_sionna_diffraction_tape_accumulate",
         "mc_sionna_diffraction_tape_accumulate_backward",
         "mc_sionna_diffraction_tape_accumulate_jvp"
       ],
-      "current_owner": "Channel Native",
-      "target_owner": "Channel Native",
-      "action": "retain complete family",
+      "phase7_current_owner": "Channel Native",
+      "accepted_authoritative_owner": "Channel Native",
+      "activation_phase": "retained",
+      "action": "retain the complete estimator family",
       "compile_contract": "precise math",
-      "fusion_tape": "proposal/Jacobian, slab, cell atomics and RNG remain one estimator contract",
-      "binding_evidence": [
-        {
-          "symbol": "mc_sionna_diffraction_tape_accumulate",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/montecarlo.cpp",
-            "line": 293
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
-              "line": 1330
-            },
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
-              "line": 1517
-            },
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
-              "line": 887
-            }
-          ]
-        },
-        {
-          "symbol": "mc_sionna_diffraction_tape_accumulate_backward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/montecarlo.cpp",
-            "line": 297
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
-              "line": 1617
-            }
-          ]
-        },
-        {
-          "symbol": "mc_sionna_diffraction_tape_accumulate_jvp",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/montecarlo.cpp",
-            "line": 301
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
-              "line": 1709
-            }
-          ]
-        }
+      "fusion_tape_contract": "proposal/Jacobian, finite-thickness slab, cell atomics, RNG, map schema, primal, backward, and JVP stay one owner",
+      "forbidden": [
+        "extract UTD into another ABI or launch",
+        "treat the RayD sample-tape producer as this family's primal",
+        "inherit pure-wedge fast math"
       ]
     },
     {
-      "family": "coupled RD field",
+      "family_id": "coupled-rd-field",
+      "family": "coupled reflection-diffraction field",
       "symbols": [
         "field_coupled_rd",
         "field_coupled_rd_backward",
         "field_coupled_rd_jvp"
       ],
-      "current_owner": "Channel Native",
-      "target_owner": "Channel Native",
-      "action": "retain complete family; include RayD shared device primitives",
+      "phase7_current_owner": "Channel Native",
+      "accepted_authoritative_owner": "Channel Native",
+      "activation_phase": "retained",
+      "action": "retain the complete fused family and consume RayD public device primitives",
       "compile_contract": "precise math",
-      "fusion_tape": "reflection slab plus UTD row fusion; no UTD sub-launch",
-      "binding_evidence": [
-        {
-          "symbol": "field_coupled_rd",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 657
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "field_coupled_rd_backward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 706
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "field_coupled_rd_jvp",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 710
-          },
-          "production_callers": []
-        }
+      "fusion_tape_contract": "reflection slab plus stationary UTD row fusion stays whole with ADR-012 AD lockstep",
+      "forbidden": [
+        "pure-wedge ABI sub-launch",
+        "materialized UTD intermediate",
+        "owner split across primal/backward/JVP"
       ]
     },
     {
-      "family": "coupled DD field",
+      "family_id": "coupled-dd-field",
+      "family": "coupled double-diffraction field",
       "symbols": [
         "field_coupled_dd",
         "field_coupled_dd_backward",
         "field_coupled_dd_jvp"
       ],
-      "current_owner": "Channel Native",
-      "target_owner": "Channel Native",
-      "action": "retain complete family; include RayD shared device primitives",
+      "phase7_current_owner": "Channel Native",
+      "accepted_authoritative_owner": "Channel Native",
+      "activation_phase": "retained",
+      "action": "retain the complete fused family and consume RayD public device primitives",
       "compile_contract": "precise math",
-      "fusion_tape": "two-wedge one-launch row fusion",
-      "binding_evidence": [
-        {
-          "symbol": "field_coupled_dd",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 661
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "field_coupled_dd_backward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 714
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "field_coupled_dd_jvp",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 719
-          },
-          "production_callers": []
-        }
+      "fusion_tape_contract": "ADR-013 two-wedge row remains one launch and one primal/backward/JVP owner",
+      "forbidden": [
+        "per-wedge ABI sub-launch",
+        "materialized inter-wedge field",
+        "owner split across primal/backward/JVP"
       ]
     },
     {
-      "family": "coupled RD stationary geometry",
+      "family_id": "coupled-rd-stationary-geometry",
+      "family": "coupled reflection-diffraction stationary geometry",
       "symbols": [
         "coupled_rd_prepare",
         "coupled_rd_prepare_backward",
         "coupled_rd_prepare_jvp"
       ],
-      "current_owner": "Channel Native",
-      "target_owner": "Channel Native",
-      "action": "retain complete family",
+      "phase7_current_owner": "Channel Native",
+      "accepted_authoritative_owner": "Channel Native",
+      "activation_phase": "retained",
+      "action": "retain the complete continuous stationary-geometry family",
       "compile_contract": "precise math",
-      "fusion_tape": "continuous stationary geometry family",
-      "binding_evidence": [
-        {
-          "symbol": "coupled_rd_prepare",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 744
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "coupled_rd_prepare_backward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 748
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "coupled_rd_prepare_jvp",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/fields.cpp",
-            "line": 752
-          },
-          "production_callers": []
-        }
+      "fusion_tape_contract": "fixed topology and geometry AD remain lockstep",
+      "forbidden": [
+        "partial move",
+        "winner-selection derivative",
+        "future move without a separate accepted ADR"
       ]
     },
     {
-      "family": "composed RD/DD geometry ABI",
+      "family_id": "composed-rd-dd-geometry",
+      "family": "composed reflection-diffraction and double-diffraction geometry",
       "symbols": [
-        "raydn_coupled_rd_geometry_forward",
-        "raydn_coupled_dd_geometry_forward"
+        "coupled_rd_geometry_forward",
+        "coupled_dd_geometry_forward"
       ],
-      "current_owner": "Channel operation / RayD EPC and visibility primitives",
-      "target_owner": "Channel operation / RayD typed primitives",
-      "action": "rename and record layered ownership",
-      "compile_contract": "no numerical or fusion change",
-      "fusion_tape": "Channel prepare/finalize around RayD primitive calls",
-      "binding_evidence": [
-        {
-          "symbol": "raydn_coupled_rd_geometry_forward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/rayd.cpp",
-            "line": 384
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/propagation/geometry/coupled.py",
-              "line": 83
-            }
-          ]
-        },
-        {
-          "symbol": "raydn_coupled_dd_geometry_forward",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/rayd.cpp",
-            "line": 388
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/propagation/geometry/coupled.py",
-              "line": 119
-            }
-          ]
-        }
+      "phase7_current_owner": "Channel operation / RayD primitives",
+      "accepted_authoritative_owner": "Channel operation / RayD primitives",
+      "activation_phase": "retained layered owner",
+      "action": "Channel owns prepare/finalize and row semantics; RayD owns typed EPC and visibility primitives",
+      "compile_contract": "precise math; no numerical or fusion change",
+      "fusion_tape_contract": "record layered ownership by operation and primitive rather than source directory",
+      "forbidden": [
+        "blanket rayd_* rename of Channel-composed operations",
+        "RayD dependency on Channel-private source",
+        "duplicate geometry implementation"
       ]
     },
     {
-      "family": "MC edge discovery",
+      "family_id": "solver-propagation-diffraction-ops",
+      "family": "deterministic/path/MC packing, compaction, vector accumulation, and edge discovery",
       "symbols": [
-        "bdpt_diffraction_discover_edges",
-        "bdpt_diffraction_discover_edges_counted"
+        "deterministic_diffraction_state_pack",
+        "deterministic_diffraction_state_pack_selected",
+        "deterministic_diffraction_order1_compact",
+        "deterministic_diffraction_vector_field",
+        "path_diffraction_block",
+        "mc_diffraction_discover_edges",
+        "mc_diffraction_discover_edges_counted",
+        "mc_diffraction_edge_geometry"
       ],
-      "current_owner": "Channel Native CUDA",
-      "target_owner": "Channel Native CUDA",
-      "action": "rename mc_diffraction_discover_edges* and move out of RayD bridge owner",
-      "compile_contract": "no numerical change",
-      "fusion_tape": "MC/Sionna sampling policy, not a RayD geometry primitive",
-      "binding_evidence": [
-        {
-          "symbol": "bdpt_diffraction_discover_edges",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/rayd.cpp",
-            "line": 399
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
-              "line": 600,
-              "via_alias": "raydn_diffraction_discover_edges"
-            }
-          ]
-        },
-        {
-          "symbol": "bdpt_diffraction_discover_edges_counted",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/rayd.cpp",
-            "line": 403
-          },
-          "production_callers": [
-            {
-              "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
-              "line": 582,
-              "via_alias": "raydn_diffraction_discover_edges_counted"
-            }
-          ]
-        }
+      "phase7_current_owner": "Channel Native",
+      "accepted_authoritative_owner": "Channel Native",
+      "activation_phase": "retained",
+      "action": "retain solver and propagation policy operations in Channel",
+      "compile_contract": "existing per-operation precise contract",
+      "fusion_tape_contract": "packing, compaction, accumulation, and MC discovery remain separate from generic RayD UTD physics",
+      "forbidden": [
+        "move based only on a diffraction substring",
+        "restore bdpt/raydn aliases for MC edge discovery",
+        "move solver row schemas or policy to RayD"
       ]
     },
     {
-      "family": "solver packing, MIS and accumulation",
-      "symbols": [
-        "bdpt_diffraction_connection_samples_from_tape",
-        "bdpt_diffraction_point_connection_samples",
-        "bdpt_diffraction_state_pack",
-        "bdpt_diffraction_state_wi",
-        "bdpt_diffraction_edge_geometry"
-      ],
-      "current_owner": "Channel Native",
-      "target_owner": "Channel Native only when real caller exists",
-      "action": "retain only after four-part reachability audit; otherwise governance-complete deletion",
-      "compile_contract": "unchanged until decision",
-      "fusion_tape": "solver policy and storage are not eligible for RayD runtime migration",
-      "binding_evidence": [
-        {
-          "symbol": "bdpt_diffraction_connection_samples_from_tape",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/bdpt.cpp",
-            "line": 533
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "bdpt_diffraction_point_connection_samples",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/bdpt.cpp",
-            "line": 537
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "bdpt_diffraction_state_pack",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/bdpt.cpp",
-            "line": 643
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "bdpt_diffraction_state_wi",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/bdpt.cpp",
-            "line": 635
-          },
-          "production_callers": []
-        },
-        {
-          "symbol": "bdpt_diffraction_edge_geometry",
-          "present": true,
-          "binding": {
-            "path": "native/channel_native/binding/bdpt.cpp",
-            "line": 650
-          },
-          "production_callers": []
-        }
+      "family_id": "bdpt-diffraction-policy-storage",
+      "family": "BDPT connection, PDF, MIS, and storage",
+      "symbols": [],
+      "phase7_current_owner": "no dedicated live diffraction ABI; ADR-018 uses enumerated paths",
+      "accepted_authoritative_owner": "Channel Native only when a real BDPT caller exists",
+      "activation_phase": "Phase 4 deletion retained; Phase 8B four-axis audit for any candidate",
+      "action": "do not recreate the five deleted bindings; a future entry requires static, dynamic, public-import, and real-BDPT-E2E evidence",
+      "compile_contract": "not applicable while no dedicated ABI exists",
+      "fusion_tape_contract": "BDPT MIS/PDF/storage policy remains Channel-owned; standalone diffraction is an opaque enumerated discrete path",
+      "forbidden": [
+        "name-based reachability evidence",
+        "dead binding retained for compatibility",
+        "reintroduction of the crude ADR-018 estimator"
       ]
     }
-  ]
+  ],
+  "compile_mode_boundary": {
+    "fast_math_families": [
+      "rayd-order1-export-and-tape",
+      "pure-wedge-fixed-winner-field"
+    ],
+    "precise_math_families": [
+      "mc-sionna-fixed-tape-estimator",
+      "coupled-rd-field",
+      "coupled-dd-field",
+      "coupled-rd-stationary-geometry",
+      "composed-rd-dd-geometry"
+    ],
+    "rule": "pure-wedge --use_fast_math must not spread to MC, coupled, transmission, or other precise families; scattering --fmad=false is independent"
+  },
+  "sample_tape_rename": {
+    "current_symbol": "bdpt_diffraction_accumulation_forward",
+    "accepted_symbol": "rayd_diffraction_sample_tape_forward",
+    "phase": "8B",
+    "kind": "rename-only",
+    "output_contract": "preserve complete fused output tuple, row order, launches, and RNG; do not trim unconsumed columns",
+    "compatibility_alias_allowed": false
+  },
+  "tx_visible_state_selection": {
+    "current_python_owner": "src/witwin/channel_native/propagation/geometry/diffraction.py::_tx_visible_diffraction_states",
+    "accepted_native_operation": "diffraction_tx_visible_state_select",
+    "operation_owner": "Channel operation / RayD visibility primitives",
+    "activation_phase": "8B",
+    "fractions_in_order": [
+      "0.02",
+      "1/3",
+      "2/3",
+      "0.98"
+    ],
+    "survival_rule": "any of four source-to-edge samples visible, with no ignored face",
+    "selection_contract": "stable row identity/order across all twelve state tensors",
+    "forbidden": [
+      "Python loop",
+      "Torch point geometry or Boolean reduction",
+      "host Boolean extraction or synchronization",
+      "CPU or fallback path"
+    ]
+  }
 }

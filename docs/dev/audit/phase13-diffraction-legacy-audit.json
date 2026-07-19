@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "plan": "Plan 13",
+  "decision_phase": 7,
+  "adr": "docs/dev/standards/adr-025-diffraction-operation-family-ownership.md",
+  "audit_axes": [
+    "static_production_caller",
+    "dynamic_binding",
+    "public_import",
+    "real_bdpt_e2e"
+  ],
+  "inherited_phase4_audit": "docs/dev/audit/phase13-phase4-dead-binding-reachability.json",
+  "binding_count_after_phase4": 202,
+  "closed_deletions": [
+    {
+      "symbol": "bdpt_diffraction_connection_samples_from_tape",
+      "all_four_axes_reachable": false,
+      "disposition": "deleted in Phase 4"
+    },
+    {
+      "symbol": "bdpt_diffraction_point_connection_samples",
+      "all_four_axes_reachable": false,
+      "disposition": "deleted in Phase 4"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_pack",
+      "all_four_axes_reachable": false,
+      "disposition": "deleted in Phase 4"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_wi",
+      "all_four_axes_reachable": false,
+      "disposition": "deleted in Phase 4"
+    },
+    {
+      "symbol": "bdpt_diffraction_edge_geometry",
+      "all_four_axes_reachable": false,
+      "disposition": "deleted in Phase 4"
+    }
+  ],
+  "closed_renames": [
+    {
+      "old_symbol": "bdpt_diffraction_discover_edges",
+      "current_symbol": "mc_diffraction_discover_edges",
+      "owner": "Channel Native",
+      "disposition": "renamed in Phase 4; no old alias"
+    },
+    {
+      "old_symbol": "bdpt_diffraction_discover_edges_counted",
+      "current_symbol": "mc_diffraction_discover_edges_counted",
+      "owner": "Channel Native",
+      "disposition": "renamed in Phase 4; no old alias"
+    }
+  ],
+  "pending_phase8b_rename": {
+    "old_symbol": "bdpt_diffraction_accumulation_forward",
+    "new_symbol": "rayd_diffraction_sample_tape_forward",
+    "current_numerical_owner": "RayD",
+    "real_production_owner": "montecarlo.basic sample-tape production",
+    "static_production_caller": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
+    "rename_only": true,
+    "compatibility_alias_allowed": false,
+    "trim_output_allowed": false
+  },
+  "phase8b_exit_requirements": {
+    "live_rayd_diffraction_alias_count": 0,
+    "live_old_sample_tape_name_count": 0,
+    "retained_bdpt_diffraction_symbol_rule": "every retained symbol must pass all four axes with a real BDPT E2E caller",
+    "dead_symbol_rule": "delete facade, registration, source/helper, tests, manifest, coverage, inventory, and budget records together"
+  },
+  "result": "Phase 4 deletion and MC rename decisions are closed; exactly one misleading sample-tape name remains for rename-only Phase 8B cleanup"
+}

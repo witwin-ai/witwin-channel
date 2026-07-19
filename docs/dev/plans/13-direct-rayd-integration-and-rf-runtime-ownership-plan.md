@@ -1,7 +1,7 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024 已接受，ADR-025/026 仍须在各自条件阶段先接受，再实施对应 owner move
+ADR-023/024/025 已接受，ADR-026 仍须在其条件阶段先接受，再实施对应 owner move
 
 **计划日期：** 2026-07-18
 
@@ -34,7 +34,8 @@ primal/JVP/VJP family。除明确独立立项的 batched penetration trace 外�
 [ADR-021](../standards/adr-021-multibounce-coherent-scattering.md)、
 [ADR-022](../standards/adr-022-bdpt-fixed-topology-ad.md)、
 [ADR-023](../standards/adr-023-direct-rayd-typed-integration.md)、
-[ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)。
+[ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)、
+[ADR-025](../standards/adr-025-diffraction-operation-family-ownership.md)。
 
 ## 1. 执行结论
 
@@ -586,8 +587,14 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ### Phase 7 — ADR-025：Diffraction operation-family ownership
 
+**状态：已完成（2026-07-19）。** ADR-025 已接受；此阶段只接受边界，不执行 Phase 8A/8B
+代码迁移。机器契约记录于 `docs/dev/audit/phase13-diffraction-family-matrix.json` 和
+`docs/dev/audit/phase13-diffraction-legacy-audit.json`。
+
 冻结第 6.1 节矩阵、pure-wedge三件套 move、MC/coupled families保留、sample-tape rename、
-fast/precise math边界和 legacy deletion规则。
+fast/precise math边界和 legacy deletion规则。live `_tx_visible_diffraction_states` 的四个
+fractions、any-visible判定和稳定row selection也已冻结；Phase 8B必须以Channel composed
+native planning/selection operation替换Torch几何/loop/host Boolean，不得作为fallback保留。
 
 ### Phase 8A — Pure-wedge family 迁入 RayD
 

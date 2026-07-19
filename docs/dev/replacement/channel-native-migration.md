@@ -103,6 +103,28 @@ count remains 202; the owner split is now RayD 23, layered Channel/RayD 2, and
 Channel Native 177. The frozen 129-helper partition remains 112/10/7 because
 Phase 6B moved an operation family, not a new helper source closure.
 
+### Plan 13 Phase 7: diffraction operation-family decision
+
+ADR-025 is accepted, but Phase 7 does not move production code. It freezes
+nine diffraction operation families by their full primal/JVP/VJP, fusion,
+tape, and compile contracts. The pure-wedge fixed-winner
+`field_diffraction_wedge/backward/jvp` family is approved for an atomic Phase
+8A move to RayD; until that pin/switch/delete commit, Channel remains its sole
+numerical implementation. MC Sionna fixed-tape accumulation and coupled R-D/
+D-D fields remain complete Channel owners and stay on precise math. The pure
+wedge family alone retains exporter-locked `--use_fast_math`.
+
+Phase 8B will rename the misleading live
+`bdpt_diffraction_accumulation_forward` sample-tape producer to
+`rayd_diffraction_sample_tape_forward` without an alias or output trimming.
+The five dead BDPT diffraction bindings deleted in Phase 4 remain deleted under
+the four-axis reachability rule. The live transmitter visibility prefilter will
+become a complete Channel native planning/selection operation while preserving
+the ordered fractions `(0.02, 1/3, 2/3, 0.98)`, any-visible rule, and stable row
+selection. The accepted contracts and stop conditions are recorded in
+`docs/dev/audit/phase13-diffraction-family-matrix.json` and
+`docs/dev/audit/phase13-diffraction-legacy-audit.json`.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)
