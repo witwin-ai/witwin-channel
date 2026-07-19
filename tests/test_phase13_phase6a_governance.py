@@ -34,8 +34,6 @@ def test_phase6a_evidence_is_preserved_after_later_pin() -> None:
     inventory = _json(AUDIT / "phase13-current-native-owner-inventory.json")
     migration = _json(AUDIT / "phase13-migration-delta.json")
 
-    assert inventory["current_phase"] == migration["current_phase"] == 6
-    assert inventory["current_subphase"] == migration["current_subphase"] == "6B"
     inventory_phase6a = inventory["phase6a_shared_rf_and_layer_stack"]  # type: ignore[index]
     migration_phase6a = migration["phase6a_current"]  # type: ignore[index]
     assert (

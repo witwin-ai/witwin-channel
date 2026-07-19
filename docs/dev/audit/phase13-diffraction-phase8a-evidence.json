@@ -139,6 +139,13 @@
       }
     },
     "occupancy_contract": "unchanged: normalized SASS, per-kernel resource usage, and 128-thread launch geometry are identical",
+    "static_theoretical_occupancy_rtx_5080": {
+      "device": "84 SM, 1536 threads/SM, 65536 registers/SM",
+      "field_diffraction_wedge": "4 blocks/SM, 33.333 percent",
+      "field_diffraction_wedge_backward": "2 blocks/SM, 16.667 percent",
+      "field_diffraction_wedge_jvp": "2 blocks/SM, 16.667 percent",
+      "achieved_occupancy": "not claimed; Nsight Compute counters unavailable with ERR_NVGPUCTRPERM"
+    },
     "command": "cuobjdump --dump-ptx/--dump-sass/--dump-resource-usage <object>"
   },
   "copy_memory_packaging_contract": {
@@ -147,7 +154,26 @@
     "persistent_tape_bytes_delta": 0,
     "materialized_intermediate_bytes_delta": 0,
     "peak_output_storage_contract": "unchanged named outputs with the same shapes, dtypes, allocation count, and zero-row behavior; typed adapters only pack at::Tensor references",
+    "peak_memory_bytes_phase0_equal": {
+      "method": "isolated processes, one warmup, seven repeats",
+      "primal": {
+        "allocated": 113152,
+        "reserved": 2097152,
+        "temporary": 45568
+      },
+      "jvp": {
+        "allocated": 130560,
+        "reserved": 2097152,
+        "temporary": 75264
+      },
+      "vjp": {
+        "allocated": 125440,
+        "reserved": 2097152,
+        "temporary": 70656
+      }
+    },
     "packaged_extension_build": "passed: artifacts/cmake-plan13-baseline/_channel_native.cp311-win_amd64.pyd linked the locked rayd_torch_native_core static target",
+    "packaged_extension_sha256": "ffd7a165ddb04168398a64901cca4784d18b6ad7a6600e7727b03b0cc7b5efda",
     "packaged_extension_dependency_audit": "dumpbin /dependents passed; no RayD Python extension or RayD runtime DLL dependency is present",
     "rayd_python_extension_built_or_imported": false,
     "supported_architecture_build": "sm_120 plus compute_120 passed"
