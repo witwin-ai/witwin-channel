@@ -1,6 +1,8 @@
 # ADR-010: Native CUDA ownership of scattering and rough-reflection physics
 
-- **Status:** Accepted
+- **Status:** Accepted; numerical contracts retained. Cross-repository
+  implementation ownership is superseded by ADR-026 after each Phase 10
+  activation.
 - **Date:** 2026-07-16
 - **Kind:** Numerical-kernel change (Plan 08 section 6 / G2 exception path). This is
   NOT an architecture move; it deliberately replaces Torch-computed production
@@ -30,6 +32,14 @@ was forbidden to touch. This ADR authorizes their migration as an independent
 numerical-kernel change.
 
 ## Decision
+
+ADR-010 authorizes and freezes the native CUDA numerical behavior described
+below. It originally placed the implementations in Channel because that was the
+active native boundary at the time. ADR-026 later accepts RayD as the final
+source owner for the generic scattering runtime families without changing this
+ADR's numerical, fusion, launch, reduction, AD, or acceptance contracts.
+Channel remains the production numerical owner until the corresponding Phase
+10 pin/switch/delete commit activates the complete RayD family.
 
 Introduce three native op families, each with a single Python kernel facade owner:
 
@@ -139,3 +149,6 @@ Replaces `_rough_reflection_factor` and its Torch-autograd differentiation.
   Python event semantics over native sampling/CDF/BSDF kernels) and CPU/numpy
   compile-time table construction (`scattering/tables.py`, cached per compiled
   scene). Revisit only with their own ADRs.
+- ADR-026 moves only the final native source owner for the generic runtime
+  operations. It does not move table/phase-screen lifecycle, MC/BDPT event
+  policy, topology, accumulation, or the test-only references accepted here.

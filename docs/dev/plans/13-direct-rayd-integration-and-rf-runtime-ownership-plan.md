@@ -1,7 +1,8 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024/025 已接受，ADR-026 仍须在其条件阶段先接受，再实施对应 owner move
+ADR-023/024/025/026 已接受；Phase 10 的 scattering owner move 仍须按 dormant
+candidate → Channel pin/switch/delete 顺序激活
 
 **计划日期：** 2026-07-18
 
@@ -35,7 +36,8 @@ primal/JVP/VJP family。除明确独立立项的 batched penetration trace 外�
 [ADR-022](../standards/adr-022-bdpt-fixed-topology-ad.md)、
 [ADR-023](../standards/adr-023-direct-rayd-typed-integration.md)、
 [ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)、
-[ADR-025](../standards/adr-025-diffraction-operation-family-ownership.md)。
+[ADR-025](../standards/adr-025-diffraction-operation-family-ownership.md)、
+[ADR-026](../standards/adr-026-rayd-generic-scattering-runtime-ownership.md)。
 
 ## 1. 执行结论
 
@@ -482,7 +484,8 @@ Channel solver policy 或 table builder 搬入 RayD。
   primal/sample/pdf 使用默认 flags；ensemble/patch/chain/table-AD 等既有 lockstep TUs
   保持 `--fmad=false`；不得把任一模式扩散到另一 family；
 - deterministic primal/JVP reduction 与 backward shared-gradient atomic behavior；
-- ADR-021 当前限制：chain geometry reverse mode 必须 fail loud，forward geometry 使用 JVP；
+- chain geometry AD 按 as-built family 冻结：chain ensemble reverse mode 必须 fail loud、
+  forward geometry 使用 JVP；chain realization 继续支持现有 geometry VJP/JVP；
 - ADR-022 的 fixed-topology/fixed-sample/fixed-visibility/fixed-PDF/MIS contract。
 
 任何一项若要改变，都不再是 owner move，必须退出 ADR-026，进入独立 numerical ADR。
@@ -621,9 +624,12 @@ BDPT bindings；live `_tx_visible_diffraction_states` 改为 native完整 planni
 
 ### Phase 9 — ADR-026：RayD generic scattering runtime ownership
 
+**状态：已完成（2026-07-19）。** ADR-026 已接受；此阶段只接受边界，不执行 Phase
+10A/10B 的源码移动、RayD pin 或本地实现删除。
+
 显式修订 ADR-010，冻结第 7.2 节 17 个 contracts、resource/tensor ABI、完整 family move、
-source/header唯一 owner、chain fusion/AD/compile flags和第 7.3 节不迁移内容。未接受则
-scattering保持 Channel owner，但不影响 Phase 0-8完成。
+source/header唯一 owner、chain fusion/AD/compile flags和第 7.3 节不迁移内容。ADR 已接受，
+但在对应 Phase 10 atomic activation 前 scattering 仍保持 Channel production owner。
 
 ### Phase 10A — Scattering table 与 single-bounce families
 

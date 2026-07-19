@@ -19,9 +19,19 @@ Scattering may depend on material value contracts, physics utilities, and
 domain kernel facades. It must not import a solver or acquire a mutable scene or
 native handle. Solvers consume scattering contracts through their owning
 pipeline stage. After Plan 13 Phase 6A, retained scattering and chain kernels
-consume RayD's public shared RF device headers; the seven scattering-table
-helpers remain Channel-owned until ADR-026 and are not folded into the
-ADR-024 transfer.
+consume RayD's public shared RF device headers. ADR-026 accepts RayD as the
+final numerical owner of 17 generic resident scattering runtime contracts and
+the seven scattering-table helpers, but Channel remains their production owner
+until the corresponding Phase 10A/10B atomic pin/switch/delete activation.
+
+The accepted boundary is deliberately narrow: RayD consumes caller-owned
+resident table/height/geometry tensors and owns complete native operation
+families. Channel continues to own table construction/cache/versioning,
+`KirchhoffRuntimeResources`, `PhaseScreenRuntime`, seeds, topology and C1/C2
+packing, `scattering_event_probabilities`, solver accumulation, RNG/MIS/event
+policy, and result/metadata assembly. The chain families retain their as-built
+AD difference: ensemble geometry is JVP-only and rejects reverse mode;
+realization geometry keeps both VJP and JVP.
 
 ## Numerical and AD contract
 

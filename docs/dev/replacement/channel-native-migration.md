@@ -74,7 +74,8 @@ former Channel-private numerical headers and `kernels/em_debug.cu` are removed
 without forwarding aliases or a runtime fallback. Of the 129 frozen helper
 records, 112 now have RayD as their active unique source owner, 10 remain
 Channel boundary-only tensor/launch adapters, and 7 scattering-table helpers
-remain Channel-owned pending ADR-026. The live binding count remains 202; the
+remain Channel-owned pending Phase 10A activation under accepted ADR-026. The
+live binding count remains 202; the
 current owner split is RayD 20, layered Channel/RayD 2, and Channel Native 180.
 
 ### Plan 13 Phase 6B: complete-row transmission ownership
@@ -150,6 +151,24 @@ remains 202; the owner split is RayD 26, layered Channel/RayD 2, and Channel
 Native 174. Evidence and deletion hashes live in
 `docs/dev/audit/phase13-diffraction-phase8a-evidence.json` and
 `docs/dev/audit/phase13-migration-delta.json`.
+
+### Plan 13 Phase 9: generic scattering runtime ownership decision
+
+ADR-026 is accepted, but Phase 9 moves no source and changes no production
+owner. It freezes six complete families containing 17 Channel-facing runtime
+contracts for ordered Phase 10A/10B transfer to RayD, together with the seven
+shared table-interpolation helpers. Channel remains the production numerical
+owner until each dormant RayD candidate is pinned, switched, validated, and
+the corresponding local implementation is deleted atomically.
+
+RayD will consume only caller-owned resident tensors. Channel retains
+Kirchhoff and phase-screen construction/cache/seed lifecycle,
+`scattering_event_probabilities`, topology/C1-C2 packing, RNG/MIS/event policy,
+solver accumulation, and results. Table primal/sample/PDF remains on default
+CUDA flags; table AD, ensemble, patch, and chain TUs retain `--fmad=false`.
+Chain-ensemble geometry stays JVP-only with loud reverse rejection, while
+chain-realization geometry retains its implemented VJP/JVP support. See
+`docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`.
 
 ## API surface changes
 

@@ -42,6 +42,14 @@ priority `scattering > diffraction > transmission > reflection > los`.
   Pure wedge keeps exporter-locked `--use_fast_math`; MC and coupled families
   remain precise. Phase 8B still owns the sample-tape rename and native
   transmitter-edge visibility planning/selection operation.
+- ADR-026 accepts RayD as the final numerical owner of 17 solver-neutral,
+  resident scattering runtime contracts and seven table-interpolation device
+  helpers. The decision is not yet activated: Channel remains the production
+  owner until the Phase 10A/10B pin/switch/delete commits. Table and
+  phase-screen construction/cache/seed lifecycle, event probabilities,
+  topology/packing, RNG/MIS, accumulation, and result policy remain Channel
+  owners. Per-TU default/`--fmad=false` modes and the family-specific chain
+  geometry AD behavior are frozen.
 
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.

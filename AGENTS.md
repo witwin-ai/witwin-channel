@@ -115,6 +115,15 @@ requires them.
   facades. MC Sionna and coupled RD/DD diffraction stay complete Channel
   owners; do not extract a UTD sub-launch or spread the pure-wedge fast-math
   flag into their precise-math translation units.
+- ADR-026 accepts RayD as the final numerical owner of 17 generic resident
+  scattering runtime contracts and the seven scattering-table device helpers.
+  Until each Phase 10A/10B atomic pin/switch/delete activates a complete
+  family, Channel remains its production numerical owner. RayD only consumes
+  caller-owned resident tensors; Channel retains table/phase-screen lifecycle,
+  `scattering_event_probabilities`, topology/packing, RNG/MIS/event policy,
+  accumulation, and results. Preserve per-TU flags and the as-built chain AD
+  split: ensemble geometry is JVP-only, while realization geometry supports
+  VJP and JVP.
 - Do not split a fused native operation merely to mirror Python modules. A
   refactor must not add kernel launches, synchronizations, materialized
   intermediates, persistent tape, host/device transfers, or reduction-order
@@ -198,6 +207,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-023-direct-rayd-typed-integration.md`
 - `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
 - `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
+- `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or
