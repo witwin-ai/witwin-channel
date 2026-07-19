@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "contract_count": 6,
+  "families": [
+    "resident CSR layer-stack",
+    "complete-row transmission field"
+  ],
+  "contracts": [
+    {
+      "symbol": "em_layer_stack_eval",
+      "family": "resident CSR layer-stack",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-024",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 399
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            9
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/em_debug.cu",
+          "lines": [
+            309
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/materials/kernels/autograd.py",
+          "line": 48
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
+          "line": 190
+        },
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/transmission.py",
+          "line": 290
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+          "line": 742
+        }
+      ],
+      "contract_test": "tests/kernels/test_em_layer_stack.py::test_single_layer_matches_complex128_oracle_at_oblique_lossy_conditions",
+      "e2e_callers": [
+        "tests/ad/test_field_em_ad.py::test_transmission_layer_vjp_matches_reference_oracle"
+      ],
+      "compile_contract": "precise math; must not inherit --use_fast_math or scattering --fmad=false",
+      "fusion_contract": "complete family move; CSR layers stay resident and no per-layer cross-launch tensor is introduced",
+      "tape_contract": "backward/JVP recompute the current layer chain; no persistent tape; shared layer gradients retain atomic accumulation/order",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "em_layer_stack_backward",
+      "family": "resident CSR layer-stack",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-024",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 403
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            19
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/em_debug.cu",
+          "lines": [
+            464
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/materials/kernels/autograd.py",
+          "line": 95
+        }
+      ],
+      "contract_test": "tests/kernels/test_em_layer_stack.py::test_single_layer_matches_complex128_oracle_at_oblique_lossy_conditions",
+      "e2e_callers": [
+        "tests/ad/test_field_em_ad.py::test_transmission_layer_vjp_matches_reference_oracle"
+      ],
+      "compile_contract": "precise math; must not inherit --use_fast_math or scattering --fmad=false",
+      "fusion_contract": "complete family move; CSR layers stay resident and no per-layer cross-launch tensor is introduced",
+      "tape_contract": "backward/JVP recompute the current layer chain; no persistent tape; shared layer gradients retain atomic accumulation/order",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "em_layer_stack_jvp",
+      "family": "resident CSR layer-stack",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-024",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 407
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            33
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/em_debug.cu",
+          "lines": [
+            534
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/materials/kernels/autograd.py",
+          "line": 170
+        }
+      ],
+      "contract_test": "tests/kernels/test_em_layer_stack.py::test_single_layer_matches_complex128_oracle_at_oblique_lossy_conditions",
+      "e2e_callers": [
+        "tests/ad/test_field_em_ad.py::test_transmission_layer_vjp_matches_reference_oracle"
+      ],
+      "compile_contract": "precise math; must not inherit --use_fast_math or scattering --fmad=false",
+      "fusion_contract": "complete family move; CSR layers stay resident and no per-layer cross-launch tensor is introduced",
+      "tape_contract": "backward/JVP recompute the current layer chain; no persistent tape; shared layer gradients retain atomic accumulation/order",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "field_transmission_sequence",
+      "family": "complete-row transmission field",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-024",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/fields.cpp",
+        "line": 653
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/fields.cpp",
+          "lines": [
+            364
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/field_transport.cu",
+          "lines": [
+            957
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [],
+      "contract_test": "tests/kernels/test_field_transmission_sequence.py::test_lossy_wall_attenuates_consistently_with_layer_stack_eval",
+      "e2e_callers": [
+        "tests/ad/test_field_em_ad.py::test_transmission_layer_vjp_matches_reference_oracle"
+      ],
+      "compile_contract": "precise math; must not inherit --use_fast_math or scattering --fmad=false",
+      "fusion_contract": "complete family move; CSR layers stay resident and no per-layer cross-launch tensor is introduced",
+      "tape_contract": "backward/JVP recompute the current layer chain; no persistent tape; shared layer gradients retain atomic accumulation/order",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "field_transmission_sequence_backward",
+      "family": "complete-row transmission field",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-024",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/fields.cpp",
+        "line": 686
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/fields.cpp",
+          "lines": [
+            462
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/field_transport_transmission.cu",
+          "lines": [
+            619
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+          "line": 695
+        }
+      ],
+      "contract_test": "tests/kernels/test_field_transmission_sequence.py::test_lossy_wall_attenuates_consistently_with_layer_stack_eval",
+      "e2e_callers": [
+        "tests/ad/test_field_em_ad.py::test_transmission_layer_vjp_matches_reference_oracle"
+      ],
+      "compile_contract": "precise math; must not inherit --use_fast_math or scattering --fmad=false",
+      "fusion_contract": "complete family move; CSR layers stay resident and no per-layer cross-launch tensor is introduced",
+      "tape_contract": "backward/JVP recompute the current layer chain; no persistent tape; shared layer gradients retain atomic accumulation/order",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "field_transmission_sequence_jvp",
+      "family": "complete-row transmission field",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-024",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/fields.cpp",
+        "line": 690
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/fields.cpp",
+          "lines": [
+            490
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/field_transport_transmission.cu",
+          "lines": [
+            769
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+          "line": 811
+        }
+      ],
+      "contract_test": "tests/kernels/test_field_transmission_sequence.py::test_lossy_wall_attenuates_consistently_with_layer_stack_eval",
+      "e2e_callers": [
+        "tests/ad/test_field_em_ad.py::test_transmission_layer_vjp_matches_reference_oracle"
+      ],
+      "compile_contract": "precise math; must not inherit --use_fast_math or scattering --fmad=false",
+      "fusion_contract": "complete family move; CSR layers stay resident and no per-layer cross-launch tensor is introduced",
+      "tape_contract": "backward/JVP recompute the current layer chain; no persistent tape; shared layer gradients retain atomic accumulation/order",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    }
+  ],
+  "retained_channel_owners": [
+    "material models, CSR encoding, cache and validation façade",
+    "topology winner/eligibility/component-5 packing",
+    "bdpt_transmitted_light_subpath_state primal/backward/JVP complete 19-field family",
+    "BDPT event probability, MIS and RNG",
+    "MC Basic incident-polarization power estimator semantics",
+    "component accumulation, metadata and results"
+  ],
+  "deferred_adr027": [
+    "batched straight-segment penetration trace",
+    "MC wall-product/active-state native estimator if profiling proves hot"
+  ]
+}

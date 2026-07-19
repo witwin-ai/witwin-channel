@@ -21,6 +21,7 @@ WRAPPERS_BY_SOURCE = {
         "cn_raydn_intersect_backward",
         "cn_raydn_intersect_jvp",
         "cn_raydn_coupled_rd_geometry_forward",
+        "cn_raydn_coupled_dd_geometry_forward",
     },
     "reflection.cpp": {
         "cn_raydn_trace_reflections_forward",
@@ -86,7 +87,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
 
-    assert len(expected_wrappers) == 22
+    assert len(expected_wrappers) == 23
     assert set(owners) == expected_wrappers
     assert all(len(source_names) == 1 for source_names in owners.values())
 

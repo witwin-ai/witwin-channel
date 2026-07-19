@@ -1,0 +1,425 @@
+{
+  "schema_version": 1,
+  "baseline_binding_count": 211,
+  "applied_count_delta": 0,
+  "projected_final_count": null,
+  "projected_count_formula": "211 minus only those legacy candidates later proven dead by all four reachability checks",
+  "actions": [
+    {
+      "symbol": "raydn_scene_create",
+      "action": "rename",
+      "replacement": "rayd_scene_create",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_scene_edge_records",
+      "action": "rename",
+      "replacement": "rayd_scene_edge_records",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_intersect_backward",
+      "action": "rename",
+      "replacement": "rayd_intersect_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_intersect_jvp",
+      "action": "rename",
+      "replacement": "rayd_intersect_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_forward",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_forward_tape",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_forward_tape",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_backward",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_jvp",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_reflection_epc_paths_forward",
+      "action": "rename",
+      "replacement": "rayd_reflection_epc_paths_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_reflection_epc_paths_backward",
+      "action": "rename",
+      "replacement": "rayd_reflection_epc_paths_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_reflection_epc_paths_jvp",
+      "action": "rename",
+      "replacement": "rayd_reflection_epc_paths_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_scene_face_normals_backward",
+      "action": "rename",
+      "replacement": "rayd_scene_face_normals_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_scene_face_normals_jvp",
+      "action": "rename",
+      "replacement": "rayd_scene_face_normals_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_diffraction_paths_order1_forward",
+      "action": "rename",
+      "replacement": "rayd_diffraction_paths_order1_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_coupled_rd_geometry_forward",
+      "action": "rename",
+      "replacement": "rayd_coupled_rd_geometry_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_coupled_dd_geometry_forward",
+      "action": "rename",
+      "replacement": "rayd_coupled_dd_geometry_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_intersect_forward",
+      "action": "rename",
+      "replacement": "rayd_intersect_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_visibility_forward",
+      "action": "rename",
+      "replacement": "rayd_visibility_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_diffraction_accumulation_forward",
+      "action": "rename",
+      "replacement": "rayd_diffraction_sample_tape_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_diffraction_discover_edges",
+      "action": "rename",
+      "replacement": "mc_diffraction_discover_edges",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_diffraction_discover_edges_counted",
+      "action": "rename",
+      "replacement": "mc_diffraction_discover_edges_counted",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "em_layer_stack_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "em_layer_stack_eval",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "em_layer_stack_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "em_layer_stack_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "em_layer_stack_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "em_layer_stack_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_transmission_sequence",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_transmission_sequence",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_transmission_sequence_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_transmission_sequence_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_transmission_sequence_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_transmission_sequence_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_diffraction_wedge",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_diffraction_wedge",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_diffraction_wedge_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_diffraction_wedge_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_diffraction_wedge_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_diffraction_wedge_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_eval",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_eval_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_eval_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_sample",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_sample",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_pdf",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_pdf",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_ensemble_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_ensemble_eval",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_ensemble_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_ensemble_eval_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_ensemble_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_ensemble_eval_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_patch_integral_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_patch_integral_eval",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_patch_integral_eval_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_patch_integral_eval_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_ensemble_eval",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_ensemble_eval_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_ensemble_eval_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_realization_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_realization_eval",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_realization_eval_backward",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_realization_eval_jvp",
+      "count_delta": 0,
+      "status": "conditional on accepted ADR and cross-repository switch",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "bdpt_diffraction_connection_samples_from_tape",
+      "action": "four-part-reachability-audit",
+      "replacement": null,
+      "count_delta": null,
+      "status": "unresolved; deletion is not authorized by static scan alone",
+      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+    },
+    {
+      "symbol": "bdpt_diffraction_point_connection_samples",
+      "action": "four-part-reachability-audit",
+      "replacement": null,
+      "count_delta": null,
+      "status": "unresolved; deletion is not authorized by static scan alone",
+      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_pack",
+      "action": "four-part-reachability-audit",
+      "replacement": null,
+      "count_delta": null,
+      "status": "unresolved; deletion is not authorized by static scan alone",
+      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_wi",
+      "action": "four-part-reachability-audit",
+      "replacement": null,
+      "count_delta": null,
+      "status": "unresolved; deletion is not authorized by static scan alone",
+      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+    },
+    {
+      "symbol": "bdpt_diffraction_edge_geometry",
+      "action": "four-part-reachability-audit",
+      "replacement": null,
+      "count_delta": null,
+      "status": "unresolved; deletion is not authorized by static scan alone",
+      "reason": "Plan 13 section 6.4 requires static, dynamic binding, public import and BDPT E2E evidence"
+    }
+  ]
+}

@@ -1,0 +1,3528 @@
+{
+  "schema_version": 1,
+  "helper_count": 129,
+  "extraction": "source-level inline/device function declarations from the Phase 0 shared-header closure",
+  "helpers": [
+    {
+      "name": "c_sqrt_passive",
+      "source": "native/channel_native/em/complex.cuh",
+      "line": 26,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/medium.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "c_exp_neg_j",
+      "source": "native/channel_native/em/complex.cuh",
+      "line": 36,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/medium.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "c_div",
+      "source": "native/channel_native/em/complex.cuh",
+      "line": 49,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/medium.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "c_abs2",
+      "source": "native/channel_native/em/complex.cuh",
+      "line": 56,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/medium.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "make_medium",
+      "source": "native/channel_native/em/medium.cuh",
+      "line": 24,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/fresnel.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "vacuum_medium",
+      "source": "native/channel_native/em/medium.cuh",
+      "line": 39,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/fresnel.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "kz_from_kpar",
+      "source": "native/channel_native/em/fresnel.cuh",
+      "line": 26,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/layer_stack.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "admittance_te",
+      "source": "native/channel_native/em/fresnel.cuh",
+      "line": 32,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/layer_stack.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "admittance_tm",
+      "source": "native/channel_native/em/fresnel.cuh",
+      "line": 37,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/layer_stack.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "admittance",
+      "source": "native/channel_native/em/fresnel.cuh",
+      "line": 42,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/layer_stack.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "interface_rt",
+      "source": "native/channel_native/em/fresnel.cuh",
+      "line": 48,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/em/layer_stack.cuh"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "layer_one_way_phase",
+      "source": "native/channel_native/em/layer_stack.cuh",
+      "line": 67,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "stack_rt",
+      "source": "native/channel_native/em/layer_stack.cuh",
+      "line": 79,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "precise_neg_kd",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 10,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "free_space_complex3",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 17,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "project_receiver",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 37,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "exp_neg_2i",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 52,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_add",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 68,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_sub",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 73,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_mul",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 78,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_scale",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 83,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_div",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 88,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_div_floor",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 96,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_sqrt",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 105,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_interface_sqrt",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 114,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_interface_fresnel",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 124,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_exp_neg_2i",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 150,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_sionna_slab_fresnel",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 159,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "slab_fresnel",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 209,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "complex3_dot_real",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 259,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "reflect_frame",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 282,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "reflect_complex3",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 309,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "wall_frame",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 350,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "slab_face_operator",
+      "source": "native/channel_native/field_transport.cuh",
+      "line": 370,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df_const",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 63,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_const",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 65,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_make",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 69,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_add",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 73,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_sub",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 77,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_mul",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 81,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_mul_real",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 87,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_mul_dualreal",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 91,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_div_utd",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 101,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_div_em",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 117,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_sqrt_utd",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 134,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_sqrt_passive",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 146,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_exp_neg_2i",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 158,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_dot",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 177,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "d_fabsf",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 190,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "slab_fresnel_dual",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 198,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "make_medium_dual",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 295,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_kz_from_kpar2",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 329,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_admittance",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 334,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_interface_rt",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 349,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dc_layer_one_way_phase",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 364,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "stack_rt_dual",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 394,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "SeedFn>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_load",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 539,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_sub",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 545,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_scale",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 550,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_dot",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 555,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_length",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 560,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_safe_normalize",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 566,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_stable_perp_basis",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 575,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_transverse_project",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 594,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "free_space_eval",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 623,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_add",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 674,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "v3_neg",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 679,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dv3_const",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 690,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dv3_sub",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 695,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_v3_length",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 702,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_v3_safe_normalize",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 712,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_v3_stable_perp_basis",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 735,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_v3_length",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 757,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_v3_normalize_branch",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 768,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_v3_safe_normalize",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 782,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_v3_stable_perp_basis",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 794,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_v3_transverse_project",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 818,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_v3_transverse_project",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 832,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df3_const",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 854,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df3_make",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 858,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df3_sub",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 862,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df3_neg",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 866,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df3_cross",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 870,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "df3_dot",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 876,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_safe_length",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 884,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_safe_length",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 891,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_safe_normalize",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 900,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_stable_perp_basis",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 921,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_transverse_project",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 948,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_transverse_project",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 962,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_reflect_frame",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 989,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_reflect_frame",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1028,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_wall_frame",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1133,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "adj_wall_frame",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1158,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_const",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1236,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_make",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1240,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_add",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1244,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_sub",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1248,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_mul",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1252,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_scale_dual",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1259,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_div",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1268,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_sqrt",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1287,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dlc_exp_neg_2i",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1305,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "legacy_sionna_slab_fresnel_dual",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1324,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "dual_cplx_from",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1397,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "seeded",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1403,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "seeded3",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1414,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "const3",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1423,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native pending helper-by-helper closure decision",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>",
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "slab_fresnel_dual_rd",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1430,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "slab_face_operator_dual",
+      "source": "native/channel_native/field_transport_ad.cuh",
+      "line": 1453,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-024",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "load3f",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 34,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "load_sequence3f",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 39,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "load_dual3f",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 45,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "load_dual_sequence3f",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 52,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "complex_of",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 64,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "to_c10",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 68,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "fold_output_cotangents",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 79,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "write_output_tangents",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 121,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "launch_blocks",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 157,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "zero_filled",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 163,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "optional_grad",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 177,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "grad_ptr",
+      "source": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 196,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "Channel Native wrapper; move referenced numerical helper only",
+      "compiler_attributes": [
+        "template",
+        "<typename",
+        "T>"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "positive_phi",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 15,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "linear_axis",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 20,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "nearest_axis",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 37,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "interp4",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 43,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "eval_te_tm",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 71,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "primal",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "linear_axis_grad",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 94,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    },
+    {
+      "name": "eval_te_tm_grad",
+      "source": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 131,
+      "current_unique_source_owner": "Channel Native",
+      "target_unique_source_owner": "RayD after ADR-026",
+      "compiler_attributes": [
+        "__device__",
+        "__forceinline__"
+      ],
+      "mirror_role": "dual/adjoint",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "acceptance": [
+        "normalized-body comparison",
+        "compile-attribute parity",
+        "PTX/SASS or equivalent codegen evidence",
+        "primal/dual lockstep"
+      ]
+    }
+  ],
+  "decision_rule": "Move only generic RF numerical helpers; Channel tensor checks, pybind validation and solver schema remain Channel-owned."
+}

@@ -1,0 +1,857 @@
+{
+  "schema_version": 1,
+  "binding_count": 18,
+  "move_count": 17,
+  "retain_count": 1,
+  "contracts": [
+    {
+      "symbol": "scattering_table_eval",
+      "family": "table evaluation AD",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 411
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            48
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering.cu",
+          "lines": [
+            130
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 407
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 543
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_eval_backward",
+      "family": "table evaluation AD",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 431
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            237
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_table_eval_ad.cu",
+          "lines": [
+            195
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 427
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
+      "e2e_callers": [
+        "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_eval_jvp",
+      "family": "table evaluation AD",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 433
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            246
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_table_eval_ad.cu",
+          "lines": [
+            257
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 461
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
+      "e2e_callers": [
+        "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_sample",
+      "family": "table sampling",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 415
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            52
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering.cu",
+          "lines": [
+            147
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 354
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 568
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_pdf",
+      "family": "table sampling",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 413
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            50
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering.cu",
+          "lines": [
+            141
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 588
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 603
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_ensemble_eval",
+      "family": "single-bounce ensemble",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 419
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            88
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_ensemble.cu",
+          "lines": [
+            151
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+          "line": 471
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 113
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
+      "e2e_callers": [
+        "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_ensemble_eval_backward",
+      "family": "single-bounce ensemble",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 423
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            113
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_ensemble_ad.cu",
+          "lines": [
+            542
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 175
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_ensemble_eval_jvp",
+      "family": "single-bounce ensemble",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 425
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            145
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_ensemble_ad.cu",
+          "lines": [
+            684
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 311
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_patch_integral_eval",
+      "family": "phase-screen patch integral",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 421
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            69
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_patch_integral.cu",
+          "lines": [
+            281
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+          "line": 782
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes",
+      "e2e_callers": [
+        "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_backward",
+      "family": "phase-screen patch integral",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 427
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            185
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_patch_integral_ad.cu",
+          "lines": [
+            751
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 571
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_jvp",
+      "family": "phase-screen patch integral",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 429
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            209
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_patch_integral_ad.cu",
+          "lines": [
+            845
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 681
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval",
+      "family": "v2 chain ensemble",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 435
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            279
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_chain_ensemble.cu",
+          "lines": [
+            311
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 162
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_forward_schema",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_backward",
+      "family": "v2 chain ensemble",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 437
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            292
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+          "lines": [
+            806
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 257
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_jvp",
+      "family": "v2 chain ensemble",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 439
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            309
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+          "lines": [
+            972
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 434
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_realization_eval",
+      "family": "v2 chain realization",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 441
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            335
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_chain_realization.cu",
+          "lines": [
+            527
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_backward",
+      "family": "v2 chain realization",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 443
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            350
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
+          "lines": [
+            1194
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 866
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_jvp",
+      "family": "v2 chain realization",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 445
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            369
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
+          "lines": [
+            1349
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 1052
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_event_probabilities",
+      "family": "unaffected",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "Channel Native",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 417
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            58
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering.cu",
+          "lines": [
+            153
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 201
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "--fmad=false for migrated runtime TUs; event-probability policy remains on its existing Channel TU contract",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    }
+  ],
+  "retained_channel_owners": [
+    "scattering_event_probabilities",
+    "Kirchhoff table builder/cache/version/validation",
+    "ScatteringTableRuntime and PhaseScreenRuntime resource lifecycles",
+    "rough C_r composition",
+    "chain discovery/join/row budget/C1-C2 packing",
+    "coherent combine and deterministic accumulation",
+    "BDPT continuation/NEE/MIS/event glue/AD companions",
+    "MC Basic estimator and result/metadata assembly"
+  ]
+}

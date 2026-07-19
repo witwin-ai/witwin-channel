@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "baseline": {
+    "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+    "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+    "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+    "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+    "binding_count": 211,
+    "binding_manifest_sha256": "bcca1358baed39dfb95838bb4069b4b43b3ff62abf3d81859840c477a6fbaef7",
+    "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
+    "rayd_lock": {
+      "schema_version": 1,
+      "repository_url": "https://github.com/Asixa/RayD.git",
+      "commit": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+      "integration_abi": {
+        "kind": "source-header-sha256",
+        "path": "backends/torch/include/rayd/torch/integration.h",
+        "sha256": "13cf52d0d2e45638b3262faed249bded739887129ede09c2f8c5c0774f64d939"
+      }
+    }
+  },
+  "current_phase": 0,
+  "transfers_applied": [],
+  "renames_applied": [],
+  "deletions_applied": [],
+  "binding_count_delta": 0,
+  "implementation_owner_delta": {
+    "Channel Native": 0,
+    "RayD": 0
+  },
+  "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory."
+}

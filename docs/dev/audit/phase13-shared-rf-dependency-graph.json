@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "roots": [
+    "native/channel_native/kernels/scattering_chain_ensemble.cu",
+    "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+    "native/channel_native/kernels/scattering_chain_realization.cu",
+    "native/channel_native/kernels/scattering_chain_realization_ad.cu",
+    "native/channel_native/kernels/field_transport.cu",
+    "native/channel_native/kernels/field_transport_transmission.cu"
+  ],
+  "nodes": [
+    {
+      "id": "native/channel_native/em/complex.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/em/medium.cuh"
+      ],
+      "sha256": "391b5e7e76165798b0ee91df4f4b11af120e648e3f6dc61f7723f1f9488a863d"
+    },
+    {
+      "id": "native/channel_native/em/medium.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/em/fresnel.cuh"
+      ],
+      "sha256": "54dd6779c224d53a8c7458f44be7a7ac88a9d88cbf87e934a2515ec74346b2fc"
+    },
+    {
+      "id": "native/channel_native/em/fresnel.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/em/layer_stack.cuh"
+      ],
+      "sha256": "cf3cb339ce820e6e5cf378ef4a94afc026e95833362b022ea4a913a3d9563445"
+    },
+    {
+      "id": "native/channel_native/em/layer_stack.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu"
+      ],
+      "sha256": "a9e8cbf781b75441694a1d70bb4744ba8b40458d4ecdaa5391be5d60fdf4017c"
+    },
+    {
+      "id": "native/channel_native/field_transport.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/field_transport_ad.cuh",
+        "native/channel_native/kernels/bdpt_connect_common.cuh",
+        "native/channel_native/kernels/bdpt_subpaths.cu",
+        "native/channel_native/kernels/deterministic_field.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/field_transport.cu",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/reflection.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu"
+      ],
+      "sha256": "f6e9ed4ebc07389b0961c33004dcf43a34cd1e402e914cc658655ad7de78bd81"
+    },
+    {
+      "id": "native/channel_native/field_transport_ad.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_connect_ad.cu",
+        "native/channel_native/kernels/diffraction.cu",
+        "native/channel_native/kernels/em_debug.cu",
+        "native/channel_native/kernels/field_transport_ad_common.cuh",
+        "native/channel_native/kernels/field_wedge_ad_common.cuh",
+        "native/channel_native/kernels/kirchhoff_table_ad.cu",
+        "native/channel_native/kernels/reflection.cu"
+      ],
+      "sha256": "3072c5f024b8a8dd761e511439ca5e32282e62487ac8d1b7a1e19426eaa3c88f"
+    },
+    {
+      "id": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "split: RayD numerical helpers / Channel Torch validation wrapper",
+      "direct_consumers": [
+        "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+        "native/channel_native/kernels/field_transport_free_space.cu",
+        "native/channel_native/kernels/field_transport_reflection.cu",
+        "native/channel_native/kernels/field_transport_transmission.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_chain_realization.cu",
+        "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+      ],
+      "sha256": "d6611018f79d950da2bb34f6eac102dec2abb0767380f12eb0507e66a68a5f94"
+    },
+    {
+      "id": "native/channel_native/kernels/scattering_table.cuh",
+      "current_source_owner": "Channel Native",
+      "target_source_owner": "RayD after ADR-024",
+      "direct_consumers": [
+        "native/channel_native/kernels/scattering.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble.cu",
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_ensemble.cu",
+        "native/channel_native/kernels/scattering_ensemble_ad.cu",
+        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+      ],
+      "sha256": "8b798e1e89888cba762a5938c294816c73f13205c2e3752b76ddeddf210a4e32"
+    },
+    {
+      "id": "RayD:include/rayd/shared/utd/utd_math.h",
+      "current_source_owner": "RayD",
+      "target_source_owner": "RayD",
+      "direct_consumers": [
+        "native/channel_native/em/complex.cuh",
+        "native/channel_native/field_transport.cuh",
+        "native/channel_native/kernels/coupled_topology.cu",
+        "native/channel_native/kernels/diffraction.cu"
+      ],
+      "sha256": null
+    }
+  ],
+  "edges": [
+    {
+      "from": "native/channel_native/em/complex.cuh",
+      "to": "RayD:include/rayd/shared/utd/utd_math.h",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/em/fresnel.cuh",
+      "to": "native/channel_native/em/medium.cuh",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/em/layer_stack.cuh",
+      "to": "native/channel_native/em/fresnel.cuh",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/em/medium.cuh",
+      "to": "native/channel_native/em/complex.cuh",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/field_transport.cuh",
+      "to": "RayD:include/rayd/shared/utd/utd_math.h",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/field_transport_ad.cuh",
+      "to": "native/channel_native/em/layer_stack.cuh",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/field_transport_ad.cuh",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 4
+    },
+    {
+      "from": "native/channel_native/kernels/bdpt_connect_ad.cu",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/kernels/bdpt_connect_common.cuh",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 8
+    },
+    {
+      "from": "native/channel_native/kernels/bdpt_subpaths.cu",
+      "to": "native/channel_native/em/layer_stack.cuh",
+      "line": 7
+    },
+    {
+      "from": "native/channel_native/kernels/bdpt_subpaths.cu",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 8
+    },
+    {
+      "from": "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 1
+    },
+    {
+      "from": "native/channel_native/kernels/bdpt_subpaths_ad.cu",
+      "to": "native/channel_native/em/layer_stack.cuh",
+      "line": 3
+    },
+    {
+      "from": "native/channel_native/kernels/coupled_topology.cu",
+      "to": "RayD:include/rayd/shared/utd/utd_math.h",
+      "line": 5
+    },
+    {
+      "from": "native/channel_native/kernels/deterministic_field.cu",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 8
+    },
+    {
+      "from": "native/channel_native/kernels/diffraction.cu",
+      "to": "RayD:include/rayd/shared/utd/utd_math.h",
+      "line": 5
+    },
+    {
+      "from": "native/channel_native/kernels/diffraction.cu",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 8
+    },
+    {
+      "from": "native/channel_native/kernels/diffraction.cu",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 9
+    },
+    {
+      "from": "native/channel_native/kernels/em_debug.cu",
+      "to": "native/channel_native/em/layer_stack.cuh",
+      "line": 6
+    },
+    {
+      "from": "native/channel_native/kernels/em_debug.cu",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 7
+    },
+    {
+      "from": "native/channel_native/kernels/field_transport.cu",
+      "to": "native/channel_native/em/layer_stack.cuh",
+      "line": 7
+    },
+    {
+      "from": "native/channel_native/kernels/field_transport.cu",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 8
+    },
+    {
+      "from": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 9
+    },
+    {
+      "from": "native/channel_native/kernels/field_transport_free_space.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 1
+    },
+    {
+      "from": "native/channel_native/kernels/field_transport_reflection.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 1
+    },
+    {
+      "from": "native/channel_native/kernels/field_transport_transmission.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 1
+    },
+    {
+      "from": "native/channel_native/kernels/field_wedge_ad_common.cuh",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 9
+    },
+    {
+      "from": "native/channel_native/kernels/field_wedge_ad_common.cuh",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 10
+    },
+    {
+      "from": "native/channel_native/kernels/kirchhoff_table_ad.cu",
+      "to": "native/channel_native/em/layer_stack.cuh",
+      "line": 49
+    },
+    {
+      "from": "native/channel_native/kernels/kirchhoff_table_ad.cu",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 50
+    },
+    {
+      "from": "native/channel_native/kernels/reflection.cu",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 7
+    },
+    {
+      "from": "native/channel_native/kernels/reflection.cu",
+      "to": "native/channel_native/field_transport_ad.cuh",
+      "line": 8
+    },
+    {
+      "from": "native/channel_native/kernels/scattering.cu",
+      "to": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 7
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "to": "native/channel_native/field_transport.cuh",
+      "line": 43
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "to": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 45
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 18
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+      "to": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 19
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_chain_realization.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 45
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
+      "to": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "line": 35
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_ensemble.cu",
+      "to": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 23
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_ensemble_ad.cu",
+      "to": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 23
+    },
+    {
+      "from": "native/channel_native/kernels/scattering_table_eval_ad.cu",
+      "to": "native/channel_native/kernels/scattering_table.cuh",
+      "line": 25
+    }
+  ],
+  "forbidden_future_edge": "RayD -> native/channel_native private header"
+}
