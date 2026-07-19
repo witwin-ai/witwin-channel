@@ -13,12 +13,6 @@ from .autograd_chain import (
     scattering_chain_realization_eval_ad,
 )
 from .functional import (
-    scattering_chain_ensemble_eval,
-    scattering_chain_ensemble_eval_backward,
-    scattering_chain_ensemble_eval_jvp,
-    scattering_chain_realization_eval,
-    scattering_chain_realization_eval_backward,
-    scattering_chain_realization_eval_jvp,
     scattering_ensemble_eval_backward,
     scattering_ensemble_eval_jvp,
     scattering_event_probabilities,
@@ -27,6 +21,14 @@ from .functional import (
     scattering_table_eval,
     scattering_table_pdf,
     scattering_table_sample,
+)
+from .functional_chain import (
+    scattering_chain_ensemble_eval,
+    scattering_chain_ensemble_eval_backward,
+    scattering_chain_ensemble_eval_jvp,
+    scattering_chain_realization_eval,
+    scattering_chain_realization_eval_backward,
+    scattering_chain_realization_eval_jvp,
 )
 
 

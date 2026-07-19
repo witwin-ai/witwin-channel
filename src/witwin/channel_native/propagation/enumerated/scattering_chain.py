@@ -944,8 +944,41 @@ def discover_scatter_chains(
         return None
 
     geom = _reflection_geometry(compiled, device)
+    c1_tables, c2_tables = _enumerate_leg_tables(
+        compiled=compiled,
+        geom=geom,
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+        samples=samples,
+        scene_diagonal=scene_diagonal,
+        max_leg_depth=max_leg_depth,
+    )
+    rows = _join_leg_tables(
+        c1_tables=c1_tables,
+        c2_tables=c2_tables,
+        num_tx=num_tx,
+        num_rx=num_rx,
+        max_chain_depth=max_chain_depth,
+        samples=samples,
+        device=device,
+    )
+    if not rows:
+        return None
+    return _budget_and_assemble(rows, num_rx=num_rx, max_rows=max_rows)
 
-    # Per-source leg tables tagged by endpoint id (tx for C1, rx for C2).
+
+def _enumerate_leg_tables(
+    *,
+    compiled: object,
+    geom: "_ReflectionGeometry",
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+    samples: ChainSamples,
+    scene_diagonal: torch.Tensor,
+    max_leg_depth: int,
+) -> tuple[list[dict[str, torch.Tensor]], list[dict[str, torch.Tensor]]]:
+    """Trace the per-source specular legs tagged by endpoint id (tx C1, rx C2)."""
+
     c1_tables = [
         _gather_leg(
             compiled=compiled,
@@ -956,7 +989,7 @@ def discover_scatter_chains(
             max_leg_depth=max_leg_depth,
             reverse=False,
         )
-        for i in range(num_tx)
+        for i in range(int(tx_positions.shape[0]))
     ]
     c2_tables = [
         _gather_leg(
@@ -968,8 +1001,26 @@ def discover_scatter_chains(
             max_leg_depth=max_leg_depth,
             reverse=True,
         )
-        for j in range(num_rx)
+        for j in range(int(rx_positions.shape[0]))
     ]
+    return c1_tables, c2_tables
+
+
+def _join_leg_tables(
+    *,
+    c1_tables: list[dict[str, torch.Tensor]],
+    c2_tables: list[dict[str, torch.Tensor]],
+    num_tx: int,
+    num_rx: int,
+    max_chain_depth: int,
+    samples: ChainSamples,
+    device: torch.device,
+) -> list[dict[str, torch.Tensor]]:
+    """Join C1/C2 legs per (tx, rx) on the sample index into chain-row blocks.
+
+    Excludes the ``d1 = d2 = 0`` single-bounce collapse and enforces the total
+    ``d1 + d2 <= scattering_chain_max_depth`` gate before packing each survivor.
+    """
 
     rows: list[dict[str, torch.Tensor]] = []
     for i in range(num_tx):
@@ -1002,9 +1053,17 @@ def discover_scatter_chains(
                     device=device,
                 )
             )
+    return rows
 
-    if not rows:
-        return None
+
+def _budget_and_assemble(
+    rows: list[dict[str, torch.Tensor]],
+    *,
+    num_rx: int,
+    max_rows: int,
+) -> ScatterChainDiscovery:
+    """Merge chain rows, budget per (tx, rx), sort deterministically, and freeze."""
+
     merged = {name: torch.cat([r[name] for r in rows]) for name in rows[0]}
 
     strength = 1.0 / (

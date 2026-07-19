@@ -2096,7 +2096,7 @@
     ],
     [
       "scattering_chain_ensemble_eval",
-      "witwin.channel_native.scattering.kernels.functional.scattering_chain_ensemble_eval",
+      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_ensemble_eval",
       "named_wrapper",
       "native-scattering-chain-ensemble",
       [
@@ -2105,7 +2105,7 @@
     ],
     [
       "scattering_chain_ensemble_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional.scattering_chain_ensemble_eval_backward",
+      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_ensemble_eval_backward",
       "named_wrapper",
       "native-scattering-chain-ensemble-ad",
       [
@@ -2114,7 +2114,7 @@
     ],
     [
       "scattering_chain_ensemble_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional.scattering_chain_ensemble_eval_jvp",
+      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_ensemble_eval_jvp",
       "named_wrapper",
       "native-scattering-chain-ensemble-ad",
       [
@@ -2123,7 +2123,7 @@
     ],
     [
       "scattering_chain_realization_eval",
-      "witwin.channel_native.scattering.kernels.functional.scattering_chain_realization_eval",
+      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_realization_eval",
       "named_wrapper",
       "native-scattering-chain-realization",
       [
@@ -2132,7 +2132,7 @@
     ],
     [
       "scattering_chain_realization_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional.scattering_chain_realization_eval_backward",
+      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_realization_eval_backward",
       "named_wrapper",
       "native-scattering-chain-realization-ad",
       [
@@ -2141,7 +2141,7 @@
     ],
     [
       "scattering_chain_realization_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional.scattering_chain_realization_eval_jvp",
+      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_realization_eval_jvp",
       "named_wrapper",
       "native-scattering-chain-realization-ad",
       [

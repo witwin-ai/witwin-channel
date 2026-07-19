@@ -31,7 +31,7 @@ from witwin.channel_native.runtime.autograd_contracts import (
     _ad_reject_fixed_tangents,
 )
 
-from .functional import (
+from .functional_chain import (
     _CHAIN_ENSEMBLE_OUTPUT_FIELDS,
     _CHAIN_REALIZATION_OUTPUT_FIELDS,
     scattering_chain_ensemble_eval,
@@ -850,15 +850,13 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
         )
         need_k0 = needed[44]
         need_frequency = needed[45]
-        if not (
-            need_heights
-            or need_layers
-            or need_chain1
-            or need_chain2
-            or need_geometry
-            or need_k0
-            or need_frequency
-        ) or (grad_total is None and grad_path_field is None and grad_path_gain is None):
+        need_flags = (
+            need_heights, need_layers, need_chain1, need_chain2,
+            need_geometry, need_k0, need_frequency,
+        )
+        if not any(need_flags) or (
+            grad_total is None and grad_path_field is None and grad_path_gain is None
+        ):
             return none_grads
         saved = ctx.saved_tensors
         if grad_total is None:

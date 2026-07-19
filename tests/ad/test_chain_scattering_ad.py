@@ -39,7 +39,7 @@ from tests.reference import chain_ensemble as ref_a
 from tests.reference import chain_realization as ref_b
 from witwin.channel_native.materials.kernels import functional as materials_functional
 from witwin.channel_native.scattering.kernels import autograd_chain as chain_autograd
-from witwin.channel_native.scattering.kernels import functional as F
+from witwin.channel_native.scattering.kernels import functional_chain as F
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for chain scattering AD"
