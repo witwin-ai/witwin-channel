@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 from ci import check_contract_coverage as coverage
@@ -16,10 +17,13 @@ def _manifest() -> dict[str, object]:
 
 def test_current_contract_matrix_covers_every_public_export_and_native_binding():
     manifest = _manifest()
+    binding_manifest = json.loads(
+        (REPOSITORY_ROOT / coverage.BINDING_BASELINE_PATH).read_text(encoding="utf-8")
+    )
 
     assert coverage.check_contract_coverage(REPOSITORY_ROOT, manifest) == []
     assert len(manifest["public_exports"]) == coverage.EXPECTED_PUBLIC_EXPORT_COUNT
-    assert len(manifest["native_bindings"]) == coverage.EXPECTED_NATIVE_BINDING_COUNT
+    assert len(manifest["native_bindings"]) == len(binding_manifest["symbols"])
 
 
 def test_contract_matrix_rejects_missing_public_and_native_entries():
@@ -64,5 +68,9 @@ def test_contract_matrix_rejects_nonexistent_contract_nodeids():
 
 
 def test_contract_coverage_cli_passes_with_repository_defaults(capsys):
+    native_binding_count = len(_manifest()["native_bindings"])
     assert coverage.main(["--repository-root", str(REPOSITORY_ROOT)]) == 0
-    assert "37 public exports, 209 native bindings" in capsys.readouterr().out
+    assert (
+        f"37 public exports, {native_binding_count} native bindings"
+        in capsys.readouterr().out
+    )

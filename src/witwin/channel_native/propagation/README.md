@@ -67,6 +67,18 @@ native zeros. Topology is non-differentiable, row identity is shared throughout
 the packed `EvaluatedPaths`, and no Torch numerical gather or live solver caller
 is introduced before the atomic activation.
 
+`propagation.topology.kernels.coupled_candidate_capacity_block` is the dormant
+discrete producer for coupled R-D, D-R, and D-D candidate axes. Its internal
+capacity is the complete host-known theoretical candidate count
+`tx * rx * (2 * groups * edges + edges * (edges - 1))`, bounded by the existing
+coupled candidate guardrail; public path capacity and path-selection policy do
+not participate. The producer freezes the historical 65,536-row R-D chunk
+order (`R-D` then `D-R` inside each chunk), places D-D after every R-D/D-R
+chunk, and keeps the ordered off-diagonal edge-pair sequence. Capacity overflow
+makes every discrete output inert and the device count zero before an
+asynchronous CUDA error. This producer has no AD surface and no live caller;
+mask-aware composed geometry and field companions must exist before activation.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

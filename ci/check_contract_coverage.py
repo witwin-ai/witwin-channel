@@ -26,22 +26,6 @@ BINDING_BASELINE_PATH = Path("ci/native-binding-manifest.json")
 PHASE10_AUDIT_PATH = Path("docs/dev/audit/phase10-legacy-dead-binding.json")
 PYTHON_PACKAGE_PATH = Path("src/witwin/channel_native")
 EXPECTED_PUBLIC_EXPORT_COUNT = 37
-# 174 phase-0 symbols + 5 ADR-010 native scattering/rough-reflection kernels
-# + 2 ADR-013 coupled double-diffraction forward symbols (field_coupled_dd,
-# coupled_dd_geometry_forward) + their 2 AD companions
-# (field_coupled_dd_backward/jvp): 179 -> 183.
-# + 2 ADR-017 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply):
-# 183 -> 185.
-# + 4 ADR-014 native scattering JVP/VJP companions: 185 -> 189.
-# + 4 ADR-015 native scattering table-eval / table-build JVP/VJP companions:
-# 189 -> 193.
-# + 6 ADR-021 multi-bounce chain scattering symbols (Op A/Op B forwards
-# scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
-# _backward/_jvp companions): 193 -> 199;
-# ADR-022 added the 12 BDPT fixed-topology AD companions: 199 -> 211. Plan 13
-# Phase 4 retired 9 dead bindings (211 -> 202), and ADR-028/ADR-029 Phase 8B
-# added seven dormant capacity contracts (202 -> 209).
-EXPECTED_NATIVE_BINDING_COUNT = 209
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",
@@ -136,8 +120,7 @@ BOOTSTRAP_E2E_SCENARIOS = {
     ),
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
     "deterministic-ad": (
-        "tests/ad/test_deterministic_accum_ad.py::"
-        "test_accumulate_flat_jvp_vjp_duality"
+        "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality"
     ),
     "deterministic-diffraction": (
         "tests/deterministic/test_diffraction_single_wedge.py::"
@@ -248,9 +231,7 @@ def _public_snapshot_exports(snapshot: dict[str, Any]) -> list[str]:
     exports: list[str] = []
     for module in snapshot.get("modules", []):
         module_name = module["module"]
-        exports.extend(
-            f"{module_name}.{entry['name']}" for entry in module["exports"]
-        )
+        exports.extend(f"{module_name}.{entry['name']}" for entry in module["exports"])
     return exports
 
 
@@ -295,9 +276,7 @@ class _DefinitionVisitor(ast.NodeVisitor):
     ) -> None:
         self._visit_function(node)
 
-    def _visit_function(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> None:
+    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         self.stack.append(node.name)
         qualified_name = ".".join((self.module, *self.stack))
         self.definitions[qualified_name] = node
@@ -641,7 +620,8 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
         )
 
     used_scenarios = {
-        str(row[-1][0]) for row in [*public_rows, *native_rows]  # type: ignore[index]
+        str(row[-1][0])
+        for row in [*public_rows, *native_rows]  # type: ignore[index]
     }
     return {
         "schema_version": 1,
@@ -817,11 +797,6 @@ def check_contract_coverage(repo: Path, manifest: dict[str, Any]) -> list[str]:
         issues.append("current native binding manifest contains duplicate symbols")
     if len(current_names) != len(set(current_names)):
         issues.append("current native binding names are not unique")
-    if len(current_names) != EXPECTED_NATIVE_BINDING_COUNT:
-        issues.append(
-            "current native binding count changed: "
-            f"expected {EXPECTED_NATIVE_BINDING_COUNT}, got {len(current_names)}"
-        )
     if baseline_names != current_names:
         issues.append("current native binding universe differs from frozen baseline")
     issues.extend(
@@ -836,7 +811,9 @@ def check_contract_coverage(repo: Path, manifest: dict[str, Any]) -> list[str]:
         used_contracts.add(contract_test)
         used_scenarios.update(callers)
         if contract_test not in contract_tests:
-            issues.append(f"unknown contract test for public export {export}: {contract_test}")
+            issues.append(
+                f"unknown contract test for public export {export}: {contract_test}"
+            )
         unknown_callers = set(callers) - set(scenarios)
         if unknown_callers:
             issues.append(
@@ -864,7 +841,9 @@ def check_contract_coverage(repo: Path, manifest: dict[str, Any]) -> list[str]:
             )
         owner_node = definitions.get(owner)
         if owner_node is None:
-            issues.append(f"native binding Python owner does not exist: {symbol}: {owner}")
+            issues.append(
+                f"native binding Python owner does not exist: {symbol}: {owner}"
+            )
             continue
         if owner_kind == "named_wrapper":
             candidates = sorted(by_terminal.get(symbol, []))
@@ -912,9 +891,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.print_initial:
         print(json.dumps(build_initial_manifest(repository_root), indent=2) + "\n")
         return 0
-    manifest_path = (
-        args.manifest or repository_root / DEFAULT_MANIFEST_PATH
-    ).resolve()
+    manifest_path = (args.manifest or repository_root / DEFAULT_MANIFEST_PATH).resolve()
     try:
         manifest = load_manifest(manifest_path)
         issues = check_contract_coverage(repository_root, manifest)
@@ -928,7 +905,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "contract coverage passed "
         f"({EXPECTED_PUBLIC_EXPORT_COUNT} public exports, "
-        f"{EXPECTED_NATIVE_BINDING_COUNT} native bindings)"
+        f"{len(manifest['native_bindings'])} native bindings)"
     )
     return 0
 

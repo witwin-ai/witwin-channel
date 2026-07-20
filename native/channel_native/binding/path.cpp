@@ -309,6 +309,14 @@ pybind11::dict cn_deterministic_face_groups(
     torch::Tensor surface_ids,
     double quantization);
 pybind11::dict cn_deterministic_surface_face_groups(torch::Tensor surface_ids);
+pybind11::dict cn_coupled_candidate_capacity_block(
+    torch::Tensor representative_faces,
+    torch::Tensor selected_edges,
+    int64_t tx_count,
+    int64_t rx_count,
+    int64_t rx_id_offset,
+    int64_t candidate_capacity,
+    int64_t candidate_limit);
 torch::Tensor cn_deterministic_sort_order(
     torch::Tensor valid,
     torch::Tensor tx_id,
@@ -643,6 +651,17 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_gather_topology_block",
         &cn_deterministic_gather_topology_block,
         "Gather and truncate deterministic topology rows with native CUDA.");
+    module.def(
+        "coupled_candidate_capacity_block",
+        &cn_coupled_candidate_capacity_block,
+        "Generate the fixed-capacity coupled R-D/D-R/D-D candidate axes.",
+        pybind11::arg("representative_faces"),
+        pybind11::arg("selected_edges"),
+        pybind11::arg("tx_count"),
+        pybind11::arg("rx_count"),
+        pybind11::arg("rx_id_offset"),
+        pybind11::arg("candidate_capacity"),
+        pybind11::arg("candidate_limit"));
     module.def(
         "deterministic_face_groups",
         &cn_deterministic_face_groups,

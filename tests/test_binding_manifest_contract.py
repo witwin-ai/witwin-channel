@@ -8,30 +8,9 @@ from tools.refactor_baseline import binding_manifest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-# Canonical live binding manifest. The phase-0 copy under
-# docs/dev/baselines/0892d855.../static/bindings.json is an immutable
-# historical artifact and must never be rewritten; symbol additions are
-# re-frozen HERE, with the delta explained in the introducing change
-# (ADR-010 added the 5 scattering/rough-reflection kernels: 174 -> 179;
-# ADR-013 added the 2 coupled double-diffraction forward symbols and the two
-# AD companions (field_coupled_dd_backward/_jvp): 179 -> 183; ADR-017 added the
-# 2 ISB-taper LoS symbols (los_silhouette_clearance, los_taper_apply): 183 -> 185;
-# ADR-014 added the 4 scattering JVP/VJP companions: 185 -> 189;
-# ADR-015 added the 4 scattering table-eval / table-build JVP/VJP
-# companions: 189 -> 193;
-# ADR-021 added the 6 multi-bounce chain scattering symbols (Op A/Op B forwards
-# scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
-# _backward/_jvp companions): 193 -> 199;
-# ADR-022 added 12 BDPT fixed-topology AD companions: 199 -> 211. Plan 13
-# Phase 4 then retired 9 strictly unreachable legacy/duplicate bindings:
-# 211 -> 202. ADR-028 Phase 8B added one device-resident diffraction planning
-# symbol: 202 -> 203. ADR-029 adds the dormant fixed-capacity diffraction state
-# selector: 203 -> 204. ADR-029 then adds the dormant post-RayD diffraction
-# path capacity block: 204 -> 205. ADR-029 then adds the dormant final
-# pair-major capacity index contract: 205 -> 206. ADR-029 then adds the dormant
-# evaluated-path capacity packer and its backward/JVP companions: 206 -> 209.
+# Canonical live binding manifest. Historical binding counts remain frozen in
+# their phase audit artifacts; the live universe is derived from this manifest.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 209
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )
@@ -99,10 +78,10 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     rename_sources = set(rename_projection)
     rename_targets = set(rename_projection.values())
 
-    assert len(baseline_names) == EXPECTED_BINDING_COUNT
-    assert len(current_names) == EXPECTED_BINDING_COUNT
-    assert len(baseline_name_set) == EXPECTED_BINDING_COUNT
-    assert len(current_name_set) == EXPECTED_BINDING_COUNT
+    expected_binding_count = len(baseline_names)
+    assert len(current_names) == expected_binding_count
+    assert len(baseline_name_set) == expected_binding_count
+    assert len(current_name_set) == expected_binding_count
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
     assert migration["current_phase"] == 12

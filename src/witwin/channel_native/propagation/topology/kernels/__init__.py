@@ -38,6 +38,7 @@ from .construction import (
     deterministic_topology_base_fields,
     deterministic_topology_default_fields,
 )
+from .coupled import coupled_candidate_capacity_block
 from .primitives import (
     DiffractionStateCapacityBlock,
     core_pack_int2,
@@ -62,6 +63,7 @@ __all__ = [
     "DiffractionOrder1CapacityBlock",
     "deterministic_capacity_finalize",
     "core_pack_int2",
+    "coupled_candidate_capacity_block",
     "deterministic_concat_topology_blocks",
     "deterministic_component_counts",
     "deterministic_diffraction_state_capacity_select",
