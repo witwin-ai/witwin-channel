@@ -78,7 +78,7 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     }
     assert inventory["current_subphase"] == "10B"
     assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11A"
+    assert migration["current_subphase"] == "11B"
     assert Counter(row["numerical_owner"] for row in inventory["symbols"]) == {
         "RayD": 43,
         "Channel operation / RayD primitives": 2,

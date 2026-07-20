@@ -10,6 +10,95 @@
 #include <algorithm>
 #include <vector>
 
+#define CN_DIFFRACTION_CHECK_STATE_PACK_TENSORS()                                     \
+    check_tensor(edge_pos, "edge_pos", at::kFloat, 2);                               \
+    check_tensor(edge_dir, "edge_dir", at::kFloat, 2);                               \
+    check_tensor(line_min, "line_min", at::kFloat, 1);                               \
+    check_tensor(line_max, "line_max", at::kFloat, 1);                               \
+    check_tensor(n0, "n0", at::kFloat, 2);                                           \
+    check_tensor(n1, "n1", at::kFloat, 2);                                           \
+    check_tensor(face0, "face0", at::kInt, 1);                                       \
+    check_tensor(face1, "face1", at::kInt, 1);                                       \
+    check_tensor(exterior_angle, "exterior_angle", at::kFloat, 1);                   \
+    check_tensor(tx, "tx", at::kFloat, 1)
+
+#define CN_DIFFRACTION_CHECK_STATE_PACK_POWER()                                       \
+    TORCH_CHECK(tx_power.is_cuda(), "tx_power must be a CUDA tensor");                \
+    TORCH_CHECK(tx_power.scalar_type() == at::kFloat, "tx_power has the wrong dtype");\
+    TORCH_CHECK(tx_power.is_contiguous(), "tx_power must be contiguous");             \
+    TORCH_CHECK(tx_power.dim() == 0 || tx_power.dim() == 1, "tx_power must be scalar or 1-D");\
+    if (tx_power.dim() == 0) {                                                         \
+        TORCH_CHECK(tx_power_index == 0, "tx_power_index must be zero for scalar tx_power");\
+    } else {                                                                           \
+        TORCH_CHECK(tx_power_index >= 0 && tx_power_index < tx_power.size(0), "tx_power_index is out of range");\
+    }
+
+#define CN_DIFFRACTION_CHECK_STATE_PACK_SHAPES()                                      \
+    TORCH_CHECK(edge_pos.size(1) == 3, "edge_pos must have shape (N, 3)");            \
+    TORCH_CHECK(edge_dir.sizes() == edge_pos.sizes(), "edge_dir must match edge_pos");\
+    TORCH_CHECK(n0.sizes() == edge_pos.sizes(), "n0 must match edge_pos");            \
+    TORCH_CHECK(n1.sizes() == edge_pos.sizes(), "n1 must match edge_pos");            \
+    TORCH_CHECK(line_min.size(0) == edge_pos.size(0), "line_min must match edge count");\
+    TORCH_CHECK(line_max.size(0) == edge_pos.size(0), "line_max must match edge count");\
+    TORCH_CHECK(face0.size(0) == edge_pos.size(0), "face0 must match edge count");    \
+    TORCH_CHECK(face1.size(0) == edge_pos.size(0), "face1 must match edge count");    \
+    TORCH_CHECK(exterior_angle.size(0) == edge_pos.size(0), "exterior_angle must match edge count")
+
+#define CN_DIFFRACTION_ALLOCATE_STATE_PACK()                                          \
+    auto state_edge_index = at::empty({state_count}, int_options);                    \
+    auto state_edge_pos = at::empty({state_count, 3}, float_options);                  \
+    auto state_edge_dir = at::empty({state_count, 3}, float_options);                  \
+    auto state_line_min = at::empty({state_count}, float_options);                     \
+    auto state_line_max = at::empty({state_count}, float_options);                     \
+    auto state_n0 = at::empty({state_count, 3}, float_options);                        \
+    auto state_n1 = at::empty({state_count, 3}, float_options);                        \
+    auto state_face0 = at::empty({state_count}, int_options);                         \
+    auto state_face1 = at::empty({state_count}, int_options);                         \
+    auto state_exterior_angle = at::empty({state_count}, float_options);               \
+    auto state_src = at::empty({state_count, 3}, float_options);                       \
+    auto state_src_power = at::empty({state_count}, float_options)
+
+#define CN_DIFFRACTION_STATE_PACK_INPUT_POINTERS()                                    \
+    edge_pos.data_ptr<float>(),                                                       \
+    edge_dir.data_ptr<float>(),                                                       \
+    line_min.data_ptr<float>(),                                                       \
+    line_max.data_ptr<float>(),                                                       \
+    n0.data_ptr<float>(),                                                             \
+    n1.data_ptr<float>(),                                                             \
+    face0.data_ptr<int>(),                                                            \
+    face1.data_ptr<int>(),                                                            \
+    exterior_angle.data_ptr<float>(),                                                 \
+    tx.data_ptr<float>(),                                                             \
+    tx_power.data_ptr<float>() + tx_power_index
+
+#define CN_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS()                                   \
+    state_edge_index.data_ptr<int>(),                                                 \
+    state_edge_pos.data_ptr<float>(),                                                 \
+    state_edge_dir.data_ptr<float>(),                                                 \
+    state_line_min.data_ptr<float>(),                                                 \
+    state_line_max.data_ptr<float>(),                                                 \
+    state_n0.data_ptr<float>(),                                                       \
+    state_n1.data_ptr<float>(),                                                       \
+    state_face0.data_ptr<int>(),                                                      \
+    state_face1.data_ptr<int>(),                                                      \
+    state_exterior_angle.data_ptr<float>(),                                           \
+    state_src.data_ptr<float>(),                                                      \
+    state_src_power.data_ptr<float>()
+
+#define CN_DIFFRACTION_STATE_PACK_RESULTS()                                           \
+    state_edge_index,                                                                 \
+    state_edge_pos,                                                                   \
+    state_edge_dir,                                                                   \
+    state_line_min,                                                                   \
+    state_line_max,                                                                   \
+    state_n0,                                                                         \
+    state_n1,                                                                         \
+    state_face0,                                                                      \
+    state_face1,                                                                      \
+    state_exterior_angle,                                                             \
+    state_src,                                                                        \
+    state_src_power
+
 namespace {
 
 constexpr int kDiffractionBlockSize = 256;
@@ -1078,98 +1167,30 @@ std::vector<at::Tensor> diffraction_state_pack_cuda_impl(
     at::Tensor tx_power,
     int64_t tx_power_index) {
     check_tensor(edge_indices, "edge_indices", at::kInt, 1);
-    check_tensor(edge_pos, "edge_pos", at::kFloat, 2);
-    check_tensor(edge_dir, "edge_dir", at::kFloat, 2);
-    check_tensor(line_min, "line_min", at::kFloat, 1);
-    check_tensor(line_max, "line_max", at::kFloat, 1);
-    check_tensor(n0, "n0", at::kFloat, 2);
-    check_tensor(n1, "n1", at::kFloat, 2);
-    check_tensor(face0, "face0", at::kInt, 1);
-    check_tensor(face1, "face1", at::kInt, 1);
-    check_tensor(exterior_angle, "exterior_angle", at::kFloat, 1);
-    check_tensor(tx, "tx", at::kFloat, 1);
-    TORCH_CHECK(tx_power.is_cuda(), "tx_power must be a CUDA tensor");
-    TORCH_CHECK(tx_power.scalar_type() == at::kFloat, "tx_power has the wrong dtype");
-    TORCH_CHECK(tx_power.is_contiguous(), "tx_power must be contiguous");
-    TORCH_CHECK(tx_power.dim() == 0 || tx_power.dim() == 1, "tx_power must be scalar or 1-D");
-    if (tx_power.dim() == 0) {
-        TORCH_CHECK(tx_power_index == 0, "tx_power_index must be zero for scalar tx_power");
-    } else {
-        TORCH_CHECK(tx_power_index >= 0 && tx_power_index < tx_power.size(0), "tx_power_index is out of range");
-    }
-    TORCH_CHECK(edge_pos.size(1) == 3, "edge_pos must have shape (N, 3)");
-    TORCH_CHECK(edge_dir.sizes() == edge_pos.sizes(), "edge_dir must match edge_pos");
-    TORCH_CHECK(n0.sizes() == edge_pos.sizes(), "n0 must match edge_pos");
-    TORCH_CHECK(n1.sizes() == edge_pos.sizes(), "n1 must match edge_pos");
-    TORCH_CHECK(line_min.size(0) == edge_pos.size(0), "line_min must match edge count");
-    TORCH_CHECK(line_max.size(0) == edge_pos.size(0), "line_max must match edge count");
-    TORCH_CHECK(face0.size(0) == edge_pos.size(0), "face0 must match edge count");
-    TORCH_CHECK(face1.size(0) == edge_pos.size(0), "face1 must match edge count");
-    TORCH_CHECK(exterior_angle.size(0) == edge_pos.size(0), "exterior_angle must match edge count");
+    CN_DIFFRACTION_CHECK_STATE_PACK_TENSORS();
+    CN_DIFFRACTION_CHECK_STATE_PACK_POWER();
+    CN_DIFFRACTION_CHECK_STATE_PACK_SHAPES();
     TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
     TORCH_CHECK(edge_pos.get_device() == edge_indices.get_device(), "edge tensors must be on the same device");
 
     const int64_t state_count = edge_indices.size(0);
     auto int_options = edge_indices.options();
     auto float_options = edge_pos.options();
-    auto state_edge_index = at::empty({state_count}, int_options);
-    auto state_edge_pos = at::empty({state_count, 3}, float_options);
-    auto state_edge_dir = at::empty({state_count, 3}, float_options);
-    auto state_line_min = at::empty({state_count}, float_options);
-    auto state_line_max = at::empty({state_count}, float_options);
-    auto state_n0 = at::empty({state_count, 3}, float_options);
-    auto state_n1 = at::empty({state_count, 3}, float_options);
-    auto state_face0 = at::empty({state_count}, int_options);
-    auto state_face1 = at::empty({state_count}, int_options);
-    auto state_exterior_angle = at::empty({state_count}, float_options);
-    auto state_src = at::empty({state_count, 3}, float_options);
-    auto state_src_power = at::empty({state_count}, float_options);
+    CN_DIFFRACTION_ALLOCATE_STATE_PACK();
 
     if (state_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(edge_pos.get_device()).stream();
         const int block_count = static_cast<int>((state_count + kDiffractionBlockSize - 1) / kDiffractionBlockSize);
         diffraction_state_pack_kernel<<<block_count, kDiffractionBlockSize, 0, stream>>>(
             edge_indices.data_ptr<int>(),
-            edge_pos.data_ptr<float>(),
-            edge_dir.data_ptr<float>(),
-            line_min.data_ptr<float>(),
-            line_max.data_ptr<float>(),
-            n0.data_ptr<float>(),
-            n1.data_ptr<float>(),
-            face0.data_ptr<int>(),
-            face1.data_ptr<int>(),
-            exterior_angle.data_ptr<float>(),
-            tx.data_ptr<float>(),
-            tx_power.data_ptr<float>() + tx_power_index,
-            state_edge_index.data_ptr<int>(),
-            state_edge_pos.data_ptr<float>(),
-            state_edge_dir.data_ptr<float>(),
-            state_line_min.data_ptr<float>(),
-            state_line_max.data_ptr<float>(),
-            state_n0.data_ptr<float>(),
-            state_n1.data_ptr<float>(),
-            state_face0.data_ptr<int>(),
-            state_face1.data_ptr<int>(),
-            state_exterior_angle.data_ptr<float>(),
-            state_src.data_ptr<float>(),
-            state_src_power.data_ptr<float>(),
+            CN_DIFFRACTION_STATE_PACK_INPUT_POINTERS(),
+            CN_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS(),
             state_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
     return {
-        state_edge_index,
-        state_edge_pos,
-        state_edge_dir,
-        state_line_min,
-        state_line_max,
-        state_n0,
-        state_n1,
-        state_face0,
-        state_face1,
-        state_exterior_angle,
-        state_src,
-        state_src_power,
+        CN_DIFFRACTION_STATE_PACK_RESULTS(),
     };
 }
 
@@ -1188,34 +1209,9 @@ std::vector<at::Tensor> diffraction_state_pack_selected_cuda_impl(
     at::Tensor tx_power,
     int64_t tx_power_index) {
     check_tensor(selected, "selected", at::kBool, 1);
-    check_tensor(edge_pos, "edge_pos", at::kFloat, 2);
-    check_tensor(edge_dir, "edge_dir", at::kFloat, 2);
-    check_tensor(line_min, "line_min", at::kFloat, 1);
-    check_tensor(line_max, "line_max", at::kFloat, 1);
-    check_tensor(n0, "n0", at::kFloat, 2);
-    check_tensor(n1, "n1", at::kFloat, 2);
-    check_tensor(face0, "face0", at::kInt, 1);
-    check_tensor(face1, "face1", at::kInt, 1);
-    check_tensor(exterior_angle, "exterior_angle", at::kFloat, 1);
-    check_tensor(tx, "tx", at::kFloat, 1);
-    TORCH_CHECK(tx_power.is_cuda(), "tx_power must be a CUDA tensor");
-    TORCH_CHECK(tx_power.scalar_type() == at::kFloat, "tx_power has the wrong dtype");
-    TORCH_CHECK(tx_power.is_contiguous(), "tx_power must be contiguous");
-    TORCH_CHECK(tx_power.dim() == 0 || tx_power.dim() == 1, "tx_power must be scalar or 1-D");
-    if (tx_power.dim() == 0) {
-        TORCH_CHECK(tx_power_index == 0, "tx_power_index must be zero for scalar tx_power");
-    } else {
-        TORCH_CHECK(tx_power_index >= 0 && tx_power_index < tx_power.size(0), "tx_power_index is out of range");
-    }
-    TORCH_CHECK(edge_pos.size(1) == 3, "edge_pos must have shape (N, 3)");
-    TORCH_CHECK(edge_dir.sizes() == edge_pos.sizes(), "edge_dir must match edge_pos");
-    TORCH_CHECK(n0.sizes() == edge_pos.sizes(), "n0 must match edge_pos");
-    TORCH_CHECK(n1.sizes() == edge_pos.sizes(), "n1 must match edge_pos");
-    TORCH_CHECK(line_min.size(0) == edge_pos.size(0), "line_min must match edge count");
-    TORCH_CHECK(line_max.size(0) == edge_pos.size(0), "line_max must match edge count");
-    TORCH_CHECK(face0.size(0) == edge_pos.size(0), "face0 must match edge count");
-    TORCH_CHECK(face1.size(0) == edge_pos.size(0), "face1 must match edge count");
-    TORCH_CHECK(exterior_angle.size(0) == edge_pos.size(0), "exterior_angle must match edge count");
+    CN_DIFFRACTION_CHECK_STATE_PACK_TENSORS();
+    CN_DIFFRACTION_CHECK_STATE_PACK_POWER();
+    CN_DIFFRACTION_CHECK_STATE_PACK_SHAPES();
     TORCH_CHECK(selected.size(0) == edge_pos.size(0), "selected must match edge count");
     TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
     TORCH_CHECK(edge_pos.get_device() == selected.get_device(), "edge tensors must be on the same device");
@@ -1223,64 +1219,21 @@ std::vector<at::Tensor> diffraction_state_pack_selected_cuda_impl(
     const int64_t state_count = edge_pos.size(0);
     auto int_options = face0.options();
     auto float_options = edge_pos.options();
-    auto state_edge_index = at::empty({state_count}, int_options);
-    auto state_edge_pos = at::empty({state_count, 3}, float_options);
-    auto state_edge_dir = at::empty({state_count, 3}, float_options);
-    auto state_line_min = at::empty({state_count}, float_options);
-    auto state_line_max = at::empty({state_count}, float_options);
-    auto state_n0 = at::empty({state_count, 3}, float_options);
-    auto state_n1 = at::empty({state_count, 3}, float_options);
-    auto state_face0 = at::empty({state_count}, int_options);
-    auto state_face1 = at::empty({state_count}, int_options);
-    auto state_exterior_angle = at::empty({state_count}, float_options);
-    auto state_src = at::empty({state_count, 3}, float_options);
-    auto state_src_power = at::empty({state_count}, float_options);
+    CN_DIFFRACTION_ALLOCATE_STATE_PACK();
 
     if (state_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(edge_pos.get_device()).stream();
         const int block_count = static_cast<int>((state_count + kDiffractionBlockSize - 1) / kDiffractionBlockSize);
         diffraction_state_pack_selected_kernel<<<block_count, kDiffractionBlockSize, 0, stream>>>(
             selected.data_ptr<bool>(),
-            edge_pos.data_ptr<float>(),
-            edge_dir.data_ptr<float>(),
-            line_min.data_ptr<float>(),
-            line_max.data_ptr<float>(),
-            n0.data_ptr<float>(),
-            n1.data_ptr<float>(),
-            face0.data_ptr<int>(),
-            face1.data_ptr<int>(),
-            exterior_angle.data_ptr<float>(),
-            tx.data_ptr<float>(),
-            tx_power.data_ptr<float>() + tx_power_index,
-            state_edge_index.data_ptr<int>(),
-            state_edge_pos.data_ptr<float>(),
-            state_edge_dir.data_ptr<float>(),
-            state_line_min.data_ptr<float>(),
-            state_line_max.data_ptr<float>(),
-            state_n0.data_ptr<float>(),
-            state_n1.data_ptr<float>(),
-            state_face0.data_ptr<int>(),
-            state_face1.data_ptr<int>(),
-            state_exterior_angle.data_ptr<float>(),
-            state_src.data_ptr<float>(),
-            state_src_power.data_ptr<float>(),
+            CN_DIFFRACTION_STATE_PACK_INPUT_POINTERS(),
+            CN_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS(),
             state_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
     return {
-        state_edge_index,
-        state_edge_pos,
-        state_edge_dir,
-        state_line_min,
-        state_line_max,
-        state_n0,
-        state_n1,
-        state_face0,
-        state_face1,
-        state_exterior_angle,
-        state_src,
-        state_src_power,
+        CN_DIFFRACTION_STATE_PACK_RESULTS(),
     };
 }
 
@@ -1780,3 +1733,11 @@ at::Tensor cn_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output_tangent;
 }
+
+#undef CN_DIFFRACTION_STATE_PACK_RESULTS
+#undef CN_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS
+#undef CN_DIFFRACTION_STATE_PACK_INPUT_POINTERS
+#undef CN_DIFFRACTION_ALLOCATE_STATE_PACK
+#undef CN_DIFFRACTION_CHECK_STATE_PACK_SHAPES
+#undef CN_DIFFRACTION_CHECK_STATE_PACK_POWER
+#undef CN_DIFFRACTION_CHECK_STATE_PACK_TENSORS

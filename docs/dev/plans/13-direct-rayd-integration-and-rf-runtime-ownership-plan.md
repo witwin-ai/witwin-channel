@@ -1,8 +1,8 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024/025/026 已接受；Phase 10A/10B 已完成原子 pin/switch/delete；Phase 11A
-typed-boundary 机械去重已完成，Phase 11B 仍须关闭 frozen duplication budget，随后完成
+ADR-023/024/025/026 已接受；Phase 10A/10B 已完成原子 pin/switch/delete；Phase 11A/11B
+机械去重已完成且 frozen duplication budget 已关闭；Phase 11 仍在完成 RayD legacy API、
 nightly/release 与 packaging 收口
 
 **计划日期：** 2026-07-18
@@ -681,15 +681,26 @@ move-only 实现已将 duplication 从 Phase 10A 的 11.913070% 降至 11.170566
 
 ### Phase 11 — Release、packaging 与旧 RayD API退役
 
-**实现状态：IN PROGRESS（Phase 11A COMPLETE，2026-07-19）。** Phase 11A 仅在
+**实现状态：IN PROGRESS（Phase 11A/11B COMPLETE，2026-07-19；RayD legacy API、
+packaging、nightly/release 仍待完成）。** Phase 11A 仅在
 `fields.cpp` 与 `materials.cpp` 使用 TU-local compile-time helpers 收敛 typed request/
 parameter packing；显式 pybind signatures、参数和 validation/error 顺序、typed
 Request/Result、output schema、ABI、launch 与数值均不变。`EXACT_TOKEN_MATCH` 从 Phase
 10B 的 `8747/78304 = 11.170566%` 降至 `8402/78162 = 10.749469%`；5 个 stale regions
 已移除，当前 155 个 regions 全部分类且 0 unclassified。冻结预算 `10.211512%` 未放宽、
-仍未达到，最终 acceptance 明确留给 Phase 11B。binding manifest 保持 202 symbols，
+在 Phase 11A 尚未达到，最终 acceptance 明确留给 Phase 11B。binding manifest 保持 202 symbols，
 仅 source line locations 更新，semantic changes 为 0。证据见
 `docs/dev/audit/phase13-boundary-dedup-phase11a-evidence.json`。
+
+Phase 11B 继续只收敛非数值 boilerplate：Python façade 共用 validation/result helpers，
+chain 参数按冻结名称顺序进行 zero-copy tuple packing；四个 Channel CUDA TU 使用 TU-local
+compile-time macros 共用 validation、allocation、pointer/result 和 launch-configuration
+plumbing。所有显式 Python/native signatures、tensor identity/storage、validation/error 和
+saved-tensor 顺序、output schema、kernel launch/reduction/RNG 与数值保持不变。去重指标降至
+`7826/77821 = 10.056413%`，低于未放宽的冻结预算 `10.211512%`；当前 143 个 regions
+全部分类，0 stale、0 unclassified。证据见
+`docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json`。Phase 11B 完成不代表 Phase
+11 release 收口完成；下列 packaging、RayD legacy API 与 clean-checkout release gates 仍须执行。
 
 1. Wheel只有 `_channel_native` 和规定 metadata，无 RayD Python extension/未声明 DSO。
 2. 两仓无复制的 RF/scattering physics、legacy integration signature或反向 private include。

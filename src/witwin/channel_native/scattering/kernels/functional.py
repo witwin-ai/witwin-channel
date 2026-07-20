@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 import torch
 
@@ -44,12 +46,7 @@ def scattering_table_eval(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Native CUDA multilinear Kirchhoff-table evaluation; required op."""
 
-    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
-    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
-    if wi.shape != wo.shape or wi.shape[1:] != (3,):
-        raise ValueError("wi and wo must have matching shape (N, 3)")
+    _validate_table_eval_inputs(wi, wo, f_te, f_tm)
     out = _required_native_op("scattering_table_eval")(wi, wo, f_te, f_tm)
     if not isinstance(out, dict) or set(out) != {"f_te", "f_tm"}:
         raise TypeError("_channel_native.scattering_table_eval returned invalid fields")
@@ -58,6 +55,22 @@ def scattering_table_eval(
 
 _TABLE_EVAL_BACKWARD_FIELDS = ("grad_wi", "grad_wo", "grad_f_te", "grad_f_tm")
 _TABLE_EVAL_JVP_FIELDS = ("tangent_f_te", "tangent_f_tm")
+
+
+def _validate_table_eval_inputs(
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+    f_te: torch.Tensor,
+    f_tm: torch.Tensor,
+) -> None:
+    """Validate the shared table-lookup primal inputs in ABI order."""
+
+    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
+    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
+    if wi.shape != wo.shape or wi.shape[1:] != (3,):
+        raise ValueError("wi and wo must have matching shape (N, 3)")
 
 
 def scattering_table_eval_backward(
@@ -78,12 +91,7 @@ def scattering_table_eval_backward(
     (``need_grad_tables``). Entries are ``None`` when their owning flag is off.
     """
 
-    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
-    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
-    if wi.shape != wo.shape or wi.shape[1:] != (3,):
-        raise ValueError("wi and wo must have matching shape (N, 3)")
+    _validate_table_eval_inputs(wi, wo, f_te, f_tm)
     out = _required_native_op("scattering_table_eval_backward")(
         wi,
         wo,
@@ -119,12 +127,7 @@ def scattering_table_eval_jvp(
     a zero tangent.
     """
 
-    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
-    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
-    if wi.shape != wo.shape or wi.shape[1:] != (3,):
-        raise ValueError("wi and wo must have matching shape (N, 3)")
+    _validate_table_eval_inputs(wi, wo, f_te, f_tm)
     out = _required_native_op("scattering_table_eval_jvp")(
         wi,
         wo,
@@ -217,6 +220,20 @@ def scattering_event_probabilities(
     return out
 
 
+def _validate_ensemble_inputs(scope: Mapping[str, torch.Tensor]) -> None:
+    """Validate the shared ensemble primal inputs in ABI order."""
+
+    validate_cuda_tensor("wo_rows", scope["wo_rows"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("r2_rows", scope["r2_rows"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("cos_o_rows", scope["cos_o_rows"], dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("wi_local", scope["wi_local"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("rc_idx", scope["rc_idx"], dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("sc_idx", scope["sc_idx"], dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("material_id", scope["material_id"], dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("material_slot", scope["material_slot"], dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("table_dims", scope["table_dims"], dtype=torch.int32, ndim=2)
+
+
 def scattering_ensemble_eval(
     wo_rows: torch.Tensor,
     r2_rows: torch.Tensor,
@@ -253,15 +270,7 @@ def scattering_ensemble_eval(
     One launch per (tx, rx-chunk); required native op.
     """
 
-    validate_cuda_tensor("wo_rows", wo_rows, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r2_rows", r2_rows, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("cos_o_rows", cos_o_rows, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("wi_local", wi_local, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("rc_idx", rc_idx, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("sc_idx", sc_idx, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2)
+    _validate_ensemble_inputs(locals())
     out = _required_native_op("scattering_ensemble_eval")(
         wo_rows,
         r2_rows,
@@ -296,6 +305,19 @@ def scattering_ensemble_eval(
     return out
 
 
+def _validate_patch_inputs(scope: Mapping[str, torch.Tensor]) -> None:
+    """Validate the shared patch-integral primal inputs in ABI order."""
+
+    validate_cuda_tensor("patch_tris", scope["patch_tris"], dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("patch_uvs", scope["patch_uvs"], dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("rows", scope["rows"], dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("d_i", scope["d_i"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("d_o", scope["d_o"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("r_te", scope["r_te"], dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("r_tm", scope["r_tm"], dtype=torch.complex64, ndim=1)
+    validate_cuda_tensor("heights", scope["heights"], dtype=torch.float32, ndim=2)
+
+
 def scattering_patch_integral_eval(
     patch_tris: torch.Tensor,
     patch_uvs: torch.Tensor,
@@ -326,14 +348,7 @@ def scattering_patch_integral_eval(
     buffers for tests. Required native op.
     """
 
-    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("d_i", d_i, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("d_o", d_o, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r_te", r_te, dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("r_tm", r_tm, dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
+    _validate_patch_inputs(locals())
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     out = _required_native_op("scattering_patch_integral_eval")(
         patch_tris,
@@ -432,15 +447,7 @@ def scattering_ensemble_eval_backward(
 ) -> dict[str, torch.Tensor | None]:
     """VJP of :func:`scattering_ensemble_eval` (ADR-014 op 1)."""
 
-    validate_cuda_tensor("wo_rows", wo_rows, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r2_rows", r2_rows, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("cos_o_rows", cos_o_rows, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("wi_local", wi_local, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("rc_idx", rc_idx, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("sc_idx", sc_idx, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2)
+    _validate_ensemble_inputs(locals())
     out = _required_native_op("scattering_ensemble_eval_backward")(
         wo_rows,
         r2_rows,
@@ -525,15 +532,7 @@ def scattering_ensemble_eval_jvp(
 ) -> dict[str, torch.Tensor]:
     """JVP of :func:`scattering_ensemble_eval` (ADR-014 op 1)."""
 
-    validate_cuda_tensor("wo_rows", wo_rows, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r2_rows", r2_rows, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("cos_o_rows", cos_o_rows, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("wi_local", wi_local, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("rc_idx", rc_idx, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("sc_idx", sc_idx, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2)
+    _validate_ensemble_inputs(locals())
     out = _required_native_op("scattering_ensemble_eval_jvp")(
         wo_rows,
         r2_rows,
@@ -607,14 +606,7 @@ def scattering_patch_integral_eval_backward(
 ) -> dict[str, torch.Tensor | None]:
     """VJP of :func:`scattering_patch_integral_eval` (ADR-014 op 2)."""
 
-    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("d_i", d_i, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("d_o", d_o, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r_te", r_te, dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("r_tm", r_tm, dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
+    _validate_patch_inputs(locals())
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     out = _required_native_op("scattering_patch_integral_eval_backward")(
         patch_tris,
@@ -678,14 +670,7 @@ def scattering_patch_integral_eval_jvp(
 ) -> dict[str, torch.Tensor]:
     """JVP of :func:`scattering_patch_integral_eval` (ADR-014 op 2)."""
 
-    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("d_i", d_i, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("d_o", d_o, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r_te", r_te, dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("r_tm", r_tm, dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
+    _validate_patch_inputs(locals())
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     out = _required_native_op("scattering_patch_integral_eval_jvp")(
         patch_tris,

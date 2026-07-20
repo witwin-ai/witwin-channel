@@ -49,7 +49,8 @@ def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() 
         "coverage_percent": refresh["coverage_percent"],
         "region_count": refresh["region_count"],
     }
-    assert refresh["region_count"] == len(ledger["regions"]) == 155
+    assert refresh["region_count"] == 155
+    assert ledger["phase11b_refresh"]["region_count"] == len(ledger["regions"])
     assert refresh["stale_region_count"] == 0
     assert refresh["unclassified_region_count"] == 0
     assert refresh["budget_relaxed"] is False
@@ -93,7 +94,7 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
         == record["phase10b_snapshot_sha256"]
     )
     assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11A"
+    assert migration["current_subphase"] == "11B"
     assert migration["phase11a_current"]["evidence"] == str(
         EVIDENCE_PATH.relative_to(ROOT)
     ).replace("\\", "/")

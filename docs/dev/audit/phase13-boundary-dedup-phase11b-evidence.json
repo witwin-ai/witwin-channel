@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "phase": "Plan 13 Phase 11B",
+  "status": "complete; frozen duplication acceptance met",
+  "scope": {
+    "python_facades": [
+      "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+      "src/witwin/channel_native/scattering/kernels/functional.py",
+      "src/witwin/channel_native/scattering/kernels/functional_chain.py",
+      "src/witwin/channel_native/scattering/kernels/autograd_chain.py"
+    ],
+    "native_translation_units": [
+      "native/channel_native/kernels/bdpt_connect_visibility.cu",
+      "native/channel_native/kernels/diffraction.cu",
+      "native/channel_native/kernels/los.cu",
+      "native/channel_native/kernels/reflection.cu"
+    ]
+  },
+  "method": {
+    "comparison": "EXACT_TOKEN_MATCH",
+    "metric": "exact-token-duplicate-regions",
+    "min_tokens": 100,
+    "python_mechanism": "shared validation/result helpers and fixed-name zero-copy tuple packing behind unchanged explicit signatures",
+    "native_mechanism": "TU-local compile-time macros for repeated validation, allocation, pointer, result, and launch-configuration plumbing",
+    "dynamic_dispatch_added": false
+  },
+  "duplication": {
+    "pre_phase11b": {
+      "duplicate_lines": 8402,
+      "total_lines": 78162,
+      "coverage_percent": 10.749469,
+      "region_count": 155
+    },
+    "current": {
+      "duplicate_lines": 7826,
+      "total_lines": 77821,
+      "coverage_percent": 10.056413,
+      "region_count": 143
+    },
+    "delta": {
+      "duplicate_lines": -576,
+      "total_lines": -341,
+      "coverage_percentage_points": -0.693056,
+      "region_count": -12
+    },
+    "frozen_budget": {
+      "coverage_percent": 10.211512,
+      "relaxed": false,
+      "met": true,
+      "margin_percentage_points": 0.155099
+    }
+  },
+  "ledger_refresh": {
+    "stale_regions_removed": [
+      "06342d7e5a635ad3",
+      "0ba8a4e298c5f730",
+      "1ec83ce5841f084b",
+      "224ad0c4836925fc",
+      "4888c0cae87b4acb",
+      "651981f0dc7ee1d9",
+      "789ad6b54edbc8a0",
+      "7da298b872725188",
+      "7f1d95bf2c274b73",
+      "7fc51182da415659",
+      "a8aad10dea7b02b4",
+      "e19c2341dd990fc4",
+      "e8af5708739b8969"
+    ],
+    "new_regions_classified": [
+      {
+        "region_id": "490234d077127261",
+        "category": "fixture_boilerplate",
+        "owner": "scattering",
+        "reason": "explicit facade signatures and argument plumbing retained for exact boundary semantics"
+      }
+    ],
+    "new_region_count": 1,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0
+  },
+  "source_sha256": {
+    "src/witwin/channel_native/propagation/fields/kernels/functional.py": "9cc738bb1a5b75e52f7ad7c34ba9f02d4a89492adec3e96702023a965b318ed0",
+    "src/witwin/channel_native/scattering/kernels/functional.py": "92b3764a6553c5f35e4efc4e5bee838b4d4a4ca1186004ef22ea2bd76084da33",
+    "src/witwin/channel_native/scattering/kernels/functional_chain.py": "4e158e006a209f5ec1c34662bdfb6b38bbd50fad27b233b311d328e5f74023dc",
+    "src/witwin/channel_native/scattering/kernels/autograd_chain.py": "8615d85227ea66f69ffb91bc47baa7f8dec9cf9265e354dbc17b5f83f478d95a",
+    "native/channel_native/kernels/bdpt_connect_visibility.cu": "695686f29e181abd7bd8af7971cce09e15f55ebb4cfa863c1b334e0edf061a89",
+    "native/channel_native/kernels/diffraction.cu": "79c08019afae7cd252e5798ededc7767f145b03b54e457177d3d967f829af185",
+    "native/channel_native/kernels/los.cu": "7313fd71274564fa24ca32c935d8074b6f4f75e9968ee87a392563a3f8a45911",
+    "native/channel_native/kernels/reflection.cu": "61d96ef4734c567afe8294e02028786daca7a541cf305547b13f967d3e52d241"
+  },
+  "exact_contract": {
+    "python_callable_signatures": "all modified facade signatures exact against Phase 11A",
+    "chain_signature_checks": 8,
+    "native_exported_signatures": "unchanged",
+    "native_macro_expansion": "exact statement, pointer, allocation, result, and launch argument order",
+    "tensor_identity_and_storage": "unchanged; Python packers retain original objects without tensor operations",
+    "validation_and_error_order": "unchanged",
+    "saved_tensor_order": "unchanged",
+    "output_schema": "unchanged"
+  },
+  "invariants": {
+    "numerical_change": false,
+    "native_abi_change": false,
+    "public_api_change": false,
+    "callable_signature_change": false,
+    "launch_contract_change": false,
+    "validation_or_error_order_change": false,
+    "output_schema_change": false,
+    "random_consumption_change": false,
+    "reduction_order_change": false,
+    "fallback_added": false
+  },
+  "historical_records": {
+    "phase10b_binding_manifest_sha256": "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71",
+    "phase11a_binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
+    "binding_manifest_changed_in_phase11b": false
+  },
+  "validation": {
+    "native_build": "68/68 targets passed",
+    "ctest": "1/1 passed",
+    "python_targeted": "106 passed",
+    "native_targeted": "195 passed",
+    "duplication_gate": "passed; 0 stale; 0 unclassified",
+    "duplication_print_current": "7826/77821 = 10.056413%; 143 regions"
+  },
+  "remaining_phase11_work": [
+    "RayD legacy extern-C consumer retirement",
+    "wheel and PE/DSO packaging audit",
+    "nightly and release acceptance from clean locked checkouts"
+  ]
+}

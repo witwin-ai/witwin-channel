@@ -169,6 +169,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     phase8a = migration["phase8a_current"]
     phase10a = migration["phase10a_current"]
     phase10b = migration["phase10b_current"]
+    phase11b = migration["phase11b_current"]
     deleted_bindings = set(phase4["deleted_bindings"])
     approved_deletions = Counter(
         _hash_tuple(entry)
@@ -192,6 +193,26 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     approved_after = Counter(
         _hash_tuple(transfer["after"]) for transfer in live_transfers
     )
+    phase11b_transformations = phase11b[
+        "approved_phase9_body_hash_transformations"
+    ]
+    phase11b_before = Counter(
+        _hash_tuple(transformation["before"])
+        for transformation in phase11b_transformations
+    )
+    phase11b_after = Counter(
+        _hash_tuple(transformation["after"])
+        for transformation in phase11b_transformations
+    )
+    phase11b_names = {
+        transformation["before"]["name"]
+        for transformation in phase11b_transformations
+    }
+    actual_phase11b = Counter(
+        _hash_tuple(entry)
+        for entry in current_hashes
+        if entry["name"] in phase11b_names
+    )
     transferred_names = {
         transfer["before"]["name"] for transfer in live_transfers
     }
@@ -212,12 +233,36 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     }
 
     assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11A"
+    assert migration["current_subphase"] == "11B"
     assert current_inventory["current_phase"] == 10
     assert current_inventory["current_subphase"] == "10B"
     assert len(live_transfers) == len(transferred_names)
-    assert expected - actual == approved_before + approved_deletions
+    assert expected - actual == approved_before + approved_deletions + phase11b_before
     assert actual_transferred == approved_after
+    assert actual_phase11b == phase11b_after
+    assert len(phase11b_transformations) == len(phase11b_names) == 2
+    for transformation in phase11b_transformations:
+        assert set(transformation) == {
+            "owner_id",
+            "binding_symbol",
+            "owner_before",
+            "owner_after",
+            "transformation_kind",
+            "before",
+            "after",
+        }
+        assert set(transformation["before"]) == set(HASH_FIELDS)
+        assert set(transformation["after"]) == set(HASH_FIELDS)
+        assert transformation["before"]["name"] == transformation["after"]["name"]
+        assert (
+            transformation["before"]["signature_sha256"]
+            == transformation["after"]["signature_sha256"]
+        )
+        assert transformation["owner_before"] == transformation["owner_after"] == "Channel Native"
+        assert phase9_owners[transformation["owner_id"]][
+            _hash_tuple(transformation["before"])
+        ] == 1
+        assert current_owners[transformation["binding_symbol"]] == "Channel Native"
     for transfer in transfers:
         assert set(transfer) == {
             "owner_id",

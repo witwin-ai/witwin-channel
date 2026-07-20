@@ -20,7 +20,7 @@
         }
     },
     "current_phase": 11,
-    "current_subphase": "11A",
+    "current_subphase": "11B",
     "transfers_applied": [
         {
             "phase": 3,
@@ -1097,5 +1097,75 @@
         "native_abi_change": false,
         "launch_contract_change": false,
         "public_api_delta": false
+    },
+    "phase11b_current": {
+        "status": "complete; frozen duplication acceptance met",
+        "scope": "mechanical Python facade and native launch/configuration boilerplate deduplication",
+        "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json",
+        "duplication_refresh": {
+            "duplicate_lines": 7826,
+            "total_lines": 77821,
+            "duplicate_coverage_percent": 10.056413,
+            "frozen_budget_percent": 10.211512,
+            "classified_regions": 143,
+            "stale_region_count": 0,
+            "unclassified_region_count": 0,
+            "budget_relaxed": false,
+            "budget_met": true,
+            "status": "all current regions classified; frozen duplication coverage acceptance met"
+        },
+        "binding_count": 202,
+        "binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
+        "binding_manifest_changed": false,
+        "approved_phase9_body_hash_transformations": [
+            {
+                "owner_id": "bdpt.connection_storage",
+                "binding_symbol": "bdpt_compact_connection_samples",
+                "owner_before": "Channel Native",
+                "owner_after": "Channel Native",
+                "transformation_kind": "phase11b-compile-time-boilerplate-deduplication",
+                "before": {
+                    "name": "cn_bdpt_compact_connection_samples_cuda",
+                    "token_count": 1010,
+                    "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
+                    "body_sha256": "9923aac65a6d2aea3abfd39cc0dd18f91e92a662c1123179bd90c22287f79aaf"
+                },
+                "after": {
+                    "name": "cn_bdpt_compact_connection_samples_cuda",
+                    "token_count": 537,
+                    "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
+                    "body_sha256": "82231840fabd06b7896d475e3bc47478d67209d0711208557114dfd402d312b3"
+                }
+            },
+            {
+                "owner_id": "bdpt.connection_storage",
+                "binding_symbol": "bdpt_concat_connection_samples",
+                "owner_before": "Channel Native",
+                "owner_after": "Channel Native",
+                "transformation_kind": "phase11b-compile-time-boilerplate-deduplication",
+                "before": {
+                    "name": "cn_bdpt_concat_connection_samples_cuda",
+                    "token_count": 1200,
+                    "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
+                    "body_sha256": "37dd23e42f3810ac8e391dfb0c614a0bcfd1819c1a46a7494aef2ba3eeae4700"
+                },
+                "after": {
+                    "name": "cn_bdpt_concat_connection_samples_cuda",
+                    "token_count": 729,
+                    "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
+                    "body_sha256": "d2bc972e76fff241db1dca0a53cd4577c134891ba2e7681811ec60164be869e4"
+                }
+            }
+        ],
+        "numerical_change": false,
+        "native_abi_change": false,
+        "callable_signature_change": false,
+        "launch_contract_change": false,
+        "public_api_delta": false,
+        "remaining_phase11_work": [
+            "RayD legacy extern-C consumer retirement",
+            "wheel and PE/DSO packaging audit",
+            "nightly and release acceptance from clean locked checkouts"
+        ]
     }
 }

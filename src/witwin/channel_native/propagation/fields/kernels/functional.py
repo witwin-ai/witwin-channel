@@ -7,6 +7,36 @@ from witwin.channel_native.runtime.symbols import required_symbol as _required_n
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 
+def _validate_enumerated_field_result(
+    out: object,
+    count: int,
+    *,
+    type_error: str,
+    field_error: str,
+    shape_error_prefix: str,
+) -> dict[str, torch.Tensor]:
+    """Validate the shared enumerated-field result schema in field order."""
+
+    if not isinstance(out, dict):
+        raise TypeError(type_error)
+    schema = {
+        "field_vector": (torch.complex64, 2, (count, 3)),
+        "coefficient": (torch.complex64, 1, (count,)),
+        "path_field": (torch.complex64, 1, (count,)),
+        "path_gain": (torch.float32, 1, (count,)),
+        "path_length_m": (torch.float32, 1, (count,)),
+        "delay_s": (torch.float32, 1, (count,)),
+        "direction": (torch.float32, 2, (count, 3)),
+    }
+    if set(out) != set(schema):
+        raise ValueError(field_error)
+    for name, (dtype, ndim, shape) in schema.items():
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+        if tuple(out[name].shape) != shape:
+            raise ValueError(f"{shape_error_prefix} returned bad {name} shape")
+    return out
+
+
 def field_free_space(
     source: torch.Tensor,
     target: torch.Tensor,
@@ -42,24 +72,13 @@ def field_free_space(
         rx_polarization,
         float(frequency_hz),
     )
-    if not isinstance(out, dict):
-        raise TypeError("_channel_native.field_free_space must return a dict")
-    schema = {
-        "field_vector": (torch.complex64, 2, (count, 3)),
-        "coefficient": (torch.complex64, 1, (count,)),
-        "path_field": (torch.complex64, 1, (count,)),
-        "path_gain": (torch.float32, 1, (count,)),
-        "path_length_m": (torch.float32, 1, (count,)),
-        "delay_s": (torch.float32, 1, (count,)),
-        "direction": (torch.float32, 2, (count, 3)),
-    }
-    if set(out) != set(schema):
-        raise ValueError("_channel_native.field_free_space returned unexpected fields")
-    for name, (dtype, ndim, shape) in schema.items():
-        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
-        if tuple(out[name].shape) != shape:
-            raise ValueError(f"_channel_native.field_free_space returned bad {name} shape")
-    return out
+    return _validate_enumerated_field_result(
+        out,
+        count,
+        type_error="_channel_native.field_free_space must return a dict",
+        field_error="_channel_native.field_free_space returned unexpected fields",
+        shape_error_prefix="_channel_native.field_free_space",
+    )
 
 
 def field_project_complex3(
@@ -161,24 +180,13 @@ def field_reflection_sequence(
         thickness,
         float(frequency_hz),
     )
-    if not isinstance(out, dict):
-        raise TypeError("_channel_native.field_reflection_sequence must return a dict")
-    schema = {
-        "field_vector": (torch.complex64, 2, (count, 3)),
-        "coefficient": (torch.complex64, 1, (count,)),
-        "path_field": (torch.complex64, 1, (count,)),
-        "path_gain": (torch.float32, 1, (count,)),
-        "path_length_m": (torch.float32, 1, (count,)),
-        "delay_s": (torch.float32, 1, (count,)),
-        "direction": (torch.float32, 2, (count, 3)),
-    }
-    if set(out) != set(schema):
-        raise ValueError("field_reflection_sequence returned unexpected fields")
-    for name, (dtype, ndim, shape) in schema.items():
-        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
-        if tuple(out[name].shape) != shape:
-            raise ValueError(f"field_reflection_sequence returned bad {name} shape")
-    return out
+    return _validate_enumerated_field_result(
+        out,
+        count,
+        type_error="_channel_native.field_reflection_sequence must return a dict",
+        field_error="field_reflection_sequence returned unexpected fields",
+        shape_error_prefix="field_reflection_sequence",
+    )
 
 
 def field_transmission_sequence(
@@ -267,24 +275,13 @@ def field_transmission_sequence(
         layer_mu_r,
         float(frequency_hz),
     )
-    if not isinstance(out, dict):
-        raise TypeError("_channel_native.field_transmission_sequence must return a dict")
-    schema = {
-        "field_vector": (torch.complex64, 2, (count, 3)),
-        "coefficient": (torch.complex64, 1, (count,)),
-        "path_field": (torch.complex64, 1, (count,)),
-        "path_gain": (torch.float32, 1, (count,)),
-        "path_length_m": (torch.float32, 1, (count,)),
-        "delay_s": (torch.float32, 1, (count,)),
-        "direction": (torch.float32, 2, (count, 3)),
-    }
-    if set(out) != set(schema):
-        raise ValueError("field_transmission_sequence returned unexpected fields")
-    for name, (dtype, ndim, shape) in schema.items():
-        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
-        if tuple(out[name].shape) != shape:
-            raise ValueError(f"field_transmission_sequence returned bad {name} shape")
-    return out
+    return _validate_enumerated_field_result(
+        out,
+        count,
+        type_error="_channel_native.field_transmission_sequence must return a dict",
+        field_error="field_transmission_sequence returned unexpected fields",
+        shape_error_prefix="field_transmission_sequence",
+    )
 
 
 def field_coupled_rd(

@@ -1,5 +1,51 @@
 #include "bdpt_connect_common.cuh"
 
+#define CN_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS()                                     \
+    check_int_cuda(topology, "topology", 2);                                          \
+    TORCH_CHECK(topology.size(1) == 4, "topology must have shape (N, 4)");             \
+    check_float_cuda(contribution, "contribution", 1);                                \
+    check_float_cuda(pdf, "pdf", 1);                                                  \
+    check_float_cuda(mis_weight, "mis_weight", 1);                                    \
+    check_int_cuda(component_id, "component_id", 1);                                  \
+    check_bool_cuda(valid, "valid", 1);                                               \
+    check_int_cuda(tx_id, "tx_id", 1);                                                \
+    check_int_cuda(rx_id, "rx_id", 1);                                                \
+    check_int_cuda(grid_linear_id, "grid_linear_id", 1);                              \
+    check_int_cuda(light_depth, "light_depth", 1);                                    \
+    check_int_cuda(sensor_depth, "sensor_depth", 1);                                  \
+    check_float_cuda(path_length_m, "path_length_m", 1)
+
+#define CN_BDPT_CHECK_CONNECTION_SAMPLE_ROWS(REFERENCE)                               \
+    for (const auto& pair : {                                                          \
+             std::pair<const at::Tensor*, const char*>(&pdf, "pdf"),                  \
+             std::pair<const at::Tensor*, const char*>(&mis_weight, "mis_weight"),    \
+             std::pair<const at::Tensor*, const char*>(&component_id, "component_id"),\
+             std::pair<const at::Tensor*, const char*>(&valid, "valid"),              \
+             std::pair<const at::Tensor*, const char*>(&tx_id, "tx_id"),              \
+             std::pair<const at::Tensor*, const char*>(&rx_id, "rx_id"),              \
+             std::pair<const at::Tensor*, const char*>(&grid_linear_id, "grid_linear_id"),\
+             std::pair<const at::Tensor*, const char*>(&light_depth, "light_depth"),  \
+             std::pair<const at::Tensor*, const char*>(&sensor_depth, "sensor_depth"),\
+             std::pair<const at::Tensor*, const char*>(&path_length_m, "path_length_m"),\
+         }) {                                                                          \
+        TORCH_CHECK(pair.first->size(0) == count, pair.second, " must match contribution");\
+        check_same_device(*pair.first, REFERENCE, pair.second);                        \
+    }
+
+#define CN_BDPT_CONNECTION_OUTPUT_POINTERS()                                           \
+    out_topology.data_ptr<int>(),                                                      \
+    out_contribution.data_ptr<float>(),                                                \
+    out_pdf.data_ptr<float>(),                                                         \
+    out_mis_weight.data_ptr<float>(),                                                  \
+    out_component_id.data_ptr<int>(),                                                  \
+    out_valid.data_ptr<bool>(),                                                        \
+    out_tx_id.data_ptr<int>(),                                                         \
+    out_rx_id.data_ptr<int>(),                                                         \
+    out_grid_linear_id.data_ptr<int>(),                                                \
+    out_light_depth.data_ptr<int>(),                                                   \
+    out_sensor_depth.data_ptr<int>(),                                                  \
+    out_path_length_m.data_ptr<float>()
+
 namespace {
 
 __global__ void bdpt_endpoint_connection_visibility_inputs_kernel(
@@ -315,36 +361,10 @@ cn_bdpt_compact_connection_samples_cuda(
     at::Tensor sensor_depth,
     at::Tensor path_length_m,
     int64_t max_paths) {
-    check_int_cuda(topology, "topology", 2);
-    TORCH_CHECK(topology.size(1) == 4, "topology must have shape (N, 4)");
-    check_float_cuda(contribution, "contribution", 1);
-    check_float_cuda(pdf, "pdf", 1);
-    check_float_cuda(mis_weight, "mis_weight", 1);
-    check_int_cuda(component_id, "component_id", 1);
-    check_bool_cuda(valid, "valid", 1);
-    check_int_cuda(tx_id, "tx_id", 1);
-    check_int_cuda(rx_id, "rx_id", 1);
-    check_int_cuda(grid_linear_id, "grid_linear_id", 1);
-    check_int_cuda(light_depth, "light_depth", 1);
-    check_int_cuda(sensor_depth, "sensor_depth", 1);
-    check_float_cuda(path_length_m, "path_length_m", 1);
+    CN_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS();
     TORCH_CHECK(max_paths >= -1, "max_paths must be -1 or non-negative");
     const int64_t count = contribution.size(0);
-    for (const auto& pair : {
-             std::pair<const at::Tensor*, const char*>(&pdf, "pdf"),
-             std::pair<const at::Tensor*, const char*>(&mis_weight, "mis_weight"),
-             std::pair<const at::Tensor*, const char*>(&component_id, "component_id"),
-             std::pair<const at::Tensor*, const char*>(&valid, "valid"),
-             std::pair<const at::Tensor*, const char*>(&tx_id, "tx_id"),
-             std::pair<const at::Tensor*, const char*>(&rx_id, "rx_id"),
-             std::pair<const at::Tensor*, const char*>(&grid_linear_id, "grid_linear_id"),
-             std::pair<const at::Tensor*, const char*>(&light_depth, "light_depth"),
-             std::pair<const at::Tensor*, const char*>(&sensor_depth, "sensor_depth"),
-             std::pair<const at::Tensor*, const char*>(&path_length_m, "path_length_m"),
-         }) {
-        TORCH_CHECK(pair.first->size(0) == count, pair.second, " must match contribution");
-        check_same_device(*pair.first, contribution, pair.second);
-    }
+    CN_BDPT_CHECK_CONNECTION_SAMPLE_ROWS(contribution);
     TORCH_CHECK(topology.size(0) == count, "topology must match contribution");
     check_same_device(topology, contribution, "topology");
     int valid_count_host = 0;
@@ -405,18 +425,7 @@ cn_bdpt_compact_connection_samples_cuda(
             sensor_depth.data_ptr<int>(),
             path_length_m.data_ptr<float>(),
             compact_count.data_ptr<int>(),
-            out_topology.data_ptr<int>(),
-            out_contribution.data_ptr<float>(),
-            out_pdf.data_ptr<float>(),
-            out_mis_weight.data_ptr<float>(),
-            out_component_id.data_ptr<int>(),
-            out_valid.data_ptr<bool>(),
-            out_tx_id.data_ptr<int>(),
-            out_rx_id.data_ptr<int>(),
-            out_grid_linear_id.data_ptr<int>(),
-            out_light_depth.data_ptr<int>(),
-            out_sensor_depth.data_ptr<int>(),
-            out_path_length_m.data_ptr<float>());
+            CN_BDPT_CONNECTION_OUTPUT_POINTERS());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return {
@@ -489,38 +498,13 @@ cn_bdpt_concat_connection_samples_cuda(
         at::Tensor& light_depth = light_depths[block];
         at::Tensor& sensor_depth = sensor_depths[block];
         at::Tensor& path_length_m = path_lengths_m[block];
-        check_int_cuda(topology, "topology", 2);
-        TORCH_CHECK(topology.size(1) == 4, "topology must have shape (N, 4)");
-        check_float_cuda(contribution, "contribution", 1);
-        check_float_cuda(pdf, "pdf", 1);
-        check_float_cuda(mis_weight, "mis_weight", 1);
-        check_int_cuda(component_id, "component_id", 1);
-        check_bool_cuda(valid, "valid", 1);
-        check_int_cuda(tx_id, "tx_id", 1);
-        check_int_cuda(rx_id, "rx_id", 1);
-        check_int_cuda(grid_linear_id, "grid_linear_id", 1);
-        check_int_cuda(light_depth, "light_depth", 1);
-        check_int_cuda(sensor_depth, "sensor_depth", 1);
-        check_float_cuda(path_length_m, "path_length_m", 1);
+        CN_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS();
         const int64_t count = contribution.size(0);
         TORCH_CHECK(topology.size(0) == count, "topology must match contribution");
         check_same_device(contribution, reference, "contribution");
-        for (const auto& pair : {
-                 std::pair<const at::Tensor*, const char*>(&topology, "topology"),
-                 std::pair<const at::Tensor*, const char*>(&pdf, "pdf"),
-                 std::pair<const at::Tensor*, const char*>(&mis_weight, "mis_weight"),
-                 std::pair<const at::Tensor*, const char*>(&component_id, "component_id"),
-                 std::pair<const at::Tensor*, const char*>(&valid, "valid"),
-                 std::pair<const at::Tensor*, const char*>(&tx_id, "tx_id"),
-                 std::pair<const at::Tensor*, const char*>(&rx_id, "rx_id"),
-                 std::pair<const at::Tensor*, const char*>(&grid_linear_id, "grid_linear_id"),
-                 std::pair<const at::Tensor*, const char*>(&light_depth, "light_depth"),
-                 std::pair<const at::Tensor*, const char*>(&sensor_depth, "sensor_depth"),
-                 std::pair<const at::Tensor*, const char*>(&path_length_m, "path_length_m"),
-             }) {
-            TORCH_CHECK(pair.first->size(0) == count, pair.second, " must match contribution");
-            check_same_device(*pair.first, reference, pair.second);
-        }
+        TORCH_CHECK(topology.size(0) == count, "topology must match contribution");
+        check_same_device(topology, reference, "topology");
+        CN_BDPT_CHECK_CONNECTION_SAMPLE_ROWS(reference);
         total += count;
     }
     auto [
@@ -558,18 +542,7 @@ cn_bdpt_concat_connection_samples_cuda(
                 light_depths[block].data_ptr<int>(),
                 sensor_depths[block].data_ptr<int>(),
                 path_lengths_m[block].data_ptr<float>(),
-                out_topology.data_ptr<int>(),
-                out_contribution.data_ptr<float>(),
-                out_pdf.data_ptr<float>(),
-                out_mis_weight.data_ptr<float>(),
-                out_component_id.data_ptr<int>(),
-                out_valid.data_ptr<bool>(),
-                out_tx_id.data_ptr<int>(),
-                out_rx_id.data_ptr<int>(),
-                out_grid_linear_id.data_ptr<int>(),
-                out_light_depth.data_ptr<int>(),
-                out_sensor_depth.data_ptr<int>(),
-                out_path_length_m.data_ptr<float>());
+                CN_BDPT_CONNECTION_OUTPUT_POINTERS());
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
         offset += count;
@@ -588,3 +561,7 @@ cn_bdpt_concat_connection_samples_cuda(
         out_sensor_depth,
         out_path_length_m};
 }
+
+#undef CN_BDPT_CONNECTION_OUTPUT_POINTERS
+#undef CN_BDPT_CHECK_CONNECTION_SAMPLE_ROWS
+#undef CN_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS

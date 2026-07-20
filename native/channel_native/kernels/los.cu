@@ -7,6 +7,24 @@
 #include <tuple>
 #include <vector>
 
+#define CN_LOS_CHECK_VISIBILITY_APPLICATION()                                         \
+    check_cuda_tensor(maps, "maps", at::kFloat, 3);                                  \
+    check_cuda_tensor(los, "los", at::kFloat, 2);                                    \
+    check_cuda_tensor(visible, "visible", at::kBool, 1);                             \
+    TORCH_CHECK(maps.size(0) == los.size(0), "maps and los must have the same tx dimension");\
+    TORCH_CHECK(los.size(1) == maps.size(1) * maps.size(2), "los columns must match map cells");\
+    TORCH_CHECK(tx_index >= 0 && tx_index < los.size(0), "tx_index is out of range"); \
+    TORCH_CHECK(los.get_device() == maps.get_device(), "los must share maps device"); \
+    TORCH_CHECK(visible.get_device() == maps.get_device(), "visible must share maps device")
+
+#define CN_LOS_VISIBILITY_LAUNCH_ARGUMENTS()                                          \
+    los.data_ptr<float>(),                                                            \
+    visible.data_ptr<bool>(),                                                         \
+    maps.data_ptr<float>(),                                                           \
+    tx_index,                                                                         \
+    rows,                                                                             \
+    cols
+
 namespace {
 
 constexpr double kLightSpeedMetersPerSecond = 299792458.0;
@@ -820,14 +838,7 @@ at::Tensor cn_mc_apply_los_visibility_cuda(
     at::Tensor los,
     at::Tensor visible,
     int64_t tx_index) {
-    check_cuda_tensor(maps, "maps", at::kFloat, 3);
-    check_cuda_tensor(los, "los", at::kFloat, 2);
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
-    TORCH_CHECK(maps.size(0) == los.size(0), "maps and los must have the same tx dimension");
-    TORCH_CHECK(los.size(1) == maps.size(1) * maps.size(2), "los columns must match map cells");
-    TORCH_CHECK(tx_index >= 0 && tx_index < los.size(0), "tx_index is out of range");
-    TORCH_CHECK(los.get_device() == maps.get_device(), "los must share maps device");
-    TORCH_CHECK(visible.get_device() == maps.get_device(), "visible must share maps device");
+    CN_LOS_CHECK_VISIBILITY_APPLICATION();
     const int64_t rows = maps.size(2);
     const int64_t cols = maps.size(1);
     const int64_t cell_count = rows * cols;
@@ -837,12 +848,7 @@ at::Tensor cn_mc_apply_los_visibility_cuda(
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
         const int block_count = static_cast<int>((cell_count + kLosBlockSize - 1) / kLosBlockSize);
         apply_los_visibility_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
-            los.data_ptr<float>(),
-            visible.data_ptr<bool>(),
-            maps.data_ptr<float>(),
-            tx_index,
-            rows,
-            cols);
+            CN_LOS_VISIBILITY_LAUNCH_ARGUMENTS());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return maps;
@@ -919,14 +925,7 @@ at::Tensor cn_bdpt_apply_los_visibility_cuda(
     at::Tensor los,
     at::Tensor visible,
     int64_t tx_index) {
-    check_cuda_tensor(maps, "maps", at::kFloat, 3);
-    check_cuda_tensor(los, "los", at::kFloat, 2);
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
-    TORCH_CHECK(maps.size(0) == los.size(0), "maps and los must have the same tx dimension");
-    TORCH_CHECK(los.size(1) == maps.size(1) * maps.size(2), "los columns must match map cells");
-    TORCH_CHECK(tx_index >= 0 && tx_index < los.size(0), "tx_index is out of range");
-    TORCH_CHECK(los.get_device() == maps.get_device(), "los must share maps device");
-    TORCH_CHECK(visible.get_device() == maps.get_device(), "visible must share maps device");
+    CN_LOS_CHECK_VISIBILITY_APPLICATION();
     const int64_t rows = maps.size(1);
     const int64_t cols = maps.size(2);
     const int64_t cell_count = rows * cols;
@@ -936,16 +935,14 @@ at::Tensor cn_bdpt_apply_los_visibility_cuda(
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
         const int block_count = static_cast<int>((cell_count + kLosBlockSize - 1) / kLosBlockSize);
         apply_los_visibility_public_layout_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
-            los.data_ptr<float>(),
-            visible.data_ptr<bool>(),
-            maps.data_ptr<float>(),
-            tx_index,
-            rows,
-            cols);
+            CN_LOS_VISIBILITY_LAUNCH_ARGUMENTS());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return maps;
 }
+
+#undef CN_LOS_VISIBILITY_LAUNCH_ARGUMENTS
+#undef CN_LOS_CHECK_VISIBILITY_APPLICATION
 
 std::tuple<at::Tensor, at::Tensor> cn_bdpt_los_visibility_inputs_cuda(
     at::Tensor tx_positions,
