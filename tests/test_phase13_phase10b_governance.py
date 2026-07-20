@@ -52,8 +52,28 @@ def _json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _lf_text_sha256(path: Path) -> str:
+    # Evidence hashes lock Git's LF-normalized UTF-8 text, not checkout EOL bytes.
+    text = path.read_bytes().decode("utf-8")
+    normalized = text.replace("\r\n", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def test_lf_text_sha256_normalizes_eol_without_hiding_content_changes(
+    tmp_path: Path,
+) -> None:
+    lf = tmp_path / "lf.txt"
+    crlf = tmp_path / "crlf.txt"
+    changed = tmp_path / "changed.txt"
+    bare_cr = tmp_path / "bare-cr.txt"
+    lf.write_bytes("alpha\nβeta\n".encode("utf-8"))
+    crlf.write_bytes("alpha\r\nβeta\r\n".encode("utf-8"))
+    changed.write_bytes("alpha\r\nγamma\r\n".encode("utf-8"))
+    bare_cr.write_bytes("alpha\rβeta\r".encode("utf-8"))
+
+    assert _lf_text_sha256(lf) == _lf_text_sha256(crlf)
+    assert _lf_text_sha256(lf) != _lf_text_sha256(changed)
+    assert _lf_text_sha256(lf) != _lf_text_sha256(bare_cr)
 
 
 def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
@@ -97,7 +117,7 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
         evidence["activation"]["binding_manifest_sha256"]
         == PHASE10B_BINDING_MANIFEST_SHA256
     )
-    assert _sha256(coverage_manifest) == evidence["activation"][
+    assert _lf_text_sha256(coverage_manifest) == evidence["activation"][
         "contract_coverage_manifest_sha256"
     ]
 
@@ -109,14 +129,14 @@ def test_phase10b_rayd_identity_sources_and_direct_contract_are_locked() -> None
     typed = RAYD_ROOT / activation["typed_header"]
     shared = RAYD_ROOT / activation["shared_table_header"]
 
-    assert _sha256(integration) == INTEGRATION_SHA256
-    assert _sha256(typed) == TYPED_SHA256
-    assert _sha256(shared) == SHARED_SHA256
+    assert _lf_text_sha256(integration) == INTEGRATION_SHA256
+    assert _lf_text_sha256(typed) == TYPED_SHA256
+    assert _lf_text_sha256(shared) == SHARED_SHA256
     assert IDENTITY in integration.read_text(encoding="utf-8-sig")
     for record in evidence["rayd_sources"]:
-        assert _sha256(RAYD_ROOT / record["path"]) == record["sha256"]
+        assert _lf_text_sha256(RAYD_ROOT / record["path"]) == record["sha256"]
     direct = evidence["direct_contract_coverage"]
-    assert _sha256(RAYD_ROOT / direct["test"]) == direct["test_sha256"]
+    assert _lf_text_sha256(RAYD_ROOT / direct["test"]) == direct["test_sha256"]
     assert direct["ctest_result"] == "4/4 passed"
     assert len(direct["depth8_positive_coverage"]) == 2
     head = subprocess.run(
