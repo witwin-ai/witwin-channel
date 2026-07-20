@@ -6,6 +6,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "capacity_failure_state.h"
 
 #include <cstdint>
 #include <limits>
@@ -46,6 +47,7 @@ struct DiffractionPathOutputView {
 };
 
 __global__ void diffraction_path_capacity_flags_kernel(
+    const int *__restrict__ failure_state,
     const bool *__restrict__ valid,
     int *__restrict__ flags,
     int64_t input_capacity) {
@@ -53,7 +55,7 @@ __global__ void diffraction_path_capacity_flags_kernel(
     for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          row < input_capacity;
          row += stride) {
-        flags[row] = valid[row] ? 1 : 0;
+        flags[row] = failure_state[0] == 0 && valid[row] ? 1 : 0;
     }
 }
 
@@ -83,6 +85,7 @@ __global__ void diffraction_path_capacity_init_kernel(
 }
 
 __global__ void diffraction_path_capacity_status_kernel(
+    int *__restrict__ failure_state,
     const int *__restrict__ reported_count,
     const int *__restrict__ flags,
     const int *__restrict__ offsets,
@@ -91,6 +94,11 @@ __global__ void diffraction_path_capacity_status_kernel(
     int *__restrict__ num_paths,
     bool *__restrict__ overflow) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
+        return;
+    }
+    if (failure_state[0] != 0) {
+        num_paths[0] = 0;
+        overflow[0] = false;
         return;
     }
     int selected_count = 0;
@@ -102,16 +110,26 @@ __global__ void diffraction_path_capacity_status_kernel(
     const bool did_overflow = invalid_count || selected_count > output_capacity;
     num_paths[0] = did_overflow ? 0 : selected_count;
     overflow[0] = did_overflow;
+    if (invalid_count) {
+        atomicOr(
+            failure_state,
+            channel_native::capacity::kDiffractionPathContractError);
+    } else if (selected_count > output_capacity) {
+        atomicOr(
+            failure_state,
+            channel_native::capacity::kDiffractionPathOverflow);
+    }
 }
 
 __global__ void diffraction_path_capacity_gather_kernel(
+    const int *__restrict__ failure_state,
     const int *__restrict__ flags,
     const int *__restrict__ offsets,
     const bool *__restrict__ overflow,
     DiffractionPathInputView input,
     DiffractionPathOutputView output,
     int64_t input_capacity) {
-    if (overflow[0]) {
+    if (failure_state[0] != 0 || overflow[0]) {
         return;
     }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -144,13 +162,6 @@ __global__ void diffraction_path_capacity_gather_kernel(
     }
 }
 
-__global__ void diffraction_path_capacity_overflow_kernel(
-    const bool *__restrict__ overflow) {
-    if (blockIdx.x == 0 && threadIdx.x == 0 && overflow[0]) {
-        asm volatile("trap;");
-    }
-}
-
 void check_diffraction_path_input(
     const at::Tensor& tensor,
     const char *name,
@@ -165,6 +176,7 @@ void check_diffraction_path_input(
 }  // namespace
 
 pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
+    at::Tensor failure_state,
     at::Tensor count,
     at::Tensor valid,
     at::Tensor rx_id,
@@ -182,6 +194,7 @@ pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
     check_tensor(count, "count", at::kInt, 1);
     TORCH_CHECK(count.size(0) == 1, "count must have shape (1,)");
     check_tensor(valid, "valid", at::kBool, 1);
+    channel_native::capacity::validate_failure_state(failure_state, valid);
     TORCH_CHECK(output_capacity >= 0, "output_capacity must be non-negative");
     TORCH_CHECK(
         output_capacity <= std::numeric_limits<int>::max(),
@@ -274,7 +287,10 @@ pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
             kDiffractionPathBlockSize);
         diffraction_path_capacity_flags_kernel<<<
             input_blocks, kDiffractionPathBlockSize, 0, stream>>>(
-            valid.data_ptr<bool>(), flags.data_ptr<int>(), input_capacity);
+            failure_state.data_ptr<int>(),
+            valid.data_ptr<bool>(),
+            flags.data_ptr<int>(),
+            input_capacity);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
         size_t scratch_bytes = 0;
@@ -298,6 +314,7 @@ pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
     }
 
     diffraction_path_capacity_status_kernel<<<1, 1, 0, stream>>>(
+        failure_state.data_ptr<int>(),
         count.data_ptr<int>(),
         flags.data_ptr<int>(),
         offsets.data_ptr<int>(),
@@ -312,6 +329,7 @@ pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
             kDiffractionPathBlockSize);
         diffraction_path_capacity_gather_kernel<<<
             input_blocks, kDiffractionPathBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(),
             flags.data_ptr<int>(),
             offsets.data_ptr<int>(),
             overflow.data_ptr<bool>(),
@@ -320,9 +338,6 @@ pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
             input_capacity);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    diffraction_path_capacity_overflow_kernel<<<1, 1, 0, stream>>>(
-        overflow.data_ptr<bool>());
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     pybind11::dict result;
     result["valid"] = out_valid;

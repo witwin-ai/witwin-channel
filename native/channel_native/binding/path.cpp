@@ -51,6 +51,7 @@ pybind11::tuple cn_deterministic_diffraction_state_pack_selected(
     torch::Tensor tx_power,
     int64_t tx_power_index);
 pybind11::tuple cn_deterministic_diffraction_state_capacity_select(
+    torch::Tensor failure_state,
     torch::Tensor active,
     torch::Tensor edge_index,
     torch::Tensor edge_position,
@@ -265,6 +266,7 @@ pybind11::dict cn_deterministic_reflection_sequence_compact(
     torch::Tensor face_material_id,
     int64_t max_count);
 pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
+    torch::Tensor failure_state,
     torch::Tensor visible,
     torch::Tensor epc_sequences,
     torch::Tensor epc_hits,
@@ -296,6 +298,7 @@ pybind11::dict cn_deterministic_diffraction_order1_compact(
     torch::Tensor z_im,
     torch::Tensor interaction_position);
 pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
+    torch::Tensor failure_state,
     torch::Tensor count,
     torch::Tensor valid,
     torch::Tensor rx_id,
@@ -328,6 +331,7 @@ pybind11::dict cn_deterministic_face_groups(
     double quantization);
 pybind11::dict cn_deterministic_surface_face_groups(torch::Tensor surface_ids);
 pybind11::dict cn_coupled_candidate_capacity_block(
+    torch::Tensor failure_state,
     torch::Tensor representative_faces,
     torch::Tensor selected_edges,
     int64_t tx_count,
@@ -345,6 +349,7 @@ torch::Tensor cn_deterministic_sort_order(
     torch::Tensor edge_id,
     torch::Tensor primitive_sequence);
 pybind11::dict cn_deterministic_capacity_finalize(
+    torch::Tensor failure_state,
     torch::Tensor valid,
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -353,6 +358,7 @@ pybind11::dict cn_deterministic_capacity_finalize(
     int64_t num_rx,
     int64_t path_capacity_per_pair);
 pybind11::dict cn_evaluated_paths_capacity_pack(
+    torch::Tensor failure_state,
     torch::Tensor valid,
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -649,6 +655,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_reflection_candidate_capacity_block",
         &cn_deterministic_reflection_candidate_capacity_block,
         "Stably gather visible reflection EPC rows into fixed CUDA capacity.",
+        pybind11::arg("failure_state"),
         pybind11::arg("visible"),
         pybind11::arg("epc_sequences"),
         pybind11::arg("epc_hits"),
@@ -694,6 +701,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "coupled_candidate_capacity_block",
         &cn_coupled_candidate_capacity_block,
         "Generate the fixed-capacity coupled R-D/D-R/D-D candidate axes.",
+        pybind11::arg("failure_state"),
         pybind11::arg("representative_faces"),
         pybind11::arg("selected_edges"),
         pybind11::arg("tx_count"),
@@ -717,6 +725,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_capacity_finalize",
         &cn_deterministic_capacity_finalize,
         "Stably finalize deterministic rows into pair-major fixed CUDA capacity.",
+        pybind11::arg("failure_state"),
         pybind11::arg("valid"),
         pybind11::arg("tx_id"),
         pybind11::arg("rx_id"),
@@ -728,6 +737,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "evaluated_paths_capacity_pack",
         &cn_evaluated_paths_capacity_pack,
         "Pack complete evaluated paths into stable pair-major CUDA capacity.",
+        pybind11::arg("failure_state"),
         pybind11::arg("valid"),
         pybind11::arg("tx_id"),
         pybind11::arg("rx_id"),

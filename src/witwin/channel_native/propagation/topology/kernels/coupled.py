@@ -7,6 +7,10 @@ import torch
 from witwin.channel_native.propagation.models.coupled import (
     CoupledCandidateCapacity,
 )
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
@@ -48,6 +52,7 @@ def coupled_candidate_capacity_block(
     representative_faces: torch.Tensor,
     selected_edges: torch.Tensor,
     *,
+    failure_state: CapacityFailureState,
     tx_count: int,
     rx_count: int,
     rx_id_offset: int,
@@ -82,8 +87,12 @@ def coupled_candidate_capacity_block(
         )
     if candidate_capacity > effective_limit:
         raise ValueError("candidate_capacity exceeds coupled candidate guardrail")
+    require_capacity_failure_state(
+        failure_state, device=representative_faces.device
+    )
 
     raw = _required_native_op("coupled_candidate_capacity_block")(
+        failure_state.bits,
         representative_faces,
         selected_edges,
         tx_count,
@@ -96,6 +105,7 @@ def coupled_candidate_capacity_block(
         raise TypeError("native coupled candidate capacity returned bad fields")
     return CoupledCandidateCapacity(
         candidate_capacity=candidate_capacity,
+        failure_state=failure_state,
         **raw,
     )
 

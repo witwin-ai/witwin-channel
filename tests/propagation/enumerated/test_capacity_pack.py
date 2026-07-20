@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 import torch
@@ -15,6 +12,11 @@ from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
 from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -142,9 +144,18 @@ def _with_continuous(
     )
 
 
-def _pack(paths: EvaluatedPaths, *, capacity: int = 3):
+def _pack(
+    paths: EvaluatedPaths,
+    *,
+    capacity: int = 3,
+    failure_state: CapacityFailureState | None = None,
+):
+    failure_state = failure_state or create_capacity_failure_state(
+        paths.topology.valid
+    )
     return evaluated_paths_capacity_pack(
         paths,
+        failure_state=failure_state,
         pair_count=4,
         num_tx=2,
         num_rx=2,
@@ -337,8 +348,10 @@ def test_capacity_pack_rejects_bad_host_metadata_before_native_allocation(
     pair_count: int, num_tx: int, num_rx: int, capacity: int
 ) -> None:
     with pytest.raises((ValueError, RuntimeError)):
+        paths = _paths([])
         evaluated_paths_capacity_pack(
-            _paths([]),
+            paths,
+            failure_state=create_capacity_failure_state(paths.topology.valid),
             pair_count=pair_count,
             num_tx=num_tx,
             num_rx=num_rx,
@@ -346,50 +359,81 @@ def test_capacity_pack_rejects_bad_host_metadata_before_native_allocation(
         )
 
 
-@pytest.mark.parametrize("mode", ("overflow", "bad_id"))
-def test_capacity_pack_failure_is_asynchronous_in_subprocess(mode: str) -> None:
-    script = f"""
-import torch
-from tests.propagation.enumerated.test_capacity_pack import _paths
-from witwin.channel_native.propagation.enumerated.capacity import evaluated_paths_capacity_pack
+@pytest.mark.parametrize(
+    ("mode", "bit"),
+    (
+        ("overflow", CapacityFailureBit.PAIR_CAPACITY_OVERFLOW),
+        ("bad_id", CapacityFailureBit.PAIR_CONTRACT_ERROR),
+    ),
+)
+def test_capacity_pack_failure_sets_state_and_returns_fully_inert(
+    mode: str, bit: CapacityFailureBit
+) -> None:
+    paths = _paths(
+        [True, True, True] if mode == "overflow" else [True, False],
+        tx_values=[0, 0, 0] if mode == "overflow" else [3, 0],
+        rx_values=[0, 0, 0] if mode == "overflow" else [0, 0],
+    )
+    failure_state = create_capacity_failure_state(paths.topology.valid)
 
-mode = {mode!r}
-paths = _paths(
-    [True, True, True] if mode == "overflow" else [True, False],
-    tx_values=[0, 0, 0] if mode == "overflow" else [3, 0],
-    rx_values=[0, 0, 0] if mode == "overflow" else [0, 0],
-)
-packed = evaluated_paths_capacity_pack(
-    paths,
-    pair_count=1,
-    num_tx=1,
-    num_rx=1,
-    path_capacity_per_pair=2,
-)
-assert packed.selection.selected_row_index.shape == (2,)
-assert packed.evaluated.geometry.interaction_positions.shape == (2, 2, 3)
-assert packed.evaluated.fields.field_xyz.shape == (2, 3)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous capacity pack failure")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
+    packed = evaluated_paths_capacity_pack(
+        paths,
+        failure_state=failure_state,
+        pair_count=1,
+        num_tx=1,
+        num_rx=1,
+        path_capacity_per_pair=2,
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
+
+    assert packed.selection.layout.failure_state is failure_state
+    assert failure_state.bits.tolist() == [int(bit)]
+    assert packed.selection.selected_row_index.tolist() == [-1, -1]
+    assert packed.selection.valid.tolist() == [False, False]
+    assert packed.selection.num_paths.tolist() == [0]
+    assert packed.selection.overflow.tolist() == [mode == "overflow"]
+    assert torch.all(packed.evaluated.topology.tx_id == -1)
+    assert torch.all(packed.evaluated.geometry.path_length_m == -1)
+    assert torch.count_nonzero(packed.evaluated.fields.field_xyz).item() == 0
+
+
+def test_capacity_pack_failure_keeps_vjp_and_jvp_zero_without_state_ad_abi() -> None:
+    reverse = _paths(
+        [True], tx_values=[3], rx_values=[0], differentiable=True
     )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    reverse_state = create_capacity_failure_state(reverse.topology.valid)
+    reverse_output = evaluated_paths_capacity_pack(
+        reverse,
+        failure_state=reverse_state,
+        pair_count=1,
+        num_tx=1,
+        num_rx=1,
+        path_capacity_per_pair=1,
+    )
+    reverse_output.evaluated.geometry.path_length_m.sum().backward()
+    assert reverse.geometry.path_length_m.grad is not None
+    assert torch.count_nonzero(reverse.geometry.path_length_m.grad).item() == 0
+
+    forward = _paths([True], tx_values=[3], rx_values=[0])
+    values = _continuous(forward)
+    with torch.autograd.forward_ad.dual_level():
+        dual_values = dict(values)
+        dual_values["path_length_m"] = torch.autograd.forward_ad.make_dual(
+            values["path_length_m"], torch.ones_like(values["path_length_m"])
+        )
+        forward_state = create_capacity_failure_state(forward.topology.valid)
+        forward_output = evaluated_paths_capacity_pack(
+            _with_continuous(forward, dual_values),
+            failure_state=forward_state,
+            pair_count=1,
+            num_tx=1,
+            num_rx=1,
+            path_capacity_per_pair=1,
+        )
+        _primal, tangent = torch.autograd.forward_ad.unpack_dual(
+            forward_output.evaluated.geometry.path_length_m
+        )
+        assert tangent is not None
+        assert torch.count_nonzero(tangent).item() == 0
 
 
 def test_capacity_pack_family_uses_shared_no_trap_helper_without_host_transfer() -> (
@@ -410,9 +454,9 @@ def test_capacity_pack_family_uses_shared_no_trap_helper_without_host_transfer()
     assert packer.index("evaluated_paths_capacity_init_kernel<<<") < packer.index(
         "deterministic_capacity_finalize_no_trap"
     )
-    assert packer.index("evaluated_paths_capacity_gather_kernel<<<") < packer.index(
-        "deterministic_capacity_trap(state"
-    )
+    assert "trap;" not in finalizer
+    assert "trap;" not in packer
+    assert "failure_state[0] != 0" in packer
     assert "if (!output.valid[destination])" in packer
     assert "if (!valid[destination])" in ad
     for source in (finalizer, packer, ad):

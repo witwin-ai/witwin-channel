@@ -41,10 +41,11 @@ suffixed facades are forbidden.
 
 `propagation.models.CapacityPathLayout` is the dormant typed contract for this
 layout. It carries host `pair_count` and `path_capacity_per_pair` metadata plus
-CUDA-resident row validity, per-pair counts, and overflow state. Construction
-is metadata-only and zero-copy; native producers own the numerical relationship
-among those device tensors. It is not a solver result or a live solver boundary
-until the ADR-029 atomic activation.
+the same runtime-owned `CapacityFailureState`, CUDA-resident row validity,
+per-pair counts, and typed local overflow state. Construction is metadata-only
+and zero-copy; native producers own the numerical relationship among those
+device tensors. It is not a solver result or a live solver boundary until the
+ADR-029 atomic activation.
 
 `propagation.topology.kernels.deterministic_capacity_finalize` is the dormant
 native index producer for the final all-component candidate list. It stable-
@@ -52,14 +53,14 @@ groups rows by the frozen receiver-major key `rx_id * num_tx + tx_id`, retains
 candidate order within each pair without truncation, and returns CUDA `int64`
 source indices plus `CapacityPathLayout`. Invalid candidates are poison-safe.
 Any per-pair overflow leaves every public index, validity bit, and count inert
-before the asynchronous device error.
+and atomically records its owned bit without trapping in the intermediate.
 
 `propagation.enumerated.capacity.evaluated_paths_capacity_pack` is the dormant
 complete-row producer layered on that same no-trap finalizer helper. One native
 initialization pass makes every topology, geometry, field, and layout slot
-canonical-inert; the stable finalizer runs without publishing an error; a
-valid-first CUDA gather copies successful rows; only then are public status and
-the final asynchronous trap published. Thus overflow or a bad valid ID cannot
+canonical-inert; the stable finalizer atomically records failure state without
+publishing an intermediate error, and a valid-first CUDA gather copies only
+successful rows. Thus overflow, an upstream failure, or a bad valid ID cannot
 expose partially gathered RF fields. Its native backward uses source-unique
 scatter and its JVP uses valid-first gather for all continuous geometry and
 real/complex field tensors; absent cotangents/tangents and invalid rows are
@@ -75,8 +76,9 @@ coupled candidate guardrail; public path capacity and path-selection policy do
 not participate. The producer freezes the historical 65,536-row R-D chunk
 order (`R-D` then `D-R` inside each chunk), places D-D after every R-D/D-R
 chunk, and keeps the ordered off-diagonal edge-pair sequence. Capacity overflow
-makes every discrete output inert and the device count zero before an
-asynchronous CUDA error. This producer has no AD surface and no live caller;
+atomically records the coupled bit and makes every discrete output inert with a
+zero device count; it never traps independently. This producer has no AD
+surface and no live caller;
 mask-aware composed geometry and field companions must exist before activation.
 
 `propagation.topology.kernels.reflection` owns the dormant post-RayD EPC
@@ -88,7 +90,8 @@ host-known theoretical EPC batch row count `N` (or an equivalent explicit
 upper bound), never the device-selected count or public
 `path_capacity_per_pair`. Invalid rows are tested before any resolved face,
 hit, receiver, or material payload is read. Overflow leaves the complete
-candidate block inert before the asynchronous device trap. The producer is
+candidate block inert and records the reflection bit without an intermediate
+trap. The producer is
 dormant; the existing compact operations remain the live owner until the
 atomic ADR-029 switch.
 

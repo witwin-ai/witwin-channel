@@ -7,6 +7,10 @@ import torch
 from witwin.channel_native.propagation.models.reflection import (
     ReflectionCandidateCapacity,
 )
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
@@ -94,6 +98,7 @@ def _validate_shared_device(
 
 def deterministic_reflection_candidate_capacity_block(
     *,
+    failure_state: CapacityFailureState,
     visible: torch.Tensor,
     epc_sequences: torch.Tensor,
     epc_hits: torch.Tensor,
@@ -178,10 +183,12 @@ def deterministic_reflection_candidate_capacity_block(
         ("face_gain", face_gain),
         ("face_material_id", face_material_id),
     ))
+    require_capacity_failure_state(failure_state, device=visible.device)
 
     raw = _required_native_op(
         "deterministic_reflection_candidate_capacity_block"
     )(
+        failure_state.bits,
         visible,
         epc_sequences,
         epc_hits,
@@ -205,6 +212,7 @@ def deterministic_reflection_candidate_capacity_block(
     return ReflectionCandidateCapacity(
         candidate_capacity=candidate_capacity,
         depth=depth,
+        failure_state=failure_state,
         **raw,
     )
 

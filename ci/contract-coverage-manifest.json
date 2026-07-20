@@ -23,6 +23,7 @@
     "native-bdpt-paths": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_endpoint_connection_samples_emit_native_connection_schema",
     "native-bdpt-sampling": "tests/kernels/test_bdpt_ops_facade.py::test_bdpt_launch_state_returns_stable_cuda_tensors",
     "native-bootstrap": "tests/kernels/test_extension_loading.py::test_missing_bootstrap_symbol_fails_before_any_computation",
+    "native-capacity-failure-state": "tests/runtime/test_capacity_failure_state.py::test_capacity_failure_state_is_native_zeroed_on_current_stream",
     "native-deterministic-accumulation": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_validity_masks_poison_rows",
     "native-deterministic-fields": "tests/kernels/test_ops_facade.py::test_deterministic_reflection_field_returns_native_complex_field",
     "native-deterministic-topology": "tests/kernels/test_ops_facade.py::test_deterministic_los_topology_block_compacts_and_fills_extended_fields",
@@ -70,6 +71,7 @@
     "bdpt-scattering": "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference",
     "bdpt-transmission": "tests/montecarlo/bdpt/test_transmission.py::test_bdpt_lossy_wall_transmission_power_ratio_matches_stack",
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
+    "capacity-failure-state": "tests/runtime/test_capacity_failure_state.py::test_capacity_failure_bits_accumulate_and_every_block_stays_inert",
     "deterministic-ad": "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
     "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
@@ -844,6 +846,15 @@
       "native-bootstrap",
       [
         "build-info"
+      ]
+    ],
+    [
+      "capacity_failure_state_create",
+      "witwin.channel_native.runtime.capacity.create_capacity_failure_state",
+      "native_call_site",
+      "native-capacity-failure-state",
+      [
+        "capacity-failure-state"
       ]
     ],
     [

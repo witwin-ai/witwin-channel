@@ -5,6 +5,7 @@
 #include <cuda_runtime_api.h>
 
 #include "../tensor_checks.h"
+#include "capacity_failure_state.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -78,6 +79,7 @@ __device__ __forceinline__ void copy_strided_vec3(
 }
 
 __global__ void diffraction_state_selection_flags_kernel(
+    const int *__restrict__ failure_state,
     const bool *__restrict__ active,
     int *__restrict__ flags,
     int64_t state_count) {
@@ -85,7 +87,7 @@ __global__ void diffraction_state_selection_flags_kernel(
     for (int64_t state = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          state < state_count;
          state += stride) {
-        flags[state] = active[state] ? 1 : 0;
+        flags[state] = failure_state[0] == 0 && active[state] ? 1 : 0;
     }
 }
 
@@ -125,6 +127,7 @@ __global__ void diffraction_state_selection_status_init_kernel(
 }
 
 __global__ void diffraction_state_selection_status_kernel(
+    int *__restrict__ failure_state,
     const int *__restrict__ flags,
     const int *__restrict__ offsets,
     int64_t state_count,
@@ -134,21 +137,32 @@ __global__ void diffraction_state_selection_status_kernel(
     if (blockIdx.x != 0 || threadIdx.x != 0) {
         return;
     }
+    if (failure_state[0] != 0) {
+        actual_count[0] = 0;
+        overflow[0] = false;
+        return;
+    }
     const int last = static_cast<int>(state_count - 1);
     const int selected_count = offsets[last] + flags[last];
     const bool did_overflow = selected_count > capacity;
     actual_count[0] = did_overflow ? 0 : selected_count;
     overflow[0] = did_overflow;
+    if (did_overflow) {
+        atomicOr(
+            failure_state,
+            channel_native::capacity::kDiffractionStateOverflow);
+    }
 }
 
 __global__ void diffraction_state_capacity_gather_kernel(
+    const int *__restrict__ failure_state,
     const bool *__restrict__ active,
     const int *__restrict__ offsets,
     const bool *__restrict__ overflow,
     DiffractionStateInputView input,
     DiffractionStateOutputView output,
     int64_t state_count) {
-    if (overflow[0]) {
+    if (failure_state[0] != 0 || overflow[0]) {
         return;
     }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -207,13 +221,8 @@ __global__ void diffraction_state_capacity_gather_kernel(
     }
 }
 
-__global__ void diffraction_state_selection_overflow_kernel(
-    const bool *__restrict__ overflow) {
-    if (blockIdx.x == 0 && threadIdx.x == 0 && overflow[0]) {
-        asm volatile("trap;");
-    }
-}
 std::vector<at::Tensor> diffraction_state_capacity_select_cuda_impl(
+    at::Tensor failure_state,
     at::Tensor active,
     at::Tensor edge_index,
     at::Tensor edge_position,
@@ -229,6 +238,7 @@ std::vector<at::Tensor> diffraction_state_capacity_select_cuda_impl(
     at::Tensor source_power,
     int64_t state_capacity) {
     check_tensor(active, "active", at::kBool, 1);
+    channel_native::capacity::validate_failure_state(failure_state, active);
     const auto check_state_tensor = [&active](
                                       const at::Tensor& tensor,
                                       const char *name,
@@ -357,7 +367,10 @@ std::vector<at::Tensor> diffraction_state_capacity_select_cuda_impl(
             (state_count + kDiffractionBlockSize - 1) / kDiffractionBlockSize);
         diffraction_state_selection_flags_kernel<<<
             state_blocks, kDiffractionBlockSize, 0, stream>>>(
-            active.data_ptr<bool>(), flags.data_ptr<int>(), state_count);
+            failure_state.data_ptr<int>(),
+            active.data_ptr<bool>(),
+            flags.data_ptr<int>(),
+            state_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
         size_t scratch_bytes = 0;
@@ -380,6 +393,7 @@ std::vector<at::Tensor> diffraction_state_capacity_select_cuda_impl(
             stream));
 
         diffraction_state_selection_status_kernel<<<1, 1, 0, stream>>>(
+            failure_state.data_ptr<int>(),
             flags.data_ptr<int>(),
             offsets.data_ptr<int>(),
             state_count,
@@ -389,15 +403,13 @@ std::vector<at::Tensor> diffraction_state_capacity_select_cuda_impl(
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         diffraction_state_capacity_gather_kernel<<<
             state_blocks, kDiffractionBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(),
             active.data_ptr<bool>(),
             offsets.data_ptr<int>(),
             overflow.data_ptr<bool>(),
             input_view,
             output_view,
             state_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-        diffraction_state_selection_overflow_kernel<<<1, 1, 0, stream>>>(
-            overflow.data_ptr<bool>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
@@ -423,6 +435,7 @@ std::vector<at::Tensor> diffraction_state_capacity_select_cuda_impl(
 }  // namespace
 
 std::vector<at::Tensor> cn_deterministic_diffraction_state_capacity_select_cuda(
+    at::Tensor failure_state,
     at::Tensor active,
     at::Tensor edge_index,
     at::Tensor edge_position,
@@ -438,6 +451,7 @@ std::vector<at::Tensor> cn_deterministic_diffraction_state_capacity_select_cuda(
     at::Tensor source_power,
     int64_t state_capacity) {
     return diffraction_state_capacity_select_cuda_impl(
+        failure_state,
         active,
         edge_index,
         edge_position,

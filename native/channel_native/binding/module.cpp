@@ -3,6 +3,7 @@
 PYBIND11_MODULE(_channel_native, module) {
     module.doc() = "Channel Native Torch/CUDA extension.";
     register_build(module);
+    register_runtime(module);
     register_bdpt_subpaths(module);
     register_materials(module);
     register_bdpt_connections(module);

@@ -6,6 +6,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "capacity_failure_state.h"
 #include "deterministic_capacity_finalize.h"
 
 #include <cstdint>
@@ -30,6 +31,7 @@ __global__ void capacity_finalize_pair_state_init_kernel(
 }
 
 __global__ void capacity_finalize_keys_kernel(
+    int *__restrict__ failure_state,
     const bool *__restrict__ valid,
     const int *__restrict__ tx_id,
     const int *__restrict__ rx_id,
@@ -45,6 +47,10 @@ __global__ void capacity_finalize_keys_kernel(
          row < candidate_count;
          row += stride) {
         row_index[row] = row;
+        if (failure_state[0] != 0) {
+            pair_key[row] = pair_count;
+            continue;
+        }
         // Invalid rows are canonical poison lanes. Do not read either endpoint id.
         if (!valid[row]) {
             pair_key[row] = pair_count;
@@ -56,6 +62,9 @@ __global__ void capacity_finalize_keys_kernel(
             rx < 0 || static_cast<int64_t>(rx) >= num_rx) {
             pair_key[row] = pair_count;
             atomicExch(contract_error, 1);
+            atomicOr(
+                failure_state,
+                channel_native::capacity::kPairContractError);
             continue;
         }
         pair_key[row] = static_cast<int64_t>(rx) * num_tx + tx;
@@ -63,11 +72,15 @@ __global__ void capacity_finalize_keys_kernel(
 }
 
 __global__ void capacity_finalize_count_kernel(
+    const int *__restrict__ failure_state,
     const int64_t *__restrict__ sorted_pair_key,
     int *__restrict__ pair_counts,
     int *__restrict__ pair_start,
     int64_t candidate_count,
     int64_t pair_count) {
+    if (failure_state[0] != 0) {
+        return;
+    }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t position = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          position < candidate_count;
@@ -82,16 +95,23 @@ __global__ void capacity_finalize_count_kernel(
 }
 
 __global__ void capacity_finalize_overflow_kernel(
+    int *__restrict__ failure_state,
     const int *__restrict__ pair_counts,
     int *__restrict__ overflow,
     int64_t pair_count,
     int64_t path_capacity_per_pair) {
+    if (failure_state[0] != 0) {
+        return;
+    }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          pair < pair_count;
          pair += stride) {
         if (static_cast<int64_t>(pair_counts[pair]) > path_capacity_per_pair) {
             atomicExch(overflow, 1);
+            atomicOr(
+                failure_state,
+                channel_native::capacity::kPairCapacityOverflow);
         }
     }
 }
@@ -105,12 +125,13 @@ __global__ void capacity_finalize_public_status_kernel(
 }
 
 __global__ void capacity_finalize_materialize_counts_kernel(
+    const int *__restrict__ failure_state,
     const int *__restrict__ pair_counts,
     const int *__restrict__ overflow,
     const int *__restrict__ contract_error,
     int *__restrict__ num_paths,
     int64_t pair_count) {
-    if (overflow[0] || contract_error[0]) {
+    if (failure_state[0] != 0 || overflow[0] || contract_error[0]) {
         return;
     }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -122,6 +143,7 @@ __global__ void capacity_finalize_materialize_counts_kernel(
 }
 
 __global__ void capacity_finalize_materialize_rows_kernel(
+    const int *__restrict__ failure_state,
     const int64_t *__restrict__ sorted_pair_key,
     const int64_t *__restrict__ sorted_row_index,
     const int *__restrict__ pair_start,
@@ -132,7 +154,7 @@ __global__ void capacity_finalize_materialize_rows_kernel(
     int64_t candidate_count,
     int64_t pair_count,
     int64_t path_capacity_per_pair) {
-    if (overflow[0] || contract_error[0]) {
+    if (failure_state[0] != 0 || overflow[0] || contract_error[0]) {
         return;
     }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -147,15 +169,6 @@ __global__ void capacity_finalize_materialize_rows_kernel(
         const int64_t destination = pair * path_capacity_per_pair + rank;
         selected_row_index[destination] = sorted_row_index[position];
         output_valid[destination] = true;
-    }
-}
-
-__global__ void capacity_finalize_trap_kernel(
-    const int *__restrict__ overflow,
-    const int *__restrict__ contract_error) {
-    if (blockIdx.x == 0 && threadIdx.x == 0 &&
-        (overflow[0] || contract_error[0])) {
-        asm volatile("trap;");
     }
 }
 
@@ -213,6 +226,7 @@ int64_t channel_native::capacity::deterministic_capacity_validate(
 
 channel_native::capacity::FinalizeState
 channel_native::capacity::deterministic_capacity_finalize_no_trap(
+    at::Tensor failure_state,
     at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
@@ -224,6 +238,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
     at::Tensor output_valid,
     at::Tensor num_paths,
     bool initialize_public_outputs) {
+    validate_failure_state(failure_state, valid);
     const int64_t candidate_count = valid.size(0);
     const int device = valid.get_device();
     const int64_t row_capacity = pair_count * path_capacity_per_pair;
@@ -290,6 +305,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
         auto sorted_row_index = at::empty({candidate_count}, long_options);
         capacity_finalize_keys_kernel<<<
             launch_blocks(candidate_count), kCapacityFinalizeBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(),
             valid.data_ptr<bool>(),
             tx_id.data_ptr<int>(),
             rx_id.data_ptr<int>(),
@@ -330,6 +346,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
 
         capacity_finalize_count_kernel<<<
             launch_blocks(candidate_count), kCapacityFinalizeBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(),
             sorted_pair_key.data_ptr<int64_t>(),
             pair_counts.data_ptr<int>(),
             pair_start.data_ptr<int>(),
@@ -339,6 +356,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
         if (pair_count > 0) {
             capacity_finalize_overflow_kernel<<<
                 launch_blocks(pair_count), kCapacityFinalizeBlockSize, 0, stream>>>(
+                failure_state.data_ptr<int>(),
                 pair_counts.data_ptr<int>(),
                 overflow_flag.data_ptr<int>(),
                 pair_count,
@@ -346,6 +364,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
             C10_CUDA_KERNEL_LAUNCH_CHECK();
             capacity_finalize_materialize_counts_kernel<<<
                 launch_blocks(pair_count), kCapacityFinalizeBlockSize, 0, stream>>>(
+                failure_state.data_ptr<int>(),
                 pair_counts.data_ptr<int>(),
                 overflow_flag.data_ptr<int>(),
                 contract_error.data_ptr<int>(),
@@ -356,6 +375,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
         if (row_capacity > 0) {
             capacity_finalize_materialize_rows_kernel<<<
                 launch_blocks(candidate_count), kCapacityFinalizeBlockSize, 0, stream>>>(
+                failure_state.data_ptr<int>(),
                 sorted_pair_key.data_ptr<int64_t>(),
                 sorted_row_index.data_ptr<int64_t>(),
                 pair_start.data_ptr<int>(),
@@ -371,6 +391,7 @@ channel_native::capacity::deterministic_capacity_finalize_no_trap(
     }
 
     return {
+        failure_state,
         selected_row_index,
         output_valid,
         num_paths,
@@ -392,15 +413,8 @@ void channel_native::capacity::deterministic_capacity_publish_status(
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
-void channel_native::capacity::deterministic_capacity_trap(
-    const FinalizeState& state,
-    cudaStream_t stream) {
-    capacity_finalize_trap_kernel<<<1, 1, 0, stream>>>(
-        state.overflow_flag.data_ptr<int>(), state.contract_error.data_ptr<int>());
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
-}
-
 pybind11::dict cn_deterministic_capacity_finalize(
+    at::Tensor failure_state,
     at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
@@ -422,6 +436,7 @@ pybind11::dict cn_deterministic_capacity_finalize(
     auto num_paths = at::empty({pair_count}, valid.options().dtype(at::kInt));
     auto overflow = at::empty({1}, valid.options().dtype(at::kBool));
     auto state = channel_native::capacity::deterministic_capacity_finalize_no_trap(
+        failure_state,
         valid,
         tx_id,
         rx_id,
@@ -436,7 +451,6 @@ pybind11::dict cn_deterministic_capacity_finalize(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(valid.get_device()).stream();
     channel_native::capacity::deterministic_capacity_publish_status(
         state, overflow, stream);
-    channel_native::capacity::deterministic_capacity_trap(state, stream);
 
     pybind11::dict result;
     result["selected_row_index"] = selected_row_index;

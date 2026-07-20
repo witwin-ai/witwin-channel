@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 import torch
 
 from witwin.channel_native.propagation.models import CoupledCandidateCapacity
 from witwin.channel_native.propagation.topology.kernels import coupled
+from witwin.channel_native.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -30,6 +32,7 @@ def _block(
     rx_id_offset: int = 0,
     capacity: int | None = None,
     candidate_limit: int = 1_000_000,
+    failure_state: CapacityFailureState | None = None,
 ) -> CoupledCandidateCapacity:
     theoretical = _theoretical(
         tx_count,
@@ -37,9 +40,13 @@ def _block(
         int(representative_faces.shape[0]),
         int(selected_edges.shape[0]),
     )
+    failure_state = failure_state or create_capacity_failure_state(
+        representative_faces
+    )
     return coupled.coupled_candidate_capacity_block(
         representative_faces,
         selected_edges,
+        failure_state=failure_state,
         tx_count=tx_count,
         rx_count=rx_count,
         rx_id_offset=rx_id_offset,
@@ -220,46 +227,29 @@ def test_coupled_candidate_capacity_has_no_fallback(monkeypatch) -> None:
         _block(faces, edges, tx_count=1, rx_count=1)
 
 
-def test_coupled_candidate_capacity_overflow_is_inert_and_async() -> None:
-    script = r"""
-import torch
-from witwin.channel_native.propagation.topology.kernels.coupled import (
-    coupled_candidate_capacity_block,
-)
+def test_coupled_candidate_capacity_overflow_sets_state_and_is_inert() -> None:
+    faces = torch.tensor([5], device="cuda", dtype=torch.int32)
+    edges = torch.tensor([7, 9], device="cuda", dtype=torch.int32)
+    failure_state = create_capacity_failure_state(faces)
 
-block = coupled_candidate_capacity_block(
-    torch.tensor([5], device="cuda", dtype=torch.int32),
-    torch.tensor([7, 9], device="cuda", dtype=torch.int32),
-    tx_count=1,
-    rx_count=1,
-    rx_id_offset=0,
-    candidate_capacity=5,
-    candidate_limit=100,
-)
-assert block.valid.shape == (5,)
-assert block.candidate_count.shape == (1,)
-assert block.overflow.shape == (1,)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous coupled candidate capacity overflow")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
+    block = _block(
+        faces,
+        edges,
+        tx_count=1,
+        rx_count=1,
+        capacity=5,
+        candidate_limit=100,
+        failure_state=failure_state,
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    assert block.failure_state is failure_state
+    assert failure_state.bits.tolist() == [
+        int(CapacityFailureBit.COUPLED_CANDIDATE_OVERFLOW)
+    ]
+    assert block.candidate_count.tolist() == [0]
+    assert block.overflow.tolist() == [True]
+    assert block.valid.tolist() == [False] * 5
+    assert block.tx_id.tolist() == [-1] * 5
 
 
 def test_coupled_candidate_capacity_source_has_no_host_transfer_or_public_cap() -> None:
@@ -283,4 +273,5 @@ def test_coupled_candidate_capacity_source_has_no_host_transfer_or_public_cap() 
     for forbidden in ("torch.arange", "torch.div", "torch.remainder", "torch.where"):
         assert forbidden not in facade
     assert "kRdChunkSize = 65'536" in native
-    assert "coupled_candidate_capacity_trap_kernel<<<" in native
+    assert "trap;" not in native
+    assert "atomicOr" in native

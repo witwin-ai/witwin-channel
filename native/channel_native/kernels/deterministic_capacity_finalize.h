@@ -6,6 +6,7 @@
 namespace channel_native::capacity {
 
 struct FinalizeState {
+    at::Tensor failure_state;
     at::Tensor selected_row_index;
     at::Tensor valid;
     at::Tensor num_paths;
@@ -23,6 +24,7 @@ int64_t deterministic_capacity_validate(
     int64_t path_capacity_per_pair);
 
 FinalizeState deterministic_capacity_finalize_no_trap(
+    at::Tensor failure_state,
     at::Tensor candidate_valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
@@ -38,10 +40,6 @@ FinalizeState deterministic_capacity_finalize_no_trap(
 void deterministic_capacity_publish_status(
     const FinalizeState& state,
     at::Tensor overflow,
-    cudaStream_t stream);
-
-void deterministic_capacity_trap(
-    const FinalizeState& state,
     cudaStream_t stream);
 
 }  // namespace channel_native::capacity

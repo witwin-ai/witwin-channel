@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 import torch
 
 from witwin.channel_native.propagation.topology.kernels import primitives
+from witwin.channel_native.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -39,8 +41,11 @@ def _select(
     active: torch.Tensor,
     states: tuple[torch.Tensor, ...],
     capacity: int,
+    failure_state: CapacityFailureState | None = None,
 ) -> primitives.DiffractionStateCapacityBlock:
+    failure_state = failure_state or create_capacity_failure_state(active)
     return primitives.deterministic_diffraction_state_capacity_select(
+        failure_state=failure_state,
         active=active,
         edge_index=states[0],
         edge_position=states[1],
@@ -168,54 +173,19 @@ def test_diffraction_state_capacity_select_accepts_strided_inputs_and_stream() -
     torch.testing.assert_close(block.edge_position, states[1][[1, 3]])
 
 
-def test_diffraction_state_capacity_overflow_fails_asynchronously_in_subprocess() -> (
-    None
-):
-    script = r"""
-import torch
-from witwin.channel_native.propagation.topology.kernels import primitives
+def test_diffraction_state_capacity_overflow_sets_state_and_is_inert() -> None:
+    active = torch.ones((3,), device="cuda", dtype=torch.bool)
+    failure_state = create_capacity_failure_state(active)
 
-n = 3
-rows = torch.arange(n, device="cuda", dtype=torch.float32)
-vec = torch.stack((rows, rows + 1, rows + 2), dim=1)
-block = primitives.deterministic_diffraction_state_capacity_select(
-    active=torch.ones((n,), device="cuda", dtype=torch.bool),
-    edge_index=torch.arange(n, device="cuda", dtype=torch.int32),
-    edge_position=vec,
-    edge_direction=vec,
-    edge_t_min=rows,
-    edge_t_max=rows,
-    n0=vec,
-    n1=vec,
-    prim0=torch.arange(n, device="cuda", dtype=torch.int32),
-    prim1=torch.arange(n, device="cuda", dtype=torch.int32),
-    exterior_angle=rows,
-    source=vec,
-    source_power=rows,
-    state_capacity=2,
-)
-assert block.edge_index.shape == (2,)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous diffraction capacity overflow")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
-    )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    block = _select(active, _states(3), 2, failure_state)
+
+    assert failure_state.bits.tolist() == [
+        int(CapacityFailureBit.DIFFRACTION_STATE_OVERFLOW)
+    ]
+    assert block.actual_count.tolist() == [0]
+    assert block.overflow.tolist() == [True]
+    assert block.valid.tolist() == [False, False]
+    assert block.edge_index.tolist() == [-1, -1]
 
 
 def test_diffraction_state_capacity_selector_has_no_host_count_transfer() -> None:
@@ -233,3 +203,4 @@ def test_diffraction_state_capacity_selector_has_no_host_count_transfer() -> Non
         ".cpu",
     ):
         assert forbidden not in source
+    assert "trap;" not in source

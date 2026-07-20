@@ -7,6 +7,13 @@ identity, tensor/AD call contracts, native buffers, and pure-stdlib native
 handle normalization. It does not own solver policy, scene construction,
 materials, propagation algorithms, or RF numerical kernels.
 
+`runtime.capacity.CapacityFailureState` owns the ADR-029 transaction failure
+protocol. Native creation asynchronously zeros one contiguous CUDA `int32[1]`
+bitmask on the caller's current stream. Capacity producers receive and retain
+the same typed object/storage, atomically OR owner-specific bits, and never read
+the state on the host. Intermediates do not trap; the solve/result boundary owns
+the single terminal failure observation.
+
 ## Public entry points
 
 The stable root entry is `witwin.channel_native.build_info`. `runtime.__all__`

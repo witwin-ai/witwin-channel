@@ -18,6 +18,10 @@ from witwin.channel_native.runtime.autograd_contracts import (
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 
 
@@ -120,8 +124,10 @@ class _EvaluatedPathsCapacityPackFunction(torch.autograd.Function):
     @staticmethod
     def forward(*inputs):
         tensors = inputs[:22]
-        pair_count, num_tx, num_rx, capacity = inputs[22:]
+        pair_count, num_tx, num_rx, capacity = inputs[22:26]
+        failure_state_bits = inputs[26]
         raw = _required_native_op("evaluated_paths_capacity_pack")(
+            failure_state_bits,
             *tensors,
             int(pair_count),
             int(num_tx),
@@ -148,7 +154,7 @@ class _EvaluatedPathsCapacityPackFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
-        none_grads = (None,) * 26
+        none_grads = (None,) * 27
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
             return none_grads
@@ -172,6 +178,7 @@ class _EvaluatedPathsCapacityPackFunction(torch.autograd.Function):
                 raw[name] if ctx.needs_input_grad[index] else None
                 for index, name in enumerate(_CONTINUOUS_FIELDS, start=11)
             ),
+            None,
             None,
             None,
             None,
@@ -207,6 +214,7 @@ class _EvaluatedPathsCapacityPackFunction(torch.autograd.Function):
 def _contract_from_outputs(
     outputs: tuple[torch.Tensor, ...],
     *,
+    failure_state: CapacityFailureState,
     pair_count: int,
     path_capacity_per_pair: int,
 ) -> CapacityEvaluatedPaths:
@@ -246,6 +254,7 @@ def _contract_from_outputs(
         layout=CapacityPathLayout(
             pair_count=pair_count,
             path_capacity_per_pair=path_capacity_per_pair,
+            failure_state=failure_state,
             valid=topology.valid,
             num_paths=raw["num_paths"],
             overflow=raw["overflow"],
@@ -260,6 +269,7 @@ def _contract_from_outputs(
 def evaluated_paths_capacity_pack(
     paths: EvaluatedPaths,
     *,
+    failure_state: CapacityFailureState,
     pair_count: int,
     num_tx: int,
     num_rx: int,
@@ -274,15 +284,18 @@ def evaluated_paths_capacity_pack(
         num_rx=num_rx,
         path_capacity_per_pair=path_capacity_per_pair,
     )
+    require_capacity_failure_state(failure_state, device=tensors[0].device)
     outputs = _EvaluatedPathsCapacityPackFunction.apply(
         *tensors,
         pair_count,
         num_tx,
         num_rx,
         path_capacity_per_pair,
+        failure_state.bits,
     )
     return _contract_from_outputs(
         outputs,
+        failure_state=failure_state,
         pair_count=pair_count,
         path_capacity_per_pair=path_capacity_per_pair,
     )

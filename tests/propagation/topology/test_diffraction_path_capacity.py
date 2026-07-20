@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 import torch
 
 from witwin.channel_native.propagation.topology.kernels import compaction
+from witwin.channel_native.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -40,6 +42,18 @@ def _inputs(valid_values: tuple[bool, ...]) -> dict[str, torch.Tensor]:
     }
 
 
+def _produce(
+    inputs: dict[str, torch.Tensor],
+    *,
+    output_capacity: int,
+    failure_state: CapacityFailureState | None = None,
+) -> compaction.DiffractionOrder1CapacityBlock:
+    failure_state = failure_state or create_capacity_failure_state(inputs["valid"])
+    return compaction.deterministic_diffraction_order1_capacity_block(
+        failure_state=failure_state, **inputs, output_capacity=output_capacity
+    )
+
+
 @pytest.mark.parametrize(
     ("valid_values", "output_capacity", "expected_rows"),
     (
@@ -55,9 +69,7 @@ def test_diffraction_order1_capacity_block_is_stable_and_canonical(
 ) -> None:
     inputs = _inputs(valid_values)
 
-    block = compaction.deterministic_diffraction_order1_capacity_block(
-        **inputs, output_capacity=output_capacity
-    )
+    block = _produce(inputs, output_capacity=output_capacity)
 
     selected_count = len(expected_rows)
     assert block.valid.tolist() == [True] * selected_count + [False] * (
@@ -110,9 +122,7 @@ def test_diffraction_order1_capacity_block_is_stable_and_canonical(
 
 
 def test_diffraction_order1_capacity_block_handles_empty_input_and_capacity() -> None:
-    block = compaction.deterministic_diffraction_order1_capacity_block(
-        **_inputs(()), output_capacity=0
-    )
+    block = _produce(_inputs(()), output_capacity=0)
 
     assert block.valid.shape == (0,)
     assert block.interaction_position.shape == (0, 3)
@@ -125,9 +135,7 @@ def test_diffraction_order1_capacity_block_uses_nondefault_stream() -> None:
     stream = torch.cuda.Stream()
 
     with torch.cuda.stream(stream):
-        block = compaction.deterministic_diffraction_order1_capacity_block(
-            **inputs, output_capacity=3
-        )
+        block = _produce(inputs, output_capacity=3)
     stream.synchronize()
 
     assert block.rx_id.tolist() == [11, 12, -1]
@@ -153,9 +161,7 @@ def test_diffraction_order1_capacity_block_never_reads_invalid_poison() -> None:
         dtype=torch.float32,
     )
 
-    block = compaction.deterministic_diffraction_order1_capacity_block(
-        **inputs, output_capacity=3
-    )
+    block = _produce(inputs, output_capacity=3)
 
     assert block.valid.tolist() == [True, True, False]
     assert block.rx_id.tolist() == [10, 12, -1]
@@ -175,57 +181,34 @@ def test_diffraction_order1_capacity_block_never_reads_invalid_poison() -> None:
     assert torch.count_nonzero(block.interaction_position[2]).item() == 0
 
 
-@pytest.mark.parametrize("failure", ("overflow", "count_mismatch"))
-def test_diffraction_order1_capacity_failure_is_asynchronous_in_subprocess(
-    failure: str,
-) -> None:
-    script = f"""
-import torch
-from witwin.channel_native.propagation.topology.kernels import compaction
-
-n = 3
-rows = torch.arange(n, device="cuda", dtype=torch.float32)
-vec = torch.stack((rows, rows + 1, rows + 2), dim=1)
-reported_count = 2 if {failure!r} == "count_mismatch" else 3
-output_capacity = 3 if {failure!r} == "count_mismatch" else 2
-block = compaction.deterministic_diffraction_order1_capacity_block(
-    count=torch.tensor([reported_count], device="cuda", dtype=torch.int32),
-    valid=torch.ones((n,), device="cuda", dtype=torch.bool),
-    rx_id=torch.arange(n, device="cuda", dtype=torch.int32),
-    depth=torch.ones((n,), device="cuda", dtype=torch.int32),
-    edge_id=torch.arange(n, device="cuda", dtype=torch.int32),
-    delay_s=rows,
-    x_re=rows,
-    x_im=rows,
-    y_re=rows,
-    y_im=rows,
-    z_re=rows,
-    z_im=rows,
-    interaction_position=vec,
-    output_capacity=output_capacity,
+@pytest.mark.parametrize(
+    ("failure", "bit"),
+    (
+        ("overflow", CapacityFailureBit.DIFFRACTION_PATH_OVERFLOW),
+        ("count_mismatch", CapacityFailureBit.DIFFRACTION_PATH_CONTRACT_ERROR),
+    ),
 )
-assert block.valid.shape == (output_capacity,)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous diffraction path capacity failure")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
+def test_diffraction_order1_capacity_failure_sets_state_and_is_inert(
+    failure: str, bit: CapacityFailureBit
+) -> None:
+    inputs = _inputs((True, True, True))
+    inputs["count"] = torch.tensor(
+        [2 if failure == "count_mismatch" else 3],
+        device="cuda",
+        dtype=torch.int32,
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
+    output_capacity = 3 if failure == "count_mismatch" else 2
+    failure_state = create_capacity_failure_state(inputs["valid"])
+
+    block = _produce(
+        inputs, output_capacity=output_capacity, failure_state=failure_state
     )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    assert failure_state.bits.tolist() == [int(bit)]
+    assert block.num_paths.tolist() == [0]
+    assert block.overflow.tolist() == [True]
+    assert block.valid.tolist() == [False] * output_capacity
+    assert block.rx_id.tolist() == [-1] * output_capacity
 
 
 def test_diffraction_order1_capacity_owner_has_no_host_count_transfer() -> None:
@@ -241,7 +224,5 @@ def test_diffraction_order1_capacity_owner_has_no_host_count_transfer() -> None:
     assert source.index("diffraction_path_capacity_init_kernel<<<") < source.index(
         "diffraction_path_capacity_status_kernel<<<"
     )
-    assert source.index("diffraction_path_capacity_gather_kernel<<<") < source.index(
-        "diffraction_path_capacity_overflow_kernel<<<"
-    )
-    assert "if (overflow[0])" in source
+    assert "trap;" not in source
+    assert "failure_state[0] != 0" in source

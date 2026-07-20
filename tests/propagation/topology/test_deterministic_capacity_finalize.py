@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 import torch
 
 from witwin.channel_native.propagation.models import CapacityPathSelection
 from witwin.channel_native.propagation.topology.kernels import compaction
+from witwin.channel_native.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import required_symbol
 
 
@@ -27,8 +29,11 @@ def _finalize(
     num_tx: int,
     num_rx: int,
     capacity: int,
+    failure_state: CapacityFailureState | None = None,
 ) -> CapacityPathSelection:
+    failure_state = failure_state or create_capacity_failure_state(valid)
     return compaction.deterministic_capacity_finalize(
+        failure_state=failure_state,
         valid=valid,
         tx_id=tx_id,
         rx_id=rx_id,
@@ -211,8 +216,10 @@ def test_native_capacity_finalize_rejects_negative_metadata_before_allocation(
     empty_bool = torch.empty(0, device="cuda", dtype=torch.bool)
     empty_int = torch.empty(0, device="cuda", dtype=torch.int32)
     native = required_symbol("deterministic_capacity_finalize")
+    failure_state = create_capacity_failure_state(empty_bool)
     with pytest.raises(RuntimeError, match=message):
         native(
+            failure_state.bits,
             empty_bool,
             empty_int,
             empty_int,
@@ -223,86 +230,51 @@ def test_native_capacity_finalize_rejects_negative_metadata_before_allocation(
         )
 
 
-def test_capacity_finalize_overflow_fails_asynchronously_in_subprocess() -> None:
-    script = r"""
-import torch
-from witwin.channel_native.propagation.topology.kernels import compaction
+def test_capacity_finalize_overflow_sets_state_and_returns_inert() -> None:
+    valid = torch.ones(3, device="cuda", dtype=torch.bool)
+    failure_state = create_capacity_failure_state(valid)
 
-selection = compaction.deterministic_capacity_finalize(
-    valid=torch.ones(3, device="cuda", dtype=torch.bool),
-    tx_id=torch.zeros(3, device="cuda", dtype=torch.int32),
-    rx_id=torch.zeros(3, device="cuda", dtype=torch.int32),
-    pair_count=1,
-    num_tx=1,
-    num_rx=1,
-    path_capacity_per_pair=2,
-)
-assert selection.selected_row_index.shape == (2,)
-assert selection.valid.shape == (2,)
-assert selection.num_paths.shape == (1,)
-assert selection.overflow.shape == (1,)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous deterministic capacity overflow")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
+    selection = _finalize(
+        valid,
+        torch.zeros(3, device="cuda", dtype=torch.int32),
+        torch.zeros(3, device="cuda", dtype=torch.int32),
+        pair_count=1,
+        num_tx=1,
+        num_rx=1,
+        capacity=2,
+        failure_state=failure_state,
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    assert failure_state.bits.tolist() == [
+        int(CapacityFailureBit.PAIR_CAPACITY_OVERFLOW)
+    ]
+    assert selection.layout.failure_state is failure_state
+    assert selection.selected_row_index.tolist() == [-1, -1]
+    assert selection.valid.tolist() == [False, False]
+    assert selection.num_paths.tolist() == [0]
+    assert selection.overflow.tolist() == [True]
 
 
-def test_capacity_finalize_valid_bad_id_fails_asynchronously_in_subprocess() -> None:
-    script = r"""
-import torch
-from witwin.channel_native.propagation.topology.kernels import compaction
+def test_capacity_finalize_valid_bad_id_sets_state_and_returns_inert() -> None:
+    valid = torch.tensor([True, False], device="cuda", dtype=torch.bool)
+    failure_state = create_capacity_failure_state(valid)
 
-selection = compaction.deterministic_capacity_finalize(
-    valid=torch.tensor([True, False], device="cuda", dtype=torch.bool),
-    tx_id=torch.tensor([2, -2147483648], device="cuda", dtype=torch.int32),
-    rx_id=torch.tensor([0, -2147483648], device="cuda", dtype=torch.int32),
-    pair_count=1,
-    num_tx=1,
-    num_rx=1,
-    path_capacity_per_pair=2,
-)
-assert selection.selected_row_index.shape == (2,)
-assert selection.valid.shape == (2,)
-assert selection.num_paths.shape == (1,)
-assert selection.overflow.shape == (1,)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous endpoint-id contract error")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
+    selection = _finalize(
+        valid,
+        torch.tensor([2, -2147483648], device="cuda", dtype=torch.int32),
+        torch.tensor([0, -2147483648], device="cuda", dtype=torch.int32),
+        pair_count=1,
+        num_tx=1,
+        num_rx=1,
+        capacity=2,
+        failure_state=failure_state,
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    assert failure_state.bits.tolist() == [int(CapacityFailureBit.PAIR_CONTRACT_ERROR)]
+    assert selection.selected_row_index.tolist() == [-1, -1]
+    assert selection.valid.tolist() == [False, False]
+    assert selection.num_paths.tolist() == [0]
+    assert selection.overflow.tolist() == [False]
 
 
 def test_capacity_finalize_has_no_host_count_transfer_or_atomic_rank() -> None:
@@ -317,4 +289,5 @@ def test_capacity_finalize_has_no_host_count_transfer_or_atomic_rank() -> None:
         assert forbidden not in source
     assert "DeviceRadixSort::SortPairs" in source
     assert "position - pair_start[pair]" in source
-    assert "if (overflow[0] || contract_error[0])" in source
+    assert "trap;" not in source
+    assert "failure_state[0] != 0" in source

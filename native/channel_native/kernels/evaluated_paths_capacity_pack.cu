@@ -128,11 +128,12 @@ __global__ void evaluated_paths_capacity_init_kernel(
 __global__ void evaluated_paths_capacity_gather_kernel(
     PackInput input,
     PackOutput output,
+    const int *__restrict__ failure_state,
     const int *__restrict__ overflow_flag,
     const int *__restrict__ contract_error,
     int64_t row_capacity,
     int64_t sequence_width) {
-    if (overflow_flag[0] || contract_error[0]) {
+    if (failure_state[0] != 0 || overflow_flag[0] || contract_error[0]) {
         return;
     }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -208,6 +209,7 @@ void check_row_tensor(
 }  // namespace
 
 pybind11::dict cn_evaluated_paths_capacity_pack(
+    at::Tensor failure_state,
     at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
@@ -366,6 +368,7 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
         output, row_capacity, pair_count, sequence_width);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     auto state = channel_native::capacity::deterministic_capacity_finalize_no_trap(
+        failure_state,
         valid,
         tx_id,
         rx_id,
@@ -382,6 +385,7 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
             launch_blocks(row_capacity), kPackBlockSize, 0, stream>>>(
             input,
             output,
+            state.failure_state.data_ptr<int>(),
             state.overflow_flag.data_ptr<int>(),
             state.contract_error.data_ptr<int>(),
             row_capacity,
@@ -390,7 +394,6 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
     }
     channel_native::capacity::deterministic_capacity_publish_status(
         state, overflow, stream);
-    channel_native::capacity::deterministic_capacity_trap(state, stream);
 
     pybind11::dict result;
     result["selected_row_index"] = selected_row_index;

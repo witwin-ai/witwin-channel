@@ -5,6 +5,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "capacity_failure_state.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -29,6 +30,7 @@ struct CandidateOutput {
 };
 
 __global__ void coupled_candidate_capacity_kernel(
+    int *__restrict__ failure_state,
     const int *__restrict__ representative_faces,
     const int *__restrict__ selected_edges,
     CandidateOutput output,
@@ -41,6 +43,7 @@ __global__ void coupled_candidate_capacity_kernel(
     int64_t theoretical_candidate_count,
     int64_t candidate_capacity,
     bool capacity_overflow) {
+    const bool blocked = failure_state[0] != 0 || capacity_overflow;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t slot = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          slot < candidate_capacity;
@@ -52,7 +55,7 @@ __global__ void coupled_candidate_capacity_kernel(
         output.face_id[slot] = -1;
         output.edge1_id[slot] = -1;
         output.edge2_id[slot] = -1;
-        if (capacity_overflow || slot >= theoretical_candidate_count) {
+        if (blocked || slot >= theoretical_candidate_count) {
             continue;
         }
 
@@ -108,16 +111,14 @@ __global__ void coupled_candidate_capacity_kernel(
         output.edge2_id[slot] = selected_edges[second_slot];
     }
     if (blockIdx.x == 0 && threadIdx.x == 0) {
+        if (capacity_overflow) {
+            atomicOr(
+                failure_state,
+                channel_native::capacity::kCoupledCandidateOverflow);
+        }
         output.candidate_count[0] =
-            capacity_overflow ? 0 : static_cast<int>(theoretical_candidate_count);
+            blocked ? 0 : static_cast<int>(theoretical_candidate_count);
         output.overflow[0] = capacity_overflow;
-    }
-}
-
-__global__ void coupled_candidate_capacity_trap_kernel(
-    const bool *__restrict__ overflow) {
-    if (blockIdx.x == 0 && threadIdx.x == 0 && overflow[0]) {
-        asm volatile("trap;");
     }
 }
 
@@ -135,6 +136,7 @@ int64_t checked_product(int64_t lhs, int64_t rhs, const char *message) {
 }  // namespace
 
 pybind11::dict cn_coupled_candidate_capacity_block(
+    at::Tensor failure_state,
     at::Tensor representative_faces,
     at::Tensor selected_edges,
     int64_t tx_count,
@@ -144,6 +146,8 @@ pybind11::dict cn_coupled_candidate_capacity_block(
     int64_t candidate_limit) {
     channel_native::check_tensor(
         representative_faces, "representative_faces", at::kInt, 1);
+    channel_native::capacity::validate_failure_state(
+        failure_state, representative_faces);
     channel_native::check_tensor(selected_edges, "selected_edges", at::kInt, 1);
     TORCH_CHECK(
         selected_edges.get_device() == representative_faces.get_device(),
@@ -227,6 +231,7 @@ pybind11::dict cn_coupled_candidate_capacity_block(
     const int64_t init_count = std::max<int64_t>(candidate_capacity, 1);
     coupled_candidate_capacity_kernel<<<
         launch_blocks(init_count), kBlockSize, 0, stream>>>(
+        failure_state.data_ptr<int>(),
         representative_faces.data_ptr<int>(),
         selected_edges.data_ptr<int>(),
         output,
@@ -239,9 +244,6 @@ pybind11::dict cn_coupled_candidate_capacity_block(
         theoretical_candidate_count,
         candidate_capacity,
         capacity_overflow);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
-    coupled_candidate_capacity_trap_kernel<<<1, 1, 0, stream>>>(
-        overflow.data_ptr<bool>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     pybind11::dict result;

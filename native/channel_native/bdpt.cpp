@@ -405,6 +405,7 @@ std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
     at::Tensor tx_power,
     int64_t tx_power_index);
 std::vector<at::Tensor> cn_deterministic_diffraction_state_capacity_select_cuda(
+    at::Tensor failure_state,
     at::Tensor active,
     at::Tensor edge_index,
     at::Tensor edge_position,
@@ -1102,6 +1103,7 @@ pybind11::tuple cn_deterministic_diffraction_state_pack_selected(
 }
 
 pybind11::tuple cn_deterministic_diffraction_state_capacity_select(
+    torch::Tensor failure_state,
     torch::Tensor active,
     torch::Tensor edge_index,
     torch::Tensor edge_position,
@@ -1118,6 +1120,7 @@ pybind11::tuple cn_deterministic_diffraction_state_capacity_select(
     int64_t state_capacity) {
     return tensor_vector_to_tuple(
         cn_deterministic_diffraction_state_capacity_select_cuda(
+            failure_state,
             active,
             edge_index,
             edge_position,

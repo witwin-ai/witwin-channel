@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 import torch
 
 from witwin.channel_native.propagation.topology.kernels import compaction
 from witwin.channel_native.propagation.topology.kernels import reflection
+from witwin.channel_native.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -61,9 +63,16 @@ def _inputs(
 
 
 def _produce(
-    inputs: dict[str, torch.Tensor | int | bool], *, candidate_capacity: int
+    inputs: dict[str, torch.Tensor | int | bool],
+    *,
+    candidate_capacity: int,
+    failure_state: CapacityFailureState | None = None,
 ):
+    visible = inputs["visible"]
+    assert isinstance(visible, torch.Tensor)
+    failure_state = failure_state or create_capacity_failure_state(visible)
     return reflection.deterministic_reflection_candidate_capacity_block(
+        failure_state=failure_state,
         **inputs,
         candidate_capacity=candidate_capacity,
     )
@@ -267,58 +276,28 @@ def test_reflection_candidate_capacity_uses_nondefault_stream() -> None:
     ("visible_values", "candidate_capacity"),
     (((True, True, True), 2), ((True,), 0)),
 )
-def test_reflection_candidate_capacity_overflow_is_asynchronous_in_subprocess(
+def test_reflection_candidate_capacity_overflow_sets_state_and_is_inert(
     visible_values: tuple[bool, ...], candidate_capacity: int
 ) -> None:
-    script = f"""
-import torch
-from witwin.channel_native.propagation.topology.kernels import reflection
+    inputs = _inputs(visible_values, depth=2)
+    visible = inputs["visible"]
+    assert isinstance(visible, torch.Tensor)
+    failure_state = create_capacity_failure_state(visible)
 
-n = {len(visible_values)}
-d = 2
-seq = torch.zeros((n, d), device="cuda", dtype=torch.int32)
-vec = torch.zeros((n, d, 3), device="cuda", dtype=torch.float32)
-block = reflection.deterministic_reflection_candidate_capacity_block(
-    visible=torch.tensor({visible_values!r}, device="cuda", dtype=torch.bool),
-    epc_sequences=seq,
-    epc_hits=vec,
-    epc_normals=vec,
-    sequence_batch=seq,
-    rx_indices=torch.zeros((n,), device="cuda", dtype=torch.int32),
-    tx=torch.zeros((3,), device="cuda", dtype=torch.float32),
-    rx_positions=torch.zeros((1, 3), device="cuda", dtype=torch.float32),
-    tx_power=torch.ones((1,), device="cuda", dtype=torch.float32),
-    tx_index=0,
-    face_eps_r=torch.ones((1,), device="cuda", dtype=torch.float32),
-    face_sigma_e=torch.zeros((1,), device="cuda", dtype=torch.float32),
-    face_mu_r=torch.ones((1,), device="cuda", dtype=torch.float32),
-    face_gain=torch.ones((1,), device="cuda", dtype=torch.float32),
-    face_material_id=torch.zeros((1,), device="cuda", dtype=torch.int32),
-    grouped_export=True,
-    candidate_capacity={candidate_capacity},
-)
-assert block.valid.shape == ({candidate_capacity},)
-try:
-    torch.cuda.synchronize()
-except RuntimeError:
-    raise SystemExit(0)
-raise SystemExit("expected asynchronous reflection candidate capacity failure")
-"""
-    repo_root = Path(__file__).resolve().parents[3]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), environment.get("PYTHONPATH", "")]
+    block = _produce(
+        inputs,
+        candidate_capacity=candidate_capacity,
+        failure_state=failure_state,
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    assert block.failure_state is failure_state
+    assert failure_state.bits.tolist() == [
+        int(CapacityFailureBit.REFLECTION_CANDIDATE_OVERFLOW)
+    ]
+    assert block.candidate_count.tolist() == [0]
+    assert block.overflow.tolist() == [True]
+    assert block.valid.tolist() == [False] * candidate_capacity
+    _assert_inert(block, 0)
 
 
 def test_reflection_candidate_capacity_owner_has_no_host_count_transfer() -> None:
@@ -335,10 +314,8 @@ def test_reflection_candidate_capacity_owner_has_no_host_count_transfer() -> Non
     assert source.index("reflection_candidate_init_kernel<<<") < source.index(
         "reflection_candidate_status_kernel<<<"
     )
-    assert source.index("reflection_candidate_gather_kernel<int64_t><<<") < source.index(
-        "reflection_candidate_overflow_kernel<<<"
-    )
-    assert "if (overflow[0])" in source
+    assert "trap;" not in source
+    assert "failure_state[0] != 0" in source
     assert source.index("if (flags[row] == 0)") < source.index(
         "const int rx_id = rx_indices[row]"
     )

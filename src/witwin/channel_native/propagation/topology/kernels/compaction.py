@@ -8,12 +8,17 @@ from witwin.channel_native.propagation.models.capacity import (
     CapacityPathLayout,
     CapacityPathSelection,
 )
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 
 @dataclass(frozen=True, slots=True)
 class DiffractionOrder1CapacityBlock:
+    failure_state: CapacityFailureState
     valid: torch.Tensor
     rx_id: torch.Tensor
     depth: torch.Tensor
@@ -522,6 +527,7 @@ def _validate_diffraction_order1_capacity_inputs(
 def _name_diffraction_order1_capacity_output(
     raw: object,
     *,
+    failure_state: CapacityFailureState,
     output_capacity: int,
     device: torch.device,
 ) -> DiffractionOrder1CapacityBlock:
@@ -589,11 +595,12 @@ def _name_diffraction_order1_capacity_output(
             raise ValueError(f"native diffraction capacity output {name} must have shape (1,)")
         if tensor.device != device:
             raise ValueError(f"native diffraction capacity output {name} has wrong device")
-    return DiffractionOrder1CapacityBlock(**raw)
+    return DiffractionOrder1CapacityBlock(failure_state=failure_state, **raw)
 
 
 def deterministic_diffraction_order1_capacity_block(
     *,
+    failure_state: CapacityFailureState,
     count: torch.Tensor,
     valid: torch.Tensor,
     rx_id: torch.Tensor,
@@ -630,7 +637,9 @@ def deterministic_diffraction_order1_capacity_block(
         row_tensors=row_tensors,
         output_capacity=output_capacity,
     )
+    require_capacity_failure_state(failure_state, device=valid.device)
     raw = _required_native_op("deterministic_diffraction_order1_capacity_block")(
+        failure_state.bits,
         count,
         valid,
         rx_id,
@@ -648,6 +657,7 @@ def deterministic_diffraction_order1_capacity_block(
     )
     return _name_diffraction_order1_capacity_output(
         raw,
+        failure_state=failure_state,
         output_capacity=output_capacity,
         device=valid.device,
     )
@@ -700,6 +710,7 @@ def deterministic_sort_order(
 
 def deterministic_capacity_finalize(
     *,
+    failure_state: CapacityFailureState,
     valid: torch.Tensor,
     tx_id: torch.Tensor,
     rx_id: torch.Tensor,
@@ -729,8 +740,10 @@ def deterministic_capacity_finalize(
             raise ValueError(f"{name} must be non-negative")
     if pair_count != num_tx * num_rx:
         raise ValueError("pair_count must equal num_tx * num_rx")
+    require_capacity_failure_state(failure_state, device=valid.device)
 
     raw = _required_native_op("deterministic_capacity_finalize")(
+        failure_state.bits,
         valid,
         tx_id,
         rx_id,
@@ -747,6 +760,7 @@ def deterministic_capacity_finalize(
     layout = CapacityPathLayout(
         pair_count=pair_count,
         path_capacity_per_pair=path_capacity_per_pair,
+        failure_state=failure_state,
         valid=raw["valid"],
         num_paths=raw["num_paths"],
         overflow=raw["overflow"],

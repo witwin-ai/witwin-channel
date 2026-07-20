@@ -7,6 +7,10 @@ import pytest
 import torch
 
 from witwin.channel_native.propagation.models import CapacityPathLayout
+from witwin.channel_native.runtime import (
+    CapacityFailureState,
+    create_capacity_failure_state,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -16,11 +20,13 @@ pytestmark = pytest.mark.skipif(
 
 def _layout_inputs(
     *, pair_count: int = 2, capacity: int = 3
-) -> dict[str, int | torch.Tensor]:
+) -> dict[str, int | torch.Tensor | CapacityFailureState]:
     device = torch.device("cuda:0")
+    reference = torch.empty(0, device=device)
     return {
         "pair_count": pair_count,
         "path_capacity_per_pair": capacity,
+        "failure_state": create_capacity_failure_state(reference),
         "valid": torch.zeros(pair_count * capacity, dtype=torch.bool, device=device),
         "num_paths": torch.zeros(pair_count, dtype=torch.int32, device=device),
         "overflow": torch.zeros(1, dtype=torch.bool, device=device),
@@ -54,6 +60,8 @@ def test_capacity_layout_accepts_zero_sparse_and_dense_rows(
     assert layout.row_capacity == pair_count * capacity
     assert layout.device.type == "cuda"
     assert layout.valid is inputs["valid"]
+    assert layout.failure_state is inputs["failure_state"]
+    assert layout.failure_state.bits.data_ptr() == inputs["failure_state"].bits.data_ptr()
     assert layout.num_paths is inputs["num_paths"]
     assert layout.overflow is inputs["overflow"]
     with pytest.raises(FrozenInstanceError):

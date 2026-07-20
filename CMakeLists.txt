@@ -456,6 +456,7 @@ Python_add_library(
     WITH_SOABI
     native/channel_native/binding/module.cpp
     native/channel_native/binding/build.cpp
+    native/channel_native/binding/runtime.cpp
     native/channel_native/binding/materials.cpp
     native/channel_native/binding/fields.cpp
     native/channel_native/binding/rayd.cpp
@@ -481,6 +482,7 @@ Python_add_library(
     native/channel_native/kernels/bdpt_subpaths_ad.cu
     native/channel_native/kernels/bdpt_maps.cu
     native/channel_native/kernels/coupled_candidate_capacity.cu
+    native/channel_native/kernels/capacity_failure_state.cu
     native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/field_transport.cu
     native/channel_native/kernels/field_transport_free_space.cu

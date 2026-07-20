@@ -4,6 +4,10 @@ from dataclasses import dataclass
 
 import torch
 
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import (
     native_extension,
     required_symbol as _required_native_op,
@@ -13,6 +17,7 @@ from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 @dataclass(frozen=True, slots=True)
 class DiffractionStateCapacityBlock:
+    failure_state: CapacityFailureState
     edge_index: torch.Tensor
     edge_position: torch.Tensor
     edge_direction: torch.Tensor
@@ -258,6 +263,7 @@ def _validate_diffraction_state_capacity_inputs(
 def _name_diffraction_state_capacity_output(
     raw: object,
     *,
+    failure_state: CapacityFailureState,
     capacity: int,
     device: torch.device,
 ) -> DiffractionStateCapacityBlock:
@@ -313,11 +319,12 @@ def _name_diffraction_state_capacity_output(
             raise ValueError(
                 f"native diffraction capacity output {name} has wrong device"
             )
-    return DiffractionStateCapacityBlock(*raw)
+    return DiffractionStateCapacityBlock(failure_state, *raw)
 
 
 def deterministic_diffraction_state_capacity_select(
     *,
+    failure_state: CapacityFailureState,
     active: torch.Tensor,
     edge_index: torch.Tensor,
     edge_position: torch.Tensor,
@@ -352,8 +359,10 @@ def deterministic_diffraction_state_capacity_select(
     state_count = _validate_diffraction_state_capacity_inputs(
         active, state_capacity, state_tensors
     )
+    require_capacity_failure_state(failure_state, device=active.device)
 
     raw = _required_native_op("deterministic_diffraction_state_capacity_select")(
+        failure_state.bits,
         active,
         edge_index,
         edge_position,
@@ -371,6 +380,7 @@ def deterministic_diffraction_state_capacity_select(
     )
     return _name_diffraction_state_capacity_output(
         raw,
+        failure_state=failure_state,
         capacity=min(state_capacity, state_count),
         device=active.device,
     )

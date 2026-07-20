@@ -3,6 +3,7 @@
 #include <pybind11/pybind11.h>
 
 void register_build(pybind11::module_ &module);
+void register_runtime(pybind11::module_ &module);
 void register_bdpt_subpaths(pybind11::module_ &module);
 void register_materials(pybind11::module_ &module);
 void register_bdpt_connections(pybind11::module_ &module);

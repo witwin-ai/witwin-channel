@@ -6,6 +6,11 @@ from dataclasses import dataclass
 
 import torch
 
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
+
 from .capacity import _require_cuda_tensor, _require_host_count
 
 
@@ -15,6 +20,7 @@ class ReflectionCandidateCapacity:
 
     candidate_capacity: int
     depth: int
+    failure_state: CapacityFailureState
     valid: torch.Tensor
     candidate_count: torch.Tensor
     overflow: torch.Tensor
@@ -43,6 +49,7 @@ class ReflectionCandidateCapacity:
         valid = _require_cuda_tensor(
             "valid", self.valid, dtype=torch.bool, shape=(capacity,)
         )
+        require_capacity_failure_state(self.failure_state, device=valid.device)
         _require_cuda_tensor(
             "candidate_count",
             self.candidate_count,

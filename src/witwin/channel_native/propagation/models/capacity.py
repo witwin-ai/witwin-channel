@@ -6,6 +6,11 @@ from dataclasses import dataclass
 
 import torch
 
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
+
 from .evaluated import EvaluatedPaths
 
 
@@ -51,6 +56,7 @@ class CapacityPathLayout:
 
     pair_count: int
     path_capacity_per_pair: int
+    failure_state: CapacityFailureState
     valid: torch.Tensor
     num_paths: torch.Tensor
     overflow: torch.Tensor
@@ -67,6 +73,7 @@ class CapacityPathLayout:
             dtype=torch.bool,
             shape=(row_capacity,),
         )
+        require_capacity_failure_state(self.failure_state, device=valid.device)
         _require_cuda_tensor(
             "num_paths",
             self.num_paths,

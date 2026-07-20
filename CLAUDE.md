@@ -38,6 +38,12 @@ compiled native CUDA/RayD extension.
   `int32 num_paths` hold actual cardinality. Diffraction uses the explicit
   `diffraction_state_capacity`. Overflow must make the entire device result
   inert and fail asynchronously; never synchronize just to raise earlier.
+- Each ADR-029 solve transaction owns one runtime `CapacityFailureState`: a
+  contiguous CUDA `int32[1]` bitmask initialized asynchronously on the caller's
+  current stream. Every capacity intermediate must receive and retain that same
+  typed object/storage, atomically OR its owned failure bit, publish only inert
+  outputs after any failure, and never trap or return a partial result. Terminal
+  failure observation belongs to the solve/result boundary, not intermediates.
 
 Python and Torch may perform non-numerical boundary work: API validation,
 typed-contract construction, dispatch, orchestration, row selection, structural

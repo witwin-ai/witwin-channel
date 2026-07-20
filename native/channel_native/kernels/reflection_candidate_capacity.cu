@@ -6,6 +6,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "capacity_failure_state.h"
 
 #include <cstdint>
 #include <limits>
@@ -37,6 +38,7 @@ struct ReflectionCandidateOutput {
 };
 
 __global__ void reflection_candidate_flags_kernel(
+    const int *__restrict__ failure_state,
     const bool *__restrict__ visible,
     int *__restrict__ flags,
     int64_t input_count) {
@@ -44,7 +46,7 @@ __global__ void reflection_candidate_flags_kernel(
     for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          row < input_count;
          row += stride) {
-        flags[row] = visible[row] ? 1 : 0;
+        flags[row] = failure_state[0] == 0 && visible[row] ? 1 : 0;
     }
 }
 
@@ -86,6 +88,7 @@ __global__ void reflection_candidate_init_kernel(
 }
 
 __global__ void reflection_candidate_status_kernel(
+    int *__restrict__ failure_state,
     const int *__restrict__ flags,
     const int *__restrict__ offsets,
     int64_t input_count,
@@ -93,6 +96,11 @@ __global__ void reflection_candidate_status_kernel(
     int *__restrict__ candidate_count,
     bool *__restrict__ overflow) {
     if (blockIdx.x != 0 || threadIdx.x != 0) {
+        return;
+    }
+    if (failure_state[0] != 0) {
+        candidate_count[0] = 0;
+        overflow[0] = false;
         return;
     }
     int visible_count = 0;
@@ -103,10 +111,16 @@ __global__ void reflection_candidate_status_kernel(
     const bool did_overflow = visible_count > candidate_capacity;
     candidate_count[0] = did_overflow ? 0 : visible_count;
     overflow[0] = did_overflow;
+    if (did_overflow) {
+        atomicOr(
+            failure_state,
+            channel_native::capacity::kReflectionCandidateOverflow);
+    }
 }
 
 template <typename sequence_t>
 __global__ void reflection_candidate_gather_kernel(
+    const int *__restrict__ failure_state,
     const int *__restrict__ flags,
     const int *__restrict__ offsets,
     const bool *__restrict__ overflow,
@@ -128,7 +142,7 @@ __global__ void reflection_candidate_gather_kernel(
     int64_t input_count,
     int64_t depth,
     bool grouped_export) {
-    if (overflow[0]) {
+    if (failure_state[0] != 0 || overflow[0]) {
         return;
     }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
@@ -184,13 +198,6 @@ __global__ void reflection_candidate_gather_kernel(
     }
 }
 
-__global__ void reflection_candidate_overflow_kernel(
-    const bool *__restrict__ overflow) {
-    if (blockIdx.x == 0 && threadIdx.x == 0 && overflow[0]) {
-        asm volatile("trap;");
-    }
-}
-
 int launch_blocks(int64_t count) {
     return static_cast<int>(
         (count + kReflectionCandidateBlockSize - 1) /
@@ -209,6 +216,7 @@ void check_row_device(
 }  // namespace
 
 pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
+    at::Tensor failure_state,
     at::Tensor visible,
     at::Tensor epc_sequences,
     at::Tensor epc_hits,
@@ -227,6 +235,7 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
     bool grouped_export,
     int64_t candidate_capacity) {
     channel_native::check_tensor(visible, "visible", at::kBool, 1);
+    channel_native::capacity::validate_failure_state(failure_state, visible);
     TORCH_CHECK(epc_sequences.is_cuda(), "epc_sequences must be a CUDA tensor");
     TORCH_CHECK(epc_sequences.is_contiguous(), "epc_sequences must be contiguous");
     TORCH_CHECK(
@@ -396,7 +405,11 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
             launch_blocks(input_count),
             kReflectionCandidateBlockSize,
             0,
-            stream>>>(visible.data_ptr<bool>(), flags.data_ptr<int>(), input_count);
+            stream>>>(
+            failure_state.data_ptr<int>(),
+            visible.data_ptr<bool>(),
+            flags.data_ptr<int>(),
+            input_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
         size_t scratch_bytes = 0;
@@ -420,6 +433,7 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
     }
 
     reflection_candidate_status_kernel<<<1, 1, 0, stream>>>(
+        failure_state.data_ptr<int>(),
         flags.data_ptr<int>(),
         offsets.data_ptr<int>(),
         input_count,
@@ -432,6 +446,7 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
         if (epc_sequences.scalar_type() == at::kLong) {
             reflection_candidate_gather_kernel<int64_t><<<
                 blocks, kReflectionCandidateBlockSize, 0, stream>>>(
+                failure_state.data_ptr<int>(),
                 flags.data_ptr<int>(),
                 offsets.data_ptr<int>(),
                 overflow.data_ptr<bool>(),
@@ -456,6 +471,7 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
         } else {
             reflection_candidate_gather_kernel<int><<<
                 blocks, kReflectionCandidateBlockSize, 0, stream>>>(
+                failure_state.data_ptr<int>(),
                 flags.data_ptr<int>(),
                 offsets.data_ptr<int>(),
                 overflow.data_ptr<bool>(),
@@ -480,9 +496,6 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    reflection_candidate_overflow_kernel<<<1, 1, 0, stream>>>(
-        overflow.data_ptr<bool>());
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     pybind11::dict result;
     result["valid"] = out_valid;

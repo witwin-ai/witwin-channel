@@ -120,15 +120,24 @@ compact behavior without exposing `K` to the host. The selector launches and
 scratch storage remain explicit Phase 12 costs and must be included in the
 performance and memory evidence.
 
-### Two-stage overflow and fail-loud behavior
+### Shared transaction failure state and fail-loud behavior
 
-Selection and result packing use a two-stage device protocol. Stage one
-computes the stable selected indices, actual count, and overflow state. Stage
-two reads overflow before consuming any selected row. If `K > M` or any
-endpoint pair exceeds `path_capacity_per_pair`, stage two writes the canonical
-inert representation to all twelve selected-state outputs and every result
-capacity row, sets every `valid` bit false, zeros every device count, suppresses
-all vector/grid accumulation, and triggers a standard asynchronous CUDA error.
+Selection and result packing share one solve-owned `CapacityFailureState`: a
+runtime-created contiguous CUDA `int32[1]` bitmask asynchronously zeroed on the
+caller's current stream. Every capacity producer receives and retains that same
+typed object and storage. A producer atomically ORs its owner-specific failure
+bit; after any bit is set it must not consume upstream payload, and it publishes
+only the canonical inert representation: all selected-state and result-capacity
+rows inert, every `valid` bit false, every device count zero, and no vector/grid
+accumulation. Typed per-operation overflow/count outputs remain available for
+direct contract diagnostics, but they do not replace the shared transaction
+state.
+
+Intermediate capacity operations never trap. The solve/result boundary reads
+the shared state on the same ordered CUDA stream and owns exactly one terminal
+native asynchronous failure operation after all device outputs are inert. This
+permits multiple producer failures to accumulate without poisoning subsequent
+initialization kernels or exposing a partial result.
 
 This error is fail-loud at the next normal CUDA synchronization boundary. The
 solver call must not return a usable partial numerical result. It is expressly
