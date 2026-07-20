@@ -39,6 +39,13 @@ before topology, field, accumulation, backward, or JVP reads it. Dynamic ATen
 row shapes, count D2H copies, host compaction, and compatibility/generation-
 suffixed facades are forbidden.
 
+`propagation.models.CapacityPathLayout` is the dormant typed contract for this
+layout. It carries host `pair_count` and `path_capacity_per_pair` metadata plus
+CUDA-resident row validity, per-pair counts, and overflow state. Construction
+is metadata-only and zero-copy; native producers own the numerical relationship
+among those device tensors. It is not a solver result or a live solver boundary
+until the ADR-029 atomic activation.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

@@ -432,3 +432,9 @@ selection or truncation policy. No compatibility alias, generation-suffixed
 name, solver dispatch, result-shape change, or native ABI change is introduced
 by this configuration-only step. The public export count remains 37; only the
 two Config `contract_sha256` values change.
+
+The dormant internal `propagation.models.CapacityPathLayout` contract records
+host pair/capacity metadata and exact CUDA `valid`, `num_paths`, and `overflow`
+tensor metadata without reading or recomputing device values. It is exported
+only from the internal `propagation.models` package; it is not a root public
+export, solver result, or active solver boundary.
