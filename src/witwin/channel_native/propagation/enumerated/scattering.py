@@ -76,7 +76,9 @@ from witwin.channel_native.propagation.models.topology import PathTopology
 from witwin.channel_native.propagation.topology.export import EvaluatedPathSidecars
 from witwin.channel_native.materials.models import PhaseScreen
 from witwin.channel_native.physics.conventions import C0
-from witwin.channel_native.scattering.tables import MAX_RMS_SLOPE
+from witwin.channel_native.scene.scattering_resources import (
+    realization_phase_screens,
+)
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
@@ -149,71 +151,6 @@ def _visible(
         )
         launches += 1
     return torch.cat(masks), launches
-
-
-def _realization_structures(compiled: object) -> dict[int, PhaseScreen]:
-    """Structures whose scattering is the coherent phase-screen realization.
-
-    Enforces contract 6.7.3 exclusivity: a ``PhaseScreen`` with
-    ``mode='ensemble_bsdf'`` on a Kirchhoff-rough material is refused because
-    it would define a second ensemble source for the same surface; the
-    material roughness already is the ensemble model.
-    """
-
-    screens: dict[int, PhaseScreen] = {}
-    structure_material = compiled.assignments.structure_material_id.to(torch.int64)
-    scatter_model = compiled.materials.scatter_model_id
-    for index, screen in compiled.assignments.structure_phase_screens.items():
-        material_index = int(structure_material[index])
-        rough = int(scatter_model[material_index]) == 1
-        if screen.mode == "realization_coherent":
-            screens[index] = screen
-            continue
-        # mode == "ensemble_bsdf"
-        if rough:
-            raise RuntimeError(
-                "scattering_mode_conflict: structure "
-                f"{index} combines a PhaseScreen(mode='ensemble_bsdf') with a "
-                "Kirchhoff-rough material; realization and ensemble models "
-                "must never be summed for one surface (contract 6.7.3). Use "
-                "mode='realization_coherent' to replace the ensemble lobe, "
-                "or drop the phase screen to keep the material ensemble table"
-            )
-        raise RuntimeError(
-            "PhaseScreen mode 'ensemble_bsdf' requires a Kirchhoff-rough "
-            "material to define the ensemble statistics; assign a rough "
-            "PhysicalSurface or use mode='realization_coherent'"
-        )
-    return screens
-
-
-def _guard_phase_screen_geometry(
-    runtime: object, uv_scale_m: float, structure_index: int
-) -> None:
-    """Applicability guard (contract section 6): the phase screen never moves
-    geometry, so its RMS metric slope must stay in the tangent-plane domain.
-    Out-of-domain surfaces raise instead of silently degrading."""
-
-    heights = runtime.heights_m
-    rows, cols = heights.shape
-    if uv_scale_m <= 0.0 or not math.isfinite(uv_scale_m):
-        raise RuntimeError(
-            "phase_screen_geometry_limit_exceeded: structure "
-            f"{structure_index} has a degenerate UV-to-world scale"
-        )
-    slope_u = (heights[:, 1:] - heights[:, :-1]) * (cols / uv_scale_m)
-    slope_v = (heights[1:, :] - heights[:-1, :]) * (rows / uv_scale_m)
-    rms_slope = math.sqrt(
-        float(slope_u.square().mean()) + float(slope_v.square().mean())
-    )
-    if rms_slope > MAX_RMS_SLOPE:
-        raise RuntimeError(
-            "phase_screen_geometry_limit_exceeded: structure "
-            f"{structure_index} phase screen RMS slope {rms_slope:.3g} exceeds "
-            f"the tangent-plane limit {MAX_RMS_SLOPE:g}; heights of this "
-            "magnitude change occlusion/silhouettes and cannot be represented "
-            "as a pure phase screen"
-        )
 
 
 def _r2_barycentric(
@@ -559,12 +496,6 @@ def _realization_rows(
     device = tx_positions.device
     ad_enabled = ad_mode != "none"
     records = compiled.rayd.edge_records()
-    face_structure = compiled.geometry.face_structure_id.to(
-        device=device, dtype=torch.int64
-    )
-    face_material = compiled.assignments.face_material_id.to(
-        device=device, dtype=torch.int64
-    )
     materials = compiled.materials
     layer_offset = materials.layer_offset.to(device=device, dtype=torch.int32)
     layer_count = materials.layer_count.to(device=device, dtype=torch.int32)
@@ -581,44 +512,21 @@ def _realization_rows(
     # prefactor and the radiometric normalization.
     if ad_enabled:
         frequency_t, k0_t, amplitude_scale_t = realization_scalars(scene, device)
-    runtimes = compiled.phase_screen_runtimes
+    resources = compiled.phase_screen_resources.structures
     density = float(getattr(config, "scattering_samples_per_m2", 8.0))
 
     for structure_index in sorted(screens):
-        structure = scene.structures[structure_index]
-        if structure.uv is None or structure.face_uv is None:
-            raise RuntimeError(
-                "realization_coherent phase screen requires structure UV "
-                f"(structure {structure_index} has none); contract section 6"
-            )
-        runtime = runtimes[structure_index]
-        global_faces = torch.nonzero(
-            face_structure == structure_index, as_tuple=False
-        ).reshape(-1)
-        if int(global_faces.numel()) == 0:
+        resource = resources[structure_index]
+        runtime = resource.runtime
+        if resource.face_count == 0:
             continue
-        first_face = int(global_faces.min())
-        faces = records.faces.to(torch.int64)[global_faces]
+        first_face = resource.first_face
+        face_stop = resource.face_range[1]
+        faces = records.faces[first_face:face_stop].to(torch.int64)
         tri = records.vertices[faces]  # [F, 3, 3]
-        uv_vertices = structure.uv.to(device=device, dtype=torch.float32)
-        face_uv = structure.face_uv.to(device=device, dtype=torch.int64)
-        material_index = int(face_material[first_face])
-
-        # UV -> world metric scale for the geometry guard: compare face area
-        # with its UV-space area (isotropic estimate, documented).
-        e1 = tri[:, 1] - tri[:, 0]
-        e2 = tri[:, 2] - tri[:, 0]
-        areas = 0.5 * torch.linalg.vector_norm(torch.cross(e1, e2, dim=-1), dim=-1)
-        uv_tris = uv_vertices[face_uv[(global_faces - first_face)]]
-        uv_e1 = uv_tris[:, 1] - uv_tris[:, 0]
-        uv_e2 = uv_tris[:, 2] - uv_tris[:, 0]
-        uv_areas = 0.5 * (
-            uv_e1[:, 0] * uv_e2[:, 1] - uv_e1[:, 1] * uv_e2[:, 0]
-        ).abs()
-        uv_scale = float(
-            torch.sqrt(areas.sum() / uv_areas.sum().clamp_min(1.0e-20))
-        )
-        _guard_phase_screen_geometry(runtime, uv_scale, structure_index)
+        material_index = resource.material_index
+        areas = resource.face_areas_m2
+        uv_tris = resource.uv_tris
 
         # Per-face subdivision: patch edges must resolve both the requested
         # density and the Fresnel-zone linearization of the carrier phase
@@ -638,7 +546,7 @@ def _realization_rows(
         )
         r_min = float(endpoint_r.min().clamp_min(1.0e-3))
         s_max = 0.5 * math.sqrt(wavelength * r_min / 2.0)
-        for local in range(int(global_faces.numel())):
+        for local in range(resource.face_count):
             edge = float(
                 torch.linalg.vector_norm(
                     tri[local] - tri[local].roll(1, dims=0), dim=-1
@@ -1042,7 +950,7 @@ def _collect_scattering_rows(
     ad_mode: str = "none",
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = scene.compile()
-    screens = _realization_structures(compiled)
+    screens = realization_phase_screens(compiled.materials, compiled.assignments)
     face_material = compiled.assignments.face_material_id.to(
         device=device, dtype=torch.int64
     )

@@ -3,24 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import math
 
 import torch
 
-from witwin.channel_native.materials.models import Roughness
+from witwin.channel_native.materials.models import PhaseScreen, Roughness
 from witwin.channel_native.scattering.phase_screen import PhaseScreenRuntime
-from witwin.channel_native.scattering.tables import KirchhoffTable
+from witwin.channel_native.scattering.tables import KirchhoffTable, MAX_RMS_SLOPE
+from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 from witwin.channel_native.scene.stores.assignments import AssignmentStore
 from witwin.channel_native.scene.stores.materials import MaterialStore
 
 __all__ = [
     "KirchhoffRuntimeResources",
     "KirchhoffTableStack",
+    "PhaseScreenResourceKey",
     "PhaseScreenRuntimeResources",
+    "PhaseScreenStructureResource",
     "RoughMaterialRuntime",
     "ScatteringResourceKey",
     "build_kirchhoff_resources",
     "build_kirchhoff_table_stack",
     "build_phase_screen_resources",
+    "realization_phase_screens",
 ]
 
 
@@ -30,6 +35,17 @@ class ScatteringResourceKey:
 
     material_cache_token: str
     assignment_version: int
+    device: torch.device
+
+
+@dataclass(frozen=True, slots=True)
+class PhaseScreenResourceKey:
+    """Identity of immutable phase-screen resources for one compiled scene."""
+
+    material_cache_token: str
+    geometry_version: int
+    assignment_version: int
+    phase_screen_token: tuple[tuple[object, ...], ...]
     device: torch.device
 
 
@@ -71,12 +87,106 @@ class KirchhoffRuntimeResources:
     stack: KirchhoffTableStack
 
 
+def _require_phase_screen_tensor(
+    name: str,
+    tensor: torch.Tensor,
+    *,
+    dtype: torch.dtype,
+    shape: tuple[int, ...],
+    device: torch.device,
+) -> None:
+    if tensor.device != device or tensor.dtype != dtype or tuple(tensor.shape) != shape:
+        raise ValueError(f"phase-screen {name} must be {dtype} {shape} on {device}")
+    if not tensor.is_contiguous():
+        raise ValueError(f"phase-screen {name} must be contiguous")
+
+
+@dataclass(frozen=True, slots=True)
+class PhaseScreenStructureResource:
+    """Immutable scene-owned inputs for one realization phase screen.
+
+    Endpoint-, frequency-, and solver-config-dependent patch subdivision and
+    visibility are intentionally absent.  They remain solve-plan state.
+    """
+
+    structure_index: int
+    material_index: int
+    face_range: tuple[int, int]
+    first_face: int
+    face_count: int
+    uv_vertex_count: int
+    runtime: PhaseScreenRuntime
+    uv_vertices: torch.Tensor
+    face_uv: torch.Tensor
+    uv_tris: torch.Tensor
+    face_areas_m2: torch.Tensor
+    uv_world_scale_m: float
+    rms_slope: float
+
+    def __post_init__(self) -> None:
+        start, stop = self.face_range
+        if self.structure_index < 0 or self.material_index < 0:
+            raise ValueError("phase-screen structure/material indices must be non-negative")
+        if start < 0 or stop < start or self.first_face != start:
+            raise ValueError("phase-screen face_range/first_face is inconsistent")
+        if self.face_count != stop - start:
+            raise ValueError("phase-screen face_count must match face_range")
+        if self.uv_vertex_count < 0:
+            raise ValueError("phase-screen uv_vertex_count must be non-negative")
+        device = self.runtime.heights_m.device
+        expected = (
+            ("uv_vertices", self.uv_vertices, torch.float32, (self.uv_vertex_count, 2)),
+            ("face_uv", self.face_uv, torch.int64, (self.face_count, 3)),
+            ("uv_tris", self.uv_tris, torch.float32, (self.face_count, 3, 2)),
+            ("face_areas_m2", self.face_areas_m2, torch.float32, (self.face_count,)),
+        )
+        for name, tensor, dtype, shape in expected:
+            _require_phase_screen_tensor(
+                name, tensor, dtype=dtype, shape=shape, device=device
+            )
+        if not math.isfinite(self.uv_world_scale_m) or self.uv_world_scale_m <= 0.0:
+            raise ValueError("phase-screen uv_world_scale_m must be finite and positive")
+        if not math.isfinite(self.rms_slope) or self.rms_slope < 0.0:
+            raise ValueError("phase-screen rms_slope must be finite and non-negative")
+
+
 @dataclass(frozen=True, slots=True)
 class PhaseScreenRuntimeResources:
-    """GPU phase-screen runtimes for one compiled scene resource key."""
+    """Immutable per-structure phase-screen resources for a compiled scene."""
 
-    key: ScatteringResourceKey
-    runtimes: dict[int, PhaseScreenRuntime]
+    key: PhaseScreenResourceKey
+    structures: dict[int, PhaseScreenStructureResource]
+
+
+def realization_phase_screens(
+    materials: MaterialStore, assignments: AssignmentStore
+) -> dict[int, PhaseScreen]:
+    """Resolve mutually exclusive realization assignments at the scene boundary."""
+
+    screens: dict[int, PhaseScreen] = {}
+    for structure_index, screen in sorted(
+        assignments.structure_phase_screens.items()
+    ):
+        material_index = int(assignments.structure_material_id[structure_index])
+        rough = int(materials.scatter_model_id[material_index]) == 1
+        if screen.mode == "realization_coherent":
+            screens[structure_index] = screen
+        elif rough:
+            raise RuntimeError(
+                "scattering_mode_conflict: structure "
+                f"{structure_index} combines a PhaseScreen(mode='ensemble_bsdf') "
+                "with a Kirchhoff-rough material; realization and ensemble "
+                "models must never be summed for one surface (contract 6.7.3). "
+                "Use mode='realization_coherent' to replace the ensemble lobe, "
+                "or drop the phase screen to keep the material ensemble table"
+            )
+        else:
+            raise RuntimeError(
+                "PhaseScreen mode 'ensemble_bsdf' requires a Kirchhoff-rough "
+                "material to define the ensemble statistics; assign a rough "
+                "PhysicalSurface or use mode='realization_coherent'"
+            )
+    return screens
 
 
 def build_kirchhoff_resources(
@@ -232,17 +342,165 @@ def build_kirchhoff_table_stack(
 
 
 def build_phase_screen_resources(
-    assignments: AssignmentStore, key: ScatteringResourceKey
+    materials: MaterialStore,
+    assignments: AssignmentStore,
+    rayd: RayDSceneResource,
+    key: PhaseScreenResourceKey,
 ) -> PhaseScreenRuntimeResources:
-    """Build all phase-screen resources without publishing partial state."""
+    """Build immutable phase-screen resources without publishing partial state.
+
+    This is called lazily by the first phase-screen consumer.  The build owns
+    only scene-static data; patch subdivision and visibility remain solve-plan
+    work because they depend on endpoints, frequency, or solver configuration.
+    """
 
     from witwin.channel_native import scattering
 
+    if not assignments.structure_phase_screens:
+        return PhaseScreenRuntimeResources(key=key, structures={})
+    if not rayd.available:
+        rayd.require_resource()
+
+    mesh_tensors = rayd.mesh_tensors
+    if len(mesh_tensors) != int(assignments.structure_material_id.shape[0]):
+        raise RuntimeError(
+            "phase-screen scene resource mesh/structure count is inconsistent"
+        )
+    face_ranges: list[tuple[int, int]] = []
+    running = 0
+    for mesh in mesh_tensors:
+        if len(mesh) < 4:
+            raise RuntimeError("phase-screen scene resource mesh layout is incomplete")
+        face_count = int(mesh[1].shape[0])
+        face_ranges.append((running, running + face_count))
+        running += face_count
+
+    records = rayd.edge_records()
+    if running != int(records.faces.shape[0]):
+        raise RuntimeError("phase-screen scene resource face ranges are inconsistent")
+
+    screens = sorted(realization_phase_screens(materials, assignments).items())
     runtimes = {
-        index: scattering.PhaseScreenRuntime(screen, device=key.device)
-        for index, screen in assignments.structure_phase_screens.items()
+        structure_index: scattering.PhaseScreenRuntime(screen, device=key.device)
+        for structure_index, screen in screens
     }
-    return PhaseScreenRuntimeResources(key=key, runtimes=runtimes)
+    resources: dict[int, PhaseScreenStructureResource] = {}
+    for structure_index, screen in screens:
+        material_index = int(assignments.structure_material_id[structure_index])
+
+        mesh_vertices, mesh_faces, mesh_uv, mesh_face_uv = mesh_tensors[
+            structure_index
+        ][:4]
+        del mesh_vertices
+        face_range = face_ranges[structure_index]
+        face_count = face_range[1] - face_range[0]
+        runtime = runtimes[structure_index]
+        uv_vertex_count = int(mesh_uv.shape[0])
+        if face_count == 0:
+            resources[structure_index] = PhaseScreenStructureResource(
+                structure_index=structure_index,
+                material_index=material_index,
+                face_range=face_range,
+                first_face=face_range[0],
+                face_count=0,
+                uv_vertex_count=0,
+                runtime=runtime,
+                uv_vertices=torch.empty(
+                    (0, 2), device=key.device, dtype=torch.float32
+                ),
+                face_uv=torch.empty(
+                    (0, 3), device=key.device, dtype=torch.int64
+                ),
+                uv_tris=torch.empty(
+                    (0, 3, 2), device=key.device, dtype=torch.float32
+                ),
+                face_areas_m2=torch.empty(
+                    (0,), device=key.device, dtype=torch.float32
+                ),
+                uv_world_scale_m=1.0,
+                rms_slope=0.0,
+            )
+            continue
+        if uv_vertex_count == 0 or tuple(mesh_uv.shape[1:]) != (2,):
+            raise RuntimeError(
+                "realization_coherent phase screen requires structure UV "
+                f"(structure {structure_index} has none); contract section 6"
+            )
+        if tuple(mesh_faces.shape) != (face_count, 3):
+            raise RuntimeError("phase-screen structure face shape is inconsistent")
+        if tuple(mesh_face_uv.shape) != (face_count, 3):
+            raise RuntimeError("phase-screen structure face_uv shape is inconsistent")
+
+        uv_vertices = mesh_uv.to(device=key.device, dtype=torch.float32).contiguous()
+        face_uv = mesh_face_uv.to(device=key.device, dtype=torch.int64).contiguous()
+        # Structure construction already checks face_uv value bounds on the
+        # host.  Here F_s/P_s and the resident shapes are checked without a
+        # device-to-host value transfer in the lazy solve boundary.
+        uv_tris = uv_vertices[face_uv].contiguous()
+        first_face = face_range[0]
+        faces = records.faces[first_face : face_range[1]].to(torch.int64)
+        tri = records.vertices[faces]
+        e1 = tri[:, 1] - tri[:, 0]
+        e2 = tri[:, 2] - tri[:, 0]
+        face_areas_m2 = (
+            0.5
+            * torch.linalg.vector_norm(torch.cross(e1, e2, dim=-1), dim=-1)
+        ).contiguous()
+        uv_e1 = uv_tris[:, 1] - uv_tris[:, 0]
+        uv_e2 = uv_tris[:, 2] - uv_tris[:, 0]
+        uv_areas = 0.5 * (
+            uv_e1[:, 0] * uv_e2[:, 1] - uv_e1[:, 1] * uv_e2[:, 0]
+        ).abs()
+        uv_world_scale_m = float(
+            torch.sqrt(face_areas_m2.sum() / uv_areas.sum().clamp_min(1.0e-20))
+        )
+        rms_slope = _phase_screen_rms_slope(
+            runtime, uv_world_scale_m, structure_index
+        )
+        resources[structure_index] = PhaseScreenStructureResource(
+            structure_index=structure_index,
+            material_index=material_index,
+            face_range=face_range,
+            first_face=first_face,
+            face_count=face_count,
+            uv_vertex_count=uv_vertex_count,
+            runtime=runtime,
+            uv_vertices=uv_vertices,
+            face_uv=face_uv,
+            uv_tris=uv_tris,
+            face_areas_m2=face_areas_m2,
+            uv_world_scale_m=uv_world_scale_m,
+            rms_slope=rms_slope,
+        )
+    return PhaseScreenRuntimeResources(key=key, structures=resources)
+
+
+def _phase_screen_rms_slope(
+    runtime: PhaseScreenRuntime, uv_scale_m: float, structure_index: int
+) -> float:
+    """Validate the static tangent-plane applicability guard exactly once."""
+
+    if uv_scale_m <= 0.0 or not math.isfinite(uv_scale_m):
+        raise RuntimeError(
+            "phase_screen_geometry_limit_exceeded: structure "
+            f"{structure_index} has a degenerate UV-to-world scale"
+        )
+    heights = runtime.heights_m
+    rows, cols = heights.shape
+    slope_u = (heights[:, 1:] - heights[:, :-1]) * (cols / uv_scale_m)
+    slope_v = (heights[1:, :] - heights[:-1, :]) * (rows / uv_scale_m)
+    mean_square_u = 0.0 if slope_u.numel() == 0 else float(slope_u.square().mean())
+    mean_square_v = 0.0 if slope_v.numel() == 0 else float(slope_v.square().mean())
+    rms_slope = math.sqrt(mean_square_u + mean_square_v)
+    if rms_slope > MAX_RMS_SLOPE:
+        raise RuntimeError(
+            "phase_screen_geometry_limit_exceeded: structure "
+            f"{structure_index} phase screen RMS slope {rms_slope:.3g} exceeds "
+            f"the tangent-plane limit {MAX_RMS_SLOPE:g}; heights of this "
+            "magnitude change occlusion/silhouettes and cannot be represented "
+            "as a pure phase screen"
+        )
+    return rms_slope
 
 
 # Preserve the import/pickle owner exposed by the MC events module.

@@ -224,9 +224,9 @@ def test_realization_runtime_preserves_height_graph():
     heights = _heights().requires_grad_(True)
     scene = _realization_scene(heights)
     compiled = scene.compile()
-    runtimes = compiled.phase_screen_runtimes
-    assert runtimes, "expected a compiled phase-screen runtime"
-    runtime = next(iter(runtimes.values()))
+    resources = compiled.phase_screen_resources.structures
+    assert resources, "expected a compiled phase-screen resource"
+    runtime = resources[min(resources)].runtime
     assert runtime.heights_m.requires_grad, "PhaseScreenRuntime detached heights"
     assert runtime.heights_m.grad_fn is not None
 

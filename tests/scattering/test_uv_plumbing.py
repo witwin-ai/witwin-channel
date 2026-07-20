@@ -209,7 +209,18 @@ def test_compiled_scene_lazy_scattering_caches():
     # Lazy cache: second access returns the same objects.
     assert compiled.kirchhoff_tables is tables
 
-    runtimes = compiled.phase_screen_runtimes
-    assert set(runtimes.keys()) == {0}
-    assert runtimes[0].heights_m.shape == (16, 16)
-    assert compiled.phase_screen_runtimes is runtimes
+    resources = compiled.phase_screen_resources
+    assert set(resources.structures) == {0}
+    resource = resources.structures[0]
+    assert resource.runtime.heights_m.shape == (16, 16)
+    assert resource.face_range == (0, 2)
+    assert resource.first_face == 0
+    assert resource.face_count == 2
+    assert resource.uv_vertex_count == 4
+    assert resource.uv_vertices.shape == (4, 2)
+    assert resource.face_uv.shape == (2, 3)
+    assert resource.uv_tris.shape == (2, 3, 2)
+    assert resource.face_areas_m2.shape == (2,)
+    assert resource.uv_world_scale_m > 0.0
+    assert resource.rms_slope == 0.0
+    assert compiled.phase_screen_resources is resources

@@ -37,6 +37,16 @@ state. Continuous tensor leaves needed by fixed-topology AD retain identity and
 their graph; topology-only scalarization is explicit and detached.
 Frequency-dependent compiled records reject unsupported frequency AD.
 
+Phase-screen resources are CompiledScene-owned and remain lazy: scenes that
+never enter a phase-screen consumer perform no height allocation or validation.
+The first consumer atomically caches a typed immutable resource per structure:
+mode exclusivity, host structure/material ids, face range and first face,
+resident scaled heights, checked UV tensors/triangles, face areas, static
+UV-to-world scale, and the RMS-slope applicability guard. Geometry, material,
+assignment, and mutation-aware height identity participate in invalidation.
+Frequency-, endpoint-, and solver-config-dependent patch subdivision and
+visibility remain solve-plan state and are never presented as compile resources.
+
 ## Forbidden fallback
 
 Production scene construction may not fall back to CPU geometry, a Python ray

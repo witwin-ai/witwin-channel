@@ -35,6 +35,13 @@ policy, and result/metadata assembly. The chain families retain their as-built
 AD difference: ensemble geometry is JVP-only and rejects reverse mode;
 realization geometry keeps both VJP and JVP.
 
+`PhaseScreenRuntime` retains height scaling, sampling, seed, and realization
+semantics. Scene-static bindings and resident tensors are assembled once by the
+lazy typed CompiledScene resource; scattering consumers read that resource and
+do not reconstruct UV scale, face ownership, or RMS-slope state per solve.
+Patch subdivision and visibility stay in the solve plan because they depend on
+frequency, endpoints, and solver configuration.
+
 ## Numerical and AD contract
 
 Directions point away from the mean surface; roughness axes and SI units follow

@@ -4,11 +4,11 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel_native.scattering.phase_screen import PhaseScreenRuntime
 from witwin.channel_native.scattering.tables import KirchhoffTable
 from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
 from witwin.channel_native.scene.scattering_resources import (
     KirchhoffRuntimeResources,
+    PhaseScreenResourceKey,
     PhaseScreenRuntimeResources,
     RoughMaterialRuntime,
     ScatteringResourceKey,
@@ -61,15 +61,15 @@ class CompiledScene:
 
     @property
     def phase_screen_resources(self) -> PhaseScreenRuntimeResources:
-        """Phase-screen runtimes per structure index (lazy, GPU textures)."""
+        """Immutable per-structure phase-screen resources, built lazily."""
 
-        key = self._scattering_resource_key()
+        key = self._phase_screen_resource_key()
         if (
             self._phase_screen_resources_cache is None
             or self._phase_screen_resources_cache.key != key
         ):
             self._phase_screen_resources_cache = build_phase_screen_resources(
-                self.assignments, key
+                self.materials, self.assignments, self.rayd, key
             )
         return self._phase_screen_resources_cache
 
@@ -78,12 +78,6 @@ class CompiledScene:
         """Compatibility view of the typed Kirchhoff table resources."""
 
         return self.kirchhoff_resources.tables
-
-    @property
-    def phase_screen_runtimes(self) -> dict[int, PhaseScreenRuntime]:
-        """Compatibility view of the typed phase-screen resources."""
-
-        return self.phase_screen_resources.runtimes
 
     @property
     def rough_material_runtimes(self) -> dict[int, RoughMaterialRuntime]:
@@ -98,6 +92,41 @@ class CompiledScene:
             assignment_version=self.assignment_version,
             device=device,
         )
+
+    def _phase_screen_resource_key(self) -> PhaseScreenResourceKey:
+        device = torch.device("cuda")
+        return PhaseScreenResourceKey(
+            material_cache_token=self.materials.cache_token,
+            geometry_version=self.geometry_version,
+            assignment_version=self.assignment_version,
+            phase_screen_token=self._phase_screen_assignment_token(),
+            device=device,
+        )
+
+    def _phase_screen_assignment_token(self) -> tuple[tuple[object, ...], ...]:
+        """Mutation-aware identity without reading resident values to the host."""
+
+        tokens: list[tuple[object, ...]] = []
+        for structure_index, screen in sorted(
+            self.assignments.structure_phase_screens.items()
+        ):
+            height = screen.height
+            if isinstance(height, torch.Tensor):
+                height_token: tuple[object, ...] = (
+                    "tensor",
+                    id(height),
+                    int(height._version),
+                    tuple(height.shape),
+                    height.dtype,
+                    height.device,
+                )
+            else:
+                height_token = (
+                    "sequence",
+                    tuple(tuple(float(value) for value in row) for row in height),
+                )
+            tokens.append((structure_index, id(screen), *height_token))
+        return tuple(tokens)
 
 
 CompiledScene.__module__ = "witwin.channel_native.core.runtime.compiled_scene"

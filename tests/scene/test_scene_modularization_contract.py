@@ -115,6 +115,23 @@ def _triangle_scene() -> public.Scene:
     )
 
 
+def _triangle_uv_scene() -> public.Scene:
+    scene = _triangle_scene()
+    structure = scene.structures[0]
+    return public.Scene(
+        structures=[
+            replace(
+                structure,
+                uv=torch.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]),
+                face_uv=structure.faces.clone(),
+            )
+        ],
+        transmitters=scene.transmitters,
+        receivers=scene.receivers,
+        frequency=scene.frequency,
+    )
+
+
 def _annotation_types(annotation: object):
     origin = get_origin(annotation)
     if origin is None:
@@ -697,6 +714,29 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
     }
 
 
+def test_phase_screen_scene_resource_schema_is_exact():
+    assert tuple(
+        item.name for item in fields(scattering_resources.PhaseScreenStructureResource)
+    ) == (
+        "structure_index",
+        "material_index",
+        "face_range",
+        "first_face",
+        "face_count",
+        "uv_vertex_count",
+        "runtime",
+        "uv_vertices",
+        "face_uv",
+        "uv_tris",
+        "face_areas_m2",
+        "uv_world_scale_m",
+        "rms_slope",
+    )
+    assert tuple(
+        item.name for item in fields(scattering_resources.PhaseScreenRuntimeResources)
+    ) == ("key", "structures")
+
+
 @pytest.mark.parametrize(
     "imports",
     (
@@ -817,9 +857,7 @@ def test_compile_cache_invalidation_and_material_storage_are_exact():
 
 
 def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatch):
-    base = public.Scene(
-        structures=[], transmitters=[], receivers=[], frequency=3.5e9
-    ).compile()
+    base = _triangle_uv_scene().compile()
     materials = replace(
         base.materials,
         scatter_model_id=torch.ones_like(base.materials.scatter_model_id),
@@ -844,7 +882,11 @@ def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatc
         f_te=torch.zeros((2, 2, 2, 2), dtype=torch.float32),
         f_tm=torch.zeros((2, 2, 2, 2), dtype=torch.float32),
     )
-    screen_resource = object()
+    screen_resource = SimpleNamespace(
+        device=torch.device("cuda"),
+        heights_m=torch.zeros((2, 2), device="cuda", dtype=torch.float32),
+        screen=screen,
+    )
     events: list[str] = []
 
     def build_table(*args, **kwargs):
@@ -895,16 +937,16 @@ def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatc
     assert compiled._phase_screen_resources_cache is None
     phase_screen_resources = compiled.phase_screen_resources
     assert compiled.phase_screen_resources is phase_screen_resources
-    runtimes = phase_screen_resources.runtimes
-    assert runtimes == {0: screen_resource}
-    assert compiled.phase_screen_runtimes is runtimes
+    resources = phase_screen_resources.structures
+    assert set(resources) == {0}
+    assert resources[0].runtime is screen_resource
+    assert resources[0].face_range == (0, 1)
+    assert resources[0].material_index == 0
     assert events == ["table", "screen"]
 
 
 def test_compiled_scattering_resource_failures_are_retryable(monkeypatch):
-    base = public.Scene(
-        structures=[], transmitters=[], receivers=[], frequency=3.5e9
-    ).compile()
+    base = _triangle_uv_scene().compile()
     compiled = replace(
         base,
         materials=replace(
@@ -938,11 +980,14 @@ def test_compiled_scattering_resource_failures_are_retryable(monkeypatch):
 
     def build_screen(*args, **kwargs):
         nonlocal screen_calls
-        del args, kwargs
         screen_calls += 1
         if screen_calls == 1:
             raise RuntimeError("screen build failed")
-        return object()
+        return SimpleNamespace(
+            device=torch.device(kwargs.get("device", "cuda")),
+            heights_m=torch.zeros((1, 1), device="cuda", dtype=torch.float32),
+            screen=args[0],
+        )
 
     monkeypatch.setattr(scattering, "build_kirchhoff_table", build_table)
     monkeypatch.setattr(scattering, "PhaseScreenRuntime", build_screen)
@@ -961,6 +1006,103 @@ def test_compiled_scattering_resource_failures_are_retryable(monkeypatch):
     assert screen_calls == 2
 
 
+def test_zero_face_phase_screen_resource_keeps_runtime_without_requiring_uv(
+    monkeypatch,
+):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for resident phase-screen resources")
+    base = public.Scene(
+        structures=[], transmitters=[], receivers=[], frequency=3.5e9
+    ).compile()
+    screen = public_materials.PhaseScreen(height=[[0.0]], height_scale_m=1.0)
+    assignments = replace(
+        base.assignments,
+        structure_material_id=torch.tensor([0], dtype=torch.int32),
+        structure_phase_screens={0: screen},
+    )
+    empty_vertices = torch.empty((0, 3), device="cuda", dtype=torch.float32)
+    empty_faces = torch.empty((0, 3), device="cuda", dtype=torch.int32)
+    empty_uv = torch.empty((0, 2), device="cuda", dtype=torch.float32)
+    empty_face_uv = torch.empty((0, 3), device="cuda", dtype=torch.int32)
+    fake_rayd = SimpleNamespace(
+        available=True,
+        mesh_tensors=((empty_vertices, empty_faces, empty_uv, empty_face_uv),),
+        edge_records=lambda: SimpleNamespace(
+            vertices=empty_vertices, faces=empty_faces
+        ),
+    )
+    runtime = SimpleNamespace(
+        device=torch.device("cuda"),
+        heights_m=torch.zeros((1, 1), device="cuda", dtype=torch.float32),
+        screen=screen,
+    )
+    monkeypatch.setattr(scattering, "PhaseScreenRuntime", lambda *args, **kwargs: runtime)
+    key = scattering_resources.PhaseScreenResourceKey(
+        material_cache_token=base.materials.cache_token,
+        geometry_version=0,
+        assignment_version=0,
+        phase_screen_token=((0, id(screen)),),
+        device=torch.device("cuda"),
+    )
+
+    resources = scattering_resources.build_phase_screen_resources(
+        base.materials, assignments, fake_rayd, key
+    )
+    resource = resources.structures[0]
+    assert resource.runtime is runtime
+    assert resource.face_range == (0, 0)
+    assert resource.face_count == 0
+    assert resource.uv_vertex_count == 0
+    assert resource.uv_vertices.shape == (0, 2)
+    assert resource.face_uv.shape == (0, 3)
+    assert resource.uv_tris.shape == (0, 3, 2)
+    assert resource.face_areas_m2.shape == (0,)
+    assert resource.uv_world_scale_m == 1.0
+    assert resource.rms_slope == 0.0
+
+
+def test_phase_screen_resource_identity_invalidation_and_scene_isolation():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for resident phase-screen resources")
+    screen = public_materials.PhaseScreen(
+        height=torch.zeros((2, 2)), height_scale_m=1.0
+    )
+
+    def bind(scene: public.Scene):
+        compiled = scene.compile()
+        return replace(
+            compiled,
+            assignments=replace(
+                compiled.assignments,
+                structure_phase_screens={0: screen},
+            ),
+        )
+
+    compiled = bind(_triangle_uv_scene())
+    first = compiled.phase_screen_resources
+    assert compiled.phase_screen_resources is first
+    first_resource = first.structures[0]
+    assert compiled.phase_screen_resources.structures[0].uv_tris is (
+        first_resource.uv_tris
+    )
+
+    assert isinstance(screen.height, torch.Tensor)
+    screen.height.add_(1.0)
+    rebuilt = compiled.phase_screen_resources
+    assert rebuilt is not first
+    assert rebuilt.key.phase_screen_token != first.key.phase_screen_token
+    torch.testing.assert_close(first_resource.runtime.heights_m, torch.zeros((2, 2), device="cuda"))
+    torch.testing.assert_close(rebuilt.structures[0].runtime.heights_m, torch.ones((2, 2), device="cuda"))
+
+    other = bind(_triangle_uv_scene()).phase_screen_resources.structures[0]
+    assert other.runtime.heights_m.untyped_storage().data_ptr() != (
+        rebuilt.structures[0].runtime.heights_m.untyped_storage().data_ptr()
+    )
+    assert other.uv_tris.untyped_storage().data_ptr() != (
+        rebuilt.structures[0].uv_tris.untyped_storage().data_ptr()
+    )
+
+
 def test_smooth_compiled_scene_persists_independent_empty_resources():
     compiled = public.Scene(
         structures=[], transmitters=[], receivers=[], frequency=3.5e9
@@ -972,9 +1114,9 @@ def test_smooth_compiled_scene_persists_independent_empty_resources():
     assert compiled.rough_material_runtimes == {}
     assert compiled._phase_screen_resources_cache is None
 
-    runtimes = compiled.phase_screen_runtimes
-    assert runtimes == {}
-    assert compiled.phase_screen_runtimes is runtimes
+    resources = compiled.phase_screen_resources
+    assert resources.structures == {}
+    assert compiled.phase_screen_resources is resources
 
 
 def test_compiled_scattering_resources_rebuild_when_key_changes():

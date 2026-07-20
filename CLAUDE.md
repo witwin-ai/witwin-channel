@@ -137,6 +137,12 @@ requires them.
   topology/packing, RNG/MIS/event policy, accumulation, and results. Preserve
   per-TU flags and the as-built chain AD split: ensemble geometry is JVP-only,
   while realization geometry supports VJP and JVP.
+- Phase-screen mode resolution and scene-static realization resources are
+  CompiledScene-owned and lazy. The first phase-screen consumer atomically
+  caches immutable resident heights, structure/material ids, face ranges, UV
+  tensors, scale, and RMS-slope state; endpoint/frequency/config-dependent
+  subdivision and visibility remain solve-plan work. Unrelated compile and
+  non-scattering solves must not allocate or validate these resources.
 - Do not split a fused native operation merely to mirror Python modules. A
   refactor must not add kernel launches, synchronizations, materialized
   intermediates, persistent tape, host/device transfers, or reduction-order

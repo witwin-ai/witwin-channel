@@ -271,7 +271,9 @@ def _run_discovery(scene, config):
 
     device = torch.device("cuda")
     compiled = scene.compile()
-    screens = scattering_mod._realization_structures(compiled)
+    screens = scattering_mod.realization_phase_screens(
+        compiled.materials, compiled.assignments
+    )
     ensemble_faces = scattering_append._ensemble_scatter_faces(
         compiled, screens, device=device
     )

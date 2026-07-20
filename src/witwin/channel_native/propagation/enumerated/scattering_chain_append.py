@@ -10,8 +10,8 @@ scattering path stays in ``scattering.py``.
 Discovery itself is owned by the sibling ``scattering_chain`` module; this
 module consumes its ``ScatterChainDiscovery`` contract and appends the joined,
 budgeted rows. The vertex-frame geometry mirrors the single-bounce ensemble
-convention and reuses ``_unit``/``_stable_tangent``/``_realization_structures``
-from ``scattering`` so the two paths never diverge.
+convention and reuses ``_unit``/``_stable_tangent`` plus the scene-owned
+phase-screen assignment resolver so the two paths never diverge.
 """
 
 from __future__ import annotations
@@ -34,9 +34,11 @@ from witwin.channel_native.scattering.kernels import autograd as scattering_auto
 from witwin.channel_native.scattering.kernels import functional_chain as scattering_chain_kernels
 from witwin.channel_native.propagation.enumerated.contracts import TopologyConfig
 from witwin.channel_native.propagation.enumerated.scattering import (
-    _realization_structures,
     _stable_tangent,
     _unit,
+)
+from witwin.channel_native.scene.scattering_resources import (
+    realization_phase_screens,
 )
 from witwin.channel_native.propagation.enumerated.scattering_chain import (
     KMAX_AD_DEPTH,
@@ -531,7 +533,7 @@ def append_chain_scattering_paths(
         raise RuntimeError(
             "deterministic scatter-chain discovery requires RayD native capability"
         )
-    screens = _realization_structures(compiled)
+    screens = realization_phase_screens(compiled.materials, compiled.assignments)
     ensemble_faces = _ensemble_scatter_faces(compiled, screens, device=device)
     samples = build_chain_samples(compiled, config, ensemble_faces, device=device)
     info["chain_sample_count"] = 0 if samples is None else int(samples.position.shape[0])
