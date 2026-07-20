@@ -19,8 +19,8 @@
             }
         }
     },
-    "current_phase": 11,
-    "current_subphase": "8B device-resident diffraction planning",
+    "current_phase": 12,
+    "current_subphase": "profiling-driven performance closure",
     "transfers_applied": [
         {
             "phase": 3,
@@ -1216,5 +1216,22 @@
         "python_torch_numerical_geometry": false,
         "compatibility_alias": false,
         "public_api_delta": false
+    },
+    "phase11_release_governance_closure": {
+        "status": "governance complete; final release evidence pending",
+        "evidence": "docs/dev/audit/phase13-phase11-release-acceptance.json",
+        "completed": [
+            "Phase 11A and 11B frozen duplication acceptance",
+            "RayD legacy extern-C retirement",
+            "stable typed integration naming",
+            "live manifest, current owner, lock, feature, migration, and workflow alignment",
+            "live-surface version-suffixed WIP boundary scan"
+        ],
+        "historical_evidence_mutated": false,
+        "pending": [
+            "final clean-checkout nightly tier",
+            "final clean-checkout release tier",
+            "final wheel, PE/DSO, and build-fingerprint evidence"
+        ]
     }
 }

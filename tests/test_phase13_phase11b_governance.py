@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,46 @@ ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/dev/audit"
 EVIDENCE_PATH = AUDIT / "phase13-boundary-dedup-phase11b-evidence.json"
 LEDGER_PATH = AUDIT / "duplication-classification.json"
+RELEASE_EVIDENCE_PATH = AUDIT / "phase13-phase11-release-acceptance.json"
+PHASE11_IMPLEMENTATION_BOUNDARY = "d2681c5810d78fdd1132a60a88b568c00581f6e2"
+
+_LIVE_FILE_SUFFIXES = {".cpp", ".cu", ".cuh", ".h", ".json", ".md", ".py", ".toml", ".yml"}
+_LIVE_ROOTS = (
+    ROOT / "src",
+    ROOT / "native",
+    ROOT / "ci",
+    ROOT / ".github/workflows",
+)
+_LIVE_TOP_LEVEL = (
+    ROOT / "CMakeLists.txt",
+    ROOT / "dependencies/rayd.lock.json",
+    ROOT / "FEATURE_LIST.md",
+    ROOT / "AGENTS.md",
+    ROOT / "CLAUDE.md",
+)
+_TRIANGLE_VERTEX_V2_LINES = {
+    (
+        "src/witwin/channel_native/montecarlo/events/scattering.py",
+        "v2 = vertices.index_select(0, faces[:, 2])",
+    ),
+    (
+        "src/witwin/channel_native/montecarlo/events/scattering.py",
+        "areas = 0.5 * torch.linalg.cross(v1 - v0, v2 - v0).norm(dim=-1)",
+    ),
+    (
+        "src/witwin/channel_native/montecarlo/events/scattering.py",
+        "+ b2 * v2.index_select(0, chosen)",
+    ),
+    (
+        "native/channel_native/kernels/diffraction.cu",
+        "const int v2 = tri[2];",
+    ),
+    ("native/channel_native/kernels/diffraction.cu", "return v2;"),
+    (
+        "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+        "companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))",
+    ),
+}
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -19,6 +60,16 @@ def _json(path: Path) -> dict[str, Any]:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _live_surface_files() -> tuple[Path, ...]:
+    nested = (
+        path
+        for root in _LIVE_ROOTS
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in _LIVE_FILE_SUFFIXES
+    )
+    return tuple(sorted((*nested, *_LIVE_TOP_LEVEL)))
 
 
 def _module_functions(path: Path) -> dict[str, ast.FunctionDef]:
@@ -69,7 +120,6 @@ def test_phase11b_duplication_budget_is_met_without_relaxation() -> None:
         "met": True,
         "margin_percentage_points": 0.155099,
     }
-    assert migration["current_phase"] == 11
     assert migration["phase11b_current"]["duplication_refresh"]["budget_met"] is True
     assert migration["phase11b_current"]["evidence"] == str(
         EVIDENCE_PATH.relative_to(ROOT)
@@ -174,3 +224,79 @@ def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved(
 
     invariants = _json(EVIDENCE_PATH)["invariants"]
     assert all(value is False for value in invariants.values())
+
+
+def test_phase11_live_surface_has_no_version_suffixed_wip_boundary_name() -> None:
+    versioned_boundary = re.compile(
+        r"integration[_-]v\d+|rayd\.torch\.integration\.v\d+",
+        re.IGNORECASE,
+    )
+    unexpected_boundary_names: list[str] = []
+    observed_triangle_v2: set[tuple[str, str]] = set()
+    unexpected_v2: list[str] = []
+
+    for path in _live_surface_files():
+        relative = path.relative_to(ROOT).as_posix()
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8-sig").splitlines(), start=1
+        ):
+            if versioned_boundary.search(line):
+                unexpected_boundary_names.append(f"{relative}:{number}: {line.strip()}")
+            if relative.startswith(("src/", "native/")) and re.search(
+                r"\bv2\b", line, re.IGNORECASE
+            ):
+                record = (relative, line.strip())
+                if record in _TRIANGLE_VERTEX_V2_LINES:
+                    observed_triangle_v2.add(record)
+                else:
+                    unexpected_v2.append(f"{relative}:{number}: {line.strip()}")
+
+    assert unexpected_boundary_names == []
+    assert unexpected_v2 == []
+    assert observed_triangle_v2 == _TRIANGLE_VERTEX_V2_LINES
+
+
+def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
+    evidence = _json(RELEASE_EVIDENCE_PATH)
+    lock = _json(ROOT / "dependencies/rayd.lock.json")
+    inventory = _json(AUDIT / "phase13-current-native-owner-inventory.json")
+    migration = _json(AUDIT / "phase13-migration-delta.json")
+
+    assert evidence["status"] == (
+        "governance complete; final release evidence pending"
+    )
+    assert evidence["release_claim"] is False
+    assert (
+        evidence["implementation_boundary"]["channel_commit"]
+        == PHASE11_IMPLEMENTATION_BOUNDARY
+    )
+    assert evidence["implementation_boundary"]["rayd_commit"] == lock["commit"]
+    assert (
+        evidence["implementation_boundary"]["integration_header_sha256"]
+        == lock["integration_abi"]["sha256"]
+    )
+    assert evidence["verified"]["binding_count"] == len(
+        _json(ROOT / "ci/native-binding-manifest.json")["symbols"]
+    )
+    assert evidence["verified"]["owner_counts"] == {
+        "RayD": inventory["counts"]["rayd_numerical"],
+        "layered": inventory["counts"]["layered"],
+        "Channel Native": inventory["counts"]["channel_numerical"],
+    }
+    assert evidence["verified"]["native_binding_manifest_sha256"] == _sha256(
+        ROOT / "ci/native-binding-manifest.json"
+    )
+    assert evidence["verified"]["contract_coverage_manifest_sha256"] == _sha256(
+        ROOT / "ci/contract-coverage-manifest.json"
+    )
+    assert (ROOT / "AGENTS.md").read_bytes() == (ROOT / "CLAUDE.md").read_bytes()
+    assert evidence["verified"]["agents_claude_sha256"] == _sha256(
+        ROOT / "AGENTS.md"
+    )
+    assert inventory["phase11_release_governance_closure"]["evidence"] == str(
+        RELEASE_EVIDENCE_PATH.relative_to(ROOT)
+    ).replace("\\", "/")
+    assert migration["phase11_release_governance_closure"]["evidence"] == str(
+        RELEASE_EVIDENCE_PATH.relative_to(ROOT)
+    ).replace("\\", "/")
+    assert len(evidence["pending_final_acceptance"]) == 6

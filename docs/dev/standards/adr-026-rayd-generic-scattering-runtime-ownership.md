@@ -1,7 +1,7 @@
 # ADR-026: RayD ownership of generic scattering runtime operations
 
-- **Status:** Accepted (2026-07-19); Phase 10A/10B implementation activated;
-  final duplication/release acceptance pending Phase 11
+- **Status:** Accepted (2026-07-19); Phase 10A/10B implementation and Phase 11B
+  frozen duplication acceptance complete; final release evidence pending
 - **Date:** 2026-07-19
 - **Kind:** Cross-repository native-owner move. This decision does not authorize
   a numerical, fusion, launch, resource-lifecycle, or public-Python-API change.
@@ -326,6 +326,13 @@ to 11.170566%, pruned all 12 stale chain-region entries, and classified the
 three new typed-adapter packing regions. The frozen 10.211512% budget was not
 relaxed and is still exceeded; this is an explicit Phase 11 nightly/release
 acceptance blocker, not a reason to mix unrelated deduplication into Phase 10B.
+
+Phase 11B subsequently reduced the metric to `7826/77821 = 10.056413%`, below
+the unchanged `10.211512%` frozen budget, with 143 classified regions, zero
+stale regions, and zero unclassified regions. This closes the duplication
+blocker without changing scattering physics, signatures, launches, or numerical
+order. Final clean-checkout nightly/release and wheel evidence remains tracked
+separately in `docs/dev/audit/phase13-phase11-release-acceptance.json`.
 
 ## Consequences
 

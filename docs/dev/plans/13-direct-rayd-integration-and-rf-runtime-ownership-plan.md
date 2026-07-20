@@ -1,10 +1,10 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** EXECUTION IN PROGRESS（用户于 2026-07-20 选择 Phase 8B 方案 2 并要求完成
-Phase 11/12）；ADR-023/024/025/026/028 已接受；Phase 10A/10B 已完成原子
-pin/switch/delete；Phase 11A/11B 机械去重、RayD legacy extern-C 删除、clean-RayD wheel
-packaging 与 nightly 子门已完成；Phase 8B、稳定 integration 命名、Phase 12 profiling 优化和
-最终 clean-checkout release 收口正在执行
+Phase 11/12）；ADR-023/024/025/026/028 已接受；Phase 8B、Phase 10A/10B、Phase
+11A/11B、RayD legacy extern-C 删除和稳定 integration 命名已完成。Phase 11 live
+governance/docs 已收口；最终 clean-checkout nightly/release、wheel/fingerprint 证据和 Phase
+12 profiling-driven 性能验收仍在执行
 
 **计划日期：** 2026-07-18
 
@@ -39,7 +39,8 @@ primal/JVP/VJP family。除明确独立立项的 batched penetration trace 外�
 [ADR-023](../standards/adr-023-direct-rayd-typed-integration.md)、
 [ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)、
 [ADR-025](../standards/adr-025-diffraction-operation-family-ownership.md)、
-[ADR-026](../standards/adr-026-rayd-generic-scattering-runtime-ownership.md)。
+[ADR-026](../standards/adr-026-rayd-generic-scattering-runtime-ownership.md)、
+[ADR-028](../standards/adr-028-device-resident-diffraction-state-selection.md)。
 
 ## 1. 执行结论
 
@@ -702,8 +703,10 @@ move-only 实现已将 duplication 从 Phase 10A 的 11.913070% 降至 11.170566
 
 ### Phase 11 — Release、packaging 与旧 RayD API退役
 
-**实现状态：IN PROGRESS（Phase 11A/11B COMPLETE，2026-07-19；RayD legacy API、
-packaging、nightly/release 仍待完成）。** Phase 11A 仅在
+**实现状态：治理与文档收口完成（2026-07-20）；最终 release evidence 待完成。** RayD
+legacy extern-C API 已经 consumer/reachability 审计并删除；stable typed boundary 使用
+`rayd/torch/integration.h` 与 `rayd.torch.integration`，numeric API version 2 独立校验且没有
+version-suffixed compatibility alias。Phase 11A 仅在
 `fields.cpp` 与 `materials.cpp` 使用 TU-local compile-time helpers 收敛 typed request/
 parameter packing；显式 pybind signatures、参数和 validation/error 顺序、typed
 Request/Result、output schema、ABI、launch 与数值均不变。`EXACT_TOKEN_MATCH` 从 Phase
@@ -720,14 +723,16 @@ plumbing。所有显式 Python/native signatures、tensor identity/storage、val
 saved-tensor 顺序、output schema、kernel launch/reduction/RNG 与数值保持不变。去重指标降至
 `7826/77821 = 10.056413%`，低于未放宽的冻结预算 `10.211512%`；当前 143 个 regions
 全部分类，0 stale、0 unclassified。证据见
-`docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json`。Phase 11B 完成不代表 Phase
-11 release 收口完成；下列 packaging、RayD legacy API 与 clean-checkout release gates 仍须执行。
+`docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json`。
 
-1. Wheel只有 `_channel_native` 和规定 metadata，无 RayD Python extension/未声明 DSO。
-2. 两仓无复制的 RF/scattering physics、legacy integration signature或反向 private include。
-3. 更新 FEATURE_LIST、migration docs、live manifests、current-owner delta、lock/fingerprint。
-4. RayD 其他 consumer全部迁移后，才在 RayD独立 PR删除旧 extern-C API。
-5. 保存 nightly/release、Nsight、exact/codegen/AD/packaging evidence，关闭 ADR-023-026。
+Phase 11 live governance 已同步 FEATURE_LIST、migration docs、203-symbol binding/coverage
+manifests、current-owner delta、final RayD lock 与三个 CUDA workflows；历史 Phase
+6/8/10/11A/11B evidence 保持不可变。当前已验证项和诚实的 pending 边界记录在
+`docs/dev/audit/phase13-phase11-release-acceptance.json`。仍未完成、不得提前宣称通过的仅有：
+
+1. 最终 clean-checkout `nightly`；
+2. 最终 clean-checkout `release`；
+3. 对最终提交重新生成并保存 wheel、PE/DSO、build fingerprint 和 Phase 12 性能证据。
 
 ### Phase 12 — Profiling-driven 性能收口
 

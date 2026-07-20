@@ -4,18 +4,13 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 from collections import Counter
 from pathlib import Path
-
-from tools.refactor_baseline import binding_manifest
-
 
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/dev/audit"
 RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayDi"))
 PHASE10B_RAYD_COMMIT = "768b96e42a95f70c32d55f98a72000085317e288"
-CURRENT_RAYD_COMMIT = "5df6497d36ac941bbc88b26dc3c16e373ee37705"
 INTEGRATION_SHA256 = (
     "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654"
 )
@@ -27,6 +22,32 @@ SHARED_SHA256 = (
 )
 PHASE10B_BINDING_MANIFEST_SHA256 = (
     "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71"
+)
+PHASE10B_COVERAGE_MANIFEST_SHA256 = (
+    "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f"
+)
+PHASE10B_RAYD_SOURCE_SHA256 = {
+    "backends/torch/src/torch_ext/rf/scattering_chain_checks.h": (
+        "4f61082059d08112d675613e2e0ff0d8b7489753ffb96aec152aa17ac2409b73"
+    ),
+    "backends/torch/src/torch_ext/rf/scattering_chain_ad_common.cuh": (
+        "2551c33533dc7ea0a0c1680d67e5432587f8c2f77833d5a717fcb2d20597b507"
+    ),
+    "backends/torch/src/torch_ext/rf/scattering_chain_ensemble.cu": (
+        "6293c9238fa5c251d23408493fffd0b88cc557f50de84c90519ec1115ca7d9fd"
+    ),
+    "backends/torch/src/torch_ext/rf/scattering_chain_ensemble_ad.cu": (
+        "a207dbf58b62286b8a58d7f22535900b198f187c7d0bffb2bacce728eaae306e"
+    ),
+    "backends/torch/src/torch_ext/rf/scattering_chain_realization.cu": (
+        "be9601740ad1dce283708446ebc596b5fd5aca1da8f12421cc077d0dac99d424"
+    ),
+    "backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu": (
+        "970c579cc9d0c384d28e7aaa8f32200800a1de159de9a0338b2f0bad75f7fa93"
+    ),
+}
+PHASE10B_DIRECT_TEST_SHA256 = (
+    "5661129d9662d4f2879aaba284b245dd7f32a61b95c13a77e270d624ff315423"
 )
 IDENTITY = (
     "rayd.torch.integration.v2.20260719.rf-transmission-sequence."
@@ -77,76 +98,62 @@ def test_lf_text_sha256_normalizes_eol_without_hiding_content_changes(
 
 
 def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
-    lock = _json(ROOT / "dependencies/rayd.lock.json")
     inventory = _json(AUDIT / "phase13-current-native-owner-inventory.json")
     migration = _json(AUDIT / "phase13-migration-delta.json")
     evidence = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")
 
-    assert lock["commit"] == CURRENT_RAYD_COMMIT
-    assert lock["integration_abi"]["sha256"] == INTEGRATION_SHA256
     assert {
         inventory["phase10b_scattering_chains"]["rayd_commit"],
         migration["phase10b_current"]["rayd_commit"],
         evidence["activation"]["rayd_commit"],
         graph["phase10b_activation"]["rayd_commit"],
     } == {PHASE10B_RAYD_COMMIT}
-    assert inventory["counts"] == {
-        "bindings": 202,
-        "rayd_numerical": 43,
+    assert migration["phase10b_current"]["owner_counts"] == {
+        "RayD": 43,
         "layered": 2,
-        "channel_numerical": 157,
+        "Channel Native": 157,
     }
-    assert inventory["current_subphase"] == "10B"
-    assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11B"
+    assert evidence["owner_transfer"]["owner_counts"] == {
+        "RayD": 43,
+        "layered": 2,
+        "Channel Native": 157,
+    }
+    assert inventory["phase10b_scattering_chains"]["binding_count"] == 202
+    assert migration["phase10b_current"]["binding_count"] == 202
+    assert evidence["activation"]["binding_count"] == 202
     assert Counter(row["numerical_owner"] for row in inventory["symbols"]) == {
         "RayD": 43,
-        "Channel operation / RayD primitives": 2,
+        "Channel operation / RayD primitives": 3,
         "Channel Native": 157,
     }
     owners = {row["symbol"]: row["numerical_owner"] for row in inventory["symbols"]}
     assert all(owners[symbol] == "RayD" for symbol in CHAIN_SYMBOLS)
 
-    native_manifest = ROOT / "ci/native-binding-manifest.json"
-    coverage_manifest = ROOT / "ci/contract-coverage-manifest.json"
-    assert _json(native_manifest) == binding_manifest(ROOT)
-    assert len(_json(native_manifest)["symbols"]) == 202
-    assert len(_json(coverage_manifest)["native_bindings"]) == 202
     assert (
         evidence["activation"]["binding_manifest_sha256"]
         == PHASE10B_BINDING_MANIFEST_SHA256
     )
-    assert _lf_text_sha256(coverage_manifest) == evidence["activation"][
-        "contract_coverage_manifest_sha256"
-    ]
+    assert (
+        evidence["activation"]["contract_coverage_manifest_sha256"]
+        == PHASE10B_COVERAGE_MANIFEST_SHA256
+    )
 
 
-def test_phase10b_rayd_identity_sources_and_direct_contract_are_locked() -> None:
+def test_phase10b_rayd_identity_sources_and_direct_contract_are_recorded() -> None:
     evidence = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
     activation = evidence["activation"]
-    integration = RAYD_ROOT / activation["integration_header"]
-    typed = RAYD_ROOT / activation["typed_header"]
-    shared = RAYD_ROOT / activation["shared_table_header"]
-
-    assert _lf_text_sha256(integration) == INTEGRATION_SHA256
-    assert _lf_text_sha256(typed) == TYPED_SHA256
-    assert _lf_text_sha256(shared) == SHARED_SHA256
-    assert IDENTITY in integration.read_text(encoding="utf-8-sig")
-    for record in evidence["rayd_sources"]:
-        assert _lf_text_sha256(RAYD_ROOT / record["path"]) == record["sha256"]
+    assert activation["integration_header_sha256"] == INTEGRATION_SHA256
+    assert activation["integration_header_identity"] == IDENTITY
+    assert activation["typed_header_sha256"] == TYPED_SHA256
+    assert activation["shared_table_header_sha256"] == SHARED_SHA256
+    assert {record["path"]: record["sha256"] for record in evidence["rayd_sources"]} == (
+        PHASE10B_RAYD_SOURCE_SHA256
+    )
     direct = evidence["direct_contract_coverage"]
-    assert _lf_text_sha256(RAYD_ROOT / direct["test"]) == direct["test_sha256"]
+    assert direct["test_sha256"] == PHASE10B_DIRECT_TEST_SHA256
     assert direct["ctest_result"] == "4/4 passed"
     assert len(direct["depth8_positive_coverage"]) == 2
-    head = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=RAYD_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert head == CURRENT_RAYD_COMMIT
 
 
 def test_phase10b_channel_is_typed_facade_without_duplicate_or_fallback() -> None:

@@ -232,10 +232,15 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for entry in current_inventory["symbols"]
     }
 
-    assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11B"
-    assert current_inventory["current_phase"] == 10
-    assert current_inventory["current_subphase"] == "10B"
+    # This is an immutable Phase-9 body-hash test.  Later phases advance the
+    # live cursor, so validate the recorded transformations rather than pinning
+    # the repository-wide current phase to the historical cut.
+    assert migration["phase11b_current"]["status"] == (
+        "complete; frozen duplication acceptance met"
+    )
+    assert current_inventory["phase10b_scattering_chains"]["rayd_commit"] == (
+        "768b96e42a95f70c32d55f98a72000085317e288"
+    )
     assert len(live_transfers) == len(transferred_names)
     assert expected - actual == approved_before + approved_deletions + phase11b_before
     assert actual_transferred == approved_after

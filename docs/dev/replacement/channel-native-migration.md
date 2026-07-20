@@ -231,7 +231,7 @@ mixed into this owner move.
 
 ### Plan 13 Phase 11: stable typed-integration naming
 
-Channel Native now pins pushed RayD commit
+Stable naming was activated at pushed RayD commit
 `3869c2ab76bb06498dc95e3cf634fdf117529906`. The stable typed boundary is
 `backends/torch/include/rayd/torch/integration.h`, with SHA-256
 `e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86`
@@ -245,6 +245,17 @@ stable name. No forwarding header, identity alias, dual include, runtime
 fallback, binding-symbol change, numerical-owner change, kernel launch change,
 or public Python API change is introduced. Earlier Phase 3/6/8/10 commit, path,
 identity, and hash records remain explicitly historical activation evidence.
+
+The current lock subsequently advanced to pushed RayD
+`102470daf44b649030df3b2554d9ace5c1eea482` for the accepted Phase 8B typed
+axial-edge visibility operation. The same stable header now has SHA-256
+`65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435`;
+the identity and independently validated numeric API version are unchanged.
+Phase 11A/11B also closed the frozen duplication budget at 10.056413%, retired
+the legacy RayD entries, and aligned live manifests, workflows, owner records,
+and migration governance. Final clean-checkout nightly/release and final
+wheel/fingerprint evidence remain explicitly pending in
+`docs/dev/audit/phase13-phase11-release-acceptance.json`.
 
 ## API surface changes
 

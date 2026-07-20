@@ -78,7 +78,6 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
         phase10b["activation"]["binding_manifest_sha256"]
         == record["phase10b_snapshot_sha256"]
     )
-    assert migration["current_phase"] == 11
     assert migration["phase11a_current"]["evidence"] == str(
         EVIDENCE_PATH.relative_to(ROOT)
     ).replace("\\", "/")

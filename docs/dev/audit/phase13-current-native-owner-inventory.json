@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan": "Plan 13 Phase 11 stable integration naming",
+  "plan": "Plan 13 current owner inventory",
   "baseline": {
     "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
     "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
@@ -32,8 +32,8 @@
     "layered": 3,
     "channel_numerical": 157
   },
-  "current_phase": 11,
-  "current_subphase": "8B device-resident diffraction planning",
+  "current_phase": 12,
+  "current_subphase": "profiling-driven performance closure",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -340,6 +340,24 @@
     "native_abi_symbol_delta": 1,
     "public_api_delta": false,
     "compatibility_alias": false
+  },
+  "phase11_release_governance_closure": {
+    "status": "governance complete; final release evidence pending",
+    "evidence": "docs/dev/audit/phase13-phase11-release-acceptance.json",
+    "binding_count": 203,
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 3,
+      "Channel Native": 157
+    },
+    "legacy_rayd_api_retired": true,
+    "stable_integration_naming": true,
+    "historical_evidence_mutated": false,
+    "pending": [
+      "final clean-checkout nightly tier",
+      "final clean-checkout release tier",
+      "final wheel, PE/DSO, and build-fingerprint evidence"
+    ]
   },
   "symbols": [
     {
@@ -5371,7 +5389,7 @@
           "count": 1
         }
       ],
-      "numerical_owner": "Channel operation / RayD primitive",
+      "numerical_owner": "Channel operation / RayD primitives",
       "owner_kind": "Channel composed native operation through direct typed RayD API",
       "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.diffraction_tx_visible_state_plan",
       "python_definitions": [
@@ -7177,7 +7195,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "stable Monte Carlo diffraction discovery name retained"
     },
     {
       "symbol": "mc_diffraction_discover_edges_counted",
@@ -7217,7 +7235,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "stable Monte Carlo diffraction discovery name retained"
     },
     {
       "symbol": "mc_diffraction_edge_geometry",
@@ -9434,7 +9452,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 stable RayD primitive name complete"
     },
     {
       "symbol": "rayd_intersect_jvp",
@@ -10182,7 +10200,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "Phase 3 stable RayD primitive name complete"
     },
     {
       "symbol": "scattering_chain_ensemble_eval",

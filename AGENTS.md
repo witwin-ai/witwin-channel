@@ -94,6 +94,10 @@ requires them.
   directly; do not build/import a RayD Python extension, add a second
   dispatcher/registry, or route through copied `extern "C"` signatures,
   function-pointer getters, compatibility shims, or dynamic symbol lookup.
+- The stable public typed boundary is `rayd/torch/integration.h` with identity
+  `rayd.torch.integration`. Validate its numeric API version independently; do
+  not encode version or capability growth in a WIP filename, target, identity,
+  forwarding header, or compatibility alias.
 - RayD scene ownership crosses the boundary as an RAII `SceneResource` held by
   a typed `RayDSceneResource` holder. Never encode a native pointer as an
   integer handle or add dummy/stale-handle plumbing. Typed operations use

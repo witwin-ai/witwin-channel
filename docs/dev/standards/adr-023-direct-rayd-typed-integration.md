@@ -1,6 +1,7 @@
 # ADR-023: Direct RayD typed integration and RayDN retirement
 
-- **Status:** Accepted (2026-07-19)
+- **Status:** Accepted (2026-07-19); typed switch, legacy retirement, and stable
+  integration naming implemented; final release evidence pending
 - **Date:** 2026-07-19
 - **Kind:** Native integration boundary and lifecycle ownership. This ADR does
   not change physics, numerical order, fusion, launch configuration, solver
@@ -174,21 +175,19 @@ and accepted historical decision or migration records may retain historical
 terms only through explicit archive-scoped allowances; they do not authorize a
 live compatibility name.
 
-### 6. Legacy RayD API retirement window
+### 6. Realized legacy retirement and stable naming
 
-RayD's legacy `extern "C"` integration entries remain temporarily available
-only so other known RayD consumers can migrate. Channel stops compiling and
-calling them when it switches to the typed boundary; it does not wrap them
-behind a new name.
+Plan 13 Phase 11 completed the repository/consumer reachability audit and
+removed RayD's legacy `extern "C"` integration entries. Channel neither compiles
+nor calls those entries and exposes no renamed wrapper, compatibility alias, or
+dual path. The audit covered declarations, definitions, link references,
+tests, examples, packages, downstream build files, and current documentation.
 
-The legacy entries are removed from RayD only in Plan 13 Phase 11, in a
-separate RayD change, after a repository/consumer reachability audit proves
-that every consumer has moved to the typed boundary. Until that deletion,
-changes to the old
-entries are limited to keeping the shared implementation in exact lockstep and
-must not add capability or establish them as a second long-term API. The final
-audit must cover declarations, definitions, link references, tests, examples,
-packages, downstream build files, and documentation.
+The live typed boundary now uses `rayd/torch/integration.h` and identity
+`rayd.torch.integration`. Numeric API version 2 remains a separately validated
+contract value; it is not encoded in a WIP filename, target, or identity. The
+final Channel lock advances through later accepted RayD additions without
+reintroducing the retired surface.
 
 ## Required migration and acceptance evidence
 
