@@ -31,7 +31,26 @@
     "channel_typed_adapter": "native/channel_native/binding/fields.cpp",
     "reverse_private_include_count": 0
   },
+  "phase10a_activation": {
+    "status": "active",
+    "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
+    "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce",
+    "scattering_contracts_activated": 11,
+    "scattering_table_helpers_activated": 7,
+    "deleted_channel_private_header": "native/channel_native/kernels/scattering_table.cuh",
+    "channel_typed_adapter": "native/channel_native/binding/materials.cpp",
+    "reverse_private_include_count": 0
+  },
   "roots": [
+    "RayD:backends/torch/include/rayd/torch/rf/scattering.h",
+    "RayD:shared/include/rayd/shared/rf/scattering_table.cuh",
+    "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+    "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+    "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu",
+    "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+    "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral.cu",
+    "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu",
     "RayD:backends/torch/include/rayd/torch/rf/diffraction.h",
     "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
     "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu",
@@ -167,18 +186,18 @@
       "sha256": "3aade1cf51777ba3ee9e89943c89973b684709455c23bf303c954eb0ec594d29"
     },
     {
-      "id": "native/channel_native/kernels/scattering_table.cuh",
-      "current_source_owner": "Channel Native",
-      "target_source_owner": "RayD after ADR-026",
+      "id": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh",
+      "current_source_owner": "RayD",
+      "target_source_owner": "RayD",
       "direct_consumers": [
-        "native/channel_native/kernels/scattering.cu",
+        "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+        "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+        "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu",
+        "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
         "native/channel_native/kernels/scattering_chain_ensemble.cu",
-        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-        "native/channel_native/kernels/scattering_ensemble.cu",
-        "native/channel_native/kernels/scattering_ensemble_ad.cu",
-        "native/channel_native/kernels/scattering_table_eval_ad.cu"
+        "native/channel_native/kernels/scattering_chain_ensemble_ad.cu"
       ],
-      "sha256": "8b798e1e89888cba762a5938c294816c73f13205c2e3752b76ddeddf210a4e32"
+      "sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
     },
     {
       "id": "RayD:include/rayd/shared/utd/utd_math.h",
@@ -228,16 +247,26 @@
     {"from": "native/channel_native/kernels/kirchhoff_table_ad.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "line": 50},
     {"from": "native/channel_native/kernels/reflection.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 7},
     {"from": "native/channel_native/kernels/reflection.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "line": 8},
-    {"from": "native/channel_native/kernels/scattering_chain_ensemble.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 43}
+    {"from": "native/channel_native/kernels/scattering_chain_ensemble.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 43},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/scattering.cu", "to": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh", "line": 12},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu", "to": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh", "line": 31},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu", "to": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh", "line": 28},
+    {"from": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu", "to": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh", "line": 29},
+    {"from": "native/channel_native/kernels/scattering_chain_ensemble.cu", "to": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh", "line": 45},
+    {"from": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu", "to": "RayD:shared/include/rayd/shared/rf/scattering_table.cuh", "line": 19},
+    {"from": "native/channel_native/binding/materials.cpp", "to": "RayD:backends/torch/include/rayd/torch/integration_v2.h", "line": 2}
   ],
   "invariants": [
     "the 112 ADR-024 numerical helpers have exactly one active source owner in locked RayD",
     "the 10 Channel boundary helpers remain validation/allocation/launch adapters only",
-    "the 7 scattering-table helpers remain Channel-owned until ADR-026 activation",
+    "the 7 scattering-table helpers have exactly one active source owner in locked RayD",
     "the complete transmission-sequence primal/backward/JVP family has RayD as its unique numerical source owner",
     "the removed Channel transmission TU is absent and field_transport.cu no longer owns transmission-sequence numerics",
     "the complete pure-wedge primal/backward/JVP family has RayD as its unique numerical source owner",
     "the removed Channel pure-wedge TU is absent and the Channel fields binding is a typed adapter only",
+    "the 11 Phase 10A scattering contracts have RayD as their unique numerical source owner",
+    "the removed Channel Phase 10A scattering TUs and private table header are absent",
+    "the Channel materials binding is a typed adapter and the event/chain owners remain in Channel",
     "RayD never includes a Channel-private header"
   ]
 }

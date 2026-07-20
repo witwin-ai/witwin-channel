@@ -1,8 +1,8 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024/025/026 已接受；Phase 10 的 scattering owner move 仍须按 dormant
-candidate → Channel pin/switch/delete 顺序激活
+ADR-023/024/025/026 已接受；Phase 10A 已完成原子 pin/switch/delete，Phase 10B
+chain family 仍须按 dormant candidate → Channel pin/switch/delete 顺序激活
 
 **计划日期：** 2026-07-18
 
@@ -632,6 +632,20 @@ source/header唯一 owner、chain fusion/AD/compile flags和第 7.3 节不迁移
 但在对应 Phase 10 atomic activation 前 scattering 仍保持 Channel production owner。
 
 ### Phase 10A — Scattering table 与 single-bounce families
+
+**状态：COMPLETE（2026-07-19）。** RayD 提交
+`4577e744adfe8665f7817e3aff5e8e533ec896e7` 已 push；Channel 已原子 pin/switch/delete
+11 个 table/ensemble/patch contracts 的本地数值实现与 private table header。integration
+v2 header SHA-256 为
+`9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb`，typed
+scattering header SHA-256 为
+`66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a`，shared
+table header SHA-256 为
+`38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`。
+202 个 bindings 的 ABI/façade保持 Channel 持有，numerical owner split 更新为 RayD 37、
+layered 2、Channel Native 163。`scattering_event_probabilities` 与六个 chain contracts
+仍为完整 Channel owners；direct tests、逐 TU flags、launch/codegen/resource 和 deletion
+证据见 `docs/dev/audit/phase13-scattering-phase10a-evidence.json`。
 
 迁 11 个 bindings：table eval/backward/JVP/sample/pdf、ensemble三件套、patch-integral
 三件套。Channel pin/switch后删除本地 source；确有 table-runtime helper 依赖的 Channel

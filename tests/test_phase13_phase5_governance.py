@@ -39,14 +39,19 @@ def test_shared_rf_helper_decision_covers_frozen_closure_once() -> None:
     )
 
 
-def test_scattering_table_is_reserved_for_adr_026() -> None:
+def test_scattering_table_reservation_is_realized_by_phase10a() -> None:
     graph = _json("docs/dev/audit/phase13-shared-rf-dependency-graph.json")
     node = next(
         record
         for record in graph["nodes"]  # type: ignore[index]
         if record["id"].endswith("scattering_table.cuh")
     )
-    assert node["target_source_owner"] == "RayD after ADR-026"
+    assert node["current_source_owner"] == "RayD"
+    assert node["target_source_owner"] == "RayD"
+    assert graph["phase10a_activation"]["status"] == "active"  # type: ignore[index]
+    assert graph["phase10a_activation"][  # type: ignore[index]
+        "scattering_table_helpers_activated"
+    ] == 7
 
 
 def test_architecture_guides_remain_identical_and_list_adr_024() -> None:

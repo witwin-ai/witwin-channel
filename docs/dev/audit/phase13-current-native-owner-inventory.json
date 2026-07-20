@@ -28,12 +28,12 @@
   },
   "counts": {
     "bindings": 202,
-    "rayd_numerical": 26,
+    "rayd_numerical": 37,
     "layered": 2,
-    "channel_numerical": 174
+    "channel_numerical": 163
   },
-  "current_phase": 8,
-  "current_subphase": "8A",
+  "current_phase": 10,
+  "current_subphase": "10A",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -225,6 +225,46 @@
       "coupled_rd_prepare/backward/jvp"
     ],
     "activation_evidence": "docs/dev/audit/phase13-diffraction-phase8a-evidence.json",
+    "public_api_delta": false
+  },
+  "phase10a_scattering_table_single_bounce": {
+    "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce",
+    "typed_header": "backends/torch/include/rayd/torch/rf/scattering.h",
+    "typed_header_sha256": "66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a",
+    "shared_table_header": "shared/include/rayd/shared/rf/scattering_table.cuh",
+    "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
+    "binding_count": 202,
+    "binding_manifest_sha256": "54a0e643fd6d5986e3a0ba12c30db5a23372b62b7537f9218c327aadac2ee308",
+    "owner_transfer": [
+      "scattering_table_eval",
+      "scattering_table_eval_backward",
+      "scattering_table_eval_jvp",
+      "scattering_table_sample",
+      "scattering_table_pdf",
+      "scattering_ensemble_eval",
+      "scattering_ensemble_eval_backward",
+      "scattering_ensemble_eval_jvp",
+      "scattering_patch_integral_eval",
+      "scattering_patch_integral_eval_backward",
+      "scattering_patch_integral_eval_jvp"
+    ],
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/kernels/scattering_table_eval_ad.cu",
+      "native/channel_native/kernels/scattering_ensemble.cu",
+      "native/channel_native/kernels/scattering_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_patch_integral.cu",
+      "native/channel_native/kernels/scattering_patch_integral_ad.cu",
+      "native/channel_native/kernels/scattering_table.cuh"
+    ],
+    "retained_channel_complete_owners": [
+      "scattering_event_probabilities",
+      "scattering_chain_ensemble_eval/backward/jvp",
+      "scattering_chain_realization_eval/backward/jvp"
+    ],
+    "activation_evidence": "docs/dev/audit/phase13-scattering-phase10a-evidence.json",
     "public_api_delta": false
   },
   "symbols": [
@@ -10018,13 +10058,13 @@
       "binding_target": "cn_scattering_chain_ensemble_eval",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 548
+      "line": 877
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            279
+          721
           ],
           "count": 1
         },
@@ -10071,13 +10111,13 @@
       "binding_target": "cn_scattering_chain_ensemble_eval_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 550
+      "line": 879
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            292
+          734
           ],
           "count": 1
         },
@@ -10124,13 +10164,13 @@
       "binding_target": "cn_scattering_chain_ensemble_eval_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 552
+      "line": 881
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            309
+          751
           ],
           "count": 1
         },
@@ -10177,13 +10217,13 @@
       "binding_target": "cn_scattering_chain_realization_eval",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 554
+      "line": 883
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            335
+          777
           ],
           "count": 1
         },
@@ -10229,13 +10269,13 @@
       "binding_target": "cn_scattering_chain_realization_eval_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 556
+      "line": 885
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            350
+          792
           ],
           "count": 1
         },
@@ -10282,13 +10322,13 @@
       "binding_target": "cn_scattering_chain_realization_eval_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 558
+      "line": 887
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            369
+          811
           ],
           "count": 1
         },
@@ -10333,28 +10373,28 @@
       "symbol": "scattering_ensemble_eval",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_ensemble_eval",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 532
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 861
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            88
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          374
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_ensemble.cu",
-          "lines": [
-            151
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu",
+        "lines": [
+          254
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval",
       "python_definitions": [
         {
@@ -10384,34 +10424,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_ensemble_eval_backward",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_ensemble_eval_backward",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_ensemble_eval_backward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 536
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 865
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            113
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          432
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_ensemble_ad.cu",
-          "lines": [
-            542
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+        "lines": [
+          780
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_backward",
       "python_definitions": [
         {
@@ -10437,34 +10477,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_ensemble_eval_jvp",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_ensemble_eval_jvp",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_ensemble_eval_jvp",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 538
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 867
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            145
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          515
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_ensemble_ad.cu",
-          "lines": [
-            684
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+        "lines": [
+          795
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_jvp",
       "python_definitions": [
         {
@@ -10490,28 +10530,28 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_event_probabilities",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_event_probabilities",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_event_probabilities",
       "binding_registration": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 530
+      "line": 859
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            58
+          338
           ],
           "count": 1
         },
         {
           "path": "native/channel_native/kernels/scattering.cu",
           "lines": [
-            153
+          46
           ],
           "count": 1
         }
@@ -10549,28 +10589,28 @@
       "symbol": "scattering_patch_integral_eval",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_patch_integral_eval",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 534
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 863
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            69
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          543
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_patch_integral.cu",
-          "lines": [
-            281
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral.cu",
+        "lines": [
+          377
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval",
       "python_definitions": [
         {
@@ -10600,34 +10640,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_patch_integral_eval_backward",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_patch_integral_eval_backward",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_patch_integral_eval_backward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 540
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 869
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            185
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          589
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_patch_integral_ad.cu",
-          "lines": [
-            751
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu",
+        "lines": [
+          936
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_backward",
       "python_definitions": [
         {
@@ -10653,34 +10693,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_patch_integral_eval_jvp",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_patch_integral_eval_jvp",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_patch_integral_eval_jvp",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 542
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 871
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            209
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          646
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_patch_integral_ad.cu",
-          "lines": [
-            845
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu",
+        "lines": [
+          948
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_jvp",
       "python_definitions": [
         {
@@ -10706,34 +10746,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_table_eval",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_table_eval",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_table_eval",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 524
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 853
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            48
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          300
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering.cu",
-          "lines": [
-            130
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+        "lines": [
+          128
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_table_eval",
       "python_definitions": [
         {
@@ -10763,34 +10803,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_table_eval_backward",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_table_eval_backward",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_table_eval_backward",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 544
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 873
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            237
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          667
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_table_eval_ad.cu",
-          "lines": [
-            195
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+        "lines": [
+          297
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_table_eval_backward",
       "python_definitions": [
         {
@@ -10816,34 +10856,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_table_eval_jvp",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_table_eval_jvp",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_table_eval_jvp",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 546
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 875
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            246
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          691
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering_table_eval_ad.cu",
-          "lines": [
-            257
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+        "lines": [
+          312
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_table_eval_jvp",
       "python_definitions": [
         {
@@ -10869,34 +10909,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_table_pdf",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_table_pdf",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_table_pdf",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 526
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 855
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            50
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          315
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering.cu",
-          "lines": [
-            141
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+        "lines": [
+          134
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_table_pdf",
       "python_definitions": [
         {
@@ -10926,34 +10966,34 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    },
-    {
-      "symbol": "scattering_table_sample",
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  },
+  {
+    "symbol": "scattering_table_sample",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_scattering_table_sample",
-      "binding_registration": {
-        "path": "native/channel_native/binding/materials.cpp",
-        "line": 528
+    "binding_registration": {
+      "path": "native/channel_native/binding/materials.cpp",
+      "line": 857
       },
       "target_source_evidence": [
-        {
-          "path": "native/channel_native/binding/materials.cpp",
-          "lines": [
-            52
+      {
+        "path": "native/channel_native/binding/materials.cpp",
+        "lines": [
+          330
           ],
           "count": 1
         },
         {
-          "path": "native/channel_native/kernels/scattering.cu",
-          "lines": [
-            147
+        "path": "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+        "lines": [
+          140
           ],
           "count": 1
         }
       ],
-      "numerical_owner": "Channel Native",
-      "owner_kind": "Channel native implementation",
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed RF implementation with Channel Native ABI facade",
       "python_owner": "witwin.channel_native.scattering.kernels.functional.scattering_table_sample",
       "python_definitions": [
         {
@@ -10983,7 +11023,7 @@
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "move numerical owner to RayD as a complete family"
-    }
+    "plan13_disposition": "applied in Phase 10A as a complete family"
+  }
   ]
 }

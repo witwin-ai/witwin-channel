@@ -1,7 +1,6 @@
 # ADR-026: RayD ownership of generic scattering runtime operations
 
-- **Status:** Accepted (2026-07-19; ownership boundary only, Phase 10 not yet
-  activated)
+- **Status:** Accepted (2026-07-19); Phase 10A activated, Phase 10B pending
 - **Date:** 2026-07-19
 - **Kind:** Cross-repository native-owner move. This decision does not authorize
   a numerical, fusion, launch, resource-lifecycle, or public-Python-API change.
@@ -27,9 +26,10 @@ generic runtime implementations in Channel would therefore preserve an
 unnecessary downstream numerical owner and keep the seven table-interpolation
 helpers outside their reusable dependency owner.
 
-This ADR accepts the final owner boundary. It does not activate it. Until the
-ordered Phase 10 pin/switch/delete commits land, Channel remains the production
-numerical owner and RayD has no production scattering runtime owner.
+At acceptance, this ADR fixed the final owner boundary without activating it.
+The realized-state section below records the completed Phase 10A switch;
+Channel remains the production numerical owner only for the six contracts whose
+Phase 10B pin/switch/delete has not yet landed.
 
 ## Decision
 
@@ -281,6 +281,25 @@ and is not a supported dual-owner state. Channel never pins a branch, dirty
 worktree, or unmerged candidate. Rollback selects the previous accepted RayD
 commit through the lock file; it never introduces a runtime feature flag,
 dynamic lookup, copied implementation, or fallback.
+
+### Phase 10A realized state
+
+Phase 10A activated the first four complete families (eleven contracts) and the
+seven shared table helpers at pushed RayD commit
+`4577e744adfe8665f7817e3aff5e8e533ec896e7`. The locked typed scattering,
+integration-v2, and shared table header SHA-256 values are respectively
+`66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a`,
+`9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb`, and
+`38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`.
+
+Channel retains all eleven ABI symbols and typed Python facades but no longer
+contains their numerical CUDA bodies or the private scattering-table header.
+The retained event-policy kernel and all six Phase 10B chain contracts remain
+complete Channel owners. The binding count stays 202 and the active numerical
+owner split is RayD 37, layered Channel/RayD 2, and Channel Native 163. Exact
+launch, current-stream, compile-flag, codegen/resource, direct-contract,
+dependency, deletion, and no-fallback evidence is recorded in
+`docs/dev/audit/phase13-scattering-phase10a-evidence.json`.
 
 ## Consequences
 

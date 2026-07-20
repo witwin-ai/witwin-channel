@@ -396,23 +396,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 115
     },
-    "4be76dc9b1dc1f38": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_patch_integral.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 116
-    },
     "4c160fa53e86cc03": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -478,23 +461,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 104
     },
-    "5ba7d986f88556d8": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization.cu",
-        "scattering_patch_integral.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 116
-    },
     "651981f0dc7ee1d9": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -510,18 +476,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 122
-    },
-    "6661b4c2baf3d56d": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "kirchhoff_table_ad.cu",
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
-      "token_count": 106
     },
     "6a6cd66ce1fb7900": {
       "category": "numeric_sensitive_exempt",
@@ -682,23 +636,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 110
     },
-    "a77c91f19330c4a6": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_ensemble.cu",
-        "scattering_ensemble_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 120
-    },
     "aa1a1f0135d6dcd3": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -781,22 +718,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 167
     },
-    "3b81167f47109bff": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 196
-    },
     "3da511e52cacd4b7": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -863,22 +784,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 172
     },
-    "61b84244819c067c": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_ensemble_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 168
-    },
     "06d4aba35fa86f3f": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -928,23 +833,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 140
-    },
-    "76e4d25f51f5e3a2": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization_ad.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 127
     },
     "7d41c8eaabfb4040": {
       "category": "numeric_sensitive_exempt",
@@ -1335,23 +1223,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 396
     },
-    "80971b1bf9a2fe20": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_patch_integral.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 207
-    },
     "84d3ed58786cd593": {
       "category": "other",
       "corpus": "native",
@@ -1380,88 +1251,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 465
-    },
-    "9a7d7a8ad69f6bc2": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_ensemble.cu",
-        "scattering_ensemble_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 409
-    },
-    "9f9e241bcca56727": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization.cu",
-        "scattering_chain_realization_ad.cu",
-        "scattering_patch_integral.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 678
-    },
-    "846a229878ccdf77": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "bdpt_connect_accumulation.cu",
-        "bdpt_connect_ad.cu",
-        "bdpt_maps.cu",
-        "deterministic_accum.cu",
-        "field_rough_scale.cu",
-        "field_transport_ad_common.cuh",
-        "field_wedge_ad_common.cuh",
-        "kirchhoff_table_ad.cu",
-        "scattering_ensemble.cu",
-        "scattering_ensemble_ad.cu",
-        "scattering_patch_integral_ad.cu",
-        "scattering_table_eval_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6B hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 537
-    },
-    "a9ea28f19ab5fe4b": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization.cu",
-        "scattering_chain_realization_ad.cu",
-        "scattering_patch_integral.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 585
     },
     "afd690e8d070ef9f": {
       "category": "numeric_sensitive_exempt",
@@ -1514,24 +1303,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 206
-    },
-    "05b542a47530f3b9": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization.cu",
-        "scattering_patch_integral.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 427
     },
     "06342d7e5a635ad3": {
       "category": "indexing_packing",
@@ -1846,23 +1617,6 @@
       "reason": "Repeated Python facade signature and argument plumbing.",
       "token_count": 126
     },
-    "22fba0706842d96e": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_ensemble.cu",
-        "scattering_ensemble_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 205
-    },
     "2452c606f1151c92": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -2043,43 +1797,6 @@
       "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
       "token_count": 167
     },
-    "3285a1e358491bb8": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization.cu",
-        "scattering_chain_realization_ad.cu",
-        "scattering_patch_integral.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad…12163 tokens truncated…tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "bdpt",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 112
-    },
-    "bf44d45c79b99d0f": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_ensemble.cu",
-        "scattering_ensemble_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 140
-    },
     "c054ffde843f8e08": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -2135,23 +1852,6 @@
       "provenance": "hand-curated",
       "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression.",
       "token_count": 174
-    },
-    "c795aab738849e7b": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_chain_realization_ad.cu",
-        "scattering_patch_integral_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 217
     },
     "c96235a200940c25": {
       "category": "numeric_sensitive_exempt",
@@ -2452,22 +2152,6 @@
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 141
     },
-    "efbf824dcc3f7e67": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "scattering_ensemble_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 103
-    },
     "f1d8fdd528ee096b": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -2478,17 +2162,6 @@
       "provenance": "hand-curated",
       "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
       "token_count": 109
-    },
-    "f2f6eb2ed37816c4": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
-      "token_count": 120
     },
     "f34ec15d3420e882": {
       "category": "numeric_sensitive_exempt",
@@ -2601,7 +2274,152 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 101
+    },
+    "cb7e5f4d8b6e9bbb": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "scattering_chain_realization.cu",
+        "scattering_chain_realization_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 585
+    },
+    "de2c1d77579c5fb0": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "scattering_chain_realization.cu",
+        "scattering_chain_realization_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 303
+    },
+    "ef7154f03f6c6972": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "scattering_chain_realization.cu",
+        "scattering_chain_realization_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 191
+    },
+    "b453f1bf00b90310": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "scattering_chain_realization.cu",
+        "scattering_chain_realization_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 147
+    },
+    "d8c17ba0c2e5de8e": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu",
+        "bdpt_connect_ad.cu",
+        "bdpt_maps.cu",
+        "deterministic_accum.cu",
+        "field_rough_scale.cu",
+        "field_transport_ad_common.cuh",
+        "field_wedge_ad_common.cuh",
+        "kirchhoff_table_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "shared native numerical owners",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 299
+    },
+    "6c5d7de2f3e5f2e2": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 169
+    },
+    "6739532853292b8a": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 132
+    },
+    "e027caec2c91d2fc": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 120
+    },
+    "993244068125503a": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "kirchhoff_table_ad.cu",
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 107
     }
   },
-  "schema_version": 1
+  "schema_version": 1,
+  "phase10a_refresh": {
+    "combined_duplicate_lines": 9730,
+    "combined_total_lines": 81675,
+    "coverage_percent": 11.91307,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Phase 10A removed the five Channel scattering numerical TUs and private table helper, pruned stale regions, and classified typed RayD adapter packing without weakening the frozen maintenance budget.",
+    "region_count": 169,
+    "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  }
 }

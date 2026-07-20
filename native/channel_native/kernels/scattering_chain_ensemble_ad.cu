@@ -16,11 +16,11 @@
 // covers geometry in forward mode, and a follow-up wave adds the reverse.
 
 #include "field_transport_ad_common.cuh"
-#include "scattering_table.cuh"
+#include <rayd/shared/rf/scattering_table.cuh>
 
 namespace {
 
-namespace st = channel_native::scattering_tables;
+namespace st = rayd::shared::rf::scattering_tables;
 
 __device__ __forceinline__ field::float3a load_chain3f(
     const float* p, int64_t row, int bounce) {

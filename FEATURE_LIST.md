@@ -14,7 +14,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `11e72526cdddf669678975c8921a9d44c6504e20` and calls the typed
+  `4577e744adfe8665f7817e3aff5e8e533ec896e7` and calls the typed
   `rayd::torch` v2 C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
@@ -22,9 +22,9 @@ priority `scattering > diffraction > transmission > reflection > los`.
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration header is
   `backends/torch/include/rayd/torch/integration_v2.h` with SHA-256
-  `7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef`
+  `9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb`
   and identity
-  `rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction`.
+  `rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce`.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and
@@ -42,14 +42,15 @@ priority `scattering > diffraction > transmission > reflection > los`.
   Pure wedge keeps exporter-locked `--use_fast_math`; MC and coupled families
   remain precise. Phase 8B still owns the sample-tape rename and native
   transmitter-edge visibility planning/selection operation.
-- ADR-026 accepts RayD as the final numerical owner of 17 solver-neutral,
-  resident scattering runtime contracts and seven table-interpolation device
-  helpers. The decision is not yet activated: Channel remains the production
-  owner until the Phase 10A/10B pin/switch/delete commits. Table and
-  phase-screen construction/cache/seed lifecycle, event probabilities,
-  topology/packing, RNG/MIS, accumulation, and result policy remain Channel
-  owners. Per-TU default/`--fmad=false` modes and the family-specific chain
-  geometry AD behavior are frozen.
+- ADR-026 assigns 17 solver-neutral resident scattering runtime contracts to
+  RayD. Phase 10A atomically moved the eleven table, single-bounce ensemble,
+  and patch-integral contracts plus all seven table-interpolation helpers;
+  Channel retains their stable ABI and typed domain/autograd facades. The six
+  chain contracts remain complete Channel numerical owners until Phase 10B.
+  Table and phase-screen construction/cache/seed lifecycle, event
+  probabilities, topology/packing, RNG/MIS, accumulation, and result policy
+  remain Channel owners. Per-TU default/`--fmad=false` modes and the
+  family-specific chain geometry AD behavior are frozen.
 
 - **LoS, specular reflection (depth <= 5), first-order UTD diffraction,
   reflection-diffraction coupling** - pre-existing.

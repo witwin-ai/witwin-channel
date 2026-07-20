@@ -501,15 +501,10 @@ Python_add_library(
     native/channel_native/kernels/kirchhoff_table_ad.cu
     native/channel_native/kernels/reflection.cu
     native/channel_native/kernels/scattering.cu
-    native/channel_native/kernels/scattering_ensemble.cu
-    native/channel_native/kernels/scattering_ensemble_ad.cu
     native/channel_native/kernels/scattering_chain_ensemble.cu
     native/channel_native/kernels/scattering_chain_ensemble_ad.cu
     native/channel_native/kernels/scattering_chain_realization.cu
     native/channel_native/kernels/scattering_chain_realization_ad.cu
-    native/channel_native/kernels/scattering_patch_integral.cu
-    native/channel_native/kernels/scattering_patch_integral_ad.cu
-    native/channel_native/kernels/scattering_table_eval_ad.cu
     native/channel_native/kernels/sampling.cu
     native/channel_native/montecarlo_basic.cpp
     native/channel_native/path_solver.cpp
@@ -533,15 +528,10 @@ target_compile_features(_channel_native PRIVATE cxx_std_17)
 # interpolation, are unaffected).
 set_source_files_properties(
     native/channel_native/kernels/kirchhoff_table_ad.cu
-    native/channel_native/kernels/scattering_ensemble.cu
-    native/channel_native/kernels/scattering_ensemble_ad.cu
     native/channel_native/kernels/scattering_chain_ensemble.cu
     native/channel_native/kernels/scattering_chain_ensemble_ad.cu
     native/channel_native/kernels/scattering_chain_realization.cu
     native/channel_native/kernels/scattering_chain_realization_ad.cu
-    native/channel_native/kernels/scattering_patch_integral.cu
-    native/channel_native/kernels/scattering_patch_integral_ad.cu
-    native/channel_native/kernels/scattering_table_eval_ad.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 target_link_libraries(
     _channel_native

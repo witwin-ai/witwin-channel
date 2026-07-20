@@ -18,11 +18,13 @@ domain APIs, not root exports. Kernel modules and energy helpers are internal.
 Scattering may depend on material value contracts, physics utilities, and
 domain kernel facades. It must not import a solver or acquire a mutable scene or
 native handle. Solvers consume scattering contracts through their owning
-pipeline stage. After Plan 13 Phase 6A, retained scattering and chain kernels
-consume RayD's public shared RF device headers. ADR-026 accepts RayD as the
-final numerical owner of 17 generic resident scattering runtime contracts and
-the seven scattering-table helpers, but Channel remains their production owner
-until the corresponding Phase 10A/10B atomic pin/switch/delete activation.
+pipeline stage. After Plan 13 Phase 10A, RayD is the active numerical owner of
+the eleven table evaluation/sampling, single-bounce ensemble, and patch-integral
+contracts and the seven scattering-table helpers. Channel retains the stable
+extension ABI and typed domain/autograd facades. The six fused chain contracts
+remain complete Channel numerical owners until the Phase 10B atomic
+pin/switch/delete activation; retained chain consumers use RayD's public shared
+RF and scattering-table device headers.
 
 The accepted boundary is deliberately narrow: RayD consumes caller-owned
 resident table/height/geometry tensors and owns complete native operation

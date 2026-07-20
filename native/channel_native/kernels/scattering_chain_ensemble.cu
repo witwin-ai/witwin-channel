@@ -42,7 +42,7 @@
 
 #include <rayd/shared/rf/field_transport.cuh>
 #include "../tensor_checks.h"
-#include "scattering_table.cuh"
+#include <rayd/shared/rf/scattering_table.cuh>
 
 namespace {
 
@@ -50,7 +50,7 @@ constexpr int kBlockSize = 256;
 constexpr int kMaxAdDepth = 8;
 namespace field = rayd::shared::utd;
 namespace transport = rayd::shared::rf::field_transport;
-namespace st = channel_native::scattering_tables;
+namespace st = rayd::shared::rf::scattering_tables;
 
 int launch_blocks(int64_t count) {
     return static_cast<int>((count + kBlockSize - 1) / kBlockSize);

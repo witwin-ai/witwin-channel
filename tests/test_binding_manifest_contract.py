@@ -102,8 +102,8 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert len(current_name_set) == EXPECTED_BINDING_COUNT
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
-    assert migration["current_phase"] == 8
-    assert migration["current_subphase"] == "8A"
+    assert migration["current_phase"] == 10
+    assert migration["current_subphase"] == "10A"
     assert len(renames) == len(rename_sources) == len(rename_targets) == 20
     assert rename_sources.isdisjoint(rename_targets)
     assert baseline_name_set & (rename_sources | rename_targets) == rename_targets

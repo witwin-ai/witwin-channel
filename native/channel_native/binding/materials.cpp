@@ -158,28 +158,89 @@ pybind11::dict cn_em_layer_stack_jvp(
     request.tangent_frequency = tangent_frequency;
     return layer_stack_result_dict(rayd::torch::em_layer_stack_jvp(request));
 }
-pybind11::dict cn_scattering_table_eval(
-    torch::Tensor wi, torch::Tensor wo, torch::Tensor f_te, torch::Tensor f_tm);
-torch::Tensor cn_scattering_table_pdf(
-    torch::Tensor wi, torch::Tensor wo, torch::Tensor sample_density, bool reverse);
-pybind11::dict cn_scattering_table_sample(
+namespace {
+
+rayd::torch::ScatteringTableEvalRequest scattering_table_eval_request(
     torch::Tensor wi,
-    torch::Tensor uniforms,
-    torch::Tensor marginal_cdf,
-    torch::Tensor conditional_cdf,
-    torch::Tensor sample_density);
-pybind11::dict cn_scattering_event_probabilities(
-    torch::Tensor cos_theta,
+    torch::Tensor wo,
+    torch::Tensor f_te,
+    torch::Tensor f_tm) {
+    return {
+        std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm)};
+}
+
+pybind11::dict scattering_table_eval_result_dict(
+    const rayd::torch::ScatteringTableEvalResult &result) {
+    pybind11::dict out;
+    out["f_te"] = result.f_te;
+    out["f_tm"] = result.f_tm;
+    return out;
+}
+
+rayd::torch::ScatteringEnsembleEvalRequest scattering_ensemble_request(
+    torch::Tensor wo_rows,
+    torch::Tensor r2_rows,
+    torch::Tensor cos_o_rows,
+    torch::Tensor n_o,
+    torch::Tensor t1r,
+    torch::Tensor t2r,
+    torch::Tensor wi_local,
+    torch::Tensor cos_i,
+    torch::Tensor r1,
+    torch::Tensor a_te2,
+    torch::Tensor a_tm2,
+    torch::Tensor weights,
     torch::Tensor material_id,
-    torch::Tensor cap_r_te,
-    torch::Tensor cap_r_tm,
-    torch::Tensor cap_t_te,
-    torch::Tensor cap_t_tm,
-    torch::Tensor rough_sigma_h_m,
-    torch::Tensor scatter_model_id,
-    double frequency_hz,
-    double probability_floor);
-pybind11::dict cn_scattering_patch_integral_eval(
+    torch::Tensor backup_axis,
+    torch::Tensor rx_pol,
+    torch::Tensor rc_idx,
+    torch::Tensor sc_idx,
+    torch::Tensor fte_flat,
+    torch::Tensor ftm_flat,
+    torch::Tensor table_offset,
+    torch::Tensor table_dims,
+    torch::Tensor material_slot,
+    double coef,
+    double threshold) {
+    rayd::torch::ScatteringEnsembleEvalRequest request;
+    request.wo_rows = std::move(wo_rows);
+    request.r2_rows = std::move(r2_rows);
+    request.cos_o_rows = std::move(cos_o_rows);
+    request.n_o = std::move(n_o);
+    request.t1r = std::move(t1r);
+    request.t2r = std::move(t2r);
+    request.wi_local = std::move(wi_local);
+    request.cos_i = std::move(cos_i);
+    request.r1 = std::move(r1);
+    request.a_te2 = std::move(a_te2);
+    request.a_tm2 = std::move(a_tm2);
+    request.weights = std::move(weights);
+    request.material_id = std::move(material_id);
+    request.backup_axis = std::move(backup_axis);
+    request.rx_pol = std::move(rx_pol);
+    request.rc_idx = std::move(rc_idx);
+    request.sc_idx = std::move(sc_idx);
+    request.f_te_flat = std::move(fte_flat);
+    request.f_tm_flat = std::move(ftm_flat);
+    request.table_offset = std::move(table_offset);
+    request.table_dims = std::move(table_dims);
+    request.material_slot = std::move(material_slot);
+    request.coefficient = coef;
+    request.threshold = threshold;
+    return request;
+}
+
+pybind11::dict scattering_ensemble_result_dict(
+    const rayd::torch::ScatteringEnsembleEvalResult &result) {
+    pybind11::dict out;
+    out["gain"] = result.gain;
+    out["amplitude"] = result.amplitude;
+    out["length"] = result.length;
+    out["keep"] = result.keep;
+    return out;
+}
+
+rayd::torch::ScatteringPatchIntegralEvalRequest scattering_patch_request(
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
     torch::Tensor rows,
@@ -197,7 +258,94 @@ pybind11::dict cn_scattering_patch_integral_eval(
     torch::Tensor quad_a,
     torch::Tensor quad_b,
     torch::Tensor quad_w,
-    double k0);
+    double k0) {
+    rayd::torch::ScatteringPatchIntegralEvalRequest request;
+    request.patch_tris = std::move(patch_tris);
+    request.patch_uvs = std::move(patch_uvs);
+    request.rows = std::move(rows);
+    request.d_i = std::move(d_i);
+    request.d_o = std::move(d_o);
+    request.n_rows = std::move(n_rows);
+    request.r_te = std::move(r_te);
+    request.r_tm = std::move(r_tm);
+    request.pol_t = std::move(pol_t);
+    request.pol_r = std::move(pol_r);
+    request.r1_rows = std::move(r1_rows);
+    request.r2_rows = std::move(r2_rows);
+    request.centroids = std::move(centroids);
+    request.heights = std::move(heights);
+    request.quad_a = std::move(quad_a);
+    request.quad_b = std::move(quad_b);
+    request.quad_w = std::move(quad_w);
+    request.k0 = k0;
+    return request;
+}
+
+pybind11::dict scattering_patch_result_dict(
+    const rayd::torch::ScatteringPatchIntegralEvalResult &result) {
+    pybind11::dict out;
+    out["total"] = result.total;
+    out["integral"] = result.integral;
+    out["row_value"] = result.row_value;
+    return out;
+}
+
+}  // namespace
+
+pybind11::dict cn_scattering_table_eval(
+    torch::Tensor wi,
+    torch::Tensor wo,
+    torch::Tensor f_te,
+    torch::Tensor f_tm) {
+    return scattering_table_eval_result_dict(rayd::torch::scattering_table_eval(
+        scattering_table_eval_request(
+            std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm))));
+}
+
+torch::Tensor cn_scattering_table_pdf(
+    torch::Tensor wi,
+    torch::Tensor wo,
+    torch::Tensor sample_density,
+    bool reverse) {
+    rayd::torch::ScatteringTablePdfRequest request;
+    request.wi = std::move(wi);
+    request.wo = std::move(wo);
+    request.sample_density = std::move(sample_density);
+    request.reverse = reverse;
+    return rayd::torch::scattering_table_pdf(request).pdf;
+}
+
+pybind11::dict cn_scattering_table_sample(
+    torch::Tensor wi,
+    torch::Tensor uniforms,
+    torch::Tensor marginal_cdf,
+    torch::Tensor conditional_cdf,
+    torch::Tensor sample_density) {
+    rayd::torch::ScatteringTableSampleRequest request;
+    request.wi = std::move(wi);
+    request.uniforms = std::move(uniforms);
+    request.marginal_cdf = std::move(marginal_cdf);
+    request.conditional_cdf = std::move(conditional_cdf);
+    request.sample_density = std::move(sample_density);
+    const auto result = rayd::torch::scattering_table_sample(request);
+    pybind11::dict out;
+    out["wo"] = result.wo;
+    out["pdf_forward"] = result.pdf_forward;
+    out["pdf_reverse"] = result.pdf_reverse;
+    return out;
+}
+
+pybind11::dict cn_scattering_event_probabilities(
+    torch::Tensor cos_theta,
+    torch::Tensor material_id,
+    torch::Tensor cap_r_te,
+    torch::Tensor cap_r_tm,
+    torch::Tensor cap_t_te,
+    torch::Tensor cap_t_tm,
+    torch::Tensor rough_sigma_h_m,
+    torch::Tensor scatter_model_id,
+    double frequency_hz,
+    double probability_floor);
 pybind11::dict cn_scattering_ensemble_eval(
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
@@ -222,7 +370,17 @@ pybind11::dict cn_scattering_ensemble_eval(
     torch::Tensor table_dims,
     torch::Tensor material_slot,
     double coef,
-    double threshold);
+    double threshold) {
+    return scattering_ensemble_result_dict(rayd::torch::scattering_ensemble_eval(
+        scattering_ensemble_request(
+            std::move(wo_rows), std::move(r2_rows), std::move(cos_o_rows),
+            std::move(n_o), std::move(t1r), std::move(t2r), std::move(wi_local),
+            std::move(cos_i), std::move(r1), std::move(a_te2), std::move(a_tm2),
+            std::move(weights), std::move(material_id), std::move(backup_axis),
+            std::move(rx_pol), std::move(rc_idx), std::move(sc_idx),
+            std::move(fte_flat), std::move(ftm_flat), std::move(table_offset),
+            std::move(table_dims), std::move(material_slot), coef, threshold)));
+}
 pybind11::dict cn_scattering_ensemble_eval_backward(
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
@@ -254,7 +412,42 @@ pybind11::dict cn_scattering_ensemble_eval_backward(
     bool need_grad_rows,
     bool need_grad_samples,
     bool need_grad_tables,
-    bool need_grad_coef);
+    bool need_grad_coef) {
+    rayd::torch::ScatteringEnsembleEvalBackwardRequest request;
+    request.primal = scattering_ensemble_request(
+        std::move(wo_rows), std::move(r2_rows), std::move(cos_o_rows),
+        std::move(n_o), std::move(t1r), std::move(t2r), std::move(wi_local),
+        std::move(cos_i), std::move(r1), std::move(a_te2), std::move(a_tm2),
+        std::move(weights), std::move(material_id), std::move(backup_axis),
+        std::move(rx_pol), std::move(rc_idx), std::move(sc_idx),
+        std::move(fte_flat), std::move(ftm_flat), std::move(table_offset),
+        std::move(table_dims), std::move(material_slot), coef, threshold);
+    request.grad_gain = optional_tensor(grad_gain);
+    request.grad_amplitude = optional_tensor(grad_amplitude);
+    request.grad_length = optional_tensor(grad_length);
+    request.need_grad_rows = need_grad_rows;
+    request.need_grad_samples = need_grad_samples;
+    request.need_grad_tables = need_grad_tables;
+    request.need_grad_coefficient = need_grad_coef;
+    const auto result = rayd::torch::scattering_ensemble_eval_backward(request);
+    pybind11::dict out;
+    out["grad_wo_rows"] = result.grad_wo_rows;
+    out["grad_r2_rows"] = result.grad_r2_rows;
+    out["grad_cos_o_rows"] = result.grad_cos_o_rows;
+    out["grad_n_o"] = result.grad_n_o;
+    out["grad_t1r"] = result.grad_t1r;
+    out["grad_t2r"] = result.grad_t2r;
+    out["grad_wi_local"] = result.grad_wi_local;
+    out["grad_cos_i"] = result.grad_cos_i;
+    out["grad_r1"] = result.grad_r1;
+    out["grad_a_te2"] = result.grad_a_te2;
+    out["grad_a_tm2"] = result.grad_a_tm2;
+    out["grad_weights"] = result.grad_weights;
+    out["grad_f_te"] = result.grad_f_te;
+    out["grad_f_tm"] = result.grad_f_tm;
+    out["grad_coef"] = result.grad_coefficient;
+    return out;
+}
 pybind11::dict cn_scattering_ensemble_eval_jvp(
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
@@ -294,7 +487,68 @@ pybind11::dict cn_scattering_ensemble_eval_jvp(
     pybind11::object t_weights,
     pybind11::object t_fte_flat,
     pybind11::object t_ftm_flat,
-    double tangent_coef);
+    double tangent_coef) {
+    rayd::torch::ScatteringEnsembleEvalJvpRequest request;
+    request.primal = scattering_ensemble_request(
+        std::move(wo_rows), std::move(r2_rows), std::move(cos_o_rows),
+        std::move(n_o), std::move(t1r), std::move(t2r), std::move(wi_local),
+        std::move(cos_i), std::move(r1), std::move(a_te2), std::move(a_tm2),
+        std::move(weights), std::move(material_id), std::move(backup_axis),
+        std::move(rx_pol), std::move(rc_idx), std::move(sc_idx),
+        std::move(fte_flat), std::move(ftm_flat), std::move(table_offset),
+        std::move(table_dims), std::move(material_slot), coef, threshold);
+    request.tangent_wo_rows = optional_tensor(t_wo_rows);
+    request.tangent_r2_rows = optional_tensor(t_r2_rows);
+    request.tangent_cos_o_rows = optional_tensor(t_cos_o_rows);
+    request.tangent_n_o = optional_tensor(t_n_o);
+    request.tangent_t1r = optional_tensor(t_t1r);
+    request.tangent_t2r = optional_tensor(t_t2r);
+    request.tangent_wi_local = optional_tensor(t_wi_local);
+    request.tangent_cos_i = optional_tensor(t_cos_i);
+    request.tangent_r1 = optional_tensor(t_r1);
+    request.tangent_a_te2 = optional_tensor(t_a_te2);
+    request.tangent_a_tm2 = optional_tensor(t_a_tm2);
+    request.tangent_weights = optional_tensor(t_weights);
+    request.tangent_f_te_flat = optional_tensor(t_fte_flat);
+    request.tangent_f_tm_flat = optional_tensor(t_ftm_flat);
+    request.tangent_coefficient = tangent_coef;
+    const auto result = rayd::torch::scattering_ensemble_eval_jvp(request);
+    pybind11::dict out;
+    out["tangent_gain"] = result.tangent_gain;
+    out["tangent_amplitude"] = result.tangent_amplitude;
+    out["tangent_length"] = result.tangent_length;
+    return out;
+}
+
+pybind11::dict cn_scattering_patch_integral_eval(
+    torch::Tensor patch_tris,
+    torch::Tensor patch_uvs,
+    torch::Tensor rows,
+    torch::Tensor d_i,
+    torch::Tensor d_o,
+    torch::Tensor n_rows,
+    torch::Tensor r_te,
+    torch::Tensor r_tm,
+    torch::Tensor pol_t,
+    torch::Tensor pol_r,
+    torch::Tensor r1_rows,
+    torch::Tensor r2_rows,
+    torch::Tensor centroids,
+    torch::Tensor heights,
+    torch::Tensor quad_a,
+    torch::Tensor quad_b,
+    torch::Tensor quad_w,
+    double k0) {
+    return scattering_patch_result_dict(
+        rayd::torch::scattering_patch_integral_eval(scattering_patch_request(
+            std::move(patch_tris), std::move(patch_uvs), std::move(rows),
+            std::move(d_i), std::move(d_o), std::move(n_rows), std::move(r_te),
+            std::move(r_tm), std::move(pol_t), std::move(pol_r),
+            std::move(r1_rows), std::move(r2_rows), std::move(centroids),
+            std::move(heights), std::move(quad_a), std::move(quad_b),
+            std::move(quad_w), k0)));
+}
+
 pybind11::dict cn_scattering_patch_integral_eval_backward(
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
@@ -318,7 +572,33 @@ pybind11::dict cn_scattering_patch_integral_eval_backward(
     bool need_grad_heights,
     bool need_grad_jones,
     bool need_grad_geometry,
-    bool need_grad_k0);
+    bool need_grad_k0) {
+    rayd::torch::ScatteringPatchIntegralEvalBackwardRequest request;
+    request.primal = scattering_patch_request(
+        std::move(patch_tris), std::move(patch_uvs), std::move(rows),
+        std::move(d_i), std::move(d_o), std::move(n_rows), std::move(r_te),
+        std::move(r_tm), std::move(pol_t), std::move(pol_r), std::move(r1_rows),
+        std::move(r2_rows), std::move(centroids), std::move(heights),
+        std::move(quad_a), std::move(quad_b), std::move(quad_w), k0);
+    request.grad_total = std::move(grad_total);
+    request.need_grad_heights = need_grad_heights;
+    request.need_grad_jones = need_grad_jones;
+    request.need_grad_geometry = need_grad_geometry;
+    request.need_grad_k0 = need_grad_k0;
+    const auto result =
+        rayd::torch::scattering_patch_integral_eval_backward(request);
+    pybind11::dict out;
+    out["grad_heights"] = result.grad_heights;
+    out["grad_r_te"] = result.grad_r_te;
+    out["grad_r_tm"] = result.grad_r_tm;
+    out["grad_d_i"] = result.grad_d_i;
+    out["grad_d_o"] = result.grad_d_o;
+    out["grad_r1_rows"] = result.grad_r1_rows;
+    out["grad_r2_rows"] = result.grad_r2_rows;
+    out["grad_centroids"] = result.grad_centroids;
+    out["grad_k0"] = result.grad_k0;
+    return out;
+}
 pybind11::dict cn_scattering_patch_integral_eval_jvp(
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
@@ -346,7 +626,28 @@ pybind11::dict cn_scattering_patch_integral_eval_jvp(
     pybind11::object t_r1_rows,
     pybind11::object t_r2_rows,
     pybind11::object t_centroids,
-    double tangent_k0);
+    double tangent_k0) {
+    rayd::torch::ScatteringPatchIntegralEvalJvpRequest request;
+    request.primal = scattering_patch_request(
+        std::move(patch_tris), std::move(patch_uvs), std::move(rows),
+        std::move(d_i), std::move(d_o), std::move(n_rows), std::move(r_te),
+        std::move(r_tm), std::move(pol_t), std::move(pol_r), std::move(r1_rows),
+        std::move(r2_rows), std::move(centroids), std::move(heights),
+        std::move(quad_a), std::move(quad_b), std::move(quad_w), k0);
+    request.tangent_heights = optional_tensor(t_heights);
+    request.tangent_r_te = optional_tensor(t_r_te);
+    request.tangent_r_tm = optional_tensor(t_r_tm);
+    request.tangent_d_i = optional_tensor(t_d_i);
+    request.tangent_d_o = optional_tensor(t_d_o);
+    request.tangent_r1_rows = optional_tensor(t_r1_rows);
+    request.tangent_r2_rows = optional_tensor(t_r2_rows);
+    request.tangent_centroids = optional_tensor(t_centroids);
+    request.tangent_k0 = tangent_k0;
+    const auto result = rayd::torch::scattering_patch_integral_eval_jvp(request);
+    pybind11::dict out;
+    out["tangent_total"] = result.tangent_total;
+    return out;
+}
 pybind11::dict cn_scattering_table_eval_backward(
     at::Tensor wi,
     at::Tensor wo,
@@ -355,7 +656,22 @@ pybind11::dict cn_scattering_table_eval_backward(
     pybind11::object grad_out_f_te,
     pybind11::object grad_out_f_tm,
     bool need_grad_dirs,
-    bool need_grad_tables);
+    bool need_grad_tables) {
+    rayd::torch::ScatteringTableEvalBackwardRequest request;
+    request.primal = scattering_table_eval_request(
+        std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm));
+    request.grad_f_te = optional_tensor(grad_out_f_te);
+    request.grad_f_tm = optional_tensor(grad_out_f_tm);
+    request.need_grad_directions = need_grad_dirs;
+    request.need_grad_tables = need_grad_tables;
+    const auto result = rayd::torch::scattering_table_eval_backward(request);
+    pybind11::dict out;
+    out["grad_wi"] = result.grad_wi;
+    out["grad_wo"] = result.grad_wo;
+    out["grad_f_te"] = result.grad_f_te;
+    out["grad_f_tm"] = result.grad_f_tm;
+    return out;
+}
 pybind11::dict cn_scattering_table_eval_jvp(
     at::Tensor wi,
     at::Tensor wo,
@@ -364,7 +680,20 @@ pybind11::dict cn_scattering_table_eval_jvp(
     pybind11::object t_wi,
     pybind11::object t_wo,
     pybind11::object t_f_te,
-    pybind11::object t_f_tm);
+    pybind11::object t_f_tm) {
+    rayd::torch::ScatteringTableEvalJvpRequest request;
+    request.primal = scattering_table_eval_request(
+        std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm));
+    request.tangent_wi = optional_tensor(t_wi);
+    request.tangent_wo = optional_tensor(t_wo);
+    request.tangent_f_te = optional_tensor(t_f_te);
+    request.tangent_f_tm = optional_tensor(t_f_tm);
+    const auto result = rayd::torch::scattering_table_eval_jvp(request);
+    pybind11::dict out;
+    out["tangent_f_te"] = result.tangent_f_te;
+    out["tangent_f_tm"] = result.tangent_f_tm;
+    return out;
+}
 pybind11::dict cn_kirchhoff_table_build_backward(
     at::Tensor s_te, at::Tensor s_tm, at::Tensor a_te, at::Tensor a_tm,
     at::Tensor r_diff_te, at::Tensor r_diff_tm, at::Tensor cos_i,

@@ -170,6 +170,34 @@ Chain-ensemble geometry stays JVP-only with loud reverse rejection, while
 chain-realization geometry retains its implemented VJP/JVP support. See
 `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`.
 
+### Plan 13 Phase 10A: table and single-bounce scattering activation
+
+Channel Native now pins pushed RayD commit
+`4577e744adfe8665f7817e3aff5e8e533ec896e7`. The typed scattering header and
+integration-v2 header SHA-256 values are respectively
+`66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a`
+and `9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb`;
+the RayD shared scattering-table header SHA-256 is
+`38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`.
+
+The complete table-evaluation AD, table-sampling, single-bounce ensemble, and
+patch-integral families now dispatch through typed `rayd::torch` requests and
+results. Channel keeps all eleven `_channel_native` names, Python facades,
+resident-resource lifecycle, and solver policy. The five former dedicated
+Channel numerical TUs and private table helper header are deleted; the retained
+`scattering.cu` contains only `scattering_event_probabilities`. Remaining chain
+consumers include RayD's public table header directly, while
+`kirchhoff_table_ad.cu` gains no unused dependency.
+
+The live binding count remains 202. The numerical-owner split is RayD 37,
+layered Channel/RayD 2, and Channel Native 163. Table primal/sample/PDF and the
+retained event-policy TU remain on their default CUDA flags; table AD, ensemble,
+and patch owners retain `--fmad=false` in RayD. Launch count, current stream,
+reduction order, atomics, resident tensors, and public API remain unchanged.
+Phase 10B still owns the six fused chain contracts. Detailed activation,
+codegen/resource, deletion, and direct-test evidence is recorded in
+`docs/dev/audit/phase13-scattering-phase10a-evidence.json`.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

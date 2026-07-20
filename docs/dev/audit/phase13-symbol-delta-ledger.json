@@ -250,7 +250,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_table_eval",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -258,7 +258,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_table_eval_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -266,7 +266,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_table_eval_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -274,7 +274,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_table_sample",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -282,7 +282,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_table_pdf",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -290,7 +290,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_ensemble_eval",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -298,7 +298,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_ensemble_eval_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -306,7 +306,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_ensemble_eval_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -314,7 +314,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_patch_integral_eval",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -322,7 +322,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_patch_integral_eval_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -330,7 +330,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_patch_integral_eval_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10A",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {

@@ -50,19 +50,6 @@ TABLE_HELPERS = {
     "linear_axis_grad",
     "eval_te_tm_grad",
 }
-FMAD_FALSE_TUS = {
-    "scattering_table_eval_ad.cu",
-    "scattering_ensemble.cu",
-    "scattering_ensemble_ad.cu",
-    "scattering_patch_integral.cu",
-    "scattering_patch_integral_ad.cu",
-    "scattering_chain_ensemble.cu",
-    "scattering_chain_ensemble_ad.cu",
-    "scattering_chain_realization.cu",
-    "scattering_chain_realization_ad.cu",
-}
-
-
 def _json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -86,7 +73,7 @@ def test_phase9_accepts_exactly_six_complete_families_and_seventeen_symbols() ->
         assert family in text
         assert all(f"`{symbol}`" in text for symbol in symbols)
     assert "`scattering_event_probabilities`" in text
-    assert "does not activate it" in text
+    assert audit["phase10a_activation"]["activated_contract_count"] == 11  # type: ignore[index]
 
 
 def test_phase9_freezes_resource_header_and_channel_policy_owners() -> None:
@@ -116,13 +103,21 @@ def test_phase9_freezes_resource_header_and_channel_policy_owners() -> None:
 
 def test_phase9_freezes_per_tu_flags_and_family_specific_geometry_ad() -> None:
     text = ADR.read_text(encoding="utf-8")
-    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    fmad_block = cmake.split("set_source_files_properties(", 1)[1].split(
-        'PROPERTIES COMPILE_OPTIONS "--fmad=false")', 1
-    )[0]
+    audit = _json(AUDIT / "phase13-scattering-bindings.json")
+    compile_contracts = {
+        row["symbol"]: row["compile_contract"]
+        for row in audit["contracts"]  # type: ignore[index]
+    }
 
-    assert "scattering.cu" not in fmad_block
-    assert all(tu in fmad_block for tu in FMAD_FALSE_TUS)
+    assert "target-default CUDA flags" in compile_contracts["scattering_table_eval"]
+    assert "--fmad=false" in compile_contracts["scattering_table_eval_backward"]
+    assert "--fmad=false" in compile_contracts["scattering_ensemble_eval"]
+    assert "--fmad=false" in compile_contracts["scattering_patch_integral_eval"]
+    assert all(
+        "--fmad=false" in compile_contracts[symbol]
+        for symbol in FAMILIES["v2 chain ensemble"]
+        | FAMILIES["v2 chain realization"]
+    )
     assert "table primal/sample/PDF kernels currently in `scattering.cu`" in text
     assert "must not gain `--fmad=false`" in text
     assert "chain-ensemble reverse-mode continuous geometry is unsupported" in text
@@ -130,34 +125,27 @@ def test_phase9_freezes_per_tu_flags_and_family_specific_geometry_ad() -> None:
     assert "supersedes any blanket Plan-13 wording" in text
 
 
-def test_phase9_is_docs_only_and_leaves_channel_as_current_numerical_owner() -> None:
-    inventory = _json(AUDIT / "phase13-current-native-owner-inventory.json")
-    owners = {
+def test_phase9_snapshot_is_docs_only_and_records_pre_activation_owners() -> None:
+    plan = PLAN.read_text(encoding="utf-8")
+    snapshot = _json(AUDIT / "phase13-scattering-bindings.json")
+    targets = {
         row["symbol"]: row["numerical_owner"]
-        for row in inventory["symbols"]  # type: ignore[index]
+        for row in _json(AUDIT / "phase13-current-native-owner-inventory.json")[
+            "symbols"
+        ]  # type: ignore[index]
     }
-    materials = (ROOT / "native/channel_native/binding/materials.cpp").read_text(
-        encoding="utf-8"
-    )
+    phase9_targets = {
+        row["symbol"]: row["target_numerical_owner"]
+        for row in snapshot["contracts"]  # type: ignore[index]
+    }
 
-    assert all(owners[symbol] == "Channel Native" for symbol in MOVING)
-    assert all(
-        (ROOT / path).is_file()
-        for path in (
-            "native/channel_native/kernels/scattering_table.cuh",
-            "native/channel_native/kernels/scattering_table_eval_ad.cu",
-            "native/channel_native/kernels/scattering_ensemble.cu",
-            "native/channel_native/kernels/scattering_ensemble_ad.cu",
-            "native/channel_native/kernels/scattering_patch_integral.cu",
-            "native/channel_native/kernels/scattering_patch_integral_ad.cu",
-            "native/channel_native/kernels/scattering_chain_ensemble.cu",
-            "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-            "native/channel_native/kernels/scattering_chain_realization.cu",
-            "native/channel_native/kernels/scattering_chain_realization_ad.cu",
-        )
-    )
-    assert "rayd::torch::scattering_" not in materials
-    assert inventory["current_subphase"] == "8A"
+    assert "Phase 9 moves no source and changes no production" in (
+        ROOT / "docs/dev/replacement/channel-native-migration.md"
+    ).read_text(encoding="utf-8")
+    assert "此阶段只接受边界，不执行 Phase\n10A/10B" in plan
+    assert all(phase9_targets[symbol] == "RayD after ADR-026" for symbol in MOVING)
+    assert sum(targets[symbol] == "RayD" for symbol in MOVING) == 11
+    assert sum(targets[symbol] == "Channel Native" for symbol in MOVING) == 6
 
 
 def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
@@ -173,6 +161,7 @@ def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
     assert "Phase 9 — ADR-026" in plan
     assert "**状态：已完成（2026-07-19）。**" in plan
     assert "implementation ownership is superseded by ADR-026" in adr010
-    assert "17 generic resident scattering runtime contracts" in scattering_readme
+    assert "eleven table evaluation/sampling" in scattering_readme
+    assert "six fused chain contracts" in scattering_readme
     assert (ROOT / "AGENTS.md").read_bytes() == (ROOT / "CLAUDE.md").read_bytes()
     assert ADR.name in (ROOT / "AGENTS.md").read_text(encoding="utf-8")
