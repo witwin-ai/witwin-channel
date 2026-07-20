@@ -6,6 +6,7 @@ from .contracts import TopologyConfig
 from .evaluated import EvaluatedPaths
 from .fields import PathFields
 from .geometry import PathGeometry
+from .reflection import ReflectionCandidateCapacity
 from .topology import PathTopology
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "PathFields",
     "PathGeometry",
     "PathTopology",
+    "ReflectionCandidateCapacity",
     "TopologyConfig",
 ]

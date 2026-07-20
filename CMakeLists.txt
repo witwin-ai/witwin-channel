@@ -503,6 +503,7 @@ Python_add_library(
     native/channel_native/kernels/los_silhouette_clearance.cu
     native/channel_native/kernels/material.cu
     native/channel_native/kernels/path_compaction.cu
+    native/channel_native/kernels/reflection_candidate_capacity.cu
     native/channel_native/kernels/path_trace.cu
     native/channel_native/kernels/kirchhoff_table_ad.cu
     native/channel_native/kernels/reflection.cu

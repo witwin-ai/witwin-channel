@@ -79,6 +79,19 @@ makes every discrete output inert and the device count zero before an
 asynchronous CUDA error. This producer has no AD surface and no live caller;
 mask-aware composed geometry and field companions must exist before activation.
 
+`propagation.topology.kernels.reflection` owns the dormant post-RayD EPC
+reflection capacity producer. One operation covers the existing order-1 and
+multibounce consumer schemas, stable-selects `visible[N]` rows in their frozen
+input order into explicit host capacity `Q`, and carries CUDA `valid`,
+`candidate_count`, and overflow state. At activation `Q` comes from the
+host-known theoretical EPC batch row count `N` (or an equivalent explicit
+upper bound), never the device-selected count or public
+`path_capacity_per_pair`. Invalid rows are tested before any resolved face,
+hit, receiver, or material payload is read. Overflow leaves the complete
+candidate block inert before the asynchronous device trap. The producer is
+dormant; the existing compact operations remain the live owner until the
+atomic ADR-029 switch.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

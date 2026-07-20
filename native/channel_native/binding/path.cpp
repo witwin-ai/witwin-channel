@@ -264,6 +264,24 @@ pybind11::dict cn_deterministic_reflection_sequence_compact(
     torch::Tensor face_gain,
     torch::Tensor face_material_id,
     int64_t max_count);
+pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
+    torch::Tensor visible,
+    torch::Tensor epc_sequences,
+    torch::Tensor epc_hits,
+    torch::Tensor epc_normals,
+    torch::Tensor sequence_batch,
+    torch::Tensor rx_indices,
+    torch::Tensor tx,
+    torch::Tensor rx_positions,
+    torch::Tensor tx_power,
+    int64_t tx_index,
+    torch::Tensor face_eps_r,
+    torch::Tensor face_sigma_e,
+    torch::Tensor face_mu_r,
+    torch::Tensor face_gain,
+    torch::Tensor face_material_id,
+    bool grouped_export,
+    int64_t candidate_capacity);
 pybind11::dict cn_deterministic_diffraction_order1_compact(
     torch::Tensor valid,
     torch::Tensor rx_id,
@@ -627,6 +645,27 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_reflection_sequence_compact",
         &cn_deterministic_reflection_sequence_compact,
         "Compact deterministic multi-bounce reflection EPC outputs with native CUDA.");
+    module.def(
+        "deterministic_reflection_candidate_capacity_block",
+        &cn_deterministic_reflection_candidate_capacity_block,
+        "Stably gather visible reflection EPC rows into fixed CUDA capacity.",
+        pybind11::arg("visible"),
+        pybind11::arg("epc_sequences"),
+        pybind11::arg("epc_hits"),
+        pybind11::arg("epc_normals"),
+        pybind11::arg("sequence_batch"),
+        pybind11::arg("rx_indices"),
+        pybind11::arg("tx"),
+        pybind11::arg("rx_positions"),
+        pybind11::arg("tx_power"),
+        pybind11::arg("tx_index"),
+        pybind11::arg("face_eps_r"),
+        pybind11::arg("face_sigma_e"),
+        pybind11::arg("face_mu_r"),
+        pybind11::arg("face_gain"),
+        pybind11::arg("face_material_id"),
+        pybind11::arg("grouped_export"),
+        pybind11::arg("candidate_capacity"));
     module.def(
         "deterministic_diffraction_order1_compact",
         &cn_deterministic_diffraction_order1_compact,

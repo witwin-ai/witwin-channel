@@ -50,6 +50,7 @@ from .primitives import (
     mc_selected_edge_indices,
     path_concat_vec3,
 )
+from .reflection import deterministic_reflection_candidate_capacity_block
 
 
 __all__ = [
@@ -78,6 +79,7 @@ __all__ = [
     "deterministic_mapped_face_sequence_chunk",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
+    "deterministic_reflection_candidate_capacity_block",
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",
     "deterministic_repeat_range",

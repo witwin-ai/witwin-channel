@@ -152,6 +152,14 @@ requires them.
   Its cache key may record `id(RayDSceneResource)` solely as Python wrapper
   identity while CompiledScene owns that wrapper; this is never a native
   pointer, scene handle, or ABI argument.
+- `deterministic_reflection_candidate_capacity_block` is the dormant ADR-029
+  post-EPC reflection producer for both order-1 and multibounce rows. Its
+  internal `candidate_capacity` comes from the host-known theoretical EPC batch
+  row count (or an equivalent explicit upper bound), never from a CUDA-selected
+  count or public `path_capacity_per_pair`. It preserves visible input order,
+  checks validity before reading any EPC/material payload, and fails
+  asynchronously with a completely inert block on overflow. The existing live
+  compact operations remain authoritative until the atomic capacity switch.
 - Do not split a fused native operation merely to mirror Python modules. A
   refactor must not add kernel launches, synchronizations, materialized
   intermediates, persistent tape, host/device transfers, or reduction-order

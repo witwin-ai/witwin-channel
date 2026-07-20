@@ -27,10 +27,10 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 210,
+    "bindings": 211,
     "rayd_numerical": 43,
     "layered": 3,
-    "channel_numerical": 164
+    "channel_numerical": 165
   },
   "current_phase": 12,
   "current_subphase": "profiling-driven performance closure",
@@ -5066,6 +5066,59 @@
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "unaffected by Plan 13"
+    },
+    {
+      "symbol": "deterministic_reflection_candidate_capacity_block",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_deterministic_reflection_candidate_capacity_block",
+      "binding_registration": {
+        "path": "native/channel_native/binding/path.cpp",
+        "line": 640
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/path.cpp",
+          "lines": [
+            267
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/reflection_candidate_capacity.cu",
+          "lines": [
+            211
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/reflection_candidate_capacity.cu",
+        "implementation_line": 211,
+        "export_line": 211
+      },
+      "python_owner": "witwin.channel_native.propagation.topology.kernels.reflection.deterministic_reflection_candidate_capacity_block",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/reflection.py",
+          "line": 45
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/reflection.py",
+          "line": 149
+        }
+      ],
+      "contract_test": "tests/propagation/topology/test_reflection_candidate_capacity.py::test_reflection_candidate_capacity_matches_multibounce_compact_order",
+      "e2e_callers": [
+        "tests/propagation/topology/test_reflection_candidate_capacity.py::test_reflection_candidate_capacity_matches_multibounce_compact_order"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-producer",
+      "plan13_disposition": "ADR-029 dormant post-RayD EPC reflection candidate capacity producer"
     },
     {
       "symbol": "deterministic_reflection_epc_input_batch",
