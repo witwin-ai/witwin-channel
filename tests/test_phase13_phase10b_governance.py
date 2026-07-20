@@ -24,6 +24,9 @@ TYPED_SHA256 = (
 SHARED_SHA256 = (
     "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
 )
+PHASE10B_BINDING_MANIFEST_SHA256 = (
+    "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71"
+)
 IDENTITY = (
     "rayd.torch.integration.v2.20260719.rf-transmission-sequence."
     "pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains"
@@ -73,7 +76,9 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
         "layered": 2,
         "channel_numerical": 157,
     }
-    assert inventory["current_subphase"] == migration["current_subphase"] == "10B"
+    assert inventory["current_subphase"] == "10B"
+    assert migration["current_phase"] == 11
+    assert migration["current_subphase"] == "11A"
     assert Counter(row["numerical_owner"] for row in inventory["symbols"]) == {
         "RayD": 43,
         "Channel operation / RayD primitives": 2,
@@ -87,7 +92,10 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     assert _json(native_manifest) == binding_manifest(ROOT)
     assert len(_json(native_manifest)["symbols"]) == 202
     assert len(_json(coverage_manifest)["native_bindings"]) == 202
-    assert _sha256(native_manifest) == evidence["activation"]["binding_manifest_sha256"]
+    assert (
+        evidence["activation"]["binding_manifest_sha256"]
+        == PHASE10B_BINDING_MANIFEST_SHA256
+    )
     assert _sha256(coverage_manifest) == evidence["activation"][
         "contract_coverage_manifest_sha256"
     ]
@@ -202,7 +210,7 @@ def test_phase10b_ledgers_ad_truth_and_duplication_budget_are_closed() -> None:
         "realization_geometry": "VJP and JVP supported",
     }
     refresh = duplication["phase10b_refresh"]
-    assert refresh["region_count"] == len(duplication["regions"])
+    assert refresh["region_count"] == 160
     assert refresh["stale_region_count"] == refresh["unclassified_region_count"] == 0
     assert refresh["budget_relaxed"] is False
     assert refresh["coverage_percent"] > duplication["baseline"]["coverage_percent"]

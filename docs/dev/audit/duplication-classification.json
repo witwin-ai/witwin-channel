@@ -61,17 +61,6 @@
       "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, fallback, or second numerical owner.",
       "token_count": 208
     },
-    "594a008e9ed5ab11": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 10B hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, fallback, or second numerical owner.",
-      "token_count": 323
-    },
     "aa2960d0cd72dc1b": {
       "category": "other",
       "corpus": "native",
@@ -82,17 +71,6 @@
       "provenance": "Phase 10B hand-reviewed refresh",
       "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, fallback, or second numerical owner.",
       "token_count": 227
-    },
-    "10bc8cf33736c565": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "fields.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 8A hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
-      "token_count": 190
     },
     "8238926b2e1e3356": {
       "category": "other",
@@ -1915,17 +1893,6 @@
       "reason": "Repeated Python facade signature and argument plumbing.",
       "token_count": 123
     },
-    "2e67e038abc98927": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "fields.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 6B hand-reviewed refresh",
-      "reason": "Repeated typed ABI request construction and tensor forwarding at the direct RayD binding boundary.",
-      "token_count": 118
-    },
     "e19c2341dd990fc4": {
       "category": "host_check",
       "corpus": "native",
@@ -2197,28 +2164,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 299
     },
-    "6c5d7de2f3e5f2e2": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 10A hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
-      "token_count": 169
-    },
-    "6739532853292b8a": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 10A hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
-      "token_count": 132
-    },
     "e027caec2c91d2fc": {
       "category": "other",
       "corpus": "native",
@@ -2264,5 +2209,18 @@
     "stale_region_count": 0,
     "unclassified_region_count": 0,
     "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  },
+  "phase11a_refresh": {
+    "combined_duplicate_lines": 8402,
+    "combined_total_lines": 78162,
+    "coverage_percent": 10.749469,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 0,
+    "note": "Phase 11A mechanically deduplicated typed request packing in fields.cpp and materials.cpp, pruned five stale binding-boundary regions, and retained explicit pybind signatures without weakening the frozen maintenance budget.",
+    "region_count": 155,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; boundary deduplication complete; frozen duplication acceptance remains pending Phase 11B"
   }
 }

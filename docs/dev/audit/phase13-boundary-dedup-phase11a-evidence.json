@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "phase": "Plan 13 Phase 11A",
+  "status": "boundary deduplication complete; frozen duplication acceptance pending Phase 11B",
+  "scope": [
+    "native/channel_native/binding/fields.cpp",
+    "native/channel_native/binding/materials.cpp"
+  ],
+  "method": {
+    "comparison": "EXACT_TOKEN_MATCH",
+    "metric": "exact-token-duplicate-regions",
+    "min_tokens": 100,
+    "mechanism": "TU-local compile-time typed request/parameter packing helpers",
+    "dynamic_dispatch_added": false
+  },
+  "duplication": {
+    "pre_phase11a": {
+      "duplicate_lines": 8747,
+      "total_lines": 78304,
+      "coverage_percent": 11.170566,
+      "region_count": 160
+    },
+    "current": {
+      "duplicate_lines": 8402,
+      "total_lines": 78162,
+      "coverage_percent": 10.749469,
+      "region_count": 155
+    },
+    "delta": {
+      "duplicate_lines": -345,
+      "total_lines": -142,
+      "coverage_percentage_points": -0.421097
+    },
+    "frozen_budget": {
+      "coverage_percent": 10.211512,
+      "relaxed": false,
+      "met": false,
+      "final_acceptance": "pending Phase 11B"
+    }
+  },
+  "ledger_refresh": {
+    "stale_regions_removed": [
+      "10bc8cf33736c565",
+      "2e67e038abc98927",
+      "594a008e9ed5ab11",
+      "6739532853292b8a",
+      "6c5d7de2f3e5f2e2"
+    ],
+    "new_regions_classified": [],
+    "new_region_count": 0,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "surviving_boundary_classification": {
+      "category": "other",
+      "owner": "bindings",
+      "reason": "typed ABI signatures and request/result packing only; no numerical implementation or fallback"
+    }
+  },
+  "binding_manifest": {
+    "phase10b_snapshot_sha256": "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71",
+    "current_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
+    "symbol_count": 202,
+    "pre_semantic_sha256": "289a6962ab9037723d6f6a32ac59382e27379b1ae23f3cc8143273048a353f63",
+    "current_semantic_sha256": "289a6962ab9037723d6f6a32ac59382e27379b1ae23f3cc8143273048a353f63",
+    "semantic_changes": 0,
+    "delta": "source line locations only"
+  },
+  "invariants": {
+    "numerical_change": false,
+    "native_abi_change": false,
+    "public_api_change": false,
+    "launch_contract_change": false,
+    "validation_or_error_order_change": false,
+    "output_schema_change": false,
+    "cuda_source_change": false,
+    "fallback_added": false
+  },
+  "validation": {
+    "duplication_print_current": "8402/78162 = 10.749469%; 155 regions",
+    "duplication_ledger": "0 stale; 0 unclassified; expected frozen-budget coverage failure only",
+    "binding_manifest": "202 symbols; 0 semantic changes"
+  }
+}

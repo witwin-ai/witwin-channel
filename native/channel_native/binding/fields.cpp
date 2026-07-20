@@ -11,6 +11,52 @@
 
 namespace {
 
+#define CN_TRANSMISSION_SEQUENCE_ARGUMENTS        \
+    std::move(source),                             \
+        std::move(target),                         \
+        std::move(interaction_positions),          \
+        std::move(interaction_normals),            \
+        std::move(interaction_material_id),        \
+        std::move(interaction_valid),              \
+        std::move(tx_power),                       \
+        std::move(tx_polarization),                \
+        std::move(rx_polarization),                \
+        std::move(layer_offset),                   \
+        std::move(layer_count),                    \
+        std::move(layer_thickness_m),              \
+        std::move(layer_eps_r),                    \
+        std::move(layer_sigma_e),                  \
+        std::move(layer_mu_r),                     \
+        frequency_hz
+
+#define CN_DIFFRACTION_WEDGE_COMMON_ARGUMENTS \
+    std::move(source),                         \
+        std::move(target),                     \
+        std::move(edge_position),              \
+        std::move(edge_direction),             \
+        std::move(edge_t_min),                 \
+        std::move(edge_t_max),                 \
+        std::move(edge_n0),                    \
+        std::move(edge_n1),                    \
+        std::move(exterior_angle),             \
+        std::move(face0_valid),                \
+        std::move(face0_eps_r),                \
+        std::move(face0_sigma_e),              \
+        std::move(face0_mu_r),                 \
+        std::move(face0_gain),                 \
+        std::move(face1_valid),                \
+        std::move(face1_eps_r),                \
+        std::move(face1_sigma_e),              \
+        std::move(face1_mu_r),                 \
+        std::move(face1_gain),                 \
+        std::move(tx_power),                   \
+        frequency_hz,                          \
+        std::move(vertex_v0),                  \
+        std::move(vertex_v1),                  \
+        std::move(vertex_opp0),                \
+        std::move(vertex_opp1),                \
+        std::move(edge_boundary)
+
 rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
     torch::Tensor source,
     torch::Tensor target,
@@ -225,32 +271,7 @@ pybind11::dict cn_field_diffraction_wedge(
     double isb_boundary_taper_width) {
     return diffraction_wedge_result_dict(
         rayd::torch::field_diffraction_wedge(diffraction_wedge_request(
-            std::move(source),
-            std::move(target),
-            std::move(edge_position),
-            std::move(edge_direction),
-            std::move(edge_t_min),
-            std::move(edge_t_max),
-            std::move(edge_n0),
-            std::move(edge_n1),
-            std::move(exterior_angle),
-            std::move(face0_valid),
-            std::move(face0_eps_r),
-            std::move(face0_sigma_e),
-            std::move(face0_mu_r),
-            std::move(face0_gain),
-            std::move(face1_valid),
-            std::move(face1_eps_r),
-            std::move(face1_sigma_e),
-            std::move(face1_mu_r),
-            std::move(face1_gain),
-            std::move(tx_power),
-            frequency_hz,
-            std::move(vertex_v0),
-            std::move(vertex_v1),
-            std::move(vertex_opp0),
-            std::move(vertex_opp1),
-            std::move(edge_boundary),
+            CN_DIFFRACTION_WEDGE_COMMON_ARGUMENTS,
             isb_boundary_taper_width)));
 }
 pybind11::dict cn_field_diffraction_wedge_backward(
@@ -289,32 +310,7 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     double isb_boundary_taper_width) {
     rayd::torch::DiffractionWedgeBackwardRequest request;
     request.primal = diffraction_wedge_request(
-        std::move(source),
-        std::move(target),
-        std::move(edge_position),
-        std::move(edge_direction),
-        std::move(edge_t_min),
-        std::move(edge_t_max),
-        std::move(edge_n0),
-        std::move(edge_n1),
-        std::move(exterior_angle),
-        std::move(face0_valid),
-        std::move(face0_eps_r),
-        std::move(face0_sigma_e),
-        std::move(face0_mu_r),
-        std::move(face0_gain),
-        std::move(face1_valid),
-        std::move(face1_eps_r),
-        std::move(face1_sigma_e),
-        std::move(face1_mu_r),
-        std::move(face1_gain),
-        std::move(tx_power),
-        frequency_hz,
-        std::move(vertex_v0),
-        std::move(vertex_v1),
-        std::move(vertex_opp0),
-        std::move(vertex_opp1),
-        std::move(edge_boundary),
+        CN_DIFFRACTION_WEDGE_COMMON_ARGUMENTS,
         isb_boundary_taper_width);
     request.grad_field_vector = optional_tensor(grad_field_vector);
     request.grad_direction = optional_tensor(grad_direction);
@@ -389,32 +385,7 @@ pybind11::dict cn_field_diffraction_wedge_jvp(
     double isb_boundary_taper_width) {
     rayd::torch::DiffractionWedgeJvpRequest request;
     request.primal = diffraction_wedge_request(
-        std::move(source),
-        std::move(target),
-        std::move(edge_position),
-        std::move(edge_direction),
-        std::move(edge_t_min),
-        std::move(edge_t_max),
-        std::move(edge_n0),
-        std::move(edge_n1),
-        std::move(exterior_angle),
-        std::move(face0_valid),
-        std::move(face0_eps_r),
-        std::move(face0_sigma_e),
-        std::move(face0_mu_r),
-        std::move(face0_gain),
-        std::move(face1_valid),
-        std::move(face1_eps_r),
-        std::move(face1_sigma_e),
-        std::move(face1_mu_r),
-        std::move(face1_gain),
-        std::move(tx_power),
-        frequency_hz,
-        std::move(vertex_v0),
-        std::move(vertex_v1),
-        std::move(vertex_opp0),
-        std::move(vertex_opp1),
-        std::move(edge_boundary),
+        CN_DIFFRACTION_WEDGE_COMMON_ARGUMENTS,
         isb_boundary_taper_width);
     request.tangent_source = optional_tensor(tangent_source);
     request.tangent_target = optional_tensor(tangent_target);
@@ -672,23 +643,7 @@ pybind11::dict cn_field_transmission_sequence(
     double frequency_hz) {
     return transmission_sequence_result_dict(
         rayd::torch::field_transmission_sequence(
-            transmission_sequence_request(
-                std::move(source),
-                std::move(target),
-                std::move(interaction_positions),
-                std::move(interaction_normals),
-                std::move(interaction_material_id),
-                std::move(interaction_valid),
-                std::move(tx_power),
-                std::move(tx_polarization),
-                std::move(rx_polarization),
-                std::move(layer_offset),
-                std::move(layer_count),
-                std::move(layer_thickness_m),
-                std::move(layer_eps_r),
-                std::move(layer_sigma_e),
-                std::move(layer_mu_r),
-                frequency_hz)));
+            transmission_sequence_request(CN_TRANSMISSION_SEQUENCE_ARGUMENTS)));
 }
 pybind11::dict cn_field_free_space_fwd64(
     torch::Tensor source,
@@ -801,22 +756,7 @@ pybind11::dict cn_field_transmission_sequence_backward(
     bool need_grad_geometry) {
     rayd::torch::TransmissionSequenceBackwardRequest request;
     request.primal = transmission_sequence_request(
-        std::move(source),
-        std::move(target),
-        std::move(interaction_positions),
-        std::move(interaction_normals),
-        std::move(interaction_material_id),
-        std::move(interaction_valid),
-        std::move(tx_power),
-        std::move(tx_polarization),
-        std::move(rx_polarization),
-        std::move(layer_offset),
-        std::move(layer_count),
-        std::move(layer_thickness_m),
-        std::move(layer_eps_r),
-        std::move(layer_sigma_e),
-        std::move(layer_mu_r),
-        frequency_hz);
+        CN_TRANSMISSION_SEQUENCE_ARGUMENTS);
     request.grad_field_vector = optional_tensor(grad_field_vector);
     request.grad_coefficient = optional_tensor(grad_coefficient);
     request.grad_path_field = optional_tensor(grad_path_field);
@@ -875,22 +815,7 @@ pybind11::dict cn_field_transmission_sequence_jvp(
     pybind11::object tangent_interaction_normals) {
     rayd::torch::TransmissionSequenceJvpRequest request;
     request.primal = transmission_sequence_request(
-        std::move(source),
-        std::move(target),
-        std::move(interaction_positions),
-        std::move(interaction_normals),
-        std::move(interaction_material_id),
-        std::move(interaction_valid),
-        std::move(tx_power),
-        std::move(tx_polarization),
-        std::move(rx_polarization),
-        std::move(layer_offset),
-        std::move(layer_count),
-        std::move(layer_thickness_m),
-        std::move(layer_eps_r),
-        std::move(layer_sigma_e),
-        std::move(layer_mu_r),
-        frequency_hz);
+        CN_TRANSMISSION_SEQUENCE_ARGUMENTS);
     request.tangent_layer_thickness_m =
         optional_tensor(tangent_layer_thickness_m);
     request.tangent_layer_eps_r = optional_tensor(tangent_layer_eps_r);
@@ -978,6 +903,9 @@ pybind11::dict cn_field_coupled_dd(
     torch::Tensor edge2_line_min,
     torch::Tensor edge2_line_max,
     double frequency_hz);
+
+#undef CN_DIFFRACTION_WEDGE_COMMON_ARGUMENTS
+#undef CN_TRANSMISSION_SEQUENCE_ARGUMENTS
 pybind11::dict cn_field_rough_reflection_scale(
     torch::Tensor field_vector,
     torch::Tensor coefficient,

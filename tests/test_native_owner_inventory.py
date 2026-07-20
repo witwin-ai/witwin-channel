@@ -211,8 +211,10 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for entry in current_inventory["symbols"]
     }
 
-    assert migration["current_phase"] == current_inventory["current_phase"] == 10
-    assert migration["current_subphase"] == current_inventory["current_subphase"] == "10B"
+    assert migration["current_phase"] == 11
+    assert migration["current_subphase"] == "11A"
+    assert current_inventory["current_phase"] == 10
+    assert current_inventory["current_subphase"] == "10B"
     assert len(live_transfers) == len(transferred_names)
     assert expected - actual == approved_before + approved_deletions
     assert actual_transferred == approved_after

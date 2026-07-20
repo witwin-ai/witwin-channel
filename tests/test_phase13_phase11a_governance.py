@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+from tools.refactor_baseline import binding_manifest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+AUDIT = ROOT / "docs/dev/audit"
+EVIDENCE_PATH = AUDIT / "phase13-boundary-dedup-phase11a-evidence.json"
+LEDGER_PATH = AUDIT / "duplication-classification.json"
+MANIFEST_PATH = ROOT / "ci/native-binding-manifest.json"
+BOUNDARY_FILES = {"fields.cpp", "materials.cpp"}
+
+
+def _json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _semantic_sha256(manifest: dict[str, Any]) -> str:
+    projection = [
+        {key: value for key, value in symbol.items() if key != "line"}
+        for symbol in manifest["symbols"]
+    ]
+    payload = json.dumps(
+        projection, sort_keys=True, separators=(",", ":")
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() -> None:
+    evidence = _json(EVIDENCE_PATH)
+    ledger = _json(LEDGER_PATH)
+    refresh = ledger["phase11a_refresh"]
+    current = evidence["duplication"]["current"]
+
+    assert evidence["method"]["comparison"] == "EXACT_TOKEN_MATCH"
+    assert evidence["method"]["min_tokens"] == ledger["min_tokens"] == 100
+    assert current == {
+        "duplicate_lines": refresh["combined_duplicate_lines"],
+        "total_lines": refresh["combined_total_lines"],
+        "coverage_percent": refresh["coverage_percent"],
+        "region_count": refresh["region_count"],
+    }
+    assert refresh["region_count"] == len(ledger["regions"]) == 155
+    assert refresh["stale_region_count"] == 0
+    assert refresh["unclassified_region_count"] == 0
+    assert refresh["budget_relaxed"] is False
+    assert refresh["coverage_percent"] > refresh["frozen_coverage_percent"]
+    assert evidence["duplication"]["frozen_budget"] == {
+        "coverage_percent": refresh["frozen_coverage_percent"],
+        "relaxed": False,
+        "met": False,
+        "final_acceptance": "pending Phase 11B",
+    }
+
+    stale = set(evidence["ledger_refresh"]["stale_regions_removed"])
+    assert len(stale) == 5
+    assert stale.isdisjoint(ledger["regions"])
+    assert evidence["ledger_refresh"]["new_regions_classified"] == []
+    boundary_regions = [
+        region
+        for region in ledger["regions"].values()
+        if BOUNDARY_FILES.intersection(region["files"])
+    ]
+    assert boundary_regions
+    assert all(region["category"] == "other" for region in boundary_regions)
+    assert all(region["owner"] == "bindings" for region in boundary_regions)
+
+
+def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numerical() -> None:
+    evidence = _json(EVIDENCE_PATH)
+    migration = _json(AUDIT / "phase13-migration-delta.json")
+    phase10b = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
+    manifest = _json(MANIFEST_PATH)
+    record = evidence["binding_manifest"]
+
+    assert manifest == binding_manifest(ROOT)
+    assert len(manifest["symbols"]) == record["symbol_count"] == 202
+    assert _sha256(MANIFEST_PATH) == record["current_sha256"]
+    assert _semantic_sha256(manifest) == record["current_semantic_sha256"]
+    assert record["pre_semantic_sha256"] == record["current_semantic_sha256"]
+    assert record["semantic_changes"] == 0
+    assert (
+        phase10b["activation"]["binding_manifest_sha256"]
+        == record["phase10b_snapshot_sha256"]
+    )
+    assert migration["current_phase"] == 11
+    assert migration["current_subphase"] == "11A"
+    assert migration["phase11a_current"]["evidence"] == str(
+        EVIDENCE_PATH.relative_to(ROOT)
+    ).replace("\\", "/")
+    assert migration["phase11a_current"]["binding_semantic_changes"] == 0
+    assert all(value is False for value in evidence["invariants"].values())
+
+    for relative in evidence["scope"]:
+        source = (ROOT / relative).read_text(encoding="utf-8-sig")
+        assert "py::args" not in source
+        assert "pybind11::args" not in source
+        assert "<<<" not in source

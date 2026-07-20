@@ -19,8 +19,8 @@
             }
         }
     },
-    "current_phase": 10,
-    "current_subphase": "10B",
+    "current_phase": 11,
+    "current_subphase": "11A",
     "transfers_applied": [
         {
             "phase": 3,
@@ -1075,5 +1075,27 @@
         "approved_phase9_body_hash_deletions": [],
         "public_api_delta": false,
         "binding_count_delta": 0
+    },
+    "phase11a_current": {
+        "scope": "mechanical typed-boundary deduplication in fields.cpp and materials.cpp",
+        "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11a-evidence.json",
+        "binding_count": 202,
+        "binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
+        "binding_semantic_changes": 0,
+        "duplication_refresh": {
+            "duplicate_lines": 8402,
+            "total_lines": 78162,
+            "duplicate_coverage_percent": 10.749469,
+            "frozen_budget_percent": 10.211512,
+            "classified_regions": 155,
+            "stale_region_count": 0,
+            "unclassified_region_count": 0,
+            "budget_relaxed": false,
+            "status": "boundary deduplication complete; frozen duplication acceptance remains pending Phase 11B"
+        },
+        "numerical_change": false,
+        "native_abi_change": false,
+        "launch_contract_change": false,
+        "public_api_delta": false
     }
 }
