@@ -194,7 +194,7 @@ layered Channel/RayD 2, and Channel Native 163. Table primal/sample/PDF and the
 retained event-policy TU remain on their default CUDA flags; table AD, ensemble,
 and patch owners retain `--fmad=false` in RayD. Launch count, current stream,
 reduction order, atomics, resident tensors, and public API remain unchanged.
-At the Phase 10A cut, Phase 10B still owned the six fused chain contracts.
+At the Phase 10A cut, Channel still owned the six fused chain contracts pending Phase 10B.
 Detailed Phase 10A activation, codegen/resource, deletion, and direct-test evidence is recorded in
 `docs/dev/audit/phase13-scattering-phase10a-evidence.json`.
 
