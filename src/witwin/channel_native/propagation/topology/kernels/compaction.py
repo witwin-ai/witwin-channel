@@ -1,9 +1,29 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionOrder1CapacityBlock:
+    valid: torch.Tensor
+    rx_id: torch.Tensor
+    depth: torch.Tensor
+    edge_id: torch.Tensor
+    delay_s: torch.Tensor
+    x_re: torch.Tensor
+    x_im: torch.Tensor
+    y_re: torch.Tensor
+    y_im: torch.Tensor
+    z_re: torch.Tensor
+    z_im: torch.Tensor
+    interaction_position: torch.Tensor
+    num_paths: torch.Tensor
+    overflow: torch.Tensor
 
 
 def deterministic_reflection_order1_compact(
@@ -460,6 +480,173 @@ def deterministic_diffraction_order1_compact(
             "_channel_native.deterministic_diffraction_order1_compact returned bad interaction_position shape"
         )
     return exported
+
+
+def _validate_diffraction_order1_capacity_inputs(
+    *,
+    count: torch.Tensor,
+    valid: torch.Tensor,
+    row_tensors: tuple[tuple[str, torch.Tensor, torch.dtype, int, tuple[int, ...]], ...],
+    output_capacity: int,
+) -> int:
+    validate_cuda_tensor("count", count, dtype=torch.int32, ndim=1)
+    if count.shape != (1,):
+        raise ValueError("count must have shape (1,)")
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    input_capacity = int(valid.shape[0])
+    if count.device != valid.device:
+        raise ValueError("count must share valid device")
+    for name, tensor, dtype, ndim, trailing_shape in row_tensors:
+        validate_cuda_tensor(
+            name,
+            tensor,
+            dtype=dtype,
+            ndim=ndim,
+            trailing_shape=trailing_shape,
+        )
+        if tensor.shape[0] != input_capacity:
+            raise ValueError(f"{name} must match valid capacity")
+        if tensor.device != valid.device:
+            raise ValueError(f"{name} must share valid device")
+    if type(output_capacity) is not int:
+        raise TypeError("output_capacity must be an integer")
+    if output_capacity < 0:
+        raise ValueError("output_capacity must be non-negative")
+    return input_capacity
+
+
+def _name_diffraction_order1_capacity_output(
+    raw: object,
+    *,
+    output_capacity: int,
+    device: torch.device,
+) -> DiffractionOrder1CapacityBlock:
+    if not isinstance(raw, dict):
+        raise TypeError(
+            "_channel_native.deterministic_diffraction_order1_capacity_block "
+            "must return a dict"
+        )
+    expected = {
+        "valid",
+        "rx_id",
+        "depth",
+        "edge_id",
+        "delay_s",
+        "x_re",
+        "x_im",
+        "y_re",
+        "y_im",
+        "z_re",
+        "z_im",
+        "interaction_position",
+        "num_paths",
+        "overflow",
+    }
+    if set(raw) != expected:
+        raise ValueError(
+            "_channel_native.deterministic_diffraction_order1_capacity_block "
+            "returned unexpected fields"
+        )
+    output_schema = (
+        ("valid", torch.bool, 1, ()),
+        ("rx_id", torch.int32, 1, ()),
+        ("depth", torch.int32, 1, ()),
+        ("edge_id", torch.int32, 1, ()),
+        ("delay_s", torch.float32, 1, ()),
+        ("x_re", torch.float32, 1, ()),
+        ("x_im", torch.float32, 1, ()),
+        ("y_re", torch.float32, 1, ()),
+        ("y_im", torch.float32, 1, ()),
+        ("z_re", torch.float32, 1, ()),
+        ("z_im", torch.float32, 1, ()),
+        ("interaction_position", torch.float32, 2, (3,)),
+    )
+    for name, dtype, ndim, trailing_shape in output_schema:
+        tensor = raw[name]
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(f"native diffraction capacity output {name} must be a tensor")
+        validate_cuda_tensor(
+            name,
+            tensor,
+            dtype=dtype,
+            ndim=ndim,
+            trailing_shape=trailing_shape,
+        )
+        if tensor.shape[0] != output_capacity:
+            raise ValueError(f"native diffraction capacity output {name} has wrong capacity")
+        if tensor.device != device:
+            raise ValueError(f"native diffraction capacity output {name} has wrong device")
+    for name, dtype in (("num_paths", torch.int32), ("overflow", torch.bool)):
+        tensor = raw[name]
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(f"native diffraction capacity output {name} must be a tensor")
+        validate_cuda_tensor(name, tensor, dtype=dtype, ndim=1)
+        if tensor.shape != (1,):
+            raise ValueError(f"native diffraction capacity output {name} must have shape (1,)")
+        if tensor.device != device:
+            raise ValueError(f"native diffraction capacity output {name} has wrong device")
+    return DiffractionOrder1CapacityBlock(**raw)
+
+
+def deterministic_diffraction_order1_capacity_block(
+    *,
+    count: torch.Tensor,
+    valid: torch.Tensor,
+    rx_id: torch.Tensor,
+    depth: torch.Tensor,
+    edge_id: torch.Tensor,
+    delay_s: torch.Tensor,
+    x_re: torch.Tensor,
+    x_im: torch.Tensor,
+    y_re: torch.Tensor,
+    y_im: torch.Tensor,
+    z_re: torch.Tensor,
+    z_im: torch.Tensor,
+    interaction_position: torch.Tensor,
+    output_capacity: int,
+) -> DiffractionOrder1CapacityBlock:
+    """Stably gather one RayD exporter chunk into a fixed-capacity CUDA block."""
+
+    row_tensors = (
+        ("rx_id", rx_id, torch.int32, 1, ()),
+        ("depth", depth, torch.int32, 1, ()),
+        ("edge_id", edge_id, torch.int32, 1, ()),
+        ("delay_s", delay_s, torch.float32, 1, ()),
+        ("x_re", x_re, torch.float32, 1, ()),
+        ("x_im", x_im, torch.float32, 1, ()),
+        ("y_re", y_re, torch.float32, 1, ()),
+        ("y_im", y_im, torch.float32, 1, ()),
+        ("z_re", z_re, torch.float32, 1, ()),
+        ("z_im", z_im, torch.float32, 1, ()),
+        ("interaction_position", interaction_position, torch.float32, 2, (3,)),
+    )
+    _validate_diffraction_order1_capacity_inputs(
+        count=count,
+        valid=valid,
+        row_tensors=row_tensors,
+        output_capacity=output_capacity,
+    )
+    raw = _required_native_op("deterministic_diffraction_order1_capacity_block")(
+        count,
+        valid,
+        rx_id,
+        depth,
+        edge_id,
+        delay_s,
+        x_re,
+        x_im,
+        y_re,
+        y_im,
+        z_re,
+        z_im,
+        interaction_position,
+        output_capacity,
+    )
+    return _name_diffraction_order1_capacity_output(
+        raw,
+        output_capacity=output_capacity,
+        device=valid.device,
+    )
 
 
 def deterministic_sort_order(

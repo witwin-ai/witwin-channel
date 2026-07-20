@@ -70,7 +70,7 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
     record = evidence["binding_manifest"]
 
     assert manifest == binding_manifest(ROOT)
-    assert len(manifest["symbols"]) == 204
+    assert len(manifest["symbols"]) == 205
     assert record["symbol_count"] == 202
     assert len(record["current_sha256"]) == 64
     assert len(record["current_semantic_sha256"]) == 64

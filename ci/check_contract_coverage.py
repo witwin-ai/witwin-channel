@@ -39,7 +39,7 @@ EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
 # _backward/_jvp companions): 193 -> 199;
 # ADR-022 added the 12 BDPT fixed-topology AD companions: 199 -> 211.
-EXPECTED_NATIVE_BINDING_COUNT = 204
+EXPECTED_NATIVE_BINDING_COUNT = 205
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",

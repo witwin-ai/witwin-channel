@@ -26,9 +26,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # Phase 4 then retired 9 strictly unreachable legacy/duplicate bindings:
 # 211 -> 202. ADR-028 Phase 8B added one device-resident diffraction planning
 # symbol: 202 -> 203. ADR-029 adds the dormant fixed-capacity diffraction state
-# selector: 203 -> 204.
+# selector: 203 -> 204. ADR-029 then adds the dormant post-RayD diffraction
+# path capacity block: 204 -> 205.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 204
+EXPECTED_BINDING_COUNT = 205
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )

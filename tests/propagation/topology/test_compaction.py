@@ -10,6 +10,7 @@ from witwin.channel_native.runtime import symbols, tensor_contracts
 
 
 _OWNER_NAMES = (
+    "deterministic_diffraction_order1_capacity_block",
     "deterministic_diffraction_order1_compact",
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",

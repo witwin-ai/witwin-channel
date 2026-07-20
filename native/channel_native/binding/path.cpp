@@ -275,6 +275,21 @@ pybind11::dict cn_deterministic_diffraction_order1_compact(
     torch::Tensor z_re,
     torch::Tensor z_im,
     torch::Tensor interaction_position);
+pybind11::dict cn_deterministic_diffraction_order1_capacity_block(
+    torch::Tensor count,
+    torch::Tensor valid,
+    torch::Tensor rx_id,
+    torch::Tensor depth,
+    torch::Tensor edge_id,
+    torch::Tensor delay,
+    torch::Tensor x_re,
+    torch::Tensor x_im,
+    torch::Tensor y_re,
+    torch::Tensor y_im,
+    torch::Tensor z_re,
+    torch::Tensor z_im,
+    torch::Tensor interaction_position,
+    int64_t output_capacity);
 torch::Tensor cn_deterministic_normalize_vec3(torch::Tensor values, double eps);
 torch::Tensor cn_deterministic_reflect_points(
     torch::Tensor points,
@@ -535,6 +550,10 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_diffraction_order1_compact",
         &cn_deterministic_diffraction_order1_compact,
         "Compact deterministic first-order diffraction RayD outputs with native CUDA.");
+    module.def(
+        "deterministic_diffraction_order1_capacity_block",
+        &cn_deterministic_diffraction_order1_capacity_block,
+        "Stably gather one RayD diffraction exporter chunk into a fixed CUDA capacity block.");
     module.def(
         "deterministic_normalize_vec3",
         &cn_deterministic_normalize_vec3,
