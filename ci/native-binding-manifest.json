@@ -450,278 +450,6 @@
       "doc": "Count valid BDPT connection samples with CUDA."
     },
     {
-      "name": "bdpt_diffraction_accumulation_forward",
-      "target": "cn_bdpt_diffraction_accumulation_forward",
-      "path": "native/channel_native/binding/rayd.cpp",
-      "line": 341,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "scene",
-          "type": "RayDSceneResource &",
-          "default": null
-        },
-        {
-          "name": "active",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "state_edge_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_edge_t_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_edge_t_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_n1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_prim0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_prim1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_exterior_angle",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_src",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_src_power",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_wi",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "state_d0",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "material_eta_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sigma",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_mu_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_limit",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_axis",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_position",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord0_min",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord0_max",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord1_min",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_coord1_max",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "grid_resolution0",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_resolution1",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "grid_cell_area",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "direct_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "keller_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "suffix_samples",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "seed",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "max_order",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "recursive_state_limit",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "recursive_active",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_edge_index",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_edge_pos",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_edge_dir",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_edge_t_min",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_edge_t_max",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_n0",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_n1",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_prim0",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_prim1",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "recursive_state_exterior_angle",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "export_tape",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "sample_state_index",
-          "type": "pybind11::object",
-          "default": null
-        },
-        {
-          "name": "sample_edge_weight",
-          "type": "pybind11::object",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Call typed RayD diffraction accumulation."
-    },
-    {
       "name": "bdpt_empty_subpath_state",
       "target": "cn_bdpt_empty_subpath_state",
       "path": "native/channel_native/binding/bdpt.cpp",
@@ -11074,6 +10802,278 @@
       ],
       "pybind_arguments": [],
       "doc": "Call typed RayD diffraction order-1 path export."
+    },
+    {
+      "name": "rayd_diffraction_sample_tape_forward",
+      "target": "cn_rayd_diffraction_sample_tape_forward",
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 341,
+      "return_type": "pybind11::tuple",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "scene",
+          "type": "RayDSceneResource &",
+          "default": null
+        },
+        {
+          "name": "active",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "state_edge_index",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_edge_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_edge_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_edge_t_min",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_edge_t_max",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_n0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_n1",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_prim0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_prim1",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_exterior_angle",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_src",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_src_power",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_wi",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "state_d0",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "material_eta_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_sigma",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_gain",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "state_limit",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grid_axis",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grid_position",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grid_coord0_min",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grid_coord0_max",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grid_coord1_min",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grid_coord1_max",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "grid_resolution0",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grid_resolution1",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grid_cell_area",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "wavelength",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "direct_samples",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "keller_samples",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "suffix_samples",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "seed",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "max_order",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "recursive_state_limit",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "recursive_active",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_edge_index",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_edge_pos",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_edge_dir",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_edge_t_min",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_edge_t_max",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_n0",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_n1",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_prim0",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_prim1",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "recursive_state_exterior_angle",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "export_tape",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "sample_state_index",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "sample_edge_weight",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Call typed RayD diffraction sample-tape production."
     },
     {
       "name": "rayd_intersect_backward",

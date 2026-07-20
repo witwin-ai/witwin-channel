@@ -25,7 +25,7 @@
       "family": "RayD order-1 path export / visibility and sample-tape production",
       "symbols": [
         "rayd_diffraction_paths_order1_forward",
-        "bdpt_diffraction_accumulation_forward"
+        "rayd_diffraction_sample_tape_forward"
       ],
       "phase7_current_owner": "RayD",
       "accepted_authoritative_owner": "RayD",
@@ -216,10 +216,11 @@
     "rule": "pure-wedge --use_fast_math must not spread to MC, coupled, transmission, or other precise families; scattering --fmad=false is independent"
   },
   "sample_tape_rename": {
-    "current_symbol": "bdpt_diffraction_accumulation_forward",
-    "accepted_symbol": "rayd_diffraction_sample_tape_forward",
+    "historical_symbol": "bdpt_diffraction_accumulation_forward",
+    "current_symbol": "rayd_diffraction_sample_tape_forward",
     "phase": "8B",
     "kind": "rename-only",
+    "status": "applied; no compatibility alias",
     "output_contract": "preserve complete fused output tuple, row order, launches, and RNG; do not trim unconsumed columns",
     "compatibility_alias_allowed": false
   },

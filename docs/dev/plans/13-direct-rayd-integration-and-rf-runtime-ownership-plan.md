@@ -413,6 +413,10 @@ Channel derivative”的同一 operation split：两者是 tape producer 与 est
 - live source中旧 `bdpt_diffraction_accumulation_forward`、`raydn_diffraction_*` façade为零；
 - 每个保留的 `bdpt_diffraction_*` symbol都有真实 BDPT E2E caller。
 
+Phase 8B 已将 sample-tape producer 原子重命名为
+`rayd_diffraction_sample_tape_forward`：旧名没有 live ABI、Python alias或
+re-export，RayD typed implementation、19-output tuple、launch、RNG和行顺序保持不变。
+
 ## 7. Scattering v2 纳入后的 owner 决策
 
 ### 7.1 当前基线

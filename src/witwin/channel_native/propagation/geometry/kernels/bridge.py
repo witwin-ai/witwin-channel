@@ -105,18 +105,18 @@ def rayd_intersect_forward(
     return exported
 
 
-def bdpt_diffraction_accumulation_forward(*args: object) -> tuple[torch.Tensor, ...]:
+def rayd_diffraction_sample_tape_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
-            "bdpt_diffraction_accumulation_forward requires a typed RayD scene resource"
+            "rayd_diffraction_sample_tape_forward requires a typed RayD scene resource"
         )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("bdpt_diffraction_accumulation_forward")(
+    out = _required_native_op("rayd_diffraction_sample_tape_forward")(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.bdpt_diffraction_accumulation_forward must return a tensor sequence"
+            "_channel_native.rayd_diffraction_sample_tape_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -292,7 +292,7 @@ def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, 
 
 
 __all__ = [
-    "bdpt_diffraction_accumulation_forward",
+    "rayd_diffraction_sample_tape_forward",
     "coupled_dd_geometry_forward",
     "coupled_rd_geometry_forward",
     "rayd_diffraction_paths_order1_forward",

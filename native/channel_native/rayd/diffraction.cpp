@@ -78,7 +78,7 @@ pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
         rayd::torch::diffraction_paths_order1_forward(scene.resource(), config));
 }
 
-pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
+pybind11::tuple cn_rayd_diffraction_sample_tape_forward(
     RayDSceneResource &scene,
     pybind11::object active,
     torch::Tensor state_edge_index,

@@ -21,9 +21,9 @@ from .autograd import (
     rayd_trace_reflections_jvp,
 )
 from .bridge import (
-    bdpt_diffraction_accumulation_forward,
     coupled_rd_geometry_forward,
     rayd_diffraction_paths_order1_forward,
+    rayd_diffraction_sample_tape_forward,
     rayd_intersect_forward,
     rayd_reflection_epc_paths_forward,
     rayd_trace_reflections_forward,
@@ -46,7 +46,6 @@ __all__ = [
     "_RaydReflectionEpcPathsAdFunction",
     "_RaydTraceReflectionsAdFunction",
     "_epc_paths_frozen_winner_checks",
-    "bdpt_diffraction_accumulation_forward",
     "core_diffraction_edge_count",
     "deterministic_face_groups",
     "deterministic_normalize_vec3",
@@ -56,6 +55,7 @@ __all__ = [
     "mc_surface_group_edge_candidates",
     "coupled_rd_geometry_forward",
     "rayd_diffraction_paths_order1_forward",
+    "rayd_diffraction_sample_tape_forward",
     "rayd_face_normals_ad",
     "rayd_intersect_ad",
     "rayd_intersect_backward",

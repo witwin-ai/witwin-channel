@@ -27,7 +27,7 @@ def _native_unoccluded_scene():
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
-def test_diffraction_accumulation_accepts_sample_state_slots_and_weights():
+def test_diffraction_sample_tape_accepts_sample_state_slots_and_weights():
     scene = _native_unoccluded_scene()
     state_edge_index = torch.tensor([0, 1], device="cuda", dtype=torch.int32)
     state_edge_pos = torch.tensor(
@@ -58,7 +58,7 @@ def test_diffraction_accumulation_accepts_sample_state_slots_and_weights():
     sample_state_index = torch.tensor([1], device="cuda", dtype=torch.int32)
     sample_edge_weight = torch.tensor([1.0], device="cuda", dtype=torch.float32)
 
-    out = ops.bdpt_diffraction_accumulation_forward(
+    out = ops.rayd_diffraction_sample_tape_forward(
         scene,
         active,
         state_edge_index,
@@ -113,6 +113,7 @@ def test_diffraction_accumulation_accepts_sample_state_slots_and_weights():
         sample_edge_weight,
     )
 
+    assert len(out) == 19
     torch.cuda.synchronize()
     assert float(out[0].sum().item()) > 0.0
     assert int(out[7].item()) == 1

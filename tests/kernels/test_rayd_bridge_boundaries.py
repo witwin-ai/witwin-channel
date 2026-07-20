@@ -35,7 +35,7 @@ WRAPPERS_BY_SOURCE = {
     },
     "diffraction.cpp": {
         "cn_rayd_diffraction_paths_order1_forward",
-        "cn_bdpt_diffraction_accumulation_forward",
+        "cn_rayd_diffraction_sample_tape_forward",
     },
 }
 

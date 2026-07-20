@@ -140,7 +140,7 @@ def test_phase7_pre_activation_pure_wedge_snapshot_is_preserved() -> None:
     } <= {entry["name"] for entry in deletions}
 
 
-def test_phase7_legacy_audit_closes_deletions_and_freezes_one_rename() -> None:
+def test_phase8b_legacy_audit_closes_deletions_and_sample_tape_rename() -> None:
     audit = _json(AUDIT / "phase13-diffraction-legacy-audit.json")
     phase4 = _json(AUDIT / "phase13-phase4-dead-binding-reachability.json")
     manifest = _manifest_symbols()
@@ -171,7 +171,7 @@ def test_phase7_legacy_audit_closes_deletions_and_freezes_one_rename() -> None:
         "bdpt_diffraction_discover_edges_counted",
     }.isdisjoint(manifest)
 
-    rename = audit["pending_phase8b_rename"]  # type: ignore[index]
+    rename = audit["completed_phase8b_rename"]  # type: ignore[index]
     assert rename == {
         "old_symbol": "bdpt_diffraction_accumulation_forward",
         "new_symbol": "rayd_diffraction_sample_tape_forward",
@@ -183,9 +183,10 @@ def test_phase7_legacy_audit_closes_deletions_and_freezes_one_rename() -> None:
         "rename_only": True,
         "compatibility_alias_allowed": False,
         "trim_output_allowed": False,
+        "status": "applied in Phase 8B; no live alias or re-export",
     }
-    assert rename["old_symbol"] in manifest
-    assert rename["new_symbol"] not in manifest
+    assert rename["old_symbol"] not in manifest
+    assert rename["new_symbol"] in manifest
 
 
 def test_phase7_freezes_native_tx_visibility_selection_requirements() -> None:

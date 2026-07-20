@@ -104,7 +104,7 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert current["duplicate_symbols"] == []
     assert migration["current_phase"] == 11
     assert migration["current_subphase"] == "stable integration naming"
-    assert len(renames) == len(rename_sources) == len(rename_targets) == 20
+    assert len(renames) == len(rename_sources) == len(rename_targets) == 21
     assert rename_sources.isdisjoint(rename_targets)
     assert baseline_name_set & (rename_sources | rename_targets) == rename_targets
     assert current_name_set & (rename_sources | rename_targets) == rename_targets

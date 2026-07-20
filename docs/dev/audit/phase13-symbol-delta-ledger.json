@@ -154,7 +154,7 @@
       "action": "rename",
       "replacement": "rayd_diffraction_sample_tape_forward",
       "count_delta": 0,
-      "status": "planned",
+      "status": "applied in Phase 8B",
       "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
     },
     {

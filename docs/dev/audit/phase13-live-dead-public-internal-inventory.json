@@ -370,30 +370,29 @@
       ]
     },
     {
-      "symbol": "bdpt_diffraction_accumulation_forward",
+      "symbol": "rayd_diffraction_sample_tape_forward",
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 146
+          "line": 108
         }
       ],
       "production_callers": [
         {
-          "path": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
-          "line": 831,
-          "via_alias": "raydn_diffraction_accumulation_forward"
+          "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
+          "line": 831
         }
       ],
       "native_dispatch_evidence": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 152
+          "line": 114
         }
       ],
       "e2e_callers": [
-        "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available"
+        "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available"
       ],
       "test_references": [
         {

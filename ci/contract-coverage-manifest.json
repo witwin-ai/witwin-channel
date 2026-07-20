@@ -36,6 +36,7 @@
     "native-mc-sampling": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
     "native-path-topology": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
     "native-rayd-geometry": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+    "native-rayd-diffraction-sample-tape": "tests/core/test_rayd_diffraction_sampling_contract.py::test_diffraction_sample_tape_accepts_sample_state_slots_and_weights",
     "native-rayd-scene": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
     "native-scattering": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
     "native-field-rough-scale": "tests/kernels/test_field_rough_reflection_scale.py::test_rough_reflection_scale_contract_shapes_and_dtypes",
@@ -55,7 +56,6 @@
     "native-mc-discovery": "tests/montecarlo/basic/test_diffraction_discovery.py::test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter"
   },
   "e2e_scenarios": {
-    "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
     "bdpt-los": "tests/montecarlo/bdpt/test_los_empty_space.py::test_bdpt_los_empty_space_matches_analytic_reference",
     "bdpt-reflection": "tests/montecarlo/bdpt/test_reflection_single_plane.py::test_bdpt_single_plane_reflection_returns_nonzero_native_component_when_available",
     "bdpt-scattering": "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference",
@@ -439,12 +439,12 @@
       ]
     ],
     [
-      "bdpt_diffraction_accumulation_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_accumulation_forward",
+      "rayd_diffraction_sample_tape_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_diffraction_sample_tape_forward",
       "named_wrapper",
-      "native-bdpt-paths",
+      "native-rayd-diffraction-sample-tape",
       [
-        "bdpt-diffraction"
+        "mc-basic-diffraction"
       ]
     ],
     [

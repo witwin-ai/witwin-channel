@@ -47,8 +47,8 @@ def test_rayd_intersection_uses_channel_native_bridge():
     assert "_rayd_resource" not in ops.__dict__
 
 
-def test_bdpt_diffraction_uses_channel_native_bridge():
-    for fn in (ops.bdpt_diffraction_accumulation_forward,):
+def test_rayd_diffraction_sample_tape_uses_channel_native_bridge():
+    for fn in (ops.rayd_diffraction_sample_tape_forward,):
         source = inspect.getsource(fn)
         assert "_required_rayd_op" not in source
         assert "torch.ops" not in source

@@ -828,7 +828,7 @@ def diffraction_component_map(
             dtype=torch.float32,
         )
         state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
-        sampled = geometry_bridge.bdpt_diffraction_accumulation_forward(
+        sampled = geometry_bridge.rayd_diffraction_sample_tape_forward(
             handle, None, *states, state_wi, state_wi,
             material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
             state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),

@@ -10,9 +10,9 @@ from witwin.channel_native.runtime import native_resources, symbols, tensor_cont
 
 
 _CANONICAL_FUNCTION_NAMES = (
-    "bdpt_diffraction_accumulation_forward",
     "coupled_rd_geometry_forward",
     "rayd_diffraction_paths_order1_forward",
+    "rayd_diffraction_sample_tape_forward",
     "rayd_intersect_forward",
     "rayd_reflection_epc_paths_forward",
     "rayd_trace_reflections_forward",

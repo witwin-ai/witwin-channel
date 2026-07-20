@@ -50,8 +50,8 @@ the existing Channel CUDA implementation without a RayD bridge alias.
 A four-axis reachability audit deleted nine uncallable legacy bindings,
 including the crude BDPT diffraction connection exporters and the dead
 reflection/path wrappers. The binding count is therefore 202. The RayD fused
-diffraction sample-tape producer remains intentionally exposed as
-`bdpt_diffraction_accumulation_forward` until its Phase 8 semantic rename; the
+diffraction sample-tape producer was historically exposed as
+`bdpt_diffraction_accumulation_forward` before its Phase 8B semantic rename; the
 Channel `mc_sionna_diffraction_tape_accumulate` primal/JVP/VJP consumer family
 is unchanged. Exact deletion and body-hash evidence lives in
 `docs/dev/audit/phase13-phase4-dead-binding-reachability.json` and
@@ -115,7 +115,7 @@ numerical implementation. MC Sionna fixed-tape accumulation and coupled R-D/
 D-D fields remain complete Channel owners and stay on precise math. The pure
 wedge family alone retains exporter-locked `--use_fast_math`.
 
-Phase 8B will rename the misleading live
+Phase 8B renamed the misleading live
 `bdpt_diffraction_accumulation_forward` sample-tape producer to
 `rayd_diffraction_sample_tape_forward` without an alias or output trimming.
 The five dead BDPT diffraction bindings deleted in Phase 4 remain deleted under

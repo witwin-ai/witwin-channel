@@ -52,7 +52,7 @@
       "disposition": "renamed in Phase 4; no old alias"
     }
   ],
-  "pending_phase8b_rename": {
+  "completed_phase8b_rename": {
     "old_symbol": "bdpt_diffraction_accumulation_forward",
     "new_symbol": "rayd_diffraction_sample_tape_forward",
     "current_numerical_owner": "RayD",
@@ -60,7 +60,8 @@
     "static_production_caller": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
     "rename_only": true,
     "compatibility_alias_allowed": false,
-    "trim_output_allowed": false
+    "trim_output_allowed": false,
+    "status": "applied in Phase 8B; no live alias or re-export"
   },
   "phase8b_exit_requirements": {
     "live_rayd_diffraction_alias_count": 0,
@@ -68,5 +69,5 @@
     "retained_bdpt_diffraction_symbol_rule": "every retained symbol must pass all four axes with a real BDPT E2E caller",
     "dead_symbol_rule": "delete facade, registration, source/helper, tests, manifest, coverage, inventory, and budget records together"
   },
-  "result": "Phase 4 deletion and MC rename decisions are closed; exactly one misleading sample-tape name remains for rename-only Phase 8B cleanup"
+  "result": "Phase 4 deletions and both MC semantic renames are closed; the historical sample-tape name remains only in immutable decision/evidence records"
 }

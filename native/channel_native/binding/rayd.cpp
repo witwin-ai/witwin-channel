@@ -200,7 +200,7 @@ pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
     int64_t capacity,
     double wavelength,
     double isb_taper_width_scale);
-pybind11::tuple cn_bdpt_diffraction_accumulation_forward(
+pybind11::tuple cn_rayd_diffraction_sample_tape_forward(
     RayDSceneResource &scene,
     pybind11::object active,
     torch::Tensor state_edge_index,
@@ -339,7 +339,7 @@ void register_rayd_accumulation(pybind11::module_ &module) {
         &cn_rayd_diffraction_paths_order1_forward,
         "Call typed RayD diffraction order-1 path export.");
     module.def(
-        "bdpt_diffraction_accumulation_forward",
-        &cn_bdpt_diffraction_accumulation_forward,
-        "Call typed RayD diffraction accumulation.");
+        "rayd_diffraction_sample_tape_forward",
+        &cn_rayd_diffraction_sample_tape_forward,
+        "Call typed RayD diffraction sample-tape production.");
 }

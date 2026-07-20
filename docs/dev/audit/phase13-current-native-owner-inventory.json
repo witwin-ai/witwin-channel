@@ -797,9 +797,9 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "bdpt_diffraction_accumulation_forward",
+      "symbol": "rayd_diffraction_sample_tape_forward",
       "abi_owner": "Channel Native _channel_native",
-      "binding_target": "cn_bdpt_diffraction_accumulation_forward",
+      "binding_target": "cn_rayd_diffraction_sample_tape_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
         "line": 341
@@ -808,47 +808,46 @@
         {
           "path": "native/channel_native/binding/rayd.cpp",
           "lines": [
-            269
+            203
           ],
           "count": 1
         },
         {
           "path": "native/channel_native/rayd/diffraction.cpp",
           "lines": [
-            386
+            81
           ],
           "count": 1
         }
       ],
       "numerical_owner": "RayD",
       "owner_kind": "RayD native implementation through typed RayD C++ API",
-      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.bdpt_diffraction_accumulation_forward",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_diffraction_sample_tape_forward",
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 146
+          "line": 108
         }
       ],
       "production_callers": [
         {
           "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
-          "line": 831,
-          "via_alias": "raydn_diffraction_accumulation_forward"
+          "line": 831
         }
       ],
       "native_dispatch_evidence": [
         {
           "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-          "line": 152
+          "line": 114
         }
       ],
-      "contract_test": "native-bdpt-paths",
+      "contract_test": "native-rayd-diffraction-sample-tape",
       "e2e_callers": [
-        "bdpt-diffraction"
+        "mc-basic-diffraction"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "rename/replace legacy integration identity"
+      "plan13_disposition": "renamed in Phase 8B; no compatibility alias"
     },
     {
       "symbol": "bdpt_empty_subpath_state",

@@ -215,6 +215,11 @@
             "phase": 4,
             "from": "bdpt_diffraction_discover_edges_counted",
             "to": "mc_diffraction_discover_edges_counted"
+        },
+        {
+            "phase": "8B",
+            "from": "bdpt_diffraction_accumulation_forward",
+            "to": "rayd_diffraction_sample_tape_forward"
         }
     ],
     "deletions_applied": [
