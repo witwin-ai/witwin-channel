@@ -30,6 +30,8 @@
     "native-diffraction-state-capacity": "tests/propagation/topology/test_diffraction_state_capacity.py::test_diffraction_state_capacity_select_handles_zero_and_effective_capacity",
     "native-diffraction-path-capacity": "tests/propagation/topology/test_diffraction_path_capacity.py::test_diffraction_order1_capacity_block_handles_empty_input_and_capacity",
     "native-deterministic-capacity-finalize": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
+    "native-evaluated-paths-capacity-pack": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
+    "native-evaluated-paths-capacity-pack-ad": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_jvp_gathers_every_continuous_field_and_preserves_zero_slots",
     "native-field-coupled": "tests/ad/test_solver_diffraction_coupled_ad.py::test_coupled_forward_stays_primal_without_geometry_leaves",
     "native-field-diffraction": "tests/ad/test_solver_diffraction_coupled_ad.py::test_wedge_reevaluation_forward_parity",
     "native-field-free-space": "tests/kernels/test_field_transport.py::test_free_space_complex3_matches_analytic_phase_and_power_contract",
@@ -68,6 +70,7 @@
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
     "deterministic-ad": "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
+    "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "deterministic-los": "tests/deterministic/test_los_empty_space.py::test_empty_space_los_matches_analytic_reference",
     "deterministic-reflection": "tests/deterministic/test_reflection_single_plane.py::test_single_plane_reflection_matches_path_reference",
     "field-coupled": "tests/ad/test_solver_diffraction_coupled_ad.py::test_coupled_material_grad_matches_fd",
@@ -927,6 +930,33 @@
       "native-deterministic-capacity-finalize",
       [
         "deterministic-diffraction"
+      ]
+    ],
+    [
+      "evaluated_paths_capacity_pack",
+      "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.forward",
+      "native_call_site",
+      "native-evaluated-paths-capacity-pack",
+      [
+        "evaluated-paths-capacity"
+      ]
+    ],
+    [
+      "evaluated_paths_capacity_pack_backward",
+      "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.backward",
+      "native_call_site",
+      "native-evaluated-paths-capacity-pack-ad",
+      [
+        "evaluated-paths-capacity"
+      ]
+    ],
+    [
+      "evaluated_paths_capacity_pack_jvp",
+      "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.jvp",
+      "native_call_site",
+      "native-evaluated-paths-capacity-pack-ad",
+      [
+        "evaluated-paths-capacity"
       ]
     ],
     [

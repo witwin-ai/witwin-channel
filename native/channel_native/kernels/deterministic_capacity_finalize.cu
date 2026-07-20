@@ -6,6 +6,7 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "deterministic_capacity_finalize.h"
 
 #include <cstdint>
 #include <limits>
@@ -18,7 +19,6 @@ using channel_native::check_tensor;
 __global__ void capacity_finalize_pair_state_init_kernel(
     int *__restrict__ pair_count,
     int *__restrict__ pair_start,
-    int *__restrict__ num_paths,
     int64_t count) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -26,7 +26,6 @@ __global__ void capacity_finalize_pair_state_init_kernel(
          pair += stride) {
         pair_count[pair] = 0;
         pair_start[pair] = std::numeric_limits<int>::max();
-        num_paths[pair] = 0;
     }
 }
 
@@ -167,10 +166,10 @@ int launch_blocks(int64_t count) {
 
 }  // namespace
 
-pybind11::dict cn_deterministic_capacity_finalize(
-    at::Tensor valid,
-    at::Tensor tx_id,
-    at::Tensor rx_id,
+int64_t channel_native::capacity::deterministic_capacity_validate(
+    const at::Tensor& valid,
+    const at::Tensor& tx_id,
+    const at::Tensor& rx_id,
     int64_t pair_count,
     int64_t num_tx,
     int64_t num_rx,
@@ -209,23 +208,50 @@ pybind11::dict cn_deterministic_capacity_finalize(
         path_capacity_per_pair == 0 ||
             pair_count <= std::numeric_limits<int64_t>::max() / path_capacity_per_pair,
         "result row capacity overflows int64 indexing");
+    return pair_count * path_capacity_per_pair;
+}
 
+channel_native::capacity::FinalizeState
+channel_native::capacity::deterministic_capacity_finalize_no_trap(
+    at::Tensor valid,
+    at::Tensor tx_id,
+    at::Tensor rx_id,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t path_capacity_per_pair,
+    at::Tensor selected_row_index,
+    at::Tensor output_valid,
+    at::Tensor num_paths,
+    bool initialize_public_outputs) {
+    const int64_t candidate_count = valid.size(0);
+    const int device = valid.get_device();
     const int64_t row_capacity = pair_count * path_capacity_per_pair;
-    auto bool_options = valid.options().dtype(at::kBool);
+
     auto int_options = valid.options().dtype(at::kInt);
     auto long_options = valid.options().dtype(at::kLong);
     auto byte_options = valid.options().dtype(at::kByte);
-    auto selected_row_index = at::empty({row_capacity}, long_options);
-    auto output_valid = at::empty({row_capacity}, bool_options);
-    auto num_paths = at::empty({pair_count}, int_options);
-    auto overflow = at::empty({1}, bool_options);
+    check_tensor(selected_row_index, "selected_row_index", at::kLong, 1);
+    check_tensor(output_valid, "output_valid", at::kBool, 1);
+    check_tensor(num_paths, "num_paths", at::kInt, 1);
+    TORCH_CHECK(
+        selected_row_index.size(0) == row_capacity,
+        "selected_row_index has the wrong capacity");
+    TORCH_CHECK(
+        output_valid.size(0) == row_capacity,
+        "output_valid has the wrong capacity");
+    TORCH_CHECK(num_paths.size(0) == pair_count, "num_paths has the wrong shape");
+    TORCH_CHECK(
+        selected_row_index.get_device() == device &&
+            output_valid.get_device() == device && num_paths.get_device() == device,
+        "capacity outputs must share candidate device");
     auto overflow_flag = at::empty({1}, int_options);
     auto contract_error = at::empty({1}, int_options);
     auto pair_counts = at::empty({pair_count}, int_options);
     auto pair_start = at::empty({pair_count}, int_options);
 
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    if (row_capacity > 0) {
+    if (initialize_public_outputs && row_capacity > 0) {
         C10_CUDA_CHECK(cudaMemsetAsync(
             selected_row_index.data_ptr<int64_t>(),
             0xff,
@@ -237,6 +263,13 @@ pybind11::dict cn_deterministic_capacity_finalize(
             static_cast<size_t>(row_capacity) * sizeof(bool),
             stream));
     }
+    if (initialize_public_outputs && pair_count > 0) {
+        C10_CUDA_CHECK(cudaMemsetAsync(
+            num_paths.data_ptr<int>(),
+            0,
+            static_cast<size_t>(pair_count) * sizeof(int),
+            stream));
+    }
     C10_CUDA_CHECK(cudaMemsetAsync(
         overflow_flag.data_ptr<int>(), 0, sizeof(int), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(
@@ -246,7 +279,6 @@ pybind11::dict cn_deterministic_capacity_finalize(
             launch_blocks(pair_count), kCapacityFinalizeBlockSize, 0, stream>>>(
             pair_counts.data_ptr<int>(),
             pair_start.data_ptr<int>(),
-            num_paths.data_ptr<int>(),
             pair_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -338,12 +370,73 @@ pybind11::dict cn_deterministic_capacity_finalize(
         }
     }
 
+    return {
+        selected_row_index,
+        output_valid,
+        num_paths,
+        overflow_flag,
+        contract_error};
+}
+
+void channel_native::capacity::deterministic_capacity_publish_status(
+    const FinalizeState& state,
+    at::Tensor overflow,
+    cudaStream_t stream) {
+    check_tensor(overflow, "overflow", at::kBool, 1);
+    TORCH_CHECK(overflow.size(0) == 1, "overflow must have shape (1,)");
+    TORCH_CHECK(
+        overflow.get_device() == state.valid.get_device(),
+        "overflow must share capacity device");
     capacity_finalize_public_status_kernel<<<1, 1, 0, stream>>>(
-        overflow_flag.data_ptr<int>(), overflow.data_ptr<bool>());
+        state.overflow_flag.data_ptr<int>(), overflow.data_ptr<bool>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+void channel_native::capacity::deterministic_capacity_trap(
+    const FinalizeState& state,
+    cudaStream_t stream) {
     capacity_finalize_trap_kernel<<<1, 1, 0, stream>>>(
-        overflow_flag.data_ptr<int>(), contract_error.data_ptr<int>());
+        state.overflow_flag.data_ptr<int>(), state.contract_error.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+pybind11::dict cn_deterministic_capacity_finalize(
+    at::Tensor valid,
+    at::Tensor tx_id,
+    at::Tensor rx_id,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t path_capacity_per_pair) {
+    const int64_t row_capacity =
+        channel_native::capacity::deterministic_capacity_validate(
+            valid,
+            tx_id,
+            rx_id,
+            pair_count,
+            num_tx,
+            num_rx,
+            path_capacity_per_pair);
+    auto selected_row_index = at::empty({row_capacity}, valid.options().dtype(at::kLong));
+    auto output_valid = at::empty({row_capacity}, valid.options().dtype(at::kBool));
+    auto num_paths = at::empty({pair_count}, valid.options().dtype(at::kInt));
+    auto overflow = at::empty({1}, valid.options().dtype(at::kBool));
+    auto state = channel_native::capacity::deterministic_capacity_finalize_no_trap(
+        valid,
+        tx_id,
+        rx_id,
+        pair_count,
+        num_tx,
+        num_rx,
+        path_capacity_per_pair,
+        selected_row_index,
+        output_valid,
+        num_paths,
+        true);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(valid.get_device()).stream();
+    channel_native::capacity::deterministic_capacity_publish_status(
+        state, overflow, stream);
+    channel_native::capacity::deterministic_capacity_trap(state, stream);
 
     pybind11::dict result;
     result["selected_row_index"] = selected_row_index;

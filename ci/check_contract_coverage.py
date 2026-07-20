@@ -38,8 +38,10 @@ EXPECTED_PUBLIC_EXPORT_COUNT = 37
 # + 6 ADR-021 multi-bounce chain scattering symbols (Op A/Op B forwards
 # scattering_chain_ensemble_eval / scattering_chain_realization_eval plus their
 # _backward/_jvp companions): 193 -> 199;
-# ADR-022 added the 12 BDPT fixed-topology AD companions: 199 -> 211.
-EXPECTED_NATIVE_BINDING_COUNT = 206
+# ADR-022 added the 12 BDPT fixed-topology AD companions: 199 -> 211. Plan 13
+# Phase 4 retired 9 dead bindings (211 -> 202), and ADR-028/ADR-029 Phase 8B
+# added seven dormant capacity contracts (202 -> 209).
+EXPECTED_NATIVE_BINDING_COUNT = 209
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",
@@ -69,6 +71,18 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
     "deterministic_los_topology_block_all_visible": (
         "witwin.channel_native.propagation.topology.kernels.construction."
         "deterministic_los_topology_block"
+    ),
+    "evaluated_paths_capacity_pack": (
+        "witwin.channel_native.propagation.enumerated.capacity."
+        "_EvaluatedPathsCapacityPackFunction.forward"
+    ),
+    "evaluated_paths_capacity_pack_backward": (
+        "witwin.channel_native.propagation.enumerated.capacity."
+        "_EvaluatedPathsCapacityPackFunction.backward"
+    ),
+    "evaluated_paths_capacity_pack_jvp": (
+        "witwin.channel_native.propagation.enumerated.capacity."
+        "_EvaluatedPathsCapacityPackFunction.jvp"
     ),
     "field_coupled_rd_backward": (
         "witwin.channel_native.propagation.fields.kernels.autograd."

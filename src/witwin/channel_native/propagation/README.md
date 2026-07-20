@@ -52,9 +52,20 @@ groups rows by the frozen receiver-major key `rx_id * num_tx + tx_id`, retains
 candidate order within each pair without truncation, and returns CUDA `int64`
 source indices plus `CapacityPathLayout`. Invalid candidates are poison-safe.
 Any per-pair overflow leaves every public index, validity bit, and count inert
-before the asynchronous device error. The typed `EvaluatedPaths` field gather
-is intentionally a later dormant producer; no Torch gather or live caller is
-introduced by the index-contract commit.
+before the asynchronous device error.
+
+`propagation.enumerated.capacity.evaluated_paths_capacity_pack` is the dormant
+complete-row producer layered on that same no-trap finalizer helper. One native
+initialization pass makes every topology, geometry, field, and layout slot
+canonical-inert; the stable finalizer runs without publishing an error; a
+valid-first CUDA gather copies successful rows; only then are public status and
+the final asynchronous trap published. Thus overflow or a bad valid ID cannot
+expose partially gathered RF fields. Its native backward uses source-unique
+scatter and its JVP uses valid-first gather for all continuous geometry and
+real/complex field tensors; absent cotangents/tangents and invalid rows are
+native zeros. Topology is non-differentiable, row identity is shared throughout
+the packed `EvaluatedPaths`, and no Torch numerical gather or live solver caller
+is introduced before the atomic activation.
 
 ## Public entry points
 

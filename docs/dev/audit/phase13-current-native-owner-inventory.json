@@ -27,10 +27,10 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 206,
+    "bindings": 209,
     "rayd_numerical": 43,
     "layered": 3,
-    "channel_numerical": 160
+    "channel_numerical": 163
   },
   "current_phase": 12,
   "current_subphase": "profiling-driven performance closure",
@@ -3543,6 +3543,153 @@
       "surface": "internal-native-ABI",
       "liveness": "dormant-native-producer",
       "plan13_disposition": "ADR-029 dormant stable pair-major capacity index finalizer"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_evaluated_paths_capacity_pack",
+      "binding_registration": {
+        "path": "native/channel_native/binding/path.cpp",
+        "line": 669
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/path.cpp",
+          "lines": [329],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/evaluated_paths_capacity_pack.cu",
+          "lines": [210],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/evaluated_paths_capacity_pack.cu",
+        "implementation_line": 210,
+        "export_line": 210
+      },
+      "python_owner": "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+          "line": 121
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+          "line": 124
+        }
+      ],
+      "contract_test": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
+      "e2e_callers": [
+        "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-producer",
+      "plan13_disposition": "ADR-029 dormant complete evaluated-path capacity packer"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack_backward",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_evaluated_paths_capacity_pack_backward",
+      "binding_registration": {
+        "path": "native/channel_native/binding/path.cpp",
+        "line": 699
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/path.cpp",
+          "lines": [356],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu",
+          "lines": [358],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu",
+        "implementation_line": 358,
+        "export_line": 358
+      },
+      "python_owner": "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.backward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+          "line": 150
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+          "line": 158
+        }
+      ],
+      "contract_test": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_backward_none_cotangents_and_invalid_sources_are_zero",
+      "e2e_callers": [
+        "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_jvp_vjp_duality_for_real_geometry"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-producer",
+      "plan13_disposition": "ADR-029 native source-unique capacity VJP companion"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack_jvp",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_evaluated_paths_capacity_pack_jvp",
+      "binding_registration": {
+        "path": "native/channel_native/binding/path.cpp",
+        "line": 703
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/path.cpp",
+          "lines": [372],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu",
+          "lines": [416],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu",
+        "implementation_line": 416,
+        "export_line": 416
+      },
+      "python_owner": "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.jvp",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+          "line": 182
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+          "line": 192
+        }
+      ],
+      "contract_test": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_jvp_gathers_every_continuous_field_and_preserves_zero_slots",
+      "e2e_callers": [
+        "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_jvp_vjp_duality_for_real_geometry"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-producer",
+      "plan13_disposition": "ADR-029 native valid-first capacity JVP companion"
     },
     {
       "symbol": "deterministic_component_counts",

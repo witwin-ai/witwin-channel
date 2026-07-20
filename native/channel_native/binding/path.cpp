@@ -1,8 +1,10 @@
 #include <torch/extension.h>
+#include <pybind11/stl.h>
 
 #include "registry.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -324,6 +326,65 @@ pybind11::dict cn_deterministic_capacity_finalize(
     int64_t num_tx,
     int64_t num_rx,
     int64_t path_capacity_per_pair);
+pybind11::dict cn_evaluated_paths_capacity_pack(
+    torch::Tensor valid,
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor depth,
+    torch::Tensor component_id,
+    torch::Tensor primitive_id,
+    torch::Tensor edge_id,
+    torch::Tensor material_id,
+    torch::Tensor primitive_sequence,
+    torch::Tensor material_sequence,
+    torch::Tensor interaction_type,
+    torch::Tensor path_length_m,
+    torch::Tensor delay_s,
+    torch::Tensor field_direction,
+    torch::Tensor interaction_position,
+    torch::Tensor interaction_normal,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor path_gain,
+    torch::Tensor path_field,
+    torch::Tensor field_xyz,
+    torch::Tensor coefficient,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t path_capacity_per_pair);
+pybind11::dict cn_evaluated_paths_capacity_pack_backward(
+    torch::Tensor valid,
+    torch::Tensor selected_row_index,
+    std::optional<torch::Tensor> grad_path_length_m,
+    std::optional<torch::Tensor> grad_delay_s,
+    std::optional<torch::Tensor> grad_field_direction,
+    std::optional<torch::Tensor> grad_interaction_position,
+    std::optional<torch::Tensor> grad_interaction_normal,
+    std::optional<torch::Tensor> grad_interaction_positions,
+    std::optional<torch::Tensor> grad_interaction_normals,
+    std::optional<torch::Tensor> grad_path_gain,
+    std::optional<torch::Tensor> grad_path_field,
+    std::optional<torch::Tensor> grad_field_xyz,
+    std::optional<torch::Tensor> grad_coefficient,
+    int64_t candidate_count,
+    int64_t sequence_width);
+pybind11::dict cn_evaluated_paths_capacity_pack_jvp(
+    torch::Tensor valid,
+    torch::Tensor selected_row_index,
+    std::optional<torch::Tensor> tangent_path_length_m,
+    std::optional<torch::Tensor> tangent_delay_s,
+    std::optional<torch::Tensor> tangent_field_direction,
+    std::optional<torch::Tensor> tangent_interaction_position,
+    std::optional<torch::Tensor> tangent_interaction_normal,
+    std::optional<torch::Tensor> tangent_interaction_positions,
+    std::optional<torch::Tensor> tangent_interaction_normals,
+    std::optional<torch::Tensor> tangent_path_gain,
+    std::optional<torch::Tensor> tangent_path_field,
+    std::optional<torch::Tensor> tangent_field_xyz,
+    std::optional<torch::Tensor> tangent_coefficient,
+    int64_t candidate_count,
+    int64_t sequence_width);
 pybind11::dict cn_deterministic_accumulate_flat(
     torch::Tensor valid,
     torch::Tensor tx_id,
@@ -605,6 +666,44 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("num_tx"),
         pybind11::arg("num_rx"),
         pybind11::arg("path_capacity_per_pair"));
+    module.def(
+        "evaluated_paths_capacity_pack",
+        &cn_evaluated_paths_capacity_pack,
+        "Pack complete evaluated paths into stable pair-major CUDA capacity.",
+        pybind11::arg("valid"),
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("depth"),
+        pybind11::arg("component_id"),
+        pybind11::arg("primitive_id"),
+        pybind11::arg("edge_id"),
+        pybind11::arg("material_id"),
+        pybind11::arg("primitive_sequence"),
+        pybind11::arg("material_sequence"),
+        pybind11::arg("interaction_type"),
+        pybind11::arg("path_length_m"),
+        pybind11::arg("delay_s"),
+        pybind11::arg("field_direction"),
+        pybind11::arg("interaction_position"),
+        pybind11::arg("interaction_normal"),
+        pybind11::arg("interaction_positions"),
+        pybind11::arg("interaction_normals"),
+        pybind11::arg("path_gain"),
+        pybind11::arg("path_field"),
+        pybind11::arg("field_xyz"),
+        pybind11::arg("coefficient"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("path_capacity_per_pair"));
+    module.def(
+        "evaluated_paths_capacity_pack_backward",
+        &cn_evaluated_paths_capacity_pack_backward,
+        "Scatter capacity cotangents to unique evaluated-path source rows.");
+    module.def(
+        "evaluated_paths_capacity_pack_jvp",
+        &cn_evaluated_paths_capacity_pack_jvp,
+        "Gather evaluated-path tangents into stable pair-major capacity.");
     module.def(
         "deterministic_accumulate_flat",
         &cn_deterministic_accumulate_flat,

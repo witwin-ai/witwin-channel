@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 import torch
 
+from .evaluated import EvaluatedPaths
+
 
 def _require_host_count(name: str, value: object) -> int:
     if type(value) is not int:
@@ -138,4 +140,26 @@ class CapacityPathSelection:
         return self.layout.device
 
 
-__all__ = ["CapacityPathLayout", "CapacityPathSelection"]
+@dataclass(frozen=True, slots=True, eq=False)
+class CapacityEvaluatedPaths:
+    """Packed evaluated rows and their shared capacity selection contract."""
+
+    selection: CapacityPathSelection
+    evaluated: EvaluatedPaths
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.selection, CapacityPathSelection):
+            raise TypeError("selection must be a CapacityPathSelection")
+        if not isinstance(self.evaluated, EvaluatedPaths):
+            raise TypeError("evaluated must be EvaluatedPaths")
+        if self.evaluated.row_count != self.selection.row_capacity:
+            raise ValueError("evaluated rows must match selection capacity")
+        if self.evaluated.topology.valid is not self.selection.valid:
+            raise ValueError("evaluated topology must share selection validity")
+
+
+__all__ = [
+    "CapacityEvaluatedPaths",
+    "CapacityPathLayout",
+    "CapacityPathSelection",
+]

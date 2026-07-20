@@ -10,6 +10,7 @@ import torch
 
 from witwin.channel_native.propagation.models import CapacityPathSelection
 from witwin.channel_native.propagation.topology.kernels import compaction
+from witwin.channel_native.runtime.symbols import required_symbol
 
 
 pytestmark = pytest.mark.skipif(
@@ -188,6 +189,37 @@ def test_capacity_finalize_rejects_bad_host_layout_metadata() -> None:
             num_tx=2,
             num_rx=2,
             capacity=1,
+        )
+
+
+@pytest.mark.parametrize(
+    ("pair_count", "num_tx", "num_rx", "capacity", "message"),
+    [
+        (-1, 0, 0, 0, "pair_count must be non-negative"),
+        (0, -1, 0, 0, "num_tx must be non-negative"),
+        (0, 0, -1, 0, "num_rx must be non-negative"),
+        (0, 0, 0, -1, "path_capacity_per_pair must be non-negative"),
+    ],
+)
+def test_native_capacity_finalize_rejects_negative_metadata_before_allocation(
+    pair_count: int,
+    num_tx: int,
+    num_rx: int,
+    capacity: int,
+    message: str,
+) -> None:
+    empty_bool = torch.empty(0, device="cuda", dtype=torch.bool)
+    empty_int = torch.empty(0, device="cuda", dtype=torch.int32)
+    native = required_symbol("deterministic_capacity_finalize")
+    with pytest.raises(RuntimeError, match=message):
+        native(
+            empty_bool,
+            empty_int,
+            empty_int,
+            pair_count,
+            num_tx,
+            num_rx,
+            capacity,
         )
 
 
