@@ -102,7 +102,7 @@ def test_phase4_current_inventory_counts_and_manifest_hash_are_exact() -> None:
     migration = _load("phase13-migration-delta.json")
 
     assert inventory["counts"] == {
-        "bindings": 202,
+        "bindings": 203,
         "rayd_numerical": owner_counts["RayD"],
         "layered": owner_counts["Channel operation / RayD primitives"],
         "channel_numerical": owner_counts["Channel Native"],
