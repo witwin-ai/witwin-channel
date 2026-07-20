@@ -156,10 +156,13 @@ The closed and pending records are frozen in
 `propagation.geometry.diffraction._tx_visible_diffraction_states` is live.
 Its current Torch loop constructs four points per edge, launches visibility
 repeatedly, reduces a Boolean mask, extracts a host Boolean, and selects rows.
-Phase 8B replaces that numerical path with one Channel-owned composed native
-planning/selection entry, provisionally named
-`diffraction_tx_visible_state_select`, which calls typed RayD visibility
-primitives. Python may only validate and assemble the named result.
+Phase 8B replaces that numerical path with the Channel-owned composed native
+planning entry `diffraction_tx_visible_state_plan`, which calls typed RayD
+visibility primitives. Python may only validate and assemble the named result.
+ADR-028 supersedes this ADR's provisional compact-selection storage contract:
+the accepted result preserves the twelve input tensors as exact aliases and
+returns a device-resident active mask at capacity `N`, avoiding a host-visible
+selected count.
 
 The operation freezes these exact semantics:
 
@@ -167,20 +170,21 @@ The operation freezes these exact semantics:
   `t_min + fraction * (t_max - t_min)`;
 - a state survives if any of its four source-to-edge sample segments is
   visible, with no ignored face;
-- selection is stable and preserves input row identity/order and all twelve
-  row-aligned state fields;
+- active rows preserve input row identity/order and all twelve row-aligned state
+  fields remain exact object/storage aliases;
 - empty input returns the established correctly shaped CUDA result without a
   launch; dtype/device/shape/resource errors fail before a success result;
 - the caller's active CUDA stream is used and no host scalar extraction,
   synchronization, Python loop, Torch geometry/reduction, CPU path, or fallback
   remains.
 
-Phase 8B must record the exact output storage/stride contract chosen by the
-native compaction and prove that solver-visible values and row order are exact.
-It may not hide a new persistent tape, host wait, device transfer, or launch/
-peak-memory regression. If the complete operation cannot meet those resource
-and exactness gates, the Phase 8B migration stops for an explicit follow-up
-fusion decision; the Torch implementation is not accepted as a fallback.
+Phase 8B must prove the ADR-028 capacity/mask storage contract and that
+solver-visible values and row order are exact. It may not hide a new persistent
+tape, host wait, device transfer, or unbounded peak-memory regression. Phase 12
+records the intentionally changed inactive-lane/launch behavior and may replace
+composed visibility with one typed native launch only with profiler evidence.
+If the complete operation cannot meet those resource and exactness gates, the
+Phase 8B migration stops; the Torch implementation is not accepted as fallback.
 
 ## Acceptance evidence
 
@@ -214,9 +218,10 @@ fusion decision; the Torch implementation is not accepted as a fallback.
 - exact rename manifest/coverage/E2E evidence with zero old aliases and
   unchanged sample-tape output/launch/RNG records;
 - the four-axis audit for every remaining legacy diffraction candidate;
-- exact four-fraction visibility and stable-selection parity for empty,
-  all-visible, partially visible, non-contiguous (accepted or rejected per the
-  frozen contract), invalid dtype/shape/device, and current-stream cases; and
+- exact four-fraction visibility and active-mask/active-row parity for empty,
+  all-visible, partially visible, accepted passthrough views, rejected
+  non-contiguous numerical inputs, invalid dtype/shape/device, capacity-limit,
+  and current-stream cases; and
 - static proof that production Python contains no transmitter visibility
   geometry loop, host Boolean extraction, or Torch numerical reconstruction.
 

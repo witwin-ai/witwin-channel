@@ -1,9 +1,10 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
-**状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024/025/026 已接受；Phase 10A/10B 已完成原子 pin/switch/delete；Phase 11A/11B
-机械去重已完成且 frozen duplication budget 已关闭；Phase 11 仍在完成 RayD legacy API、
-nightly/release 与 packaging 收口
+**状态：** EXECUTION IN PROGRESS（用户于 2026-07-20 选择 Phase 8B 方案 2 并要求完成
+Phase 11/12）；ADR-023/024/025/026/028 已接受；Phase 10A/10B 已完成原子
+pin/switch/delete；Phase 11A/11B 机械去重、RayD legacy extern-C 删除、clean-RayD wheel
+packaging 与 nightly 子门已完成；Phase 8B、稳定 integration 命名、Phase 12 profiling 优化和
+最终 clean-checkout release 收口正在执行
 
 **计划日期：** 2026-07-18
 
@@ -397,9 +398,9 @@ Channel derivative”的同一 operation split：两者是 tape producer 与 est
   caller、dynamic binding、public import、真实 BDPT E2E 四项审计；无 caller则连测试/
   manifest/budget一起删除，不以 name-based coverage当作生产可达证据。
 - `_tx_visible_diffraction_states` 当前存在 Python loop/Torch 几何重算候选。Phase 0 必须
-  确认 live path；若 live，迁成完整 native Channel planning/selection op或使用 RayD batched
-  visibility primitive，保持四个 fractions和 row selection exact，禁止继续生产 Torch
-  geometry。
+  确认 live path；若 live，迁成完整 native Channel capacity/mask planning op并调用 RayD
+  batched visibility primitive，保持四个 fractions和 active-row order exact，禁止继续生产
+  Torch geometry。
 
 ### 6.5 Diffraction 冻结验收
 
@@ -597,8 +598,8 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 冻结第 6.1 节矩阵、pure-wedge三件套 move、MC/coupled families保留、sample-tape rename、
 fast/precise math边界和 legacy deletion规则。live `_tx_visible_diffraction_states` 的四个
-fractions、any-visible判定和稳定row selection也已冻结；Phase 8B必须以Channel composed
-native planning/selection operation替换Torch几何/loop/host Boolean，不得作为fallback保留。
+fractions、any-visible判定和 active-row 顺序也已冻结；Phase 8B必须以Channel composed
+native capacity/mask planning operation替换Torch几何/loop/host Boolean，不得作为fallback保留。
 
 ### Phase 8A — Pure-wedge family 迁入 RayD
 
@@ -619,9 +620,14 @@ C++ contract测试及完整CTest 2/2通过。完整证据见
 
 ### Phase 8B — Diffraction 名称、legacy 与 Torch geometry 收口
 
+**实现状态：IN PROGRESS（2026-07-20；ADR-028 方案 2 已接受）。**
+
 执行第 6.3/6.4 节：区分 tape producer/estimator consumer，删除旧 aliases，四项审计 dead
-BDPT bindings；live `_tx_visible_diffraction_states` 改为 native完整 planning/selection op，
-不改变四 fractions或row selection。
+BDPT bindings；live `_tx_visible_diffraction_states` 改为 native完整 planning op。按 ADR-028
+保留十二个状态 tensors 的 object/storage/stride 等全部 identity，以 CUDA `bool[N]` mask
+作为唯一 validity truth；不得把 `K` 或 Boolean 拉回 host，不改变四 fractions 或 active row
+顺序。sample-tape producer 原子改名为 `rayd_diffraction_sample_tape_forward`，旧名和兼容
+re-export 为零。
 
 ### Phase 9 — ADR-026：RayD generic scattering runtime ownership
 
@@ -708,10 +714,27 @@ saved-tensor 顺序、output schema、kernel launch/reduction/RNG 与数值保�
 4. RayD 其他 consumer全部迁移后，才在 RayD独立 PR删除旧 extern-C API。
 5. 保存 nightly/release、Nsight、exact/codegen/AD/packaging evidence，关闭 ADR-023-026。
 
-### Phase 12 — 可选 profiling-driven 数值/性能工作
+### Phase 12 — Profiling-driven 性能收口
 
-Visibility+scattering fusion、tape-only diffraction kernel、CUDA Graph、stochastic/chain reverse
-geometry AD、cross-pol table、GPU table builder等均需独立 ADR；不得塞入 owner-move phases。
+**实现状态：IN PROGRESS（2026-07-20）。** 先以独立进程冻结 diffraction/scattering 候选
+微基准（每进程 1 warmup + 7 steady，默认 2 进程，波动显著时扩至 5 进程），记录 hash、
+CUDA 时间、launch/sync/copy、temporary bytes 与 capacity/active ratio；再用 Nsight Systems
+定位 launch/synchronization hot path，并仅对有证据的一个假设进行独立提交优化。RTX 5080
+当前 Nsight Compute performance-counter 权限受限，若管理员权限仍不可用则保存明确 blocker，
+以 Systems timeline、编译器 codegen/resource 与稳定 timing 完成不依赖硬件 counters 的验收。
+
+首选候选是把 ADR-028 的 composed four-visibility launches 收敛为 pure-native typed RayD
+single-launch edge visibility；只有 exact mask/stream/error parity、launch/copy/sync 不回退、峰值
+内存不超过冻结 capacity 模型且跨进程改善超出方差时才激活。tape-only diffraction kernel、
+CUDA Graph、stochastic/chain reverse geometry AD、cross-pol table、GPU table builder等仍需各自
+独立 ADR 和 profiler 证据，不得顺带实现。
+
+最终 Phase 12 验收还必须清除 diffraction output compaction 中既有的 device-to-host count
+copies 和 `cudaStreamSynchronize`：将其迁为 capacity+valid contract，并让无效 rows 在 native
+vector accumulation/topology packing 中保持 inert；不得把动态 shape 或数值筛选转回 Python/
+Torch。目标 stage 每个独立进程 median 至少改善 10%，端到端 median 至少改善 5%，非目标
+median/p95 回退分别不超过 5%/10%，hash exact；边界结果扩为 5 进程并要求 paired 95% bootstrap
+CI 的改善下界大于零。
 
 ## 9. 跨仓 PR/提交顺序
 

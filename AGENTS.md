@@ -29,6 +29,10 @@ compiled native CUDA/RayD extension.
 - Device data must remain resident through the compute pipeline. Do not add
   hot-path `.cpu()`, `.numpy()`, `.tolist()`, scalar extraction, host iteration,
   implicit synchronization, or avoidable host/device copies.
+- Device-selected dynamic cardinality must use an accepted capacity-plus-device-
+  mask/count contract when host-shaped compaction would require synchronization.
+  Do not hide a device-to-host count transfer behind tensor allocation or row
+  selection.
 
 Python and Torch may perform non-numerical boundary work: API validation,
 typed-contract construction, dispatch, orchestration, row selection, structural
@@ -208,6 +212,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
 - `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
 - `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
+- `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or
