@@ -33,6 +33,11 @@ compiled native CUDA/RayD extension.
   mask/count contract when host-shaped compaction would require synchronization.
   Do not hide a device-to-host count transfer behind tensor allocation or row
   selection.
+- Under ADR-029, public Path/Deterministic path shapes and `max_num_paths` mean
+  the explicit host-known `path_capacity_per_pair`; CUDA `valid` plus contiguous
+  `int32 num_paths` hold actual cardinality. Diffraction uses the explicit
+  `diffraction_state_capacity`. Overflow must make the entire device result
+  inert and fail asynchronously; never synchronize just to raise earlier.
 
 Python and Torch may perform non-numerical boundary work: API validation,
 typed-contract construction, dispatch, orchestration, row selection, structural
@@ -217,6 +222,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
 - `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
 - `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
+- `docs/dev/standards/adr-029-device-resident-capacity-results.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or

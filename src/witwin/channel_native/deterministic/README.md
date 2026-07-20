@@ -27,6 +27,15 @@ IDs, path depth, row order, visibility, phase convention, and accumulation
 order are contractual. Expression-order or tolerance changes are separate
 numerical changes, not architecture cleanup.
 
+Under ADR-029, exported `PathTable` storage is endpoint-pair-major with exactly
+`path_capacity_per_pair` rows per pair. Its row length is capacity, not actual
+cardinality; CUDA Boolean `valid` and CUDA contiguous `int32 num_paths` carry
+actual validity/counts. Native primal/backward/JVP accumulation skips invalid
+rows before reading IDs or numerical fields. Diffraction exporter work uses the
+explicit device-selected `diffraction_state_capacity`, and capacity overflow
+makes the entire result inert before surfacing a standard asynchronous CUDA
+error; it never returns a usable partial result or synchronizes to raise early.
+
 ### AD contract
 
 `Config.ad_mode` accepts `none`, `jvp`, and `vjp`. AD uses fixed topology and

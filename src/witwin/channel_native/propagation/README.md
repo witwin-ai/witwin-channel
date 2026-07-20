@@ -31,6 +31,14 @@ aliases at capacity `N` and carries validity only as a CUDA Boolean mask from
 the typed RayD axial-edge visibility primitive; it never obtains a host count
 or performs Torch compaction.
 
+ADR-029 defines the downstream closure. A device-stable capacity state block
+with explicit `diffraction_state_capacity=M` drives RayD exporter planning;
+actual counts remain CUDA `int32` tensors. Propagation contracts keep
+host-known capacity rows plus CUDA `valid`, and every invalid row is inert
+before topology, field, accumulation, backward, or JVP reads it. Dynamic ATen
+row shapes, count D2H copies, host compaction, and compatibility/generation-
+suffixed facades are forbidden.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

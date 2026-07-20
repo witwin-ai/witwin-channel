@@ -69,10 +69,16 @@ import them directly.
   `exp(+j*2*pi*f*t)`. CFR evaluation therefore applies
   `exp(-j*2*pi*tau*f)`. Synthetic array steering applies
   `exp(+j*k*element_position_dot_endpoint_direction)`.
-- `num_paths` equals the valid count for each endpoint pair. Ragged paths are
-  stably grouped by pair before padding. Synthetic arrays share a centre
-  geometric path set and use far-field phase weighting; explicit arrays trace
-  element positions independently and currently require point receivers.
+- Under ADR-029, the `path` axis and `max_num_paths` are exactly the configured
+  host-known `path_capacity_per_pair`; they are not actual-count values.
+  `num_paths` is a CUDA contiguous `int32` tensor equal to the device-valid
+  count for each endpoint pair, and `valid` is the row truth. Filtering and
+  array packing preserve capacity. Production solve never derives a result
+  shape from a CUDA count or silently truncates on capacity overflow.
+- Ragged paths are stably grouped by pair before padding. Synthetic arrays
+  share a centre geometric path set and use far-field phase weighting;
+  explicit arrays trace element positions independently and currently require
+  point receivers.
 - Interaction bits are `REFLECTION=1`, `DIFFRACTION=2`,
   `TRANSMISSION=4`, and `SCATTERING=8`; `NONE=0` denotes LoS/no
   interaction.

@@ -736,7 +736,8 @@ manifests、current-owner delta、final RayD lock 与三个 CUDA workflows；历
 
 ### Phase 12 — Profiling-driven 性能收口
 
-**实现状态：IN PROGRESS（2026-07-20）。** 先以独立进程冻结 diffraction/scattering 候选
+**实现状态：IN PROGRESS（2026-07-20）；ADR-029 capacity-result 契约已接受，生产实现与
+性能验收待完成。** 先以独立进程冻结 diffraction/scattering 候选
 微基准（每进程 1 warmup + 7 steady，默认 2 进程，波动显著时扩至 5 进程），记录 hash、
 CUDA 时间、launch/sync/copy、temporary bytes 与 capacity/active ratio；再用 Nsight Systems
 定位 launch/synchronization hot path，并仅对有证据的一个假设进行独立提交优化。RTX 5080
@@ -755,6 +756,22 @@ vector accumulation/topology packing 中保持 inert；不得把动态 shape 或
 Torch。目标 stage 每个独立进程 median 至少改善 10%，端到端 median 至少改善 5%，非目标
 median/p95 回退分别不超过 5%/10%，hash exact；边界结果扩为 5 进程并要求 paired 95% bootstrap
 CI 的改善下界大于零。
+
+ADR-029 冻结最终契约：`path_capacity_per_pair=C` 是 Path/Deterministic public result 的
+host-known 每 endpoint-pair 存储容量，shape 与 `max_num_paths` 表示 capacity；CUDA Boolean
+`valid` 和 CUDA contiguous `int32 num_paths` 是 actual-count 真值。`max_paths` 仍是显式选择
+策略，capacity 不得静默截断。order-1 diffraction 另由显式 `diffraction_state_capacity=M`
+控制 device stable selection 与 RayD exporter planning。selector 为两阶段 device protocol；
+overflow 时全部 12 个 selected outputs、所有 result rows/counts/valid 和 accumulation 均先置
+inert，再由标准 CUDA 异步错误 fail loudly，禁止为返回前主机异常增加 D2H、scalar extraction
+或同步。旧 `deterministic_diffraction_order1_compact` 在 switch 时原子删除，不保留 shim；所有
+新 symbol/type/file/target/header/API identity 禁止 `v2`/WIP generation naming。
+
+冻结 Munich case 为 `N=51,640`、`K=5,682`、`R=1,024`、`P=4,194,304`：旧 compact planner
+为 2 exporter chunks，ADR-028 直接按 `N` planning 为 13；目标 `M=8,192` 在不暴露 `K` 的
+前提下恢复为 2 exporter chunks。selector launches/scratch 与 capacity result memory 必须纳入
+同一 Phase 12 证据，不能只报告 exporter 局部收益。详细公共 shape、overflow、AD、提交顺序、
+验收和 stop conditions 见 [ADR-029](../standards/adr-029-device-resident-capacity-results.md)。
 
 ## 9. 跨仓 PR/提交顺序
 
