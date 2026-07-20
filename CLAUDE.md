@@ -142,7 +142,16 @@ requires them.
   caches immutable resident heights, structure/material ids, face ranges, UV
   tensors, scale, and RMS-slope state; endpoint/frequency/config-dependent
   subdivision and visibility remain solve-plan work. Unrelated compile and
-  non-scattering solves must not allocate or validate these resources.
+  non-scattering solves must not allocate or validate these resources. Here
+  "atomically" means publish-after-success cache replacement, not a
+  multi-thread synchronization guarantee. This Plan-13 resource construction
+  only caches the same scene-static UV/area/scale/slope work formerly performed
+  by each consumer, preserving its exception and numerical order; it is not a
+  Torch production-physics backend or fallback. Moving that retained static
+  construction across the native boundary requires a separate accepted ADR.
+  Its cache key may record `id(RayDSceneResource)` solely as Python wrapper
+  identity while CompiledScene owns that wrapper; this is never a native
+  pointer, scene handle, or ABI argument.
 - Do not split a fused native operation merely to mirror Python modules. A
   refactor must not add kernel launches, synchronizations, materialized
   intermediates, persistent tape, host/device transfers, or reduction-order

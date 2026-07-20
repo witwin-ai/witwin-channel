@@ -104,6 +104,7 @@ def _compile_geometry(
             edge_param_range=torch.empty((0, 2), dtype=torch.float32),
             face_structure_id=torch.empty((0,), dtype=torch.int32),
             face_surface_id=torch.empty((0,), dtype=torch.int32),
+            structure_uv_presence=(),
             version=version,
         )
 
@@ -129,6 +130,10 @@ def _compile_geometry(
         ),
         face_structure_id=torch.tensor(face_structure_id, dtype=torch.int32),
         face_surface_id=torch.tensor(face_surface_id, dtype=torch.int32),
+        structure_uv_presence=tuple(
+            (structure.uv is not None, structure.face_uv is not None)
+            for structure in structures
+        ),
         version=version,
     )
 

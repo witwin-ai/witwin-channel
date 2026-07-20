@@ -39,6 +39,10 @@ realization geometry keeps both VJP and JVP.
 semantics. Scene-static bindings and resident tensors are assembled once by the
 lazy typed CompiledScene resource; scattering consumers read that resource and
 do not reconstruct UV scale, face ownership, or RMS-slope state per solve.
+The builder merely caches the same static calculation in its original exception
+and numerical order; it does not add a Torch physics backend, fallback, or new
+RNG behavior. Moving this retained resource construction into native code is a
+separate ownership decision requiring its own ADR.
 Patch subdivision and visibility stay in the solve plan because they depend on
 frequency, endpoints, and solver configuration.
 

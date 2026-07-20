@@ -39,11 +39,22 @@ Frequency-dependent compiled records reject unsupported frequency AD.
 
 Phase-screen resources are CompiledScene-owned and remain lazy: scenes that
 never enter a phase-screen consumer perform no height allocation or validation.
-The first consumer atomically caches a typed immutable resource per structure:
-mode exclusivity, host structure/material ids, face range and first face,
-resident scaled heights, checked UV tensors/triangles, face areas, static
-UV-to-world scale, and the RMS-slope applicability guard. Geometry, material,
-assignment, and mutation-aware height identity participate in invalidation.
+The first consumer builds a typed immutable resource per structure and publishes
+the cache only after the complete build succeeds; this is not a multi-thread
+locking guarantee. The resource retains mode exclusivity, true host UV-presence,
+host structure/material ids, face range and first face, resident scaled heights,
+checked UV tensors/triangles, face areas, static UV-to-world scale, and the
+RMS-slope applicability guard. Geometry, material, assignment, RayD wrapper,
+and mutation-aware height identity participate in invalidation.
+The numeric `id(RayDSceneResource)` key component is only Python wrapper
+identity while CompiledScene owns the wrapper; it is not a native pointer,
+scene handle, or ABI argument.
+
+This lazy builder caches the same scene-static UV/area/scale/slope calculation
+that the realization consumer previously repeated, with the same exception and
+numerical order. It is retained Plan-13 resource construction, not a Torch
+production-physics owner or fallback. Native ownership of that static build,
+including removal of its remaining scalar device read, requires a separate ADR.
 Frequency-, endpoint-, and solver-config-dependent patch subdivision and
 visibility remain solve-plan state and are never presented as compile resources.
 

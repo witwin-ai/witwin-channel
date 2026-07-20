@@ -17,6 +17,7 @@ class GeometryStore:
     edge_param_range: torch.Tensor
     face_structure_id: torch.Tensor
     face_surface_id: torch.Tensor
+    structure_uv_presence: tuple[tuple[bool, bool], ...]
     version: int
 
     def __post_init__(self) -> None:
@@ -48,6 +49,11 @@ class GeometryStore:
             raise ValueError("edge_adj_faces length must match edges")
         if self.edges.shape[0] != self.edge_param_range.shape[0]:
             raise ValueError("edge_param_range length must match edges")
+        if any(
+            type(uv_present) is not bool or type(face_uv_present) is not bool
+            for uv_present, face_uv_present in self.structure_uv_presence
+        ):
+            raise ValueError("structure_uv_presence entries must contain bool values")
 
 
 GeometryStore.__module__ = "witwin.channel_native.core.runtime.geometry"

@@ -268,6 +268,7 @@ def test_geometry_store_schema_type_hints_and_validation_owner_are_exact():
         "edge_param_range",
         "face_structure_id",
         "face_surface_id",
+        "structure_uv_presence",
         "version",
     )
     assert get_type_hints(owner) == {
@@ -279,6 +280,7 @@ def test_geometry_store_schema_type_hints_and_validation_owner_are_exact():
         "edge_param_range": torch.Tensor,
         "face_structure_id": torch.Tensor,
         "face_surface_id": torch.Tensor,
+        "structure_uv_presence": tuple[tuple[bool, bool], ...],
         "version": int,
     }
     from witwin.channel_native.core.runtime import _validation as legacy_validation
@@ -716,6 +718,17 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
 
 def test_phase_screen_scene_resource_schema_is_exact():
     assert tuple(
+        item.name for item in fields(scattering_resources.PhaseScreenResourceKey)
+    ) == (
+        "material_cache_token",
+        "geometry_version",
+        "assignment_version",
+        "phase_screen_token",
+        "structure_uv_presence",
+        "rayd_scene_identity",
+        "device",
+    )
+    assert tuple(
         item.name for item in fields(scattering_resources.PhaseScreenStructureResource)
     ) == (
         "structure_index",
@@ -1006,7 +1019,7 @@ def test_compiled_scattering_resource_failures_are_retryable(monkeypatch):
     assert screen_calls == 2
 
 
-def test_zero_face_phase_screen_resource_keeps_runtime_without_requiring_uv(
+def test_zero_face_phase_screen_resource_requires_uv_then_builds_canonical_empty(
     monkeypatch,
 ):
     if not torch.cuda.is_available():
@@ -1042,9 +1055,17 @@ def test_zero_face_phase_screen_resource_keeps_runtime_without_requiring_uv(
         geometry_version=0,
         assignment_version=0,
         phase_screen_token=((0, id(screen)),),
+        structure_uv_presence=((False, False),),
+        rayd_scene_identity=id(fake_rayd),
         device=torch.device("cuda"),
     )
 
+    with pytest.raises(RuntimeError, match="requires structure UV"):
+        scattering_resources.build_phase_screen_resources(
+            base.materials, assignments, fake_rayd, key
+        )
+
+    key = replace(key, structure_uv_presence=((True, True),))
     resources = scattering_resources.build_phase_screen_resources(
         base.materials, assignments, fake_rayd, key
     )
@@ -1086,6 +1107,25 @@ def test_phase_screen_resource_identity_invalidation_and_scene_isolation():
         first_resource.uv_tris
     )
 
+    rebound_rayd = replace(compiled.rayd, runtime_cache={})
+    rebound = replace(compiled, rayd=rebound_rayd)
+    assert rebound._phase_screen_resources_cache is first
+    rebound_resources = rebound.phase_screen_resources
+    rebound_resource = rebound_resources.structures[0]
+    assert rebound_resources is not first
+    assert rebound_resources.key.rayd_scene_identity == id(rebound_rayd)
+    assert rebound_resources.key.phase_screen_token == first.key.phase_screen_token
+    assert rebound_resource is not first_resource
+    assert rebound_resource.runtime.heights_m.untyped_storage().data_ptr() != (
+        first_resource.runtime.heights_m.untyped_storage().data_ptr()
+    )
+    assert rebound_resource.uv_tris.untyped_storage().data_ptr() != (
+        first_resource.uv_tris.untyped_storage().data_ptr()
+    )
+    assert rebound_resource.face_areas_m2.untyped_storage().data_ptr() != (
+        first_resource.face_areas_m2.untyped_storage().data_ptr()
+    )
+
     assert isinstance(screen.height, torch.Tensor)
     screen.height.add_(1.0)
     rebuilt = compiled.phase_screen_resources
@@ -1100,6 +1140,9 @@ def test_phase_screen_resource_identity_invalidation_and_scene_isolation():
     )
     assert other.uv_tris.untyped_storage().data_ptr() != (
         rebuilt.structures[0].uv_tris.untyped_storage().data_ptr()
+    )
+    assert other.face_areas_m2.untyped_storage().data_ptr() != (
+        rebuilt.structures[0].face_areas_m2.untyped_storage().data_ptr()
     )
 
 

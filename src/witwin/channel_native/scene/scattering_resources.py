@@ -46,6 +46,8 @@ class PhaseScreenResourceKey:
     geometry_version: int
     assignment_version: int
     phase_screen_token: tuple[tuple[object, ...], ...]
+    structure_uv_presence: tuple[tuple[bool, bool], ...]
+    rayd_scene_identity: int
     device: torch.device
 
 
@@ -356,6 +358,7 @@ def build_phase_screen_resources(
 
     from witwin.channel_native import scattering
 
+    _require_phase_screen_rayd_identity(rayd, key)
     if not assignments.structure_phase_screens:
         return PhaseScreenRuntimeResources(key=key, structures={})
     if not rayd.available:
@@ -365,6 +368,10 @@ def build_phase_screen_resources(
     if len(mesh_tensors) != int(assignments.structure_material_id.shape[0]):
         raise RuntimeError(
             "phase-screen scene resource mesh/structure count is inconsistent"
+        )
+    if len(key.structure_uv_presence) != len(mesh_tensors):
+        raise RuntimeError(
+            "phase-screen scene resource UV-presence contract is inconsistent"
         )
     face_ranges: list[tuple[int, int]] = []
     running = 0
@@ -396,6 +403,7 @@ def build_phase_screen_resources(
         face_count = face_range[1] - face_range[0]
         runtime = runtimes[structure_index]
         uv_vertex_count = int(mesh_uv.shape[0])
+        _require_phase_screen_uv_presence(key, structure_index)
         if face_count == 0:
             resources[structure_index] = PhaseScreenStructureResource(
                 structure_index=structure_index,
@@ -422,10 +430,7 @@ def build_phase_screen_resources(
             )
             continue
         if uv_vertex_count == 0 or tuple(mesh_uv.shape[1:]) != (2,):
-            raise RuntimeError(
-                "realization_coherent phase screen requires structure UV "
-                f"(structure {structure_index} has none); contract section 6"
-            )
+            raise RuntimeError("phase-screen structure UV shape is inconsistent")
         if tuple(mesh_faces.shape) != (face_count, 3):
             raise RuntimeError("phase-screen structure face shape is inconsistent")
         if tuple(mesh_face_uv.shape) != (face_count, 3):
@@ -473,6 +478,26 @@ def build_phase_screen_resources(
             rms_slope=rms_slope,
         )
     return PhaseScreenRuntimeResources(key=key, structures=resources)
+
+
+def _require_phase_screen_rayd_identity(
+    rayd: RayDSceneResource, key: PhaseScreenResourceKey
+) -> None:
+    if id(rayd) != key.rayd_scene_identity:
+        raise RuntimeError(
+            "phase-screen resource key does not own the supplied RayD scene"
+        )
+
+
+def _require_phase_screen_uv_presence(
+    key: PhaseScreenResourceKey, structure_index: int
+) -> None:
+    uv_present, face_uv_present = key.structure_uv_presence[structure_index]
+    if not uv_present or not face_uv_present:
+        raise RuntimeError(
+            "realization_coherent phase screen requires structure UV "
+            f"(structure {structure_index} has none); contract section 6"
+        )
 
 
 def _phase_screen_rms_slope(

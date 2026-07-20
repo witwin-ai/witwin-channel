@@ -100,6 +100,11 @@ class CompiledScene:
             geometry_version=self.geometry_version,
             assignment_version=self.assignment_version,
             phase_screen_token=self._phase_screen_assignment_token(),
+            structure_uv_presence=self.geometry.structure_uv_presence,
+            # Pure Python wrapper identity for cache invalidation. This is not
+            # a native pointer or an integer scene handle; CompiledScene keeps
+            # the owning RayDSceneResource alive for the cache lifetime.
+            rayd_scene_identity=id(self.rayd),
             device=device,
         )
 

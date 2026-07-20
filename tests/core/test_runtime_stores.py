@@ -85,7 +85,9 @@ def test_geometry_store_canonical_owner_preserves_input_storage():
         "face_structure_id": torch.zeros((1,), dtype=torch.int32),
         "face_surface_id": torch.zeros((1,), dtype=torch.int32),
     }
-    store = CanonicalGeometryStore(**tensors, version=0)
+    store = CanonicalGeometryStore(
+        **tensors, structure_uv_presence=((True, True),), version=0
+    )
 
     assert CanonicalGeometryStore is GeometryStore
     for name, tensor in tensors.items():
@@ -105,6 +107,7 @@ def test_geometry_store_rejects_wrong_vertex_shape():
             edge_param_range=torch.zeros((3, 2), dtype=torch.float32),
             face_structure_id=torch.zeros((1,), dtype=torch.int32),
             face_surface_id=torch.zeros((1,), dtype=torch.int32),
+            structure_uv_presence=((False, False),),
             version=0,
         )
 
