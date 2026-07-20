@@ -44,8 +44,11 @@ def main() -> None:
     parser.add_argument("--label", required=True)
     parser.add_argument("--warmup-runs", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=7)
+    parser.add_argument("--solves-per-repeat", type=int, default=1)
     parser.add_argument("--profile-one", action="store_true")
     args = parser.parse_args()
+    if args.solves_per_repeat < 1:
+        parser.error("--solves-per-repeat must be at least 1")
 
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required")
@@ -62,7 +65,8 @@ def main() -> None:
     first_wall_ms = (time.perf_counter() - first_start) * 1000.0
 
     for _ in range(max(0, args.warmup_runs)):
-        result = solve(scene, config)
+        for _ in range(args.solves_per_repeat):
+            result = solve(scene, config)
         torch.cuda.synchronize()
 
     if args.profile_one:
@@ -79,11 +83,14 @@ def main() -> None:
         end = torch.cuda.Event(enable_timing=True)
         wall_start = time.perf_counter()
         start.record()
-        result = solve(scene, config)
+        for _ in range(args.solves_per_repeat):
+            result = solve(scene, config)
         end.record()
         torch.cuda.synchronize()
-        wall_ms.append((time.perf_counter() - wall_start) * 1000.0)
-        cuda_ms.append(float(start.elapsed_time(end)))
+        wall_ms.append(
+            (time.perf_counter() - wall_start) * 1000.0 / args.solves_per_repeat
+        )
+        cuda_ms.append(float(start.elapsed_time(end)) / args.solves_per_repeat)
 
     print(
         json.dumps(
@@ -95,6 +102,7 @@ def main() -> None:
                 "rayd_commit": native_info["rayd_commit"],
                 "cuda_architectures": native_info["cuda_architectures"],
                 "first_wall_ms": first_wall_ms,
+                "solves_per_repeat": args.solves_per_repeat,
                 "steady_cuda_ms": cuda_ms,
                 "steady_wall_ms": wall_ms,
                 "cuda_median_ms": statistics.median(cuda_ms),
