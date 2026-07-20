@@ -69,14 +69,14 @@ def _torch_runtime_diagnostics(torch: ModuleType) -> dict[str, Any]:
         "cuda_runtime": torch.version.cuda,
         "cuda_available": cuda_available,
     }
-    if cuda_available:
-        major, minor = torch.cuda.get_device_capability(0)
-        sm = major * 10 + minor
-        support = sm_support(sm)
+    if cuda_available and (index := _require_active_cuda_device(torch)) >= 0:
+        major, minor = torch.cuda.get_device_capability(index)
+        support = sm_support(sm := major * 10 + minor)
+        total_memory = int(torch.cuda.get_device_properties(index).total_memory)
         info["device"] = {
-            "name": torch.cuda.get_device_name(0),
+            "name": torch.cuda.get_device_name(index),
             "sm": sm,
-            "total_memory_bytes": int(torch.cuda.get_device_properties(0).total_memory),
+            "total_memory_bytes": total_memory,
             **support,
         }
         info["sm_matrix_status"] = support["status"]
@@ -87,6 +87,15 @@ def _import_native_build_info() -> Callable[[], dict[str, object]]:
     from .runtime.extension import build_info
 
     return cast(Callable[[], dict[str, object]], build_info)
+
+
+def _require_active_cuda_device(torch: ModuleType) -> int:
+    index = int(torch.cuda.current_device())
+    if index < 0:
+        raise RuntimeError(
+            f"CUDA reports available but has invalid active device index {index}"
+        )
+    return index
 
 
 def _import_error(component: str, exc: ImportError | OSError) -> str:
@@ -138,17 +147,38 @@ def runtime_diagnostics() -> dict[str, Any]:
 
 
 def require_supported_runtime() -> dict[str, Any]:
-    """Require CUDA and a declared build architecture, not runtime verification."""
+    """Require CUDA and installed SASS for a declared device architecture."""
     diagnostics = runtime_diagnostics()
     errors = list(diagnostics["errors"])
     if not diagnostics.get("cuda_available", False):
         errors.append("CUDA is unavailable; Channel Native has no CPU/ROCm backend")
     device = diagnostics.get("device")
+    if diagnostics.get("cuda_available", False) and not isinstance(device, dict):
+        errors.append(
+            "CUDA is available but runtime diagnostics has no valid active device"
+        )
     if isinstance(device, dict) and not device.get("declared_supported", False):
         errors.append(
             f"GPU SM {device.get('sm')} is outside the declared build SM values "
             f"{list(DECLARED_SM_ARCHITECTURES)}"
         )
+    if isinstance(device, dict) and device.get("declared_supported", False):
+        sm = device.get("sm")
+        native_build = diagnostics.get("native_build")
+        architectures = (
+            native_build.get("cuda_architectures")
+            if isinstance(native_build, dict)
+            else None
+        )
+        required_architecture = f"{sm}-real"
+        if (
+            not isinstance(architectures, list)
+            or required_architecture not in architectures
+        ):
+            errors.append(
+                f"installed _channel_native does not contain {required_architecture}; "
+                f"compiled CUDA architectures are {architectures!r}"
+            )
     if errors:
         raise RuntimeError(
             "Channel Native runtime requirements failed: " + "; ".join(errors)

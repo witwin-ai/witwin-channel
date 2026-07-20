@@ -78,6 +78,113 @@ def _cuda_unavailable_torch():
     )
 
 
+def _cuda_torch(sm: int, *, device_index: int = 0):
+    return SimpleNamespace(
+        __version__="2.10.0",
+        version=SimpleNamespace(cuda="12.8"),
+        cuda=SimpleNamespace(
+            is_available=lambda: True,
+            current_device=lambda: device_index,
+            get_device_capability=lambda index: divmod(sm, 10),
+            get_device_name=lambda index: "test GPU",
+            get_device_properties=lambda index: SimpleNamespace(total_memory=1024),
+        ),
+    )
+
+
+def test_runtime_diagnostics_checks_the_active_cuda_device(monkeypatch):
+    torch = _cuda_torch(120, device_index=2)
+    monkeypatch.setattr(deployment, "_import_torch", lambda: torch)
+    monkeypatch.setattr(
+        deployment,
+        "_import_native_build_info",
+        lambda: lambda: {"cuda_architectures": ["120-real", "120-virtual"]},
+    )
+
+    diagnostics = runtime_diagnostics()
+
+    assert diagnostics["device"]["sm"] == 120
+
+
+def test_runtime_diagnostics_rejects_negative_active_cuda_device(monkeypatch):
+    monkeypatch.setattr(
+        deployment, "_import_torch", lambda: _cuda_torch(120, device_index=-1)
+    )
+
+    with pytest.raises(RuntimeError, match="invalid active device index -1"):
+        runtime_diagnostics()
+
+
+@pytest.mark.parametrize("device", [None, "cuda:0"])
+def test_require_supported_runtime_rejects_missing_or_non_dict_device(
+    monkeypatch, device
+):
+    diagnostics = {
+        "errors": [],
+        "cuda_available": True,
+        "native_build": {"cuda_architectures": ["120-real"]},
+    }
+    if device is not None:
+        diagnostics["device"] = device
+    monkeypatch.setattr(deployment, "runtime_diagnostics", lambda: diagnostics)
+
+    with pytest.raises(RuntimeError, match="no valid active device"):
+        deployment.require_supported_runtime()
+
+
+def test_require_supported_runtime_requires_installed_real_architecture(monkeypatch):
+    monkeypatch.setattr(deployment, "_import_torch", lambda: _cuda_torch(89))
+    monkeypatch.setattr(
+        deployment,
+        "_import_native_build_info",
+        lambda: lambda: {"cuda_architectures": ["120-real", "120-virtual"]},
+    )
+
+    with pytest.raises(RuntimeError, match="does not contain 89-real"):
+        deployment.require_supported_runtime()
+
+
+def test_require_supported_runtime_keeps_declared_unverified_status(monkeypatch):
+    monkeypatch.setattr(deployment, "_import_torch", lambda: _cuda_torch(89))
+    monkeypatch.setattr(
+        deployment,
+        "_import_native_build_info",
+        lambda: lambda: {"cuda_architectures": ["89-real"]},
+    )
+
+    diagnostics = deployment.require_supported_runtime()
+
+    assert diagnostics["sm_matrix_status"] == "declared_unverified"
+    assert diagnostics["device"]["runtime_verified"] is False
+    assert diagnostics["native_build"]["cuda_architectures"] == ["89-real"]
+
+
+@pytest.mark.parametrize("native_build", [{}, {"cuda_architectures": "89-real"}])
+def test_require_supported_runtime_rejects_missing_or_malformed_architectures(
+    monkeypatch, native_build
+):
+    monkeypatch.setattr(deployment, "_import_torch", lambda: _cuda_torch(89))
+    monkeypatch.setattr(
+        deployment, "_import_native_build_info", lambda: lambda: native_build
+    )
+
+    with pytest.raises(RuntimeError, match="compiled CUDA architectures"):
+        deployment.require_supported_runtime()
+
+
+def test_require_supported_runtime_fails_when_build_info_is_unavailable(monkeypatch):
+    def missing_native_library():
+        raise ImportError("packaged extension is unavailable")
+
+    monkeypatch.setattr(deployment, "_import_torch", lambda: _cuda_torch(120))
+    monkeypatch.setattr(
+        deployment, "_import_native_build_info", lambda: missing_native_library
+    )
+
+    with pytest.raises(RuntimeError, match="native extension import failed"):
+        deployment.require_supported_runtime()
+
+
 def test_runtime_diagnostics_records_expected_import_failures(monkeypatch):
     def missing_torch():
         raise ModuleNotFoundError("No module named 'torch'")
