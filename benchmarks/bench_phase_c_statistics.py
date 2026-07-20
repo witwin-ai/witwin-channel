@@ -74,7 +74,7 @@ def _run_case(
                 ),
             )
             for seed in seeds
-        ], 4.66e-5
+        ], None
     if name == "mc_basic_rough_scattering":
         scene = basic_scattering._grid_scene(
             [

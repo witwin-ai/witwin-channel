@@ -4,7 +4,7 @@
   "cases": {
     "bdpt_wedge_diffraction": {
       "samples": 4096,
-      "reference": 0.0000466,
+      "reference": 2.1433029573358908e-08,
       "thresholds": {
         "failure_rate_max": 0.0,
         "finite_ratio_min": 1.0,

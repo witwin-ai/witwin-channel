@@ -91,3 +91,18 @@ def test_full_gate_has_sixteen_fixed_seeds_and_all_required_cases():
     for case in gate["cases"].values():
         assert case["thresholds"]["failure_rate_max"] == 0.0
         assert case["thresholds"]["finite_ratio_min"] == 1.0
+
+
+def test_wedge_gate_uses_adr018_deterministic_utd_reference():
+    root = Path(__file__).resolve().parents[2]
+    gate = json.loads(
+        (root / "benchmarks" / "gates" / "phase_c_statistics.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    # ADR-018 retired the crude stochastic estimate fossilized as 4.66e-05.
+    # Standalone BDPT diffraction now consumes the deterministic UTD oracle.
+    assert gate["cases"]["bdpt_wedge_diffraction"]["reference"] == pytest.approx(
+        2.1433029573358908e-08, rel=0.0, abs=0.0
+    )
