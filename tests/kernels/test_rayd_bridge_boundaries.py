@@ -34,6 +34,7 @@ WRAPPERS_BY_SOURCE = {
         "cn_rayd_scene_face_normals_jvp",
     },
     "diffraction.cpp": {
+        "cn_diffraction_tx_visible_state_plan",
         "cn_rayd_diffraction_paths_order1_forward",
         "cn_rayd_diffraction_sample_tape_forward",
     },
@@ -85,7 +86,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
 
-    assert len(expected_wrappers) == 19
+    assert len(expected_wrappers) == 20
     assert set(owners) == expected_wrappers
     assert all(len(source_names) == 1 for source_names in owners.values())
 
@@ -113,3 +114,20 @@ def test_cmake_builds_every_rayd_source_without_legacy_exception_boundary():
         re.DOTALL,
     )
     assert exception_source_groups == []
+
+
+def test_diffraction_visibility_plan_calls_the_typed_rayd_axial_operation() -> None:
+    source = (_repo_root() / "native/channel_native/rayd/diffraction.cpp").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert source.count("cn_diffraction_tx_visible_state_plan(") == 1
+    assert source.count("rayd::torch::AxialEdgeVisibilityRequest request{") == 1
+    assert source.count("rayd::torch::axial_edge_visibility_forward(") == 1
+    assert "kDiffractionStateCapacity = 4'194'304" in source
+    body = source.split("cn_diffraction_tx_visible_state_plan(", 1)[1].split(
+        "cn_rayd_diffraction_paths_order1_forward(", 1
+    )[0]
+    assert "state_src" not in body
+    assert "cudaStreamSynchronize" not in body
+    assert ".cpu()" not in body

@@ -389,7 +389,8 @@ Evidence summary:
 - **Brute-force candidate cost.** The discovery is O(rx * coplanar_groups *
   selected_edges) with no TX face/edge visibility prefilter, so candidates_per_pair
   = 648 for three_cube and the full grid is ~85M candidate evaluations (~5 s). A
-  TX-visibility prefilter mirroring diffraction's `_tx_visible_diffraction_states`
+  TX-visibility prefilter mirroring diffraction's native
+  `diffraction_tx_visible_state_plan`
   would cut this several-fold and is a documented optional optimization, not
   required for the benchmark.
 - **Public-surface churn.** Config + capabilities + public-api-snapshot +

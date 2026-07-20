@@ -204,7 +204,7 @@ def test_workflows_use_only_the_verified_windows_cuda_runner() -> None:
     assert "torch.cuda.get_device_capability()" not in quick
     assert "SM120" not in quick
 
-    locked_rayd = "5df6497d36ac941bbc88b26dc3c16e373ee37705"
+    locked_rayd = "102470daf44b649030df3b2554d9ace5c1eea482"
     lock = json.loads(
         (ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
     )

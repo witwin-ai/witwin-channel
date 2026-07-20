@@ -21,6 +21,7 @@ from .autograd import (
     rayd_trace_reflections_jvp,
 )
 from .bridge import (
+    diffraction_tx_visible_state_plan,
     coupled_rd_geometry_forward,
     rayd_diffraction_paths_order1_forward,
     rayd_diffraction_sample_tape_forward,
@@ -41,6 +42,7 @@ from .primitives import (
 
 
 __all__ = [
+    "diffraction_tx_visible_state_plan",
     "_RaydFaceNormalsAdFunction",
     "_RaydIntersectAdFunction",
     "_RaydReflectionEpcPathsAdFunction",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from witwin.channel_native.propagation.enumerated import diffraction
@@ -28,6 +29,165 @@ def _states() -> tuple[torch.Tensor, ...]:
         torch.zeros((1, 3)),
         torch.ones(1),
     )
+
+
+def _states_with_rows(rows: int) -> tuple[torch.Tensor, ...]:
+    return tuple(tensor.expand((rows, *tensor.shape[1:])) for tensor in _states())
+
+
+def _visible_plan(
+    states: tuple[torch.Tensor, ...], active: torch.Tensor
+) -> geometry_diffraction.DiffractionVisibleStatePlan:
+    named = geometry_diffraction.name_diffraction_states(states)
+    return geometry_diffraction.DiffractionVisibleStatePlan(
+        edge_index=named.edge_index,
+        edge_position=named.edge_position,
+        edge_direction=named.edge_direction,
+        edge_t_min=named.edge_t_min,
+        edge_t_max=named.edge_t_max,
+        n0=named.n0,
+        n1=named.n1,
+        prim0=named.prim0,
+        prim1=named.prim1,
+        exterior_angle=named.exterior_angle,
+        source=named.source,
+        source_power=named.source_power,
+        active=active,
+    )
+
+
+def _minimal_scene_and_compiled() -> tuple[object, object]:
+    rayd = SimpleNamespace(available=True, require_resource=lambda: 41)
+    scene = SimpleNamespace(
+        structures=[object()],
+        metadata={"mitsuba": {"merge_shapes": True}},
+        transmitters=[SimpleNamespace(polarization=torch.tensor([0.0, 0.0, 1.0]))],
+    )
+    return scene, SimpleNamespace(rayd=rayd)
+
+
+def _patch_empty_result_assembly(monkeypatch) -> None:
+    monkeypatch.setattr(
+        diffraction,
+        "concatenate_path_blocks",
+        lambda blocks, **_kwargs: {"blocks": tuple(blocks)},
+    )
+    monkeypatch.setattr(
+        diffraction,
+        "_ensure_topology_fields",
+        lambda block, **kwargs: block | kwargs,
+    )
+
+
+def test_empty_states_call_native_planner_but_not_exporter(monkeypatch) -> None:
+    scene, compiled = _minimal_scene_and_compiled()
+    empty_states = _states_with_rows(0)
+    planner_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        diffraction,
+        "face_material_tensors",
+        lambda *_args, **_kwargs: tuple(torch.ones(1) for _ in range(5)),
+    )
+    monkeypatch.setattr(
+        diffraction,
+        "_deterministic_diffraction_states",
+        lambda *_args, **_kwargs: empty_states,
+    )
+
+    def plan(rayd, states, tx):
+        planner_calls.append((rayd, states, tx))
+        return _visible_plan(states, torch.empty(0, dtype=torch.bool))
+
+    monkeypatch.setattr(diffraction, "plan_tx_visible_diffraction_states", plan)
+    monkeypatch.setattr(
+        diffraction,
+        "query_diffraction_order1",
+        lambda _query: pytest.fail("empty state capacity must not call exporter"),
+    )
+    _patch_empty_result_assembly(monkeypatch)
+
+    block, launch_count, _field = diffraction._diffraction_topology_order1(
+        scene,
+        compiled,
+        torch.zeros((1, 3)),
+        torch.ones(1),
+        torch.ones((2, 3)),
+        frequency_hz=3.0e9,
+    )
+
+    assert len(planner_calls) == 1
+    assert planner_calls[0][1] is empty_states
+    assert launch_count == 0
+    assert block["blocks"] == ()
+
+
+@pytest.mark.parametrize(
+    "active",
+    (torch.tensor([False, False]), torch.tensor([True, False])),
+    ids=("all-invisible", "sparse"),
+)
+def test_nonempty_mask_keeps_capacity_n_for_exporter(monkeypatch, active) -> None:
+    scene, compiled = _minimal_scene_and_compiled()
+    states = _states_with_rows(2)
+    plan = _visible_plan(states, active)
+    queries: list[geometry_diffraction.DiffractionOrder1Query] = []
+    monkeypatch.setattr(
+        diffraction,
+        "face_material_tensors",
+        lambda *_args, **_kwargs: tuple(torch.ones(1) for _ in range(5)),
+    )
+    monkeypatch.setattr(
+        diffraction,
+        "_deterministic_diffraction_states",
+        lambda *_args, **_kwargs: states,
+    )
+    monkeypatch.setattr(
+        diffraction,
+        "plan_tx_visible_diffraction_states",
+        lambda *_args: plan,
+    )
+
+    def export(query):
+        queries.append(query)
+        empty = torch.empty(0)
+        return geometry_diffraction.DiffractionOrder1Geometry(
+            valid=torch.empty(0, dtype=torch.bool),
+            rx_id=torch.empty(0, dtype=torch.int32),
+            depth=torch.empty(0, dtype=torch.int32),
+            edge_id=torch.empty(0, dtype=torch.int32),
+            delay_s=empty,
+            x_re=empty,
+            x_im=empty,
+            y_re=empty,
+            y_im=empty,
+            z_re=empty,
+            z_im=empty,
+            interaction_position=torch.empty((0, 3)),
+        )
+
+    monkeypatch.setattr(diffraction, "query_diffraction_order1", export)
+    monkeypatch.setattr(
+        diffraction.topology_compaction,
+        "deterministic_diffraction_order1_compact",
+        lambda **_kwargs: {"rx_id": torch.empty(0, dtype=torch.int32)},
+    )
+    _patch_empty_result_assembly(monkeypatch)
+
+    _block, launch_count, _field = diffraction._diffraction_topology_order1(
+        scene,
+        compiled,
+        torch.zeros((1, 3)),
+        torch.ones(1),
+        torch.ones((2, 3)),
+        frequency_hz=3.0e9,
+    )
+
+    assert launch_count == 1
+    assert len(queries) == 1
+    assert queries[0].active is plan.active
+    assert queries[0].states is plan
+    assert queries[0].state_count == 2
+    assert queries[0].capacity == 4
 
 
 def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
@@ -91,25 +251,35 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         fake_states,
     )
 
-    def fake_visibility(rayd_arg, states, tx):
+    active = torch.ones(1, dtype=torch.bool)
+
+    def fake_visibility_plan(rayd_arg, states, tx):
         events.append("visibility")
         assert rayd_arg is rayd
         assert states is raw_states
         assert tx.data_ptr() == tx_positions[0].data_ptr()
-        return states
+        named = geometry_diffraction.name_diffraction_states(states)
+        return geometry_diffraction.DiffractionVisibleStatePlan(
+            edge_index=named.edge_index,
+            edge_position=named.edge_position,
+            edge_direction=named.edge_direction,
+            edge_t_min=named.edge_t_min,
+            edge_t_max=named.edge_t_max,
+            n0=named.n0,
+            n1=named.n1,
+            prim0=named.prim0,
+            prim1=named.prim1,
+            exterior_angle=named.exterior_angle,
+            source=named.source,
+            source_power=named.source_power,
+            active=active,
+        )
 
     monkeypatch.setattr(
         diffraction,
-        "_tx_visible_diffraction_states",
-        fake_visibility,
+        "plan_tx_visible_diffraction_states",
+        fake_visibility_plan,
     )
-    original_name_states = diffraction.name_diffraction_states
-
-    def fake_name_states(states):
-        events.append("name states")
-        return original_name_states(states)
-
-    monkeypatch.setattr(diffraction, "name_diffraction_states", fake_name_states)
     original_rx_requests = diffraction.iter_diffraction_rx_chunk_requests
 
     def fake_rx_requests(*args, **kwargs):
@@ -145,6 +315,7 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         assert query.tx_position.is_contiguous()
         assert query.rx_positions.data_ptr() == rx_positions.data_ptr()
         assert query.rx_positions.stride() == rx_positions.stride()
+        assert query.active is active
         assert query.states.edge_index is raw_states[0]
         assert query.material_eta_r is material[0]
         assert query.material_sigma is material[1]
@@ -256,7 +427,6 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         "yield tx",
         "states",
         "visibility",
-        "name states",
         "yield rx",
         "geometry",
         "compact",

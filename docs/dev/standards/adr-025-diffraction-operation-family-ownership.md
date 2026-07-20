@@ -153,12 +153,11 @@ The closed and pending records are frozen in
 
 ### 7. Transmitter-visible state selection becomes one native operation
 
-`propagation.geometry.diffraction._tx_visible_diffraction_states` is live.
-Its current Torch loop constructs four points per edge, launches visibility
-repeatedly, reduces a Boolean mask, extracts a host Boolean, and selects rows.
-Phase 8B replaces that numerical path with the Channel-owned composed native
-planning entry `diffraction_tx_visible_state_plan`, which calls typed RayD
-visibility primitives. Python may only validate and assemble the named result.
+Phase 8B deleted `propagation.geometry.diffraction._tx_visible_diffraction_states`
+and its Torch loop/compaction path. The Channel-owned composed native planning
+entry `diffraction_tx_visible_state_plan` now calls the typed RayD axial-edge
+visibility primitive directly; Python only validates and assembles the named
+result.
 ADR-028 supersedes this ADR's provisional compact-selection storage contract:
 the accepted result preserves the twelve input tensors as exact aliases and
 returns a device-resident active mask at capacity `N`, avoiding a host-visible
@@ -178,11 +177,12 @@ The operation freezes these exact semantics:
   synchronization, Python loop, Torch geometry/reduction, CPU path, or fallback
   remains.
 
-Phase 8B must prove the ADR-028 capacity/mask storage contract and that
-solver-visible values and row order are exact. It may not hide a new persistent
-tape, host wait, device transfer, or unbounded peak-memory regression. Phase 12
-records the intentionally changed inactive-lane/launch behavior and may replace
-composed visibility with one typed native launch only with profiler evidence.
+Phase 8B acceptance proves the ADR-028 capacity/mask storage contract and that
+solver-visible values and row order are exact. The implementation may not hide
+a new persistent tape, host wait, device transfer, or unbounded peak-memory
+regression. Phase 12 records the intentionally changed inactive-lane/launch
+behavior and may replace composed visibility with one typed native launch only
+with profiler evidence.
 If the complete operation cannot meet those resource and exactness gates, the
 Phase 8B migration stops; the Torch implementation is not accepted as fallback.
 

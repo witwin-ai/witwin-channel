@@ -37,6 +37,15 @@ def test_rayd_visibility_uses_channel_native_bridge():
     assert "rayd_visibility_forward" in source
 
 
+def test_diffraction_visibility_plan_uses_channel_native_bridge():
+    source = inspect.getsource(ops.diffraction_tx_visible_state_plan)
+
+    assert "_required_rayd_op" not in source
+    assert "torch.ops" not in source
+    assert "_required_native_op" in source
+    assert "diffraction_tx_visible_state_plan" in source
+
+
 def test_rayd_intersection_uses_channel_native_bridge():
     source = inspect.getsource(ops.rayd_intersect_forward)
 

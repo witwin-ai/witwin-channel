@@ -32,13 +32,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Asixa/RayD
-          ref: 5df6497d36ac941bbc88b26dc3c16e373ee37705
+          ref: 102470daf44b649030df3b2554d9ace5c1eea482
           path: '${{ env.WITWIN_RAYD_DIR }}'
       - name: Verify immutable RayD checkout
         shell: pwsh
         working-directory: '${{ env.WITWIN_CHECKOUT_DIR }}'
         run: |
-          $expected = '5df6497d36ac941bbc88b26dc3c16e373ee37705'
+          $expected = '102470daf44b649030df3b2554d9ace5c1eea482'
           $lock = Get-Content -LiteralPath 'dependencies/rayd.lock.json' -Raw | ConvertFrom-Json
           if ($lock.commit -cne $expected) { throw "RayD workflow ref does not match dependencies/rayd.lock.json: $($lock.commit)" }
           $rayd = (Resolve-Path -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $env:WITWIN_RAYD_DIR)).Path

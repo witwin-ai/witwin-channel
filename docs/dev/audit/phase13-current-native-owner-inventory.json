@@ -27,13 +27,13 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 202,
+    "bindings": 203,
     "rayd_numerical": 43,
-    "layered": 2,
+    "layered": 3,
     "channel_numerical": 157
   },
   "current_phase": 11,
-  "current_subphase": "stable integration naming",
+  "current_subphase": "8B device-resident diffraction planning",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -319,6 +319,27 @@
     "native_abi_symbol_change": false,
     "launch_contract_change": false,
     "public_api_delta": false
+  },
+  "phase8b_device_resident_diffraction_planning": {
+    "status": "active",
+    "adr": "docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md",
+    "native_symbol": "diffraction_tx_visible_state_plan",
+    "rayd_typed_operation": "rayd::torch::axial_edge_visibility_forward",
+    "rayd_commit": "102470daf44b649030df3b2554d9ace5c1eea482",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435",
+    "binding_count": 203,
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 3,
+      "Channel Native": 157
+    },
+    "capacity": 4194304,
+    "validity_contract": "contiguous CUDA bool[N] active mask; no selected count",
+    "state_alias_contract": "twelve exact object/storage/stride/dtype/device/gradient aliases",
+    "native_abi_symbol_delta": 1,
+    "public_api_delta": false,
+    "compatibility_alias": false
   },
   "symbols": [
     {
@@ -802,7 +823,7 @@
       "binding_target": "cn_rayd_diffraction_sample_tape_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 341
+        "line": 352
       },
       "target_source_evidence": [
         {
@@ -3014,7 +3035,7 @@
       "binding_target": "cn_coupled_dd_geometry_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 330
+        "line": 337
       },
       "target_source_evidence": [
         {
@@ -3067,7 +3088,7 @@
       "binding_target": "cn_coupled_rd_geometry_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 326
+        "line": 333
       },
       "target_source_evidence": [
         {
@@ -5325,6 +5346,65 @@
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "unaffected by Plan 13"
+    },
+    {
+      "symbol": "diffraction_tx_visible_state_plan",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_diffraction_tx_visible_state_plan",
+      "binding_registration": {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "line": 341
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/rayd.cpp",
+          "lines": [
+            256
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/rayd/diffraction.cpp",
+          "lines": [
+            32
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel operation / RayD primitive",
+      "owner_kind": "Channel composed native operation through direct typed RayD API",
+      "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.diffraction_tx_visible_state_plan",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 297
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/diffraction.py",
+          "line": 116
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/diffraction.py",
+          "line": 153
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+          "line": 392
+        }
+      ],
+      "contract_test": "native-diffraction-visibility-plan",
+      "e2e_callers": [
+        "path-diffraction",
+        "deterministic-diffraction",
+        "bdpt-diffraction"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Phase 8B ADR-028 device-resident capacity-plus-mask planning"
     },
     {
       "symbol": "em_layer_stack_backward",
@@ -9191,7 +9271,7 @@
       "binding_target": "cn_rayd_diffraction_paths_order1_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 337
+        "line": 348
       },
       "target_source_evidence": [
         {
@@ -9244,7 +9324,7 @@
       "binding_target": "cn_rayd_intersect_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 290
+        "line": 297
       },
       "target_source_evidence": [
         {
@@ -9297,7 +9377,7 @@
       "binding_target": "cn_rayd_intersect_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 274
+        "line": 281
       },
       "target_source_evidence": [
         {
@@ -9362,7 +9442,7 @@
       "binding_target": "cn_rayd_intersect_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 294
+        "line": 301
       },
       "target_source_evidence": [
         {
@@ -9415,7 +9495,7 @@
       "binding_target": "cn_rayd_reflection_epc_paths_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 310
+        "line": 317
       },
       "target_source_evidence": [
         {
@@ -9468,7 +9548,7 @@
       "binding_target": "cn_rayd_reflection_epc_paths_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 286
+        "line": 293
       },
       "target_source_evidence": [
         {
@@ -9525,7 +9605,7 @@
       "binding_target": "cn_rayd_reflection_epc_paths_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 314
+        "line": 321
       },
       "target_source_evidence": [
         {
@@ -9578,7 +9658,7 @@
       "binding_target": "cn_rayd_scene_create",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 266
+        "line": 273
       },
       "target_source_evidence": [
         {
@@ -9631,7 +9711,7 @@
       "binding_target": "cn_rayd_scene_edge_records",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 270
+        "line": 277
       },
       "target_source_evidence": [
         {
@@ -9684,7 +9764,7 @@
       "binding_target": "cn_rayd_scene_face_normals_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 318
+        "line": 325
       },
       "target_source_evidence": [
         {
@@ -9737,7 +9817,7 @@
       "binding_target": "cn_rayd_scene_face_normals_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 322
+        "line": 329
       },
       "target_source_evidence": [
         {
@@ -9790,7 +9870,7 @@
       "binding_target": "cn_rayd_trace_reflections_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 302
+        "line": 309
       },
       "target_source_evidence": [
         {
@@ -9843,7 +9923,7 @@
       "binding_target": "cn_rayd_trace_reflections_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 282
+        "line": 289
       },
       "target_source_evidence": [
         {
@@ -9904,7 +9984,7 @@
       "binding_target": "cn_rayd_trace_reflections_forward_tape",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 298
+        "line": 305
       },
       "target_source_evidence": [
         {
@@ -9956,7 +10036,7 @@
       "binding_target": "cn_rayd_trace_reflections_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 306
+        "line": 313
       },
       "target_source_evidence": [
         {
@@ -10009,7 +10089,7 @@
       "binding_target": "cn_rayd_visibility_forward",
       "binding_registration": {
         "path": "native/channel_native/binding/rayd.cpp",
-        "line": 278
+        "line": 285
       },
       "target_source_evidence": [
         {

@@ -17,7 +17,7 @@ from witwin.channel_native.propagation.topology.discovery import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
 _DIGESTS = {
-    "_tx_visible_diffraction_states": "1c9433ceded093f33aeb956fc6e63739e7b0f943028f48db023819a7d55a28c9",
+    "plan_tx_visible_diffraction_states": "2313925423a053c7e466c982425e608aa847811a3c61347bc496a5acd2a99a64",
 }
 
 
@@ -38,27 +38,20 @@ def test_diffraction_owner_identity_module_and_constant():
         diffraction.__name__
     )
     assert diffraction._diffraction_topology_order1.__module__ == diffraction.__name__
-    assert (
-        diffraction._tx_visible_diffraction_states
-        is geometry_diffraction._tx_visible_diffraction_states
+    assert diffraction.plan_tx_visible_diffraction_states is (
+        geometry_diffraction.plan_tx_visible_diffraction_states
     )
-    assert geometry_diffraction._tx_visible_diffraction_states.__module__ == (
+    assert geometry_diffraction.plan_tx_visible_diffraction_states.__module__ == (
         geometry_diffraction.__name__
     )
     assert (
-        _digest(geometry_diffraction, "_tx_visible_diffraction_states")
-        == _DIGESTS["_tx_visible_diffraction_states"]
+        _digest(geometry_diffraction, "plan_tx_visible_diffraction_states")
+        == _DIGESTS["plan_tx_visible_diffraction_states"]
     )
-    assert (
-        diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS
-        is geometry_diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS
-    )
-    assert geometry_diffraction._DIFFRACTION_PREFILTER_EDGE_FRACTIONS == (
-        0.02,
-        1.0 / 3.0,
-        2.0 / 3.0,
-        0.98,
-    )
+    assert not hasattr(diffraction, "_tx_visible_diffraction_states")
+    assert not hasattr(geometry_diffraction, "_tx_visible_diffraction_states")
+    assert not hasattr(diffraction, "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS")
+    assert not hasattr(geometry_diffraction, "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS")
     assert diffraction.prepare_diffraction_order1_plan is (
         discovery.prepare_diffraction_order1_plan
     )
@@ -116,8 +109,7 @@ def test_diffraction_consumers_use_named_geometry_and_canonical_event_order():
         "prepare_diffraction_order1_plan",
         "iter_diffraction_tx_requests",
         "_deterministic_diffraction_states",
-        "_tx_visible_diffraction_states",
-        "name_diffraction_states",
+        "plan_tx_visible_diffraction_states",
         "iter_diffraction_rx_chunk_requests",
         "query_diffraction_order1",
         "deterministic_diffraction_order1_compact",

@@ -197,7 +197,7 @@ def test_phase7_freezes_native_tx_visibility_selection_requirements() -> None:
     ).read_text(encoding="utf-8")
 
     assert selection["accepted_native_operation"] == (  # type: ignore[index]
-        "diffraction_tx_visible_state_select"
+        "diffraction_tx_visible_state_plan"
     )
     assert selection["operation_owner"] == (  # type: ignore[index]
         "Channel operation / RayD visibility primitives"
@@ -208,13 +208,18 @@ def test_phase7_freezes_native_tx_visibility_selection_requirements() -> None:
         "2/3",
         "0.98",
     ]
-    assert (
-        "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS = "
-        "(0.02, 1.0 / 3.0, 2.0 / 3.0, 0.98)"
-    ) in source
-    assert "for fraction in _DIFFRACTION_PREFILTER_EDGE_FRACTIONS:" in source
-    assert "visible |= geometry_bridge.rayd_visibility_forward(" in source
-    assert "if bool(visible.all()):" in source
+    assert selection["activation_status"] == "active"  # type: ignore[index]
+    assert selection["state_capacity"] == 4_194_304  # type: ignore[index]
+    assert "def plan_tx_visible_diffraction_states(" in source
+    assert "geometry_bridge.diffraction_tx_visible_state_plan(" in source
+    for forbidden in (
+        "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS",
+        "for fraction in",
+        "geometry_bridge.rayd_visibility_forward(",
+        "bool(visible.all())",
+        "tensor[visible]",
+    ):
+        assert forbidden not in source
 
 
 def test_phase7_guardrails_are_byte_identical_and_authoritative() -> None:

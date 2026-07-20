@@ -72,6 +72,8 @@ class DiffractionStateGeometry:
 def name_diffraction_states(
     states: tuple[torch.Tensor, ...],
 ) -> DiffractionStateGeometry:
+    if len(states) != 12:
+        raise ValueError("diffraction state tuple must contain exactly 12 tensors")
     return DiffractionStateGeometry(
         edge_index=states[0],
         edge_position=states[1],
@@ -88,43 +90,59 @@ def name_diffraction_states(
     )
 
 
-_DIFFRACTION_PREFILTER_EDGE_FRACTIONS = (0.02, 1.0 / 3.0, 2.0 / 3.0, 0.98)
+@dataclass(frozen=True, slots=True)
+class DiffractionVisibleStatePlan:
+    edge_index: torch.Tensor
+    edge_position: torch.Tensor
+    edge_direction: torch.Tensor
+    edge_t_min: torch.Tensor
+    edge_t_max: torch.Tensor
+    n0: torch.Tensor
+    n1: torch.Tensor
+    prim0: torch.Tensor
+    prim1: torch.Tensor
+    exterior_angle: torch.Tensor
+    source: torch.Tensor
+    source_power: torch.Tensor
+    active: torch.Tensor
 
 
-def _tx_visible_diffraction_states(
+def plan_tx_visible_diffraction_states(
     rayd: object,
     states: tuple[torch.Tensor, ...],
     tx: torch.Tensor,
-) -> tuple[torch.Tensor, ...]:
-    """Drop edge states that are occluded from the transmitter.
-
-    The UTD kernel checks visibility at the per-receiver stationary point, so
-    a state is only culled when the transmitter cannot see the edge at any of
-    several sample points along it. This shrinks the rx x state workspace and
-    pair launches on city-scale scenes (mirrors the original tx_first
-    pruning) while keeping states whose midpoint happens to be occluded.
-    """
-
-    state_count = int(states[0].shape[0])
-    if state_count <= 0:
-        return states
-    edge_anchor = states[1]
-    edge_dir = states[2]
-    line_min = states[3]
-    line_max = states[4]
-    starts = tx.reshape(1, 3).expand(state_count, 3).contiguous()
-    visible = torch.zeros((state_count,), device=edge_anchor.device, dtype=torch.bool)
-    for fraction in _DIFFRACTION_PREFILTER_EDGE_FRACTIONS:
-        t = line_min + fraction * (line_max - line_min)
-        point = (edge_anchor + t.unsqueeze(1) * edge_dir).contiguous()
-        visible |= geometry_bridge.rayd_visibility_forward(
-            rayd.require_resource(), starts, point, None
-        )[0]
-    if bool(visible.all()):
-        return states
-    return tuple(
-        tensor[visible] if tensor.shape[:1] == (state_count,) else tensor
-        for tensor in states
+) -> DiffractionVisibleStatePlan:
+    named = name_diffraction_states(states)
+    active = geometry_bridge.diffraction_tx_visible_state_plan(
+        rayd.require_resource(),
+        tx,
+        named.edge_index,
+        named.edge_position,
+        named.edge_direction,
+        named.edge_t_min,
+        named.edge_t_max,
+        named.n0,
+        named.n1,
+        named.prim0,
+        named.prim1,
+        named.exterior_angle,
+        named.source,
+        named.source_power,
+    )
+    return DiffractionVisibleStatePlan(
+        edge_index=named.edge_index,
+        edge_position=named.edge_position,
+        edge_direction=named.edge_direction,
+        edge_t_min=named.edge_t_min,
+        edge_t_max=named.edge_t_max,
+        n0=named.n0,
+        n1=named.n1,
+        prim0=named.prim0,
+        prim1=named.prim1,
+        exterior_angle=named.exterior_angle,
+        source=named.source,
+        source_power=named.source_power,
+        active=active,
     )
 
 
@@ -134,8 +152,8 @@ class DiffractionOrder1Query:
     tx_position: torch.Tensor
     tx_polarization: torch.Tensor
     rx_positions: torch.Tensor
-    active: torch.Tensor | None
-    states: DiffractionStateGeometry
+    active: torch.Tensor
+    states: DiffractionVisibleStatePlan
     material_eta_r: torch.Tensor
     material_sigma: torch.Tensor
     material_mu_r: torch.Tensor
@@ -148,6 +166,12 @@ class DiffractionOrder1Query:
     # RayD GO step; > 0 notches the incident-boundary odd part over the congruent
     # window inside the shared UTD header (pair.isbTaperWidthScale).
     isb_taper_width_scale: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.active is not self.states.active:
+            raise ValueError("diffraction query active must alias the visible state plan")
+        if self.state_count != int(self.states.edge_index.shape[0]):
+            raise ValueError("diffraction query state_count must equal plan capacity N")
 
 
 @dataclass(frozen=True, slots=True)

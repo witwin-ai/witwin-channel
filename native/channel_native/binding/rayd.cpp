@@ -253,6 +253,13 @@ pybind11::tuple cn_rayd_diffraction_sample_tape_forward(
     int64_t export_tape,
     pybind11::object sample_state_index,
     pybind11::object sample_edge_weight);
+at::Tensor cn_diffraction_tx_visible_state_plan(
+    RayDSceneResource &scene,
+    torch::Tensor tx,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max);
 
 void register_rayd_geometry(pybind11::module_ &module) {
     pybind11::class_<RayDSceneResource, std::shared_ptr<RayDSceneResource>>(
@@ -331,6 +338,10 @@ void register_rayd_geometry(pybind11::module_ &module) {
         "coupled_dd_geometry_forward",
         &cn_coupled_dd_geometry_forward,
         "Construct two-edge diffraction geometry with an alternating-projection Fermat solve and typed RayD segment visibility; no field coefficient is evaluated.");
+    module.def(
+        "diffraction_tx_visible_state_plan",
+        &cn_diffraction_tx_visible_state_plan,
+        "Plan transmitter-visible diffraction states with a device Boolean mask.");
 }
 
 void register_rayd_accumulation(pybind11::module_ &module) {

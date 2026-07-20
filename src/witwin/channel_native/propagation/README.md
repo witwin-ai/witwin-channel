@@ -26,8 +26,9 @@ and may use RayD public device primitives without adding a UTD sub-launch. Pure
 wedge keeps its exporter-locked fast-math contract; retained MC and coupled
 operations stay precise. Phase 8B separately owns the sample-tape semantic
 rename and native transmitter-visible state planning cleanup. Under ADR-028,
-that plan preserves all twelve state tensors as exact aliases at capacity `N`
-and carries validity only as a CUDA Boolean mask; it never obtains a host count
+`diffraction_tx_visible_state_plan` preserves all twelve state tensors as exact
+aliases at capacity `N` and carries validity only as a CUDA Boolean mask from
+the typed RayD axial-edge visibility primitive; it never obtains a host count
 or performs Torch compaction.
 
 ## Public entry points

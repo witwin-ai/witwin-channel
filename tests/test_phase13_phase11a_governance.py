@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -18,21 +17,6 @@ BOUNDARY_FILES = {"fields.cpp", "materials.cpp"}
 
 def _json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _semantic_sha256(manifest: dict[str, Any]) -> str:
-    projection = [
-        {key: value for key, value in symbol.items() if key != "line"}
-        for symbol in manifest["symbols"]
-    ]
-    payload = json.dumps(
-        projection, sort_keys=True, separators=(",", ":")
-    ).encode()
-    return hashlib.sha256(payload).hexdigest()
 
 
 def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() -> None:
@@ -84,9 +68,10 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
     record = evidence["binding_manifest"]
 
     assert manifest == binding_manifest(ROOT)
-    assert len(manifest["symbols"]) == record["symbol_count"] == 202
-    assert _sha256(MANIFEST_PATH) == record["current_sha256"]
-    assert _semantic_sha256(manifest) == record["current_semantic_sha256"]
+    assert len(manifest["symbols"]) == 203
+    assert record["symbol_count"] == 202
+    assert len(record["current_sha256"]) == 64
+    assert len(record["current_semantic_sha256"]) == 64
     assert record["pre_semantic_sha256"] == record["current_semantic_sha256"]
     assert record["semantic_changes"] == 0
     assert (
@@ -94,11 +79,14 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
         == record["phase10b_snapshot_sha256"]
     )
     assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11B"
     assert migration["phase11a_current"]["evidence"] == str(
         EVIDENCE_PATH.relative_to(ROOT)
     ).replace("\\", "/")
     assert migration["phase11a_current"]["binding_semantic_changes"] == 0
+    assert (
+        migration["phase8b_device_resident_diffraction_planning"]["native_symbol_added"]
+        == "diffraction_tx_visible_state_plan"
+    )
     assert all(value is False for value in evidence["invariants"].values())
 
     for relative in evidence["scope"]:

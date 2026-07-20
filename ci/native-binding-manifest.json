@@ -2309,7 +2309,7 @@
       "name": "coupled_dd_geometry_forward",
       "target": "cn_coupled_dd_geometry_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 330,
+      "line": 337,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2386,7 +2386,7 @@
       "name": "coupled_rd_geometry_forward",
       "target": "cn_coupled_rd_geometry_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 326,
+      "line": 333,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4543,6 +4543,48 @@
       ],
       "pybind_arguments": [],
       "doc": "Allocate zero deterministic field and phase storage with native CUDA."
+    },
+    {
+      "name": "diffraction_tx_visible_state_plan",
+      "target": "cn_diffraction_tx_visible_state_plan",
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 341,
+      "return_type": "at::Tensor",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "scene",
+          "type": "RayDSceneResource &",
+          "default": null
+        },
+        {
+          "name": "tx",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_position",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_direction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_t_min",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_t_max",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Plan transmitter-visible diffraction states with a device Boolean mask."
     },
     {
       "name": "em_layer_stack_backward",
@@ -10665,7 +10707,7 @@
       "name": "rayd_diffraction_paths_order1_forward",
       "target": "cn_rayd_diffraction_paths_order1_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 337,
+      "line": 348,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -10807,7 +10849,7 @@
       "name": "rayd_diffraction_sample_tape_forward",
       "target": "cn_rayd_diffraction_sample_tape_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 341,
+      "line": 352,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11079,7 +11121,7 @@
       "name": "rayd_intersect_backward",
       "target": "cn_rayd_intersect_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 290,
+      "line": 297,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11176,7 +11218,7 @@
       "name": "rayd_intersect_forward",
       "target": "cn_rayd_intersect_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 274,
+      "line": 281,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11218,7 +11260,7 @@
       "name": "rayd_intersect_jvp",
       "target": "cn_rayd_intersect_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 294,
+      "line": 301,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11280,7 +11322,7 @@
       "name": "rayd_reflection_epc_paths_backward",
       "target": "cn_rayd_reflection_epc_paths_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 310,
+      "line": 317,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11362,7 +11404,7 @@
       "name": "rayd_reflection_epc_paths_forward",
       "target": "cn_rayd_reflection_epc_paths_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 286,
+      "line": 293,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11434,7 +11476,7 @@
       "name": "rayd_reflection_epc_paths_jvp",
       "target": "cn_rayd_reflection_epc_paths_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 314,
+      "line": 321,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11501,7 +11543,7 @@
       "name": "rayd_scene_create",
       "target": "cn_rayd_scene_create",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 266,
+      "line": 273,
       "return_type": "std::shared_ptr<RayDSceneResource>",
       "return_arity": 1,
       "parameters": [
@@ -11548,7 +11590,7 @@
       "name": "rayd_scene_edge_records",
       "target": "cn_rayd_scene_edge_records",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 270,
+      "line": 277,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11565,7 +11607,7 @@
       "name": "rayd_scene_face_normals_backward",
       "target": "cn_rayd_scene_face_normals_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 318,
+      "line": 325,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11587,7 +11629,7 @@
       "name": "rayd_scene_face_normals_jvp",
       "target": "cn_rayd_scene_face_normals_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 322,
+      "line": 329,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11609,7 +11651,7 @@
       "name": "rayd_trace_reflections_backward",
       "target": "cn_rayd_trace_reflections_backward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 302,
+      "line": 309,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11681,7 +11723,7 @@
       "name": "rayd_trace_reflections_forward",
       "target": "cn_rayd_trace_reflections_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 282,
+      "line": 289,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11723,7 +11765,7 @@
       "name": "rayd_trace_reflections_forward_tape",
       "target": "cn_rayd_trace_reflections_forward_tape",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 298,
+      "line": 305,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11765,7 +11807,7 @@
       "name": "rayd_trace_reflections_jvp",
       "target": "cn_rayd_trace_reflections_jvp",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 306,
+      "line": 313,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11837,7 +11879,7 @@
       "name": "rayd_visibility_forward",
       "target": "cn_rayd_visibility_forward",
       "path": "native/channel_native/binding/rayd.cpp",
-      "line": 278,
+      "line": 285,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [

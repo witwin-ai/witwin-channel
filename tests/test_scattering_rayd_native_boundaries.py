@@ -50,7 +50,7 @@ def _sha256(path: Path) -> str:
 def test_current_build_uses_the_locked_rayd_scattering_surface() -> None:
     integration = RAYD_ROOT / "backends/torch/include/rayd/torch/integration.h"
     assert _sha256(integration) == (
-        "e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86"
+        "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435"
     )
     integration_text = integration.read_text(encoding="utf-8-sig")
     assert 'kIntegrationApiVersion = 2;' in integration_text

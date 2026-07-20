@@ -12,10 +12,8 @@ from witwin.channel_native.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
 from witwin.channel_native.propagation.geometry.diffraction import (
-    _DIFFRACTION_PREFILTER_EDGE_FRACTIONS,  # noqa: F401 - compatibility re-export
-    _tx_visible_diffraction_states,  # noqa: F401 - compatibility re-export
     DiffractionOrder1Query,
-    name_diffraction_states,
+    plan_tx_visible_diffraction_states,
     query_diffraction_edges,
     query_diffraction_order1,
 )
@@ -152,9 +150,8 @@ def _diffraction_topology_order1(
             tx_index,
             preserve_imported_edges=plan.preserve_imported_edges,
         )
-        states = _tx_visible_diffraction_states(rayd, states, tx)
-        named_states = name_diffraction_states(states)
-        state_count = int(named_states.edge_index.shape[0])
+        visible_plan = plan_tx_visible_diffraction_states(rayd, states, tx)
+        state_count = int(visible_plan.edge_index.shape[0])
         if state_count <= 0:
             continue
         # Chunk receivers so the rx x edge-state workspace stays bounded on
@@ -174,8 +171,8 @@ def _diffraction_topology_order1(
                     .reshape(1, 3)
                     .contiguous(),
                     rx_positions=rx_chunk,
-                    active=None,
-                    states=named_states,
+                    active=visible_plan.active,
+                    states=visible_plan,
                     material_eta_r=face_eps_r,
                     material_sigma=face_sigma_e,
                     material_mu_r=face_mu_r,

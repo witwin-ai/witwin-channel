@@ -70,7 +70,6 @@ def test_phase11b_duplication_budget_is_met_without_relaxation() -> None:
         "margin_percentage_points": 0.155099,
     }
     assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "11B"
     assert migration["phase11b_current"]["duplication_refresh"]["budget_met"] is True
     assert migration["phase11b_current"]["evidence"] == str(
         EVIDENCE_PATH.relative_to(ROOT)

@@ -20,7 +20,7 @@
         }
     },
     "current_phase": 11,
-    "current_subphase": "stable integration naming",
+    "current_subphase": "8B device-resident diffraction planning",
     "transfers_applied": [
         {
             "phase": 3,
@@ -357,7 +357,7 @@
             "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu"
         }
     ],
-    "binding_count_delta": -9,
+    "binding_count_delta": -8,
     "implementation_owner_delta": {
         "Channel Native": -26,
         "RayD": 26
@@ -1195,5 +1195,26 @@
         "launch_contract_change": false,
         "public_api_delta": false,
         "compatibility_alias": false
+    },
+    "phase8b_device_resident_diffraction_planning": {
+        "status": "active",
+        "adr": "docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md",
+        "native_symbol_added": "diffraction_tx_visible_state_plan",
+        "rayd_typed_operation": "rayd::torch::axial_edge_visibility_forward",
+        "rayd_commit": "102470daf44b649030df3b2554d9ace5c1eea482",
+        "integration_header": "backends/torch/include/rayd/torch/integration.h",
+        "integration_header_sha256": "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435",
+        "binding_count": 203,
+        "binding_count_delta": 1,
+        "owner_count_delta": {
+            "layered": 1
+        },
+        "capacity": 4194304,
+        "validity_contract": "capacity N plus contiguous CUDA bool[N] active mask",
+        "state_alias_count": 12,
+        "host_selected_count": false,
+        "python_torch_numerical_geometry": false,
+        "compatibility_alias": false,
+        "public_api_delta": false
     }
 }

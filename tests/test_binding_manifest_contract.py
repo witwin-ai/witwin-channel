@@ -24,9 +24,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # _backward/_jvp companions): 193 -> 199;
 # ADR-022 added 12 BDPT fixed-topology AD companions: 199 -> 211. Plan 13
 # Phase 4 then retired 9 strictly unreachable legacy/duplicate bindings:
-# 211 -> 202.
+# 211 -> 202. ADR-028 Phase 8B added one device-resident diffraction planning
+# symbol: 202 -> 203.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 202
+EXPECTED_BINDING_COUNT = 203
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )
@@ -103,7 +104,7 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
     assert migration["current_phase"] == 11
-    assert migration["current_subphase"] == "stable integration naming"
+    assert migration["current_subphase"] == "8B device-resident diffraction planning"
     assert len(renames) == len(rename_sources) == len(rename_targets) == 21
     assert rename_sources.isdisjoint(rename_targets)
     assert baseline_name_set & (rename_sources | rename_targets) == rename_targets

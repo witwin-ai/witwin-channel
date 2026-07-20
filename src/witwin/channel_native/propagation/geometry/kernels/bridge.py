@@ -291,7 +291,130 @@ def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, 
     return tuple(out)
 
 
+_DIFFRACTION_STATE_CAPACITY = 4_194_304
+
+
+def diffraction_tx_visible_state_plan(
+    scene_resource: object,
+    tx: torch.Tensor,
+    edge_index: torch.Tensor,
+    edge_position: torch.Tensor,
+    edge_direction: torch.Tensor,
+    edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor,
+    n0: torch.Tensor,
+    n1: torch.Tensor,
+    prim0: torch.Tensor,
+    prim1: torch.Tensor,
+    exterior_angle: torch.Tensor,
+    source: torch.Tensor,
+    source_power: torch.Tensor,
+) -> torch.Tensor:
+    validate_cuda_tensor("tx", tx, dtype=torch.float32, ndim=1, trailing_shape=(3,))
+    validate_cuda_tensor(
+        "edge_index", edge_index, dtype=torch.int32, ndim=1, require_contiguous=False
+    )
+    validate_cuda_tensor(
+        "edge_position",
+        edge_position,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor(
+        "edge_direction",
+        edge_direction,
+        dtype=torch.float32,
+        ndim=2,
+        trailing_shape=(3,),
+    )
+    validate_cuda_tensor("edge_t_min", edge_t_min, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("edge_t_max", edge_t_max, dtype=torch.float32, ndim=1)
+    for name, tensor, dtype, ndim, trailing_shape in (
+        ("n0", n0, torch.float32, 2, (3,)),
+        ("n1", n1, torch.float32, 2, (3,)),
+        ("prim0", prim0, torch.int32, 1, ()),
+        ("prim1", prim1, torch.int32, 1, ()),
+        ("exterior_angle", exterior_angle, torch.float32, 1, ()),
+        ("source", source, torch.float32, 2, (3,)),
+        ("source_power", source_power, torch.float32, 1, ()),
+    ):
+        validate_cuda_tensor(
+            name,
+            tensor,
+            dtype=dtype,
+            ndim=ndim,
+            trailing_shape=trailing_shape,
+            require_contiguous=False,
+        )
+
+    state_count = int(edge_position.shape[0])
+    if state_count > _DIFFRACTION_STATE_CAPACITY:
+        raise ValueError(
+            "diffraction transmitter-visible state capacity exceeds 4194304"
+        )
+    row_shapes = {
+        "edge_index": edge_index.shape[:1],
+        "edge_direction": edge_direction.shape[:1],
+        "edge_t_min": edge_t_min.shape[:1],
+        "edge_t_max": edge_t_max.shape[:1],
+        "n0": n0.shape[:1],
+        "n1": n1.shape[:1],
+        "prim0": prim0.shape[:1],
+        "prim1": prim1.shape[:1],
+        "exterior_angle": exterior_angle.shape[:1],
+        "source": source.shape[:1],
+        "source_power": source_power.shape[:1],
+    }
+    mismatched = [name for name, shape in row_shapes.items() if shape != (state_count,)]
+    if mismatched:
+        raise ValueError(
+            "diffraction state tensors must share one row capacity: "
+            + ", ".join(mismatched)
+        )
+    state_tensors = (
+        edge_index,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+        n0,
+        n1,
+        prim0,
+        prim1,
+        exterior_angle,
+        source,
+        source_power,
+    )
+    if any(tensor.get_device() != tx.get_device() for tensor in state_tensors):
+        raise ValueError("tx and diffraction state tensors must share one CUDA device")
+
+    active = _required_native_op("diffraction_tx_visible_state_plan")(
+        _rayd_scene_resource(scene_resource),
+        tx,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+    )
+    if not isinstance(active, torch.Tensor):
+        raise TypeError(
+            "_channel_native.diffraction_tx_visible_state_plan must return a tensor"
+        )
+    validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
+    if active.shape != (state_count,):
+        raise ValueError(
+            "_channel_native.diffraction_tx_visible_state_plan returned bad shape"
+        )
+    if active.get_device() != tx.get_device():
+        raise ValueError(
+            "_channel_native.diffraction_tx_visible_state_plan returned wrong device"
+        )
+    return active
+
+
 __all__ = [
+    "diffraction_tx_visible_state_plan",
     "rayd_diffraction_sample_tape_forward",
     "coupled_dd_geometry_forward",
     "coupled_rd_geometry_forward",

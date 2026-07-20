@@ -5,6 +5,8 @@
 
 namespace {
 
+constexpr int64_t kDiffractionStateCapacity = 4'194'304;
+
 pybind11::tuple diffraction_path_tuple(const rayd::torch::DiffractionPathResult &result) {
     return pybind11::make_tuple(
         result.count, result.valid, result.tx_id, result.rx_id, result.order,
@@ -26,6 +28,31 @@ pybind11::tuple diffraction_accumulation_tuple(
 }
 
 }  // namespace
+
+at::Tensor cn_diffraction_tx_visible_state_plan(
+    RayDSceneResource &scene,
+    torch::Tensor tx,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max) {
+    TORCH_CHECK(
+        edge_position.dim() >= 1,
+        "edge_position must have at least one dimension");
+    TORCH_CHECK(
+        edge_position.size(0) <= kDiffractionStateCapacity,
+        "diffraction transmitter-visible state capacity exceeds 4194304");
+    rayd::torch::AxialEdgeVisibilityRequest request{
+        tx,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+        std::nullopt,
+        {}};
+    return rayd::torch::axial_edge_visibility_forward(scene.resource(), request)
+        .any_visible;
+}
 
 pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
     RayDSceneResource &scene,

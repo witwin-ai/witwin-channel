@@ -624,7 +624,7 @@ C++ contract测试及完整CTest 2/2通过。完整证据见
 
 ### Phase 8B — Diffraction 名称、legacy 与 Torch geometry 收口
 
-**实现状态：IN PROGRESS（2026-07-20；ADR-028 方案 2 已接受）。**
+**实现状态：已完成（2026-07-20；ADR-028 方案 2）。**
 
 执行第 6.3/6.4 节：区分 tape producer/estimator consumer，删除旧 aliases，四项审计 dead
 BDPT bindings；live `_tx_visible_diffraction_states` 改为 native完整 planning op。按 ADR-028
@@ -632,6 +632,17 @@ BDPT bindings；live `_tx_visible_diffraction_states` 改为 native完整 planni
 作为唯一 validity truth；不得把 `K` 或 Boolean 拉回 host，不改变四 fractions 或 active row
 顺序。sample-tape producer 原子改名为 `rayd_diffraction_sample_tape_forward`，旧名和兼容
 re-export 为零。
+
+Channel staged implementation新增唯一 ABI `diffraction_tx_visible_state_plan`，其 C++ owner
+直接调用 typed `rayd::torch::axial_edge_visibility_forward`。Python返回
+`DiffractionVisibleStatePlan`：十二个 state tensor保持 exact alias，另带 contiguous CUDA
+`bool[N] active`；enumerated caller以 `state_count=N` 和该 mask调用既有 order-1 exporter。
+生产 Python中的四 fractions常量、sample point math、visibility loop/reduction、host Boolean
+和Boolean indexing均已删除。`N=0`由native返回空mask且不launch，`N>4,194,304`在dispatch前
+fail loud。最终锁定并构建已push RayD `102470daf44b649030df3b2554d9ace5c1eea482`
+（稳定 `integration.h` SHA-256
+`65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435`）；真实
+native direct contract 以及 Path、Deterministic、ADR-008 BDPT CUDA端到端均通过。
 
 ### Phase 9 — ADR-026：RayD generic scattering runtime ownership
 
