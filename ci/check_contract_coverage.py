@@ -52,6 +52,18 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "witwin.channel_native.deterministic.kernels.accumulation."
         "_DeterministicAccumulateFlatAdFunction.forward"
     ),
+    "deterministic_path_table_capacity_pack": (
+        "witwin.channel_native.deterministic.capacity."
+        "_DeterministicPathTableCapacityPackFunction.forward"
+    ),
+    "deterministic_path_table_capacity_pack_backward": (
+        "witwin.channel_native.deterministic.capacity."
+        "_DeterministicPathTableCapacityPackFunction.backward"
+    ),
+    "deterministic_path_table_capacity_pack_jvp": (
+        "witwin.channel_native.deterministic.capacity."
+        "_DeterministicPathTableCapacityPackFunction.jvp"
+    ),
     "deterministic_los_topology_block_all_visible": (
         "witwin.channel_native.propagation.topology.kernels.construction."
         "deterministic_los_topology_block"
@@ -121,6 +133,10 @@ BOOTSTRAP_E2E_SCENARIOS = {
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
     "deterministic-ad": (
         "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality"
+    ),
+    "deterministic-path-table-capacity": (
+        "tests/deterministic/test_path_table_capacity_pack.py::"
+        "test_path_table_capacity_pack_matches_live_export_bitwise"
     ),
     "deterministic-diffraction": (
         "tests/deterministic/test_diffraction_single_wedge.py::"

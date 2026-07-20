@@ -36,6 +36,22 @@ explicit device-selected `diffraction_state_capacity`, and capacity overflow
 makes the entire result inert before surfacing a standard asynchronous CUDA
 error; it never returns a usable partial result or synchronizes to raise early.
 
+`deterministic.capacity.deterministic_path_table_capacity_pack` is the dormant
+fixed-capacity exporter. It consumes the shared `CapacityFailureState` carried
+by `CapacityPathLayout`, preserves the exact flat `pair * C + slot` row map,
+and returns a strictly internal typed bundle containing every existing
+`PathTable` field plus CUDA `valid`, CUDA int32 `num_paths`, and host-known
+pair/capacity metadata. This bundle is not a `Result.paths` type and is not
+exported from the package root; the later atomic solver switch must merge its
+capacity metadata into stable `PathTable` and delete the internal bundle.
+Failure bits and local
+overflow are tested before any payload or ID read; every failed or invalid row
+is canonical inert. The constructor validates metadata only and never reduces
+device counts. Valid rows are bitwise identical to `build_path_table` for both
+`include_fields` modes. `phase_rad` deliberately preserves the current native
+export contract and is non-differentiable; only the existing eleven continuous
+evaluated-path inputs have native backward/JVP companions.
+
 ### AD contract
 
 `Config.ad_mode` accepts `none`, `jvp`, and `vjp`. AD uses fixed topology and

@@ -143,6 +143,12 @@ requires them.
   topology/packing, RNG/MIS/event policy, accumulation, and results. Preserve
   per-TU flags and the as-built chain AD split: ensemble geometry is JVP-only,
   while realization geometry supports VJP and JVP.
+- Under ADR-029, dormant deterministic PathTable capacity export consumes the
+  exact shared `CapacityFailureState` from its layout and preserves pair-major
+  `P*C` rows. Native primal checks failure/overflow/valid before payload or ID
+  reads; derivative companions consume only canonical output validity. Phase
+  export remains non-differentiable, while the existing eleven continuous
+  evaluated-path inputs retain native VJP/JVP.
 - Phase-screen mode resolution and scene-static realization resources are
   CompiledScene-owned and lazy. The first phase-screen consumer atomically
   caches immutable resident heights, structure/material ids, face ranges, UV

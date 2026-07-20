@@ -69,6 +69,19 @@ capacity. Host metadata may report configured/effective capacities but must not
 claim a device-selected actual count. A caller that needs actual counts reads
 the device tensor and knowingly chooses its own synchronization boundary.
 
+Before the atomic public solver switch, the dormant Channel owner
+`deterministic_path_table_capacity_pack` may expose this representation only
+through a strictly internal typed bundle. It consumes the exact shared
+`CapacityFailureState` carried by its `CapacityEvaluatedPaths` layout, keeps
+the flat `pair * C + slot` mapping, and never changes live `Result.paths`.
+Failure bits, local overflow, and row validity are checked in that order before
+any identifier or payload read. Its native VJP/JVP companions consume only the
+canonical output validity, cover the existing eleven continuous evaluated-path
+inputs, and return exact positive zero for inactive derivatives. `phase_rad`
+retains the live native export formula bit-for-bit and remains
+non-differentiable. The later atomic switch must merge the count/host-capacity
+metadata into stable `PathTable` and delete the internal bundle without a shim.
+
 `RaggedPathSoA` remains an explicit host-structural/import representation; it is
 not an allowed production solver boundary for deriving a result shape. Public
 filtering and array packing preserve `C`, row order, and device count tensors.

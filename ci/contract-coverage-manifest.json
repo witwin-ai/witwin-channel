@@ -34,6 +34,9 @@
     "native-deterministic-capacity-finalize": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
     "native-evaluated-paths-capacity-pack": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "native-evaluated-paths-capacity-pack-ad": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_jvp_gathers_every_continuous_field_and_preserves_zero_slots",
+    "native-deterministic-path-table-capacity-pack": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
+    "native-deterministic-path-table-capacity-pack-backward": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_backward_preserves_all_continuous_inputs",
+    "native-deterministic-path-table-capacity-pack-jvp": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_jvp_preserves_all_continuous_inputs",
     "native-coupled-candidate-capacity": "tests/propagation/topology/test_coupled_candidate_capacity.py::test_coupled_candidate_capacity_matches_frozen_rd_dd_order",
     "native-field-coupled": "tests/ad/test_solver_diffraction_coupled_ad.py::test_coupled_forward_stays_primal_without_geometry_leaves",
     "native-field-diffraction": "tests/ad/test_solver_diffraction_coupled_ad.py::test_wedge_reevaluation_forward_parity",
@@ -73,6 +76,7 @@
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
     "capacity-failure-state": "tests/runtime/test_capacity_failure_state.py::test_capacity_failure_bits_accumulate_and_every_block_stays_inert",
     "deterministic-ad": "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality",
+    "deterministic-path-table-capacity": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
     "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "coupled-candidate-capacity": "tests/propagation/topology/test_coupled_candidate_capacity.py::test_coupled_candidate_capacity_matches_frozen_rd_dd_order",
@@ -972,6 +976,33 @@
       "native-evaluated-paths-capacity-pack-ad",
       [
         "evaluated-paths-capacity"
+      ]
+    ],
+    [
+      "deterministic_path_table_capacity_pack",
+      "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.forward",
+      "native_call_site",
+      "native-deterministic-path-table-capacity-pack",
+      [
+        "deterministic-path-table-capacity"
+      ]
+    ],
+    [
+      "deterministic_path_table_capacity_pack_backward",
+      "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.backward",
+      "native_call_site",
+      "native-deterministic-path-table-capacity-pack-backward",
+      [
+        "deterministic-path-table-capacity"
+      ]
+    ],
+    [
+      "deterministic_path_table_capacity_pack_jvp",
+      "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.jvp",
+      "native_call_site",
+      "native-deterministic-path-table-capacity-pack-jvp",
+      [
+        "deterministic-path-table-capacity"
       ]
     ],
     [
