@@ -115,12 +115,11 @@ requires them.
   facades. MC Sionna and coupled RD/DD diffraction stay complete Channel
   owners; do not extract a UTD sub-launch or spread the pure-wedge fast-math
   flag into their precise-math translation units.
-- Under ADR-026 and the completed Phase 10A atomic pin/switch/delete, RayD is
-  the sole numerical owner of the eleven table evaluation/sampling,
-  single-bounce ensemble, and patch-integral contracts and the seven shared
-  scattering-table helpers. Channel retains their `_channel_native` ABI and
-  typed facades. The six chain contracts remain complete Channel numerical
-  owners until Phase 10B. RayD only consumes caller-owned resident tensors;
+- Under ADR-026 and the completed Phase 10A/10B atomic pin/switch/delete, RayD
+  is the sole numerical owner of all 17 generic resident scattering runtime
+  contracts and the seven shared scattering-table helpers. Channel retains
+  their `_channel_native` ABI and typed facades. RayD only consumes
+  caller-owned resident tensors;
   Channel retains table/phase-screen lifecycle, `scattering_event_probabilities`,
   topology/packing, RNG/MIS/event policy, accumulation, and results. Preserve
   per-TU flags and the as-built chain AD split: ensemble geometry is JVP-only,

@@ -338,7 +338,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_chain_ensemble_eval",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -346,7 +346,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_chain_ensemble_eval_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -354,7 +354,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_chain_ensemble_eval_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -362,7 +362,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_chain_realization_eval",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -370,7 +370,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_chain_realization_eval_backward",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {
@@ -378,7 +378,7 @@
       "action": "implementation-owner-transfer",
       "replacement": "scattering_chain_realization_eval_jvp",
       "count_delta": 0,
-      "status": "conditional on accepted ADR and cross-repository switch",
+      "status": "applied in Phase 10B",
       "reason": "move complete operation family while preserving Channel-facing ABI"
     },
     {

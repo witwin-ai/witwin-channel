@@ -194,9 +194,40 @@ layered Channel/RayD 2, and Channel Native 163. Table primal/sample/PDF and the
 retained event-policy TU remain on their default CUDA flags; table AD, ensemble,
 and patch owners retain `--fmad=false` in RayD. Launch count, current stream,
 reduction order, atomics, resident tensors, and public API remain unchanged.
-Phase 10B still owns the six fused chain contracts. Detailed activation,
-codegen/resource, deletion, and direct-test evidence is recorded in
+At the Phase 10A cut, Phase 10B still owned the six fused chain contracts.
+Detailed Phase 10A activation, codegen/resource, deletion, and direct-test evidence is recorded in
 `docs/dev/audit/phase13-scattering-phase10a-evidence.json`.
+
+### Plan 13 Phase 10B: fused scattering-chain activation
+
+Channel Native now pins pushed RayD commit
+`768b96e42a95f70c32d55f98a72000085317e288`. The typed scattering,
+integration-v2, and shared scattering-table header SHA-256 values are
+respectively
+`ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b`,
+`0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654`,
+and `38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`.
+
+The complete ensemble-chain and realization-chain primal/backward/JVP families
+now dispatch through typed `rayd::torch` requests/results. Channel keeps all six
+`_channel_native` names and typed Python/autograd facades, while the four local
+chain CUDA TUs are deleted. `scattering_event_probabilities`, table/phase-screen
+lifecycle, topology/C1-C2 packing, RNG/MIS/event policy, solver accumulation,
+and results remain Channel owners. The geometry AD truth is unchanged:
+ensemble is JVP-only with loud VJP rejection; realization supports VJP/JVP.
+
+The live binding count remains 202. The numerical-owner split is RayD 43,
+layered Channel/RayD 2, and Channel Native 157. All four RayD chain TUs retain
+source-local `--fmad=false`; launch count, current stream, reduction order,
+atomics, resident tensors, and public API are unchanged. Detailed activation,
+codegen/resource, deletion, and direct-test evidence is recorded in
+`docs/dev/audit/phase13-scattering-phase10b-evidence.json`.
+
+The move-only cut reduced exact-token duplication from 11.913070% to
+11.170566%, removed 12 stale chain regions, and classified three typed-adapter
+packing regions. The frozen 10.211512% budget was not relaxed and remains a
+Phase 11 nightly/release acceptance blocker; no unrelated deduplication was
+mixed into this owner move.
 
 ## API surface changes
 

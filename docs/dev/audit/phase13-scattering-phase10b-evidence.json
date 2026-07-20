@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "phase": "Plan 13 Phase 10B",
+  "status": "implementation complete; final duplication/release acceptance pending Phase 11",
+  "activation": {
+    "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
+    "typed_header": "backends/torch/include/rayd/torch/rf/scattering.h",
+    "typed_header_sha256": "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b",
+    "shared_table_header": "shared/include/rayd/shared/rf/scattering_table.cuh",
+    "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
+    "binding_count": 202,
+    "binding_manifest_sha256": "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71",
+    "contract_coverage_manifest_sha256": "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f"
+  },
+  "owner_transfer": {
+    "symbols": [
+      "scattering_chain_ensemble_eval",
+      "scattering_chain_ensemble_eval_backward",
+      "scattering_chain_ensemble_eval_jvp",
+      "scattering_chain_realization_eval",
+      "scattering_chain_realization_eval_backward",
+      "scattering_chain_realization_eval_jvp"
+    ],
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 2,
+      "Channel Native": 157
+    },
+    "channel_abi_owner": "_channel_native binding and domain facades",
+    "rayd_numerical_owner": "six complete scattering-chain contracts",
+    "retained_channel_owner": "scattering_event_probabilities and scattering lifecycle/policy/topology/packing/accumulation",
+    "public_api_delta": false
+  },
+  "rayd_sources": [
+    {
+      "path": "backends/torch/src/torch_ext/rf/scattering_chain_checks.h",
+      "sha256": "4f61082059d08112d675613e2e0ff0d8b7489753ffb96aec152aa17ac2409b73"
+    },
+    {
+      "path": "backends/torch/src/torch_ext/rf/scattering_chain_ad_common.cuh",
+      "sha256": "2551c33533dc7ea0a0c1680d67e5432587f8c2f77833d5a717fcb2d20597b507"
+    },
+    {
+      "path": "backends/torch/src/torch_ext/rf/scattering_chain_ensemble.cu",
+      "sha256": "6293c9238fa5c251d23408493fffd0b88cc557f50de84c90519ec1115ca7d9fd"
+    },
+    {
+      "path": "backends/torch/src/torch_ext/rf/scattering_chain_ensemble_ad.cu",
+      "sha256": "a207dbf58b62286b8a58d7f22535900b198f187c7d0bffb2bacce728eaae306e"
+    },
+    {
+      "path": "backends/torch/src/torch_ext/rf/scattering_chain_realization.cu",
+      "sha256": "be9601740ad1dce283708446ebc596b5fd5aca1da8f12421cc077d0dac99d424"
+    },
+    {
+      "path": "backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu",
+      "sha256": "970c579cc9d0c384d28e7aaa8f32200800a1de159de9a0338b2f0bad75f7fa93"
+    }
+  ],
+  "deleted_channel_sources": [
+    "native/channel_native/kernels/scattering_chain_ensemble.cu",
+    "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+    "native/channel_native/kernels/scattering_chain_realization.cu",
+    "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+  ],
+  "direct_contract_coverage": {
+    "test": "backends/torch/tests/cpp/scattering_chain_test.cpp",
+    "test_sha256": "5661129d9662d4f2879aaba284b245dd7f32a61b95c13a77e270d624ff315423",
+    "ctest": "rayd_torch_scattering_chain",
+    "ctest_result": "4/4 passed",
+    "depth8_positive_coverage": [
+      "ensemble primal/backward/JVP",
+      "realization primal/backward/JVP"
+    ],
+    "negative_contracts": [
+      "dtype/device/shape validation",
+      "Dmax=8 enforcement",
+      "ensemble geometry VJP fail-loud",
+      "zero-row and optional-tensor contracts"
+    ]
+  },
+  "ad_contract": {
+    "ensemble_geometry": "JVP-only; VJP fails loudly before launch",
+    "realization_geometry": "VJP and JVP supported",
+    "topology_sample_visibility_pdf_mis": "frozen structural inputs",
+    "persistent_tape": false
+  },
+  "launch_contract": {
+    "ensemble": {
+      "primal_launches": 1,
+      "backward_launches": 1,
+      "jvp_launches": 1
+    },
+    "realization": {
+      "primal_launches": 2,
+      "backward_launches": 1,
+      "jvp_launches": 2,
+      "empty_output_initialization": "asynchronous memset on caller stream"
+    },
+    "zero_row_launches": 0,
+    "explicit_synchronizations": 0,
+    "host_device_round_trips": 0
+  },
+  "compile_contract": {
+    "source_local_fmad_false": [
+      "backends/torch/src/torch_ext/rf/scattering_chain_ensemble.cu",
+      "backends/torch/src/torch_ext/rf/scattering_chain_ensemble_ad.cu",
+      "backends/torch/src/torch_ext/rf/scattering_chain_realization.cu",
+      "backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu"
+    ],
+    "use_fast_math": false,
+    "channel_chain_compile_entries_remaining": 0
+  },
+  "sm120_codegen": {
+    "normalization": "cuobjdump SASS normalized with addresses, encodings and tool banners removed",
+    "families": {
+      "ensemble": {
+        "sha256": "5ab69926383664788201883299c1e31f1705b23db2427690a4d12e4a0f4305d4",
+        "instruction_lines": 4096,
+        "resources": {"registers": 80, "stack_bytes": 32, "shared_bytes": 0, "local_bytes": 0}
+      },
+      "ensemble_ad": {
+        "sha256": "574b47ad82fb701c01cfec7adce4fcefd06147d2132388ef6826977bf64aa248",
+        "instruction_lines": 8192,
+        "resources": {
+          "backward": {"registers": 154, "stack_bytes": 2912, "shared_bytes": 0, "local_bytes": 0},
+          "jvp": {"registers": 144, "stack_bytes": 32, "shared_bytes": 0, "local_bytes": 0}
+        }
+      },
+      "realization": {
+        "sha256": "0a5eec5592e61022343c5e0308cefbb5a2a56e71bfba2be456037f04552bb750",
+        "instruction_lines": 4360,
+        "resources": {
+          "rows": {"registers": 64, "stack_bytes": 32, "shared_bytes": 3072, "local_bytes": 0},
+          "total": {"registers": 40, "stack_bytes": 0, "shared_bytes": 3072, "local_bytes": 0}
+        }
+      },
+      "realization_ad": {
+        "sha256": "a33f88780f83f4acf6d8e80068bdd16db804f8cd8ea33daf622d780ec8562bc6",
+        "instruction_lines": 8456,
+        "resources": {
+          "backward": {"registers": 238, "stack_bytes": 1952, "shared_bytes": 9232, "local_bytes": 0},
+          "jvp": {"registers": 109, "stack_bytes": 32, "shared_bytes": 5120, "local_bytes": 0},
+          "jvp_total": {"registers": 40, "stack_bytes": 0, "shared_bytes": 3072, "local_bytes": 0}
+        }
+      }
+    },
+    "exact_match_to_channel_baseline": true
+  },
+  "duplication_refresh": {
+    "duplicate_lines": 8747,
+    "total_lines": 78304,
+    "duplicate_coverage_percent": 11.170566,
+    "frozen_budget_percent": 10.211512,
+    "budget_relaxed": false,
+    "status": "all regions classified; implementation complete; frozen duplication acceptance remains a Phase 11 blocker"
+  },
+  "scope_stops": [
+    "no scattering_event_probabilities transfer",
+    "no table or phase-screen lifecycle transfer",
+    "no topology, chain discovery, row packing, RNG, MIS, event policy, accumulation or result transfer",
+    "no numerical, launch, reduction-order or random-consumption change",
+    "no reverse private include and no RayD Python extension"
+  ],
+  "retained_event_contract": {
+    "source": "native/channel_native/kernels/scattering.cu",
+    "kernel": "scattering_event_kernel",
+    "numerical_owner": "Channel Native",
+    "unchanged": true,
+    "evidence_reference": "docs/dev/audit/phase13-scattering-phase10a-evidence.json#retained_event_contract"
+  }
+}

@@ -1,8 +1,8 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** APPROVED FOR EXECUTION（用户于 2026-07-19 批准完整实施）；
-ADR-023/024/025/026 已接受；Phase 10A 已完成原子 pin/switch/delete，Phase 10B
-chain family 仍须按 dormant candidate → Channel pin/switch/delete 顺序激活
+ADR-023/024/025/026 已接受；Phase 10A/10B 已完成原子 pin/switch/delete；Phase 11
+仍须完成 frozen duplication budget、nightly/release 与 packaging 收口
 
 **计划日期：** 2026-07-18
 
@@ -655,9 +655,28 @@ delta/duplication/launch/coverage。
 
 ### Phase 10B — Scattering v2 chain families
 
+**实现状态：COMPLETE（2026-07-19）；最终 duplication/release acceptance 待 Phase
+11。** RayD 提交 `768b96e42a95f70c32d55f98a72000085317e288` 已 push；Channel
+已原子 pin/switch/delete 六个 chain contracts 和四个本地 chain CUDA TUs。integration
+v2、typed scattering、shared table header SHA-256 分别为
+`0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654`、
+`ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b`、
+`38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`。
+202 个 bindings 的 ABI/façade仍由 Channel 持有，numerical owner split 为 RayD 43、
+layered 2、Channel Native 157；`scattering_event_probabilities` 与 lifecycle/policy/
+topology/packing/RNG/MIS/accumulation/results 仍由 Channel 持有。ensemble geometry
+为 JVP-only/VJP fail-loud，realization geometry 支持 VJP/JVP。direct tests、逐 TU
+flags、launch/codegen/resource、deletion 与 duplication 证据见
+`docs/dev/audit/phase13-scattering-phase10b-evidence.json`。
+
 在 Phase 6A dependency closure后整族迁 6 个 bindings：chain ensemble三件套、chain
 realization三件套。保持 reflection-only C1/C2、`Dmax=8`、row/tape/output、`--fmad=false`、
 launch/reduction/atomic和default-off exactness；Channel无本地 duplicate。
+
+move-only 实现已将 duplication 从 Phase 10A 的 11.913070% 降至 11.170566%，并
+清理 12 个 stale regions、分类 3 个 typed-adapter packing regions；冻结预算
+10.211512% 未放宽且仍未达到。按 move-only 约束不在 Phase 10B 混入额外 dedup，
+该 nightly/release blocker 由 Phase 11 显式关闭。
 
 ### Phase 11 — Release、packaging 与旧 RayD API退役
 

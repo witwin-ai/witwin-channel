@@ -45,8 +45,8 @@ priority `scattering > diffraction > transmission > reflection > los`.
 - ADR-026 assigns 17 solver-neutral resident scattering runtime contracts to
   RayD. Phase 10A atomically moved the eleven table, single-bounce ensemble,
   and patch-integral contracts plus all seven table-interpolation helpers;
-  Channel retains their stable ABI and typed domain/autograd facades. The six
-  chain contracts remain complete Channel numerical owners until Phase 10B.
+  Phase 10B moved the six fused ensemble/realization chain contracts. Channel
+  retains the stable ABI and typed domain/autograd facades for all 17.
   Table and phase-screen construction/cache/seed lifecycle, event
   probabilities, topology/packing, RNG/MIS, accumulation, and result policy
   remain Channel owners. Per-TU default/`--fmad=false` modes and the

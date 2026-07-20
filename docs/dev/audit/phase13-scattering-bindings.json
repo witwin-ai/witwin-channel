@@ -16,6 +16,23 @@
     "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp",
     "rayd_ctest": "rayd_torch_scattering"
   },
+  "phase10b_activation": {
+    "status": "active",
+    "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
+    "activated_contract_count": 6,
+    "total_rayd_contract_count": 17,
+    "retained_channel_policy_contract_count": 1,
+    "owner_counts": {
+      "RayD": 17,
+      "Channel Native": 1
+    },
+    "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp",
+    "rayd_ctest": "rayd_torch_scattering_chain",
+    "ad_contract": {
+      "ensemble_geometry": "JVP-only; VJP fails loudly",
+      "realization_geometry": "VJP and JVP supported"
+    }
+  },
   "contracts": [
     {
       "symbol": "scattering_table_eval",
@@ -25,7 +42,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 853
+        "line": 1168
       },
       "implementation_evidence": [
         {
@@ -76,7 +93,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 873
+        "line": 1188
       },
       "implementation_evidence": [
         {
@@ -123,7 +140,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 875
+        "line": 1190
       },
       "implementation_evidence": [
         {
@@ -170,7 +187,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 857
+        "line": 1172
       },
       "implementation_evidence": [
         {
@@ -221,7 +238,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 855
+        "line": 1170
       },
       "implementation_evidence": [
         {
@@ -272,7 +289,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 861
+        "line": 1176
       },
       "implementation_evidence": [
         {
@@ -323,7 +340,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 865
+        "line": 1180
       },
       "implementation_evidence": [
         {
@@ -370,7 +387,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 867
+        "line": 1182
       },
       "implementation_evidence": [
         {
@@ -417,7 +434,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 863
+        "line": 1178
       },
       "implementation_evidence": [
         {
@@ -464,7 +481,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 869
+        "line": 1184
       },
       "implementation_evidence": [
         {
@@ -511,7 +528,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 871
+        "line": 1186
       },
       "implementation_evidence": [
         {
@@ -553,25 +570,18 @@
     {
       "symbol": "scattering_chain_ensemble_eval",
       "family": "v2 chain ensemble",
-      "current_numerical_owner": "Channel Native",
+      "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 877
+        "line": 1192
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            721
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/kernels/scattering_chain_ensemble.cu",
-          "lines": [
-            311
+            802
           ],
           "count": 1
         }
@@ -583,10 +593,11 @@
         }
       ],
       "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_forward_schema",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
       "e2e_callers": [
         "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
       ],
-      "compile_contract": "retained Channel scattering_chain_ensemble.cu uses source-local --fmad=false; no --use_fast_math",
+      "compile_contract": "RayD scattering_chain_ensemble.cu uses source-local --fmad=false; no --use_fast_math",
       "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
       "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
       "acceptance": [
@@ -599,25 +610,18 @@
     {
       "symbol": "scattering_chain_ensemble_eval_backward",
       "family": "v2 chain ensemble",
-      "current_numerical_owner": "Channel Native",
+      "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 879
+        "line": 1194
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            734
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-          "lines": [
-            806
+            835
           ],
           "count": 1
         }
@@ -629,10 +633,11 @@
         }
       ],
       "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
       "e2e_callers": [
         "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
       ],
-      "compile_contract": "retained Channel scattering_chain_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "compile_contract": "RayD scattering_chain_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
       "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
       "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
       "acceptance": [
@@ -645,25 +650,18 @@
     {
       "symbol": "scattering_chain_ensemble_eval_jvp",
       "family": "v2 chain ensemble",
-      "current_numerical_owner": "Channel Native",
+      "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 881
+        "line": 1196
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            751
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-          "lines": [
-            972
+            893
           ],
           "count": 1
         }
@@ -675,10 +673,11 @@
         }
       ],
       "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
       "e2e_callers": [
         "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
       ],
-      "compile_contract": "retained Channel scattering_chain_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "compile_contract": "RayD scattering_chain_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
       "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
       "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
       "acceptance": [
@@ -691,37 +690,31 @@
     {
       "symbol": "scattering_chain_realization_eval",
       "family": "v2 chain realization",
-      "current_numerical_owner": "Channel Native",
+      "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 883
+        "line": 1198
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            777
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/kernels/scattering_chain_realization.cu",
-          "lines": [
-            527
+            964
           ],
           "count": 1
         }
       ],
       "python_callers": [],
       "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
       "e2e_callers": [
         "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
       ],
-      "compile_contract": "retained Channel scattering_chain_realization.cu uses source-local --fmad=false; no --use_fast_math",
+      "compile_contract": "RayD scattering_chain_realization.cu uses source-local --fmad=false; no --use_fast_math",
       "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
-      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; realization geometry VJP and JVP are supported",
       "acceptance": [
         "exact/ULP parity",
         "primal/JVP/VJP lockstep",
@@ -732,25 +725,18 @@
     {
       "symbol": "scattering_chain_realization_eval_backward",
       "family": "v2 chain realization",
-      "current_numerical_owner": "Channel Native",
+      "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 885
+        "line": 1200
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            792
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
-          "lines": [
-            1194
+            1002
           ],
           "count": 1
         }
@@ -762,12 +748,13 @@
         }
       ],
       "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
       "e2e_callers": [
         "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
       ],
-      "compile_contract": "retained Channel scattering_chain_realization_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "compile_contract": "RayD scattering_chain_realization_ad.cu uses source-local --fmad=false; no --use_fast_math",
       "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
-      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; realization geometry VJP and JVP are supported",
       "acceptance": [
         "exact/ULP parity",
         "primal/JVP/VJP lockstep",
@@ -778,25 +765,18 @@
     {
       "symbol": "scattering_chain_realization_eval_jvp",
       "family": "v2 chain realization",
-      "current_numerical_owner": "Channel Native",
+      "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 887
+        "line": 1202
       },
       "implementation_evidence": [
         {
           "path": "native/channel_native/binding/materials.cpp",
           "lines": [
-            811
-          ],
-          "count": 1
-        },
-        {
-          "path": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
-          "lines": [
-            1349
+            1077
           ],
           "count": 1
         }
@@ -808,12 +788,13 @@
         }
       ],
       "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
       "e2e_callers": [
         "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
       ],
-      "compile_contract": "retained Channel scattering_chain_realization_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "compile_contract": "RayD scattering_chain_realization_ad.cu uses source-local --fmad=false; no --use_fast_math",
       "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
-      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; realization geometry VJP and JVP are supported",
       "acceptance": [
         "exact/ULP parity",
         "primal/JVP/VJP lockstep",
@@ -829,7 +810,7 @@
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
       "binding": {
         "path": "native/channel_native/binding/materials.cpp",
-        "line": 859
+        "line": 1174
       },
       "implementation_evidence": [
         {

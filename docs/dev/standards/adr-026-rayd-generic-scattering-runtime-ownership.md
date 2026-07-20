@@ -1,6 +1,7 @@
 # ADR-026: RayD ownership of generic scattering runtime operations
 
-- **Status:** Accepted (2026-07-19); Phase 10A activated, Phase 10B pending
+- **Status:** Accepted (2026-07-19); Phase 10A/10B implementation activated;
+  final duplication/release acceptance pending Phase 11
 - **Date:** 2026-07-19
 - **Kind:** Cross-repository native-owner move. This decision does not authorize
   a numerical, fusion, launch, resource-lifecycle, or public-Python-API change.
@@ -27,9 +28,9 @@ unnecessary downstream numerical owner and keep the seven table-interpolation
 helpers outside their reusable dependency owner.
 
 At acceptance, this ADR fixed the final owner boundary without activating it.
-The realized-state section below records the completed Phase 10A switch;
-Channel remains the production numerical owner only for the six contracts whose
-Phase 10B pin/switch/delete has not yet landed.
+The realized-state sections below record the completed Phase 10A and Phase 10B
+switches. RayD is now the unique production numerical owner of all 17 contracts;
+Channel retains the ABI/facade and explicitly retained lifecycle/policy owners.
 
 ## Decision
 
@@ -300,6 +301,31 @@ owner split is RayD 37, layered Channel/RayD 2, and Channel Native 163. Exact
 launch, current-stream, compile-flag, codegen/resource, direct-contract,
 dependency, deletion, and no-fallback evidence is recorded in
 `docs/dev/audit/phase13-scattering-phase10a-evidence.json`.
+
+### Phase 10B realized state
+
+Phase 10B activated the two complete fused chain families (six contracts) at
+pushed RayD commit `768b96e42a95f70c32d55f98a72000085317e288`. The locked
+typed scattering, integration-v2, and shared table header SHA-256 values are
+respectively
+`ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b`,
+`0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654`, and
+`38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`.
+
+Channel retains all six ABI symbols and typed Python/autograd facades but no
+longer contains the four chain CUDA TUs. The binding count stays 202 and the
+active numerical owner split is RayD 43, layered Channel/RayD 2, and Channel
+Native 157. The as-built geometry AD split is unchanged: ensemble geometry is
+JVP-only and rejects VJP loudly, while realization geometry supports VJP and
+JVP. Exact launch/current-stream/compile-flag/codegen/resource/direct-contract,
+dependency, deletion, and no-fallback evidence is recorded in
+`docs/dev/audit/phase13-scattering-phase10b-evidence.json`.
+
+The move-only implementation reduced exact-token duplication from 11.913070%
+to 11.170566%, pruned all 12 stale chain-region entries, and classified the
+three new typed-adapter packing regions. The frozen 10.211512% budget was not
+relaxed and is still exceeded; this is an explicit Phase 11 nightly/release
+acceptance blocker, not a reason to mix unrelated deduplication into Phase 10B.
 
 ## Consequences
 
