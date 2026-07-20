@@ -28,8 +28,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Asixa/RayD
-          ref: 6047089cc7a41661402a02d40c96b9117e03a135
+          ref: 5df6497d36ac941bbc88b26dc3c16e373ee37705
           path: '${{ env.WITWIN_RAYD_DIR }}'
+      - name: Verify immutable RayD checkout
+        shell: pwsh
+        working-directory: '${{ env.WITWIN_CHECKOUT_DIR }}'
+        run: |
+          $expected = '5df6497d36ac941bbc88b26dc3c16e373ee37705'
+          $lock = Get-Content -LiteralPath 'dependencies/rayd.lock.json' -Raw | ConvertFrom-Json
+          if ($lock.commit -cne $expected) { throw "RayD workflow ref does not match dependencies/rayd.lock.json: $($lock.commit)" }
+          $rayd = (Resolve-Path -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $env:WITWIN_RAYD_DIR)).Path
+          $actual = (& git -C $rayd rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($actual -cne $expected) { throw "RayD checkout is not the immutable workflow ref: $actual" }
       - name: Configure MSVC x64 environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -50,7 +61,7 @@ jobs:
           $python = $env:WITWIN_CI_PYTHON
           $rayd = (Resolve-Path -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $env:WITWIN_RAYD_DIR)).Path
           $buildDir = Join-Path $env:RUNNER_TEMP "channel-native-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-$env:GITHUB_JOB"
-          & $python -m cmake -S . -B $buildDir -G Ninja -DCMAKE_BUILD_TYPE=Release "-DPython_EXECUTABLE=$python" "-DRAYD_SOURCE_DIR=$rayd" -DCMAKE_CUDA_ARCHITECTURES=120 -DCHANNEL_NATIVE_RELEASE_BUILD=OFF
+          & $python -m cmake -S . -B $buildDir -G Ninja -DCMAKE_BUILD_TYPE=Release "-DPython_EXECUTABLE=$python" "-DRAYD_SOURCE_DIR=$rayd" -DCMAKE_CUDA_ARCHITECTURES=120 -DCHANNEL_NATIVE_RELEASE_BUILD=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & $python -m cmake --build $buildDir --config Release --parallel
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -64,8 +75,14 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "WITWIN_CHANNEL_NATIVE_EXTENSION_PATH=$($extensions[0].FullName)"
           Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT=$fingerprint"
           Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "RAYD_SOURCE_DIR=$rayd"
-          Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd -DCMAKE_CUDA_ARCHITECTURES=120 -DCHANNEL_NATIVE_RELEASE_BUILD=OFF"
+          Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd -DCMAKE_CUDA_ARCHITECTURES=120 -DCHANNEL_NATIVE_RELEASE_BUILD=ON"
       - name: Run nightly tier
         shell: pwsh
         working-directory: '${{ env.WITWIN_CHECKOUT_DIR }}'
         run: '& $env:WITWIN_CI_PYTHON ci/run_ci_tier.py nightly'
+      - name: Upload nightly wheel and PE evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'nightly-wheel-pe-${{ github.run_id }}-${{ github.run_attempt }}'
+          path: '${{ env.WITWIN_CHECKOUT_DIR }}/artifacts/nightly/wheel-smoke-pe-audit.v1.json'
+          if-no-files-found: error

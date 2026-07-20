@@ -14,17 +14,18 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `4577e744adfe8665f7817e3aff5e8e533ec896e7` and calls the typed
+  `5df6497d36ac941bbc88b26dc3c16e373ee37705` and calls the typed
   `rayd::torch` v2 C++ API directly; no RayD Python module, second dispatcher,
-  copied C ABI, getter table, or dynamic symbol lookup participates.
+  copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
+  legacy `extern "C"` Torch integration entry points are retired.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
   handles and the former bridge/common indirection are removed. RayD-owned ABI
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration header is
   `backends/torch/include/rayd/torch/integration_v2.h` with SHA-256
-  `9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb`
+  `0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654`
   and identity
-  `rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce`.
+  `rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains`.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and

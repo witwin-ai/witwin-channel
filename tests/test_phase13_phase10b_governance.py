@@ -14,7 +14,8 @@ from tools.refactor_baseline import binding_manifest
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/dev/audit"
 RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayDi"))
-RAYD_COMMIT = "768b96e42a95f70c32d55f98a72000085317e288"
+PHASE10B_RAYD_COMMIT = "768b96e42a95f70c32d55f98a72000085317e288"
+CURRENT_RAYD_COMMIT = "5df6497d36ac941bbc88b26dc3c16e373ee37705"
 INTEGRATION_SHA256 = (
     "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654"
 )
@@ -62,14 +63,14 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     evidence = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")
 
-    assert lock["commit"] == RAYD_COMMIT
+    assert lock["commit"] == CURRENT_RAYD_COMMIT
     assert lock["integration_abi"]["sha256"] == INTEGRATION_SHA256
     assert {
         inventory["phase10b_scattering_chains"]["rayd_commit"],
         migration["phase10b_current"]["rayd_commit"],
         evidence["activation"]["rayd_commit"],
         graph["phase10b_activation"]["rayd_commit"],
-    } == {RAYD_COMMIT}
+    } == {PHASE10B_RAYD_COMMIT}
     assert inventory["counts"] == {
         "bindings": 202,
         "rayd_numerical": 43,
@@ -125,7 +126,7 @@ def test_phase10b_rayd_identity_sources_and_direct_contract_are_locked() -> None
         capture_output=True,
         text=True,
     ).stdout.strip()
-    assert head == RAYD_COMMIT
+    assert head == CURRENT_RAYD_COMMIT
 
 
 def test_phase10b_channel_is_typed_facade_without_duplicate_or_fallback() -> None:

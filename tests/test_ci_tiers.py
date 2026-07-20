@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tomllib
 
@@ -99,6 +100,25 @@ def test_tiers_cover_the_required_gate_families() -> None:
     ]
     assert len(wheel_builds) == 2
     assert all("--no-isolation" in gate.args for gate in wheel_builds)
+    wheel_smokes = {
+        gate.id: gate.args
+        for gate in tiers.TIER_GATES["release"]
+        if "wheel-smoke" in gate.id
+    }
+    assert wheel_smokes == {
+        "nightly.wheel-smoke-py311-cu128-win-x64": (
+            "ci/wheel_smoke.py",
+            "artifacts/nightly/wheel",
+            "--output",
+            "artifacts/nightly/wheel-smoke-pe-audit.v1.json",
+        ),
+        "release.fresh-checkout-wheel-smoke": (
+            "ci/wheel_smoke.py",
+            "artifacts/release/wheel",
+            "--output",
+            "artifacts/release/wheel-smoke-pe-audit.v1.json",
+        ),
+    }
 
 
 def test_all_python_entry_points_in_the_registry_exist() -> None:
@@ -184,11 +204,29 @@ def test_workflows_use_only_the_verified_windows_cuda_runner() -> None:
     assert "torch.cuda.get_device_capability()" not in quick
     assert "SM120" not in quick
 
-    locked_rayd = "6047089cc7a41661402a02d40c96b9117e03a135"
+    locked_rayd = "5df6497d36ac941bbc88b26dc3c16e373ee37705"
+    lock = json.loads(
+        (ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
+    )
+    assert lock["commit"] == locked_rayd
     for name in ("cuda-pr.yml", "nightly.yml", "release.yml"):
         source = (WORKFLOWS / name).read_text(encoding="utf-8")
+        rayd_checkout = source.split("- name: Checkout locked RayD", maxsplit=1)[
+            1
+        ].split("- name: Verify immutable RayD checkout", maxsplit=1)[0]
         assert "repository: Asixa/RayD" in source
-        assert f"ref: {locked_rayd}" in source
+        assert [
+            line.strip()
+            for line in rayd_checkout.splitlines()
+            if line.strip().startswith("ref:")
+        ] == [f"ref: {locked_rayd}"]
+        assert f"$expected = '{locked_rayd}'" in source
+        assert "dependencies/rayd.lock.json" in source
+        assert "ConvertFrom-Json" in source
+        assert "git -C $rayd rev-parse HEAD" in source
+        assert source.index(f"ref: {locked_rayd}") < source.index(
+            "dependencies/rayd.lock.json"
+        )
         assert "torch.cuda.is_available()" in source
         assert "torch.cuda.get_device_capability() == (12, 0)" in source
         assert "-m cmake -S . -B $buildDir" in source
@@ -203,8 +241,16 @@ def test_workflows_use_only_the_verified_windows_cuda_runner() -> None:
     nightly_source = (WORKFLOWS / "nightly.yml").read_text(encoding="utf-8")
     release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
     assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" in cuda
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" in nightly_source
+    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" not in cuda
+    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" in nightly_source
+    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" not in nightly_source
     assert "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" in release
+    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" not in release
+    assert "actions/upload-artifact@v4" in nightly_source
+    assert "artifacts/nightly/wheel-smoke-pe-audit.v1.json" in nightly_source
+    assert "actions/upload-artifact@v4" in release
+    assert "artifacts/nightly/wheel-smoke-pe-audit.v1.json" in release
+    assert "artifacts/release/wheel-smoke-pe-audit.v1.json" in release
     assert "schedule:" in release
     assert "types: [published]" in release
     assert "github.run_id" in release

@@ -167,7 +167,12 @@ NIGHTLY_GATES = (
     ),
     Gate(
         "nightly.wheel-smoke-py311-cu128-win-x64",
-        ("ci/wheel_smoke.py", "artifacts/nightly/wheel"),
+        (
+            "ci/wheel_smoke.py",
+            "artifacts/nightly/wheel",
+            "--output",
+            "artifacts/nightly/wheel-smoke-pe-audit.v1.json",
+        ),
     ),
     Gate("nightly.duplication", ("ci/check_duplication.py",)),
 )
@@ -237,7 +242,12 @@ RELEASE_GATES = (
     ),
     Gate(
         "release.fresh-checkout-wheel-smoke",
-        ("ci/wheel_smoke.py", "artifacts/release/wheel"),
+        (
+            "ci/wheel_smoke.py",
+            "artifacts/release/wheel",
+            "--output",
+            "artifacts/release/wheel-smoke-pe-audit.v1.json",
+        ),
     ),
     Gate(
         "release.rayd-lock-build-identity",
