@@ -75,6 +75,37 @@ def _validate_isb_boundary_taper(width: float) -> None:
         raise ValueError("isb_boundary_taper_width must be in (0, 4]")
 
 
+def _validate_capacity_config(
+    *,
+    path_capacity_per_pair: int | None,
+    diffraction_state_capacity: int | None,
+    max_paths: int | None,
+    max_paths_scope: str,
+) -> None:
+    """Validate the ADR-029 host-known capacity fields."""
+
+    for name, value in (
+        ("path_capacity_per_pair", path_capacity_per_pair),
+        ("diffraction_state_capacity", diffraction_state_capacity),
+    ):
+        if value is None:
+            continue
+        if type(value) is not int:
+            raise ValueError(f"{name} must be an integer when set")
+        if value < 0:
+            raise ValueError(f"{name} must be non-negative when set")
+    if (
+        max_paths is not None
+        and max_paths_scope == "per_pair"
+        and path_capacity_per_pair is not None
+        and max_paths > path_capacity_per_pair
+    ):
+        raise ValueError(
+            "max_paths cannot exceed path_capacity_per_pair when "
+            "max_paths_scope='per_pair'"
+        )
+
+
 def _validate_coupled_config(
     *,
     coupled_paths: bool,
@@ -212,24 +243,12 @@ class Config:
             raise ValueError("max_paths must be positive when set")
         if self.max_paths_scope not in _VALID_MAX_PATHS_SCOPES:
             raise ValueError("max_paths_scope must be 'global' or 'per_pair'")
-        for name in ("path_capacity_per_pair", "diffraction_state_capacity"):
-            value = getattr(self, name)
-            if value is None:
-                continue
-            if type(value) is not int:
-                raise ValueError(f"{name} must be an integer when set")
-            if value < 0:
-                raise ValueError(f"{name} must be non-negative when set")
-        if (
-            self.max_paths is not None
-            and self.max_paths_scope == "per_pair"
-            and self.path_capacity_per_pair is not None
-            and self.max_paths > self.path_capacity_per_pair
-        ):
-            raise ValueError(
-                "max_paths cannot exceed path_capacity_per_pair when "
-                "max_paths_scope='per_pair'"
-            )
+        _validate_capacity_config(
+            path_capacity_per_pair=self.path_capacity_per_pair,
+            diffraction_state_capacity=self.diffraction_state_capacity,
+            max_paths=self.max_paths,
+            max_paths_scope=self.max_paths_scope,
+        )
         if self.sort_key not in _VALID_SORT_KEYS:
             raise ValueError(f"sort_key must be one of {sorted(_VALID_SORT_KEYS)}")
         if self.ad_mode not in _VALID_AD_MODES:
