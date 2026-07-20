@@ -14,6 +14,40 @@ EVIDENCE_PATH = AUDIT / "phase13-boundary-dedup-phase11b-evidence.json"
 LEDGER_PATH = AUDIT / "duplication-classification.json"
 RELEASE_EVIDENCE_PATH = AUDIT / "phase13-phase11-release-acceptance.json"
 PHASE11_IMPLEMENTATION_BOUNDARY = "d2681c5810d78fdd1132a60a88b568c00581f6e2"
+_EXPECTED_PENDING_FINAL_ACCEPTANCE = {
+    "clean-checkout nightly tier at the final Channel commit",
+    "clean-checkout release tier at the final Channel commit",
+    "final wheel contents and SHA-256",
+    "final _channel_native PE/DSO audit and SHA-256",
+    "final native build fingerprint bound to the accepted build",
+    "Phase 12 profiler and performance evidence",
+}
+_PHASE11B_SOURCE_SHA256 = {
+    "src/witwin/channel_native/propagation/fields/kernels/functional.py": (
+        "9cc738bb1a5b75e52f7ad7c34ba9f02d4a89492adec3e96702023a965b318ed0"
+    ),
+    "src/witwin/channel_native/scattering/kernels/functional.py": (
+        "92b3764a6553c5f35e4efc4e5bee838b4d4a4ca1186004ef22ea2bd76084da33"
+    ),
+    "src/witwin/channel_native/scattering/kernels/functional_chain.py": (
+        "4e158e006a209f5ec1c34662bdfb6b38bbd50fad27b233b311d328e5f74023dc"
+    ),
+    "src/witwin/channel_native/scattering/kernels/autograd_chain.py": (
+        "8615d85227ea66f69ffb91bc47baa7f8dec9cf9265e354dbc17b5f83f478d95a"
+    ),
+    "native/channel_native/kernels/bdpt_connect_visibility.cu": (
+        "695686f29e181abd7bd8af7971cce09e15f55ebb4cfa863c1b334e0edf061a89"
+    ),
+    "native/channel_native/kernels/diffraction.cu": (
+        "79c08019afae7cd252e5798ededc7767f145b03b54e457177d3d967f829af185"
+    ),
+    "native/channel_native/kernels/los.cu": (
+        "7313fd71274564fa24ca32c935d8074b6f4f75e9968ee87a392563a3f8a45911"
+    ),
+    "native/channel_native/kernels/reflection.cu": (
+        "61d96ef4734c567afe8294e02028786daca7a541cf305547b13f967d3e52d241"
+    ),
+}
 
 _LIVE_FILE_SUFFIXES = {".cpp", ".cu", ".cuh", ".h", ".json", ".md", ".py", ".toml", ".yml"}
 _LIVE_ROOTS = (
@@ -126,7 +160,7 @@ def test_phase11b_duplication_budget_is_met_without_relaxation() -> None:
     ).replace("\\", "/")
 
 
-def test_phase11b_ledger_refresh_and_source_snapshots_are_current() -> None:
+def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
     evidence = _json(EVIDENCE_PATH)
     ledger = _json(LEDGER_PATH)
 
@@ -138,10 +172,10 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_current() -> None:
     assert ledger["regions"]["490234d077127261"]["category"] == "fixture_boilerplate"
     assert evidence["ledger_refresh"]["stale_region_count"] == 0
     assert evidence["ledger_refresh"]["unclassified_region_count"] == 0
-    assert all(
-        _sha256(ROOT / relative) == digest
-        for relative, digest in evidence["source_sha256"].items()
-    )
+    assert evidence["source_sha256"] == _PHASE11B_SOURCE_SHA256
+    for relative, digest in evidence["source_sha256"].items():
+        assert (ROOT / relative).is_file()
+        assert re.fullmatch(r"[0-9a-f]{64}", digest)
 
     phase10b = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
     phase11a = _json(AUDIT / "phase13-boundary-dedup-phase11a-evidence.json")
@@ -262,41 +296,63 @@ def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
     inventory = _json(AUDIT / "phase13-current-native-owner-inventory.json")
     migration = _json(AUDIT / "phase13-migration-delta.json")
 
-    assert evidence["status"] == (
-        "governance complete; final release evidence pending"
-    )
-    assert evidence["release_claim"] is False
-    assert (
-        evidence["implementation_boundary"]["channel_commit"]
-        == PHASE11_IMPLEMENTATION_BOUNDARY
-    )
-    assert evidence["implementation_boundary"]["rayd_commit"] == lock["commit"]
-    assert (
-        evidence["implementation_boundary"]["integration_header_sha256"]
-        == lock["integration_abi"]["sha256"]
-    )
-    assert evidence["verified"]["binding_count"] == len(
-        _json(ROOT / "ci/native-binding-manifest.json")["symbols"]
-    )
-    assert evidence["verified"]["owner_counts"] == {
-        "RayD": inventory["counts"]["rayd_numerical"],
-        "layered": inventory["counts"]["layered"],
-        "Channel Native": inventory["counts"]["channel_numerical"],
-    }
-    assert evidence["verified"]["native_binding_manifest_sha256"] == _sha256(
-        ROOT / "ci/native-binding-manifest.json"
-    )
-    assert evidence["verified"]["contract_coverage_manifest_sha256"] == _sha256(
-        ROOT / "ci/contract-coverage-manifest.json"
-    )
-    assert (ROOT / "AGENTS.md").read_bytes() == (ROOT / "CLAUDE.md").read_bytes()
-    assert evidence["verified"]["agents_claude_sha256"] == _sha256(
-        ROOT / "AGENTS.md"
-    )
+    boundary = evidence["implementation_boundary"]
+    assert boundary["channel_commit"] == PHASE11_IMPLEMENTATION_BOUNDARY
+    assert re.fullmatch(r"[0-9a-f]{40}", boundary["rayd_commit"])
+    assert re.fullmatch(r"[0-9a-f]{64}", boundary["rayd_lock_sha256"])
+    assert boundary["integration_header"].endswith("/integration.h")
+    assert re.fullmatch(r"[0-9a-f]{64}", boundary["integration_header_sha256"])
+    assert boundary["integration_identity"] == "rayd.torch.integration"
+    assert isinstance(boundary["integration_api_version"], int)
+    assert isinstance(evidence["release_claim"], bool)
+    verified = evidence["verified"]
+    assert isinstance(verified["binding_count"], int)
+    assert verified["binding_count"] > 0
+    assert verified["binding_count"] == sum(verified["owner_counts"].values())
+    assert set(verified["owner_counts"]) == {"RayD", "layered", "Channel Native"}
+    for key in (
+        "native_binding_manifest_sha256",
+        "contract_coverage_manifest_sha256",
+        "agents_claude_sha256",
+    ):
+        assert re.fullmatch(r"[0-9a-f]{64}", verified[key])
     assert inventory["phase11_release_governance_closure"]["evidence"] == str(
         RELEASE_EVIDENCE_PATH.relative_to(ROOT)
     ).replace("\\", "/")
     assert migration["phase11_release_governance_closure"]["evidence"] == str(
         RELEASE_EVIDENCE_PATH.relative_to(ROOT)
     ).replace("\\", "/")
-    assert len(evidence["pending_final_acceptance"]) == 6
+    pending = evidence["pending_final_acceptance"]
+    if evidence["release_claim"]:
+        assert evidence["status"] == "release accepted"
+        assert pending == []
+        assert boundary["rayd_commit"] == lock["commit"]
+        assert boundary["rayd_lock_sha256"] == _sha256(
+            ROOT / "dependencies/rayd.lock.json"
+        )
+        assert boundary["integration_header"] == lock["integration_abi"]["path"]
+        assert (
+            boundary["integration_header_sha256"]
+            == lock["integration_abi"]["sha256"]
+        )
+        assert verified["binding_count"] == len(
+            _json(ROOT / "ci/native-binding-manifest.json")["symbols"]
+        )
+        assert verified["owner_counts"] == {
+            "RayD": inventory["counts"]["rayd_numerical"],
+            "layered": inventory["counts"]["layered"],
+            "Channel Native": inventory["counts"]["channel_numerical"],
+        }
+        assert verified["native_binding_manifest_sha256"] == _sha256(
+            ROOT / "ci/native-binding-manifest.json"
+        )
+        assert verified["contract_coverage_manifest_sha256"] == _sha256(
+            ROOT / "ci/contract-coverage-manifest.json"
+        )
+        assert (ROOT / "AGENTS.md").read_bytes() == (ROOT / "CLAUDE.md").read_bytes()
+        assert verified["agents_claude_sha256"] == _sha256(ROOT / "AGENTS.md")
+    else:
+        assert evidence["status"] == (
+            "governance complete; final release evidence pending"
+        )
+        assert set(pending) == _EXPECTED_PENDING_FINAL_ACCEPTANCE

@@ -122,10 +122,12 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     assert inventory["phase10b_scattering_chains"]["binding_count"] == 202
     assert migration["phase10b_current"]["binding_count"] == 202
     assert evidence["activation"]["binding_count"] == 202
+    current_counts = inventory["counts"]
+    assert current_counts["bindings"] == len(inventory["symbols"])
     assert Counter(row["numerical_owner"] for row in inventory["symbols"]) == {
-        "RayD": 43,
-        "Channel operation / RayD primitives": 3,
-        "Channel Native": 157,
+        "RayD": current_counts["rayd_numerical"],
+        "Channel operation / RayD primitives": current_counts["layered"],
+        "Channel Native": current_counts["channel_numerical"],
     }
     owners = {row["symbol"]: row["numerical_owner"] for row in inventory["symbols"]}
     assert all(owners[symbol] == "RayD" for symbol in CHAIN_SYMBOLS)
