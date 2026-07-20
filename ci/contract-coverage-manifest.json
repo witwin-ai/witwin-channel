@@ -37,6 +37,8 @@
     "native-deterministic-path-table-capacity-pack": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
     "native-deterministic-path-table-capacity-pack-backward": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_backward_preserves_all_continuous_inputs",
     "native-deterministic-path-table-capacity-pack-jvp": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_jvp_preserves_all_continuous_inputs",
+    "native-path-result-capacity-pack": "tests/path/test_path_result_capacity.py::test_path_result_capacity_is_pair_major_exact_and_inert",
+    "native-path-result-capacity-pack-ad": "tests/path/test_path_result_capacity.py::test_path_result_capacity_vjp_matches_torch_reference",
     "native-coupled-candidate-capacity": "tests/propagation/topology/test_coupled_candidate_capacity.py::test_coupled_candidate_capacity_matches_frozen_rd_dd_order",
     "native-field-coupled": "tests/ad/test_solver_diffraction_coupled_ad.py::test_coupled_forward_stays_primal_without_geometry_leaves",
     "native-field-diffraction": "tests/ad/test_solver_diffraction_coupled_ad.py::test_wedge_reevaluation_forward_parity",
@@ -96,6 +98,7 @@
     "path-diffraction": "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available",
     "path-los": "tests/path/test_path_solver_smoke.py::test_path_solver_empty_space_los_returns_one_path_per_pair",
     "path-reflection": "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available",
+    "path-result-capacity": "tests/path/test_path_result_capacity.py::test_path_result_capacity_is_pair_major_exact_and_inert",
     "public-capabilities": "tests/test_capabilities.py::test_capability_manifest_is_versioned_serializable_and_defensive",
     "public-core": "tests/core/test_public_scene.py::test_public_scene_objects_capture_structured_inputs",
     "public-deployment": "tests/performance/test_deployment_contract.py::test_pipeline_cache_key_is_stable_and_invalidates_all_contract_inputs",
@@ -1985,6 +1988,33 @@
       "native-path-topology",
       [
         "path-reflection"
+      ]
+    ],
+    [
+      "path_result_capacity_pack",
+      "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.forward",
+      "native_call_site",
+      "native-path-result-capacity-pack",
+      [
+        "path-result-capacity"
+      ]
+    ],
+    [
+      "path_result_capacity_pack_backward",
+      "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.backward",
+      "native_call_site",
+      "native-path-result-capacity-pack-ad",
+      [
+        "path-result-capacity"
+      ]
+    ],
+    [
+      "path_result_capacity_pack_jvp",
+      "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.jvp",
+      "native_call_site",
+      "native-path-result-capacity-pack-ad",
+      [
+        "path-result-capacity"
       ]
     ],
     [

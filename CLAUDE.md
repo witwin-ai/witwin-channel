@@ -172,6 +172,14 @@ requires them.
   checks validity before reading any EPC/material payload, and fails
   asynchronously with a completely inert block on overflow. The existing live
   compact operations remain authoritative until the atomic capacity switch.
+- `path_result_capacity_pack` is the dormant Path-owned ADR-029 terminal
+  storage packer. It consumes pair-major `CapacityEvaluatedPaths`, inherits the
+  exact shared `CapacityFailureState`, and produces the public base tensor
+  layout at the configured capacity without Ragged conversion, Boolean
+  compaction, a device count read, or an intermediate trap. Shared failure or
+  upstream overflow makes every output and device count inert. Its native
+  backward and JVP companions differentiate only fixed-valid continuous rows;
+  invalid rows and failed results contribute exact zero.
 - Do not split a fused native operation merely to mirror Python modules. A
   refactor must not add kernel launches, synchronizations, materialized
   intermediates, persistent tape, host/device transfers, or reduction-order

@@ -80,6 +80,18 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "witwin.channel_native.propagation.enumerated.capacity."
         "_EvaluatedPathsCapacityPackFunction.jvp"
     ),
+    "path_result_capacity_pack": (
+        "witwin.channel_native.path.capacity."
+        "_PathResultCapacityPackFunction.forward"
+    ),
+    "path_result_capacity_pack_backward": (
+        "witwin.channel_native.path.capacity."
+        "_PathResultCapacityPackFunction.backward"
+    ),
+    "path_result_capacity_pack_jvp": (
+        "witwin.channel_native.path.capacity."
+        "_PathResultCapacityPackFunction.jvp"
+    ),
     "field_coupled_rd_backward": (
         "witwin.channel_native.propagation.fields.kernels.autograd."
         "_FieldCoupledRdAdFunction.backward"

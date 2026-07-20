@@ -797,16 +797,44 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 172
     },
-    "2a98cefbef95c694": {
+    "21f1f71eaaff17a2": {
       "category": "other",
       "corpus": "native",
       "files": [
         "path.cpp"
       ],
       "owner": "bindings",
-      "provenance": "ADR-029 C2-D hand-reviewed refresh",
+      "provenance": "ADR-029 C2-P hand-reviewed fingerprint refresh",
       "reason": "Repeated explicit pybind registration argument lists at the typed ABI boundary.",
       "token_count": 200
+    },
+    "2252eaab35758773": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_capacity_pack_ad.cu",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/propagation/enumerated/test_capacity_pack.py",
+        "tests/path/test_path_result_capacity.py"
+      ],
+      "owner": "propagation enumerated and path AD pack owners",
+      "provenance": "ADR-029 C2-P hand-reviewed classification",
+      "reason": "Optional tangent and cotangent reads are duplicated locally so both dormant native capacity AD companions preserve identical fixed-valid zero semantics without changing the established evaluated-path compiler unit.",
+      "token_count": 160
+    },
+    "8541f60b5d49f5f9": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_capacity_pack_ad.cu",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "owner": "native AD boundary validation",
+      "provenance": "ADR-029 C2-P hand-reviewed classification",
+      "reason": "Repeated optional tensor contract validation is boundary boilerplate for two independently owned dormant capacity AD operations.",
+      "token_count": 191
     },
     "63472b1e830460ad": {
       "category": "numeric_sensitive_exempt",

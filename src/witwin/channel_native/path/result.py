@@ -154,10 +154,8 @@ class PathResult:
         )
         if any(tensor.device != self.a.device for tensor in tensors):
             raise ValueError("all PathResult tensors must share one device")
-        _validate_tensor_predicate(
-            (self.num_paths == self.valid.sum(dim=-1, dtype=torch.int32)).all(),
-            "num_paths must equal the valid path count for each pair",
-        )
+        # Device-selected cardinality is owned by the native capacity producer.
+        # Construction is metadata-only and must not recompute or synchronize it.
 
     @property
     def num_rx(self) -> int:

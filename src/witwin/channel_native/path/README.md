@@ -79,6 +79,14 @@ import them directly.
   share a centre geometric path set and use far-field phase weighting;
   explicit arrays trace element positions independently and currently require
   point receivers.
+- `path.capacity.from_capacity_evaluated_paths` is the dormant ADR-029 native
+  replacement for production Ragged padding. It consumes the fixed
+  receiver-major pair layout, preserves path capacity `C`, derives endpoint
+  angles and canonical interaction storage in one native row pass, and carries
+  CUDA `valid`/`num_paths` without a host count. Its primal, backward, and JVP
+  operations all gate validity before endpoint identifiers or numerical
+  payloads. The shared failure state or upstream overflow makes the complete
+  packed result inert; this producer does not trap or switch the live solver.
 - Interaction bits are `REFLECTION=1`, `DIFFRACTION=2`,
   `TRANSMISSION=4`, and `SCATTERING=8`; `NONE=0` denotes LoS/no
   interaction.

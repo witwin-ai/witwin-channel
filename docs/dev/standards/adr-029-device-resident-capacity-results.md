@@ -191,6 +191,16 @@ separate profiler and exactness evidence.
    changing the live Channel lock.
 3. Add dormant Channel selector/capacity-block operations, binding/coverage
    manifests, native owner inventory, and direct contract tests.
+   The dormant Path base-result portion is implemented by the stable
+   `path_result_capacity_pack` primal/backward/JVP family. It inherits the
+   shared failure state carried by `CapacityEvaluatedPaths`, gates both that
+   state and the upstream overflow tensor, produces the exact
+   `(rx, 1, tx, 1, C, ...)` base layout, and introduces no Ragged boundary,
+   host cardinality read, live solver caller, or intermediate trap.
+   `PathResult.__post_init__` now validates only host-visible tensor metadata;
+   it no longer recomputes `num_paths` from CUDA `valid` or launches an
+   asynchronous Torch assertion. The native capacity owner is the sole source
+   of the count relationship, with a direct constructor contract test.
 4. Change Path and Deterministic configs/results atomically with the public API
    snapshot and migration note; propagate validity through topology,
    accumulation, backward, and JVP.

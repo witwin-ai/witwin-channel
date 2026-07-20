@@ -500,6 +500,8 @@ Python_add_library(
     native/channel_native/kernels/evaluated_paths_capacity_pack.cu
     native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu
     native/channel_native/kernels/deterministic_path_table_capacity_pack.cu
+    native/channel_native/kernels/path_result_capacity_pack.cu
+    native/channel_native/kernels/path_result_capacity_pack_ad.cu
     native/channel_native/kernels/deterministic_field.cu
     native/channel_native/kernels/deterministic_topology.cu
     native/channel_native/kernels/los.cu
@@ -534,6 +536,13 @@ target_compile_features(_channel_native PRIVATE cxx_std_17)
 # interpolation, are unaffected).
 set_source_files_properties(
     native/channel_native/kernels/kirchhoff_table_ad.cu
+    PROPERTIES COMPILE_OPTIONS "--fmad=false")
+# ADR-029 PathResult packing freezes the former Torch endpoint-angle operation
+# order. Contraction across those per-op multiply/add boundaries changes the
+# public valid-row bits and its fixed-topology derivative companions.
+set_source_files_properties(
+    native/channel_native/kernels/path_result_capacity_pack.cu
+    native/channel_native/kernels/path_result_capacity_pack_ad.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 target_link_libraries(
     _channel_native
