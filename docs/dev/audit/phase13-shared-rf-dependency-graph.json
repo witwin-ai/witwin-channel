@@ -179,7 +179,7 @@
       "target_source_owner": "RayD",
       "direct_consumers": [
         "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
-        "RayD:backends/torch/include/rayd/torch/integration_v2.h"
+        "RayD:backends/torch/include/rayd/torch/integration.h"
       ],
       "sha256": "88f36a1c0b5c7ba7ed20f546aec52f18cc31f4830ea6ed6110831c1801d4fe7e"
     },
@@ -269,7 +269,7 @@
     {"from": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 6},
     {"from": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu", "to": "RayD:backends/torch/include/rayd/torch/common/tensor_check.h", "line": 7},
     {"from": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "line": 8},
-    {"from": "native/channel_native/binding/fields.cpp", "to": "RayD:backends/torch/include/rayd/torch/integration_v2.h", "line": 2},
+    {"from": "native/channel_native/binding/fields.cpp", "to": "RayD:backends/torch/include/rayd/torch/integration.h", "line": 2},
     {"from": "native/channel_native/kernels/bdpt_connect_ad.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh", "line": 3},
     {"from": "native/channel_native/kernels/bdpt_connect_common.cuh", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 8},
     {"from": "native/channel_native/kernels/bdpt_subpaths.cu", "to": "RayD:shared/include/rayd/shared/rf/field_transport.cuh", "line": 7},
@@ -298,7 +298,7 @@
     {"from": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_ensemble_ad.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/scattering.h", "line": 21},
     {"from": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/scattering.h", "line": 47},
     {"from": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu", "to": "RayD:backends/torch/include/rayd/torch/rf/scattering.h", "line": 36},
-    {"from": "native/channel_native/binding/materials.cpp", "to": "RayD:backends/torch/include/rayd/torch/integration_v2.h", "line": 2}
+    {"from": "native/channel_native/binding/materials.cpp", "to": "RayD:backends/torch/include/rayd/torch/integration.h", "line": 2}
   ],
   "invariants": [
     "the 112 ADR-024 numerical helpers have exactly one active source owner in locked RayD",

@@ -161,7 +161,7 @@ def test_rayd_transmission_preserves_migrated_launch_budget() -> None:
 
 def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None:
     source = FIELDS_BINDING.read_text(encoding="utf-8-sig")
-    assert source.count("#include <rayd/torch/integration_v2.h>") == 1
+    assert source.count("#include <rayd/torch/integration.h>") == 1
     for entry in (
         "field_transmission_sequence",
         "field_transmission_sequence_backward",

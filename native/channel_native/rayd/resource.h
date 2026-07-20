@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rayd/torch/integration_v2.h>
+#include <rayd/torch/integration.h>
 #include <torch/extension.h>
 
 #include <memory>

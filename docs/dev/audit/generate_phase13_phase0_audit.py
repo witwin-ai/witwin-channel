@@ -281,9 +281,9 @@ def family_for(symbol: str) -> str:
     if symbol.startswith("scattering_patch_integral_eval"):
         return "phase-screen patch integral"
     if symbol.startswith("scattering_chain_ensemble_eval"):
-        return "v2 chain ensemble"
+        return "chain ensemble"
     if symbol.startswith("scattering_chain_realization_eval"):
-        return "v2 chain realization"
+        return "chain realization"
     return "unaffected"
 
 

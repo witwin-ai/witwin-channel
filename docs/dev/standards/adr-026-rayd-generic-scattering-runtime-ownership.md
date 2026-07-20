@@ -45,8 +45,8 @@ implementation owner of exactly these 17 Channel-facing contracts:
 | table sampling | `scattering_table_sample`, `scattering_table_pdf` | 10A |
 | single-bounce ensemble | `scattering_ensemble_eval`, `scattering_ensemble_eval_backward`, `scattering_ensemble_eval_jvp` | 10A |
 | phase-screen patch integral | `scattering_patch_integral_eval`, `scattering_patch_integral_eval_backward`, `scattering_patch_integral_eval_jvp` | 10A |
-| v2 chain ensemble | `scattering_chain_ensemble_eval`, `scattering_chain_ensemble_eval_backward`, `scattering_chain_ensemble_eval_jvp` | 10B |
-| v2 chain realization | `scattering_chain_realization_eval`, `scattering_chain_realization_eval_backward`, `scattering_chain_realization_eval_jvp` | 10B |
+| chain ensemble | `scattering_chain_ensemble_eval`, `scattering_chain_ensemble_eval_backward`, `scattering_chain_ensemble_eval_jvp` | 10B |
+| chain realization | `scattering_chain_realization_eval`, `scattering_chain_realization_eval_backward`, `scattering_chain_realization_eval_jvp` | 10B |
 
 Primal, backward/VJP, and JVP companions move as complete families. Channel
 continues to own the stable `_channel_native` symbol names and the Python domain
@@ -57,7 +57,7 @@ must not reconstruct scattering math.
 
 RayD declarations belong in a public typed header under
 `backends/torch/include/rayd/torch/rf/`, included by
-`rayd/torch/integration_v2.h`. They use `at::Tensor`,
+`rayd/torch/integration.h`. They use `at::Tensor`,
 `std::optional<at::Tensor>`, scalar values, and named request/result structures.
 They are a source-level interface for one CMake/LibTorch graph, not a stable
 cross-build DSO ABI and not a RayD Python extension or second dispatcher.

@@ -39,7 +39,9 @@ RayD primitive participates in it.
 
 ### 1. One typed source-level integration API
 
-RayD provides a versioned C++ integration API v2 in `namespace rayd::torch`.
+RayD provides a versioned C++ integration API in `namespace rayd::torch`.
+Its numeric API version is 2; the source header and identity use stable,
+capability-neutral names.
 The public integration header exposes typed resource, config, operation, and
 result contracts. Its version and header identity participate in Channel's
 locked RayD dependency and complete build fingerprint.
@@ -56,7 +58,7 @@ The API uses:
 - symmetric typed contracts for any operation family that has
   primal/JVP/VJP/backward entries.
 
-Channel's C++ Torch bindings include the v2 header and call these functions
+Channel's C++ Torch bindings include `rayd/torch/integration.h` and call these functions
 directly. There is no copied integration signature, function-pointer getter,
 raw output-capacity protocol, dynamic symbol lookup, or Channel compatibility
 adapter between the binding and this API. Python domain kernel facades and the
@@ -64,7 +66,7 @@ adapter between the binding and this API. Python domain kernel facades and the
 error-translation, and result-assembly boundaries; they do not reimplement
 geometry or physics.
 
-New v2 entries reuse the existing RayD implementation and kernel launches.
+New typed entries reuse the existing RayD implementation and kernel launches.
 They must not copy a kernel or create a second numerical implementation. During
 the bounded migration window, old and new RayD entries are two interfaces to
 the same implementation, not two production owners.
@@ -99,7 +101,7 @@ and leak/UAF detection appropriate to the build.
 
 ### 3. Tensor, device, stream, ABI, and error contracts
 
-Every v2 entry validates the complete contract at the RayD host boundary before
+Every typed entry validates the complete contract at the RayD host boundary before
 launch or empty-result return:
 
 - required rank, shape, scalar type, layout/contiguity policy, and optional
@@ -127,7 +129,7 @@ loudly before partial computation is reported as success. RayD raises a typed
 C++/c10 exception with operation and contract context; `_channel_native`
 translates it once at the pybind boundary. Channel must not catch it to return
 zeros, empty success, detached outputs, a reduced algorithm, or any Torch/CPU
-fallback. No error-code tensor or partially filled output array is a valid v2
+fallback. No error-code tensor or partially filled output array is a valid typed
 result.
 
 ### 4. Single extension and build/package boundary
@@ -148,7 +150,8 @@ that full fingerprint; it is not a fallback.
 
 ### 5. Ownership-aware names and zero Channel shims
 
-After Channel switches to v2, live Channel production source, build rules, CI
+After Channel switches to the typed boundary, live Channel production source,
+build rules, CI
 manifests, tests, and current operational documentation use no historical
 `RayDN/raydn`
 identity and expose no alias, re-export, feature-flag dual path, capability
@@ -175,11 +178,13 @@ live compatibility name.
 
 RayD's legacy `extern "C"` integration entries remain temporarily available
 only so other known RayD consumers can migrate. Channel stops compiling and
-calling them when it switches to v2; it does not wrap them behind a new name.
+calling them when it switches to the typed boundary; it does not wrap them
+behind a new name.
 
 The legacy entries are removed from RayD only in Plan 13 Phase 11, in a
 separate RayD change, after a repository/consumer reachability audit proves
-that every consumer has moved to v2. Until that deletion, changes to the old
+that every consumer has moved to the typed boundary. Until that deletion,
+changes to the old
 entries are limited to keeping the shared implementation in exact lockstep and
 must not add capability or establish them as a second long-term API. The final
 audit must cover declarations, definitions, link references, tests, examples,
@@ -188,7 +193,7 @@ packages, downstream build files, and documentation.
 ## Required migration and acceptance evidence
 
 The interface migration is behavior-preserving. Before Channel can delete its
-historical bridge and raw-handle plumbing, the old and v2 entries must pass
+historical bridge and raw-handle plumbing, the legacy and typed entries must pass
 exact lockstep on representative and boundary cases for scene operations,
 intersection, visibility, reflection trace/EPC, diffraction export, and every
 other moved generic geometry entry. The comparison freezes:
@@ -229,7 +234,7 @@ allowlists are not weakened to accept it.
   lifetime-safe C++ boundary without adding a production backend.
 - Channel keeps its domain facades and composed/fused solver operations while
   deleting identity-only bridge code and raw-handle plumbing.
-- The v2 addition and Channel switch can be reviewed and bisected separately:
+- The typed API addition and Channel switch can be reviewed and bisected separately:
   RayD first lands an exact dormant interface, then Channel pins that merged
   commit and switches atomically.
 - Rollback is a lock-file/build-fingerprint change to the previous accepted

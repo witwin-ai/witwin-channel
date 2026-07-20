@@ -118,7 +118,7 @@ def test_diffraction_coverage_mode_and_confidence_interval() -> None:
     assert 0.0 <= interval["lower_95"] <= interval["mean"] <= interval["upper_95"] <= 1.0
 
 
-def test_native_v2_stats_extracts_padded_signal_and_geometry() -> None:
+def test_native_stats_extracts_padded_signal_and_geometry() -> None:
     path_shape = (1, 1, 1, 1, 2)
     result = SimpleNamespace(
         a=torch.tensor([[[[[[1.0 + 0.0j], [0.5 + 0.25j]]]]]], dtype=torch.complex64),

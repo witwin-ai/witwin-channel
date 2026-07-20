@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan": "Plan 13 Phase 10B",
+  "plan": "Plan 13 Phase 11 stable integration naming",
   "baseline": {
     "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
     "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
@@ -32,8 +32,8 @@
     "layered": 2,
     "channel_numerical": 157
   },
-  "current_phase": 10,
-  "current_subphase": "10B",
+  "current_phase": 11,
+  "current_subphase": "stable integration naming",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -296,6 +296,28 @@
       "scattering_event_probabilities"
     ],
     "activation_evidence": "docs/dev/audit/phase13-scattering-phase10b-evidence.json",
+    "public_api_delta": false
+  },
+  "phase11_stable_integration_naming": {
+    "rayd_commit": "3869c2ab76bb06498dc95e3cf634fdf117529906",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86",
+    "integration_header_identity": "rayd.torch.integration",
+    "integration_api_version": 2,
+    "previous_boundary_names": {
+      "header": "backends/torch/include/rayd/torch/integration_v2.h",
+      "identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
+      "scope": "historical Phase 10B snapshot only"
+    },
+    "binding_count": 202,
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 2,
+      "Channel Native": 157
+    },
+    "numerical_owner_change": false,
+    "native_abi_symbol_change": false,
+    "launch_contract_change": false,
     "public_api_delta": false
   },
   "symbols": [

@@ -229,6 +229,23 @@ packing regions. The frozen 10.211512% budget was not relaxed and remains a
 Phase 11 nightly/release acceptance blocker; no unrelated deduplication was
 mixed into this owner move.
 
+### Plan 13 Phase 11: stable typed-integration naming
+
+Channel Native now pins pushed RayD commit
+`3869c2ab76bb06498dc95e3cf634fdf117529906`. The stable typed boundary is
+`backends/torch/include/rayd/torch/integration.h`, with SHA-256
+`e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86`
+and identity `rayd.torch.integration`. The numeric integration API version
+remains 2; it is not encoded as a work-in-progress filename, target, or
+capability-accumulating identity.
+
+All live Channel C++ adapters, lock/build identity, wheel validation, boundary
+tests, feature documentation, and current owner/migration records use the
+stable name. No forwarding header, identity alias, dual include, runtime
+fallback, binding-symbol change, numerical-owner change, kernel launch change,
+or public Python API change is introduced. Earlier Phase 3/6/8/10 commit, path,
+identity, and hash records remain explicitly historical activation evidence.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

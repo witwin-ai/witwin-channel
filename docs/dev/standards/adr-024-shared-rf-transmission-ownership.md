@@ -59,7 +59,7 @@ duplicating their bodies.
 
 RayD exposes the transmission API through
 `backends/torch/include/rayd/torch/rf/transmission.h`, included by
-`rayd/torch/integration_v2.h`. It uses named request/result structs containing
+`rayd/torch/integration.h`. It uses named request/result structs containing
 `at::Tensor` and `std::optional<at::Tensor>` values. It does not expose
 `pybind11::object`, untyped sequences, dictionaries, raw native tuples, dummy
 tensors, or a second dispatcher/extension.

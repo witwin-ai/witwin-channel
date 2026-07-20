@@ -540,7 +540,7 @@ def _validate_build_info(value: object) -> dict[str, object]:
         "material_abi_version": 3,
         "rayd_integration": "source-linked",
         "rayd_integration_abi_kind": "source-header-sha256",
-        "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration_v2.h",
+        "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration.h",
         "rayd_repository_url": "https://github.com/Asixa/RayD.git",
         "uses_dr_jit": False,
         "uses_path_native": True,

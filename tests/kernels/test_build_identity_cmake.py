@@ -55,7 +55,7 @@ def _validate(
     rayd_dirty: int = 0,
     release: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    abi = rayd / "integration_v2.h"
+    abi = rayd / "integration.h"
     lock = channel / "rayd.lock.json"
     git = shutil.which("git")
     assert git is not None
@@ -89,11 +89,11 @@ def _identity_repositories(tmp_path: Path) -> tuple[Path, Path, str, str]:
     channel_sha = _repository(channel)
     rayd_sha = _repository(rayd, remote=RAYD_REMOTE)
     (channel / "rayd.lock.json").write_bytes(b"lock-v1\n")
-    (rayd / "integration_v2.h").write_bytes(b"abi-v1\n")
+    (rayd / "integration.h").write_bytes(b"abi-v1\n")
     _git("add", "rayd.lock.json", cwd=channel)
     _git("commit", "-m", "add lock", cwd=channel)
     channel_sha = _git("rev-parse", "HEAD", cwd=channel)
-    _git("add", "integration_v2.h", cwd=rayd)
+    _git("add", "integration.h", cwd=rayd)
     _git("commit", "-m", "add ABI", cwd=rayd)
     rayd_sha = _git("rev-parse", "HEAD", cwd=rayd)
     return channel, rayd, channel_sha, rayd_sha
@@ -148,7 +148,7 @@ def test_release_identity_validator_rejects_dirty_checkout(tmp_path: Path):
 
 def test_build_identity_validator_rejects_stale_abi_and_lock(tmp_path: Path):
     channel, rayd, channel_sha, rayd_sha = _identity_repositories(tmp_path)
-    (rayd / "integration_v2.h").write_bytes(b"abi-v2\n")
+    (rayd / "integration.h").write_bytes(b"abi-mutated\n")
 
     abi_result = _validate(
         channel,
@@ -162,7 +162,7 @@ def test_build_identity_validator_rejects_stale_abi_and_lock(tmp_path: Path):
     assert abi_result.returncode != 0, abi_output
     assert "integration ABI changed after configure" in abi_output
 
-    (rayd / "integration_v2.h").write_bytes(b"abi-v1\n")
+    (rayd / "integration.h").write_bytes(b"abi-v1\n")
     (channel / "rayd.lock.json").write_bytes(b"lock-v2\n")
     lock_result = _validate(
         channel,

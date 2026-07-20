@@ -47,16 +47,16 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def test_phase10b_uses_the_locked_rayd_scattering_surface() -> None:
-    integration = RAYD_ROOT / "backends/torch/include/rayd/torch/integration_v2.h"
+def test_current_build_uses_the_locked_rayd_scattering_surface() -> None:
+    integration = RAYD_ROOT / "backends/torch/include/rayd/torch/integration.h"
     assert _sha256(integration) == (
-        "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654"
+        "e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86"
     )
-    assert (
-        "rayd.torch.integration.v2.20260719.rf-transmission-sequence."
-        "pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains"
-        in integration.read_text(encoding="utf-8-sig")
-    )
+    integration_text = integration.read_text(encoding="utf-8-sig")
+    assert 'kIntegrationApiVersion = 2;' in integration_text
+    assert '"rayd.torch.integration";' in integration_text
+    assert "integration_v2" not in integration_text
+    assert "rayd.torch.integration.v2" not in integration_text
     assert _sha256(
         RAYD_ROOT / "backends/torch/include/rayd/torch/rf/scattering.h"
     ) == "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b"
@@ -67,7 +67,7 @@ def test_phase10b_uses_the_locked_rayd_scattering_surface() -> None:
 
 def test_phase10b_binding_has_one_typed_adapter_per_entry() -> None:
     source = BINDING.read_text(encoding="utf-8-sig")
-    assert source.count("#include <rayd/torch/integration_v2.h>") == 1
+    assert source.count("#include <rayd/torch/integration.h>") == 1
     assert "<<<" not in source
     for entry in TYPED_ENTRIES:
         assert source.count(f"rayd::torch::{entry}(") == 1

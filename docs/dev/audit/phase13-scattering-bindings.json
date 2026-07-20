@@ -569,7 +569,7 @@
     },
     {
       "symbol": "scattering_chain_ensemble_eval",
-      "family": "v2 chain ensemble",
+      "family": "chain ensemble",
       "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
@@ -609,7 +609,7 @@
     },
     {
       "symbol": "scattering_chain_ensemble_eval_backward",
-      "family": "v2 chain ensemble",
+      "family": "chain ensemble",
       "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
@@ -649,7 +649,7 @@
     },
     {
       "symbol": "scattering_chain_ensemble_eval_jvp",
-      "family": "v2 chain ensemble",
+      "family": "chain ensemble",
       "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
@@ -689,7 +689,7 @@
     },
     {
       "symbol": "scattering_chain_realization_eval",
-      "family": "v2 chain realization",
+      "family": "chain realization",
       "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
@@ -724,7 +724,7 @@
     },
     {
       "symbol": "scattering_chain_realization_eval_backward",
-      "family": "v2 chain realization",
+      "family": "chain realization",
       "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",
@@ -764,7 +764,7 @@
     },
     {
       "symbol": "scattering_chain_realization_eval_jvp",
-      "family": "v2 chain realization",
+      "family": "chain realization",
       "current_numerical_owner": "RayD",
       "target_numerical_owner": "RayD after ADR-026",
       "channel_abi_owner_after_move": "_channel_native binding and domain façade",

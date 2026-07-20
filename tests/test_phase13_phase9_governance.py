@@ -29,12 +29,12 @@ FAMILIES = {
         "scattering_patch_integral_eval_backward",
         "scattering_patch_integral_eval_jvp",
     },
-    "v2 chain ensemble": {
+    "chain ensemble": {
         "scattering_chain_ensemble_eval",
         "scattering_chain_ensemble_eval_backward",
         "scattering_chain_ensemble_eval_jvp",
     },
-    "v2 chain realization": {
+    "chain realization": {
         "scattering_chain_realization_eval",
         "scattering_chain_realization_eval_backward",
         "scattering_chain_realization_eval_jvp",
@@ -115,8 +115,8 @@ def test_phase9_freezes_per_tu_flags_and_family_specific_geometry_ad() -> None:
     assert "--fmad=false" in compile_contracts["scattering_patch_integral_eval"]
     assert all(
         "--fmad=false" in compile_contracts[symbol]
-        for symbol in FAMILIES["v2 chain ensemble"]
-        | FAMILIES["v2 chain realization"]
+        for symbol in FAMILIES["chain ensemble"]
+        | FAMILIES["chain realization"]
     )
     assert "table primal/sample/PDF kernels currently in `scattering.cu`" in text
     assert "must not gain `--fmad=false`" in text
@@ -156,7 +156,7 @@ def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
         ROOT / "src/witwin/channel_native/scattering/README.md"
     ).read_text(encoding="utf-8")
 
-    assert "ADR-023/024/025/026 已接受" in plan
+    assert "ADR-023/024/025/026/028 已接受" in plan
     assert "Phase 9 — ADR-026" in plan
     assert "**状态：已完成（2026-07-19）。**" in plan
     assert "implementation ownership is superseded by ADR-026" in adr010

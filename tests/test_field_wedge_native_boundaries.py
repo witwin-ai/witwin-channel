@@ -191,7 +191,7 @@ def test_rayd_pure_wedge_preserves_launch_and_fast_math_boundary() -> None:
 
 def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
     source = FIELDS_BINDING.read_text(encoding="utf-8-sig")
-    assert source.count("#include <rayd/torch/integration_v2.h>") == 1
+    assert source.count("#include <rayd/torch/integration.h>") == 1
     for entry in (
         "field_diffraction_wedge",
         "field_diffraction_wedge_backward",

@@ -20,13 +20,13 @@
         }
     },
     "current_phase": 11,
-    "current_subphase": "11B",
+    "current_subphase": "stable integration naming",
     "transfers_applied": [
         {
             "phase": 3,
             "scope": "RayD integration boundary",
             "from": "copied extern-C signatures, getter indirection, integer scene handles",
-            "to": "source-linked rayd::torch integration_v2 typed API and RAII SceneResource",
+            "to": "source-linked typed rayd::torch API and RAII SceneResource",
             "numerical_owner_changed": false
         },
         {
@@ -1167,5 +1167,28 @@
             "wheel and PE/DSO packaging audit",
             "nightly and release acceptance from clean locked checkouts"
         ]
+    },
+    "phase11_stable_integration_naming": {
+        "status": "active",
+        "scope": "stable typed RayD source boundary naming",
+        "rayd_commit": "3869c2ab76bb06498dc95e3cf634fdf117529906",
+        "integration_header": "backends/torch/include/rayd/torch/integration.h",
+        "integration_header_sha256": "e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86",
+        "integration_header_identity": "rayd.torch.integration",
+        "integration_api_version": 2,
+        "historical_predecessor": {
+            "header": "backends/torch/include/rayd/torch/integration_v2.h",
+            "identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
+            "scope": "immutable Phase 10B activation evidence"
+        },
+        "binding_count": 202,
+        "binding_count_delta": 0,
+        "owner_count_delta": 0,
+        "numerical_change": false,
+        "native_abi_symbol_change": false,
+        "callable_signature_change": false,
+        "launch_contract_change": false,
+        "public_api_delta": false,
+        "compatibility_alias": false
     }
 }
