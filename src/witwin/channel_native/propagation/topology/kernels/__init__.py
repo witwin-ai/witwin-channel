@@ -20,6 +20,7 @@ from .blocks import (
 from .candidates import path_reflection_candidates
 from .compaction import (
     DiffractionOrder1CapacityBlock,
+    deterministic_capacity_finalize,
     deterministic_diffraction_order1_capacity_block,
     deterministic_diffraction_order1_compact,
     deterministic_reflection_order1_compact,
@@ -59,6 +60,7 @@ __all__ = [
     "_validate_topology_extra_fields",
     "DiffractionStateCapacityBlock",
     "DiffractionOrder1CapacityBlock",
+    "deterministic_capacity_finalize",
     "core_pack_int2",
     "deterministic_concat_topology_blocks",
     "deterministic_component_counts",

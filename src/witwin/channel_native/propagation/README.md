@@ -46,6 +46,16 @@ is metadata-only and zero-copy; native producers own the numerical relationship
 among those device tensors. It is not a solver result or a live solver boundary
 until the ADR-029 atomic activation.
 
+`propagation.topology.kernels.deterministic_capacity_finalize` is the dormant
+native index producer for the final all-component candidate list. It stable-
+groups rows by the frozen receiver-major key `rx_id * num_tx + tx_id`, retains
+candidate order within each pair without truncation, and returns CUDA `int64`
+source indices plus `CapacityPathLayout`. Invalid candidates are poison-safe.
+Any per-pair overflow leaves every public index, validity bit, and count inert
+before the asynchronous device error. The typed `EvaluatedPaths` field gather
+is intentionally a later dormant producer; no Torch gather or live caller is
+introduced by the index-contract commit.
+
 ## Public entry points
 
 There are no root public API exports. The internal package export surface is

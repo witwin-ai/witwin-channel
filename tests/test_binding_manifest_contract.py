@@ -27,9 +27,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # 211 -> 202. ADR-028 Phase 8B added one device-resident diffraction planning
 # symbol: 202 -> 203. ADR-029 adds the dormant fixed-capacity diffraction state
 # selector: 203 -> 204. ADR-029 then adds the dormant post-RayD diffraction
-# path capacity block: 204 -> 205.
+# path capacity block: 204 -> 205. ADR-029 then adds the dormant final
+# pair-major capacity index contract: 205 -> 206.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 205
+EXPECTED_BINDING_COUNT = 206
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )

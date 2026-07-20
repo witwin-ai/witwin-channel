@@ -3193,6 +3193,82 @@
       "doc": "Fixed-gate JVP of the flat accumulation (per-path field and power tangents)."
     },
     {
+      "name": "deterministic_capacity_finalize",
+      "target": "cn_deterministic_capacity_finalize",
+      "path": "native/channel_native/binding/path.cpp",
+      "line": 598,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tx_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "rx_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "pair_count",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "num_tx",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "num_rx",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "path_capacity_per_pair",
+          "type": "int64_t",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [
+        {
+          "name": "valid",
+          "default": null
+        },
+        {
+          "name": "tx_id",
+          "default": null
+        },
+        {
+          "name": "rx_id",
+          "default": null
+        },
+        {
+          "name": "pair_count",
+          "default": null
+        },
+        {
+          "name": "num_tx",
+          "default": null
+        },
+        {
+          "name": "num_rx",
+          "default": null
+        },
+        {
+          "name": "path_capacity_per_pair",
+          "default": null
+        }
+      ],
+      "doc": "Stably finalize deterministic rows into pair-major fixed CUDA capacity."
+    },
+    {
       "name": "deterministic_component_counts",
       "target": "cn_deterministic_component_counts",
       "path": "native/channel_native/binding/path.cpp",

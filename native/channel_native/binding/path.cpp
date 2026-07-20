@@ -316,6 +316,14 @@ torch::Tensor cn_deterministic_sort_order(
     torch::Tensor primitive_id,
     torch::Tensor edge_id,
     torch::Tensor primitive_sequence);
+pybind11::dict cn_deterministic_capacity_finalize(
+    torch::Tensor valid,
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t path_capacity_per_pair);
 pybind11::dict cn_deterministic_accumulate_flat(
     torch::Tensor valid,
     torch::Tensor tx_id,
@@ -586,6 +594,17 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_sort_order",
         &cn_deterministic_sort_order,
         "Stable-sort deterministic topology rows by native CUDA path keys.");
+    module.def(
+        "deterministic_capacity_finalize",
+        &cn_deterministic_capacity_finalize,
+        "Stably finalize deterministic rows into pair-major fixed CUDA capacity.",
+        pybind11::arg("valid"),
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("path_capacity_per_pair"));
     module.def(
         "deterministic_accumulate_flat",
         &cn_deterministic_accumulate_flat,

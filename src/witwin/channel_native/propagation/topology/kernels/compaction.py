@@ -4,6 +4,10 @@ from dataclasses import dataclass
 
 import torch
 
+from witwin.channel_native.propagation.models.capacity import (
+    CapacityPathLayout,
+    CapacityPathSelection,
+)
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
@@ -692,3 +696,62 @@ def deterministic_sort_order(
     if out.shape != valid.shape:
         raise ValueError("_channel_native.deterministic_sort_order returned bad shape")
     return out
+
+
+def deterministic_capacity_finalize(
+    *,
+    valid: torch.Tensor,
+    tx_id: torch.Tensor,
+    rx_id: torch.Tensor,
+    pair_count: int,
+    num_tx: int,
+    num_rx: int,
+    path_capacity_per_pair: int,
+) -> CapacityPathSelection:
+    """Stably map final candidate rows into receiver-major pair capacity."""
+
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    for name, tensor in (("tx_id", tx_id), ("rx_id", rx_id)):
+        validate_cuda_tensor(name, tensor, dtype=torch.int32, ndim=1)
+        if tensor.shape != valid.shape:
+            raise ValueError(f"{name} must match valid")
+        if tensor.device != valid.device:
+            raise ValueError(f"{name} must share valid device")
+    for name, value in (
+        ("pair_count", pair_count),
+        ("num_tx", num_tx),
+        ("num_rx", num_rx),
+        ("path_capacity_per_pair", path_capacity_per_pair),
+    ):
+        if type(value) is not int:
+            raise TypeError(f"{name} must be an int")
+        if value < 0:
+            raise ValueError(f"{name} must be non-negative")
+    if pair_count != num_tx * num_rx:
+        raise ValueError("pair_count must equal num_tx * num_rx")
+
+    raw = _required_native_op("deterministic_capacity_finalize")(
+        valid,
+        tx_id,
+        rx_id,
+        pair_count,
+        num_tx,
+        num_rx,
+        path_capacity_per_pair,
+    )
+    if not isinstance(raw, dict):
+        raise TypeError("native deterministic capacity finalizer must return a dict")
+    expected = {"selected_row_index", "valid", "num_paths", "overflow"}
+    if set(raw) != expected:
+        raise ValueError("native deterministic capacity finalizer returned bad fields")
+    layout = CapacityPathLayout(
+        pair_count=pair_count,
+        path_capacity_per_pair=path_capacity_per_pair,
+        valid=raw["valid"],
+        num_paths=raw["num_paths"],
+        overflow=raw["overflow"],
+    )
+    return CapacityPathSelection(
+        selected_row_index=raw["selected_row_index"],
+        layout=layout,
+    )

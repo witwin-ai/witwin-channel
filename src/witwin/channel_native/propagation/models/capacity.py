@@ -93,4 +93,49 @@ class CapacityPathLayout:
         return self.valid.device
 
 
-__all__ = ["CapacityPathLayout"]
+@dataclass(frozen=True, slots=True, eq=False)
+class CapacityPathSelection:
+    """Stable source-row selection paired with a fixed-capacity layout."""
+
+    selected_row_index: torch.Tensor
+    layout: CapacityPathLayout
+
+    def __post_init__(self) -> None:
+        _require_cuda_tensor(
+            "selected_row_index",
+            self.selected_row_index,
+            dtype=torch.int64,
+            shape=(self.layout.row_capacity,),
+            device=self.layout.device,
+        )
+
+    @property
+    def pair_count(self) -> int:
+        return self.layout.pair_count
+
+    @property
+    def path_capacity_per_pair(self) -> int:
+        return self.layout.path_capacity_per_pair
+
+    @property
+    def row_capacity(self) -> int:
+        return self.layout.row_capacity
+
+    @property
+    def valid(self) -> torch.Tensor:
+        return self.layout.valid
+
+    @property
+    def num_paths(self) -> torch.Tensor:
+        return self.layout.num_paths
+
+    @property
+    def overflow(self) -> torch.Tensor:
+        return self.layout.overflow
+
+    @property
+    def device(self) -> torch.device:
+        return self.layout.device
+
+
+__all__ = ["CapacityPathLayout", "CapacityPathSelection"]

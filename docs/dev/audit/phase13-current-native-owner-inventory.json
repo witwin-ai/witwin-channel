@@ -27,10 +27,10 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 205,
+    "bindings": 206,
     "rayd_numerical": 43,
     "layered": 3,
-    "channel_numerical": 159
+    "channel_numerical": 160
   },
   "current_phase": 12,
   "current_subphase": "profiling-driven performance closure",
@@ -3492,6 +3492,57 @@
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
       "plan13_disposition": "Phase 12 A6a requires device-resident row validity"
+    },
+    {
+      "symbol": "deterministic_capacity_finalize",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_deterministic_capacity_finalize",
+      "binding_registration": {
+        "path": "native/channel_native/binding/path.cpp",
+        "line": 598
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/path.cpp",
+          "lines": [
+            319
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/deterministic_capacity_finalize.cu",
+          "lines": [
+            170
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/deterministic_capacity_finalize.cu",
+        "implementation_line": 170,
+        "export_line": 170
+      },
+      "python_owner": "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_capacity_finalize",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "line": 701
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "line": 733
+        }
+      ],
+      "contract_test": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
+      "e2e_callers": [],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-producer",
+      "plan13_disposition": "ADR-029 dormant stable pair-major capacity index finalizer"
     },
     {
       "symbol": "deterministic_component_counts",
