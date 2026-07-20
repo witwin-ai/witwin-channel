@@ -144,8 +144,7 @@ def test_phase9_snapshot_is_docs_only_and_records_pre_activation_owners() -> Non
     ).read_text(encoding="utf-8")
     assert "此阶段只接受边界，不执行 Phase\n10A/10B" in plan
     assert all(phase9_targets[symbol] == "RayD after ADR-026" for symbol in MOVING)
-    assert sum(targets[symbol] == "RayD" for symbol in MOVING) == 11
-    assert sum(targets[symbol] == "Channel Native" for symbol in MOVING) == 6
+    assert all(targets[symbol] == "RayD" for symbol in MOVING)
 
 
 def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
@@ -161,7 +160,7 @@ def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
     assert "Phase 9 — ADR-026" in plan
     assert "**状态：已完成（2026-07-19）。**" in plan
     assert "implementation ownership is superseded by ADR-026" in adr010
-    assert "eleven table evaluation/sampling" in scattering_readme
-    assert "six fused chain contracts" in scattering_readme
+    assert "of all 17 table evaluation/sampling" in scattering_readme
+    assert "fused ensemble/realization chain contracts" in scattering_readme
     assert (ROOT / "AGENTS.md").read_bytes() == (ROOT / "CLAUDE.md").read_bytes()
     assert ADR.name in (ROOT / "AGENTS.md").read_text(encoding="utf-8")
