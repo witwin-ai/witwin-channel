@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 
 from witwin.channel_native.runtime.symbols import (
@@ -7,6 +9,25 @@ from witwin.channel_native.runtime.symbols import (
     required_symbol as _required_native_op,
 )
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionStateCapacityBlock:
+    edge_index: torch.Tensor
+    edge_position: torch.Tensor
+    edge_direction: torch.Tensor
+    edge_t_min: torch.Tensor
+    edge_t_max: torch.Tensor
+    n0: torch.Tensor
+    n1: torch.Tensor
+    prim0: torch.Tensor
+    prim1: torch.Tensor
+    exterior_angle: torch.Tensor
+    source: torch.Tensor
+    source_power: torch.Tensor
+    valid: torch.Tensor
+    actual_count: torch.Tensor
+    overflow: torch.Tensor
 
 
 def deterministic_component_counts(component_id: torch.Tensor) -> dict[str, int]:
@@ -203,6 +224,156 @@ def deterministic_diffraction_state_pack_selected(
     )
     validate_cuda_tensor("state_tx_power", states[11], dtype=torch.float32, ndim=1)
     return states
+
+
+def _validate_diffraction_state_capacity_inputs(
+    active: torch.Tensor,
+    state_capacity: int,
+    state_tensors: tuple[
+        tuple[str, torch.Tensor, torch.dtype, int, tuple[int, ...]], ...
+    ],
+) -> int:
+    validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
+    state_count = int(active.shape[0])
+    for name, tensor, dtype, ndim, trailing_shape in state_tensors:
+        validate_cuda_tensor(
+            name,
+            tensor,
+            dtype=dtype,
+            ndim=ndim,
+            trailing_shape=trailing_shape,
+            require_contiguous=False,
+        )
+        if tensor.shape[0] != state_count:
+            raise ValueError(f"{name} must share active row capacity")
+        if tensor.get_device() != active.get_device():
+            raise ValueError(f"{name} must share active device")
+    if isinstance(state_capacity, bool) or not isinstance(state_capacity, int):
+        raise TypeError("state_capacity must be an integer")
+    if state_capacity < 0:
+        raise ValueError("state_capacity must be non-negative")
+    return state_count
+
+
+def _name_diffraction_state_capacity_output(
+    raw: object,
+    *,
+    capacity: int,
+    device: torch.device,
+) -> DiffractionStateCapacityBlock:
+    if not isinstance(raw, tuple) or len(raw) != 15:
+        raise TypeError(
+            "_channel_native.deterministic_diffraction_state_capacity_select "
+            "must return 15 tensors"
+        )
+    for name, tensor, dtype, ndim, trailing_shape in (
+        ("edge_index", raw[0], torch.int32, 1, ()),
+        ("edge_position", raw[1], torch.float32, 2, (3,)),
+        ("edge_direction", raw[2], torch.float32, 2, (3,)),
+        ("edge_t_min", raw[3], torch.float32, 1, ()),
+        ("edge_t_max", raw[4], torch.float32, 1, ()),
+        ("n0", raw[5], torch.float32, 2, (3,)),
+        ("n1", raw[6], torch.float32, 2, (3,)),
+        ("prim0", raw[7], torch.int32, 1, ()),
+        ("prim1", raw[8], torch.int32, 1, ()),
+        ("exterior_angle", raw[9], torch.float32, 1, ()),
+        ("source", raw[10], torch.float32, 2, (3,)),
+        ("source_power", raw[11], torch.float32, 1, ()),
+        ("valid", raw[12], torch.bool, 1, ()),
+    ):
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(
+                f"native diffraction capacity output {name} must be a tensor"
+            )
+        validate_cuda_tensor(
+            name, tensor, dtype=dtype, ndim=ndim, trailing_shape=trailing_shape
+        )
+        if tensor.shape[0] != capacity:
+            raise ValueError(
+                f"native diffraction capacity output {name} has wrong capacity"
+            )
+        if tensor.device != device:
+            raise ValueError(
+                f"native diffraction capacity output {name} has wrong device"
+            )
+    for name, tensor, dtype in (
+        ("actual_count", raw[13], torch.int32),
+        ("overflow", raw[14], torch.bool),
+    ):
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(
+                f"native diffraction capacity output {name} must be a tensor"
+            )
+        validate_cuda_tensor(name, tensor, dtype=dtype, ndim=1)
+        if tensor.shape != (1,):
+            raise ValueError(
+                f"native diffraction capacity output {name} must have shape (1,)"
+            )
+        if tensor.device != device:
+            raise ValueError(
+                f"native diffraction capacity output {name} has wrong device"
+            )
+    return DiffractionStateCapacityBlock(*raw)
+
+
+def deterministic_diffraction_state_capacity_select(
+    *,
+    active: torch.Tensor,
+    edge_index: torch.Tensor,
+    edge_position: torch.Tensor,
+    edge_direction: torch.Tensor,
+    edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor,
+    n0: torch.Tensor,
+    n1: torch.Tensor,
+    prim0: torch.Tensor,
+    prim1: torch.Tensor,
+    exterior_angle: torch.Tensor,
+    source: torch.Tensor,
+    source_power: torch.Tensor,
+    state_capacity: int,
+) -> DiffractionStateCapacityBlock:
+    """Stably gather active rows into a host-shaped CUDA capacity block."""
+
+    state_tensors = (
+        ("edge_index", edge_index, torch.int32, 1, ()),
+        ("edge_position", edge_position, torch.float32, 2, (3,)),
+        ("edge_direction", edge_direction, torch.float32, 2, (3,)),
+        ("edge_t_min", edge_t_min, torch.float32, 1, ()),
+        ("edge_t_max", edge_t_max, torch.float32, 1, ()),
+        ("n0", n0, torch.float32, 2, (3,)),
+        ("n1", n1, torch.float32, 2, (3,)),
+        ("prim0", prim0, torch.int32, 1, ()),
+        ("prim1", prim1, torch.int32, 1, ()),
+        ("exterior_angle", exterior_angle, torch.float32, 1, ()),
+        ("source", source, torch.float32, 2, (3,)),
+        ("source_power", source_power, torch.float32, 1, ()),
+    )
+    state_count = _validate_diffraction_state_capacity_inputs(
+        active, state_capacity, state_tensors
+    )
+
+    raw = _required_native_op("deterministic_diffraction_state_capacity_select")(
+        active,
+        edge_index,
+        edge_position,
+        edge_direction,
+        edge_t_min,
+        edge_t_max,
+        n0,
+        n1,
+        prim0,
+        prim1,
+        exterior_angle,
+        source,
+        source_power,
+        state_capacity,
+    )
+    return _name_diffraction_state_capacity_output(
+        raw,
+        capacity=min(state_capacity, state_count),
+        device=active.device,
+    )
 
 
 def mc_selected_edge_indices(selected: torch.Tensor) -> torch.Tensor:

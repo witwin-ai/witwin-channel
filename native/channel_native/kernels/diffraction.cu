@@ -8,6 +8,7 @@
 #include <rayd/shared/rf/field_transport.cuh>
 #include <rayd/torch/rf/field_transport_ad.cuh>
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 #define CN_DIFFRACTION_CHECK_STATE_PACK_TENSORS()                                     \

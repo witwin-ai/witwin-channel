@@ -36,8 +36,10 @@ from .construction import (
     deterministic_topology_default_fields,
 )
 from .primitives import (
+    DiffractionStateCapacityBlock,
     core_pack_int2,
     deterministic_component_counts,
+    deterministic_diffraction_state_capacity_select,
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
     deterministic_selected_edge_count,
@@ -53,9 +55,11 @@ __all__ = [
     "_validate_path_block",
     "_validate_path_reflection_candidates",
     "_validate_topology_extra_fields",
+    "DiffractionStateCapacityBlock",
     "core_pack_int2",
     "deterministic_concat_topology_blocks",
     "deterministic_component_counts",
+    "deterministic_diffraction_state_capacity_select",
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
     "deterministic_diffraction_order1_compact",

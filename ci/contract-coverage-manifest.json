@@ -27,6 +27,7 @@
     "native-deterministic-fields": "tests/kernels/test_ops_facade.py::test_deterministic_reflection_field_returns_native_complex_field",
     "native-deterministic-topology": "tests/kernels/test_ops_facade.py::test_deterministic_los_topology_block_compacts_and_fills_extended_fields",
     "native-diffraction-visibility-plan": "tests/propagation/geometry/test_diffraction_visibility_native.py::test_native_tx_visibility_plan_matches_frozen_four_sample_contract",
+    "native-diffraction-state-capacity": "tests/propagation/topology/test_diffraction_state_capacity.py::test_diffraction_state_capacity_select_handles_zero_and_effective_capacity",
     "native-field-coupled": "tests/ad/test_solver_diffraction_coupled_ad.py::test_coupled_forward_stays_primal_without_geometry_leaves",
     "native-field-diffraction": "tests/ad/test_solver_diffraction_coupled_ad.py::test_wedge_reevaluation_forward_parity",
     "native-field-free-space": "tests/kernels/test_field_transport.py::test_free_space_complex3_matches_analytic_phase_and_power_contract",
@@ -949,6 +950,15 @@
       "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_diffraction_order1_compact",
       "named_wrapper",
       "native-deterministic-topology",
+      [
+        "deterministic-diffraction"
+      ]
+    ],
+    [
+      "deterministic_diffraction_state_capacity_select",
+      "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_diffraction_state_capacity_select",
+      "named_wrapper",
+      "native-diffraction-state-capacity",
       [
         "deterministic-diffraction"
       ]

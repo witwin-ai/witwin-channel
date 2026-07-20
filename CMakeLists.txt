@@ -489,6 +489,7 @@ Python_add_library(
     native/channel_native/kernels/field_wedge_ad_project.cu
     native/channel_native/kernels/field_wedge_ad_prepare.cu
     native/channel_native/kernels/diffraction.cu
+    native/channel_native/kernels/diffraction_state_capacity.cu
     native/channel_native/kernels/diffraction_discovery.cu
     native/channel_native/kernels/deterministic_accum.cu
     native/channel_native/kernels/deterministic_field.cu

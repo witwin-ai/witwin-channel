@@ -60,7 +60,9 @@ def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() 
     assert all(region["owner"] == "bindings" for region in boundary_regions)
 
 
-def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numerical() -> None:
+def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numerical() -> (
+    None
+):
     evidence = _json(EVIDENCE_PATH)
     migration = _json(AUDIT / "phase13-migration-delta.json")
     phase10b = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
@@ -68,7 +70,7 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
     record = evidence["binding_manifest"]
 
     assert manifest == binding_manifest(ROOT)
-    assert len(manifest["symbols"]) == 203
+    assert len(manifest["symbols"]) == 204
     assert record["symbol_count"] == 202
     assert len(record["current_sha256"]) == 64
     assert len(record["current_semantic_sha256"]) == 64

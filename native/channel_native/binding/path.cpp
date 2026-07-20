@@ -48,6 +48,21 @@ pybind11::tuple cn_deterministic_diffraction_state_pack_selected(
     torch::Tensor tx,
     torch::Tensor tx_power,
     int64_t tx_power_index);
+pybind11::tuple cn_deterministic_diffraction_state_capacity_select(
+    torch::Tensor active,
+    torch::Tensor edge_index,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    torch::Tensor n0,
+    torch::Tensor n1,
+    torch::Tensor prim0,
+    torch::Tensor prim1,
+    torch::Tensor exterior_angle,
+    torch::Tensor source,
+    torch::Tensor source_power,
+    int64_t state_capacity);
 pybind11::dict cn_path_los_export(
     torch::Tensor tx_positions,
     torch::Tensor tx_power,
@@ -364,6 +379,10 @@ void register_path_diffraction_state(pybind11::module_ &module) {
         "deterministic_diffraction_state_pack_selected",
         &cn_deterministic_diffraction_state_pack_selected,
         "Pack fixed-capacity selected diffraction edge states without host count compaction.");
+    module.def(
+        "deterministic_diffraction_state_capacity_select",
+        &cn_deterministic_diffraction_state_capacity_select,
+        "Stably select diffraction states into an explicit CUDA capacity block.");
 }
 
 void register_path(pybind11::module_ &module) {

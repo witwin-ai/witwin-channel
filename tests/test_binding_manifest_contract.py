@@ -25,9 +25,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 # ADR-022 added 12 BDPT fixed-topology AD companions: 199 -> 211. Plan 13
 # Phase 4 then retired 9 strictly unreachable legacy/duplicate bindings:
 # 211 -> 202. ADR-028 Phase 8B added one device-resident diffraction planning
-# symbol: 202 -> 203.
+# symbol: 202 -> 203. ADR-029 adds the dormant fixed-capacity diffraction state
+# selector: 203 -> 204.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
-EXPECTED_BINDING_COUNT = 203
+EXPECTED_BINDING_COUNT = 204
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"
 )
@@ -73,9 +74,7 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     current = binding_manifest(REPOSITORY_ROOT)
     audit = json.loads(PHASE10_AUDIT_PATH.read_text(encoding="utf-8"))
-    migration = json.loads(
-        PHASE13_MIGRATION_DELTA_PATH.read_text(encoding="utf-8")
-    )
+    migration = json.loads(PHASE13_MIGRATION_DELTA_PATH.read_text(encoding="utf-8"))
     retirement = audit["dummy_parameter_projection"]
     parameter_name = retirement["parameter_name"]
     binding_names = set(retirement["bindings"])

@@ -404,6 +404,21 @@ std::vector<at::Tensor> cn_deterministic_diffraction_state_pack_selected_cuda(
     at::Tensor tx,
     at::Tensor tx_power,
     int64_t tx_power_index);
+std::vector<at::Tensor> cn_deterministic_diffraction_state_capacity_select_cuda(
+    at::Tensor active,
+    at::Tensor edge_index,
+    at::Tensor edge_position,
+    at::Tensor edge_direction,
+    at::Tensor edge_t_min,
+    at::Tensor edge_t_max,
+    at::Tensor n0,
+    at::Tensor n1,
+    at::Tensor prim0,
+    at::Tensor prim1,
+    at::Tensor exterior_angle,
+    at::Tensor source,
+    at::Tensor source_power,
+    int64_t state_capacity);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> cn_bdpt_face_material_tensors_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
@@ -1084,6 +1099,39 @@ pybind11::tuple cn_deterministic_diffraction_state_pack_selected(
         tx,
         tx_power,
         tx_power_index));
+}
+
+pybind11::tuple cn_deterministic_diffraction_state_capacity_select(
+    torch::Tensor active,
+    torch::Tensor edge_index,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    torch::Tensor n0,
+    torch::Tensor n1,
+    torch::Tensor prim0,
+    torch::Tensor prim1,
+    torch::Tensor exterior_angle,
+    torch::Tensor source,
+    torch::Tensor source_power,
+    int64_t state_capacity) {
+    return tensor_vector_to_tuple(
+        cn_deterministic_diffraction_state_capacity_select_cuda(
+            active,
+            edge_index,
+            edge_position,
+            edge_direction,
+            edge_t_min,
+            edge_t_max,
+            n0,
+            n1,
+            prim0,
+            prim1,
+            exterior_angle,
+            source,
+            source_power,
+            state_capacity));
 }
 
 pybind11::dict cn_bdpt_face_material_tensors(
