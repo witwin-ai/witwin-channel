@@ -317,6 +317,7 @@ torch::Tensor cn_deterministic_sort_order(
     torch::Tensor edge_id,
     torch::Tensor primitive_sequence);
 pybind11::dict cn_deterministic_accumulate_flat(
+    torch::Tensor valid,
     torch::Tensor tx_id,
     torch::Tensor rx_id,
     torch::Tensor component_id,
@@ -328,6 +329,7 @@ pybind11::dict cn_deterministic_accumulate_flat(
     bool coherent,
     int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_accumulate_flat_fwd64(
+    torch::Tensor valid,
     torch::Tensor tx_id,
     torch::Tensor rx_id,
     torch::Tensor component_id,
@@ -339,6 +341,7 @@ pybind11::dict cn_deterministic_accumulate_flat_fwd64(
     bool coherent,
     int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_accumulate_flat_backward(
+    torch::Tensor valid,
     torch::Tensor tx_id,
     torch::Tensor rx_id,
     torch::Tensor component_id,
@@ -358,6 +361,7 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
     bool coherent,
     int64_t scattering_combine_domain);
 pybind11::dict cn_deterministic_accumulate_flat_jvp(
+    torch::Tensor valid,
     torch::Tensor tx_id,
     torch::Tensor rx_id,
     torch::Tensor component_id,
@@ -586,6 +590,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_accumulate_flat",
         &cn_deterministic_accumulate_flat,
         "Accumulate deterministic flat path fields into per-component maps with a CUDA kernel.",
+        pybind11::arg("valid"),
         pybind11::arg("tx_id"),
         pybind11::arg("rx_id"),
         pybind11::arg("component_id"),
@@ -600,6 +605,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_accumulate_flat_fwd64",
         &cn_deterministic_accumulate_flat_fwd64,
         "Float64 flat accumulation forward for the strict gradcheck AD path.",
+        pybind11::arg("valid"),
         pybind11::arg("tx_id"),
         pybind11::arg("rx_id"),
         pybind11::arg("component_id"),
@@ -614,6 +620,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_accumulate_flat_backward",
         &cn_deterministic_accumulate_flat_backward,
         "Fixed-gate VJP of the flat accumulation (per-path field and power cotangents).",
+        pybind11::arg("valid"),
         pybind11::arg("tx_id"),
         pybind11::arg("rx_id"),
         pybind11::arg("component_id"),
@@ -636,6 +643,7 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_accumulate_flat_jvp",
         &cn_deterministic_accumulate_flat_jvp,
         "Fixed-gate JVP of the flat accumulation (per-path field and power tangents).",
+        pybind11::arg("valid"),
         pybind11::arg("tx_id"),
         pybind11::arg("rx_id"),
         pybind11::arg("component_id"),

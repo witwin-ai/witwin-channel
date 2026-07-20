@@ -3303,20 +3303,20 @@
       "binding_target": "cn_deterministic_accumulate_flat",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 547
+        "line": 589
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/path.cpp",
           "lines": [
-            311
+            319
           ],
           "count": 1
         },
         {
           "path": "native/channel_native/kernels/deterministic_accum.cu",
           "lines": [
-            695
+            719
           ],
           "count": 1
         }
@@ -3333,21 +3333,21 @@
       "production_callers": [
         {
           "path": "src/witwin/channel_native/deterministic/accumulation.py",
-          "line": 103
+          "line": 105
         },
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 55
+          "line": 58
         }
       ],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_matches_torch_reference",
+      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_validity_masks_poison_rows",
       "e2e_callers": [
         "tests/deterministic/test_reflection_single_plane.py::test_single_plane_reflection_matches_path_reference"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
+      "plan13_disposition": "Phase 12 A6a requires device-resident row validity"
     },
     {
       "symbol": "deterministic_accumulate_flat_backward",
@@ -3355,20 +3355,20 @@
       "binding_target": "cn_deterministic_accumulate_flat_backward",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 575
+        "line": 619
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/path.cpp",
           "lines": [
-            333
+            343
           ],
           "count": 1
         },
         {
           "path": "native/channel_native/kernels/deterministic_accum.cu",
           "lines": [
-            727
+            753
           ],
           "count": 1
         }
@@ -3379,28 +3379,28 @@
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 119
+          "line": 123
         }
       ],
       "production_callers": [
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 331
+          "line": 343
         }
       ],
       "native_dispatch_evidence": [
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 140
+          "line": 145
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_matches_torch_reference",
+      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_validity_masks_poison_rows",
       "e2e_callers": [
         "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
+      "plan13_disposition": "Phase 12 A6a requires device-resident row validity"
     },
     {
       "symbol": "deterministic_accumulate_flat_fwd64",
@@ -3408,20 +3408,20 @@
       "binding_target": "cn_deterministic_accumulate_flat_fwd64",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 561
+        "line": 604
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/path.cpp",
           "lines": [
-            322
+            331
           ],
           "count": 1
         },
         {
           "path": "native/channel_native/kernels/deterministic_accum.cu",
           "lines": [
-            711
+            736
           ],
           "count": 1
         }
@@ -3432,13 +3432,13 @@
       "python_definitions": [],
       "production_callers": [],
       "native_dispatch_evidence": [],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_matches_torch_reference",
+      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_validity_masks_poison_rows",
       "e2e_callers": [
         "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality"
       ],
       "surface": "internal-native-ABI",
       "liveness": "declared-e2e-without-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
+      "plan13_disposition": "Phase 12 A6a requires device-resident row validity"
     },
     {
       "symbol": "deterministic_accumulate_flat_jvp",
@@ -3446,20 +3446,20 @@
       "binding_target": "cn_deterministic_accumulate_flat_jvp",
       "binding_registration": {
         "path": "native/channel_native/binding/path.cpp",
-        "line": 597
+        "line": 642
       },
       "target_source_evidence": [
         {
           "path": "native/channel_native/binding/path.cpp",
           "lines": [
-            352
+            363
           ],
           "count": 1
         },
         {
           "path": "native/channel_native/kernels/deterministic_accum.cu",
           "lines": [
-            861
+            890
           ],
           "count": 1
         }
@@ -3470,28 +3470,28 @@
       "python_definitions": [
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 169
+          "line": 175
         }
       ],
       "production_callers": [
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 394
+          "line": 410
         }
       ],
       "native_dispatch_evidence": [
         {
           "path": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
-          "line": 185
+          "line": 192
         }
       ],
-      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_matches_torch_reference",
+      "contract_test": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_validity_masks_poison_rows",
       "e2e_callers": [
         "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality"
       ],
       "surface": "internal-native-ABI",
       "liveness": "live-static-production-consumer",
-      "plan13_disposition": "unaffected by Plan 13"
+      "plan13_disposition": "Phase 12 A6a requires device-resident row validity"
     },
     {
       "symbol": "deterministic_component_counts",

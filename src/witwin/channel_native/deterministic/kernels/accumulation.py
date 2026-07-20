@@ -15,6 +15,7 @@ from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def deterministic_accumulate_flat(
+    valid: torch.Tensor,
     tx_id: torch.Tensor,
     rx_id: torch.Tensor,
     component_id: torch.Tensor,
@@ -29,6 +30,7 @@ def deterministic_accumulate_flat(
 ) -> dict[str, torch.Tensor]:
     if int(scattering_combine_domain) not in (0, 1):
         raise ValueError("scattering_combine_domain must be 0 (power) or 1 (coherent)")
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
     validate_cuda_tensor("tx_id", tx_id, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("component_id", component_id, dtype=torch.int32, ndim=1)
@@ -36,6 +38,7 @@ def deterministic_accumulate_flat(
     validate_cuda_tensor("field_real", field_real, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
     for name, tensor in {
+        "valid": valid,
         "rx_id": rx_id,
         "component_id": component_id,
         "path_gain": path_gain,
@@ -53,6 +56,7 @@ def deterministic_accumulate_flat(
             "_channel_native.deterministic_accumulate_flat CUDA kernel is required"
         )
     exported = native.deterministic_accumulate_flat(
+        valid,
         tx_id,
         rx_id,
         component_id,
@@ -117,6 +121,7 @@ _DETERMINISTIC_ACCUM_FIELDS = (
 
 
 def deterministic_accumulate_flat_backward(
+    valid: torch.Tensor,
     tx_id: torch.Tensor,
     rx_id: torch.Tensor,
     component_id: torch.Tensor,
@@ -138,6 +143,7 @@ def deterministic_accumulate_flat_backward(
     scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("deterministic_accumulate_flat_backward")(
+        valid,
         tx_id,
         rx_id,
         component_id,
@@ -167,6 +173,7 @@ def deterministic_accumulate_flat_backward(
 
 
 def deterministic_accumulate_flat_jvp(
+    valid: torch.Tensor,
     tx_id: torch.Tensor,
     rx_id: torch.Tensor,
     component_id: torch.Tensor,
@@ -183,6 +190,7 @@ def deterministic_accumulate_flat_jvp(
     scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("deterministic_accumulate_flat_jvp")(
+        valid,
         tx_id,
         rx_id,
         component_id,
@@ -199,8 +207,7 @@ def deterministic_accumulate_flat_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_DETERMINISTIC_ACCUM_FIELDS):
         raise TypeError(
-            "_channel_native.deterministic_accumulate_flat_jvp returned"
-            " invalid fields"
+            "_channel_native.deterministic_accumulate_flat_jvp returned invalid fields"
         )
     return out
 
@@ -228,6 +235,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
+        valid,
         tx_id,
         rx_id,
         component_id,
@@ -245,6 +253,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             else "deterministic_accumulate_flat"
         )
         out = _required_native_op(op_name)(
+            valid,
             tx_id,
             rx_id,
             component_id,
@@ -261,14 +270,13 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        tx_id, rx_id, component_id = (
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:3]
+        valid, tx_id, rx_id, component_id = (
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:4]
         )
-        ctx.num_tx = int(inputs[6])
-        ctx.num_rx = int(inputs[7])
-        ctx.coherent = bool(inputs[8])
-        ctx.scattering_combine_domain = int(inputs[9])
+        ctx.num_tx = int(inputs[7])
+        ctx.num_rx = int(inputs[8])
+        ctx.coherent = bool(inputs[9])
+        ctx.scattering_combine_domain = int(inputs[10])
         (
             power_total,
             field_total_real,
@@ -278,6 +286,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             component_field_imag,
         ) = output
         saved = (
+            valid,
             tx_id,
             rx_id,
             component_id,
@@ -301,11 +310,9 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
         grad_component_field_real,
         grad_component_field_imag,
     ):
-        none_grads = (None,) * 10
-        need_gain = bool(ctx.needs_input_grad[3])
-        need_field = bool(ctx.needs_input_grad[4]) or bool(
-            ctx.needs_input_grad[5]
-        )
+        none_grads = (None,) * 11
+        need_gain = bool(ctx.needs_input_grad[4])
+        need_field = bool(ctx.needs_input_grad[5]) or bool(ctx.needs_input_grad[6])
         grads = (
             grad_power_total,
             grad_field_total_real,
@@ -314,11 +321,10 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             grad_component_field_real,
             grad_component_field_imag,
         )
-        if not (need_gain or need_field) or all(
-            value is None for value in grads
-        ):
+        if not (need_gain or need_field) or all(value is None for value in grads):
             return none_grads
         (
+            valid,
             tx_id,
             rx_id,
             component_id,
@@ -329,6 +335,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             power_total,
         ) = ctx.saved_tensors
         out = deterministic_accumulate_flat_backward(
+            valid,
             tx_id,
             rx_id,
             component_id,
@@ -352,9 +359,10 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             None,
             None,
             None,
-            out["grad_path_gain"] if ctx.needs_input_grad[3] else None,
-            out["grad_field_real"] if ctx.needs_input_grad[4] else None,
-            out["grad_field_imag"] if ctx.needs_input_grad[5] else None,
+            None,
+            out["grad_path_gain"] if ctx.needs_input_grad[4] else None,
+            out["grad_field_real"] if ctx.needs_input_grad[5] else None,
+            out["grad_field_imag"] if ctx.needs_input_grad[6] else None,
             None,
             None,
             None,
@@ -364,6 +372,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(
         ctx,
+        _t_valid,
         _t_tx_id,
         _t_rx_id,
         _t_component_id,
@@ -381,6 +390,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
         if tangent_gain is None and tangent_real is None and tangent_imag is None:
             return (None,) * len(_DETERMINISTIC_ACCUM_FIELDS)
         (
+            valid,
             tx_id,
             rx_id,
             component_id,
@@ -392,6 +402,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
         ) = (_ad_native_tensor(value) for value in ctx.saved_tensors)
         with torch_compat.disable_functorch():
             out = deterministic_accumulate_flat_jvp(
+                valid,
                 tx_id,
                 rx_id,
                 component_id,
@@ -410,6 +421,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
 
 def deterministic_accumulate_flat_ad(
+    valid: torch.Tensor,
     tx_id: torch.Tensor,
     rx_id: torch.Tensor,
     component_id: torch.Tensor,
@@ -425,6 +437,7 @@ def deterministic_accumulate_flat_ad(
     """Differentiable :func:`deterministic_accumulate_flat` (plan 07)."""
 
     values = _DeterministicAccumulateFlatAdFunction.apply(
+        valid,
         tx_id,
         rx_id,
         component_id,

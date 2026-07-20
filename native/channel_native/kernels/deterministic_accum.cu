@@ -67,6 +67,7 @@ __device__ __forceinline__ double accum_max_zero(double value) { return fmax(val
 
 template <typename T>
 __global__ void deterministic_accumulate_paths_kernel(
+    const bool *__restrict__ valid,
     const int *__restrict__ tx_id,
     const int *__restrict__ rx_id,
     const int *__restrict__ component_id,
@@ -84,6 +85,9 @@ __global__ void deterministic_accumulate_paths_kernel(
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          idx < path_count;
          idx += stride) {
+        if (!valid[idx]) {
+            continue;
+        }
         const int slot = accum_slot(component_id[idx]);
         const int tx = tx_id[idx];
         const int rx = rx_id[idx];
@@ -180,6 +184,7 @@ __global__ void deterministic_finalize_accumulation_kernel(
 // atomics: dropped rows write exact zeros.
 template <typename T>
 __global__ void deterministic_accumulate_backward_kernel(
+    const bool *__restrict__ valid,
     const int *__restrict__ tx_id,
     const int *__restrict__ rx_id,
     const int *__restrict__ component_id,
@@ -207,6 +212,12 @@ __global__ void deterministic_accumulate_backward_kernel(
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          idx < path_count;
          idx += stride) {
+        if (!valid[idx]) {
+            grad_path_gain[idx] = T(0);
+            grad_field_real[idx] = T(0);
+            grad_field_imag[idx] = T(0);
+            continue;
+        }
         const int slot = accum_slot(component_id[idx]);
         const int tx = tx_id[idx];
         const int rx = rx_id[idx];
@@ -320,6 +331,7 @@ __global__ void deterministic_accumulate_backward_kernel(
 // its gain tangents in both modes.
 template <typename T>
 __global__ void deterministic_accumulate_tangent_scatter_kernel(
+    const bool *__restrict__ valid,
     const int *__restrict__ tx_id,
     const int *__restrict__ rx_id,
     const int *__restrict__ component_id,
@@ -339,6 +351,9 @@ __global__ void deterministic_accumulate_tangent_scatter_kernel(
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          idx < path_count;
          idx += stride) {
+        if (!valid[idx]) {
+            continue;
+        }
         const int slot = accum_slot(component_id[idx]);
         const int tx = tx_id[idx];
         const int rx = rx_id[idx];
@@ -560,14 +575,20 @@ void check_cell_tensor(
 }
 
 void check_accumulate_indices(
+    const at::Tensor &valid,
     const at::Tensor &tx_id,
     const at::Tensor &rx_id,
     const at::Tensor &component_id,
     int64_t num_tx,
     int64_t num_rx) {
+    check_flat_tensor(valid, "valid", at::kBool);
     check_flat_tensor(tx_id, "tx_id", at::kInt);
     check_flat_tensor(rx_id, "rx_id", at::kInt);
     check_flat_tensor(component_id, "component_id", at::kInt);
+    TORCH_CHECK(valid.sizes() == tx_id.sizes(), "valid must match tx_id");
+    TORCH_CHECK(
+        valid.get_device() == tx_id.get_device(),
+        "valid must share the index device");
     TORCH_CHECK(rx_id.sizes() == tx_id.sizes(), "rx_id must match tx_id");
     TORCH_CHECK(component_id.sizes() == tx_id.sizes(), "component_id must match tx_id");
     TORCH_CHECK(num_tx >= 0, "num_tx must be non-negative");
@@ -576,6 +597,7 @@ void check_accumulate_indices(
 
 template <typename T>
 pybind11::dict accumulate_flat_launch(
+    const at::Tensor &valid,
     const at::Tensor &tx_id,
     const at::Tensor &rx_id,
     const at::Tensor &component_id,
@@ -618,6 +640,7 @@ pybind11::dict accumulate_flat_launch(
     if (path_count > 0) {
         deterministic_accumulate_paths_kernel<T>
             <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                valid.data_ptr<bool>(),
                 tx_id.data_ptr<int>(),
                 rx_id.data_ptr<int>(),
                 component_id.data_ptr<int>(),
@@ -658,6 +681,7 @@ pybind11::dict accumulate_flat_launch(
 }
 
 pybind11::dict accumulate_flat_checked(
+    const at::Tensor &valid,
     const at::Tensor &tx_id,
     const at::Tensor &rx_id,
     const at::Tensor &component_id,
@@ -669,7 +693,7 @@ pybind11::dict accumulate_flat_checked(
     bool coherent,
     int64_t scattering_combine_domain,
     c10::ScalarType real_dtype) {
-    check_accumulate_indices(tx_id, rx_id, component_id, num_tx, num_rx);
+    check_accumulate_indices(valid, tx_id, rx_id, component_id, num_tx, num_rx);
     check_flat_tensor(path_gain, "path_gain", real_dtype);
     check_flat_tensor(field_real, "field_real", real_dtype);
     check_flat_tensor(field_imag, "field_imag", real_dtype);
@@ -682,17 +706,18 @@ pybind11::dict accumulate_flat_checked(
     const int scattering_coherent = static_cast<int>(scattering_combine_domain);
     if (real_dtype == at::kFloat) {
         return accumulate_flat_launch<float>(
-            tx_id, rx_id, component_id, path_gain, field_real, field_imag,
+            valid, tx_id, rx_id, component_id, path_gain, field_real, field_imag,
             num_tx, num_rx, coherent, scattering_coherent);
     }
     return accumulate_flat_launch<double>(
-        tx_id, rx_id, component_id, path_gain, field_real, field_imag,
+        valid, tx_id, rx_id, component_id, path_gain, field_real, field_imag,
         num_tx, num_rx, coherent, scattering_coherent);
 }
 
 }  // namespace
 
 pybind11::dict cn_deterministic_accumulate_flat(
+    at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
     at::Tensor component_id,
@@ -704,11 +729,12 @@ pybind11::dict cn_deterministic_accumulate_flat(
     bool coherent,
     int64_t scattering_combine_domain) {
     return accumulate_flat_checked(
-        tx_id, rx_id, component_id, path_gain, field_real, field_imag,
+        valid, tx_id, rx_id, component_id, path_gain, field_real, field_imag,
         num_tx, num_rx, coherent, scattering_combine_domain, at::kFloat);
 }
 
 pybind11::dict cn_deterministic_accumulate_flat_fwd64(
+    at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
     at::Tensor component_id,
@@ -720,11 +746,12 @@ pybind11::dict cn_deterministic_accumulate_flat_fwd64(
     bool coherent,
     int64_t scattering_combine_domain) {
     return accumulate_flat_checked(
-        tx_id, rx_id, component_id, path_gain, field_real, field_imag,
+        valid, tx_id, rx_id, component_id, path_gain, field_real, field_imag,
         num_tx, num_rx, coherent, scattering_combine_domain, at::kDouble);
 }
 
 pybind11::dict cn_deterministic_accumulate_flat_backward(
+    at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
     at::Tensor component_id,
@@ -743,7 +770,7 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
     int64_t num_rx,
     bool coherent,
     int64_t scattering_combine_domain) {
-    check_accumulate_indices(tx_id, rx_id, component_id, num_tx, num_rx);
+    check_accumulate_indices(valid, tx_id, rx_id, component_id, num_tx, num_rx);
     const c10::ScalarType real_dtype = component_field_real.scalar_type();
     TORCH_CHECK(
         real_dtype == at::kFloat || real_dtype == at::kDouble,
@@ -801,6 +828,7 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
         if (real_dtype == at::kFloat) {
             deterministic_accumulate_backward_kernel<float>
                 <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                    valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
                     component_id.data_ptr<int>(),
@@ -826,6 +854,7 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
         } else {
             deterministic_accumulate_backward_kernel<double>
                 <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                    valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
                     component_id.data_ptr<int>(),
@@ -859,6 +888,7 @@ pybind11::dict cn_deterministic_accumulate_flat_backward(
 }
 
 pybind11::dict cn_deterministic_accumulate_flat_jvp(
+    at::Tensor valid,
     at::Tensor tx_id,
     at::Tensor rx_id,
     at::Tensor component_id,
@@ -872,7 +902,7 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
     int64_t num_rx,
     bool coherent,
     int64_t scattering_combine_domain) {
-    check_accumulate_indices(tx_id, rx_id, component_id, num_tx, num_rx);
+    check_accumulate_indices(valid, tx_id, rx_id, component_id, num_tx, num_rx);
     const c10::ScalarType real_dtype = component_field_real.scalar_type();
     TORCH_CHECK(
         real_dtype == at::kFloat || real_dtype == at::kDouble,
@@ -921,6 +951,7 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
         if (real_dtype == at::kFloat) {
             deterministic_accumulate_tangent_scatter_kernel<float>
                 <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                    valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
                     component_id.data_ptr<int>(),
@@ -938,6 +969,7 @@ pybind11::dict cn_deterministic_accumulate_flat_jvp(
         } else {
             deterministic_accumulate_tangent_scatter_kernel<double>
                 <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                    valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
                     component_id.data_ptr<int>(),

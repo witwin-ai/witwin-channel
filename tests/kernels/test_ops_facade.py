@@ -2115,8 +2115,10 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
         dtype=torch.complex64,
     )
     slot_of = {0: 0, 1: 1, 2: 2, 5: 3, 6: 4, 3: 5, 4: 5, 7: 5}
+    valid = torch.ones_like(tx_id, dtype=torch.bool)
 
     result = deterministic_accumulation.deterministic_accumulate_flat(
+        valid,
         tx_id,
         rx_id,
         component_id,
@@ -2162,8 +2164,10 @@ def test_deterministic_accumulate_flat_incoherent_sums_power():
     path_gain = torch.tensor([4.0, 9.0], device="cuda", dtype=torch.float32)
     field_real = torch.tensor([2.0, 3.0], device="cuda", dtype=torch.float32)
     field_imag = torch.zeros((2,), device="cuda", dtype=torch.float32)
+    valid = torch.ones_like(tx_id, dtype=torch.bool)
 
     result = deterministic_accumulation.deterministic_accumulate_flat(
+        valid,
         tx_id,
         rx_id,
         component_id,
@@ -2179,3 +2183,39 @@ def test_deterministic_accumulate_flat_incoherent_sums_power():
     torch.testing.assert_close(result["power_total"], torch.tensor([[13.0]], device="cuda"))
     torch.testing.assert_close(result["field_total_real"], torch.sqrt(torch.tensor([[13.0]], device="cuda")))
     torch.testing.assert_close(result["field_total_imag"], torch.zeros((1, 1), device="cuda"))
+
+
+def test_deterministic_accumulate_flat_validity_masks_poison_rows():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic accumulation")
+
+    valid = torch.tensor([True, False], device="cuda")
+    tx_id = torch.tensor([0, 2**31 - 1], device="cuda", dtype=torch.int32)
+    rx_id = torch.tensor([0, -(2**31)], device="cuda", dtype=torch.int32)
+    component_id = torch.tensor([0, 2**31 - 1], device="cuda", dtype=torch.int32)
+    path_gain = torch.tensor([4.0, float("nan")], device="cuda")
+    field_real = torch.tensor([2.0, float("inf")], device="cuda")
+    field_imag = torch.tensor([0.5, float("-inf")], device="cuda")
+
+    result = deterministic_accumulation.deterministic_accumulate_flat(
+        valid,
+        tx_id,
+        rx_id,
+        component_id,
+        path_gain,
+        field_real,
+        field_imag,
+        num_tx=1,
+        num_rx=1,
+        coherent=True,
+    )
+    assert bool(torch.isfinite(result["power_total"]).all())
+    torch.testing.assert_close(
+        result["power_total"], torch.tensor([[4.25]], device="cuda")
+    )
+    torch.testing.assert_close(
+        result["field_total_real"], torch.tensor([[2.0]], device="cuda")
+    )
+    torch.testing.assert_close(
+        result["field_total_imag"], torch.tensor([[0.5]], device="cuda")
+    )

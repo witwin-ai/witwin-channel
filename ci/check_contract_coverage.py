@@ -661,7 +661,7 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
             ),
             "native-deterministic-accumulation": (
                 "tests/kernels/test_ops_facade.py::"
-                "test_deterministic_accumulate_flat_matches_torch_reference"
+                "test_deterministic_accumulate_flat_validity_masks_poison_rows"
             ),
             "native-deterministic-fields": (
                 "tests/kernels/test_ops_facade.py::"

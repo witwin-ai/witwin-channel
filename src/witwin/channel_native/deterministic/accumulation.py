@@ -52,6 +52,7 @@ def empty_field_like_power(path_gain: torch.Tensor) -> torch.Tensor:
 
 def accumulate_flat_components(
     *,
+    valid: torch.Tensor,
     tx_id: torch.Tensor,
     rx_id: torch.Tensor,
     component_id: torch.Tensor,
@@ -71,15 +72,14 @@ def accumulate_flat_components(
     # today; ON requests the native scattering_combine_domain=1 path where the
     # scattering slot's summed complex field squares into its power instead of
     # summing per-row powers (the ADR-019 per-component phasor precedent).
-    combine_kwargs = (
-        {"scattering_combine_domain": 1} if scattering_coherent else {}
-    )
+    combine_kwargs = {"scattering_combine_domain": 1} if scattering_coherent else {}
     if differentiable:
         # AD modes (plan 07): the same native accumulator kernels run inside
         # a dispatch-only autograd.Function with native backward/jvp
         # companions, so Result.path_gain / field / component_power carry
         # the complete graph of the per-path fields and powers.
         exported = accumulation_kernels.deterministic_accumulate_flat_ad(
+            valid.contiguous(),
             tx_id.to(dtype=torch.int32).contiguous(),
             rx_id.to(dtype=torch.int32).contiguous(),
             component_id.to(dtype=torch.int32).contiguous(),
@@ -101,6 +101,7 @@ def accumulate_flat_components(
         )
     else:
         exported = accumulation_kernels.deterministic_accumulate_flat(
+            valid.contiguous(),
             tx_id.to(dtype=torch.int32).contiguous(),
             rx_id.to(dtype=torch.int32).contiguous(),
             component_id.to(dtype=torch.int32).contiguous(),
@@ -190,6 +191,7 @@ def accumulate_path_result(
     topology = paths.topology
     fields = paths.fields
     power, field, component_power, component_fields = accumulate_flat_components(
+        valid=topology.valid,
         tx_id=topology.tx_id,
         rx_id=topology.rx_id,
         component_id=topology.component_id,
@@ -248,7 +250,9 @@ def build_path_table(
             dtype=torch.float32
         ).contiguous(),
         material_id=topology.material_id.to(dtype=torch.int32).contiguous(),
-        primitive_sequence=topology.primitive_sequence.to(dtype=torch.int32).contiguous(),
+        primitive_sequence=topology.primitive_sequence.to(
+            dtype=torch.int32
+        ).contiguous(),
         material_sequence=topology.material_sequence.to(dtype=torch.int32).contiguous(),
         interaction_positions=geometry.interaction_positions.to(
             dtype=torch.float32

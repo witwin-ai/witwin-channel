@@ -75,6 +75,7 @@ def test_accumulation_consumes_split_evaluated_path_contract(monkeypatch):
     )
 
     assert result is sentinel
+    assert captured["valid"] is paths.topology.valid
     assert captured["tx_id"] is paths.topology.tx_id
     assert captured["rx_id"] is paths.topology.rx_id
     assert captured["component_id"] is paths.topology.component_id
