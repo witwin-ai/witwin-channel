@@ -128,6 +128,12 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Results
 
+- ADR-029 adds explicit `path_capacity_per_pair` and
+  `diffraction_state_capacity` fields to Path and Deterministic configuration.
+  This configuration-only step requires exact non-negative integers (Boolean,
+  float, and NaN values are rejected) and validates the per-pair `max_paths`
+  bound; solver enforcement and capacity-backed result activation remain
+  staged Phase 12 work.
 - `PathResult` per-event `InteractionType` includes `TRANSMISSION` and
   `SCATTERING`; scattering paths are exported as incoherent power paths
   (`scattering_paths_incoherent: true` metadata).

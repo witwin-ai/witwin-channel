@@ -14,6 +14,8 @@ def test_config_defaults_match_public_contract():
     assert config.export_paths is False
     assert config.max_paths is None
     assert config.max_paths_scope == "global"
+    assert config.path_capacity_per_pair is None
+    assert config.diffraction_state_capacity is None
     assert config.sort_key == "receiver_transmitter_depth_component"
     assert config.diagnostics is False
     assert config.ad_mode == "none"
@@ -119,3 +121,39 @@ def test_coupled_paths_config_validation(kwargs, message):
 def test_config_rejects_invalid_values(kwargs, message):
     with pytest.raises((RuntimeError, ValueError), match=message):
         Config(**kwargs)
+
+
+def test_config_validates_explicit_capacity_fields():
+    config = Config(path_capacity_per_pair=0, diffraction_state_capacity=0)
+
+    assert config.path_capacity_per_pair == 0
+    assert config.diffraction_state_capacity == 0
+
+    with pytest.raises(ValueError, match="path_capacity_per_pair must be non-negative"):
+        Config(path_capacity_per_pair=-1)
+    with pytest.raises(
+        ValueError, match="diffraction_state_capacity must be non-negative"
+    ):
+        Config(diffraction_state_capacity=-1)
+    with pytest.raises(
+        ValueError, match="max_paths cannot exceed path_capacity_per_pair"
+    ):
+        Config(
+            max_paths=3,
+            max_paths_scope="per_pair",
+            path_capacity_per_pair=2,
+        )
+
+    # A global max_paths limit is compared against pair_count * capacity only
+    # once solve knows the endpoint-pair count.
+    deferred = Config(max_paths=3, path_capacity_per_pair=2)
+    assert deferred.max_paths_scope == "global"
+
+
+@pytest.mark.parametrize(
+    "field", ("path_capacity_per_pair", "diffraction_state_capacity")
+)
+@pytest.mark.parametrize("value", (1.5, float("nan"), True, False))
+def test_config_rejects_non_integer_capacity(field, value):
+    with pytest.raises(ValueError, match=rf"{field} must be an integer"):
+        Config(**{field: value})

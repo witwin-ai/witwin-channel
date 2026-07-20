@@ -408,3 +408,27 @@ binding-ownership audit `expected_count`). ADR-021's D3 coherent combine adds NO
 new primal symbol: it rides a defaulted `scattering_combine_domain` argument on
 the existing `deterministic_accumulate_flat` op (and its `_backward`/`_jvp`),
 mirroring ADR-019's `combine_domain`.
+
+### ADR-029: explicit device-resident capacities (2026-07-20)
+
+`witwin.channel_native.path.Config` and
+`witwin.channel_native.deterministic.Config` each gain two stable fields:
+
+- `path_capacity_per_pair: int | None = None`
+- `diffraction_state_capacity: int | None = None`
+
+This first activation step adds construction-time contracts only. `None`
+remains constructible so the producer/consumer switch can be staged, but the
+completed ADR-029 solver path will reject it before enumeration whenever the
+corresponding capacity is required. A non-`None` value must have exact Python
+type `int` and be non-negative; floats, NaN, and Boolean values are rejected,
+while zero explicitly represents empty capacity. When
+`max_paths_scope="per_pair"`, `max_paths` cannot exceed
+`path_capacity_per_pair`. Deterministic's global `max_paths` comparison is
+intentionally deferred until solve knows the endpoint-pair count.
+
+These capacities are storage and launch-planning bounds, not implicit path
+selection or truncation policy. No compatibility alias, generation-suffixed
+name, solver dispatch, result-shape change, or native ABI change is introduced
+by this configuration-only step. The public export count remains 37; only the
+two Config `contract_sha256` values change.
