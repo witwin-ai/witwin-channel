@@ -27,13 +27,13 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 226,
+    "bindings": 229,
     "rayd_numerical": 43,
     "layered": 3,
-    "channel_numerical": 180
+    "channel_numerical": 183
   },
   "current_phase": 12,
-  "current_subphase": "ADR-029 dormant canonical evaluated-path gather",
+  "current_subphase": "ADR-027 dormant MC wall product and ADR-029 dormant canonical evaluated-path gather",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -12330,6 +12330,138 @@
     "surface": "internal-native-ABI",
     "liveness": "dormant-native-producer",
     "plan13_disposition": "ADR-030 native source-state-serial deterministic diffraction pair JVP companion"
+  },
+  {
+    "symbol": "mc_transmission_wall_product",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_mc_transmission_wall_product",
+    "binding_registration": {
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 47
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+        "lines": [7],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/mc_transmission_wall_product.cu",
+        "lines": [1107],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.transmission.mc_transmission_wall_product",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 224
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 267
+      }
+    ],
+    "contract_test": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_capacity_poison_and_product_order",
+    "e2e_callers": [
+      "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant MC fixed-capacity straight-penetration wall-product estimator"
+  },
+  {
+    "symbol": "mc_transmission_wall_product_backward",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_mc_transmission_wall_product_backward",
+    "binding_registration": {
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 51
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+        "lines": [17],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/mc_transmission_wall_product.cu",
+        "lines": [1170],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.transmission.mc_transmission_wall_product_backward",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 292
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 318
+      }
+    ],
+    "contract_test": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
+    "e2e_callers": [
+      "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant deterministic fixed-topology MC wall-product VJP"
+  },
+  {
+    "symbol": "mc_transmission_wall_product_jvp",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_mc_transmission_wall_product_jvp",
+    "binding_registration": {
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 55
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+        "lines": [29],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/mc_transmission_wall_product.cu",
+        "lines": [1268],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.transmission.mc_transmission_wall_product_jvp",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 341
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 358
+      }
+    ],
+    "contract_test": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
+    "e2e_callers": [
+      "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant fixed-topology MC wall-product JVP"
   }
   ],
   "phase8b_c2d_deterministic_path_table_capacity": {
@@ -12380,5 +12512,18 @@
     "reduction_contract": "one warp per pair; lane 0 adds source states in strict ascending order",
     "activation_contract": "later atomic RayD pin/switch/delete commit only",
     "launch_resource_ledger": "docs/dev/audit/adr-030-diffraction-pair-reducer-launch-resource-ledger.json"
+  },
+  "adr027_dormant_mc_transmission_wall_product": {
+    "status": "dormant producer; live MC straight_transmission_chains route unchanged",
+    "symbols": [
+      "mc_transmission_wall_product",
+      "mc_transmission_wall_product_backward",
+      "mc_transmission_wall_product_jvp"
+    ],
+    "numerical_owner": "Channel Native",
+    "failure_contract": "the exact solve-owned CapacityFailureState is checked before validity and payload; canonical valid/num_hits or resident index failures OR PAIR_CONTRACT_ERROR and every primal/VJP/JVP output is inert",
+    "reduction_contract": "wall products use ascending state order; shared layer and frequency VJP owners add in fixed row-then-state order without floating-point atomics",
+    "activation_contract": "later ADR-027 MonteCarloTargetInset atomic switch/delete commit only",
+    "launch_resource_ledger": "docs/dev/audit/adr-027-mc-transmission-wall-product-resource-ledger.json"
   }
 }

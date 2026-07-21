@@ -42,6 +42,39 @@ class CapacityFailureState:
         return self.bits.device
 
 
+@dataclass(slots=True, eq=False)
+class SolveCapacityTransaction:
+    """Solve-scoped owner of one failure state and one terminal observation.
+
+    The transaction is orchestration state only. It never reads the CUDA
+    bitmask. Solvers pass ``failure_state`` unchanged to every capacity
+    intermediate and call ``terminal_check`` once after result sanitization.
+    """
+
+    failure_state: CapacityFailureState
+    _terminal_enqueued: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.failure_state, CapacityFailureState):
+            raise TypeError("failure_state must be a CapacityFailureState")
+
+    @property
+    def device(self) -> torch.device:
+        return self.failure_state.device
+
+    @property
+    def terminal_enqueued(self) -> bool:
+        return self._terminal_enqueued
+
+    def terminal_check(self) -> None:
+        """Enqueue the runtime terminal observer exactly once."""
+
+        if self._terminal_enqueued:
+            raise RuntimeError("capacity transaction terminal check already enqueued")
+        capacity_failure_terminal_check(self.failure_state)
+        self._terminal_enqueued = True
+
+
 def create_capacity_failure_state(reference: torch.Tensor) -> CapacityFailureState:
     """Create a native-zeroed failure state on ``reference``'s CUDA device."""
 
@@ -55,6 +88,16 @@ def create_capacity_failure_state(reference: torch.Tensor) -> CapacityFailureSta
     if not isinstance(bits, torch.Tensor):
         raise TypeError("native capacity failure state must be a tensor")
     return CapacityFailureState(bits=bits)
+
+
+def create_solve_capacity_transaction(
+    reference: torch.Tensor,
+) -> SolveCapacityTransaction:
+    """Create the one ADR-029 capacity transaction owned by a solve."""
+
+    return SolveCapacityTransaction(
+        failure_state=create_capacity_failure_state(reference)
+    )
 
 
 def require_capacity_failure_state(
@@ -82,6 +125,8 @@ def capacity_failure_terminal_check(failure_state: CapacityFailureState) -> None
 __all__ = [
     "CapacityFailureBit",
     "CapacityFailureState",
+    "SolveCapacityTransaction",
     "capacity_failure_terminal_check",
     "create_capacity_failure_state",
+    "create_solve_capacity_transaction",
 ]

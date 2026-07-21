@@ -240,9 +240,48 @@ class CapacityEvaluatedPaths:
             raise ValueError("evaluated topology must share selection validity")
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class CapacityExecutionCounts:
+    """Host capacity plus CUDA-resident actual diagnostic counts.
+
+    Public metadata may expose ``candidate_capacity``. The actual candidate
+    and guardrail counts remain device sidecars so result assembly never hides
+    a device-to-host synchronization behind metadata construction.
+    """
+
+    candidate_capacity: int
+    failure_state: CapacityFailureState
+    device_candidate_count: torch.Tensor
+    device_guardrail_count: torch.Tensor
+
+    def __post_init__(self) -> None:
+        _require_host_count("candidate_capacity", self.candidate_capacity)
+        candidate_count = _require_cuda_tensor(
+            "device_candidate_count",
+            self.device_candidate_count,
+            dtype=torch.int32,
+            shape=(1,),
+        )
+        require_capacity_failure_state(
+            self.failure_state, device=candidate_count.device
+        )
+        _require_cuda_tensor(
+            "device_guardrail_count",
+            self.device_guardrail_count,
+            dtype=torch.int32,
+            shape=(1,),
+            device=candidate_count.device,
+        )
+
+    @property
+    def device(self) -> torch.device:
+        return self.device_candidate_count.device
+
+
 __all__ = [
     "CanonicalEvaluatedPaths",
     "CanonicalPathSelection",
+    "CapacityExecutionCounts",
     "CapacityEvaluatedPaths",
     "CapacityPathLayout",
     "CapacityPathSelection",

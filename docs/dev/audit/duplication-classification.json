@@ -2339,9 +2339,75 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 101
+    },
+    "05b2f0c64fb569b5": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "lockstep_tests": [
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_contract_error_makes_ad_results_inert"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
+      "reason": "Separate primal, VJP, shared-VJP, and JVP kernel signatures retain the frozen fusion and launch ABI; changing their argument structure requires separate compiler-output and resource evidence.",
+      "token_count": 114
+    },
+    "50f4ce217ac2e9ed": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "lockstep_tests": [
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_error",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_pins_left_to_right_three_wall_product"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
+      "reason": "Primal, VJP, and JVP deliberately repeat discrete preflight and ascending wall evaluation where sharing could change register lifetime, compiler output, or floating-point order.",
+      "token_count": 240
+    },
+    "a673abf6bad42166": {
+      "category": "other",
+      "corpus": "python",
+      "files": [
+        "transmission.py"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
+      "reason": "The private validator and stable typed facade intentionally repeat the complete named input signature for API discoverability; the facade only validates and dispatches native computation.",
+      "token_count": 109
+    },
+    "e0144ba0a1cb062c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
+      "reason": "Repeated host-side kernel argument wiring preserves the explicit primal/VJP/JVP launch contracts and contains no numerical implementation.",
+      "token_count": 207
     }
   },
   "schema_version": 1,
+  "adr027_foundation_refresh": {
+    "combined_duplicate_lines": 8714,
+    "combined_total_lines": 90566,
+    "coverage_percent": 9.6217,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 4,
+    "note": "The dormant ADR-027 MC estimator adds one explicit typed facade and one native primal/VJP/JVP family; all new exact-token regions are hand-classified without changing the frozen maintenance budget.",
+    "region_count": 160,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
   "phase10a_refresh": {
     "combined_duplicate_lines": 9730,
     "combined_total_lines": 81675,

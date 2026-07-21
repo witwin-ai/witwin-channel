@@ -14,8 +14,10 @@ EXPECTED_REGISTRIES = {
     "fields",
     "materials",
     "montecarlo",
+    "montecarlo_transmission",
     "path",
     "rayd",
+    "runtime",
 }
 
 

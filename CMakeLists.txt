@@ -462,6 +462,7 @@ Python_add_library(
     native/channel_native/binding/rayd.cpp
     native/channel_native/binding/path.cpp
     native/channel_native/binding/montecarlo.cpp
+    native/channel_native/binding/montecarlo_transmission.cpp
     native/channel_native/binding/bdpt.cpp
     native/channel_native/build_info.cpp
     native/channel_native/bdpt.cpp
@@ -512,6 +513,7 @@ Python_add_library(
     native/channel_native/kernels/los.cu
     native/channel_native/kernels/los_silhouette_clearance.cu
     native/channel_native/kernels/material.cu
+    native/channel_native/kernels/mc_transmission_wall_product.cu
     native/channel_native/kernels/path_compaction.cu
     native/channel_native/kernels/reflection_candidate_capacity.cu
     native/channel_native/kernels/path_trace.cu
@@ -553,6 +555,11 @@ set_source_files_properties(
 set_source_files_properties(
     native/channel_native/kernels/path_result_capacity_pack.cu
     native/channel_native/kernels/path_result_capacity_pack_ad.cu
+    PROPERTIES COMPILE_OPTIONS "--fmad=false")
+# ADR-027 freezes the former per-wall Torch multiply/add sequence and its
+# continuous derivative companions for the MC straight-penetration estimator.
+set_source_files_properties(
+    native/channel_native/kernels/mc_transmission_wall_product.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 target_link_libraries(
     _channel_native

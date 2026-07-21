@@ -10,6 +10,9 @@ contracts they share. It is not itself a solver API: callers select either
 - `basic/` owns the incoherent Monte Carlo power-map solver, including its
   configuration, result type, orchestration, sampling, metadata, and
   solver-local kernel facades.
+  Its dormant ADR-027 wall-product primal/VJP/JVP facade consumes fixed RayD
+  penetration storage and a solve-owned failure state; it has no live solver
+  caller until the MonteCarloTargetInset atomic switch/delete commit.
 - `bdpt/` owns bidirectional path tracing, including subpaths, connections,
   MIS, optional path-sample export, accumulation, and its solver-local kernel
   facades. Its package loads `solve` lazily to keep the public import light.
@@ -89,6 +92,11 @@ promises. The parent `montecarlo` package exports no solver symbols.
   and geometry inputs. It rejects scattering before launch. Reflection AD also
   rejects depths above the limit reported by the native companion kernel, and
   frequency AD rejects material models outside its supported contract.
+- The MC straight-penetration estimator differentiates base power, resident
+  direction/normal geometry, CSR layer thickness/epsilon/conductivity, and
+  frequency. Discrete validity/IDs, geometry mode, permeability, and transmitter
+  polarization remain fixed. Wall products and shared-parameter reductions use
+  deterministic ascending orders without floating-point atomics.
 - BDPT supports only `ad_mode="none"`. Any other mode is rejected by
   `Config`; detached or zero gradients are not a substitute.
 

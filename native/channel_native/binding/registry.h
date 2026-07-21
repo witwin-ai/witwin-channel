@@ -17,4 +17,5 @@ void register_path_diffraction_state(pybind11::module_ &module);
 void register_bdpt_material_helpers(pybind11::module_ &module);
 void register_path(pybind11::module_ &module);
 void register_montecarlo(pybind11::module_ &module);
+void register_montecarlo_transmission(pybind11::module_ &module);
 void register_path_deterministic(pybind11::module_ &module);

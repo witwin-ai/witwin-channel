@@ -12835,6 +12835,373 @@
       "doc": "Build MC surface-group diffraction edge candidate tables with native CUDA kernels."
     },
     {
+      "name": "mc_transmission_wall_product",
+      "target": "cn_mc_transmission_wall_product",
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 47,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "num_hits",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reached_target",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "direction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "normal",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "global_primitive_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "face_material_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "geometry_mode_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_offset",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_thickness_m",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "pair_polarization",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "base_power",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "capacity_failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "failure_bit",
+          "type": "int64_t",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Evaluate fixed-capacity straight-penetration wall products on CUDA."
+    },
+    {
+      "name": "mc_transmission_wall_product_backward",
+      "target": "cn_mc_transmission_wall_product_backward",
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 51,
+      "return_type": "pybind11::tuple",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "num_hits",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reached_target",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "direction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "normal",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "global_primitive_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "face_material_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "geometry_mode_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_offset",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_thickness_m",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "pair_polarization",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "base_power",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "capacity_failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "failure_bit",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "grad_scaled_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "grad_transmittance",
+          "type": "pybind11::object",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Evaluate the fixed-topology wall-product VJP on CUDA."
+    },
+    {
+      "name": "mc_transmission_wall_product_jvp",
+      "target": "cn_mc_transmission_wall_product_jvp",
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 55,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "num_hits",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reached_target",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "direction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "normal",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "global_primitive_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "face_material_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "geometry_mode_id",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_offset",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_count",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_thickness_m",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_eps_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_sigma_e",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "layer_mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "pair_polarization",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "base_power",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "frequency_hz",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "capacity_failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "failure_bit",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "tangent_direction",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_normal",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_layer_thickness_m",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_layer_eps_r",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_layer_sigma_e",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_base_power",
+          "type": "pybind11::object",
+          "default": null
+        },
+        {
+          "name": "tangent_frequency",
+          "type": "double",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Evaluate the fixed-topology wall-product JVP on CUDA."
+    },
+
+    {
       "name": "mc_transmitter_tensors",
       "target": "cn_mc_transmitter_tensors",
       "path": "native/channel_native/binding/montecarlo.cpp",

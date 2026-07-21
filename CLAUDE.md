@@ -166,6 +166,13 @@ requires them.
   retains material/geometry-mode encoding, thin-sheet eligibility, topology,
   and the MC incident-TE/TM wall-product estimator. Do not reintroduce a Python
   depth march, Torch geometry/estimator physics, or a per-transmitter trace.
+- The dormant Channel-owned `mc_transmission_wall_product` primal/VJP/JVP
+  family consumes fixed `[pair, hit_capacity]` penetration storage and the
+  exact solve failure state. It checks canonical validity before every payload,
+  has no AD depth cap or hidden contiguous copy, multiplies walls in ascending
+  slot order, and reduces shared layer/frequency VJPs with fixed owners in
+  ascending pair/slot order. It remains caller-free until the dedicated
+  MonteCarloTargetInset atomic switch/delete commit.
 - Under ADR-029, dormant deterministic PathTable capacity export consumes the
   exact shared `CapacityFailureState` from its layout and preserves pair-major
   `P*C` rows. Native primal checks failure/overflow/valid before payload or ID

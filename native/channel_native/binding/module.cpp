@@ -17,5 +17,6 @@ PYBIND11_MODULE(_channel_native, module) {
     register_bdpt_material_helpers(module);
     register_path(module);
     register_montecarlo(module);
+    register_montecarlo_transmission(module);
     register_path_deterministic(module);
 }
