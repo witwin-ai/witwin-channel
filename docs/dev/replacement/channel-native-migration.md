@@ -291,6 +291,49 @@ compatibility path. Exact symbol ownership, launch/resource formulas, and the
 remaining activation work are recorded in
 `docs/dev/audit/phase13-adr027-penetration-foundation.json`.
 
+### Plan 13 Phase 6C Phase E: enumerated penetration activation
+
+Path, Deterministic, and the ADR-008 BDPT discrete-path oracle now share the
+single `evaluate_enumerated_paths` transmission route. The engine creates one
+solve-owned `CapacityFailureState`; its transmission stage flattens endpoint
+pairs in transmitter-major, receiver-minor order and submits exactly one
+`EnumeratedFullDistance` RayD batch using the compile-cached enumerated scene
+diagonal. Primal mode dispatches the native forward entry, while JVP/VJP modes
+dispatch the native tape and derivative companions through Channel autograd.
+
+The Channel topology pack receives the exact same failure-state object/storage
+and preserves one capacity row per endpoint pair. Actual candidate and
+guardrail counts remain CUDA `int32[1]` sidecars; metadata reports only the
+host-known candidate capacity and does not hide a device-to-host count read.
+The engine returns the typed transaction as a sidecar when Path or
+Deterministic still has work. Path sanitizes after scattering and observes only
+after base-result plus synthetic/explicit array packing; Deterministic
+sanitizes after scattering and observes only after accumulation, optional
+PathTable export, and `Result` construction. The default ADR-008 oracle has no
+later owner and therefore sanitizes and observes after its field result. Every
+route enqueues the unique runtime terminal observer exactly once. Overflow
+therefore makes penetration, topology, fields, diffraction-vector sidecar, and
+the returned solve result inert before the asynchronous failure becomes loud;
+no intermediate traps or returns a partial result.
+
+This activation replaces penetration discovery only. The legacy canonical
+selector still compacts valid rows from the fixed-capacity block and therefore
+retains a device-selected result-shape boundary. The CUDA actual-count sidecars
+are not read for metadata, but the remaining selector compaction must be
+removed by the ADR-029 capacity activation before the complete solver no-D2H,
+public-capacity, or Phase 12 performance gates can be claimed.
+Path additionally performs a post-sanitizer valid-row compaction before its
+legacy result converter so failed `-1` identifiers cannot be gathered. This is
+a temporary safety boundary, not a second result contract, and is deleted with
+the same ADR-029 Phase D capacity-pack activation.
+
+The former `TransmissionClosestHitQuery`,
+`query_transmission_closest_hit`, `iter_transmission_active_rows`, their source
+modules, Python depth loop, Torch restart/normalization math, and compatibility
+exports are deleted in the same atomic switch. Monte Carlo Basic is not part of
+this commit and retains its prior route until the separate
+`MonteCarloTargetInset` switch.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

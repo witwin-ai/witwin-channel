@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 
+from witwin.channel_native.path import pipeline as path_pipeline
 from witwin.channel_native.path import solver as path_solver
 from witwin.channel_native.path.config import Config
 from witwin.channel_native.path.result import InteractionType, from_evaluated_paths
@@ -152,7 +153,8 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
         path_solver, "_validate_runtime", lambda _config: (True, True, True)
     )
 
-    def fake_engine(_scene, _config):
+    def fake_engine(_scene, _config, *, defer_capacity_terminal):
+        assert defer_capacity_terminal is True
         calls.append("engine")
         return initial, initial_sidecars
 
@@ -167,6 +169,17 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
         captured_metadata.update(kwargs)
         return {"kernel": {"launch_count": 1}}
 
+    def fake_sanitize(evaluated, sidecars):
+        calls.append("sanitize")
+        assert evaluated is appended
+        assert sidecars is appended_sidecars
+        return evaluated, sidecars
+
+    def fake_compact(evaluated):
+        calls.append("compact")
+        assert evaluated is appended
+        return evaluated
+
     def fake_pack(paths, **kwargs):
         calls.append("pack")
         assert paths is appended
@@ -176,6 +189,14 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
 
     monkeypatch.setattr(path_solver, "evaluate_enumerated_paths", fake_engine)
     monkeypatch.setattr(path_solver, "append_scattering_evaluated_paths", fake_append)
+    monkeypatch.setattr(
+        path_pipeline, "sanitize_enumerated_capacity_transaction", fake_sanitize
+    )
+    monkeypatch.setattr(
+        path_pipeline,
+        "_compact_valid_evaluated_paths_for_legacy_result",
+        fake_compact,
+    )
     monkeypatch.setattr(path_solver, "_metadata", fake_metadata)
     monkeypatch.setattr(path_solver, "from_evaluated_paths", fake_pack)
     monkeypatch.setattr(
@@ -191,8 +212,16 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
 
     result = path_solver._solve_base(object(), Config(components={"los", "scattering"}))
 
-    assert result is sentinel
-    assert calls == ["engine", "append", "metadata", "pack"]
+    assert result.result is sentinel
+    assert result.capacity_transaction is None
+    assert calls == [
+        "engine",
+        "append",
+        "sanitize",
+        "compact",
+        "metadata",
+        "pack",
+    ]
     assert captured_metadata["path_count"] == appended.row_count
     assert captured_metadata["ad_companion_launches"] == 96
     assert captured_metadata["ad_tape_bytes"] == 97

@@ -55,9 +55,7 @@ def compile_scene(scene: Any) -> CompiledScene:
     ):
         return cached
     rayd = scene.rayd_scene()
-    geometry = _compile_geometry(
-        scene.structures, scene._geometry_version, rayd=rayd
-    )
+    geometry = _compile_geometry(scene.structures, scene._geometry_version, rayd=rayd)
     materials = _compile_materials(
         material_records,
         material_keys,
@@ -113,17 +111,23 @@ def _compile_penetration_scene_diagonals(
 
     records = rayd.edge_records()
     vertices = records.vertices
-    enumerated = float(
-        (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
-    )
+    enumerated = float((vertices.max(dim=0).values - vertices.min(dim=0).values).norm())
 
     minimum: torch.Tensor | None = None
     maximum: torch.Tensor | None = None
     for structure in structures:
-        low = structure.vertices.amin(dim=0)
-        high = structure.vertices.amax(dim=0)
-        minimum = low if minimum is None else torch.minimum(minimum, low)
-        maximum = high if maximum is None else torch.maximum(maximum, high)
+        frozen_vertices = structure.vertices.detach()
+        low = frozen_vertices.amin(dim=0)
+        high = frozen_vertices.amax(dim=0)
+        if minimum is None:
+            minimum = low
+            maximum = high
+            continue
+        assert maximum is not None
+        low = low.to(device=minimum.device)
+        high = high.to(device=minimum.device)
+        minimum = torch.minimum(minimum, low)
+        maximum = torch.maximum(maximum, high)
     assert minimum is not None and maximum is not None
     montecarlo = float((maximum - minimum).norm())
     return enumerated, montecarlo
@@ -163,9 +167,7 @@ def _compile_geometry(
         faces=records.faces,
         face_normals=records.face_normals,
         edges=topology_primitives.core_pack_int2(records.edge_v0, records.edge_v1),
-        edge_adj_faces=topology_primitives.core_pack_int2(
-            records.face0, records.face1
-        ),
+        edge_adj_faces=topology_primitives.core_pack_int2(records.face0, records.face1),
         edge_param_range=bdpt_zero_matrix(
             records.vertices, rows=records.edge_v0.shape[0], cols=2
         ),
@@ -345,9 +347,7 @@ def _compile_materials(
         layer_rows.extend(rows)
 
     def layer_column(column: int) -> torch.Tensor:
-        return torch.tensor(
-            [row[column] for row in layer_rows], dtype=torch.float32
-        )
+        return torch.tensor([row[column] for row in layer_rows], dtype=torch.float32)
 
     def rough_column(column: int) -> torch.Tensor:
         return torch.tensor(

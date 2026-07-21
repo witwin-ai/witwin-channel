@@ -298,6 +298,48 @@ pybind11::dict cn_enumerated_transmission_topology_pack(
     torch::Tensor geometry_mode_id,
     int64_t tx_count,
     int64_t rx_count);
+pybind11::dict cn_enumerated_transmission_topology_pack_backward(
+    torch::Tensor topology_valid,
+    torch::Tensor hit_valid,
+    std::optional<torch::Tensor> grad_path_length_m,
+    std::optional<torch::Tensor> grad_delay_s,
+    std::optional<torch::Tensor> grad_interaction_position,
+    std::optional<torch::Tensor> grad_interaction_normal,
+    std::optional<torch::Tensor> grad_interaction_positions,
+    std::optional<torch::Tensor> grad_interaction_normals);
+pybind11::dict cn_enumerated_transmission_topology_pack_jvp(
+    torch::Tensor topology_valid,
+    torch::Tensor hit_valid,
+    std::optional<torch::Tensor> tangent_distance,
+    std::optional<torch::Tensor> tangent_position,
+    std::optional<torch::Tensor> tangent_normal);
+pybind11::dict cn_enumerated_capacity_failure_sanitize(
+    torch::Tensor failure_state,
+    torch::Tensor valid,
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor depth,
+    torch::Tensor component_id,
+    torch::Tensor primitive_id,
+    torch::Tensor edge_id,
+    torch::Tensor material_id,
+    torch::Tensor primitive_sequence,
+    torch::Tensor material_sequence,
+    torch::Tensor interaction_type,
+    torch::Tensor path_length_m,
+    torch::Tensor delay_s,
+    torch::Tensor field_direction,
+    torch::Tensor interaction_position,
+    torch::Tensor interaction_normal,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor path_gain,
+    torch::Tensor path_field,
+    torch::Tensor field_xyz,
+    torch::Tensor coefficient);
+torch::Tensor cn_enumerated_capacity_failure_vector_sanitize(
+    torch::Tensor failure_state,
+    torch::Tensor values);
 pybind11::dict cn_deterministic_diffraction_order1_compact(
     torch::Tensor valid,
     torch::Tensor rx_id,
@@ -943,6 +985,60 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("geometry_mode_id"),
         pybind11::arg("tx_count"),
         pybind11::arg("rx_count"));
+    module.def(
+        "enumerated_transmission_topology_pack_backward",
+        &cn_enumerated_transmission_topology_pack_backward,
+        "Propagate transmission topology cotangents to RayD penetration geometry.",
+        pybind11::arg("topology_valid"),
+        pybind11::arg("hit_valid"),
+        pybind11::arg("grad_path_length_m"),
+        pybind11::arg("grad_delay_s"),
+        pybind11::arg("grad_interaction_position"),
+        pybind11::arg("grad_interaction_normal"),
+        pybind11::arg("grad_interaction_positions"),
+        pybind11::arg("grad_interaction_normals"));
+    module.def(
+        "enumerated_transmission_topology_pack_jvp",
+        &cn_enumerated_transmission_topology_pack_jvp,
+        "Propagate RayD penetration tangents through transmission topology packing.",
+        pybind11::arg("topology_valid"),
+        pybind11::arg("hit_valid"),
+        pybind11::arg("tangent_distance"),
+        pybind11::arg("tangent_position"),
+        pybind11::arg("tangent_normal"));
+    module.def(
+        "enumerated_capacity_failure_sanitize",
+        &cn_enumerated_capacity_failure_sanitize,
+        "Sanitize complete enumerated rows before terminal capacity failure observation.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("valid"),
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("depth"),
+        pybind11::arg("component_id"),
+        pybind11::arg("primitive_id"),
+        pybind11::arg("edge_id"),
+        pybind11::arg("material_id"),
+        pybind11::arg("primitive_sequence"),
+        pybind11::arg("material_sequence"),
+        pybind11::arg("interaction_type"),
+        pybind11::arg("path_length_m"),
+        pybind11::arg("delay_s"),
+        pybind11::arg("field_direction"),
+        pybind11::arg("interaction_position"),
+        pybind11::arg("interaction_normal"),
+        pybind11::arg("interaction_positions"),
+        pybind11::arg("interaction_normals"),
+        pybind11::arg("path_gain"),
+        pybind11::arg("path_field"),
+        pybind11::arg("field_xyz"),
+        pybind11::arg("coefficient"));
+    module.def(
+        "enumerated_capacity_failure_vector_sanitize",
+        &cn_enumerated_capacity_failure_vector_sanitize,
+        "Sanitize the enumerated diffraction vector sidecar before terminal failure.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("values"));
     module.def(
         "deterministic_diffraction_order1_compact",
         &cn_deterministic_diffraction_order1_compact,

@@ -37,6 +37,55 @@ struct PayloadTensors {
     const at::Tensor& coefficient;
 };
 
+struct PayloadInputView {
+    const int *tx_id;
+    const int *rx_id;
+    const int *depth;
+    const int *component_id;
+    const int *primitive_id;
+    const int *edge_id;
+    const int *material_id;
+    const int *primitive_sequence;
+    const int *material_sequence;
+    const int *interaction_type;
+    const float *path_length_m;
+    const float *delay_s;
+    const float *field_direction;
+    const float *interaction_position;
+    const float *interaction_normal;
+    const float *interaction_positions;
+    const float *interaction_normals;
+    const float *path_gain;
+    const cfloat *path_field;
+    const cfloat *field_xyz;
+    const cfloat *coefficient;
+};
+
+inline PayloadInputView input_view(const PayloadTensors& payload) {
+    return {
+        payload.tx_id.data_ptr<int>(),
+        payload.rx_id.data_ptr<int>(),
+        payload.depth.data_ptr<int>(),
+        payload.component_id.data_ptr<int>(),
+        payload.primitive_id.data_ptr<int>(),
+        payload.edge_id.data_ptr<int>(),
+        payload.material_id.data_ptr<int>(),
+        payload.primitive_sequence.data_ptr<int>(),
+        payload.material_sequence.data_ptr<int>(),
+        payload.interaction_type.data_ptr<int>(),
+        payload.path_length_m.data_ptr<float>(),
+        payload.delay_s.data_ptr<float>(),
+        payload.field_direction.data_ptr<float>(),
+        payload.interaction_position.data_ptr<float>(),
+        payload.interaction_normal.data_ptr<float>(),
+        payload.interaction_positions.data_ptr<float>(),
+        payload.interaction_normals.data_ptr<float>(),
+        payload.path_gain.data_ptr<float>(),
+        payload.path_field.data_ptr<cfloat>(),
+        payload.field_xyz.data_ptr<cfloat>(),
+        payload.coefficient.data_ptr<cfloat>()};
+}
+
 inline void check_row_tensor(
     const at::Tensor& tensor,
     const char *name,
@@ -145,6 +194,143 @@ struct AllocatedPayload {
         result["coefficient"] = coefficient;
     }
 };
+
+struct PayloadOutputView {
+    int *tx_id;
+    int *rx_id;
+    int *depth;
+    int *component_id;
+    int *primitive_id;
+    int *edge_id;
+    int *material_id;
+    int *primitive_sequence;
+    int *material_sequence;
+    int *interaction_type;
+    float *path_length_m;
+    float *delay_s;
+    float *field_direction;
+    float *interaction_position;
+    float *interaction_normal;
+    float *interaction_positions;
+    float *interaction_normals;
+    float *path_gain;
+    cfloat *path_field;
+    cfloat *field_xyz;
+    cfloat *coefficient;
+};
+
+inline PayloadOutputView output_view(const AllocatedPayload& payload) {
+    return {
+        payload.tx_id.data_ptr<int>(),
+        payload.rx_id.data_ptr<int>(),
+        payload.depth.data_ptr<int>(),
+        payload.component_id.data_ptr<int>(),
+        payload.primitive_id.data_ptr<int>(),
+        payload.edge_id.data_ptr<int>(),
+        payload.material_id.data_ptr<int>(),
+        payload.primitive_sequence.data_ptr<int>(),
+        payload.material_sequence.data_ptr<int>(),
+        payload.interaction_type.data_ptr<int>(),
+        payload.path_length_m.data_ptr<float>(),
+        payload.delay_s.data_ptr<float>(),
+        payload.field_direction.data_ptr<float>(),
+        payload.interaction_position.data_ptr<float>(),
+        payload.interaction_normal.data_ptr<float>(),
+        payload.interaction_positions.data_ptr<float>(),
+        payload.interaction_normals.data_ptr<float>(),
+        payload.path_gain.data_ptr<float>(),
+        payload.path_field.data_ptr<cfloat>(),
+        payload.field_xyz.data_ptr<cfloat>(),
+        payload.coefficient.data_ptr<cfloat>()};
+}
+
+__device__ inline void initialize_row(
+    PayloadOutputView output,
+    int64_t row,
+    int64_t sequence_width) {
+    output.tx_id[row] = -1;
+    output.rx_id[row] = -1;
+    output.depth[row] = 0;
+    output.component_id[row] = -1;
+    output.primitive_id[row] = -1;
+    output.edge_id[row] = -1;
+    output.material_id[row] = -1;
+    output.path_length_m[row] = -1.0f;
+    output.delay_s[row] = -1.0f;
+    output.path_gain[row] = 0.0f;
+    output.path_field[row] = cfloat(0.0f, 0.0f);
+    output.coefficient[row] = cfloat(0.0f, 0.0f);
+    const int64_t row_vector = row * 3;
+    for (int component = 0; component < 3; ++component) {
+        output.field_direction[row_vector + component] = 0.0f;
+        output.interaction_position[row_vector + component] = 0.0f;
+        output.interaction_normal[row_vector + component] = 0.0f;
+        output.field_xyz[row_vector + component] = cfloat(0.0f, 0.0f);
+    }
+    const int64_t row_sequence = row * sequence_width;
+    for (int64_t slot = 0; slot < sequence_width; ++slot) {
+        const int64_t item = row_sequence + slot;
+        output.primitive_sequence[item] = -1;
+        output.material_sequence[item] = -1;
+        output.interaction_type[item] = 0;
+        for (int component = 0; component < 3; ++component) {
+            const int64_t item_vector = item * 3 + component;
+            output.interaction_positions[item_vector] = 0.0f;
+            output.interaction_normals[item_vector] = 0.0f;
+        }
+    }
+}
+
+__device__ inline void copy_row(
+    PayloadInputView input,
+    PayloadOutputView output,
+    int64_t source,
+    int64_t destination,
+    int64_t sequence_width) {
+    output.tx_id[destination] = input.tx_id[source];
+    output.rx_id[destination] = input.rx_id[source];
+    output.depth[destination] = input.depth[source];
+    output.component_id[destination] = input.component_id[source];
+    output.primitive_id[destination] = input.primitive_id[source];
+    output.edge_id[destination] = input.edge_id[source];
+    output.material_id[destination] = input.material_id[source];
+    output.path_length_m[destination] = input.path_length_m[source];
+    output.delay_s[destination] = input.delay_s[source];
+    output.path_gain[destination] = input.path_gain[source];
+    output.path_field[destination] = input.path_field[source];
+    output.coefficient[destination] = input.coefficient[source];
+    const int64_t source_vector = source * 3;
+    const int64_t destination_vector = destination * 3;
+    for (int component = 0; component < 3; ++component) {
+        output.field_direction[destination_vector + component] =
+            input.field_direction[source_vector + component];
+        output.interaction_position[destination_vector + component] =
+            input.interaction_position[source_vector + component];
+        output.interaction_normal[destination_vector + component] =
+            input.interaction_normal[source_vector + component];
+        output.field_xyz[destination_vector + component] =
+            input.field_xyz[source_vector + component];
+    }
+    const int64_t source_sequence = source * sequence_width;
+    const int64_t destination_sequence = destination * sequence_width;
+    for (int64_t slot = 0; slot < sequence_width; ++slot) {
+        const int64_t source_item = source_sequence + slot;
+        const int64_t destination_item = destination_sequence + slot;
+        output.primitive_sequence[destination_item] =
+            input.primitive_sequence[source_item];
+        output.material_sequence[destination_item] =
+            input.material_sequence[source_item];
+        output.interaction_type[destination_item] = input.interaction_type[source_item];
+        for (int component = 0; component < 3; ++component) {
+            const int64_t source_item_vector = source_item * 3 + component;
+            const int64_t destination_item_vector = destination_item * 3 + component;
+            output.interaction_positions[destination_item_vector] =
+                input.interaction_positions[source_item_vector];
+            output.interaction_normals[destination_item_vector] =
+                input.interaction_normals[source_item_vector];
+        }
+    }
+}
 
 inline AllocatedPayload allocate_payload(
     const at::Tensor& reference,

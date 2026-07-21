@@ -6,6 +6,11 @@ and oblique incidence.
 """
 
 import math
+import os
+from pathlib import Path
+import subprocess
+import sys
+import textwrap
 
 import pytest
 import torch
@@ -22,6 +27,7 @@ from witwin.channel_native.core.materials import (
 from witwin.channel_native.deterministic import Config, solve
 
 _FREQUENCY_HZ = 3.0e9
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
@@ -69,9 +75,7 @@ def _stack_t_te(material: PhysicalSurface, cos_theta: float) -> complex:
             [layer.thickness_m], device="cuda", dtype=torch.float32
         ),
         layer_eps_r=torch.tensor([layer.eps_r], device="cuda", dtype=torch.float32),
-        layer_sigma_e=torch.tensor(
-            [layer.sigma_e], device="cuda", dtype=torch.float32
-        ),
+        layer_sigma_e=torch.tensor([layer.sigma_e], device="cuda", dtype=torch.float32),
         layer_mu_r=torch.tensor([layer.mu_r], device="cuda", dtype=torch.float32),
         frequency_hz=_FREQUENCY_HZ,
     )
@@ -169,21 +173,56 @@ def test_two_walls_transmission_is_the_product_of_single_wall_stacks():
     assert both.metadata["counts"]["components"]["transmission"] == 1
 
 
-def test_max_depth_capping_is_truthful_for_two_walls():
+def test_max_depth_overflow_is_fail_loud_for_two_walls():
     _require_rayd()
+    code = textwrap.dedent(
+        """
+        import torch
 
-    rx_position = [5.0, 0.0, 0.0]
-    structures = [
-        transmission_wall_structure(2.0, _vacuum_wall(), name="wall-a", surface_id=1),
-        transmission_wall_structure(3.0, _vacuum_wall(), name="wall-b", surface_id=2),
-    ]
+        from tests.deterministic.test_transmission import (
+            _TRANSMISSION,
+            _scene,
+            _vacuum_wall,
+        )
+        from tests.support.scenes import transmission_wall_structure
+        from witwin.channel_native.deterministic import solve
 
-    capped = solve(_scene(structures, rx_position), _TRANSMISSION)
+        structures = [
+            transmission_wall_structure(
+                2.0, _vacuum_wall(), name="wall-a", surface_id=1
+            ),
+            transmission_wall_structure(
+                3.0, _vacuum_wall(), name="wall-b", surface_id=2
+            ),
+        ]
+        solve(_scene(structures, [5.0, 0.0, 0.0]), _TRANSMISSION)
+        print("TERMINAL_ENQUEUED", flush=True)
+        try:
+            torch.cuda.synchronize()
+        except RuntimeError:
+            print("TERMINAL_SYNC_ERROR", flush=True)
+        else:
+            raise AssertionError("D + 1 penetration overflow did not fail loudly")
+        """
+    )
+    environment = os.environ.copy()
+    source_root = str(_REPOSITORY_ROOT / "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value for value in (source_root, environment.get("PYTHONPATH")) if value
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=_REPOSITORY_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
 
-    # A 2-wall chain must never be truncated into a 1-wall path.
-    assert capped.metadata["counts"]["components"]["transmission"] == 0
-    assert capped.metadata["components"]["transmission"] == "enabled_no_paths"
-    assert torch.count_nonzero(capped.component_power["transmission"]) == 0
+    assert completed.returncode == 0, completed.stderr
+    assert "TERMINAL_ENQUEUED" in completed.stdout
+    assert "TERMINAL_SYNC_ERROR" in completed.stdout
 
 
 def test_los_transmission_exclusivity():
@@ -216,7 +255,5 @@ def test_pec_wall_transmission_is_negligible():
     )
     empty = solve(_scene([], rx_position), _LOS)
 
-    ratio = (
-        wall.component_power["transmission"] / empty.component_power["los"]
-    ).max()
+    ratio = (wall.component_power["transmission"] / empty.component_power["los"]).max()
     assert ratio.item() <= 1.0e-10  # below -100 dB

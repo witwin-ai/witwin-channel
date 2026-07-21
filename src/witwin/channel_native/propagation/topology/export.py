@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import torch
 
+from witwin.channel_native.propagation.models.capacity import CapacityExecutionCounts
 from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.models.fields import PathFields
 from witwin.channel_native.propagation.models.geometry import PathGeometry
@@ -17,6 +18,7 @@ from witwin.channel_native.propagation.topology.kernels import (
     construction as topology_construction,
 )
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel_native.runtime.capacity import SolveCapacityTransaction
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +40,8 @@ class EvaluatedPathSidecars:
 
     execution: PathExecutionStats
     diffraction_vector_field: torch.Tensor | None
+    capacity_execution: CapacityExecutionCounts | None = None
+    capacity_transaction: SolveCapacityTransaction | None = None
 
 
 def evaluated_paths_from_result(
@@ -63,9 +67,7 @@ def evaluated_paths_from_result(
         path_field = topology_defaults()["path_field"]
     field_xyz = getattr(paths, "field_xyz", None)
     if field_xyz is None:
-        field_xyz = torch.zeros(
-            (path_count, 3), device=device, dtype=torch.complex64
-        )
+        field_xyz = torch.zeros((path_count, 3), device=device, dtype=torch.complex64)
     coefficient = getattr(paths, "coefficient", path_field)
     field_direction = getattr(paths, "field_direction", None)
     if field_direction is None:
@@ -110,30 +112,40 @@ def evaluated_paths_from_result(
     ).contiguous()
     interaction_normal_value = interaction_normal.to(dtype=torch.float32).contiguous()
     material_id_value = material_id.to(dtype=torch.int32).contiguous()
-    material_sequence_value = getattr(
-        paths,
-        "material_sequence",
-        torch.empty((path_count, 0), device=device, dtype=torch.int32),
-    ).to(dtype=torch.int32).contiguous()
+    material_sequence_value = (
+        getattr(
+            paths,
+            "material_sequence",
+            torch.empty((path_count, 0), device=device, dtype=torch.int32),
+        )
+        .to(dtype=torch.int32)
+        .contiguous()
+    )
     interaction_type_value = _interaction_type_sequence(
         component_id=paths.component_id,
         depth=paths.depth,
         width=int(primitive_sequence.shape[1]),
     )
-    interaction_positions_value = getattr(
-        paths,
-        "interaction_positions",
-        torch.empty((path_count, 0, 3), device=device, dtype=torch.float32),
-    ).to(dtype=torch.float32).contiguous()
-    interaction_normals_value = getattr(
-        paths,
-        "interaction_normals",
-        torch.empty((path_count, 0, 3), device=device, dtype=torch.float32),
-    ).to(dtype=torch.float32).contiguous()
-    launch_count = int(getattr(paths, "launch_count", 0))
-    visibility_rejection_count = int(
-        getattr(paths, "visibility_rejection_count", 0)
+    interaction_positions_value = (
+        getattr(
+            paths,
+            "interaction_positions",
+            torch.empty((path_count, 0, 3), device=device, dtype=torch.float32),
+        )
+        .to(dtype=torch.float32)
+        .contiguous()
     )
+    interaction_normals_value = (
+        getattr(
+            paths,
+            "interaction_normals",
+            torch.empty((path_count, 0, 3), device=device, dtype=torch.float32),
+        )
+        .to(dtype=torch.float32)
+        .contiguous()
+    )
+    launch_count = int(getattr(paths, "launch_count", 0))
+    visibility_rejection_count = int(getattr(paths, "visibility_rejection_count", 0))
     selected_edge_count = int(getattr(paths, "selected_edge_count", 0))
     candidate_count = int(getattr(paths, "candidate_count", path_count))
     guardrail_count = int(getattr(paths, "guardrail_count", 0))

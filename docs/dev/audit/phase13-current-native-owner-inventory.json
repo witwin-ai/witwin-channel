@@ -27,13 +27,13 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 234,
+    "bindings": 238,
     "rayd_numerical": 47,
     "layered": 3,
-    "channel_numerical": 184
+    "channel_numerical": 188
   },
   "current_phase": 12,
-  "current_subphase": "ADR-027 Phase P dormant penetration and transmission-topology foundation",
+  "current_subphase": "ADR-027 Phase E live enumerated batched penetration",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -12489,14 +12489,19 @@
     "python_definitions": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 166
+        "line": 164
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/transmission.py",
+        "line": 107
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 191
+        "line": 189
       }
     ],
     "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_forward_and_tape_keep_named_order_and_state_identity",
@@ -12504,8 +12509,8 @@
       "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant fixed-capacity segment-penetration primal"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live enumerated fixed-capacity segment-penetration primal"
   },
   {
     "symbol": "rayd_segment_penetration_forward_tape",
@@ -12533,14 +12538,19 @@
     "python_definitions": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 197
+        "line": 195
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/penetration_autograd.py",
+        "line": 100
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 222
+        "line": 220
       }
     ],
     "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_forward_and_tape_keep_named_order_and_state_identity",
@@ -12549,8 +12559,8 @@
       "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant fixed-winner segment-penetration tape"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live enumerated fixed-winner segment-penetration tape"
   },
   {
     "symbol": "rayd_segment_penetration_backward",
@@ -12578,14 +12588,19 @@
     "python_definitions": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 239
+        "line": 237
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/penetration_autograd.py",
+        "line": 178
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 297
+        "line": 298
       }
     ],
     "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results",
@@ -12593,8 +12608,8 @@
       "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant fixed-winner segment-penetration VJP companion"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live enumerated fixed-winner segment-penetration VJP companion"
   },
   {
     "symbol": "rayd_segment_penetration_jvp",
@@ -12622,14 +12637,19 @@
     "python_definitions": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 317
+        "line": 318
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/penetration_autograd.py",
+        "line": 244
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
-        "line": 356
+        "line": 360
       }
     ],
     "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results",
@@ -12637,8 +12657,8 @@
       "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant fixed-winner segment-penetration JVP companion"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live enumerated fixed-winner segment-penetration JVP companion"
   },
   {
     "symbol": "enumerated_transmission_topology_pack",
@@ -12646,7 +12666,7 @@
     "binding_target": "cn_enumerated_transmission_topology_pack",
     "binding_registration": {
       "path": "native/channel_native/binding/path.cpp",
-      "line": 930
+      "line": 971
     },
     "target_source_evidence": [
       {
@@ -12662,18 +12682,23 @@
     ],
     "numerical_owner": "Channel Native",
     "owner_kind": "Channel native implementation",
-    "python_owner": "witwin.channel_native.propagation.topology.kernels.transmission.enumerated_transmission_topology_pack",
+    "python_owner": "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.forward",
     "python_definitions": [
       {
         "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
-        "line": 47
+        "line": 59
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/transmission.py",
+        "line": 131
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
-        "line": 75
+        "line": 60
       }
     ],
     "contract_test": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_preserves_pair_capacity_normal_bits_and_device_counts",
@@ -12681,8 +12706,204 @@
       "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant component-5 transmission capacity topology producer"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live component-5 transmission capacity topology producer"
+  },
+  {
+    "symbol": "enumerated_transmission_topology_pack_backward",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_enumerated_transmission_topology_pack_backward",
+    "binding_registration": {
+      "path": "native/channel_native/binding/path.cpp",
+      "line": 988
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/path.cpp",
+        "lines": [301],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/enumerated_transmission_topology_pack.cu",
+        "lines": [567],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.backward",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
+        "line": 85
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/transmission.py",
+        "line": 131
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
+        "line": 96
+      }
+    ],
+    "contract_test": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_backward_routes_only_valid_continuous_geometry",
+    "e2e_callers": [
+      "tests/propagation/enumerated/test_transmission_integration.py::test_ad_route_uses_native_tape_companions_and_live_geometry"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live enumerated transmission topology VJP companion"
+  },
+  {
+    "symbol": "enumerated_transmission_topology_pack_jvp",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_enumerated_transmission_topology_pack_jvp",
+    "binding_registration": {
+      "path": "native/channel_native/binding/path.cpp",
+      "line": 1000
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/path.cpp",
+        "lines": [310],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/enumerated_transmission_topology_pack.cu",
+        "lines": [645],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.jvp",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
+        "line": 119
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/transmission.py",
+        "line": 131
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
+        "line": 129
+      }
+    ],
+    "contract_test": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_jvp_routes_only_valid_continuous_geometry",
+    "e2e_callers": [
+      "tests/propagation/enumerated/test_transmission_integration.py::test_ad_route_uses_native_tape_companions_and_live_geometry"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live enumerated transmission topology JVP companion"
+  },
+  {
+    "symbol": "enumerated_capacity_failure_sanitize",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_enumerated_capacity_failure_sanitize",
+    "binding_registration": {
+      "path": "native/channel_native/binding/path.cpp",
+      "line": 1009
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/path.cpp",
+        "lines": [316],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/enumerated_capacity_failure_sanitize.cu",
+        "lines": [182],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.propagation.enumerated.capacity._EnumeratedCapacityFailureSanitizeFunction.forward",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+        "line": 342
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/engine.py",
+        "line": 294
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+        "line": 343
+      }
+    ],
+    "contract_test": "tests/propagation/enumerated/test_capacity_pack.py::test_failure_sanitizers_preserve_success_and_zero_invalid_poison",
+    "e2e_callers": [
+      "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "Phase E transition sanitizer; removed by ADR-029 Phase D atomic capacity switch"
+  },
+  {
+    "symbol": "enumerated_capacity_failure_vector_sanitize",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_enumerated_capacity_failure_vector_sanitize",
+    "binding_registration": {
+      "path": "native/channel_native/binding/path.cpp",
+      "line": 1036
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/path.cpp",
+        "lines": [340],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/enumerated_capacity_failure_sanitize.cu",
+        "lines": [264],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.propagation.enumerated.capacity._enumerated_capacity_failure_vector_sanitize_native",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+        "line": 87
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+        "line": 548
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/enumerated/capacity.py",
+        "line": 91
+      }
+    ],
+    "contract_test": "tests/propagation/enumerated/test_capacity_pack.py::test_vector_failure_sanitizer_is_native_vjp_jvp_identity_on_success",
+    "e2e_callers": [
+      "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "Phase E transition diffraction sidecar sanitizer; removed by ADR-029 Phase D atomic capacity switch"
   }
   ],
   "phase8b_c2d_deterministic_path_table_capacity": {
@@ -12748,7 +12969,7 @@
     "launch_resource_ledger": "docs/dev/audit/adr-027-mc-transmission-wall-product-resource-ledger.json"
   },
   "phase6c_adr027_penetration_foundation": {
-    "status": "dormant foundation implemented; live enumerated and Monte Carlo switches pending",
+    "status": "enumerated switch live; Monte Carlo switch pending",
     "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
     "integration_header": "backends/torch/include/rayd/torch/integration.h",
     "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
@@ -12759,12 +12980,16 @@
       "rayd_segment_penetration_forward_tape",
       "rayd_segment_penetration_backward",
       "rayd_segment_penetration_jvp",
-      "enumerated_transmission_topology_pack"
+      "enumerated_transmission_topology_pack",
+      "enumerated_transmission_topology_pack_backward",
+      "enumerated_transmission_topology_pack_jvp",
+      "enumerated_capacity_failure_sanitize",
+      "enumerated_capacity_failure_vector_sanitize"
     ],
     "owner_counts": {
       "RayD": 47,
       "layered": 3,
-      "Channel Native": 184
+      "Channel Native": 188
     },
     "public_api_delta": false,
     "compatibility_alias": false,

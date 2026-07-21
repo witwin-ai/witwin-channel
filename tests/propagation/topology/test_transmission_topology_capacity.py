@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 import torch
 
@@ -52,9 +54,7 @@ def _penetration() -> SegmentPenetrationResult:
         overflow=torch.zeros(3, device="cuda", dtype=torch.bool),
         distance=torch.tensor([1.0, 2.0, 3.0], device="cuda"),
         direction=torch.tensor([[1.0, 0.0, 0.0]] * 3, device="cuda"),
-        t=torch.tensor(
-            [[-1.0, -1.0], [1.0, -1.0], [1.0, 2.0]], device="cuda"
-        ),
+        t=torch.tensor([[-1.0, -1.0], [1.0, -1.0], [1.0, 2.0]], device="cuda"),
         position=position,
         normal=normal,
         geometric_normal=torch.full_like(position, -9.0),
@@ -243,3 +243,88 @@ def test_missing_native_symbol_has_no_fallback(monkeypatch: pytest.MonkeyPatch) 
             tx_count=1,
             rx_count=3,
         )
+
+
+def test_pack_backward_routes_only_valid_continuous_geometry() -> None:
+    base = _penetration()
+    distance = base.distance.detach().clone().requires_grad_(True)
+    position = base.position.detach().clone().requires_grad_(True)
+    normal = base.normal.detach().clone().requires_grad_(True)
+    penetration = replace(
+        base,
+        distance=distance,
+        position=position,
+        normal=normal,
+    )
+    packed = enumerated_transmission_topology_pack(
+        penetration,
+        torch.tensor([0, 1], device="cuda", dtype=torch.int32),
+        torch.tensor([0, 1], device="cuda", dtype=torch.int32),
+        tx_count=1,
+        rx_count=3,
+    )
+
+    objective = (
+        packed.path_length_m.sum()
+        + packed.interaction_position.sum()
+        + packed.interaction_normal.sum()
+        + packed.interaction_positions.sum()
+        + packed.interaction_normals.sum()
+    )
+    grad_distance, grad_position, grad_normal = torch.autograd.grad(
+        objective, (distance, position, normal)
+    )
+
+    assert grad_distance.tolist() == [0.0, 1.0, 0.0]
+    assert grad_position.tolist() == [
+        [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+        [[2.0, 2.0, 2.0], [0.0, 0.0, 0.0]],
+        [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+    ]
+    assert grad_normal.tolist() == grad_position.tolist()
+
+
+def test_pack_jvp_routes_only_valid_continuous_geometry() -> None:
+    base = _penetration()
+    tangent_distance = torch.tensor([3.0, 5.0, 7.0], device="cuda")
+    tangent_position = torch.arange(
+        base.position.numel(), device="cuda", dtype=torch.float32
+    ).reshape_as(base.position)
+    tangent_normal = tangent_position + 100.0
+
+    with torch.autograd.forward_ad.dual_level():
+        penetration = replace(
+            base,
+            distance=torch.autograd.forward_ad.make_dual(
+                base.distance, tangent_distance
+            ),
+            position=torch.autograd.forward_ad.make_dual(
+                base.position, tangent_position
+            ),
+            normal=torch.autograd.forward_ad.make_dual(base.normal, tangent_normal),
+        )
+        packed = enumerated_transmission_topology_pack(
+            penetration,
+            torch.tensor([0, 1], device="cuda", dtype=torch.int32),
+            torch.tensor([0, 1], device="cuda", dtype=torch.int32),
+            tx_count=1,
+            rx_count=3,
+        )
+        path_length_tangent = torch.autograd.forward_ad.unpack_dual(
+            packed.path_length_m
+        ).tangent
+        position_tangent = torch.autograd.forward_ad.unpack_dual(
+            packed.interaction_positions
+        ).tangent
+        normal_tangent = torch.autograd.forward_ad.unpack_dual(
+            packed.interaction_normals
+        ).tangent
+
+        assert path_length_tangent is not None
+        assert position_tangent is not None
+        assert normal_tangent is not None
+        assert path_length_tangent.tolist() == [0.0, 5.0, 0.0]
+        assert position_tangent[1, 0].tolist() == tangent_position[1, 0].tolist()
+        assert normal_tangent[1, 0].tolist() == tangent_normal[1, 0].tolist()
+        assert torch.count_nonzero(position_tangent[[0, 2]]).item() == 0
+        assert torch.count_nonzero(normal_tangent[[0, 2]]).item() == 0

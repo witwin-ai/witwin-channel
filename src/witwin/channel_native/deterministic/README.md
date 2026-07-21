@@ -52,6 +52,14 @@ device counts. Valid rows are bitwise identical to `build_path_table` for both
 export contract and is non-differentiable; only the existing eleven continuous
 evaluated-path inputs have native backward/JVP companions.
 
+ADR-027 straight-transmission discovery is shared with Path and the ADR-008
+BDPT oracle through `evaluate_enumerated_paths`. The engine owns one pair-major
+`EnumeratedFullDistance` RayD batch, the compile-cached policy diagonal, the
+device actual-count sidecar, and the typed solve transaction. This solver
+sanitizes after scattering, completes accumulation, optional PathTable export,
+and `Result` construction, then enqueues the runtime-owned terminal observer
+exactly once. It does not reconstruct or specialize the penetration route.
+
 Under ADR-030, `deterministic.kernels.diffraction_pair` owns the dormant native
 source-lane pair-reduction primal/VJP/JVP family. One warp owns each endpoint
 pair, lane 0 adds valid source states strictly in ascending ordinal order, and

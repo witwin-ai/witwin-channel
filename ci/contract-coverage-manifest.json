@@ -38,6 +38,9 @@
     "native-deterministic-capacity-finalize": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
     "native-enumerated-canonical-capacity-select": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_contract_needs_no_public_result_capacity",
     "native-enumerated-transmission-topology": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_preserves_pair_capacity_normal_bits_and_device_counts",
+    "native-enumerated-transmission-topology-ad": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_jvp_routes_only_valid_continuous_geometry",
+    "native-enumerated-capacity-failure-sanitize": "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert",
+    "native-enumerated-capacity-failure-vector-sanitize": "tests/propagation/enumerated/test_capacity_pack.py::test_vector_failure_sanitizer_is_native_vjp_jvp_identity_on_success",
     "native-evaluated-paths-canonical-capacity-gather": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
     "native-evaluated-paths-canonical-capacity-gather-ad": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_jvp_all_continuous_fields_and_duality",
     "native-evaluated-paths-capacity-pack": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
@@ -95,6 +98,10 @@
     "deterministic-path-table-capacity": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
     "enumerated-canonical-capacity": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order",
+    "enumerated-capacity-failure": "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert",
+    "enumerated-capacity-failure-ad": "tests/propagation/enumerated/test_capacity_pack.py::test_vector_failure_sanitizer_is_native_vjp_jvp_identity_on_success",
+    "enumerated-transmission": "tests/path/test_path_transmission.py::test_transmission_path_result_events_and_delay",
+    "enumerated-transmission-ad": "tests/ad/test_solver_geometry_ad.py::test_mesh_vertex_transmission_grad_matches_fd",
     "evaluated-paths-canonical-capacity": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
     "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "segment-penetration-capacity": "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction",
@@ -993,11 +1000,52 @@
     ],
     [
       "enumerated_transmission_topology_pack",
-      "witwin.channel_native.propagation.topology.kernels.transmission.enumerated_transmission_topology_pack",
-      "named_wrapper",
+      "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.forward",
+      "native_call_site",
       "native-enumerated-transmission-topology",
       [
+        "enumerated-transmission",
         "segment-penetration-capacity"
+      ]
+    ],
+    [
+      "enumerated_transmission_topology_pack_backward",
+      "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.backward",
+      "native_call_site",
+      "native-enumerated-transmission-topology-ad",
+      [
+        "enumerated-transmission-ad",
+        "segment-penetration-ad"
+      ]
+    ],
+    [
+      "enumerated_transmission_topology_pack_jvp",
+      "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.jvp",
+      "native_call_site",
+      "native-enumerated-transmission-topology-ad",
+      [
+        "enumerated-transmission-ad",
+        "segment-penetration-ad"
+      ]
+    ],
+    [
+      "enumerated_capacity_failure_sanitize",
+      "witwin.channel_native.propagation.enumerated.capacity._EnumeratedCapacityFailureSanitizeFunction.forward",
+      "native_call_site",
+      "native-enumerated-capacity-failure-sanitize",
+      [
+        "enumerated-capacity-failure",
+        "enumerated-transmission"
+      ]
+    ],
+    [
+      "enumerated_capacity_failure_vector_sanitize",
+      "witwin.channel_native.propagation.enumerated.capacity._enumerated_capacity_failure_vector_sanitize_native",
+      "native_call_site",
+      "native-enumerated-capacity-failure-vector-sanitize",
+      [
+        "enumerated-capacity-failure",
+        "enumerated-capacity-failure-ad"
       ]
     ],
     [
@@ -1038,7 +1086,7 @@
     ],
     [
       "evaluated_paths_capacity_pack_backward",
-      "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.backward",
+      "witwin.channel_native.propagation.enumerated.capacity._evaluated_paths_capacity_pack_backward_native",
       "native_call_site",
       "native-evaluated-paths-capacity-pack-ad",
       [
@@ -1047,7 +1095,7 @@
     ],
     [
       "evaluated_paths_capacity_pack_jvp",
-      "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.jvp",
+      "witwin.channel_native.propagation.enumerated.capacity._evaluated_paths_capacity_pack_jvp_native",
       "native_call_site",
       "native-evaluated-paths-capacity-pack-ad",
       [

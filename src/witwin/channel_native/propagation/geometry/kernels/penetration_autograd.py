@@ -231,7 +231,9 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
             _RaydSegmentPenetrationAdFunction._saved_request(ctx)
         )
         native_values = tuple(_ad_native_tensor(value) for value in ctx.saved_tensors)
-        native_origins, native_targets, native_active, *native_tape_values = native_values
+        native_origins, native_targets, native_active, *native_tape_values = (
+            native_values
+        )
         native_input_active = None if ctx.input_active_absent else native_active
         native_tape = _segment_penetration_tape_from_values(
             tuple(native_tape_values),
@@ -300,7 +302,7 @@ def rayd_segment_penetration_ad(
     scene_diagonal: float,
     failure_state: object,
 ) -> SegmentPenetrationResult:
-    """Differentiable dormant RayD segment-penetration entry."""
+    """Differentiable live RayD segment-penetration entry."""
 
     validate_cuda_tensor(
         "vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,)

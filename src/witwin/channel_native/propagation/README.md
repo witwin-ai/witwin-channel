@@ -17,22 +17,36 @@ copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math. The
 Phase 6B move did not split the complete-row fusion or move the BDPT
 transmitted-state family, which remains a complete Channel numerical owner.
 
-ADR-027 Phase P adds a dormant complete RayD straight-segment penetration
-family behind the stable typed boundary. The four Channel ABI/facade entries
-cover primal, forward tape, VJP/backward, and JVP and require an explicit
+ADR-027 assigns the complete RayD straight-segment penetration family behind
+the stable typed boundary. The four Channel ABI/facade entries cover primal,
+forward tape, VJP/backward, and JVP and require an explicit
 `EnumeratedFullDistance` or `MonteCarloTargetInset` policy. Fixed `[N,D]`
 storage, the mandatory `D+1` probe, and the exact solve-owned
-`CapacityFailureState` replace neither live solver route yet; the old
-enumerated and Monte Carlo marches remain authoritative until their separate
-atomic switch/delete commits.
+`CapacityFailureState` are live for enumerated propagation. Path,
+Deterministic, and the ADR-008 BDPT oracle all enter the same enumerated engine,
+which submits one pair-major `EnumeratedFullDistance` batch, consumes the
+compile-cached enumerated scene diagonal, and retains device actual counts in a
+sidecar. The former per-depth active-row/closest-hit march is deleted. Monte
+Carlo Basic remains on its previous route until its separate atomic switch.
+The legacy canonical selector still compacts valid candidate rows after this
+fixed-capacity producer; removing that device-selected shape boundary belongs
+to the later ADR-029 atomic capacity activation and remains an explicit blocker
+for claiming the complete no-D2H/public-capacity solver contract.
 
 `propagation.topology.kernels.enumerated_transmission_topology_pack` is the
-dormant component-5 capacity producer for the enumerated switch. It consumes
-the same failure-state storage as penetration, preserves pair-major `P*C`
-rows, checks validity before every hit/primitive/material read, and makes the
-entire topology/count result inert on overflow or contract failure. Actual
-cardinality remains in CUDA Boolean validity and contiguous CUDA `int32`
-counts; there is no host compaction or count read.
+live component-5 capacity producer for the enumerated route. It consumes the
+same failure-state storage as penetration, preserves pair-major rows, checks
+validity before every hit/primitive/material read, and makes the entire
+topology/count result inert on overflow or contract failure. Actual cardinality
+remains in CUDA Boolean validity and contiguous CUDA `int32` sidecars; there is
+no host compaction or count read. The engine creates one solve transaction and
+returns it as a typed sidecar when an outer solver still has scattering,
+accumulation, or public packing work. Path and Deterministic sanitize after
+scattering and enqueue the unique runtime observer only after their final
+result/array/PathTable assembly. The default ADR-008 oracle has no later owner,
+so the engine sanitizes after fields and observes there. This producer-local
+statement does not waive the legacy selector compaction blocker described
+above.
 
 ADR-025 freezes diffraction ownership by complete operation. After the atomic
 Phase 8A pin/switch/delete, RayD is the sole numerical owner of the pure-wedge

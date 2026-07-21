@@ -24,8 +24,12 @@ from witwin.channel_native.propagation.geometry.endpoints import (
 from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_component_counts,
 )
+from witwin.channel_native.propagation.topology.export import EvaluatedPathSidecars
 from witwin.channel_native.propagation.enumerated.engine import (
     evaluate_enumerated_paths,
+)
+from witwin.channel_native.propagation.enumerated.capacity import (
+    sanitize_enumerated_capacity_transaction,
 )
 from witwin.channel_native.propagation.enumerated.scattering import (
     append_scattering_evaluated_paths,
@@ -164,9 +168,7 @@ def _register_coupled_component(
         return extra_components
     component_id = topology.component_id
     component_counts["coupled"] = int(
-        (
-            (component_id == 3) | (component_id == 4) | (component_id == 7)
-        ).sum().item()
+        ((component_id == 3) | (component_id == 4) | (component_id == 7)).sum().item()
     )
     component_counts["coupled_double_diffraction"] = int(
         (component_id == 7).sum().item()
@@ -278,9 +280,7 @@ def _metadata(
             backward_launch_count=(
                 ad_companion_launches if config.ad_mode == "vjp" else 0
             ),
-            jvp_launch_count=(
-                ad_companion_launches if config.ad_mode == "jvp" else 0
-            ),
+            jvp_launch_count=(ad_companion_launches if config.ad_mode == "jvp" else 0),
             tape_bytes=ad_tape_bytes if config.ad_mode == "vjp" else 0,
             accumulation_strategy="atomic_add",
             scheduling_strategy="native_fused"
@@ -324,6 +324,12 @@ def _metadata(
     )
     metadata["semantic_capabilities"] = capabilities()["solvers"]["deterministic"]
     return metadata
+
+
+def _terminal_check_capacity(sidecars: EvaluatedPathSidecars) -> None:
+    transaction = sidecars.capacity_transaction
+    if transaction is not None:
+        transaction.terminal_check()
 
 
 def solve(scene: Scene, config: Config) -> Result:
@@ -373,19 +379,19 @@ def solve(scene: Scene, config: Config) -> Result:
         # Stream coupled discovery over receiver blocks so a full grid solve
         # stays under the per-block candidate budget (ADR-011).
         coupled_rx_streaming=config.coupled_paths,
+        defer_capacity_terminal=True,
     )
     evaluated, sidecars, scattering_info = _append_scattering(
         scene, config, evaluated, sidecars
     )
+    evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
     topology = evaluated.topology
     path_count = evaluated.row_count
     component_counts = deterministic_component_counts(topology.component_id)
     # The native counter materializes only los/reflection/diffraction slots.
     for name, cid in (("transmission", 5), ("scattering", 6)):
         if name in config.components:
-            component_counts[name] = int(
-                (topology.component_id == cid).sum().item()
-            )
+            component_counts[name] = int((topology.component_id == cid).sum().item())
     extra_components = tuple(
         name for name in _OPTIONAL_COMPONENTS if name in config.components
     )
@@ -471,7 +477,7 @@ def solve(scene: Scene, config: Config) -> Result:
                 and path_count < candidate_count,
             },
         }
-    return Result(
+    result = Result(
         path_gain=path_gain,
         field=field,
         component_power=component_power,
@@ -488,3 +494,5 @@ def solve(scene: Scene, config: Config) -> Result:
         metadata=metadata,
         diagnostics=diagnostics,
     )
+    _terminal_check_capacity(sidecars)
+    return result

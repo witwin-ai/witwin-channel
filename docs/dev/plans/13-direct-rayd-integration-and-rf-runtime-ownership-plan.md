@@ -614,8 +614,8 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ### Phase 6C — ADR-027 后续：Batched penetration / MC glue native 化
 
-**状态：IN PROGRESS（2026-07-21）；Phase P dormant foundation 已实现，enumerated 与 MC
-atomic switch/delete 尚未执行。**
+**状态：IN PROGRESS（2026-07-21）；Phase P foundation 与 enumerated atomic
+switch/delete 已实现，MC atomic switch/delete 尚未执行。**
 
 ADR-027 已冻结第 5.5 节两套显式 march policy、稳定 typed API、固定 `[N,D]` hit/tape、一次
 batched traversal、`D+1` overflow probe、device fail-loud/no partial、完整
@@ -644,10 +644,18 @@ implicit-all-valid、optional-mask compatibility 或 Torch 合成 fallback。该
 
 1. RayD dormant typed family + direct tests；**已完成**；
 2. Channel dormant façade、failure-state wiring、component-5 topology pack 与 native MC
-   estimator foundation；**已实现，待本阶段完整验证提交**；
-3. enumerated atomic pin/switch/delete；
+   estimator foundation；**已完成**；
+3. enumerated atomic pin/switch/delete；**已实现，待最终 CUDA/nightly 性能证据收口**；
 4. MC Basic atomic switch/delete；
 5. 两仓 exact/AD/Nsight/performance/packaging 证据与文档收口。
+
+第 3 步只原子替换 penetration discovery：旧 canonical selector 仍对 fixed-capacity block
+执行 valid-row device-selected shape compaction。实际 candidate/guardrail count 不进入 metadata
+host read，但该既有 compaction/D2H shape 边界必须在后续 ADR-029 capacity activation 中删除；
+在此之前不得宣称完整 solver no-D2H、public capacity activation 或 Phase 6C/12 性能验收完成。
+Path 还在 final failure sanitizer 后、legacy result converter 前保留第二个 valid-row structural
+compaction，确保 overflow 后的 `-1` identifiers 不被旧 converter 读取；它与 pre-selector
+compaction 同属 Phase D 必删 blocker，不是新的长期契约。
 
 不得与 ADR-024 move-only 提交混合，也不得使用临时 generation 名称或兼容 alias。激活前必须
 证明每个非空 batch 恰有一次 OptiX traversal、无 host Boolean/count read、target stage median

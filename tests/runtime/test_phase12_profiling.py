@@ -81,9 +81,7 @@ def test_cuda_profile_mark_emits_only_the_semantic_payload(monkeypatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(profiling.torch.cuda.nvtx, "mark", calls.append)
 
-    profiling.cuda_profile_mark(
-        profiling.CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST
-    )
+    profiling.cuda_profile_mark(profiling.CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
 
     assert calls == ["witwin.channel_native:diffraction_exporter_request"]
 
@@ -139,9 +137,7 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
         "diffraction": ["deterministic_diffraction_pair_reduce"],
     }
     accepted_owner_records = "\n".join(
-        (_ROOT / "docs" / "dev" / "standards" / filename).read_text(
-            encoding="utf-8"
-        )
+        (_ROOT / "docs" / "dev" / "standards" / filename).read_text(encoding="utf-8")
         for filename in (
             "adr-027-batched-segment-penetration.md",
             "adr-030-deterministic-diffraction-pair-reduction.md",
@@ -156,9 +152,7 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
             ncu_families = variant["ncu_kernel_families"]
             assert ncu_families == sorted(set(ncu_families))
             assert ncu_families == (
-                []
-                if variant_name == "baseline"
-                else expected_ncu_families[group_name]
+                [] if variant_name == "baseline" else expected_ncu_families[group_name]
             )
             assert all(
                 family.isascii()
@@ -225,9 +219,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     assert _profile_enum_members(montecarlo, "profiled_cuda_range") == {
         "MONTECARLO_BASIC_PENETRATION_DISCOVERY"
     }
-    assert _profile_enum_members(montecarlo, "cuda_profile_mark") == {
-        "OPTIX_TRAVERSAL"
-    }
+    assert _profile_enum_members(montecarlo, "cuda_profile_mark") == {"OPTIX_TRAVERSAL"}
 
     diffraction = _function(
         "src/witwin/channel_native/propagation/enumerated/diffraction.py",
@@ -242,14 +234,6 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     }
     assert "CAPACITY_STATUS" not in ast.dump(diffraction)
     assert "DIFFRACTION_PAIR_REDUCER" not in ast.dump(diffraction)
-
-    transmission_query = _function(
-        "src/witwin/channel_native/propagation/geometry/transmission.py",
-        "query_transmission_closest_hit",
-    )
-    assert _profile_enum_members(transmission_query, "cuda_profile_mark") == {
-        "OPTIX_TRAVERSAL"
-    }
 
     diffraction_query = _function(
         "src/witwin/channel_native/propagation/geometry/diffraction.py",

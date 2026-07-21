@@ -1,7 +1,7 @@
 # ADR-027: Batched segment-penetration geometry
 
-- **Status:** Accepted (2026-07-20); dormant RayD/Channel Phase P foundation
-  implemented, enumerated and Monte Carlo activation pending
+- **Status:** Accepted (2026-07-20); RayD/Channel foundation and enumerated
+  activation implemented, Monte Carlo activation pending
 - **Date:** 2026-07-20
 - **Kind:** Native geometry, launch/fusion, fixed-capacity, automatic
   differentiation, and cross-repository ownership decision.
@@ -278,10 +278,21 @@ path unreachable.
 3. **Dormant Channel contracts:** add the single owning Python/native facades,
    binding/coverage manifests, failure-state wiring, and the Channel-native MC
    material/TE-TM/product operation. The live solvers still use the old path.
-4. **Enumerated atomic switch:** pin the pushed RayD commit, switch Path and
+4. **Enumerated atomic switch (completed 2026-07-21):** pin the pushed RayD commit, switch Path and
    Deterministic to `EnumeratedFullDistance`, preserve pair-major order, and
    delete the repeated closest-hit discovery loop and now-dead transmission
-   active-row/query helpers. No compatibility facade remains.
+   active-row/query helpers. No compatibility facade remains. The ADR-008 BDPT
+   oracle continues to call the same public enumerated engine and therefore
+   consumes this route without a solver-specific dependency. The engine owns
+   one solve capacity transaction, keeps actual candidate/guardrail counts as
+   device sidecars, and passes the transaction outward when Path or
+   Deterministic still has scattering, accumulation, result, PathTable, or
+   array packing work. Those solvers enqueue the single runtime observer after
+   final assembly; the default ADR-008 oracle observes after field evaluation
+   because it has no later owner. The switch deliberately retains the
+   downstream legacy canonical valid-row compaction until ADR-029 activation;
+   that device-selected-shape boundary remains a release/performance blocker
+   and is not counted as completion of the public capacity-result contract.
 5. **Monte Carlo atomic switch:** switch MC Basic to one flattened
    `MonteCarloTargetInset` batch, route its resident hit block through the
    Channel native estimator, and delete the Torch depth loop, host Boolean

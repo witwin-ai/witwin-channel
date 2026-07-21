@@ -18,6 +18,16 @@ geometry re-evaluation, and electromagnetic field evaluation remain owned by
   expansion. `metadata.py` owns truthful solver metadata.
 - `propagation.enumerated.engine.evaluate_enumerated_paths` is the typed
   discovery/evaluation owner consumed by this package.
+- ADR-027 straight-transmission discovery reaches that owner as one pair-major
+  `EnumeratedFullDistance` RayD batch. Path does not own a closest-hit march or
+  depth loop. It carries the typed solve transaction through scattering,
+  sanitizes evaluated rows and the diffraction sidecar before result packing,
+  and enqueues the runtime-owned terminal observer exactly once after synthetic
+  or explicit array packing.
+- Until ADR-029 Phase D activates the native public capacity pack, Path performs
+  one explicit post-sanitizer valid-row structural compaction before the legacy
+  result converter. This prevents failed `-1` identifiers from reaching that
+  converter but remains a declared device-selected-shape/D2H blocker.
 
 ## Public entry points
 

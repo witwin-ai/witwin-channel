@@ -16,59 +16,16 @@
 namespace {
 
 constexpr int kPackBlockSize = 256;
-using cfloat = c10::complex<float>;
 using channel_native::check_tensor;
 
-struct PackInput {
-    const int *tx_id;
-    const int *rx_id;
-    const int *depth;
-    const int *component_id;
-    const int *primitive_id;
-    const int *edge_id;
-    const int *material_id;
-    const int *primitive_sequence;
-    const int *material_sequence;
-    const int *interaction_type;
-    const float *path_length_m;
-    const float *delay_s;
-    const float *field_direction;
-    const float *interaction_position;
-    const float *interaction_normal;
-    const float *interaction_positions;
-    const float *interaction_normals;
-    const float *path_gain;
-    const cfloat *path_field;
-    const cfloat *field_xyz;
-    const cfloat *coefficient;
-};
+using PackInput = channel_native::evaluated_paths::PayloadInputView;
 
 struct PackOutput {
     int64_t *selected_row_index;
     bool *valid;
     int *num_paths;
     bool *overflow;
-    int *tx_id;
-    int *rx_id;
-    int *depth;
-    int *component_id;
-    int *primitive_id;
-    int *edge_id;
-    int *material_id;
-    int *primitive_sequence;
-    int *material_sequence;
-    int *interaction_type;
-    float *path_length_m;
-    float *delay_s;
-    float *field_direction;
-    float *interaction_position;
-    float *interaction_normal;
-    float *interaction_positions;
-    float *interaction_normals;
-    float *path_gain;
-    cfloat *path_field;
-    cfloat *field_xyz;
-    cfloat *coefficient;
+    channel_native::evaluated_paths::PayloadOutputView payload;
 };
 
 __global__ void evaluated_paths_capacity_init_kernel(
@@ -89,37 +46,8 @@ __global__ void evaluated_paths_capacity_init_kernel(
         }
         output.selected_row_index[row] = -1;
         output.valid[row] = false;
-        output.tx_id[row] = -1;
-        output.rx_id[row] = -1;
-        output.depth[row] = 0;
-        output.component_id[row] = -1;
-        output.primitive_id[row] = -1;
-        output.edge_id[row] = -1;
-        output.material_id[row] = -1;
-        output.path_length_m[row] = -1.0f;
-        output.delay_s[row] = -1.0f;
-        output.path_gain[row] = 0.0f;
-        output.path_field[row] = cfloat(0.0f, 0.0f);
-        output.coefficient[row] = cfloat(0.0f, 0.0f);
-        const int64_t vec = row * 3;
-        for (int component = 0; component < 3; ++component) {
-            output.field_direction[vec + component] = 0.0f;
-            output.interaction_position[vec + component] = 0.0f;
-            output.interaction_normal[vec + component] = 0.0f;
-            output.field_xyz[vec + component] = cfloat(0.0f, 0.0f);
-        }
-        const int64_t sequence = row * sequence_width;
-        const int64_t sequence_vec = sequence * 3;
-        for (int64_t slot = 0; slot < sequence_width; ++slot) {
-            output.primitive_sequence[sequence + slot] = -1;
-            output.material_sequence[sequence + slot] = -1;
-            output.interaction_type[sequence + slot] = 0;
-            const int64_t slot_vec = sequence_vec + slot * 3;
-            for (int component = 0; component < 3; ++component) {
-                output.interaction_positions[slot_vec + component] = 0.0f;
-                output.interaction_normals[slot_vec + component] = 0.0f;
-            }
-        }
+        channel_native::evaluated_paths::initialize_row(
+            output.payload, row, sequence_width);
     }
     if (blockIdx.x == 0 && threadIdx.x == 0) {
         output.overflow[0] = false;
@@ -146,48 +74,8 @@ __global__ void evaluated_paths_capacity_gather_kernel(
             continue;
         }
         const int64_t source = output.selected_row_index[destination];
-        output.tx_id[destination] = input.tx_id[source];
-        output.rx_id[destination] = input.rx_id[source];
-        output.depth[destination] = input.depth[source];
-        output.component_id[destination] = input.component_id[source];
-        output.primitive_id[destination] = input.primitive_id[source];
-        output.edge_id[destination] = input.edge_id[source];
-        output.material_id[destination] = input.material_id[source];
-        output.path_length_m[destination] = input.path_length_m[source];
-        output.delay_s[destination] = input.delay_s[source];
-        output.path_gain[destination] = input.path_gain[source];
-        output.path_field[destination] = input.path_field[source];
-        output.coefficient[destination] = input.coefficient[source];
-        const int64_t destination_vec = destination * 3;
-        const int64_t source_vec = source * 3;
-        for (int component = 0; component < 3; ++component) {
-            output.field_direction[destination_vec + component] =
-                input.field_direction[source_vec + component];
-            output.interaction_position[destination_vec + component] =
-                input.interaction_position[source_vec + component];
-            output.interaction_normal[destination_vec + component] =
-                input.interaction_normal[source_vec + component];
-            output.field_xyz[destination_vec + component] =
-                input.field_xyz[source_vec + component];
-        }
-        const int64_t destination_sequence = destination * sequence_width;
-        const int64_t source_sequence = source * sequence_width;
-        for (int64_t slot = 0; slot < sequence_width; ++slot) {
-            output.primitive_sequence[destination_sequence + slot] =
-                input.primitive_sequence[source_sequence + slot];
-            output.material_sequence[destination_sequence + slot] =
-                input.material_sequence[source_sequence + slot];
-            output.interaction_type[destination_sequence + slot] =
-                input.interaction_type[source_sequence + slot];
-            const int64_t destination_slot = (destination_sequence + slot) * 3;
-            const int64_t source_slot = (source_sequence + slot) * 3;
-            for (int component = 0; component < 3; ++component) {
-                output.interaction_positions[destination_slot + component] =
-                    input.interaction_positions[source_slot + component];
-                output.interaction_normals[destination_slot + component] =
-                    input.interaction_normals[source_slot + component];
-            }
-        }
+        channel_native::evaluated_paths::copy_row(
+            input, output.payload, source, destination, sequence_width);
     }
 }
 
@@ -257,30 +145,11 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
     auto out = channel_native::evaluated_paths::allocate_payload(
         valid, row_capacity, sequence_width);
 
-    const PackInput input{
-        tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), depth.data_ptr<int>(),
-        component_id.data_ptr<int>(), primitive_id.data_ptr<int>(), edge_id.data_ptr<int>(),
-        material_id.data_ptr<int>(), primitive_sequence.data_ptr<int>(),
-        material_sequence.data_ptr<int>(), interaction_type.data_ptr<int>(),
-        path_length_m.data_ptr<float>(), delay_s.data_ptr<float>(),
-        field_direction.data_ptr<float>(), interaction_position.data_ptr<float>(),
-        interaction_normal.data_ptr<float>(), interaction_positions.data_ptr<float>(),
-        interaction_normals.data_ptr<float>(), path_gain.data_ptr<float>(),
-        path_field.data_ptr<cfloat>(), field_xyz.data_ptr<cfloat>(),
-        coefficient.data_ptr<cfloat>()};
+    const PackInput input = channel_native::evaluated_paths::input_view(payload);
     const PackOutput output{
         selected_row_index.data_ptr<int64_t>(), out_valid.data_ptr<bool>(),
-        num_paths.data_ptr<int>(), overflow.data_ptr<bool>(), out.tx_id.data_ptr<int>(),
-        out.rx_id.data_ptr<int>(), out.depth.data_ptr<int>(),
-        out.component_id.data_ptr<int>(), out.primitive_id.data_ptr<int>(),
-        out.edge_id.data_ptr<int>(), out.material_id.data_ptr<int>(),
-        out.primitive_sequence.data_ptr<int>(), out.material_sequence.data_ptr<int>(),
-        out.interaction_type.data_ptr<int>(), out.path_length_m.data_ptr<float>(),
-        out.delay_s.data_ptr<float>(), out.field_direction.data_ptr<float>(),
-        out.interaction_position.data_ptr<float>(), out.interaction_normal.data_ptr<float>(),
-        out.interaction_positions.data_ptr<float>(), out.interaction_normals.data_ptr<float>(),
-        out.path_gain.data_ptr<float>(), out.path_field.data_ptr<cfloat>(),
-        out.field_xyz.data_ptr<cfloat>(), out.coefficient.data_ptr<cfloat>()};
+        num_paths.data_ptr<int>(), overflow.data_ptr<bool>(),
+        channel_native::evaluated_paths::output_view(out)};
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     const int64_t init_count = std::max<int64_t>(1, std::max(row_capacity, pair_count));
     evaluated_paths_capacity_init_kernel<<<

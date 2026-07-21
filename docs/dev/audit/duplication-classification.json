@@ -130,17 +130,6 @@
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 134
     },
-    "0c15425799261dd5": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
-      "files": [
-        "autograd.py"
-      ],
-      "owner": "autograd",
-      "provenance": "hand-curated",
-      "reason": "Repeated dataclass/model construction and argument boilerplate.",
-      "token_count": 110
-    },
     "0e638b46f6ebf1be": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -2016,18 +2005,6 @@
       "reason": "Repeated source-unique cotangent row scatter for the same eleven continuous tensor fields; no reduction or floating-point formula is shared.",
       "token_count": 353
     },
-    "04cd2d0f72ab3a86": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_canonical_capacity_gather.cu",
-        "evaluated_paths_capacity_pack.cu"
-      ],
-      "owner": "propagation.enumerated fixed-capacity payload boundary",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated typed payload pointer packing into independently owned fixed-capacity kernels.",
-      "token_count": 269
-    },
     "089e31c8c3dd4d1e": {
       "category": "other",
       "corpus": "native",
@@ -2075,18 +2052,6 @@
       "reason": "Repeated host-side tensor allocation shapes for continuous and complete evaluated-path payload contracts.",
       "token_count": 140
     },
-    "3c3a1f2a3207af65": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_canonical_capacity_gather.cu",
-        "evaluated_paths_capacity_pack.cu"
-      ],
-      "owner": "propagation.enumerated fixed-capacity payload boundary",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated device pointer schema for the same EvaluatedPaths payload fields.",
-      "token_count": 108
-    },
     "484beedcf38e9196": {
       "category": "host_check",
       "corpus": "native",
@@ -2099,34 +2064,6 @@
       "reason": "Repeated optional CUDA tensor shape, dtype, device, and stride extraction at typed AD boundaries.",
       "token_count": 146
     },
-    "5aa45e642061d3d0": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_canonical_capacity_gather.cu",
-        "evaluated_paths_capacity_pack.cu",
-        "evaluated_paths_continuous_gather_ad.cuh"
-      ],
-      "owner": "propagation.enumerated fixed-capacity payload boundary",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated pointer-view assembly for resident evaluated-path output tensors.",
-      "token_count": 191
-    },
-    "81d4155d89c9472f": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_canonical_capacity_gather.cu",
-        "evaluated_paths_canonical_capacity_gather_ad.cu",
-        "evaluated_paths_capacity_pack.cu",
-        "evaluated_paths_capacity_pack_ad.cu",
-        "path_result_capacity_pack_ad.cu"
-      ],
-      "owner": "fixed-capacity inert output initialization",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated inert zero and sentinel initialization for structurally identical fixed-capacity output fields.",
-      "token_count": 400
-    },
     "87dc65b298223cb1": {
       "category": "other",
       "corpus": "native",
@@ -2138,53 +2075,6 @@
       "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
       "reason": "Repeated explicit backward signatures for eleven optional continuous cotangents.",
       "token_count": 129
-    },
-    "b16b638493336889": {
-      "category": "indexing_packing",
-      "corpus": "python",
-      "files": [
-        "canonical_capacity.py",
-        "capacity.py"
-      ],
-      "owner": "propagation.enumerated typed result assembly",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated non-numerical assembly of PathTopology, PathGeometry, and PathFields from native named outputs.",
-      "token_count": 191
-    },
-    "b1d3bce5770d44ca": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "path.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated explicit backward and JVP native declarations preserve complete typed signatures.",
-      "token_count": 107
-    },
-    "b4bc76bbb585e393": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_canonical_capacity_gather.cu",
-        "evaluated_paths_capacity_pack.cu"
-      ],
-      "owner": "propagation.enumerated fixed-capacity payload boundary",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated construction of resident source payload pointer views before native launch.",
-      "token_count": 107
-    },
-    "c4e136228e78907b": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_canonical_capacity_gather.cu",
-        "evaluated_paths_capacity_pack.cu"
-      ],
-      "owner": "propagation.enumerated fixed-capacity primal packing",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated valid-first resident row payload copy for the same EvaluatedPaths schema; no reduction or floating-point formula is shared.",
-      "token_count": 436
     },
     "dc657c2d5c0f6110": {
       "category": "indexing_packing",
@@ -2281,17 +2171,6 @@
       "provenance": "Phase P RayD API 6 hand-reviewed refresh",
       "reason": "Repeated explicit scattering facade signatures and valid-mask validation preserve keyword, inspect, and native-dispatch contracts without providing a Python numerical backend.",
       "token_count": 149
-    },
-    "51f5c04ffcea2d40": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "path.cpp"
-      ],
-      "owner": "path bindings",
-      "provenance": "Phase P ADR-027 hand-reviewed refresh",
-      "reason": "Repeated explicit pybind registration lambdas and named arguments preserve stable typed fixed-capacity operation signatures; the region contains no geometry or RF implementation.",
-      "token_count": 214
     },
     "6bdda1482b7cc655": {
       "category": "fixture_boilerplate",
@@ -2400,6 +2279,122 @@
       "provenance": "Phase P RayD API 6 hand-reviewed refresh",
       "reason": "Repeated explicit valid-mask tensor contract checks enforce shape, dtype, device, and contiguity before native dispatch; no numerical expression is present.",
       "token_count": 103
+    },
+    "0c15425799261dd5": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 110
+    },
+    "29f15a107fda2427": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity payload initialization",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated structural pair/row inert initialization delegates all payload fields to the shared device initialize_row primitive.",
+      "token_count": 153
+    },
+    "3a03c110fcf83a42": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "bridge.py"
+      ],
+      "owner": "propagation.geometry segment penetration bridge",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated VJP/JVP tape identity and request-shape validation before native companion dispatch.",
+      "token_count": 101
+    },
+    "3ab36f984254672a": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "path bindings",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated complete evaluated-path tensor declaration order at the explicit typed ABI boundary.",
+      "token_count": 117
+    },
+    "59881bedbaeb7f03": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "capacity.py"
+      ],
+      "owner": "propagation.enumerated fixed-capacity autograd facade",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated native-output tuple and setup_context glue for fixed-capacity pack and failure sanitizer companions.",
+      "token_count": 104
+    },
+    "9b4aa0883a0e541a": {
+      "category": "indexing_packing",
+      "corpus": "python",
+      "files": [
+        "canonical_capacity.py",
+        "capacity.py"
+      ],
+      "owner": "propagation.enumerated typed result assembly",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated non-numerical assembly of PathTopology, PathGeometry, and PathFields from native named outputs.",
+      "token_count": 191
+    },
+    "bb7ce2b1f6892aba": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "path bindings",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated explicit pybind registrations and named arguments preserve stable typed fixed-capacity operation signatures.",
+      "token_count": 214
+    },
+    "c03a4bc38400ad77": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "owner": "native fixed-capacity AD inert initialization",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated AD-only inert tangent initialization remains structural and contains no floating-point formula or reduction.",
+      "token_count": 400
+    },
+    "c5333985f3b9364f": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_payload_plumbing.h"
+      ],
+      "owner": "propagation.enumerated shared payload plumbing",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Mirrored typed input/output data_ptr view assembly for the resident evaluated-path payload is structural only.",
+      "token_count": 239
+    },
+    "dd885b2b2c57138c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "enumerated_capacity_failure_sanitize.cu",
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "native fixed-capacity evaluated-path boundaries",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated explicit complete callable signatures at independently owned typed boundaries contain no physics implementation.",
+      "token_count": 117
     }
   },
   "schema_version": 1,
@@ -2425,6 +2420,20 @@
     "new_region_count": 14,
     "pruned_region_count": 12,
     "note": "Phase P added the dormant ADR-027 segment-penetration/topology foundation and adapted existing RayD-owned RF facades to the API 6 explicit valid-mask contract. All live exact-token regions were hand-reviewed and stale ids were pruned without changing the frozen maintenance budget or the immutable Phase 11A/11B evidence.",
+    "region_count": 171,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "phase13_phase_e_refresh": {
+    "combined_duplicate_lines": 9621,
+    "combined_total_lines": 95279,
+    "coverage_percent": 10.097713,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 9,
+    "pruned_region_count": 9,
+    "note": "Phase E activated the ADR-027 enumerated batched penetration path, added ADR-029 result-boundary failure sanitization, and consolidated primal evaluated-path payload views plus inert row initialization/copy into shared structural plumbing. All current exact-token regions were hand-reviewed and stale ids were pruned without changing the frozen maintenance budget or historical Phase 11/Phase P evidence.",
     "region_count": 171,
     "stale_region_count": 0,
     "unclassified_region_count": 0,

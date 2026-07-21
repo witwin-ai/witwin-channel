@@ -30,9 +30,12 @@ priority `scattering > diffraction > transmission > reflection > los`.
 - ADR-027 Phase P exposes the complete RayD fixed-capacity straight-segment
   penetration primal/tape/VJP/JVP family, Channel named facades, shared
   capacity-failure wiring, compile-frozen policy diagonals, component-5
-  topology pack, and MC wall-product prefix semantics. These producers are
-  dormant until the enumerated and MC atomic switch commits; current solver
-  routes remain unchanged and retain no compatibility alias.
+  topology pack, and MC wall-product prefix semantics. Path, Deterministic,
+  and the ADR-008 BDPT oracle now share one live pair-major
+  `EnumeratedFullDistance` batch through the enumerated engine. The old
+  per-depth active-row/closest-hit march is deleted without a compatibility
+  alias. Monte Carlo Basic retains its existing route until its separate
+  `MonteCarloTargetInset` atomic switch.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and

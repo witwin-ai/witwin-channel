@@ -83,9 +83,8 @@ def test_typed_engine_remains_before_optional_scattering_append():
         (_function(deterministic_pipeline, "solve"), "_append_scattering"),
     )
     for definition, append_call in cases:
-        assert (
-            _call_line(definition, "evaluate_enumerated_paths")
-            < _call_line(definition, append_call)
+        assert _call_line(definition, "evaluate_enumerated_paths") < _call_line(
+            definition, append_call
         )
         call_names = {
             node.func.id
@@ -94,6 +93,49 @@ def test_typed_engine_remains_before_optional_scattering_append():
         }
         assert "export_topology" not in call_names
         assert "export_evaluated_rows" not in call_names
+
+
+def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
+    path_base = _function(path_pipeline, "_solve_base")
+    assert _call_line(path_base, "append_scattering_evaluated_paths") < _call_line(
+        path_base, "sanitize_enumerated_capacity_transaction"
+    )
+    assert _call_line(
+        path_base, "sanitize_enumerated_capacity_transaction"
+    ) < _call_line(path_base, "_compact_valid_evaluated_paths_for_legacy_result")
+    assert _call_line(
+        path_base, "_compact_valid_evaluated_paths_for_legacy_result"
+    ) < _call_line(path_base, "pack_evaluated_paths")
+
+    path_solve = _function(path_pipeline, "solve")
+    path_calls = sorted(
+        [
+            node
+            for node in ast.walk(path_solve)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "terminal_check"
+        ],
+        key=lambda node: node.lineno,
+    )
+    assert len(path_calls) == 2
+    assert _call_line(path_solve, "pack_explicit_arrays") < path_calls[0].lineno
+    assert _call_line(path_solve, "pack_synthetic_arrays") < path_calls[1].lineno
+
+    deterministic = _function(deterministic_pipeline, "solve")
+    deterministic_terminal = _function(
+        deterministic_pipeline, "_terminal_check_capacity"
+    )
+    assert _call_line(deterministic, "_append_scattering") < _call_line(
+        deterministic, "sanitize_enumerated_capacity_transaction"
+    )
+    assert _call_line(
+        deterministic, "sanitize_enumerated_capacity_transaction"
+    ) < _call_line(deterministic, "accumulate_path_result")
+    assert _call_line(deterministic, "Result") < _call_line(
+        deterministic, "_terminal_check_capacity"
+    )
+    assert _call_line(deterministic_terminal, "terminal_check") > 0
 
 
 def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():

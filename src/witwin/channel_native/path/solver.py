@@ -11,6 +11,7 @@ from witwin.channel_native.propagation.enumerated.scattering import (
 from .config import Config
 from .metadata import _metadata
 from .pipeline import (
+    _DeferredPathResult,
     _receiver_positions,
     _solve_base as _pipeline_solve_base,
     _transmitter_tensors,
@@ -20,7 +21,7 @@ from .pipeline import (
 from .result import PathResult, from_evaluated_paths
 
 
-def _solve_base(scene: Scene, config: Config) -> PathResult:
+def _solve_base(scene: Scene, config: Config) -> _DeferredPathResult:
     """Delegate one centre-endpoint solve while preserving legacy test seams."""
 
     return _pipeline_solve_base(

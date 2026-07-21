@@ -68,17 +68,33 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "witwin.channel_native.propagation.topology.kernels.construction."
         "deterministic_los_topology_block"
     ),
+    "enumerated_capacity_failure_sanitize": (
+        "witwin.channel_native.propagation.enumerated.capacity."
+        "_EnumeratedCapacityFailureSanitizeFunction.forward"
+    ),
+    "enumerated_capacity_failure_vector_sanitize": (
+        "witwin.channel_native.propagation.enumerated.capacity."
+        "_enumerated_capacity_failure_vector_sanitize_native"
+    ),
+    "enumerated_transmission_topology_pack_backward": (
+        "witwin.channel_native.propagation.topology.kernels.transmission."
+        "_EnumeratedTransmissionTopologyPackFunction.backward"
+    ),
+    "enumerated_transmission_topology_pack_jvp": (
+        "witwin.channel_native.propagation.topology.kernels.transmission."
+        "_EnumeratedTransmissionTopologyPackFunction.jvp"
+    ),
     "evaluated_paths_capacity_pack": (
         "witwin.channel_native.propagation.enumerated.capacity."
         "_EvaluatedPathsCapacityPackFunction.forward"
     ),
     "evaluated_paths_capacity_pack_backward": (
         "witwin.channel_native.propagation.enumerated.capacity."
-        "_EvaluatedPathsCapacityPackFunction.backward"
+        "_evaluated_paths_capacity_pack_backward_native"
     ),
     "evaluated_paths_capacity_pack_jvp": (
         "witwin.channel_native.propagation.enumerated.capacity."
-        "_EvaluatedPathsCapacityPackFunction.jvp"
+        "_evaluated_paths_capacity_pack_jvp_native"
     ),
     "evaluated_paths_canonical_capacity_gather": (
         "witwin.channel_native.propagation.enumerated.canonical_capacity."
@@ -93,16 +109,13 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "_EvaluatedPathsCanonicalCapacityGatherFunction.jvp"
     ),
     "path_result_capacity_pack": (
-        "witwin.channel_native.path.capacity."
-        "_PathResultCapacityPackFunction.forward"
+        "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.forward"
     ),
     "path_result_capacity_pack_backward": (
-        "witwin.channel_native.path.capacity."
-        "_PathResultCapacityPackFunction.backward"
+        "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.backward"
     ),
     "path_result_capacity_pack_jvp": (
-        "witwin.channel_native.path.capacity."
-        "_PathResultCapacityPackFunction.jvp"
+        "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.jvp"
     ),
     "field_coupled_rd_backward": (
         "witwin.channel_native.propagation.fields.kernels.autograd."

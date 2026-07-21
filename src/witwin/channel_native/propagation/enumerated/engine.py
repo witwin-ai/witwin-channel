@@ -14,6 +14,9 @@ from witwin.channel_native.materials.evaluation import (
 from witwin.channel_native.propagation.enumerated.coupled import (
     coupled_reflection_diffraction_topology,
 )
+from witwin.channel_native.propagation.enumerated.capacity import (
+    sanitize_enumerated_capacity_transaction,
+)
 from witwin.channel_native.propagation.enumerated.diffraction import (
     _diffraction_topology_order1,
 )
@@ -30,6 +33,7 @@ from witwin.channel_native.propagation.geometry.endpoints import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
+from witwin.channel_native.propagation.models.capacity import CapacityExecutionCounts
 from witwin.channel_native.propagation.models.contracts import TopologyConfig
 from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel_native.propagation.topology.concatenate import (
@@ -43,6 +47,10 @@ from witwin.channel_native.propagation.topology.export import (
 )
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
+)
+from witwin.channel_native.runtime.capacity import (
+    SolveCapacityTransaction,
+    create_solve_capacity_transaction,
 )
 from witwin.channel_native.scene.tensors import (
     _frequency_scalar,
@@ -83,12 +91,59 @@ def _resolve_isb_taper(config: TopologyConfig) -> tuple[bool, float, float]:
     return enabled, field_width, los_width
 
 
+def _require_defer_capacity_terminal(value: bool) -> None:
+    if type(value) is not bool:
+        raise TypeError("defer_capacity_terminal must be a bool")
+
+
+def _create_transmission_capacity_transaction(
+    scene: Scene,
+    config: TopologyConfig,
+    components: set[str],
+    tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor,
+) -> SolveCapacityTransaction | None:
+    has_work = (
+        "transmission" in components
+        and config.max_depth >= 1
+        and bool(scene.structures)
+        and int(tx_positions.shape[0]) > 0
+        and int(rx_positions.shape[0]) > 0
+    )
+    if not has_work:
+        return None
+    return create_solve_capacity_transaction(tx_positions)
+
+
+def _capacity_execution_summary(
+    execution: CapacityExecutionCounts | None,
+) -> tuple[CapacityExecutionCounts | None, int]:
+    if execution is None:
+        return None, 0
+    return execution, execution.candidate_capacity
+
+
+def _finish_capacity_boundary(
+    evaluated: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars,
+    transaction: SolveCapacityTransaction | None,
+    *,
+    defer_terminal: bool,
+) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
+    if transaction is None or defer_terminal:
+        return evaluated, sidecars
+    evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
+    transaction.terminal_check()
+    return evaluated, replace(sidecars, capacity_transaction=None)
+
+
 def evaluate_enumerated_paths(
     scene: Scene,
     config: TopologyConfig,
     *,
     frequency_value: float | None = None,
     coupled_rx_streaming: bool = False,
+    defer_capacity_terminal: bool = False,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
 
@@ -97,8 +152,14 @@ def evaluate_enumerated_paths(
     candidate budget (ADR-011). The deterministic grid solver sets it; the path
     and Monte Carlo callers keep the single-shot total-cap discovery, so their
     coupled behavior is unchanged.
+
+    ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
+    solvers, which must sanitize scattering-appended rows and enqueue the one
+    terminal observer only after their public result/array packing. ADR-008
+    opaque oracle callers keep the default and complete the transaction here.
     """
 
+    _require_defer_capacity_terminal(defer_capacity_terminal)
     device = torch.device("cuda")
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
     tx_polarizations = transmitter_polarizations(scene, device=device)
@@ -127,6 +188,12 @@ def evaluate_enumerated_paths(
     candidate_count = 0
     guardrail_count = 0
     diffraction_vector_field = None
+    capacity_execution: CapacityExecutionCounts | None = None
+    capacity_transaction: SolveCapacityTransaction | None = None
+
+    capacity_transaction = _create_transmission_capacity_transaction(
+        scene, config, components, tx_positions, rx_positions
+    )
 
     if "los" in components:
         los_block, los_launches, los_candidates, los_visibility_rejections = (
@@ -192,18 +259,24 @@ def evaluate_enumerated_paths(
         candidate_count += int(block["valid"].numel())
         blocks.append(block)
     if "transmission" in components and config.max_depth >= 1:
-        block, transmission_launches, transmission_candidates, transmission_guardrails = (
-            _transmission_topology(
-                scene,
-                compiled,
-                tx_positions,
-                rx_positions,
-                max_depth=int(config.max_depth),
-            )
+        block, transmission_launches, transmission_execution = _transmission_topology(
+            scene,
+            compiled,
+            tx_positions,
+            rx_positions,
+            max_depth=int(config.max_depth),
+            ad_mode=ad_mode,
+            failure_state=(
+                capacity_transaction.failure_state
+                if capacity_transaction is not None
+                else None
+            ),
         )
         launch_count += transmission_launches
+        capacity_execution, transmission_candidates = _capacity_execution_summary(
+            transmission_execution
+        )
         candidate_count += transmission_candidates
-        guardrail_count += transmission_guardrails
         blocks.append(block)
     if (
         coupled_paths
@@ -249,7 +322,18 @@ def evaluate_enumerated_paths(
             frequency_value=frequency_hz,
             isb_boundary_taper_width=isb_boundary_taper_width,
         )
-        return evaluated, replace(sidecars, execution=execution)
+        sidecars = replace(
+            sidecars,
+            execution=execution,
+            capacity_execution=capacity_execution,
+            capacity_transaction=capacity_transaction,
+        )
+        return _finish_capacity_boundary(
+            evaluated,
+            sidecars,
+            capacity_transaction,
+            defer_terminal=defer_capacity_terminal,
+        )
     padded_blocks = [
         block
         if "primitive_sequence" in block
@@ -273,10 +357,12 @@ def evaluate_enumerated_paths(
         candidate_count=candidate_count,
         guardrail_count=guardrail_count,
     )
-    if diffraction_vector_field is not None:
-        sidecars = replace(
-            sidecars, diffraction_vector_field=diffraction_vector_field
-        )
+    sidecars = replace(
+        sidecars,
+        diffraction_vector_field=diffraction_vector_field,
+        capacity_execution=capacity_execution,
+        capacity_transaction=capacity_transaction,
+    )
     evaluated, execution = evaluate_path_fields(
         scene,
         compiled,
@@ -290,4 +376,10 @@ def evaluate_enumerated_paths(
         frequency_value=frequency_hz,
         isb_boundary_taper_width=isb_boundary_taper_width,
     )
-    return evaluated, replace(sidecars, execution=execution)
+    sidecars = replace(sidecars, execution=execution)
+    return _finish_capacity_boundary(
+        evaluated,
+        sidecars,
+        capacity_transaction,
+        defer_terminal=defer_capacity_terminal,
+    )

@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <optional>
 
 namespace {
 
@@ -275,6 +276,147 @@ void check_rows(
     TORCH_CHECK(tensor.get_device() == device, name, " must share segment device");
 }
 
+void check_optional_float_tensor(
+    const std::optional<at::Tensor>& tensor,
+    const char *name,
+    at::IntArrayRef shape,
+    int device) {
+    if (!tensor.has_value()) {
+        return;
+    }
+    channel_native::check_tensor(*tensor, name, at::kFloat, shape.size());
+    TORCH_CHECK(tensor->sizes() == shape, name, " has an unexpected shape");
+    TORCH_CHECK(tensor->get_device() == device, name, " must share the topology device");
+}
+
+__global__ void transmission_topology_pack_backward_kernel(
+    const bool *topology_valid,
+    const bool *hit_valid,
+    const float *grad_path_length_m,
+    const float *grad_delay_s,
+    const float *grad_interaction_position,
+    const float *grad_interaction_normal,
+    const float *grad_interaction_positions,
+    const float *grad_interaction_normals,
+    float *grad_distance,
+    float *grad_position,
+    float *grad_normal,
+    int64_t pair_count,
+    int64_t hit_capacity) {
+    const int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (row >= pair_count) {
+        return;
+    }
+    grad_distance[row] = 0.0f;
+    for (int64_t slot = 0; slot < hit_capacity; ++slot) {
+        for (int axis = 0; axis < 3; ++axis) {
+            const int64_t vector = (row * hit_capacity + slot) * 3 + axis;
+            grad_position[vector] = 0.0f;
+            grad_normal[vector] = 0.0f;
+        }
+    }
+    if (!topology_valid[row]) {
+        return;
+    }
+    float distance_grad = 0.0f;
+    if (grad_path_length_m != nullptr) {
+        distance_grad += grad_path_length_m[row];
+    }
+    if (grad_delay_s != nullptr) {
+        distance_grad += grad_delay_s[row] / kLightSpeedMetersPerSecond;
+    }
+    grad_distance[row] = distance_grad;
+    for (int64_t slot = 0; slot < hit_capacity; ++slot) {
+        const int64_t sequence = row * hit_capacity + slot;
+        if (!hit_valid[sequence]) {
+            continue;
+        }
+        for (int axis = 0; axis < 3; ++axis) {
+            const int64_t vector = sequence * 3 + axis;
+            float position_grad = 0.0f;
+            float normal_grad = 0.0f;
+            if (grad_interaction_positions != nullptr) {
+                position_grad += grad_interaction_positions[vector];
+            }
+            if (grad_interaction_normals != nullptr) {
+                normal_grad += grad_interaction_normals[vector];
+            }
+            if (slot == 0) {
+                if (grad_interaction_position != nullptr) {
+                    position_grad += grad_interaction_position[row * 3 + axis];
+                }
+                if (grad_interaction_normal != nullptr) {
+                    normal_grad += grad_interaction_normal[row * 3 + axis];
+                }
+            }
+            grad_position[vector] = position_grad;
+            grad_normal[vector] = normal_grad;
+        }
+    }
+}
+
+__global__ void transmission_topology_pack_jvp_kernel(
+    const bool *topology_valid,
+    const bool *hit_valid,
+    const float *tangent_distance,
+    const float *tangent_position,
+    const float *tangent_normal,
+    float *tangent_path_length_m,
+    float *tangent_delay_s,
+    float *tangent_interaction_position,
+    float *tangent_interaction_normal,
+    float *tangent_interaction_positions,
+    float *tangent_interaction_normals,
+    int64_t pair_count,
+    int64_t hit_capacity) {
+    const int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (row >= pair_count) {
+        return;
+    }
+    tangent_path_length_m[row] = 0.0f;
+    tangent_delay_s[row] = 0.0f;
+    for (int axis = 0; axis < 3; ++axis) {
+        tangent_interaction_position[row * 3 + axis] = 0.0f;
+        tangent_interaction_normal[row * 3 + axis] = 0.0f;
+    }
+    for (int64_t slot = 0; slot < hit_capacity; ++slot) {
+        for (int axis = 0; axis < 3; ++axis) {
+            const int64_t vector = (row * hit_capacity + slot) * 3 + axis;
+            tangent_interaction_positions[vector] = 0.0f;
+            tangent_interaction_normals[vector] = 0.0f;
+        }
+    }
+    if (!topology_valid[row]) {
+        return;
+    }
+    if (tangent_distance != nullptr) {
+        tangent_path_length_m[row] = tangent_distance[row];
+        tangent_delay_s[row] = tangent_distance[row] / kLightSpeedMetersPerSecond;
+    }
+    for (int64_t slot = 0; slot < hit_capacity; ++slot) {
+        const int64_t sequence = row * hit_capacity + slot;
+        if (!hit_valid[sequence]) {
+            continue;
+        }
+        for (int axis = 0; axis < 3; ++axis) {
+            const int64_t vector = sequence * 3 + axis;
+            if (tangent_position != nullptr) {
+                tangent_interaction_positions[vector] = tangent_position[vector];
+                if (slot == 0) {
+                    tangent_interaction_position[row * 3 + axis] =
+                        tangent_position[vector];
+                }
+            }
+            if (tangent_normal != nullptr) {
+                tangent_interaction_normals[vector] = tangent_normal[vector];
+                if (slot == 0) {
+                    tangent_interaction_normal[row * 3 + axis] = tangent_normal[vector];
+                }
+            }
+        }
+    }
+}
+
 }  // namespace
 
 pybind11::dict cn_enumerated_transmission_topology_pack(
@@ -419,5 +561,141 @@ pybind11::dict cn_enumerated_transmission_topology_pack(
     result["interaction_normals"] = interaction_normals;
     result["device_candidate_count"] = candidate_count;
     result["device_guardrail_count"] = guardrail_count;
+    return result;
+}
+
+pybind11::dict cn_enumerated_transmission_topology_pack_backward(
+    at::Tensor topology_valid,
+    at::Tensor hit_valid,
+    std::optional<at::Tensor> grad_path_length_m,
+    std::optional<at::Tensor> grad_delay_s,
+    std::optional<at::Tensor> grad_interaction_position,
+    std::optional<at::Tensor> grad_interaction_normal,
+    std::optional<at::Tensor> grad_interaction_positions,
+    std::optional<at::Tensor> grad_interaction_normals) {
+    channel_native::check_tensor(topology_valid, "topology_valid", at::kBool, 1);
+    channel_native::check_tensor(hit_valid, "hit_valid", at::kBool, 2);
+    const int64_t pair_count = topology_valid.size(0);
+    const int64_t hit_capacity = hit_valid.size(1);
+    const int device = topology_valid.get_device();
+    TORCH_CHECK(hit_valid.size(0) == pair_count, "hit_valid rows must match topology_valid");
+    TORCH_CHECK(hit_valid.get_device() == device, "hit_valid must share the topology device");
+    check_optional_float_tensor(
+        grad_path_length_m, "grad_path_length_m", {pair_count}, device);
+    check_optional_float_tensor(grad_delay_s, "grad_delay_s", {pair_count}, device);
+    check_optional_float_tensor(
+        grad_interaction_position,
+        "grad_interaction_position",
+        {pair_count, 3},
+        device);
+    check_optional_float_tensor(
+        grad_interaction_normal,
+        "grad_interaction_normal",
+        {pair_count, 3},
+        device);
+    check_optional_float_tensor(
+        grad_interaction_positions,
+        "grad_interaction_positions",
+        {pair_count, hit_capacity, 3},
+        device);
+    check_optional_float_tensor(
+        grad_interaction_normals,
+        "grad_interaction_normals",
+        {pair_count, hit_capacity, 3},
+        device);
+    const c10::cuda::CUDAGuard device_guard(topology_valid.device());
+    auto options = topology_valid.options().dtype(at::kFloat);
+    auto grad_distance = at::empty({pair_count}, options);
+    auto grad_position = at::empty({pair_count, hit_capacity, 3}, options);
+    auto grad_normal = at::empty({pair_count, hit_capacity, 3}, options);
+    if (pair_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+        transmission_topology_pack_backward_kernel<<<
+            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            topology_valid.data_ptr<bool>(),
+            hit_valid.data_ptr<bool>(),
+            grad_path_length_m.has_value() ? grad_path_length_m->data_ptr<float>() : nullptr,
+            grad_delay_s.has_value() ? grad_delay_s->data_ptr<float>() : nullptr,
+            grad_interaction_position.has_value()
+                ? grad_interaction_position->data_ptr<float>()
+                : nullptr,
+            grad_interaction_normal.has_value()
+                ? grad_interaction_normal->data_ptr<float>()
+                : nullptr,
+            grad_interaction_positions.has_value()
+                ? grad_interaction_positions->data_ptr<float>()
+                : nullptr,
+            grad_interaction_normals.has_value()
+                ? grad_interaction_normals->data_ptr<float>()
+                : nullptr,
+            grad_distance.data_ptr<float>(),
+            grad_position.data_ptr<float>(),
+            grad_normal.data_ptr<float>(),
+            pair_count,
+            hit_capacity);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict result;
+    result["grad_distance"] = grad_distance;
+    result["grad_position"] = grad_position;
+    result["grad_normal"] = grad_normal;
+    return result;
+}
+
+pybind11::dict cn_enumerated_transmission_topology_pack_jvp(
+    at::Tensor topology_valid,
+    at::Tensor hit_valid,
+    std::optional<at::Tensor> tangent_distance,
+    std::optional<at::Tensor> tangent_position,
+    std::optional<at::Tensor> tangent_normal) {
+    channel_native::check_tensor(topology_valid, "topology_valid", at::kBool, 1);
+    channel_native::check_tensor(hit_valid, "hit_valid", at::kBool, 2);
+    const int64_t pair_count = topology_valid.size(0);
+    const int64_t hit_capacity = hit_valid.size(1);
+    const int device = topology_valid.get_device();
+    TORCH_CHECK(hit_valid.size(0) == pair_count, "hit_valid rows must match topology_valid");
+    TORCH_CHECK(hit_valid.get_device() == device, "hit_valid must share the topology device");
+    check_optional_float_tensor(
+        tangent_distance, "tangent_distance", {pair_count}, device);
+    check_optional_float_tensor(
+        tangent_position, "tangent_position", {pair_count, hit_capacity, 3}, device);
+    check_optional_float_tensor(
+        tangent_normal, "tangent_normal", {pair_count, hit_capacity, 3}, device);
+    const c10::cuda::CUDAGuard device_guard(topology_valid.device());
+    auto options = topology_valid.options().dtype(at::kFloat);
+    auto tangent_path_length_m = at::empty({pair_count}, options);
+    auto tangent_delay_s = at::empty({pair_count}, options);
+    auto tangent_interaction_position = at::empty({pair_count, 3}, options);
+    auto tangent_interaction_normal = at::empty({pair_count, 3}, options);
+    auto tangent_interaction_positions =
+        at::empty({pair_count, hit_capacity, 3}, options);
+    auto tangent_interaction_normals =
+        at::empty({pair_count, hit_capacity, 3}, options);
+    if (pair_count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+        transmission_topology_pack_jvp_kernel<<<
+            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            topology_valid.data_ptr<bool>(),
+            hit_valid.data_ptr<bool>(),
+            tangent_distance.has_value() ? tangent_distance->data_ptr<float>() : nullptr,
+            tangent_position.has_value() ? tangent_position->data_ptr<float>() : nullptr,
+            tangent_normal.has_value() ? tangent_normal->data_ptr<float>() : nullptr,
+            tangent_path_length_m.data_ptr<float>(),
+            tangent_delay_s.data_ptr<float>(),
+            tangent_interaction_position.data_ptr<float>(),
+            tangent_interaction_normal.data_ptr<float>(),
+            tangent_interaction_positions.data_ptr<float>(),
+            tangent_interaction_normals.data_ptr<float>(),
+            pair_count,
+            hit_capacity);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict result;
+    result["path_length_m"] = tangent_path_length_m;
+    result["delay_s"] = tangent_delay_s;
+    result["interaction_position"] = tangent_interaction_position;
+    result["interaction_normal"] = tangent_interaction_normal;
+    result["interaction_positions"] = tangent_interaction_positions;
+    result["interaction_normals"] = tangent_interaction_normals;
     return result;
 }

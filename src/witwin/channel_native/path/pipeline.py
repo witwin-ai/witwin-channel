@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
@@ -10,9 +11,17 @@ from witwin.channel_native import Scene, build_info
 from witwin.channel_native.propagation.enumerated.engine import (
     evaluate_enumerated_paths,
 )
+from witwin.channel_native.propagation.enumerated.capacity import (
+    sanitize_enumerated_capacity_transaction,
+)
 from witwin.channel_native.propagation.enumerated.scattering import (
     append_scattering_evaluated_paths,
 )
+from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel_native.propagation.models.fields import PathFields
+from witwin.channel_native.propagation.models.geometry import PathGeometry
+from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel_native.runtime.capacity import SolveCapacityTransaction
 from witwin.channel_native.scene.tensors import (
     receiver_positions as _shared_receiver_positions,
     transmitter_positions as _shared_transmitter_positions,
@@ -40,6 +49,68 @@ _COMPONENT_ID = {
     "transmission": 5,
     "scattering": 6,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class _DeferredPathResult:
+    """Internal result plus the one terminal check deferred past array packing."""
+
+    result: PathResult
+    capacity_transaction: SolveCapacityTransaction | None
+
+
+def _compact_valid_evaluated_paths_for_legacy_result(
+    paths: EvaluatedPaths,
+) -> EvaluatedPaths:
+    """Select valid rows before the legacy Ragged Path result pack.
+
+    This structural bridge is deleted by the ADR-029 Phase D capacity-result
+    switch.  It performs no geometry or RF computation; it only prevents inert
+    failure rows from reaching the legacy endpoint-id gathers.
+    """
+
+    selected = torch.nonzero(paths.topology.valid, as_tuple=False).reshape(-1)
+    topology = PathTopology(
+        **{
+            name: getattr(paths.topology, name).index_select(0, selected).contiguous()
+            for name in (
+                "valid",
+                "tx_id",
+                "rx_id",
+                "depth",
+                "component_id",
+                "primitive_id",
+                "edge_id",
+                "material_id",
+                "primitive_sequence",
+                "material_sequence",
+                "interaction_type",
+            )
+        }
+    )
+    geometry = PathGeometry(
+        row_identity=topology.row_identity,
+        **{
+            name: getattr(paths.geometry, name).index_select(0, selected).contiguous()
+            for name in (
+                "path_length_m",
+                "delay_s",
+                "field_direction",
+                "interaction_position",
+                "interaction_normal",
+                "interaction_positions",
+                "interaction_normals",
+            )
+        },
+    )
+    fields = PathFields(
+        row_identity=topology.row_identity,
+        **{
+            name: getattr(paths.fields, name).index_select(0, selected).contiguous()
+            for name in ("path_gain", "path_field", "field_xyz", "coefficient")
+        },
+    )
+    return EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
 
 
 def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
@@ -97,7 +168,7 @@ def _solve_base(
     ),
     receiver_positions: Callable[..., torch.Tensor] = _receiver_positions,
     pack_evaluated_paths: Callable[..., PathResult] = from_evaluated_paths,
-) -> PathResult:
+) -> _DeferredPathResult:
     reflection_available, diffraction_available, path_native_available = (
         validate_runtime(config)
     )
@@ -112,7 +183,9 @@ def _solve_base(
         torch.cuda.synchronize()
         solve_start = perf_counter()
         peak_before = torch.cuda.max_memory_allocated()
-    evaluated, sidecars = evaluate_enumerated_paths(scene, config)
+    evaluated, sidecars = evaluate_enumerated_paths(
+        scene, config, defer_capacity_terminal=True
+    )
     scattering_info = None
     if "scattering" in config.components:
         evaluated, sidecars, scattering_info = append_scattering_evaluated_paths(
@@ -121,6 +194,8 @@ def _solve_base(
             evaluated,
             sidecars,
         )
+    evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
+    evaluated = _compact_valid_evaluated_paths_for_legacy_result(evaluated)
     path_count = evaluated.row_count
     if ad_instrumented:
         torch.cuda.synchronize()
@@ -136,16 +211,14 @@ def _solve_base(
         diffraction_available=diffraction_available,
         path_native_available=path_native_available,
         transmission_path_count=int(
-            (
-                evaluated.topology.component_id
-                == _COMPONENT_ID["transmission"]
-            ).sum().item()
+            (evaluated.topology.component_id == _COMPONENT_ID["transmission"])
+            .sum()
+            .item()
         ),
         scattering_path_count=int(
-            (
-                evaluated.topology.component_id
-                == _COMPONENT_ID["scattering"]
-            ).sum().item()
+            (evaluated.topology.component_id == _COMPONENT_ID["scattering"])
+            .sum()
+            .item()
         ),
         ad_companion_launches=sidecars.execution.ad_companion_launches,
         ad_tape_bytes=sidecars.execution.ad_tape_bytes,
@@ -155,13 +228,16 @@ def _solve_base(
     )
     tx_positions, _tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_positions)
-    return pack_evaluated_paths(
-        evaluated,
-        num_rx=int(rx_positions.shape[0]),
-        num_tx=int(tx_positions.shape[0]),
-        tx_positions=tx_positions,
-        rx_positions=rx_positions,
-        metadata=result_metadata,
+    return _DeferredPathResult(
+        result=pack_evaluated_paths(
+            evaluated,
+            num_rx=int(rx_positions.shape[0]),
+            num_tx=int(tx_positions.shape[0]),
+            tx_positions=tx_positions,
+            rx_positions=rx_positions,
+            metadata=result_metadata,
+        ),
+        capacity_transaction=sidecars.capacity_transaction,
     )
 
 
@@ -169,25 +245,31 @@ def solve(
     scene: Scene,
     config: Config,
     *,
-    solve_base: Callable[[Scene, Config], PathResult] = _solve_base,
+    solve_base: Callable[[Scene, Config], _DeferredPathResult] = _solve_base,
 ) -> PathResult:
     """Solve canonical paths and pack synthetic or explicit antenna arrays."""
 
     endpoints = [*scene.transmitters, *scene.receivers]
     if any(not endpoint.synthetic_array for endpoint in endpoints):
         expanded_scene, num_rx_ant, num_tx_ant = explicit_array_scene(scene)
-        expanded = solve_base(expanded_scene, config)
-        return pack_explicit_arrays(
-            expanded,
+        deferred = solve_base(expanded_scene, config)
+        result = pack_explicit_arrays(
+            deferred.result,
             scene=scene,
             num_rx_ant=num_rx_ant,
             num_tx_ant=num_tx_ant,
         )
+        if deferred.capacity_transaction is not None:
+            deferred.capacity_transaction.terminal_check()
+        return result
     validate_synthetic_array_scene(scene)
-    result = solve_base(scene, config)
-    return pack_synthetic_arrays(
-        result,
+    deferred = solve_base(scene, config)
+    result = pack_synthetic_arrays(
+        deferred.result,
         frequency_hz=scene.frequency,
         transmitters=scene.transmitters,
         receivers=scene.receivers,
     )
+    if deferred.capacity_transaction is not None:
+        deferred.capacity_transaction.terminal_check()
+    return result

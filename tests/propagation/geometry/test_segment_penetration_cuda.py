@@ -150,14 +150,91 @@ def test_forward_tape_and_topology_pack_share_capacity_transaction() -> None:
     assert packed.execution.device_guardrail_count.tolist() == [0]
 
 
-def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
-    rayd, vertices = _scene()
+def test_pair_major_batch_covers_clear_one_hit_exact_capacity_and_zero_length() -> None:
+    rayd, _vertices = _scene()
     origins = torch.tensor(
-        [[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda"
+        [
+            [0.0, 0.0, -1.0],
+            [0.0, 0.0, -1.0],
+            [7.0, 7.0, -1.0],
+            [3.0, 3.0, 0.5],
+        ],
+        dtype=torch.float32,
+        device="cuda",
     )
     targets = torch.tensor(
-        [[0.0, 0.0, 1.5]], dtype=torch.float32, device="cuda"
+        [
+            [0.0, 0.0, 0.5],
+            [0.0, 0.0, 1.5],
+            [7.0, 7.0, 1.5],
+            [3.0, 3.0, 0.5],
+        ],
+        dtype=torch.float32,
+        device="cuda",
     )
+    stream = torch.cuda.Stream()
+    with torch.cuda.stream(stream):
+        failure_state, kwargs = _request(rayd, origins, targets)
+        result = bridge.rayd_segment_penetration_forward(
+            rayd, origins, targets, None, **kwargs
+        )
+        packed = enumerated_transmission_topology_pack(
+            result,
+            torch.zeros(3, dtype=torch.int32, device="cuda"),
+            torch.zeros(1, dtype=torch.int32, device="cuda"),
+            tx_count=2,
+            rx_count=2,
+        )
+    stream.synchronize()
+
+    assert failure_state.bits.tolist() == [0]
+    assert result.num_hits.tolist() == [1, 2, 0, 0]
+    assert result.reached_target.tolist() == [True, True, True, True]
+    assert result.valid.tolist() == [
+        [True, False],
+        [True, True],
+        [False, False],
+        [False, False],
+    ]
+    assert packed.failure_state is failure_state
+    assert packed.valid.tolist() == [True, True, False, False]
+    assert packed.tx_id.tolist() == [0, 0, -1, -1]
+    assert packed.rx_id.tolist() == [0, 1, -1, -1]
+    assert packed.depth.tolist() == [1, 2, 0, 0]
+    assert packed.execution.device_candidate_count.tolist() == [2]
+    assert packed.execution.device_guardrail_count.tolist() == [0]
+
+
+def test_invalid_material_makes_capacity_row_inert_without_partial_result() -> None:
+    rayd, _vertices = _scene()
+    origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
+    targets = torch.tensor([[0.0, 0.0, 0.5]], dtype=torch.float32, device="cuda")
+    failure_state, kwargs = _request(rayd, origins, targets, hit_capacity=1)
+    result = bridge.rayd_segment_penetration_forward(
+        rayd, origins, targets, None, **kwargs
+    )
+    packed = enumerated_transmission_topology_pack(
+        result,
+        torch.zeros(3, dtype=torch.int32, device="cuda"),
+        torch.ones(1, dtype=torch.int32, device="cuda"),
+        tx_count=1,
+        rx_count=1,
+    )
+
+    assert failure_state.bits.tolist() == [0]
+    assert result.num_hits.tolist() == [1]
+    assert packed.valid.tolist() == [False]
+    assert packed.tx_id.tolist() == [-1]
+    assert packed.rx_id.tolist() == [-1]
+    assert packed.primitive_sequence.tolist() == [[-1]]
+    assert packed.execution.device_candidate_count.tolist() == [1]
+    assert packed.execution.device_guardrail_count.tolist() == [1]
+
+
+def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
+    rayd, vertices = _scene()
+    origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
+    targets = torch.tensor([[0.0, 0.0, 1.5]], dtype=torch.float32, device="cuda")
     failure_state, kwargs = _request(rayd, origins, targets)
     tape = bridge.rayd_segment_penetration_forward_tape(
         rayd, origins, targets, None, **kwargs
@@ -186,9 +263,7 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
         "grad_t": torch.full_like(tape.result.t, 0.4),
         "grad_position": torch.full_like(tape.result.position, 0.1),
         "grad_normal": torch.full_like(tape.result.normal, -0.15),
-        "grad_geometric_normal": torch.full_like(
-            tape.result.geometric_normal, 0.05
-        ),
+        "grad_geometric_normal": torch.full_like(tape.result.geometric_normal, 0.05),
     }
     gradients = bridge.rayd_segment_penetration_backward(
         rayd,
@@ -207,10 +282,7 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
     assert gradients.grad_targets is not None
 
     lhs = sum(
-        (
-            getattr(tangents, tangent_name)
-            * cotangents[gradient_name]
-        ).sum()
+        (getattr(tangents, tangent_name) * cotangents[gradient_name]).sum()
         for tangent_name, gradient_name in (
             ("tangent_distance", "grad_distance"),
             ("tangent_direction", "grad_direction"),
@@ -230,12 +302,8 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
 
 def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
     rayd, _vertices = _scene()
-    origins = torch.tensor(
-        [[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda"
-    )
-    targets = torch.tensor(
-        [[0.0, 0.0, 3.0]], dtype=torch.float32, device="cuda"
-    )
+    origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
+    targets = torch.tensor([[0.0, 0.0, 3.0]], dtype=torch.float32, device="cuda")
     failure_state, kwargs = _request(rayd, origins, targets, hit_capacity=2)
     tape = bridge.rayd_segment_penetration_forward_tape(
         rayd, origins, targets, None, **kwargs
@@ -256,4 +324,3 @@ def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
     assert not packed.valid.any().item()
     assert packed.execution.device_candidate_count.tolist() == [0]
     assert packed.execution.device_guardrail_count.tolist() == [0]
-

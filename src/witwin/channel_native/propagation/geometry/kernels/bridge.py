@@ -25,9 +25,7 @@ from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 from witwin.channel_native.runtime.native_resources import _rayd_scene_resource
 
 
-_SEGMENT_PENETRATION_FAILURE_BIT = int(
-    CapacityFailureBit.SEGMENT_PENETRATION_FAILURE
-)
+_SEGMENT_PENETRATION_FAILURE_BIT = int(CapacityFailureBit.SEGMENT_PENETRATION_FAILURE)
 _SEGMENT_PENETRATION_RESULT_FIELDS = (
     "valid",
     "num_hits",
@@ -175,7 +173,7 @@ def rayd_segment_penetration_forward(
     scene_diagonal: float,
     failure_state: CapacityFailureState,
 ) -> SegmentPenetrationResult:
-    """Dispatch the dormant RayD segment-penetration primal."""
+    """Dispatch the live RayD segment-penetration primal."""
 
     args = _segment_penetration_request_args(
         scene_resource,
@@ -206,7 +204,7 @@ def rayd_segment_penetration_forward_tape(
     scene_diagonal: float,
     failure_state: CapacityFailureState,
 ) -> SegmentPenetrationTapeResult:
-    """Dispatch the dormant RayD primal and opaque fixed-winner tape."""
+    """Dispatch the live RayD primal and opaque fixed-winner tape."""
 
     args = _segment_penetration_request_args(
         scene_resource,
@@ -275,7 +273,10 @@ def rayd_segment_penetration_backward(
         raise TypeError("tape must be a SegmentPenetrationTapeResult")
     if tape.failure_state is not failure_state:
         raise ValueError("tape must retain the exact request failure_state")
-    if tape.result.segment_count != origins.shape[0] or tape.result.hit_capacity != hit_capacity:
+    if (
+        tape.result.segment_count != origins.shape[0]
+        or tape.result.hit_capacity != hit_capacity
+    ):
         raise ValueError("tape must match the segment request shape")
     rows = int(origins.shape[0])
     _ad_check_optional_grad("grad_distance", grad_distance, ((rows,),))
@@ -347,7 +348,10 @@ def rayd_segment_penetration_jvp(
         raise TypeError("tape must be a SegmentPenetrationTapeResult")
     if tape.failure_state is not failure_state:
         raise ValueError("tape must retain the exact request failure_state")
-    if tape.result.segment_count != origins.shape[0] or tape.result.hit_capacity != hit_capacity:
+    if (
+        tape.result.segment_count != origins.shape[0]
+        or tape.result.hit_capacity != hit_capacity
+    ):
         raise ValueError("tape must match the segment request shape")
     rows = int(origins.shape[0])
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
@@ -483,7 +487,9 @@ def rayd_diffraction_sample_tape_forward(*args: object) -> tuple[torch.Tensor, .
 
 def rayd_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
-        raise TypeError("rayd_trace_reflections_forward requires a typed RayD scene resource")
+        raise TypeError(
+            "rayd_trace_reflections_forward requires a typed RayD scene resource"
+        )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
     out = _required_native_op("rayd_trace_reflections_forward")(
         *native_args,

@@ -38,7 +38,7 @@ _HELPER_BODY_HASHES = {
 }
 _CANONICAL_ONLY_HELPER_BODY_HASHES = {
     "_compile_penetration_scene_diagonals": (
-        "f4905bf0a7ec8b983c84c1378e950d710137e92d64e160b5027aa4868fc0db37"
+        "2d130cd4c4e7dce600e7090d010b7a2542551a5c0b12d41edefb09380e6109bb"
     ),
 }
 
@@ -85,7 +85,9 @@ def test_compile_owner_has_no_scene_or_solver_dependency_cycle():
 
     assert "witwin.channel_native.core.scene" not in targets
     assert not any(".solver" in target for target in targets)
-    assert not any(target.startswith("witwin.channel_native.scattering") for target in targets)
+    assert not any(
+        target.startswith("witwin.channel_native.scattering") for target in targets
+    )
 
 
 def test_compile_cache_hit_preserves_the_exact_call_ledger(monkeypatch):
