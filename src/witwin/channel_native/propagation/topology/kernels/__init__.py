@@ -26,6 +26,7 @@ from .compaction import (
     deterministic_reflection_order1_compact,
     deterministic_reflection_sequence_compact,
     deterministic_sort_order,
+    enumerated_canonical_capacity_select,
 )
 from .construction import (
     deterministic_face_anchor_points,
@@ -85,6 +86,7 @@ __all__ = [
     "deterministic_repeat_range",
     "deterministic_selected_edge_count",
     "deterministic_sort_order",
+    "enumerated_canonical_capacity_select",
     "deterministic_topology_base_fields",
     "deterministic_topology_default_fields",
     "mc_selected_edge_indices",

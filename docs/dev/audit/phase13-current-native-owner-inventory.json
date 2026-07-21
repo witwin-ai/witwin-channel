@@ -6,8 +6,8 @@
     "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
     "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
     "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-    "binding_count": 218,
-    "binding_manifest_sha256": "37968bcec8b0a3745954a03fd19a311e8a43f6efac794fe924810b906372f597",
+    "binding_count": 219,
+    "binding_manifest_sha256": "bf8ed837d242df41bd4ce9149f0bc8abe8b528c9f6df3d65c996a5d17cdabf8f",
     "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
     "rayd_lock": {
       "schema_version": 1,
@@ -27,10 +27,10 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 218,
+    "bindings": 219,
     "rayd_numerical": 43,
     "layered": 3,
-    "channel_numerical": 172
+    "channel_numerical": 173
   },
   "current_phase": 8,
   "current_subphase": "8B C2-P dormant PathResult capacity pack",
@@ -3664,6 +3664,59 @@
       "surface": "internal-native-ABI",
       "liveness": "dormant-native-producer",
       "plan13_disposition": "ADR-029 dormant stable pair-major capacity index finalizer"
+    },
+    {
+      "symbol": "enumerated_canonical_capacity_select",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_enumerated_canonical_capacity_select",
+      "binding_registration": {
+        "path": "native/channel_native/binding/path.cpp",
+        "line": 869
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/path.cpp",
+          "lines": [351],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/enumerated_canonical_capacity_select.cu",
+          "lines": [486],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/enumerated_canonical_capacity_select.cu",
+        "implementation_line": 486,
+        "export_line": 486
+      },
+      "python_owner": "witwin.channel_native.propagation.topology.kernels.compaction._EnumeratedCanonicalCapacitySelectFunction.forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "line": 724
+        },
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "line": 856
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "line": 728
+        }
+      ],
+      "contract_test": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order",
+      "e2e_callers": [
+        "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-producer",
+      "plan13_disposition": "ADR-029 dormant live-exact canonical compact-prefix selector"
     },
     {
       "symbol": "evaluated_paths_capacity_pack",

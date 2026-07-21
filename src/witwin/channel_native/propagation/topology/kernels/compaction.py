@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import torch
 
 from witwin.channel_native.propagation.models.capacity import (
+    CanonicalPathSelection,
     CapacityPathLayout,
     CapacityPathSelection,
 )
@@ -706,6 +707,223 @@ def deterministic_sort_order(
     if out.shape != valid.shape:
         raise ValueError("_channel_native.deterministic_sort_order returned bad shape")
     return out
+
+
+_CANONICAL_SELECTION_FIELDS = (
+    "selected_row_index",
+    "valid",
+    "num_selected",
+    "num_paths",
+    "overflow",
+)
+_CANONICAL_SCOPE = {"global": 0, "per_pair": 1}
+
+
+class _EnumeratedCanonicalCapacitySelectFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(*inputs):
+        tensors = list(inputs[:10])
+        tensors[9] = torch.autograd.forward_ad.unpack_dual(tensors[9]).primal
+        pair_count, num_tx, num_rx, capacity, max_paths, scope = inputs[10:]
+        raw = _required_native_op("enumerated_canonical_capacity_select")(
+            *tensors,
+            int(pair_count),
+            int(num_tx),
+            int(num_rx),
+            int(capacity),
+            int(max_paths),
+            int(scope),
+        )
+        if not isinstance(raw, dict) or set(raw) != set(_CANONICAL_SELECTION_FIELDS):
+            raise TypeError("native canonical capacity selection returned bad fields")
+        return tuple(raw[name] for name in _CANONICAL_SELECTION_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        del inputs
+        ctx.mark_non_differentiable(*output)
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        del ctx, grad_outputs
+        return (None,) * 16
+
+    @staticmethod
+    def jvp(ctx, *tangents):
+        del ctx, tangents
+        return (None,) * len(_CANONICAL_SELECTION_FIELDS)
+
+
+def _validate_canonical_selection_tensors(
+    *,
+    valid: torch.Tensor,
+    tx_id: torch.Tensor,
+    rx_id: torch.Tensor,
+    depth: torch.Tensor,
+    component_id: torch.Tensor,
+    primitive_id: torch.Tensor,
+    edge_id: torch.Tensor,
+    primitive_sequence: torch.Tensor,
+    path_length_m: torch.Tensor,
+) -> None:
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    for name, tensor in (
+        ("tx_id", tx_id),
+        ("rx_id", rx_id),
+        ("depth", depth),
+        ("component_id", component_id),
+        ("primitive_id", primitive_id),
+        ("edge_id", edge_id),
+    ):
+        validate_cuda_tensor(name, tensor, dtype=torch.int32, ndim=1)
+        if tensor.shape != valid.shape:
+            raise ValueError(f"{name} must match valid")
+        if tensor.device != valid.device:
+            raise ValueError(f"{name} must share valid device")
+    validate_cuda_tensor(
+        "primitive_sequence", primitive_sequence, dtype=torch.int32, ndim=2
+    )
+    if primitive_sequence.shape[0] != valid.shape[0]:
+        raise ValueError("primitive_sequence must match valid rows")
+    validate_cuda_tensor(
+        "path_length_m", path_length_m, dtype=torch.float32, ndim=1
+    )
+    if path_length_m.shape != valid.shape:
+        raise ValueError("path_length_m must match valid")
+    if (
+        primitive_sequence.device != valid.device
+        or path_length_m.device != valid.device
+    ):
+        raise ValueError("selection inputs must share valid device")
+
+
+def _canonical_selection_policy(
+    *,
+    pair_count: int,
+    num_tx: int,
+    num_rx: int,
+    path_capacity_per_pair: int,
+    max_paths: int | None,
+    max_paths_scope: str,
+) -> tuple[int, int]:
+    for name, value in (
+        ("pair_count", pair_count),
+        ("num_tx", num_tx),
+        ("num_rx", num_rx),
+        ("path_capacity_per_pair", path_capacity_per_pair),
+    ):
+        if type(value) is not int:
+            raise TypeError(f"{name} must be an int")
+        if value < 0:
+            raise ValueError(f"{name} must be non-negative")
+    if pair_count != num_tx * num_rx:
+        raise ValueError("pair_count must equal num_tx * num_rx")
+    if max_paths_scope not in _CANONICAL_SCOPE:
+        raise ValueError("max_paths_scope must be 'global' or 'per_pair'")
+    native_max_paths = _canonical_max_paths(
+        max_paths=max_paths,
+        max_paths_scope=max_paths_scope,
+        path_capacity_per_pair=path_capacity_per_pair,
+        total_capacity=pair_count * path_capacity_per_pair,
+    )
+    return native_max_paths, _CANONICAL_SCOPE[max_paths_scope]
+
+
+def _canonical_max_paths(
+    *,
+    max_paths: int | None,
+    max_paths_scope: str,
+    path_capacity_per_pair: int,
+    total_capacity: int,
+) -> int:
+    if max_paths is not None and (type(max_paths) is not int or max_paths <= 0):
+        raise ValueError("max_paths must be a positive int or None")
+    if (
+        max_paths is not None
+        and max_paths_scope == "per_pair"
+        and max_paths > path_capacity_per_pair
+    ):
+        raise ValueError("per-pair max_paths cannot exceed path_capacity_per_pair")
+    if (
+        max_paths is not None
+        and max_paths_scope == "global"
+        and max_paths > total_capacity
+    ):
+        raise ValueError("global max_paths cannot exceed total path capacity")
+    return -1 if max_paths is None else max_paths
+
+
+def enumerated_canonical_capacity_select(
+    *,
+    failure_state: CapacityFailureState,
+    valid: torch.Tensor,
+    tx_id: torch.Tensor,
+    rx_id: torch.Tensor,
+    depth: torch.Tensor,
+    component_id: torch.Tensor,
+    primitive_id: torch.Tensor,
+    edge_id: torch.Tensor,
+    primitive_sequence: torch.Tensor,
+    path_length_m: torch.Tensor,
+    pair_count: int,
+    num_tx: int,
+    num_rx: int,
+    path_capacity_per_pair: int,
+    max_paths: int | None,
+    max_paths_scope: str,
+) -> CanonicalPathSelection:
+    """Select live-equivalent canonical winners into a dormant compact prefix."""
+
+    _validate_canonical_selection_tensors(
+        valid=valid,
+        tx_id=tx_id,
+        rx_id=rx_id,
+        depth=depth,
+        component_id=component_id,
+        primitive_id=primitive_id,
+        edge_id=edge_id,
+        primitive_sequence=primitive_sequence,
+        path_length_m=path_length_m,
+    )
+    native_max_paths, native_scope = _canonical_selection_policy(
+        pair_count=pair_count,
+        num_tx=num_tx,
+        num_rx=num_rx,
+        path_capacity_per_pair=path_capacity_per_pair,
+        max_paths=max_paths,
+        max_paths_scope=max_paths_scope,
+    )
+    require_capacity_failure_state(failure_state, device=valid.device)
+    outputs = _EnumeratedCanonicalCapacitySelectFunction.apply(
+        failure_state.bits,
+        valid,
+        tx_id,
+        rx_id,
+        depth,
+        component_id,
+        primitive_id,
+        edge_id,
+        primitive_sequence,
+        path_length_m,
+        pair_count,
+        num_tx,
+        num_rx,
+        path_capacity_per_pair,
+        native_max_paths,
+        native_scope,
+    )
+    raw = dict(zip(_CANONICAL_SELECTION_FIELDS, outputs, strict=True))
+    return CanonicalPathSelection(
+        candidate_capacity=int(valid.shape[0]),
+        pair_count=pair_count,
+        path_capacity_per_pair=path_capacity_per_pair,
+        failure_state=failure_state,
+        selected_row_index=raw["selected_row_index"],
+        valid=raw["valid"],
+        num_selected=raw["num_selected"],
+        num_paths=raw["num_paths"],
+        overflow=raw["overflow"],
+    )
 
 
 def deterministic_capacity_finalize(

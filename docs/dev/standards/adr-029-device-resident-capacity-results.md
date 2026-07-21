@@ -209,6 +209,21 @@ separate profiler and exactness evidence.
 6. Record independent-process Munich and non-target performance evidence and
    activate only if all gates below pass.
 
+The dormant canonical selector in step 3 uses the complete host-known candidate
+capacity `N` for its internal output, with selected rows in a CUDA-valid compact
+prefix and a CUDA `int32[1]` selected count. This is not the public `P*C`
+layout. It preserves live compact valid-row ordinals until deterministic
+accumulation; public pair-major padding remains a later result-packing
+operation. The selector reproduces the existing stable topology sort,
+canonical event/object deduplication, shortest-path winner, and `max_paths`
+policy before scattering append. Its decisions are frozen and
+non-differentiable; continuous AD belongs to the subsequent native gather.
+The dormant launch, synchronization, copy, output, and CUB scratch formulas are
+recorded in
+[`phase13-adr029-canonical-selector-resource-ledger.json`](../audit/phase13-adr029-canonical-selector-resource-ledger.json);
+activation evidence must replace its formulas with measured peak bytes and
+timings without widening the recorded work.
+
 Each implementation step is a separately reviewable commit. A dormant producer
 must precede a consumer switch, and deletion occurs in the same commit as the
 switch that makes the old path unreachable.

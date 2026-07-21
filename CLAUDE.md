@@ -195,6 +195,13 @@ requires them.
   checks validity before reading any EPC/material payload, and fails
   asynchronously with a completely inert block on overflow. The existing live
   compact operations remain authoritative until the atomic capacity switch.
+- `enumerated_canonical_capacity_select` is the dormant ADR-029 discrete
+  selector. It reproduces the live stable topology order, canonical
+  event/object deduplication, shortest-path winner, and global/per-pair
+  `max_paths` policy into a candidate-capacity compact prefix. It shares the
+  solve failure state, has no AD companion, must remain before scattering
+  append, and must not be replaced by early pair-slot padding before
+  deterministic accumulation.
 - `path_result_capacity_pack` is the dormant Path-owned ADR-029 terminal
   storage packer. It consumes pair-major `CapacityEvaluatedPaths`, inherits the
   exact shared `CapacityFailureState`, and produces the public base tensor

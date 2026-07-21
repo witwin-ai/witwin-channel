@@ -148,6 +148,69 @@ class CapacityPathSelection:
 
 
 @dataclass(frozen=True, slots=True, eq=False)
+class CanonicalPathSelection:
+    """Canonical compact-prefix indices over a host-known candidate capacity."""
+
+    candidate_capacity: int
+    pair_count: int
+    path_capacity_per_pair: int
+    failure_state: CapacityFailureState
+    selected_row_index: torch.Tensor
+    valid: torch.Tensor
+    num_selected: torch.Tensor
+    num_paths: torch.Tensor
+    overflow: torch.Tensor
+
+    def __post_init__(self) -> None:
+        candidate_capacity = _require_host_count(
+            "candidate_capacity", self.candidate_capacity
+        )
+        pair_count = _require_host_count("pair_count", self.pair_count)
+        _require_host_count(
+            "path_capacity_per_pair", self.path_capacity_per_pair
+        )
+        selected = _require_cuda_tensor(
+            "selected_row_index",
+            self.selected_row_index,
+            dtype=torch.int64,
+            shape=(candidate_capacity,),
+        )
+        require_capacity_failure_state(self.failure_state, device=selected.device)
+        _require_cuda_tensor(
+            "valid",
+            self.valid,
+            dtype=torch.bool,
+            shape=(candidate_capacity,),
+            device=selected.device,
+        )
+        _require_cuda_tensor(
+            "num_selected",
+            self.num_selected,
+            dtype=torch.int32,
+            shape=(1,),
+            device=selected.device,
+        )
+        _require_cuda_tensor(
+            "num_paths",
+            self.num_paths,
+            dtype=torch.int32,
+            shape=(pair_count,),
+            device=selected.device,
+        )
+        _require_cuda_tensor(
+            "overflow",
+            self.overflow,
+            dtype=torch.bool,
+            shape=(1,),
+            device=selected.device,
+        )
+
+    @property
+    def device(self) -> torch.device:
+        return self.valid.device
+
+
+@dataclass(frozen=True, slots=True, eq=False)
 class CapacityEvaluatedPaths:
     """Packed evaluated rows and their shared capacity selection contract."""
 
@@ -166,6 +229,7 @@ class CapacityEvaluatedPaths:
 
 
 __all__ = [
+    "CanonicalPathSelection",
     "CapacityEvaluatedPaths",
     "CapacityPathLayout",
     "CapacityPathSelection",

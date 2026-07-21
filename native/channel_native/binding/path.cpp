@@ -348,6 +348,23 @@ torch::Tensor cn_deterministic_sort_order(
     torch::Tensor primitive_id,
     torch::Tensor edge_id,
     torch::Tensor primitive_sequence);
+pybind11::dict cn_enumerated_canonical_capacity_select(
+    torch::Tensor failure_state,
+    torch::Tensor valid,
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor depth,
+    torch::Tensor component_id,
+    torch::Tensor primitive_id,
+    torch::Tensor edge_id,
+    torch::Tensor primitive_sequence,
+    torch::Tensor path_length_m,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t path_capacity_per_pair,
+    int64_t max_paths,
+    int64_t max_paths_scope);
 pybind11::dict cn_deterministic_capacity_finalize(
     torch::Tensor failure_state,
     torch::Tensor valid,
@@ -848,6 +865,26 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_sort_order",
         &cn_deterministic_sort_order,
         "Stable-sort deterministic topology rows by native CUDA path keys.");
+    module.def(
+        "enumerated_canonical_capacity_select",
+        &cn_enumerated_canonical_capacity_select,
+        "Select canonical enumerated rows into a fixed compact-prefix CUDA capacity.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("valid"),
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("depth"),
+        pybind11::arg("component_id"),
+        pybind11::arg("primitive_id"),
+        pybind11::arg("edge_id"),
+        pybind11::arg("primitive_sequence"),
+        pybind11::arg("path_length_m"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("path_capacity_per_pair"),
+        pybind11::arg("max_paths"),
+        pybind11::arg("max_paths_scope"));
     module.def(
         "deterministic_capacity_finalize",
         &cn_deterministic_capacity_finalize,

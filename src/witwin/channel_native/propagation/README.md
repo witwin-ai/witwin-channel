@@ -55,6 +55,18 @@ source indices plus `CapacityPathLayout`. Invalid candidates are poison-safe.
 Any per-pair overflow leaves every public index, validity bit, and count inert
 and atomically records its owned bit without trapping in the intermediate.
 
+`propagation.topology.kernels.enumerated_canonical_capacity_select` is the
+dormant discrete selector that precedes final pair packing. It omits invalid
+poison lanes and exactly reproduces the live receiver/transmitter/depth/
+component/sequence stable order, canonical event/object deduplication,
+shortest-path winner, and global/per-pair `max_paths` policy. Winners occupy a
+compact valid prefix at the host-known candidate capacity, rather than early
+pair slots, so later deterministic accumulation retains live valid-row
+ordinals. Selection is frozen and has no AD companion; a later native gather
+owns continuous primal/JVP/VJP. The selector shares the solve failure state,
+publishes no partial rows on pair overflow or bad valid endpoint ids, and has
+no live caller before the atomic capacity switch.
+
 `propagation.enumerated.capacity.evaluated_paths_capacity_pack` is the dormant
 complete-row producer layered on that same no-trap finalizer helper. One native
 initialization pass makes every topology, geometry, field, and layout slot
