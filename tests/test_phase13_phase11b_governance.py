@@ -142,7 +142,10 @@ def test_phase11b_duplication_budget_is_met_without_relaxation() -> None:
         "coverage_percent": refresh["coverage_percent"],
         "region_count": refresh["region_count"],
     }
-    assert refresh["region_count"] == len(ledger["regions"]) == 143
+    # Phase 11B is an immutable historical snapshot. Later accepted phases add
+    # classified regions to the live ledger, whose completeness is enforced by
+    # ci/check_duplication.py rather than by rewriting this evidence record.
+    assert refresh["region_count"] == 143
     assert refresh["stale_region_count"] == 0
     assert refresh["unclassified_region_count"] == 0
     assert refresh["budget_relaxed"] is False
