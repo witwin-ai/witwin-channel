@@ -315,7 +315,15 @@ __device__ int row_material(
 // Validate every device-selected slot before any continuous payload is read.
 // Ordinary blocking materials do not short-circuit later discrete contract
 // checks; a malformed later slot must still poison the complete transaction.
-__device__ int preflight_row_materials(
+// The numerical kernels use first_blocker only after this complete preflight,
+// and may stop earlier when an eligible wall is not strictly positive,
+// including NaN, matching the former `t_eff > 0` continuation rule.
+struct RowMaterialPreflight {
+    bool contract_valid;
+    int first_blocker;
+};
+
+__device__ RowMaterialPreflight preflight_row_materials(
     const int* primitive_id,
     int64_t row_base,
     int count,
@@ -328,7 +336,8 @@ __device__ int preflight_row_materials(
     int64_t layer_total,
     int* failure_state,
     int failure_bit) {
-    bool all_eligible = true;
+    bool contract_valid = true;
+    int first_blocker = count;
     for (int slot = 0; slot < count; ++slot) {
         const int material = row_material(
             primitive_id,
@@ -343,11 +352,11 @@ __device__ int preflight_row_materials(
             failure_state,
             failure_bit);
         if (material == -2)
-            return -2;
-        if (material == -1)
-            all_eligible = false;
+            contract_valid = false;
+        else if (material == -1 && first_blocker == count)
+            first_blocker = slot;
     }
-    return all_eligible ? 0 : -1;
+    return {contract_valid, first_blocker};
 }
 
 #define CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS                               \
@@ -376,16 +385,16 @@ __global__ void wall_product_kernel(
             !row_contract_valid(valid, num_hits, row, hit_capacity, failure_state, failure_bit))
             continue;
         const int count = num_hits[row];
-        wall_count[row] = count;
-        if (!reached_target[row])
+        if (!reached_target[row]) {
+            wall_count[row] = count;
             continue;
+        }
         if (count == 0) {
             transmittance[row] = 1.0f;
             continue;
         }
-
         const int64_t row_base = row * hit_capacity;
-        const int preflight = preflight_row_materials(
+        const RowMaterialPreflight preflight = preflight_row_materials(
             primitive_id,
             row_base,
             count,
@@ -398,12 +407,13 @@ __global__ void wall_product_kernel(
             layer_total,
             failure_state,
             failure_bit);
-        if (preflight != 0 || *failure_state != 0)
+        if (!preflight.contract_valid || *failure_state != 0)
             continue;
         const int64_t direction_base = row * 3;
         const DualVec3 ray_direction = load_fixed_vec3(direction, direction_base);
         float product = 1.0f;
-        for (int slot = 0; slot < count; ++slot) {
+        bool stopped_before_next_wall = false;
+        for (int slot = 0; slot < preflight.first_blocker; ++slot) {
             const int64_t primitive_slot = row_base + slot;
             const int material = row_material(
                 primitive_id,
@@ -437,9 +447,18 @@ __global__ void wall_product_kernel(
                 0.0f,
                 ZeroLayerSeed{});
             product = product * value.value;
+            wall_count[row] = slot + 1;
+            if (!(value.value > 0.0f)) {
+                stopped_before_next_wall = true;
+                break;
+            }
         }
         if (*failure_state != 0)
             continue;
+        if (!stopped_before_next_wall && preflight.first_blocker < count) {
+            wall_count[row] = preflight.first_blocker + 1;
+            continue;
+        }
         transmittance[row] = product;
         scaled_power[row] = base_power[row] * product;
         penetrated[row] = true;
@@ -464,7 +483,7 @@ __global__ void wall_product_backward_kernel(
             continue;
 
         const int64_t row_base = row * hit_capacity;
-        const int preflight = preflight_row_materials(
+        const RowMaterialPreflight preflight = preflight_row_materials(
             primitive_id,
             row_base,
             count,
@@ -477,12 +496,14 @@ __global__ void wall_product_backward_kernel(
             layer_total,
             failure_state,
             failure_bit);
-        if (preflight != 0 || *failure_state != 0)
+        if (!preflight.contract_valid || *failure_state != 0)
             continue;
         const int64_t direction_base = row * 3;
         const DualVec3 ray_direction = load_fixed_vec3(direction, direction_base);
         float product = 1.0f;
-        for (int slot = 0; slot < count; ++slot) {
+        int effective_count = 0;
+        bool stopped_before_next_wall = false;
+        for (int slot = 0; slot < preflight.first_blocker; ++slot) {
             const int64_t primitive_slot = row_base + slot;
             const int material = row_material(
                 primitive_id,
@@ -509,8 +530,15 @@ __global__ void wall_product_backward_kernel(
                 0.0f,
                 ZeroLayerSeed{}).value;
             product = product * wall_value;
+            effective_count = slot + 1;
+            if (!(wall_value > 0.0f)) {
+                stopped_before_next_wall = true;
+                break;
+            }
         }
         if (*failure_state != 0)
+            continue;
+        if (!stopped_before_next_wall && preflight.first_blocker < count)
             continue;
 
         const float g_scaled = optional_load1(grad_scaled, row);
@@ -520,9 +548,9 @@ __global__ void wall_product_backward_kernel(
         grad_base_power[row] = g_scaled * product;
 
         float direction_gradient[3] = {0.0f, 0.0f, 0.0f};
-        for (int slot = 0; slot < count; ++slot) {
+        for (int slot = 0; slot < effective_count; ++slot) {
             float product_except = 1.0f;
-            for (int other = 0; other < count; ++other) {
+            for (int other = 0; other < effective_count; ++other) {
                 if (other == slot)
                     continue;
                 const int64_t other_primitive_slot = row_base + other;
@@ -639,7 +667,7 @@ __global__ void wall_product_shared_backward_kernel(
             if (!reached_target[row] || count == 0)
                 continue;
             const int64_t row_base = row * hit_capacity;
-            const int preflight = preflight_row_materials(
+            const RowMaterialPreflight preflight = preflight_row_materials(
                 primitive_id,
                 row_base,
                 count,
@@ -652,20 +680,57 @@ __global__ void wall_product_shared_backward_kernel(
                 layer_total,
                 failure_state,
                 failure_bit);
-            if (preflight == -2)
+            if (!preflight.contract_valid)
                 return;
-            if (preflight == -1)
-                continue;
             if (*failure_state != 0)
                 return;
             const int64_t direction_base = row * 3;
             const DualVec3 ray_direction = load_fixed_vec3(direction, direction_base);
 
+            int effective_count = 0;
+            bool stopped_before_next_wall = false;
+            for (int slot = 0; slot < preflight.first_blocker; ++slot) {
+                const int64_t primitive_slot = row_base + slot;
+                const int material = row_material(
+                    primitive_id,
+                    primitive_slot,
+                    face_material_id,
+                    face_count,
+                    geometry_mode_id,
+                    layer_offset,
+                    layer_count,
+                    material_count,
+                    layer_total,
+                    failure_state,
+                    failure_bit);
+                if (material < 0)
+                    return;
+                em::LayerView layers{
+                    layer_offset, layer_count, layer_thickness, layer_eps,
+                    layer_sigma, layer_mu, material};
+                const float wall_value = wall_transmittance_dual(
+                    ray_direction,
+                    load_fixed_vec3(normal, primitive_slot * 3),
+                    polarization,
+                    direction_base,
+                    layers,
+                    frequency_hz,
+                    0.0f,
+                    ZeroLayerSeed{}).value;
+                effective_count = slot + 1;
+                if (!(wall_value > 0.0f)) {
+                    stopped_before_next_wall = true;
+                    break;
+                }
+            }
+            if (!stopped_before_next_wall && preflight.first_blocker < count)
+                continue;
+
             const float g_scaled = optional_load1(grad_scaled, row);
             const float g_trans =
                 optional_load1(grad_transmittance, row) +
                 g_scaled * base_power[row];
-            for (int slot = 0; slot < count; ++slot) {
+            for (int slot = 0; slot < effective_count; ++slot) {
                 const int64_t primitive_slot = row_base + slot;
                 const int material = row_material(
                     primitive_id,
@@ -690,7 +755,7 @@ __global__ void wall_product_shared_backward_kernel(
                     continue;
 
                 float product_except = 1.0f;
-                for (int other = 0; other < count; ++other) {
+                for (int other = 0; other < effective_count; ++other) {
                     if (other == slot)
                         continue;
                     const int64_t other_primitive_slot = row_base + other;
@@ -781,7 +846,7 @@ __global__ void wall_product_jvp_kernel(
             continue;
 
         const int64_t row_base = row * hit_capacity;
-        const int preflight = preflight_row_materials(
+        const RowMaterialPreflight preflight = preflight_row_materials(
             primitive_id,
             row_base,
             count,
@@ -794,13 +859,14 @@ __global__ void wall_product_jvp_kernel(
             layer_total,
             failure_state,
             failure_bit);
-        if (preflight != 0 || *failure_state != 0)
+        if (!preflight.contract_valid || *failure_state != 0)
             continue;
         const int64_t direction_base = row * 3;
         const DualVec3 ray_direction =
             load_dual_direction(direction, tangent_direction, row);
         DualFloat product{1.0f, 0.0f};
-        for (int slot = 0; slot < count; ++slot) {
+        bool stopped_before_next_wall = false;
+        for (int slot = 0; slot < preflight.first_blocker; ++slot) {
             const int64_t primitive_slot = row_base + slot;
             const int material = row_material(
                 primitive_id,
@@ -830,8 +896,14 @@ __global__ void wall_product_jvp_kernel(
                     tangent_layer_eps,
                     tangent_layer_sigma});
             product = dual_mul(product, wall);
+            if (!(wall.value > 0.0f)) {
+                stopped_before_next_wall = true;
+                break;
+            }
         }
         if (*failure_state != 0)
+            continue;
+        if (!stopped_before_next_wall && preflight.first_blocker < count)
             continue;
         const float tangent_base = optional_load1(tangent_base_power, row);
         tangent_transmittance[row] = product.tangent;

@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "plan": "Plan 13 Phase 6C / Phase P dormant penetration foundation",
+  "status": "implemented as dormant producers; enumerated and Monte Carlo solver switches remain pending",
+  "decision": "ADR-027 accepted; ADR-029 capacity-plus-valid transaction contract accepted",
+  "rayd_lock": {
+    "commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "integration_header_identity": "rayd.torch.integration",
+    "integration_api_version": 6,
+    "pushed": true
+  },
+  "binding_universe": {
+    "before": 229,
+    "added": 5,
+    "after": 234,
+    "owner_counts_after": {
+      "RayD": 47,
+      "layered": 3,
+      "Channel Native": 184
+    }
+  },
+  "new_symbols": {
+    "rayd_segment_penetration": [
+      "rayd_segment_penetration_forward",
+      "rayd_segment_penetration_forward_tape",
+      "rayd_segment_penetration_backward",
+      "rayd_segment_penetration_jvp"
+    ],
+    "channel_topology": [
+      "enumerated_transmission_topology_pack"
+    ]
+  },
+  "typed_contract": {
+    "policies": [
+      "EnumeratedFullDistance",
+      "MonteCarloTargetInset"
+    ],
+    "capacity_layout": "fixed CUDA [N,D] hit and tape storage with a mandatory D+1 probe",
+    "failure_bit": "SEGMENT_PENETRATION_FAILURE = 1 << 7",
+    "failure_scope": "overflow, request/device-mask contract contradiction, and non-finite penetration state",
+    "failure_state": "the exact solve-owned CapacityFailureState storage is shared by RayD penetration and Channel topology packing",
+    "failure_behavior": "overflow or contract failure atomically records the owned bit and makes every batch output inert before terminal asynchronous observation",
+    "actual_cardinality": "CUDA bool validity plus contiguous CUDA int32 counts",
+    "host_cardinality_read": false,
+    "partial_result": false
+  },
+  "api6_explicit_valid_alignment": {
+    "status": "complete at the Channel typed boundary",
+    "rule": "every migrated RF operation receives an explicit contiguous CUDA bool valid tensor; no implicit all-valid or optional-mask compatibility path exists",
+    "transmission_symbols": [
+      "field_transmission_sequence",
+      "field_transmission_sequence_backward",
+      "field_transmission_sequence_jvp"
+    ],
+    "scattering_symbols": [
+      "scattering_table_eval",
+      "scattering_table_eval_backward",
+      "scattering_table_eval_jvp",
+      "scattering_table_sample",
+      "scattering_table_pdf",
+      "scattering_ensemble_eval",
+      "scattering_ensemble_eval_backward",
+      "scattering_ensemble_eval_jvp",
+      "scattering_patch_integral_eval",
+      "scattering_patch_integral_eval_backward",
+      "scattering_patch_integral_eval_jvp",
+      "scattering_chain_ensemble_eval",
+      "scattering_chain_ensemble_eval_backward",
+      "scattering_chain_ensemble_eval_jvp",
+      "scattering_chain_realization_eval",
+      "scattering_chain_realization_eval_backward",
+      "scattering_chain_realization_eval_jvp"
+    ],
+    "diffraction_active": "rayd_diffraction_paths_order1_forward requires the explicit contiguous CUDA bool active tensor"
+  },
+  "compiled_scene_metadata": {
+    "enumerated": "RayD edge-record vertex bounding-box L2 diagonal",
+    "montecarlo": "union-of-structure bounding-box L2 diagonal",
+    "lifetime": "computed once during scene compilation and retained by CompiledScene",
+    "runtime_device_read": false
+  },
+  "launch_budget": {
+    "segment_forward_N_eq_0": {
+      "cuda": 0,
+      "optix": 0
+    },
+    "segment_forward_all_inactive": {
+      "cuda": 2,
+      "optix": 0,
+      "note": "initialization plus same-stream mask-consistency/sanitize work"
+    },
+    "segment_forward_active": {
+      "cuda": 2,
+      "optix": 1,
+      "note": "depth-independent initialization/final sanitization around exactly one batched traversal"
+    },
+    "enumerated_transmission_topology_pack_N_eq_0": 1,
+    "enumerated_transmission_topology_pack_N_gt_0": 4,
+    "mc_transmission_wall_product_primal": "one fixed-capacity CUDA launch",
+    "mc_transmission_wall_product_backward": "bounded deterministic native launches recorded in its dedicated ledger",
+    "mc_transmission_wall_product_jvp": "one fixed-capacity CUDA launch"
+  },
+  "resident_byte_budget": {
+    "variables": {
+      "N": "segment row count",
+      "D": "hit_capacity",
+      "V": "scene vertex count",
+      "L": "resident layer count",
+      "I_vertices": "1 when vertex gradients are requested, otherwise 0",
+      "I_origins": "1 when origin gradients are requested, otherwise 0",
+      "I_targets": "1 when target gradients are requested, otherwise 0"
+    },
+    "segment_primal": "22*N + 45*N*D",
+    "segment_tape_additional": "N + 18*N*D",
+    "segment_primal_plus_tape": "23*N + 63*N*D",
+    "segment_jvp": "16*N + 40*N*D",
+    "segment_vjp": "12*V*I_vertices + 12*N*(I_origins + I_targets)",
+    "transmission_topology": "N*(73 + 32*D) + 8",
+    "enumerated_primal_plus_topology": "N*(95 + 77*D) + 8",
+    "enumerated_tape_plus_topology": "N*(96 + 95*D) + 8",
+    "mc_wall_product_primal": "13*N",
+    "mc_wall_product_vjp": "16*N + 12*N*D + 12*L + 4",
+    "mc_wall_product_jvp": "8*N",
+    "units": "bytes; formulas describe logical resident tensors and exclude allocator rounding"
+  },
+  "public_api": {
+    "changed": false,
+    "public_export_count": 37,
+    "solver_route_changed": false,
+    "compatibility_alias": false,
+    "generation_suffixed_name_added": false
+  },
+  "activation_remaining": [
+    "enumerated atomic switch to EnumeratedFullDistance and deletion of the repeated closest-hit depth march",
+    "Monte Carlo Basic atomic switch to MonteCarloTargetInset and the native wall-product family",
+    "independent-process exactness, AD, launch, memory, performance, wheel, fingerprint, nightly, and release evidence"
+  ]
+}

@@ -58,6 +58,14 @@ including removal of its remaining scalar device read, requires a separate ADR.
 Frequency-, endpoint-, and solver-config-dependent patch subdivision and
 visibility remain solve-plan state and are never presented as compile resources.
 
+ADR-027 also freezes two scalar penetration policy inputs at compile time.
+`CompiledScene.enumerated_penetration_scene_diagonal_m` is the L2 diagonal of
+the RayD edge-record vertex bounding box; the Monte Carlo counterpart is the
+L2 diagonal of the union of structure bounding boxes. Empty scenes produce
+zero. Solver execution consumes these cached host metadata values and must not
+repeat scene traversal, read a CUDA scalar, or substitute one policy's
+diagonal for the other.
+
 ## Forbidden fallback
 
 Production scene construction may not fall back to CPU geometry, a Python ray

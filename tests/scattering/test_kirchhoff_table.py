@@ -107,10 +107,11 @@ def test_final_table_reciprocity_at_bin_centers(table_60ghz):
     wo = torch.tensor(
         [[sin_o * math.cos(phi), sin_o * math.sin(phi), cos_o]], device=table.device
     )
-    f_te, f_tm = eval_bsdf(table, wi, wo)
+    valid = torch.ones(1, dtype=torch.bool, device=wi.device)
+    f_te, f_tm = eval_bsdf(table, valid, wi, wo)
     assert f_te.item() == pytest.approx(float(table.f_te[ti, 0, to, po]), rel=1e-5)
     assert f_tm.item() == pytest.approx(float(table.f_tm[ti, 0, to, po]), rel=1e-5)
-    f_te_rev, _ = eval_bsdf(table, wo, wi)
+    f_te_rev, _ = eval_bsdf(table, valid, wo, wi)
     assert f_te.item() == pytest.approx(f_te_rev.item(), rel=1e-5, abs=1e-8)
 
 

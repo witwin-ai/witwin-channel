@@ -27,13 +27,13 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 229,
-    "rayd_numerical": 43,
+    "bindings": 234,
+    "rayd_numerical": 47,
     "layered": 3,
-    "channel_numerical": 183
+    "channel_numerical": 184
   },
   "current_phase": 12,
-  "current_subphase": "ADR-027 dormant MC wall product and ADR-029 dormant canonical evaluated-path gather",
+  "current_subphase": "ADR-027 Phase P dormant penetration and transmission-topology foundation",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -12462,6 +12462,227 @@
     "surface": "internal-native-ABI",
     "liveness": "dormant-native-producer",
     "plan13_disposition": "ADR-027 dormant fixed-topology MC wall-product JVP"
+  },
+  {
+    "symbol": "rayd_segment_penetration_forward",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_rayd_segment_penetration_forward",
+    "binding_registration": {
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 380
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "lines": [31],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/rayd/geometry.cpp",
+        "lines": [185],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed operation through the direct C++ API",
+    "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 166
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 191
+      }
+    ],
+    "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_forward_and_tape_keep_named_order_and_state_identity",
+    "e2e_callers": [
+      "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant fixed-capacity segment-penetration primal"
+  },
+  {
+    "symbol": "rayd_segment_penetration_forward_tape",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_rayd_segment_penetration_forward_tape",
+    "binding_registration": {
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 384
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "lines": [42],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/rayd/geometry.cpp",
+        "lines": [211],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed operation through the direct C++ API",
+    "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward_tape",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 197
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 222
+      }
+    ],
+    "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_forward_and_tape_keep_named_order_and_state_identity",
+    "e2e_callers": [
+      "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction",
+      "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant fixed-winner segment-penetration tape"
+  },
+  {
+    "symbol": "rayd_segment_penetration_backward",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_rayd_segment_penetration_backward",
+    "binding_registration": {
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 388
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "lines": [53],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/rayd/geometry.cpp",
+        "lines": [237],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed operation through the direct C++ API",
+    "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_backward",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 239
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 297
+      }
+    ],
+    "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results",
+    "e2e_callers": [
+      "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant fixed-winner segment-penetration VJP companion"
+  },
+  {
+    "symbol": "rayd_segment_penetration_jvp",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_rayd_segment_penetration_jvp",
+    "binding_registration": {
+      "path": "native/channel_native/binding/rayd.cpp",
+      "line": 392
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/rayd.cpp",
+        "lines": [90],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/rayd/geometry.cpp",
+        "lines": [323],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "RayD",
+    "owner_kind": "RayD typed operation through the direct C++ API",
+    "python_owner": "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_jvp",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 317
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+        "line": 356
+      }
+    ],
+    "contract_test": "tests/propagation/geometry/test_segment_penetration_contract.py::test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results",
+    "e2e_callers": [
+      "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant fixed-winner segment-penetration JVP companion"
+  },
+  {
+    "symbol": "enumerated_transmission_topology_pack",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_enumerated_transmission_topology_pack",
+    "binding_registration": {
+      "path": "native/channel_native/binding/path.cpp",
+      "line": 930
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/path.cpp",
+        "lines": [287],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/enumerated_transmission_topology_pack.cu",
+        "lines": [280],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.propagation.topology.kernels.transmission.enumerated_transmission_topology_pack",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
+        "line": 47
+      }
+    ],
+    "production_callers": [],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/propagation/topology/kernels/transmission.py",
+        "line": 75
+      }
+    ],
+    "contract_test": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_preserves_pair_capacity_normal_bits_and_device_counts",
+    "e2e_callers": [
+      "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "dormant-native-producer",
+    "plan13_disposition": "ADR-027 dormant component-5 transmission capacity topology producer"
   }
   ],
   "phase8b_c2d_deterministic_path_table_capacity": {
@@ -12521,9 +12742,32 @@
       "mc_transmission_wall_product_jvp"
     ],
     "numerical_owner": "Channel Native",
-    "failure_contract": "the exact solve-owned CapacityFailureState is checked before validity and payload; canonical valid/num_hits or resident index failures OR PAIR_CONTRACT_ERROR and every primal/VJP/JVP output is inert",
+    "failure_contract": "the exact solve-owned CapacityFailureState is checked before validity and payload; valid must equal the exact [0,num_hits) prefix, and prefix/count or resident index failures OR PAIR_CONTRACT_ERROR before any payload read so every primal/VJP/JVP output is inert",
     "reduction_contract": "wall products use ascending state order; shared layer and frequency VJP owners add in fixed row-then-state order without floating-point atomics",
     "activation_contract": "later ADR-027 MonteCarloTargetInset atomic switch/delete commit only",
     "launch_resource_ledger": "docs/dev/audit/adr-027-mc-transmission-wall-product-resource-ledger.json"
+  },
+  "phase6c_adr027_penetration_foundation": {
+    "status": "dormant foundation implemented; live enumerated and Monte Carlo switches pending",
+    "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "integration_header_identity": "rayd.torch.integration",
+    "integration_api_version": 6,
+    "symbols": [
+      "rayd_segment_penetration_forward",
+      "rayd_segment_penetration_forward_tape",
+      "rayd_segment_penetration_backward",
+      "rayd_segment_penetration_jvp",
+      "enumerated_transmission_topology_pack"
+    ],
+    "owner_counts": {
+      "RayD": 47,
+      "layered": 3,
+      "Channel Native": 184
+    },
+    "public_api_delta": false,
+    "compatibility_alias": false,
+    "resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
   }
 }

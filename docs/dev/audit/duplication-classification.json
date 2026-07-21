@@ -119,17 +119,6 @@
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 174
     },
-    "0ab30d0054692767": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 10B hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, fallback, or second numerical owner.",
-      "token_count": 208
-    },
     "0c0107d82028ece4": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -275,17 +264,6 @@
       "provenance": "hand-curated",
       "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
       "token_count": 587
-    },
-    "1d255af1d01dc7a7": {
-      "category": "host_check",
-      "corpus": "python",
-      "files": [
-        "functional.py"
-      ],
-      "owner": "functional",
-      "provenance": "hand-curated",
-      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
-      "token_count": 122
     },
     "1dd686c2d6766794": {
       "category": "host_check",
@@ -582,18 +560,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 135
     },
-    "490234d077127261": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
-      "files": [
-        "autograd.py",
-        "functional.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 11B hand-reviewed refresh",
-      "reason": "Repeated explicit facade signatures and argument plumbing retained to preserve validation, keyword-call, and inspect semantics; no production numerical fallback.",
-      "token_count": 143
-    },
     "49b8802b51890c79": {
       "category": "fixture_boilerplate",
       "corpus": "python",
@@ -663,18 +629,6 @@
       "provenance": "ADR-029 C2-D hand-reviewed refresh",
       "reason": "Repeated optional tangent/cotangent metadata validation; no numerical computation.",
       "token_count": 115
-    },
-    "53048f88910c54e3": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
-      "files": [
-        "autograd_chain.py",
-        "functional_chain.py"
-      ],
-      "owner": "scattering",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
-      "token_count": 257
     },
     "53674b499b83c070": {
       "category": "numeric_sensitive_exempt",
@@ -855,17 +809,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 365
-    },
-    "6476d3cb1932d22c": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
-      "files": [
-        "autograd.py"
-      ],
-      "owner": "domain owner",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
-      "token_count": 127
     },
     "64908018cf171f4c": {
       "category": "other",
@@ -1105,17 +1048,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
       "token_count": 237
-    },
-    "8238926b2e1e3356": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "fields.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 8A hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
-      "token_count": 133
     },
     "8286022e6fe92069": {
       "category": "numeric_sensitive_exempt",
@@ -1465,17 +1397,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 117
-    },
-    "aa2960d0cd72dc1b": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 10B hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, fallback, or second numerical owner.",
-      "token_count": 227
     },
     "ab2fbf32bbed57d6": {
       "category": "numeric_sensitive_exempt",
@@ -1886,29 +1807,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 108
     },
-    "e027caec2c91d2fc": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "materials.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 10A hand-reviewed refresh",
-      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
-      "token_count": 120
-    },
-    "e15a6c3ca8b4bf99": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
-      "files": [
-        "autograd.py",
-        "functional.py"
-      ],
-      "owner": "autograd",
-      "provenance": "hand-curated",
-      "reason": "Repeated Python facade signature and argument plumbing.",
-      "token_count": 123
-    },
     "e1a50386e879093e": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -2078,18 +1976,6 @@
       "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression.",
       "token_count": 136
     },
-    "f89027f03af5fdfa": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "diffraction.cpp",
-        "rayd.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "Phase 6A hand-reviewed refresh",
-      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
-      "token_count": 126
-    },
     "f8fede21dbaef0e9": {
       "category": "numeric_sensitive_exempt",
       "corpus": "python",
@@ -2188,17 +2074,6 @@
       "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
       "reason": "Repeated host-side tensor allocation shapes for continuous and complete evaluated-path payload contracts.",
       "token_count": 140
-    },
-    "2a9712cb1837b5b2": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "path.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
-      "reason": "Repeated explicit pybind registration lambdas and argument names preserve stable typed operation signatures.",
-      "token_count": 214
     },
     "3c3a1f2a3207af65": {
       "category": "indexing_packing",
@@ -2340,22 +2215,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 101
     },
-    "50f4ce217ac2e9ed": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "mc_transmission_wall_product.cu"
-      ],
-      "lockstep_tests": [
-        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
-        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_error",
-        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_pins_left_to_right_three_wall_product"
-      ],
-      "owner": "montecarlo.basic",
-      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
-      "reason": "Primal, VJP, and JVP deliberately repeat discrete preflight and ascending wall evaluation where sharing could change register lifetime, compiler output, or floating-point order.",
-      "token_count": 240
-    },
     "a673abf6bad42166": {
       "category": "other",
       "corpus": "python",
@@ -2377,6 +2236,170 @@
       "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
       "reason": "Repeated host-side kernel argument wiring preserves the explicit primal/VJP/JVP launch contracts and contains no numerical implementation.",
       "token_count": 207
+    },
+    "0741ed62c9f6707a": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "enumerated_transmission_topology_pack.cu"
+      ],
+      "owner": "propagation.topology",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "The initialization and shared-failure sanitizer repeat the fixed-capacity output schema so both paths publish the same fully inert pair-major topology; the region contains only structural row/slot indexing and sentinel packing.",
+      "token_count": 340
+    },
+    "0f0278ca3dfb02fb": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit realization primal/VJP/JVP typed signatures at the Channel-to-RayD boundary preserve stable argument order and contain no scattering computation.",
+      "token_count": 232
+    },
+    "2df09a1243facb7f": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated pure-wedge typed request and primal/VJP/JVP signatures preserve the explicit valid-first ABI contract; no diffraction physics is implemented at this boundary.",
+      "token_count": 138
+    },
+    "3eb70547dc615000": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit scattering facade signatures and valid-mask validation preserve keyword, inspect, and native-dispatch contracts without providing a Python numerical backend.",
+      "token_count": 149
+    },
+    "51f5c04ffcea2d40": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "path bindings",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "Repeated explicit pybind registration lambdas and named arguments preserve stable typed fixed-capacity operation signatures; the region contains no geometry or RF implementation.",
+      "token_count": 214
+    },
+    "6bdda1482b7cc655": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd_chain.py",
+        "functional_chain.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit chain-scattering facade signatures, validation, and argument plumbing preserve the required valid-first native contracts and contain no Python RF computation.",
+      "token_count": 263
+    },
+    "a1386ee9b4f36548": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "RayD diffraction bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "The binding declaration and definition intentionally repeat the stable typed diffraction-path ABI signature; no geometry traversal is duplicated.",
+      "token_count": 126
+    },
+    "a8c718ba50f4e5ac": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit field facade signatures and valid-mask validation preserve functional/autograd boundary semantics and dispatch only to native companions.",
+      "token_count": 129
+    },
+    "b4f0f25b08b1a3d5": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "geometry.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "RayD segment-penetration bindings",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "Binding declarations/definitions and VJP/JVP tape unpacking repeat the complete typed segment-penetration contract to preserve stable argument order; RayD remains the sole geometry owner.",
+      "token_count": 347
+    },
+    "b9570a364e4f4e94": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated tensor shape, dtype, device, and contiguity validation guards for explicit valid masks; no numerical expression is present.",
+      "token_count": 100
+    },
+    "ee1e5369c2498add": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated ensemble typed request and primal/VJP/JVP signatures preserve the explicit valid-first Channel-to-RayD contract and contain no RF implementation.",
+      "token_count": 125
+    },
+    "ef2dbb06233d6c1c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated chain-ensemble primal/VJP/JVP typed signatures preserve stable argument order at the native boundary and contain no scattering computation.",
+      "token_count": 213
+    },
+    "f020f470ebde98ca": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "lockstep_tests": [
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_error",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_pins_left_to_right_three_wall_product"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "VJP and JVP deliberately repeat canonical validity, shared-failure preflight, and ascending wall setup where sharing could change register lifetime, compiler output, or floating-point evaluation order.",
+      "token_count": 159
+    },
+    "f13329e33cb8a917": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit valid-mask tensor contract checks enforce shape, dtype, device, and contiguity before native dispatch; no numerical expression is present.",
+      "token_count": 103
     }
   },
   "schema_version": 1,
@@ -2389,6 +2412,20 @@
     "new_region_count": 4,
     "note": "The dormant ADR-027 MC estimator adds one explicit typed facade and one native primal/VJP/JVP family; all new exact-token regions are hand-classified without changing the frozen maintenance budget.",
     "region_count": 160,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "phase13_phase_p_refresh": {
+    "combined_duplicate_lines": 9611,
+    "combined_total_lines": 94455,
+    "coverage_percent": 10.175216,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 14,
+    "pruned_region_count": 12,
+    "note": "Phase P added the dormant ADR-027 segment-penetration/topology foundation and adapted existing RayD-owned RF facades to the API 6 explicit valid-mask contract. All live exact-token regions were hand-reviewed and stale ids were pruned without changing the frozen maintenance budget or the immutable Phase 11A/11B evidence.",
+    "region_count": 171,
     "stale_region_count": 0,
     "unclassified_region_count": 0,
     "status": "all current regions classified; frozen duplication coverage acceptance remains met"

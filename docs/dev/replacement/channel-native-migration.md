@@ -257,6 +257,40 @@ and migration governance. Final clean-checkout nightly/release and final
 wheel/fingerprint evidence remain explicitly pending in
 `docs/dev/audit/phase13-phase11-release-acceptance.json`.
 
+### Plan 13 Phase 6C Phase P: dormant penetration foundation
+
+Channel now locks pushed RayD
+`474c122aa3cd6b6d098675e076a73e6f485bd6be`, stable integration-header SHA-256
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`, identity
+`rayd.torch.integration`, and independent numeric API version 6. Four new
+internal `_channel_native` entries expose RayD's complete fixed-capacity
+straight-segment primal/tape/VJP/JVP family. One Channel-owned
+`enumerated_transmission_topology_pack` entry converts valid hit slots into
+pair-major component-5 capacity rows. The live binding universe therefore
+moves from 229 to 234.
+
+All five entries are dormant. Path, Deterministic, and Monte Carlo Basic retain
+their existing live penetration routes until the two accepted atomic
+switch/delete commits. No public export, solver result shape, compatibility
+alias, alternate backend, or generation-suffixed name is introduced. The
+public export count stays 37 and the public API snapshot is unchanged.
+
+The new family shares the solve-owned CUDA `CapacityFailureState`, owns bit
+`1 << 7`, and publishes only completely inert hit/tape/topology outputs after
+overflow or contract failure. Actual cardinality remains CUDA validity plus
+contiguous CUDA `int32` counts. The migration adds no host count/Boolean read,
+dynamic result shape, per-depth traversal, intermediate trap, or partial
+result. Two policy-specific scene diagonals are frozen during scene
+compilation rather than recomputed in a solver hot path.
+
+RayD API 6 also makes validity explicit at every migrated RF boundary:
+transmission, all 17 generic scattering runtime contracts, and order-1
+diffraction export receive a required contiguous CUDA Boolean mask. Channel
+forwards canonical masks and retains no implicit-all-valid or optional-mask
+compatibility path. Exact symbol ownership, launch/resource formulas, and the
+remaining activation work are recorded in
+`docs/dev/audit/phase13-adr027-penetration-foundation.json`.
+
 ## API surface changes
 
 ### ADR-013 coupled double diffraction (D->D)

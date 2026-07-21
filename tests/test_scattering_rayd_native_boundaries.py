@@ -50,16 +50,16 @@ def _sha256(path: Path) -> str:
 def test_current_build_uses_the_locked_rayd_scattering_surface() -> None:
     integration = RAYD_ROOT / "backends/torch/include/rayd/torch/integration.h"
     assert _sha256(integration) == (
-        "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435"
+        "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14"
     )
     integration_text = integration.read_text(encoding="utf-8-sig")
-    assert 'kIntegrationApiVersion = 2;' in integration_text
+    assert 'kIntegrationApiVersion = 6;' in integration_text
     assert '"rayd.torch.integration";' in integration_text
     assert "integration_v2" not in integration_text
     assert "rayd.torch.integration.v2" not in integration_text
     assert _sha256(
         RAYD_ROOT / "backends/torch/include/rayd/torch/rf/scattering.h"
-    ) == "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b"
+    ) == "7a29ff216f11a08256ee271ef5dcad817e4b8379d88bc07772685fa3da439aa9"
     assert _sha256(
         RAYD_ROOT / "shared/include/rayd/shared/rf/scattering_table.cuh"
     ) == "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"

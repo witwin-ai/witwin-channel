@@ -235,6 +235,7 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
         assert f"request.{flag} = {flag};" in backward
     request = _function_body(source, "diffraction_wedge_request")
     for tensor in (
+        "valid",
         "source",
         "target",
         "edge_position",

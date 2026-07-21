@@ -284,6 +284,20 @@ pybind11::dict cn_deterministic_reflection_candidate_capacity_block(
     torch::Tensor face_material_id,
     bool grouped_export,
     int64_t candidate_capacity);
+pybind11::dict cn_enumerated_transmission_topology_pack(
+    torch::Tensor failure_state,
+    torch::Tensor valid,
+    torch::Tensor num_hits,
+    torch::Tensor reached_target,
+    torch::Tensor overflow,
+    torch::Tensor distance,
+    torch::Tensor position,
+    torch::Tensor normal,
+    torch::Tensor global_primitive_id,
+    torch::Tensor face_material_id,
+    torch::Tensor geometry_mode_id,
+    int64_t tx_count,
+    int64_t rx_count);
 pybind11::dict cn_deterministic_diffraction_order1_compact(
     torch::Tensor valid,
     torch::Tensor rx_id,
@@ -912,6 +926,23 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("face_material_id"),
         pybind11::arg("grouped_export"),
         pybind11::arg("candidate_capacity"));
+    module.def(
+        "enumerated_transmission_topology_pack",
+        &cn_enumerated_transmission_topology_pack,
+        "Pack fixed RayD segment hits into inert-capacity transmission topology.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("valid"),
+        pybind11::arg("num_hits"),
+        pybind11::arg("reached_target"),
+        pybind11::arg("overflow"),
+        pybind11::arg("distance"),
+        pybind11::arg("position"),
+        pybind11::arg("normal"),
+        pybind11::arg("global_primitive_id"),
+        pybind11::arg("face_material_id"),
+        pybind11::arg("geometry_mode_id"),
+        pybind11::arg("tx_count"),
+        pybind11::arg("rx_count"));
     module.def(
         "deterministic_diffraction_order1_compact",
         &cn_deterministic_diffraction_order1_compact,

@@ -415,6 +415,7 @@ def _evaluate_transmission_fields(
         else:
             normals = geometry.interaction_normals[rows].contiguous()
         transmission_args = (
+            topology.valid[rows].contiguous(),
             source[rows].contiguous(),
             target[rows].contiguous(),
             positions,
@@ -531,6 +532,7 @@ def _evaluate_diffraction_fields(
                     edge_boundary,
                 )
             wedge_args = (
+                topology.valid[diffraction_rows].contiguous(),
                 source[diffraction_rows].contiguous(),
                 target[diffraction_rows].contiguous(),
                 edge_geometry[1][edge_id].contiguous(),

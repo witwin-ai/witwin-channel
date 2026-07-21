@@ -528,7 +528,10 @@ def build_kirchhoff_table(
 
 
 def eval_bsdf(
-    table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wi: torch.Tensor,
+    wo: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Bilinear (multilinear) lookup of ``(f_te, f_tm)`` for batched pairs.
 
@@ -541,12 +544,13 @@ def eval_bsdf(
     )
 
     return scattering_table_eval(
-        wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
+        valid.contiguous(), wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
     )
 
 
 def sample_directions(
     table: KirchhoffTable,
+    valid: torch.Tensor,
     wi: torch.Tensor,
     u1: torch.Tensor,
     u2: torch.Tensor,
@@ -566,6 +570,7 @@ def sample_directions(
 
     uniforms = torch.stack((u1, u2), dim=1).contiguous()
     out = scattering_table_sample(
+        valid.contiguous(),
         wi.contiguous(),
         uniforms,
         table.marginal_cdf,
@@ -575,7 +580,12 @@ def sample_directions(
     return out["wo"], out["pdf_forward"]
 
 
-def pdf(table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor) -> torch.Tensor:
+def pdf(
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+) -> torch.Tensor:
     """Solid-angle sampling density of :func:`sample_directions`.
 
     Piecewise constant per outgoing bin and exactly consistent with the
@@ -586,11 +596,20 @@ def pdf(table: KirchhoffTable, wi: torch.Tensor, wo: torch.Tensor) -> torch.Tens
     from witwin.channel_native.scattering.kernels.functional import scattering_table_pdf
 
     return scattering_table_pdf(
-        wi.contiguous(), wo.contiguous(), table.sample_density, reverse=False
+        valid.contiguous(),
+        wi.contiguous(),
+        wo.contiguous(),
+        table.sample_density,
+        reverse=False,
     )
 
 
-def pdf_reverse(table: KirchhoffTable, wo: torch.Tensor, wi: torch.Tensor) -> torch.Tensor:
+def pdf_reverse(
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wo: torch.Tensor,
+    wi: torch.Tensor,
+) -> torch.Tensor:
     """Reverse-direction PDF: the SAME table evaluated with swapped args.
 
     BDPT evaluates the reverse strategy density by treating the outgoing
@@ -601,5 +620,9 @@ def pdf_reverse(table: KirchhoffTable, wo: torch.Tensor, wi: torch.Tensor) -> to
     from witwin.channel_native.scattering.kernels.functional import scattering_table_pdf
 
     return scattering_table_pdf(
-        wi.contiguous(), wo.contiguous(), table.sample_density, reverse=True
+        valid.contiguous(),
+        wi.contiguous(),
+        wo.contiguous(),
+        table.sample_density,
+        reverse=True,
     )

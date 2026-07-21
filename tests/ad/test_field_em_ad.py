@@ -108,6 +108,7 @@ def _reflection_batch(depth: int) -> dict[str, torch.Tensor]:
 def _transmission_batch() -> dict[str, torch.Tensor]:
     count, depth = 2, 2
     return {
+        "path_valid": torch.ones(count, dtype=torch.bool, device="cuda"),
         "source": torch.tensor(
             [[0.0, 0.0, 0.0], [0.0, 0.5, 0.0]], device="cuda"
         ).contiguous(),
@@ -199,6 +200,7 @@ def test_transmission_forward_parity_vs_reference():
     batch = _transmission_batch()
     native = field_functional.field_transmission_sequence(*batch.values(), frequency_hz=_FREQUENCY_HZ)
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference = transmission_sequence_reference(
         **reference_batch,
@@ -350,6 +352,7 @@ def test_transmission_layer_vjp_matches_reference_oracle():
     loss.backward()
 
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference_leaves = {}
     for name in ("layer_thickness_m", "layer_eps_r", "layer_sigma_e"):
@@ -381,6 +384,7 @@ def test_transmission_frequency_vjp_matches_reference_oracle():
     assert frequency.grad is not None
 
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference_frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
@@ -445,6 +449,7 @@ def test_transmission_sigma_zero_boundary_grad_matches_oracle():
     assert float(sigma.grad.abs().max()) > 0.0
 
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference_sigma = reference_batch["layer_sigma_e"].clone().requires_grad_(True)
     reference_batch["layer_sigma_e"] = reference_sigma
@@ -475,6 +480,7 @@ def test_transmission_thickness_zero_boundary_grads():
     assert float(thickness.grad[1].abs()) > 0.0
 
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference_thickness = (
         reference_batch["layer_thickness_m"].clone().requires_grad_(True)
@@ -965,6 +971,7 @@ def test_transmission_geometry_vjp_matches_reference_oracle():
     assert positions.grad is None or float(positions.grad.abs().max()) == 0.0
 
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference_leaves = {}
     for name in _TRANSMISSION_GEOMETRY:
@@ -1099,6 +1106,7 @@ def test_transmission_geometry_jvp_matches_reference_oracle():
     lhs = _real_pair_loss(tangents["coefficient"], weights).double()
 
     reference_batch = _reference_inputs(batch)
+    del reference_batch["path_valid"]
     del reference_batch["interaction_positions"]
     reference_leaves = {}
     for name in _TRANSMISSION_GEOMETRY:

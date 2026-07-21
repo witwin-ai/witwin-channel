@@ -37,6 +37,7 @@
     "native-diffraction-path-capacity": "tests/propagation/topology/test_diffraction_path_capacity.py::test_diffraction_order1_capacity_block_handles_empty_input_and_capacity",
     "native-deterministic-capacity-finalize": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
     "native-enumerated-canonical-capacity-select": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_contract_needs_no_public_result_capacity",
+    "native-enumerated-transmission-topology": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_preserves_pair_capacity_normal_bits_and_device_counts",
     "native-evaluated-paths-canonical-capacity-gather": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
     "native-evaluated-paths-canonical-capacity-gather-ad": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_jvp_all_continuous_fields_and_duality",
     "native-evaluated-paths-capacity-pack": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
@@ -59,6 +60,8 @@
     "native-mc-sampling": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
     "native-path-topology": "tests/kernels/test_ops_facade.py::test_path_diffraction_block_and_merge_use_native_compaction",
     "native-rayd-geometry": "tests/propagation/geometry/test_kernel_bridge.py::test_intersection_returns_the_named_tensor_contract",
+    "native-rayd-segment-penetration": "tests/propagation/geometry/test_segment_penetration_contract.py::test_forward_and_tape_keep_named_order_and_state_identity",
+    "native-rayd-segment-penetration-ad": "tests/propagation/geometry/test_segment_penetration_contract.py::test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results",
     "native-rayd-diffraction-sample-tape": "tests/core/test_rayd_diffraction_sampling_contract.py::test_diffraction_sample_tape_accepts_sample_state_slots_and_weights",
     "native-rayd-scene": "tests/scene/test_rayd_scene_kernels.py::test_scene_create_preserves_native_argument_order",
     "native-scattering": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
@@ -94,6 +97,8 @@
     "enumerated-canonical-capacity": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order",
     "evaluated-paths-canonical-capacity": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
     "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
+    "segment-penetration-capacity": "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction",
+    "segment-penetration-ad": "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity",
     "coupled-candidate-capacity": "tests/propagation/topology/test_coupled_candidate_capacity.py::test_coupled_candidate_capacity_matches_frozen_rd_dd_order",
     "deterministic-los": "tests/deterministic/test_los_empty_space.py::test_empty_space_los_matches_analytic_reference",
     "deterministic-reflection": "tests/deterministic/test_reflection_single_plane.py::test_single_plane_reflection_matches_path_reference",
@@ -984,6 +989,15 @@
       "native-enumerated-canonical-capacity-select",
       [
         "enumerated-canonical-capacity"
+      ]
+    ],
+    [
+      "enumerated_transmission_topology_pack",
+      "witwin.channel_native.propagation.topology.kernels.transmission.enumerated_transmission_topology_pack",
+      "named_wrapper",
+      "native-enumerated-transmission-topology",
+      [
+        "segment-penetration-capacity"
       ]
     ],
     [
@@ -2184,6 +2198,43 @@
       "native-rayd-geometry",
       [
         "path-reflection"
+      ]
+    ],
+    [
+      "rayd_segment_penetration_backward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_backward",
+      "named_wrapper",
+      "native-rayd-segment-penetration-ad",
+      [
+        "segment-penetration-ad"
+      ]
+    ],
+    [
+      "rayd_segment_penetration_forward",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward",
+      "named_wrapper",
+      "native-rayd-segment-penetration",
+      [
+        "segment-penetration-capacity"
+      ]
+    ],
+    [
+      "rayd_segment_penetration_forward_tape",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward_tape",
+      "named_wrapper",
+      "native-rayd-segment-penetration",
+      [
+        "segment-penetration-capacity",
+        "segment-penetration-ad"
+      ]
+    ],
+    [
+      "rayd_segment_penetration_jvp",
+      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_jvp",
+      "named_wrapper",
+      "native-rayd-segment-penetration-ad",
+      [
+        "segment-penetration-ad"
       ]
     ],
     [

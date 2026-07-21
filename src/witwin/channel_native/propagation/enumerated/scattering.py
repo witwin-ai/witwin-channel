@@ -362,6 +362,7 @@ def _ensemble_rows(
                 offset_points[sc].contiguous(),
             )
             info["visibility_launch_count"] += launches
+            row_valid = vis_rx[vis_rx].contiguous()
             rc, sc = rc[vis_rx], sc[vis_rx]
             if int(sc.shape[0]) == 0:
                 continue
@@ -375,6 +376,7 @@ def _ensemble_rows(
             # selection/concat below stays Torch (structural).
             wo_row = wo_w[rc, sc].contiguous()
             ensemble_args = (
+                row_valid,
                 wo_row,
                 r2[rc, sc].contiguous(),
                 cos_o[rc, sc].contiguous(),
@@ -615,6 +617,7 @@ def _realization_rows(
                     offset_points[rows].contiguous(),
                 )
                 info["visibility_launch_count"] += launches
+                row_valid = vis_rx[vis_rx].contiguous()
                 rows = rows[vis_rx]
                 if int(rows.numel()) == 0:
                     continue
@@ -666,6 +669,7 @@ def _realization_rows(
                 # physical +j integrand of the module docstring derivation)
                 # and the fixed-order deterministic total reduction.
                 patch_args = (
+                    row_valid,
                     patch_tris,
                     patch_uvs,
                     rows.contiguous(),

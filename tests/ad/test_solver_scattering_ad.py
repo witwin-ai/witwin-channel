@@ -476,6 +476,7 @@ def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
     coef = torch.tensor(0.3, dtype=torch.float32, device=device)
 
     out = scattering_autograd.scattering_ensemble_eval_ad(
+        torch.ones(rows, dtype=torch.bool, device=device),
         torch.nn.functional.normalize(randn(rows, 3), dim=-1),  # wo_rows
         0.5 + torch.rand(rows, generator=generator, device=device),  # r2_rows
         0.3 + 0.5 * torch.rand(rows, generator=generator, device=device),  # cos_o_rows

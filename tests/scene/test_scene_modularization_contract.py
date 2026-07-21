@@ -692,13 +692,16 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "geometry_version",
         "material_version",
         "assignment_version",
+        "enumerated_penetration_scene_diagonal_m",
+        "montecarlo_penetration_scene_diagonal_m",
         "_kirchhoff_resources_cache",
         "_phase_screen_resources_cache",
     )
     assert all(item.default is MISSING for item in schema[:7])
     assert all(item.default_factory is MISSING for item in schema)
-    assert tuple(item.default for item in schema[7:]) == (None, None)
-    assert all(not item.repr and not item.compare for item in schema[7:])
+    assert tuple(item.default for item in schema[7:]) == (0.0, 0.0, None, None)
+    assert all(item.repr and item.compare for item in schema[7:9])
+    assert all(not item.repr and not item.compare for item in schema[9:])
     assert get_type_hints(owner) == {
         "geometry": legacy_geometry.GeometryStore,
         "materials": legacy_material_store.MaterialStore,
@@ -707,6 +710,8 @@ def test_compiled_scene_dataclass_schema_and_type_hints_are_exact():
         "geometry_version": int,
         "material_version": int,
         "assignment_version": int,
+        "enumerated_penetration_scene_diagonal_m": float,
+        "montecarlo_penetration_scene_diagonal_m": float,
         "_kirchhoff_resources_cache": (
             scattering_resources.KirchhoffRuntimeResources | None
         ),

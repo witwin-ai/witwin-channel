@@ -4,6 +4,14 @@
   "applied_count_delta": -9,
   "projected_final_count": 202,
   "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
+  "live_binding_count": 234,
+  "live_count_delta_from_plan13_baseline": 23,
+  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings = 234",
+  "phase6c_phase_p_delta": {
+    "before": 229,
+    "added": 5,
+    "after": 234
+  },
   "actions": [
     {
       "symbol": "raydn_scene_create",
@@ -452,6 +460,262 @@
       "count_delta": -1,
       "status": "applied in Phase 4",
       "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "diffraction_tx_visible_state_plan",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "active in Phase 8B",
+      "reason": "ADR-028 device-resident transmitter-visible diffraction planning"
+    },
+    {
+      "symbol": "capacity_failure_state_create",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "create the solve-owned current-stream CUDA failure bitmask"
+    },
+    {
+      "symbol": "capacity_failure_terminal_check",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "unique terminal asynchronous failure observer"
+    },
+    {
+      "symbol": "coupled_candidate_capacity_block",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "fixed-capacity coupled R-D/D-R/D-D candidate producer"
+    },
+    {
+      "symbol": "deterministic_capacity_finalize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "stable pair-major capacity finalizer"
+    },
+    {
+      "symbol": "enumerated_canonical_capacity_select",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical device-resident enumerated selector"
+    },
+    {
+      "symbol": "evaluated_paths_canonical_capacity_gather",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical continuous evaluated-path gather"
+    },
+    {
+      "symbol": "evaluated_paths_canonical_capacity_gather_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical evaluated-path VJP companion"
+    },
+    {
+      "symbol": "evaluated_paths_canonical_capacity_gather_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical evaluated-path JVP companion"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "pair-major evaluated-path capacity packer"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "evaluated-path capacity VJP companion"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "evaluated-path capacity JVP companion"
+    },
+    {
+      "symbol": "deterministic_path_table_capacity_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "fixed-capacity deterministic PathTable packer"
+    },
+    {
+      "symbol": "deterministic_path_table_capacity_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "deterministic PathTable capacity VJP companion"
+    },
+    {
+      "symbol": "deterministic_path_table_capacity_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "deterministic PathTable capacity JVP companion"
+    },
+    {
+      "symbol": "deterministic_diffraction_order1_capacity_block",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "fixed-capacity order-1 diffraction path block"
+    },
+    {
+      "symbol": "deterministic_diffraction_state_capacity_select",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "stable device selection into diffraction_state_capacity"
+    },
+    {
+      "symbol": "deterministic_reflection_candidate_capacity_block",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "post-EPC reflection candidate-capacity producer"
+    },
+    {
+      "symbol": "path_result_capacity_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "Path-owned fixed-capacity result packer"
+    },
+    {
+      "symbol": "path_result_capacity_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "Path result-capacity VJP companion"
+    },
+    {
+      "symbol": "path_result_capacity_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "Path result-capacity JVP companion"
+    },
+    {
+      "symbol": "deterministic_diffraction_pair_reduce",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-030 foundation",
+      "reason": "source-state-serial deterministic diffraction pair reducer"
+    },
+    {
+      "symbol": "deterministic_diffraction_pair_reduce_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-030 foundation",
+      "reason": "deterministic diffraction pair-reducer VJP companion"
+    },
+    {
+      "symbol": "deterministic_diffraction_pair_reduce_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-030 foundation",
+      "reason": "deterministic diffraction pair-reducer JVP companion"
+    },
+    {
+      "symbol": "mc_transmission_wall_product",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-027 foundation",
+      "reason": "fixed-capacity MC incident-polarized wall-product estimator"
+    },
+    {
+      "symbol": "mc_transmission_wall_product_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-027 foundation",
+      "reason": "MC wall-product VJP companion"
+    },
+    {
+      "symbol": "mc_transmission_wall_product_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-027 foundation",
+      "reason": "MC wall-product JVP companion"
+    },
+    {
+      "symbol": "rayd_segment_penetration_forward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented in Phase 6C Phase P; dormant",
+      "reason": "RayD-owned fixed-capacity segment-penetration primal"
+    },
+    {
+      "symbol": "rayd_segment_penetration_forward_tape",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented in Phase 6C Phase P; dormant",
+      "reason": "RayD-owned fixed-winner segment-penetration tape"
+    },
+    {
+      "symbol": "rayd_segment_penetration_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented in Phase 6C Phase P; dormant",
+      "reason": "RayD-owned segment-penetration VJP companion"
+    },
+    {
+      "symbol": "rayd_segment_penetration_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented in Phase 6C Phase P; dormant",
+      "reason": "RayD-owned segment-penetration JVP companion"
+    },
+    {
+      "symbol": "enumerated_transmission_topology_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented in Phase 6C Phase P; dormant",
+      "reason": "Channel-owned pair-major component-5 capacity topology producer"
     }
   ]
 }

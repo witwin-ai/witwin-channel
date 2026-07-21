@@ -88,6 +88,7 @@ def _grid_rows(case):
 def _native_eval(case, stack, coef, threshold):
     wo, r2, cos_o = _grid_rows(case)
     return ops.scattering_ensemble_eval(
+        torch.ones(wo.shape[0], dtype=torch.bool, device=wo.device),
         wo, r2, cos_o, case["n_o"], case["t1r"], case["t2r"], case["wi_local"],
         case["cos_i"], case["r1"], case["a_te2"], case["a_tm2"], case["weights"],
         case["material_id"], case["backup_axis"], case["rx_pol"],

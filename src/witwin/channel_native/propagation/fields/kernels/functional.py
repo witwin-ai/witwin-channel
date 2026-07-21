@@ -190,6 +190,7 @@ def field_reflection_sequence(
 
 
 def field_transmission_sequence(
+    path_valid: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     interaction_positions: torch.Tensor,
@@ -208,6 +209,7 @@ def field_transmission_sequence(
     *,
     frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
+    validate_cuda_tensor("path_valid", path_valid, dtype=torch.bool, ndim=1)
     for name, value in (
         ("source", source),
         ("target", target),
@@ -232,6 +234,8 @@ def field_transmission_sequence(
     )
     validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
     count = int(source.shape[0])
+    if path_valid.shape != (count,):
+        raise ValueError("path_valid must have shape (N,)")
     depth = int(interaction_positions.shape[1])
     if interaction_positions.shape != (count, depth, 3) or depth <= 0:
         raise ValueError("interaction_positions must have shape (N, D, 3), D > 0")
@@ -258,6 +262,7 @@ def field_transmission_sequence(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
     out = _required_native_op("field_transmission_sequence")(
+        path_valid,
         source,
         target,
         interaction_positions,
@@ -721,6 +726,7 @@ def field_reflection_sequence_jvp(
 
 
 def field_transmission_sequence_backward(
+    path_valid: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     interaction_positions: torch.Tensor,
@@ -751,6 +757,7 @@ def field_transmission_sequence_backward(
     need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     out = _required_native_op("field_transmission_sequence_backward")(
+        path_valid,
         source,
         target,
         interaction_positions,
@@ -797,6 +804,7 @@ def field_transmission_sequence_backward(
 
 
 def field_transmission_sequence_jvp(
+    path_valid: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     interaction_positions: torch.Tensor,
@@ -824,6 +832,7 @@ def field_transmission_sequence_jvp(
     tangent_interaction_normals: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("field_transmission_sequence_jvp")(
+        path_valid,
         source,
         target,
         interaction_positions,
@@ -868,7 +877,14 @@ _COUPLED_OUTPUT_FIELDS = (
 )
 
 
+def _validate_wedge_valid(valid: torch.Tensor, source: torch.Tensor) -> None:
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    if valid.shape != (int(source.shape[0]),):
+        raise ValueError("valid must have shape (N,) matching source rows")
+
+
 def field_diffraction_wedge(
+    valid: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     edge_position: torch.Tensor,
@@ -894,7 +910,9 @@ def field_diffraction_wedge(
 ) -> dict[str, torch.Tensor]:
     """Re-evaluate RayD's order-1 UTD wedge export from the frozen topology."""
 
+    _validate_wedge_valid(valid, source)
     out = _required_native_op("field_diffraction_wedge")(
+        valid,
         source,
         target,
         edge_position,

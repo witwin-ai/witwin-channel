@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 
 import pytest
 
@@ -90,3 +91,27 @@ def test_fields_autograd_uses_canonical_functional_companions():
         "_WEDGE_OUTPUT_FIELDS",
     ):
         assert getattr(autograd, name) is getattr(functional, name)
+
+
+def test_transmission_autograd_requires_explicit_path_valid_first():
+    parameters = tuple(
+        inspect.signature(autograd.field_transmission_sequence_ad).parameters
+    )
+    assert parameters[0] == "path_valid"
+    function_parameters = tuple(
+        inspect.signature(
+            autograd._FieldTransmissionSequenceAdFunction.forward
+        ).parameters
+    )
+    assert function_parameters[0] == "path_valid"
+
+
+def test_diffraction_wedge_autograd_requires_explicit_valid_first():
+    parameters = tuple(
+        inspect.signature(autograd.field_diffraction_wedge_ad).parameters
+    )
+    assert parameters[0] == "valid"
+    function_parameters = tuple(
+        inspect.signature(autograd._FieldDiffractionWedgeAdFunction.forward).parameters
+    )
+    assert function_parameters[0] == "valid"

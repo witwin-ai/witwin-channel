@@ -161,12 +161,14 @@ pybind11::dict cn_em_layer_stack_jvp(
 namespace {
 
 rayd::torch::ScatteringTableEvalRequest scattering_table_eval_request(
+    torch::Tensor valid,
     torch::Tensor wi,
     torch::Tensor wo,
     torch::Tensor f_te,
     torch::Tensor f_tm) {
     return {
-        std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm)};
+        std::move(valid), std::move(wi), std::move(wo), std::move(f_te),
+        std::move(f_tm)};
 }
 
 pybind11::dict scattering_table_eval_result_dict(
@@ -178,6 +180,7 @@ pybind11::dict scattering_table_eval_result_dict(
 }
 
 rayd::torch::ScatteringEnsembleEvalRequest scattering_ensemble_request(
+    torch::Tensor valid,
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
     torch::Tensor cos_o_rows,
@@ -203,6 +206,7 @@ rayd::torch::ScatteringEnsembleEvalRequest scattering_ensemble_request(
     double coef,
     double threshold) {
     rayd::torch::ScatteringEnsembleEvalRequest request;
+    request.valid = std::move(valid);
     request.wo_rows = std::move(wo_rows);
     request.r2_rows = std::move(r2_rows);
     request.cos_o_rows = std::move(cos_o_rows);
@@ -241,6 +245,7 @@ pybind11::dict scattering_ensemble_result_dict(
 }
 
 rayd::torch::ScatteringPatchIntegralEvalRequest scattering_patch_request(
+    torch::Tensor valid,
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
     torch::Tensor rows,
@@ -260,6 +265,7 @@ rayd::torch::ScatteringPatchIntegralEvalRequest scattering_patch_request(
     torch::Tensor quad_w,
     double k0) {
     rayd::torch::ScatteringPatchIntegralEvalRequest request;
+    request.valid = std::move(valid);
     request.patch_tris = std::move(patch_tris);
     request.patch_uvs = std::move(patch_uvs);
     request.rows = std::move(rows);
@@ -299,7 +305,8 @@ pybind11::dict scattering_patch_result_dict(
         std::move(c2_gain), std::move(c2_thickness), std::move(c2_depth)
 
 rayd::torch::ScatteringChainEnsembleEvalRequest scattering_chain_ensemble_request(
-    torch::Tensor tx_pol, torch::Tensor rx_pol, torch::Tensor source,
+    torch::Tensor valid, torch::Tensor tx_pol, torch::Tensor rx_pol,
+    torch::Tensor source,
     torch::Tensor vertex, torch::Tensor target, torch::Tensor c1_positions,
     torch::Tensor c1_normals, torch::Tensor c1_eps_r, torch::Tensor c1_sigma_e,
     torch::Tensor c1_mu_r, torch::Tensor c1_gain, torch::Tensor c1_thickness,
@@ -314,7 +321,7 @@ rayd::torch::ScatteringChainEnsembleEvalRequest scattering_chain_ensemble_reques
     torch::Tensor table_dims, torch::Tensor material_slot, double coef,
     double threshold, double frequency_hz) {
     return {
-        std::move(tx_pol), std::move(rx_pol), std::move(source),
+        std::move(valid), std::move(tx_pol), std::move(rx_pol), std::move(source),
         std::move(vertex), std::move(target), CN_SCATTERING_CHAIN_MEDIA_ARGS(),
         std::move(n_o), std::move(t1r), std::move(t2r), std::move(backup_axis),
         std::move(wi_local), std::move(cos_i), std::move(cos_o), std::move(d_i),
@@ -335,7 +342,8 @@ pybind11::dict scattering_chain_ensemble_result_dict(
 }
 
 rayd::torch::ScatteringChainRealizationEvalRequest scattering_chain_realization_request(
-    torch::Tensor patch_tris, torch::Tensor patch_uvs, torch::Tensor rows,
+    torch::Tensor valid, torch::Tensor patch_tris, torch::Tensor patch_uvs,
+    torch::Tensor rows,
     torch::Tensor d_i, torch::Tensor d_o, torch::Tensor n_rows,
     torch::Tensor source, torch::Tensor vertex, torch::Tensor target,
     torch::Tensor c1_positions, torch::Tensor c1_normals, torch::Tensor c1_eps_r,
@@ -352,7 +360,8 @@ rayd::torch::ScatteringChainRealizationEvalRequest scattering_chain_realization_
     torch::Tensor layer_mu_r, torch::Tensor quad_a, torch::Tensor quad_b,
     torch::Tensor quad_w, double k0, double frequency_hz) {
     return {
-        std::move(patch_tris), std::move(patch_uvs), std::move(rows),
+        std::move(valid), std::move(patch_tris), std::move(patch_uvs),
+        std::move(rows),
         std::move(d_i), std::move(d_o), std::move(n_rows), std::move(source),
         std::move(vertex), std::move(target), CN_SCATTERING_CHAIN_MEDIA_ARGS(),
         std::move(tx_pol), std::move(rx_pol), std::move(l1), std::move(l2),
@@ -378,21 +387,25 @@ pybind11::dict scattering_chain_realization_result_dict(
 }  // namespace
 
 pybind11::dict cn_scattering_table_eval(
+    torch::Tensor valid,
     torch::Tensor wi,
     torch::Tensor wo,
     torch::Tensor f_te,
     torch::Tensor f_tm) {
     return scattering_table_eval_result_dict(rayd::torch::scattering_table_eval(
         scattering_table_eval_request(
-            std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm))));
+            std::move(valid), std::move(wi), std::move(wo), std::move(f_te),
+            std::move(f_tm))));
 }
 
 torch::Tensor cn_scattering_table_pdf(
+    torch::Tensor valid,
     torch::Tensor wi,
     torch::Tensor wo,
     torch::Tensor sample_density,
     bool reverse) {
     rayd::torch::ScatteringTablePdfRequest request;
+    request.valid = std::move(valid);
     request.wi = std::move(wi);
     request.wo = std::move(wo);
     request.sample_density = std::move(sample_density);
@@ -401,12 +414,14 @@ torch::Tensor cn_scattering_table_pdf(
 }
 
 pybind11::dict cn_scattering_table_sample(
+    torch::Tensor valid,
     torch::Tensor wi,
     torch::Tensor uniforms,
     torch::Tensor marginal_cdf,
     torch::Tensor conditional_cdf,
     torch::Tensor sample_density) {
     rayd::torch::ScatteringTableSampleRequest request;
+    request.valid = std::move(valid);
     request.wi = std::move(wi);
     request.uniforms = std::move(uniforms);
     request.marginal_cdf = std::move(marginal_cdf);
@@ -433,7 +448,8 @@ pybind11::dict cn_scattering_event_probabilities(
     double probability_floor);
 
 #define CN_SCATTERING_ENSEMBLE_PRIMAL_ARGS()                                \
-    std::move(wo_rows), std::move(r2_rows), std::move(cos_o_rows),           \
+    std::move(valid), std::move(wo_rows), std::move(r2_rows),                \
+        std::move(cos_o_rows),                                                \
         std::move(n_o), std::move(t1r), std::move(t2r),                     \
         std::move(wi_local), std::move(cos_i), std::move(r1),               \
         std::move(a_te2), std::move(a_tm2), std::move(weights),             \
@@ -443,7 +459,8 @@ pybind11::dict cn_scattering_event_probabilities(
         std::move(table_dims), std::move(material_slot), coef, threshold
 
 #define CN_SCATTERING_PATCH_PRIMAL_ARGS()                                   \
-    std::move(patch_tris), std::move(patch_uvs), std::move(rows),           \
+    std::move(valid), std::move(patch_tris), std::move(patch_uvs),           \
+        std::move(rows),                                                      \
         std::move(d_i), std::move(d_o), std::move(n_rows),                  \
         std::move(r_te), std::move(r_tm), std::move(pol_t),                 \
         std::move(pol_r), std::move(r1_rows), std::move(r2_rows),           \
@@ -451,7 +468,8 @@ pybind11::dict cn_scattering_event_probabilities(
         std::move(quad_b), std::move(quad_w), k0
 
 #define CN_SCATTERING_CHAIN_ENSEMBLE_PRIMAL_ARGS()                          \
-    std::move(tx_pol), std::move(rx_pol), std::move(source),                \
+    std::move(valid), std::move(tx_pol), std::move(rx_pol),                  \
+        std::move(source),                                                    \
         std::move(vertex), std::move(target),                               \
         CN_SCATTERING_CHAIN_MEDIA_ARGS(),                                   \
         std::move(n_o), std::move(t1r), std::move(t2r),                     \
@@ -463,7 +481,8 @@ pybind11::dict cn_scattering_event_probabilities(
         frequency_hz
 
 #define CN_SCATTERING_CHAIN_REALIZATION_PRIMAL_ARGS()                       \
-    std::move(patch_tris), std::move(patch_uvs), std::move(rows),           \
+    std::move(valid), std::move(patch_tris), std::move(patch_uvs),           \
+        std::move(rows),                                                      \
         std::move(d_i), std::move(d_o), std::move(n_rows),                  \
         std::move(source), std::move(vertex), std::move(target),            \
         CN_SCATTERING_CHAIN_MEDIA_ARGS(),                                   \
@@ -477,6 +496,7 @@ pybind11::dict cn_scattering_event_probabilities(
         frequency_hz
 
 pybind11::dict cn_scattering_ensemble_eval(
+    torch::Tensor valid,
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
     torch::Tensor cos_o_rows,
@@ -505,6 +525,7 @@ pybind11::dict cn_scattering_ensemble_eval(
         scattering_ensemble_request(CN_SCATTERING_ENSEMBLE_PRIMAL_ARGS())));
 }
 pybind11::dict cn_scattering_ensemble_eval_backward(
+    torch::Tensor valid,
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
     torch::Tensor cos_o_rows,
@@ -566,6 +587,7 @@ pybind11::dict cn_scattering_ensemble_eval_backward(
     return out;
 }
 pybind11::dict cn_scattering_ensemble_eval_jvp(
+    torch::Tensor valid,
     torch::Tensor wo_rows,
     torch::Tensor r2_rows,
     torch::Tensor cos_o_rows,
@@ -632,6 +654,7 @@ pybind11::dict cn_scattering_ensemble_eval_jvp(
 }
 
 pybind11::dict cn_scattering_patch_integral_eval(
+    torch::Tensor valid,
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
     torch::Tensor rows,
@@ -656,6 +679,7 @@ pybind11::dict cn_scattering_patch_integral_eval(
 }
 
 pybind11::dict cn_scattering_patch_integral_eval_backward(
+    torch::Tensor valid,
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
     torch::Tensor rows,
@@ -702,6 +726,7 @@ pybind11::dict cn_scattering_patch_integral_eval_backward(
     return out;
 }
 pybind11::dict cn_scattering_patch_integral_eval_jvp(
+    torch::Tensor valid,
     torch::Tensor patch_tris,
     torch::Tensor patch_uvs,
     torch::Tensor rows,
@@ -747,6 +772,7 @@ pybind11::dict cn_scattering_patch_integral_eval_jvp(
     return out;
 }
 pybind11::dict cn_scattering_table_eval_backward(
+    at::Tensor valid,
     at::Tensor wi,
     at::Tensor wo,
     at::Tensor f_te,
@@ -757,7 +783,8 @@ pybind11::dict cn_scattering_table_eval_backward(
     bool need_grad_tables) {
     rayd::torch::ScatteringTableEvalBackwardRequest request;
     request.primal = scattering_table_eval_request(
-        std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm));
+        std::move(valid), std::move(wi), std::move(wo), std::move(f_te),
+        std::move(f_tm));
     request.grad_f_te = optional_tensor(grad_out_f_te);
     request.grad_f_tm = optional_tensor(grad_out_f_tm);
     request.need_grad_directions = need_grad_dirs;
@@ -771,6 +798,7 @@ pybind11::dict cn_scattering_table_eval_backward(
     return out;
 }
 pybind11::dict cn_scattering_table_eval_jvp(
+    at::Tensor valid,
     at::Tensor wi,
     at::Tensor wo,
     at::Tensor f_te,
@@ -781,7 +809,8 @@ pybind11::dict cn_scattering_table_eval_jvp(
     pybind11::object t_f_tm) {
     rayd::torch::ScatteringTableEvalJvpRequest request;
     request.primal = scattering_table_eval_request(
-        std::move(wi), std::move(wo), std::move(f_te), std::move(f_tm));
+        std::move(valid), std::move(wi), std::move(wo), std::move(f_te),
+        std::move(f_tm));
     request.tangent_wi = optional_tensor(t_wi);
     request.tangent_wo = optional_tensor(t_wo);
     request.tangent_f_te = optional_tensor(t_f_te);
@@ -811,7 +840,8 @@ pybind11::dict cn_kirchhoff_table_build_jvp(
     double t_sigma_h, double t_corr_x, double t_corr_y, double t_frequency);
 
 pybind11::dict cn_scattering_chain_ensemble_eval(
-    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source, at::Tensor vertex,
+    at::Tensor valid, at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source,
+    at::Tensor vertex,
     at::Tensor target, at::Tensor c1_positions, at::Tensor c1_normals,
     at::Tensor c1_eps_r, at::Tensor c1_sigma_e, at::Tensor c1_mu_r,
     at::Tensor c1_gain, at::Tensor c1_thickness, at::Tensor c1_depth,
@@ -829,7 +859,8 @@ pybind11::dict cn_scattering_chain_ensemble_eval(
                 CN_SCATTERING_CHAIN_ENSEMBLE_PRIMAL_ARGS())));
 }
 pybind11::dict cn_scattering_chain_ensemble_eval_backward(
-    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source, at::Tensor vertex,
+    at::Tensor valid, at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source,
+    at::Tensor vertex,
     at::Tensor target, at::Tensor c1_positions, at::Tensor c1_normals,
     at::Tensor c1_eps_r, at::Tensor c1_sigma_e, at::Tensor c1_mu_r,
     at::Tensor c1_gain, at::Tensor c1_thickness, at::Tensor c1_depth,
@@ -874,7 +905,8 @@ pybind11::dict cn_scattering_chain_ensemble_eval_backward(
     return out;
 }
 pybind11::dict cn_scattering_chain_ensemble_eval_jvp(
-    at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source, at::Tensor vertex,
+    at::Tensor valid, at::Tensor tx_pol, at::Tensor rx_pol, at::Tensor source,
+    at::Tensor vertex,
     at::Tensor target, at::Tensor c1_positions, at::Tensor c1_normals,
     at::Tensor c1_eps_r, at::Tensor c1_sigma_e, at::Tensor c1_mu_r,
     at::Tensor c1_gain, at::Tensor c1_thickness, at::Tensor c1_depth,
@@ -932,7 +964,8 @@ pybind11::dict cn_scattering_chain_ensemble_eval_jvp(
 }
 
 pybind11::dict cn_scattering_chain_realization_eval(
-    at::Tensor patch_tris, at::Tensor patch_uvs, at::Tensor rows, at::Tensor d_i,
+    at::Tensor valid, at::Tensor patch_tris, at::Tensor patch_uvs,
+    at::Tensor rows, at::Tensor d_i,
     at::Tensor d_o, at::Tensor n_rows, at::Tensor source, at::Tensor vertex,
     at::Tensor target, at::Tensor c1_positions,
     at::Tensor c1_normals, at::Tensor c1_eps_r, at::Tensor c1_sigma_e,
@@ -952,7 +985,8 @@ pybind11::dict cn_scattering_chain_realization_eval(
                 CN_SCATTERING_CHAIN_REALIZATION_PRIMAL_ARGS())));
 }
 pybind11::dict cn_scattering_chain_realization_eval_backward(
-    at::Tensor patch_tris, at::Tensor patch_uvs, at::Tensor rows, at::Tensor d_i,
+    at::Tensor valid, at::Tensor patch_tris, at::Tensor patch_uvs,
+    at::Tensor rows, at::Tensor d_i,
     at::Tensor d_o, at::Tensor n_rows, at::Tensor source, at::Tensor vertex,
     at::Tensor target, at::Tensor c1_positions,
     at::Tensor c1_normals, at::Tensor c1_eps_r, at::Tensor c1_sigma_e,
@@ -1013,7 +1047,8 @@ pybind11::dict cn_scattering_chain_realization_eval_backward(
     return out;
 }
 pybind11::dict cn_scattering_chain_realization_eval_jvp(
-    at::Tensor patch_tris, at::Tensor patch_uvs, at::Tensor rows, at::Tensor d_i,
+    at::Tensor valid, at::Tensor patch_tris, at::Tensor patch_uvs,
+    at::Tensor rows, at::Tensor d_i,
     at::Tensor d_o, at::Tensor n_rows, at::Tensor source, at::Tensor vertex,
     at::Tensor target, at::Tensor c1_positions,
     at::Tensor c1_normals, at::Tensor c1_eps_r, at::Tensor c1_sigma_e,

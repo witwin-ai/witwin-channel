@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 
 import pytest
 
@@ -46,3 +47,18 @@ def test_fields_functional_uses_canonical_dependencies():
     assert functional._validate_layer_csr is owner
     assert material_contracts.validate_layer_csr is owner
     assert materials.validate_layer_csr is owner
+
+
+def test_transmission_family_requires_explicit_path_valid_first():
+    for name in (
+        "field_transmission_sequence",
+        "field_transmission_sequence_backward",
+        "field_transmission_sequence_jvp",
+    ):
+        parameters = tuple(inspect.signature(getattr(functional, name)).parameters)
+        assert parameters[0] == "path_valid"
+
+
+def test_diffraction_wedge_requires_explicit_valid_first():
+    parameters = tuple(inspect.signature(functional.field_diffraction_wedge).parameters)
+    assert parameters[0] == "valid"

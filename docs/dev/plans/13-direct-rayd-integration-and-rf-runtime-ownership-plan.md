@@ -2,9 +2,10 @@
 
 **状态：** EXECUTION IN PROGRESS（用户于 2026-07-20 选择 Phase 8B 方案 2 并要求完成
 Phase 11/12）；ADR-023/024/025/026/027/028/029/030 已接受；Phase 8B、Phase 10A/10B、Phase
-11A/11B、RayD legacy extern-C 删除和稳定 integration 命名已完成。Phase 11 live
-governance/docs 已收口；最终 clean-checkout nightly/release、wheel/fingerprint 证据和 Phase
-12 profiling-driven 性能验收仍在执行
+11A/11B、RayD legacy extern-C 删除和稳定 integration 命名已完成。Phase 6C 的 Phase P
+dormant penetration foundation 已完成实现并进入验证；enumerated/MC live switch 仍待独立
+原子提交。Phase 11 live governance/docs 已收口；最终 clean-checkout nightly/release、
+wheel/fingerprint 证据和 Phase 12 profiling-driven 性能验收仍在执行
 
 **计划日期：** 2026-07-18
 
@@ -23,7 +24,9 @@ dependency closure，并修正 immutable owner baseline 与 scattering C1/C2 语
 通用 scattering runtime，以及刚合并的 scattering v2 multi-bounce coherent
 primal/JVP/VJP family。本文的 owner moves 不改变物理模型、数值顺序、fusion 边界或
 solver 行为；Phase 12 经独立接受的 ADR-030 只把不稳定的 diffraction pair atomic reduction
-改为冻结的 source-state-serial 数值顺序。batched penetration trace 仍须独立立项。
+改为冻结的 source-state-serial 数值顺序。ADR-027 batched penetration 的 dormant typed
+family、Channel capacity topology pack 和 MC wall-product foundation 已落地，solver 激活仍按
+两个独立 atomic switch/delete 提交执行。
 
 **关联记录：** [Plan 08](./08-channel-native-modular-architecture-hardening-plan.md)、
 [Plan 10](./10-scattering-v2-multibounce-coherent-ad-plan.md)、
@@ -611,17 +614,37 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ### Phase 6C — ADR-027 后续：Batched penetration / MC glue native 化
 
-**状态：ADR-027 已接受（2026-07-20）；实现待按独立提交执行。**
+**状态：IN PROGRESS（2026-07-21）；Phase P dormant foundation 已实现，enumerated 与 MC
+atomic switch/delete 尚未执行。**
 
 ADR-027 已冻结第 5.5 节两套显式 march policy、稳定 typed API、固定 `[N,D]` hit/tape、一次
 batched traversal、`D+1` overflow probe、device fail-loud/no partial、完整
 forward-tape/VJP/JVP family 和 Channel/RayD owner split。零 traversal 的 all-inactive 快路由
 必须由显式 host-known `input_active_any=false` 声明，并由同流 CUDA 校验 device mask；不得从
 device mask 回读或同步推断。非 input-inactive 的退化 full-distance 与零 target-inset row 以
-`reached_target=true` 完成。实施提交顺序为：
+`reached_target=true` 完成。
 
-1. RayD dormant typed family + direct tests；
-2. Channel dormant façade、failure-state wiring 与 native MC estimator；
+已锁定并推送 RayD `474c122aa3cd6b6d098675e076a73e6f485bd6be`，稳定
+`rayd/torch/integration.h` SHA-256 为
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`，identity 为
+`rayd.torch.integration`，独立 numeric API version 为 6。Phase P 在 Channel 增加四个
+`rayd_segment_penetration_*` ABI façade、一个
+`enumerated_transmission_topology_pack` capacity producer、两套 compile-frozen scene
+diagonal，以及共享 failure-state wiring；既有 MC wall-product family 的 prefix 语义也已收口。
+五个新增 ABI 均保持 dormant，binding 总数从 229 增至 234，数值 owner 计数为 RayD 47、
+layered 3、Channel Native 184。资源与 launch 公式记录在
+`docs/dev/audit/phase13-adr027-penetration-foundation.json`。
+
+同一锁定 API 还要求 transmission 三件套、17 个 scattering runtime contracts 与 order-1
+diffraction exporter 显式接收 contiguous CUDA Boolean validity/active tensor；Channel 没有
+implicit-all-valid、optional-mask compatibility 或 Torch 合成 fallback。该 ABI 收紧不改变
+对应 numerical owner、launch 数、有效行数值或公开 API。
+
+实施提交顺序为：
+
+1. RayD dormant typed family + direct tests；**已完成**；
+2. Channel dormant façade、failure-state wiring、component-5 topology pack 与 native MC
+   estimator foundation；**已实现，待本阶段完整验证提交**；
 3. enumerated atomic pin/switch/delete；
 4. MC Basic atomic switch/delete；
 5. 两仓 exact/AD/Nsight/performance/packaging 证据与文档收口。

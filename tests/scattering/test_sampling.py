@@ -35,6 +35,10 @@ def _fixed_wi(table, ti: int) -> torch.Tensor:
     return torch.tensor([[sin_i, 0.0, cos_i]], device=table.device)
 
 
+def _all_valid(rows: int, *, device: torch.device) -> torch.Tensor:
+    return torch.ones(rows, dtype=torch.bool, device=device)
+
+
 def test_sample_matches_pdf_binned(table):
     """Binned frequencies of 2e5 samples match the sampling masses.
 
@@ -49,7 +53,7 @@ def test_sample_matches_pdf_binned(table):
     gen = torch.Generator(device="cpu").manual_seed(12345)
     u1 = torch.rand(n, generator=gen).to(table.device)
     u2 = torch.rand(n, generator=gen).to(table.device)
-    wo, _ = sample_directions(table, wi, u1, u2)
+    wo, _ = sample_directions(table, _all_valid(n, device=wi.device), wi, u1, u2)
 
     # Coarse bin indices of the samples.
     cos_o = wo[:, 2].clamp(0.0, 1.0 - 1e-7)
@@ -84,7 +88,8 @@ def test_pdf_integrates_to_one(table):
         wo = torch.stack(
             (sg * torch.cos(pg), sg * torch.sin(pg), cg), dim=-1
         ).reshape(-1, 3)
-        density = pdf(table, wi.expand(wo.shape[0], 3).contiguous(), wo)
+        wi_rows = wi.expand(wo.shape[0], 3).contiguous()
+        density = pdf(table, _all_valid(wo.shape[0], device=wi.device), wi_rows, wo)
         integral = float((density * table.bin_solid_angle).sum())
         assert abs(integral - 1.0) < 1e-2
 
@@ -97,8 +102,9 @@ def test_sample_returns_its_own_pdf(table):
     gen = torch.Generator(device="cpu").manual_seed(7)
     u1 = torch.rand(n, generator=gen).to(table.device)
     u2 = torch.rand(n, generator=gen).to(table.device)
-    wo, density = sample_directions(table, wi, u1, u2)
-    lookup = pdf(table, wi, wo)
+    valid = _all_valid(n, device=wi.device)
+    wo, density = sample_directions(table, valid, wi, u1, u2)
+    lookup = pdf(table, valid, wi, wo)
     # Identical up to samples landing exactly on a bin edge (measure zero;
     # allow a vanishing mismatch fraction from float rounding).
     mismatch = (density != lookup).float().mean().item()
@@ -119,13 +125,14 @@ def test_pdf_reverse_is_pdf_with_swapped_args(table):
 
     wi = rand_dirs(512)
     wo = rand_dirs(512)
-    assert torch.equal(pdf_reverse(table, wo, wi), pdf(table, wo, wi))
+    valid = _all_valid(wi.shape[0], device=wi.device)
+    assert torch.equal(pdf_reverse(table, valid, wo, wi), pdf(table, valid, wo, wi))
 
 
 def test_pdf_zero_below_horizon(table):
     wi = _fixed_wi(table, 20)
     wo_down = torch.tensor([[0.0, 0.5, -0.5]], device=table.device)
-    assert float(pdf(table, wi, wo_down)) == 0.0
+    assert float(pdf(table, _all_valid(1, device=wi.device), wi, wo_down)) == 0.0
 
 
 def test_runtime_table_ops_have_no_pytorch_fallback(table, monkeypatch):
@@ -135,6 +142,6 @@ def test_runtime_table_ops_have_no_pytorch_fallback(table, monkeypatch):
     with pytest.raises(RuntimeError, match="scattering_table_eval CUDA kernel is required"):
         from witwin.channel_native.scattering import eval_bsdf
 
-        eval_bsdf(table, wi, wi)
+        eval_bsdf(table, _all_valid(1, device=wi.device), wi, wi)
     with pytest.raises(RuntimeError, match="scattering_table_pdf CUDA kernel is required"):
-        pdf(table, wi, wi)
+        pdf(table, _all_valid(1, device=wi.device), wi, wi)

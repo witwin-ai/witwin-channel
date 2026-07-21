@@ -27,8 +27,16 @@ from .bridge import (
     rayd_diffraction_sample_tape_forward,
     rayd_intersect_forward,
     rayd_reflection_epc_paths_forward,
+    rayd_segment_penetration_backward,
+    rayd_segment_penetration_forward,
+    rayd_segment_penetration_forward_tape,
+    rayd_segment_penetration_jvp,
     rayd_trace_reflections_forward,
     rayd_visibility_forward,
+)
+from .penetration_autograd import (
+    _RaydSegmentPenetrationAdFunction,
+    rayd_segment_penetration_ad,
 )
 from .primitives import (
     core_diffraction_edge_count,
@@ -46,6 +54,7 @@ __all__ = [
     "_RaydFaceNormalsAdFunction",
     "_RaydIntersectAdFunction",
     "_RaydReflectionEpcPathsAdFunction",
+    "_RaydSegmentPenetrationAdFunction",
     "_RaydTraceReflectionsAdFunction",
     "_epc_paths_frozen_winner_checks",
     "core_diffraction_edge_count",
@@ -69,6 +78,11 @@ __all__ = [
     "rayd_reflection_epc_paths_jvp",
     "rayd_scene_face_normals_backward",
     "rayd_scene_face_normals_jvp",
+    "rayd_segment_penetration_ad",
+    "rayd_segment_penetration_backward",
+    "rayd_segment_penetration_forward",
+    "rayd_segment_penetration_forward_tape",
+    "rayd_segment_penetration_jvp",
     "rayd_trace_reflections_ad",
     "rayd_trace_reflections_backward",
     "rayd_trace_reflections_forward",

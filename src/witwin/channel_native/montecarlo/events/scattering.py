@@ -321,17 +321,23 @@ def scatter_carried_incident_power(
 
 
 def _grouped_rows(
-    material_id: torch.Tensor, runtimes: dict[int, RoughMaterialRuntime]
-) -> list[tuple[RoughMaterialRuntime, torch.Tensor]]:
+    valid: torch.Tensor,
+    material_id: torch.Tensor,
+    runtimes: dict[int, RoughMaterialRuntime],
+) -> list[tuple[RoughMaterialRuntime, torch.Tensor, torch.Tensor]]:
     groups = []
     for index, runtime in runtimes.items():
-        rows = torch.nonzero(material_id == index, as_tuple=False).flatten()
+        material_valid = valid & (material_id == index)
+        rows = torch.nonzero(material_valid, as_tuple=False).flatten()
         if int(rows.numel()):
-            groups.append((runtime, rows))
+            groups.append(
+                (runtime, rows, material_valid.index_select(0, rows).contiguous())
+            )
     return groups
 
 
 def sample_scatter_directions(
+    valid: torch.Tensor,
     material_id: torch.Tensor,
     wi_local: torch.Tensor,
     uniforms: torch.Tensor,
@@ -349,9 +355,10 @@ def sample_scatter_directions(
     wo_local = torch.zeros((count, 3), device=device, dtype=torch.float32)
     pdf_forward = torch.zeros((count,), device=device, dtype=torch.float32)
     pdf_reverse = torch.zeros((count,), device=device, dtype=torch.float32)
-    for runtime, rows in _grouped_rows(material_id, runtimes):
+    for runtime, rows, valid_rows in _grouped_rows(valid, material_id, runtimes):
         wi_rows = wi_local.index_select(0, rows).contiguous()
         sampled = scattering_table_sample(
+            valid_rows,
             wi_rows,
             uniforms.index_select(0, rows).contiguous(),
             runtime.table.marginal_cdf,
@@ -370,6 +377,7 @@ def sample_scatter_directions(
 
 
 def eval_bsdf_rows(
+    valid: torch.Tensor,
     material_id: torch.Tensor,
     wi_local: torch.Tensor,
     wo_local: torch.Tensor,
@@ -389,7 +397,7 @@ def eval_bsdf_rows(
     device = wi_local.device
     f_te = torch.zeros((count,), device=device, dtype=torch.float32)
     f_tm = torch.zeros((count,), device=device, dtype=torch.float32)
-    for runtime, rows in _grouped_rows(material_id, runtimes):
+    for runtime, rows, valid_rows in _grouped_rows(valid, material_id, runtimes):
         wi_rows = wi_local.index_select(0, rows).contiguous()
         wo_rows = wo_local.index_select(0, rows).contiguous()
         if ad:
@@ -398,11 +406,15 @@ def eval_bsdf_rows(
                     runtime.table.f_te, runtime.table.f_tm, wi_rows, wo_rows
                 )
             te_rows, tm_rows = scattering_table_eval_ad(
-                wi_rows, wo_rows, runtime.table.f_te, runtime.table.f_tm
+                valid_rows,
+                wi_rows,
+                wo_rows,
+                runtime.table.f_te,
+                runtime.table.f_tm,
             )
         else:
             te_rows, tm_rows = kirchhoff_tables.eval_bsdf(
-                runtime.table, wi_rows, wo_rows
+                runtime.table, valid_rows, wi_rows, wo_rows
             )
         f_te[rows] = te_rows
         f_tm[rows] = tm_rows
@@ -487,7 +499,15 @@ def scattering_nee_connection_samples(
     )
     wi_rows = flat(expand_rows(wi_local)).contiguous()
     material_rows = flat(expand_rows(material_id)).contiguous()
+    rx_id_rows = sensor["rx_id"][None, :].expand(vertex_count, sensor_count)
+    bsdf_valid = (
+        flat(front)
+        & flat(expand_rows(tx_id >= 0))
+        & (flat(rx_id_rows) >= 0)
+        & flat(sensor["valid"][None, :].expand(vertex_count, sensor_count))
+    )
     f_te, f_tm = eval_bsdf_rows(
+        bsdf_valid,
         material_rows,
         wi_rows,
         wo_local.contiguous(),
@@ -514,7 +534,6 @@ def scattering_nee_connection_samples(
         / (p_s_rows * float(max(1, int(samples))))
     )
 
-    rx_id_rows = sensor["rx_id"][None, :].expand(vertex_count, sensor_count)
     valid = (
         flat(front)
         & flat(expand_rows(tx_id >= 0))
@@ -552,6 +571,7 @@ def scattering_nee_connection_samples(
             continue
         pdf_omega[rows] = kirchhoff_tables.pdf(
             runtime.table,
+            valid.index_select(0, rows).contiguous(),
             wi_rows.index_select(0, rows),
             wo_local.index_select(0, rows).contiguous(),
         )
@@ -627,12 +647,21 @@ def scattered_subpath_state(
     here.
     """
 
-    sampled = sample_scatter_directions(material_id, wi_local, uniforms, runtimes)
+    scatter_valid = choose_scatter & state["valid"]
+    sampled = sample_scatter_directions(
+        scatter_valid, material_id, wi_local, uniforms, runtimes
+    )
     wo_local = sampled["wo_local"]
     pdf_forward = sampled["pdf_forward"]
     wo_world = local_to_world(wo_local, frame_t1, frame_t2, normal)
     f_te, f_tm = eval_bsdf_rows(
-        material_id, wi_local, wo_local, runtimes, ad=ad, ledger=ledger
+        scatter_valid,
+        material_id,
+        wi_local,
+        wo_local,
+        runtimes,
+        ad=ad,
+        ledger=ledger,
     )
     incident_power = (p_te + p_tm).clamp_min(1.0e-20)
     f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power
@@ -830,6 +859,7 @@ def scattering_map_matrix(
                 dim=-1,
             )
             f_te, f_tm = eval_bsdf_rows(
+                pair_active.reshape(count * block).contiguous(),
                 point_material.repeat_interleave(block),
                 wi_local.repeat_interleave(block, dim=0).contiguous(),
                 wo_local.contiguous(),

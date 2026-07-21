@@ -15,7 +15,7 @@ from witwin.channel_native.scene import compile as canonical_compile
 
 _HELPER_BODY_HASHES = {
     "_compile_geometry": (
-        "d02f440224fdc213ed353ac49a17438ac9001a3de25946ca42658e145ea71697"
+        "5c6b1722f0618151b416c259f961b2e41e8b40f1441fd0a820635688f1cdd1b1"
     ),
     "_abi_v3_layer_view": (
         "dc7258913a12cb41c84af8446726e1c656e41c32e8fee332c1025bffd6b2e23e"
@@ -36,6 +36,11 @@ _HELPER_BODY_HASHES = {
         "936bda87572a5dd033d1b9eba9c82f39a136ff4b81a0ac3c49c741f30c8f6cf3"
     ),
 }
+_CANONICAL_ONLY_HELPER_BODY_HASHES = {
+    "_compile_penetration_scene_diagonals": (
+        "f4905bf0a7ec8b983c84c1378e950d710137e92d64e160b5027aa4868fc0db37"
+    ),
+}
 
 
 def _body_hash(function) -> str:
@@ -53,11 +58,19 @@ def test_compile_helpers_have_one_exact_canonical_owner():
         assert owner.__module__ == canonical_compile.__name__
         assert _body_hash(owner) == expected_hash
 
+    for name, expected_hash in _CANONICAL_ONLY_HELPER_BODY_HASHES.items():
+        owner = getattr(canonical_compile, name)
+        assert not hasattr(legacy_scene, name)
+        assert owner.__module__ == canonical_compile.__name__
+        assert _body_hash(owner) == expected_hash
+
     legacy_tree = ast.parse(inspect.getsource(legacy_scene))
     legacy_definitions = {
         node.name for node in legacy_tree.body if isinstance(node, ast.FunctionDef)
     }
-    assert legacy_definitions.isdisjoint(_HELPER_BODY_HASHES)
+    assert legacy_definitions.isdisjoint(
+        _HELPER_BODY_HASHES | _CANONICAL_ONLY_HELPER_BODY_HASHES
+    )
     assert canonical_compile.compile_scene.__module__ == canonical_compile.__name__
 
 

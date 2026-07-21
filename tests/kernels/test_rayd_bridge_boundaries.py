@@ -19,6 +19,10 @@ WRAPPERS_BY_SOURCE = {
         "cn_rayd_visibility_forward",
         "cn_rayd_intersect_backward",
         "cn_rayd_intersect_jvp",
+        "cn_rayd_segment_penetration_forward",
+        "cn_rayd_segment_penetration_forward_tape",
+        "cn_rayd_segment_penetration_backward",
+        "cn_rayd_segment_penetration_jvp",
         "cn_coupled_rd_geometry_forward",
         "cn_coupled_dd_geometry_forward",
     },
@@ -86,7 +90,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
 
-    assert len(expected_wrappers) == 20
+    assert len(expected_wrappers) == 24
     assert set(owners) == expected_wrappers
     assert all(len(source_names) == 1 for source_names in owners.values())
 
@@ -131,3 +135,73 @@ def test_diffraction_visibility_plan_calls_the_typed_rayd_axial_operation() -> N
     assert "state_src" not in body
     assert "cudaStreamSynchronize" not in body
     assert ".cpu()" not in body
+
+
+def test_segment_penetration_bridge_preserves_the_typed_api6_contract() -> None:
+    root = _repo_root()
+    resource = (root / "native/channel_native/rayd/resource.h").read_text(
+        encoding="utf-8-sig"
+    )
+    geometry = (root / "native/channel_native/rayd/geometry.cpp").read_text(
+        encoding="utf-8-sig"
+    )
+    binding = (root / "native/channel_native/binding/rayd.cpp").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "rayd::torch::kIntegrationApiVersion == 6u" in resource
+    assert 'std::string_view{"rayd.torch.integration"}' in resource
+    assert "switch (policy)" in geometry
+    assert geometry.count("case 0:") == 1
+    assert geometry.count("case 1:") == 1
+    assert "(bit & (bit - 1u)) == 0u" in geometry
+
+    typed_entries = (
+        "segment_penetration_forward",
+        "segment_penetration_forward_tape",
+        "segment_penetration_backward",
+        "segment_penetration_jvp",
+    )
+    for entry in typed_entries:
+        assert geometry.count(f"rayd::torch::{entry}(") == 1
+        assert binding.count(f'"rayd_{entry}"') == 1
+
+    result_pack = geometry.split("pack_segment_penetration_result(", 1)[1].split(
+        "pack_segment_penetration_tape(", 1
+    )[0]
+    result_fields = (
+        "out.valid",
+        "out.num_hits",
+        "out.reached_target",
+        "out.overflow",
+        "out.distance",
+        "out.direction",
+        "out.t",
+        "out.position",
+        "out.normal",
+        "out.geometric_normal",
+        "out.global_primitive_id",
+    )
+    assert [result_pack.index(field) for field in result_fields] == sorted(
+        result_pack.index(field) for field in result_fields
+    )
+
+    tape_pack = geometry.split("pack_segment_penetration_tape(", 1)[1].split(
+        "}  // namespace", 1
+    )[0]
+    tape_fields = tuple(f"out.result.{field[4:]}" for field in result_fields) + (
+        "out.tape_primitive_id",
+        "out.tape_barycentric",
+        "out.tape_restart_epsilon",
+        "out.tape_restart_branch",
+        "out.tape_restart_tie_mask",
+        "out.tape_direction_denominator_branch",
+    )
+    assert [tape_pack.index(field) for field in tape_fields] == sorted(
+        tape_pack.index(field) for field in tape_fields
+    )
+
+    for gradient in ("vertices", "origins", "targets"):
+        assert f"tensor_or_none(out.grad_{gradient})" in geometry
+    assert "capacity_failure_state" in geometry
+    assert "input_active_any" in geometry

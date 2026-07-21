@@ -12,8 +12,16 @@ from .contracts import TopologyConfig
 from .evaluated import EvaluatedPaths
 from .fields import PathFields
 from .geometry import PathGeometry
+from .penetration import (
+    SegmentPenetrationBackwardResult,
+    SegmentPenetrationJvpResult,
+    SegmentPenetrationPolicy,
+    SegmentPenetrationResult,
+    SegmentPenetrationTapeResult,
+)
 from .reflection import ReflectionCandidateCapacity
 from .topology import PathTopology
+from .transmission import TransmissionTopologyCapacity
 
 __all__ = [
     "CanonicalEvaluatedPaths",
@@ -27,5 +35,11 @@ __all__ = [
     "PathGeometry",
     "PathTopology",
     "ReflectionCandidateCapacity",
+    "SegmentPenetrationBackwardResult",
+    "SegmentPenetrationJvpResult",
+    "SegmentPenetrationPolicy",
+    "SegmentPenetrationResult",
+    "SegmentPenetrationTapeResult",
     "TopologyConfig",
+    "TransmissionTopologyCapacity",
 ]

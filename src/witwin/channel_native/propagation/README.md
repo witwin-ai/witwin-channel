@@ -17,6 +17,23 @@ copy of complex, Fresnel, layer-stack, Jones, or field-transport AD math. The
 Phase 6B move did not split the complete-row fusion or move the BDPT
 transmitted-state family, which remains a complete Channel numerical owner.
 
+ADR-027 Phase P adds a dormant complete RayD straight-segment penetration
+family behind the stable typed boundary. The four Channel ABI/facade entries
+cover primal, forward tape, VJP/backward, and JVP and require an explicit
+`EnumeratedFullDistance` or `MonteCarloTargetInset` policy. Fixed `[N,D]`
+storage, the mandatory `D+1` probe, and the exact solve-owned
+`CapacityFailureState` replace neither live solver route yet; the old
+enumerated and Monte Carlo marches remain authoritative until their separate
+atomic switch/delete commits.
+
+`propagation.topology.kernels.enumerated_transmission_topology_pack` is the
+dormant component-5 capacity producer for the enumerated switch. It consumes
+the same failure-state storage as penetration, preserves pair-major `P*C`
+rows, checks validity before every hit/primitive/material read, and makes the
+entire topology/count result inert on overflow or contract failure. Actual
+cardinality remains in CUDA Boolean validity and contiguous CUDA `int32`
+counts; there is no host compaction or count read.
+
 ADR-025 freezes diffraction ownership by complete operation. After the atomic
 Phase 8A pin/switch/delete, RayD is the sole numerical owner of the pure-wedge
 fixed-winner primal/backward/JVP family; this package retains the stable ABI,
@@ -138,6 +155,12 @@ Deterministic; Monte Carlo sampling, MIS, solver results, and deterministic
 accumulation remain outside this package. Field facades may call the typed RayD
 transmission and pure-wedge entries but cannot reconstruct or fall back from
 their native math.
+
+The locked RayD numeric API requires explicit contiguous CUDA Boolean
+validity for the migrated transmission and scattering families and explicit
+active state for order-1 diffraction export. Facades must forward an existing
+canonical device mask; they may not synthesize an implicit all-valid path or
+make optional-mask compatibility part of the production contract.
 
 Raw native tuples may exist only inside domain `kernels` modules. A kernel
 façade must validate and convert them to a named internal contract before any

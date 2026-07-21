@@ -92,9 +92,12 @@ class ScatterChainDiscovery:
     """C1/C2 join output consumed read-only by the native chain facades.
 
     ``R`` = joined chain rows (budgeted keep-strongest-per-pair +
-    ``scattering_chain_max_rows`` per (tx, rx)). Every tensor shares one CUDA
-    device and is C-contiguous; ``Dmax = KMAX_AD_DEPTH = 8``. See plan 10a
-    section 2 for the normative field-by-field contract.
+    ``scattering_chain_max_rows`` per (tx, rx)). Rows are frozen in tx-major
+    order, so a consumer may pass a narrow view of its existing per-tx device
+    selection mask as the explicit RayD row-valid contract without allocating
+    a replacement mask. Every tensor shares one CUDA device and is
+    C-contiguous; ``Dmax = KMAX_AD_DEPTH = 8``. See plan 10a section 2 for the
+    normative field-by-field contract.
     """
 
     # Row identity.

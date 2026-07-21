@@ -46,25 +46,27 @@ def _grad_or_none(out: dict, key: str, needed: bool) -> torch.Tensor | None:
 # Fixed inputs of the ensemble op: rejecting a gradient/tangent here fails
 # loudly instead of silently detaching (ADR-014 differentiable-input set).
 _ENSEMBLE_FIXED = (
-    (12, "material_id"),
-    (13, "backup_axis"),
-    (14, "rx_pol"),
-    (15, "rc_idx"),
-    (16, "sc_idx"),
-    (19, "table_offset"),
-    (20, "table_dims"),
-    (21, "material_slot"),
+    (0, "valid"),
+    (13, "material_id"),
+    (14, "backup_axis"),
+    (15, "rx_pol"),
+    (16, "rc_idx"),
+    (17, "sc_idx"),
+    (20, "table_offset"),
+    (21, "table_dims"),
+    (22, "material_slot"),
 )
 _PATCH_FIXED = (
-    (0, "patch_tris"),
-    (1, "patch_uvs"),
-    (2, "rows"),
-    (5, "n_rows"),
-    (8, "pol_t"),
-    (9, "pol_r"),
-    (14, "quad_a"),
-    (15, "quad_b"),
-    (16, "quad_w"),
+    (0, "valid"),
+    (1, "patch_tris"),
+    (2, "patch_uvs"),
+    (3, "rows"),
+    (6, "n_rows"),
+    (9, "pol_t"),
+    (10, "pol_r"),
+    (15, "quad_a"),
+    (16, "quad_b"),
+    (17, "quad_w"),
 )
 
 
@@ -84,6 +86,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
+        valid,
         wo_rows,
         r2_rows,
         cos_o_rows,
@@ -111,6 +114,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         coef_value,
     ):
         out = scattering_ensemble_eval(
+            valid,
             wo_rows,
             r2_rows,
             cos_o_rows,
@@ -141,13 +145,13 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        coef = inputs[22]
+        coef = inputs[23]
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:22]
+            for value in inputs[:23]
         )
-        ctx.threshold = inputs[23]
-        ctx.coef_value = inputs[24]
+        ctx.threshold = inputs[24]
+        ctx.coef_value = inputs[25]
         ctx.coef_meta = (
             (coef.dtype, coef.device) if isinstance(coef, torch.Tensor) else None
         )
@@ -158,15 +162,15 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
-        none_grads = (None,) * 25
+        none_grads = (None,) * 26
         _ad_reject_fixed_inputs(
             "scattering_ensemble_eval_ad", ctx.needs_input_grad, _ENSEMBLE_FIXED
         )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(23))
-        need_rows = any(needed[0:3])
-        need_samples = any(needed[3:12])
-        need_tables = needed[17] or needed[18]
-        need_coef = needed[22]
+        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(24))
+        need_rows = any(needed[1:4])
+        need_samples = any(needed[4:13])
+        need_tables = needed[18] or needed[19]
+        need_coef = needed[23]
         grads = (grad_gain, grad_amplitude, grad_length)
         if not (need_rows or need_samples or need_tables or need_coef) or all(
             value is None for value in grads
@@ -188,25 +192,26 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
             _ad_frequency_grad(out["grad_coef"], ctx.coef_meta) if need_coef else None
         )
         return (
-            _grad_or_none(out, "grad_wo_rows", needed[0]),
-            _grad_or_none(out, "grad_r2_rows", needed[1]),
-            _grad_or_none(out, "grad_cos_o_rows", needed[2]),
-            _grad_or_none(out, "grad_n_o", needed[3]),
-            _grad_or_none(out, "grad_t1r", needed[4]),
-            _grad_or_none(out, "grad_t2r", needed[5]),
-            _grad_or_none(out, "grad_wi_local", needed[6]),
-            _grad_or_none(out, "grad_cos_i", needed[7]),
-            _grad_or_none(out, "grad_r1", needed[8]),
-            _grad_or_none(out, "grad_a_te2", needed[9]),
-            _grad_or_none(out, "grad_a_tm2", needed[10]),
-            _grad_or_none(out, "grad_weights", needed[11]),
+            None,
+            _grad_or_none(out, "grad_wo_rows", needed[1]),
+            _grad_or_none(out, "grad_r2_rows", needed[2]),
+            _grad_or_none(out, "grad_cos_o_rows", needed[3]),
+            _grad_or_none(out, "grad_n_o", needed[4]),
+            _grad_or_none(out, "grad_t1r", needed[5]),
+            _grad_or_none(out, "grad_t2r", needed[6]),
+            _grad_or_none(out, "grad_wi_local", needed[7]),
+            _grad_or_none(out, "grad_cos_i", needed[8]),
+            _grad_or_none(out, "grad_r1", needed[9]),
+            _grad_or_none(out, "grad_a_te2", needed[10]),
+            _grad_or_none(out, "grad_a_tm2", needed[11]),
+            _grad_or_none(out, "grad_weights", needed[12]),
             None,
             None,
             None,
             None,
             None,
-            _grad_or_none(out, "grad_f_te", needed[17]),
-            _grad_or_none(out, "grad_f_tm", needed[18]),
+            _grad_or_none(out, "grad_f_te", needed[18]),
+            _grad_or_none(out, "grad_f_tm", needed[19]),
             None,
             None,
             None,
@@ -218,6 +223,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(
         ctx,
+        t_valid,
         t_wo_rows,
         t_r2_rows,
         t_cos_o_rows,
@@ -247,6 +253,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         _ad_reject_fixed_tangents(
             "scattering_ensemble_eval_ad",
             (
+                (t_valid, "valid"),
                 (t_material_id, "material_id"),
                 (t_backup_axis, "backup_axis"),
                 (t_rx_pol, "rx_pol"),
@@ -260,48 +267,48 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         saved = ctx.saved_tensors
         tangents = {
             "tangent_wo_rows": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_wo_rows", t_wo_rows, saved[0]
+                "scattering_ensemble_eval_ad tangent_wo_rows", t_wo_rows, saved[1]
             ),
             "tangent_r2_rows": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_r2_rows", t_r2_rows, saved[1]
+                "scattering_ensemble_eval_ad tangent_r2_rows", t_r2_rows, saved[2]
             ),
             "tangent_cos_o_rows": _ad_geometry_tangent(
                 "scattering_ensemble_eval_ad tangent_cos_o_rows",
                 t_cos_o_rows,
-                saved[2],
+                saved[3],
             ),
             "tangent_n_o": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_n_o", t_n_o, saved[3]
+                "scattering_ensemble_eval_ad tangent_n_o", t_n_o, saved[4]
             ),
             "tangent_t1r": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_t1r", t_t1r, saved[4]
+                "scattering_ensemble_eval_ad tangent_t1r", t_t1r, saved[5]
             ),
             "tangent_t2r": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_t2r", t_t2r, saved[5]
+                "scattering_ensemble_eval_ad tangent_t2r", t_t2r, saved[6]
             ),
             "tangent_wi_local": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_wi_local", t_wi_local, saved[6]
+                "scattering_ensemble_eval_ad tangent_wi_local", t_wi_local, saved[7]
             ),
             "tangent_cos_i": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_cos_i", t_cos_i, saved[7]
+                "scattering_ensemble_eval_ad tangent_cos_i", t_cos_i, saved[8]
             ),
             "tangent_r1": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_r1", t_r1, saved[8]
+                "scattering_ensemble_eval_ad tangent_r1", t_r1, saved[9]
             ),
             "tangent_a_te2": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_a_te2", t_a_te2, saved[9]
+                "scattering_ensemble_eval_ad tangent_a_te2", t_a_te2, saved[10]
             ),
             "tangent_a_tm2": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_a_tm2", t_a_tm2, saved[10]
+                "scattering_ensemble_eval_ad tangent_a_tm2", t_a_tm2, saved[11]
             ),
             "tangent_weights": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_weights", t_weights, saved[11]
+                "scattering_ensemble_eval_ad tangent_weights", t_weights, saved[12]
             ),
             "tangent_f_te_flat": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_f_te_flat", t_f_te_flat, saved[17]
+                "scattering_ensemble_eval_ad tangent_f_te_flat", t_f_te_flat, saved[18]
             ),
             "tangent_f_tm_flat": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_f_tm_flat", t_f_tm_flat, saved[18]
+                "scattering_ensemble_eval_ad tangent_f_tm_flat", t_f_tm_flat, saved[19]
             ),
         }
         tangent_coef = _ad_frequency_tangent(t_coef)
@@ -324,6 +331,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
 
 def scattering_ensemble_eval_ad(
+    valid: torch.Tensor,
     wo_rows: torch.Tensor,
     r2_rows: torch.Tensor,
     cos_o_rows: torch.Tensor,
@@ -359,6 +367,7 @@ def scattering_ensemble_eval_ad(
 
     coef_value = _ad_frequency_value(coef)
     values = _ScatteringEnsembleEvalAdFunction.apply(
+        valid,
         wo_rows,
         r2_rows,
         cos_o_rows,
@@ -403,8 +412,8 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(wi, wo, f_te, f_tm):
-        return scattering_table_eval(wi, wo, f_te, f_tm)
+    def forward(valid, wi, wo, f_te, f_tm):
+        return scattering_table_eval(valid, wi, wo, f_te, f_tm)
 
     @staticmethod
     def setup_context(ctx, inputs, output):
@@ -418,12 +427,15 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, grad_f_te, grad_f_tm):
-        need_dirs = bool(ctx.needs_input_grad[0]) or bool(ctx.needs_input_grad[1])
-        need_tables = bool(ctx.needs_input_grad[2]) or bool(ctx.needs_input_grad[3])
+        _ad_reject_fixed_inputs(
+            "scattering_table_eval_ad", ctx.needs_input_grad, ((0, "valid"),)
+        )
+        need_dirs = bool(ctx.needs_input_grad[1]) or bool(ctx.needs_input_grad[2])
+        need_tables = bool(ctx.needs_input_grad[3]) or bool(ctx.needs_input_grad[4])
         if (not (need_dirs or need_tables)) or (
             grad_f_te is None and grad_f_tm is None
         ):
-            return None, None, None, None
+            return None, None, None, None, None
         out = scattering_table_eval_backward(
             *ctx.saved_tensors,
             grad_out_f_te=grad_f_te,
@@ -432,27 +444,31 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
             need_grad_tables=need_tables,
         )
         return (
-            _grad_or_none(out, "grad_wi", bool(ctx.needs_input_grad[0])),
-            _grad_or_none(out, "grad_wo", bool(ctx.needs_input_grad[1])),
-            _grad_or_none(out, "grad_f_te", bool(ctx.needs_input_grad[2])),
-            _grad_or_none(out, "grad_f_tm", bool(ctx.needs_input_grad[3])),
+            None,
+            _grad_or_none(out, "grad_wi", bool(ctx.needs_input_grad[1])),
+            _grad_or_none(out, "grad_wo", bool(ctx.needs_input_grad[2])),
+            _grad_or_none(out, "grad_f_te", bool(ctx.needs_input_grad[3])),
+            _grad_or_none(out, "grad_f_tm", bool(ctx.needs_input_grad[4])),
         )
 
     @staticmethod
-    def jvp(ctx, t_wi, t_wo, t_f_te, t_f_tm):
+    def jvp(ctx, t_valid, t_wi, t_wo, t_f_te, t_f_tm):
+        _ad_reject_fixed_tangents(
+            "scattering_table_eval_ad", ((t_valid, "valid"),)
+        )
         saved = ctx.saved_tensors
         tangents = {
             "tangent_wi": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_wi", t_wi, saved[0]
+                "scattering_table_eval_ad tangent_wi", t_wi, saved[1]
             ),
             "tangent_wo": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_wo", t_wo, saved[1]
+                "scattering_table_eval_ad tangent_wo", t_wo, saved[2]
             ),
             "tangent_f_te": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_f_te", t_f_te, saved[2]
+                "scattering_table_eval_ad tangent_f_te", t_f_te, saved[3]
             ),
             "tangent_f_tm": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_f_tm", t_f_tm, saved[3]
+                "scattering_table_eval_ad tangent_f_tm", t_f_tm, saved[4]
             ),
         }
         if all(value is None for value in tangents.values()):
@@ -465,6 +481,7 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
 
 
 def scattering_table_eval_ad(
+    valid: torch.Tensor,
     wi: torch.Tensor,
     wo: torch.Tensor,
     f_te: torch.Tensor,
@@ -476,7 +493,7 @@ def scattering_table_eval_ad(
     MC-basic scattering map can drop it in behind ``ad``.
     """
 
-    return _ScatteringTableEvalAdFunction.apply(wi, wo, f_te, f_tm)
+    return _ScatteringTableEvalAdFunction.apply(valid, wi, wo, f_te, f_tm)
 
 
 class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
@@ -494,6 +511,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
+        valid,
         patch_tris,
         patch_uvs,
         rows,
@@ -515,6 +533,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         k0_value,
     ):
         out = _required_patch_forward(
+            valid,
             patch_tris,
             patch_uvs,
             rows,
@@ -539,12 +558,12 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        k0 = inputs[17]
+        k0 = inputs[18]
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:17]
+            for value in inputs[:18]
         )
-        ctx.k0_value = inputs[18]
+        ctx.k0_value = inputs[19]
         ctx.k0_meta = (
             (k0.dtype, k0.device) if isinstance(k0, torch.Tensor) else None
         )
@@ -555,21 +574,21 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, grad_total, _grad_integral, _grad_row_value):
-        none_grads = (None,) * 19
+        none_grads = (None,) * 20
         _ad_reject_fixed_inputs(
             "scattering_patch_integral_eval_ad", ctx.needs_input_grad, _PATCH_FIXED
         )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(18))
-        need_heights = needed[13]
-        need_jones = needed[6] or needed[7]
-        need_geometry = any(needed[i] for i in (3, 4, 10, 11, 12))
-        need_k0 = needed[17]
+        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(19))
+        need_heights = needed[14]
+        need_jones = needed[7] or needed[8]
+        need_geometry = any(needed[i] for i in (4, 5, 11, 12, 13))
+        need_k0 = needed[18]
         if not (need_heights or need_jones or need_geometry or need_k0) or (
             grad_total is None
         ):
             return none_grads
         out = scattering_patch_integral_eval_backward(
-            *ctx.saved_tensors[:14],
+            *ctx.saved_tensors[:15],
             k0=ctx.k0_value,
             grad_total=grad_total,
             need_grad_heights=need_heights,
@@ -584,17 +603,18 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
             None,
             None,
             None,
-            _grad_or_none(out, "grad_d_i", needed[3]),
-            _grad_or_none(out, "grad_d_o", needed[4]),
             None,
-            _grad_or_none(out, "grad_r_te", needed[6]),
-            _grad_or_none(out, "grad_r_tm", needed[7]),
+            _grad_or_none(out, "grad_d_i", needed[4]),
+            _grad_or_none(out, "grad_d_o", needed[5]),
+            None,
+            _grad_or_none(out, "grad_r_te", needed[7]),
+            _grad_or_none(out, "grad_r_tm", needed[8]),
             None,
             None,
-            _grad_or_none(out, "grad_r1_rows", needed[10]),
-            _grad_or_none(out, "grad_r2_rows", needed[11]),
-            _grad_or_none(out, "grad_centroids", needed[12]),
-            _grad_or_none(out, "grad_heights", needed[13]),
+            _grad_or_none(out, "grad_r1_rows", needed[11]),
+            _grad_or_none(out, "grad_r2_rows", needed[12]),
+            _grad_or_none(out, "grad_centroids", needed[13]),
+            _grad_or_none(out, "grad_heights", needed[14]),
             None,
             None,
             None,
@@ -605,6 +625,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(
         ctx,
+        t_valid,
         t_patch_tris,
         t_patch_uvs,
         t_rows,
@@ -628,6 +649,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         _ad_reject_fixed_tangents(
             "scattering_patch_integral_eval_ad",
             (
+                (t_valid, "valid"),
                 (t_patch_tris, "patch_tris"),
                 (t_patch_uvs, "patch_uvs"),
                 (t_rows, "rows"),
@@ -644,34 +666,34 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
             "tangent_heights": _ad_geometry_tangent(
                 "scattering_patch_integral_eval_ad tangent_heights",
                 t_heights,
-                saved[13],
+                saved[14],
             ),
             "tangent_r_te": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_r_te", t_r_te, saved[6]
+                "scattering_patch_integral_eval_ad tangent_r_te", t_r_te, saved[7]
             ),
             "tangent_r_tm": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_r_tm", t_r_tm, saved[7]
+                "scattering_patch_integral_eval_ad tangent_r_tm", t_r_tm, saved[8]
             ),
             "tangent_d_i": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_d_i", t_d_i, saved[3]
+                "scattering_patch_integral_eval_ad tangent_d_i", t_d_i, saved[4]
             ),
             "tangent_d_o": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_d_o", t_d_o, saved[4]
+                "scattering_patch_integral_eval_ad tangent_d_o", t_d_o, saved[5]
             ),
             "tangent_r1_rows": _ad_geometry_tangent(
                 "scattering_patch_integral_eval_ad tangent_r1_rows",
                 t_r1_rows,
-                saved[10],
+                saved[11],
             ),
             "tangent_r2_rows": _ad_geometry_tangent(
                 "scattering_patch_integral_eval_ad tangent_r2_rows",
                 t_r2_rows,
-                saved[11],
+                saved[12],
             ),
             "tangent_centroids": _ad_geometry_tangent(
                 "scattering_patch_integral_eval_ad tangent_centroids",
                 t_centroids,
-                saved[12],
+                saved[13],
             ),
         }
         tangent_k0 = _ad_frequency_tangent(t_k0)
@@ -679,7 +701,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
             return (None,) * len(_PATCH_OUTPUT_FIELDS)
         with torch_compat.disable_functorch():
             out = scattering_patch_integral_eval_jvp(
-                *(_ad_native_tensor(value) for value in saved[:14]),
+                *(_ad_native_tensor(value) for value in saved[:15]),
                 k0=ctx.k0_value,
                 tangent_k0=tangent_k0,
                 **tangents,
@@ -688,6 +710,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
 
 def _required_patch_forward(
+    valid,
     patch_tris,
     patch_uvs,
     rows,
@@ -708,6 +731,7 @@ def _required_patch_forward(
     k0_value,
 ):
     out = _required_native_op("scattering_patch_integral_eval")(
+        valid,
         patch_tris,
         patch_uvs,
         rows,
@@ -736,6 +760,7 @@ def _required_patch_forward(
 
 
 def scattering_patch_integral_eval_ad(
+    valid: torch.Tensor,
     patch_tris: torch.Tensor,
     patch_uvs: torch.Tensor,
     rows: torch.Tensor,
@@ -766,6 +791,7 @@ def scattering_patch_integral_eval_ad(
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     k0_value = _ad_frequency_value(k0)
     values = _ScatteringPatchIntegralEvalAdFunction.apply(
+        valid,
         patch_tris,
         patch_uvs,
         rows,

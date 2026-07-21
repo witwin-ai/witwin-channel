@@ -69,9 +69,11 @@ def kirchhoff_ensemble_rows(
         mask = material_id[sc] == material_index
         if not bool(mask.any()):
             continue
-        te, tm = eval_bsdf(
-            table, wi_local[sc][mask].contiguous(), wo_local[mask].contiguous()
+        wi_selected = wi_local[sc][mask].contiguous()
+        valid = torch.ones(
+            wi_selected.shape[0], dtype=torch.bool, device=wi_selected.device
         )
+        te, tm = eval_bsdf(table, valid, wi_selected, wo_local[mask].contiguous())
         f_te[mask] = te
         f_tm[mask] = tm
 

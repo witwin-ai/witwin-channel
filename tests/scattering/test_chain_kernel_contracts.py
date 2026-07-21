@@ -127,6 +127,7 @@ def _chain_ensemble_case(
     f_te = 0.2 + rand(nti, npi, nto, npo)
     f_tm = 0.2 + rand(nti, npi, nto, npo)
     return {
+        "valid": torch.ones(rows, dtype=torch.bool, device=device),
         "tx_pol": unit(rows, 3).contiguous(),
         "rx_pol": unit(rows, 3).contiguous(),
         "source": source,
@@ -161,6 +162,7 @@ def _chain_ensemble_case(
 def _ensemble_forward_args(case):
     c1, c2 = case["c1"], case["c2"]
     return (
+        case["valid"],
         case["tx_pol"],
         case["rx_pol"],
         case["source"], case["vertex"], case["target"],
@@ -243,6 +245,7 @@ def _chain_realization_case(
     heights = (1.0e-3 * randn(grid, grid)).contiguous()
     k0 = 2.0 * math.pi * frequency_hz / _C0
     return {
+        "valid": torch.ones(rows, dtype=torch.bool, device=device),
         "patch_tris": patch_tris,
         "patch_uvs": patch_uvs,
         "rows": row_index,
@@ -279,6 +282,7 @@ def _chain_realization_case(
 def _realization_forward_args(case):
     c1, c2 = case["c1"], case["c2"]
     return (
+        case["valid"],
         case["patch_tris"], case["patch_uvs"], case["rows"], case["d_i"],
         case["d_o"], case["n_rows"],
         case["source"], case["vertex"], case["target"],
@@ -318,6 +322,23 @@ def test_chain_ensemble_forward_schema():
     assert bool(torch.equal(out["keep"], out["gain"] > -1.0))
 
 
+def test_chain_ensemble_valid_masks_outputs_inert():
+    case = _chain_ensemble_case(seed=111, rows=6)
+    case["valid"][1::2] = False
+    out = _ensemble_forward(case, threshold=-1.0)
+    invalid = ~case["valid"]
+    for name in ("gain", "amplitude", "length"):
+        assert torch.count_nonzero(out[name][invalid]) == 0
+    assert not bool(out["keep"][invalid].any())
+
+
+def test_chain_ensemble_rejects_non_bool_valid():
+    case = _chain_ensemble_case(seed=112)
+    case["valid"] = case["valid"].to(torch.int32)
+    with pytest.raises((TypeError, ValueError), match="valid"):
+        _ensemble_forward(case)
+
+
 def test_chain_ensemble_forward_keep_threshold():
     case = _chain_ensemble_case(seed=12)
     big = float(_ensemble_forward(case)["gain"].max()) + 1.0
@@ -336,7 +357,7 @@ def test_chain_ensemble_degenerate_rows_run():
 def test_chain_ensemble_forward_rejects_bad_dtype():
     case = _chain_ensemble_case(seed=14)
     args = list(_ensemble_forward_args(case))
-    args[0] = args[0].double()  # tx_pol wrong dtype
+    args[1] = args[1].double()  # tx_pol wrong dtype
     with pytest.raises((TypeError, ValueError)):
         F.scattering_chain_ensemble_eval(
             *args, coef=case["coef"], threshold=-1.0, frequency_hz=case["frequency_hz"]
@@ -442,6 +463,22 @@ def test_chain_realization_forward_schema():
     torch.testing.assert_close(out["path_gain"], out["path_field"].abs().square())
 
 
+def test_chain_realization_valid_masks_rows_inert():
+    case = _chain_realization_case(seed=131, rows=6)
+    case["valid"][1::2] = False
+    out = _realization_forward(case)
+    invalid = ~case["valid"]
+    for name in ("path_field", "path_gain", "integral", "row_value"):
+        assert torch.count_nonzero(out[name][invalid]) == 0
+
+
+def test_chain_realization_rejects_wrong_valid_shape():
+    case = _chain_realization_case(seed=132)
+    case["valid"] = case["valid"][:-1]
+    with pytest.raises(ValueError, match="valid must have shape"):
+        _realization_forward(case)
+
+
 def test_chain_realization_degenerate_rows_run():
     case = _chain_realization_case(seed=32, d1=0, d2=0)
     out = _realization_forward(case)
@@ -452,7 +489,7 @@ def test_chain_realization_degenerate_rows_run():
 def test_chain_realization_forward_rejects_bad_dtype():
     case = _chain_realization_case(seed=33)
     args = list(_realization_forward_args(case))
-    args[32] = args[32].double()  # heights wrong dtype
+    args[33] = args[33].double()  # heights wrong dtype
     with pytest.raises((TypeError, ValueError)):
         F.scattering_chain_realization_eval(
             *args, k0=case["k0"], frequency_hz=case["frequency_hz"]

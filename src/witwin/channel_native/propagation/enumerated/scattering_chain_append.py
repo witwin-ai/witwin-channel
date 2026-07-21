@@ -210,14 +210,23 @@ def _chain_ensemble_evaluate(
     length = torch.zeros((rows,), device=device, dtype=torch.float32)
     keep = torch.zeros((rows,), device=device, dtype=torch.bool)
 
+    # Discovery freezes rows in tx-major order. Reuse each existing device
+    # selection mask as the RayD row-valid contract: narrowing the contiguous
+    # tx block is a view (no allocation or kernel), while manufacturing an
+    # all-true tensor here would violate the caller-owned validity contract.
+    row_offset = 0
     for tx_index in torch.unique(tx_id).tolist():
         mask = tx_id == tx_index
         idx = torch.nonzero(mask, as_tuple=False).reshape(-1)
-        if int(idx.numel()) == 0:
+        row_count = int(idx.numel())
+        if row_count == 0:
             continue
+        row_valid = mask.narrow(0, row_offset, row_count)
+        row_offset += row_count
         row_tx = discovery.tx_id[idx].to(torch.int64)
         row_rx = discovery.rx_id[idx].to(torch.int64)
         args = (
+            row_valid,
             tx_pol.index_select(0, row_tx).contiguous(),
             rx_pol.index_select(0, row_rx).contiguous(),
             tx_positions.index_select(0, row_tx).contiguous(),
@@ -276,6 +285,9 @@ def _chain_ensemble_evaluate(
         amplitude[idx] = evaluated["amplitude"].to(torch.float32)
         length[idx] = evaluated["length"].to(torch.float32)
         keep[idx] = evaluated["keep"]
+
+    if row_offset != rows:
+        raise RuntimeError("scatter-chain tx-major row coverage contract was violated")
 
     return {
         "gain": gain,

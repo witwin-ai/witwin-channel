@@ -20,6 +20,7 @@ class CapacityFailureBit(enum.IntFlag):
     PAIR_CONTRACT_ERROR = 1 << 4
     COUPLED_CANDIDATE_OVERFLOW = 1 << 5
     REFLECTION_CANDIDATE_OVERFLOW = 1 << 6
+    SEGMENT_PENETRATION_FAILURE = 1 << 7
 
 
 @dataclass(frozen=True, slots=True, eq=False)

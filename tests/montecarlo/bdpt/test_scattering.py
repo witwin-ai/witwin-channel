@@ -130,7 +130,8 @@ def _quadrature_reference(*, polarized: bool) -> float:
             ((w * t1).sum(-1), (w * t2).sum(-1), (w * n).sum(-1)), dim=-1
         ).contiguous()
 
-    f_te, f_tm = eval_bsdf(table, local(wi), local(wo))
+    valid = torch.ones(wi.shape[0], dtype=torch.bool, device=device)
+    f_te, f_tm = eval_bsdf(table, valid, local(wi), local(wo))
     if polarized:
         d_in = -wi
         s = torch.linalg.cross(d_in, n.expand_as(points))
@@ -363,11 +364,22 @@ def test_scatter_direction_sampler_matches_table_pdf():
     uniforms = scatter_direction_uniforms(
         n, seed=3, tx_index=0, depth=0, device=device
     )
-    sampled = sample_scatter_directions(material_id, wi, uniforms, runtimes)
+    sampled = sample_scatter_directions(
+        torch.ones_like(material_id, dtype=torch.bool),
+        material_id,
+        wi,
+        uniforms,
+        runtimes,
+    )
     wo = sampled["wo_local"]
     assert bool((sampled["pdf_forward"] > 0.0).all())
     # Sampler returns its own density.
-    lookup = table_pdf(table, wi, wo)
+    lookup = table_pdf(
+        table,
+        torch.ones_like(material_id, dtype=torch.bool),
+        wi,
+        wo,
+    )
     mismatch = (sampled["pdf_forward"] != lookup).float().mean().item()
     assert mismatch < 1.0e-3
 

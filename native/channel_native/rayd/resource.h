@@ -5,7 +5,16 @@
 
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <utility>
+
+static_assert(
+    rayd::torch::kIntegrationApiVersion == 6u,
+    "Channel Native requires RayD Torch integration API 6.");
+static_assert(
+    rayd::torch::kIntegrationHeaderIdentity ==
+        std::string_view{"rayd.torch.integration"},
+    "Channel Native requires the stable RayD Torch integration identity.");
 
 class RayDSceneResource final {
 public:

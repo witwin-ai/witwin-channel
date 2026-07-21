@@ -1,10 +1,370 @@
 from __future__ import annotations
 
+import math
+
 import torch
 
+from witwin.channel_native.propagation.models.penetration import (
+    SegmentPenetrationBackwardResult,
+    SegmentPenetrationJvpResult,
+    SegmentPenetrationPolicy,
+    SegmentPenetrationResult,
+    SegmentPenetrationTapeResult,
+)
+from witwin.channel_native.runtime.autograd_contracts import (
+    _ad_check_optional_grad,
+    _ad_check_tangent_vec3,
+)
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureBit,
+    CapacityFailureState,
+    require_capacity_failure_state,
+)
 from witwin.channel_native.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel_native.runtime.tensor_contracts import validate_cuda_tensor
 from witwin.channel_native.runtime.native_resources import _rayd_scene_resource
+
+
+_SEGMENT_PENETRATION_FAILURE_BIT = int(
+    CapacityFailureBit.SEGMENT_PENETRATION_FAILURE
+)
+_SEGMENT_PENETRATION_RESULT_FIELDS = (
+    "valid",
+    "num_hits",
+    "reached_target",
+    "overflow",
+    "distance",
+    "direction",
+    "t",
+    "position",
+    "normal",
+    "geometric_normal",
+    "global_primitive_id",
+)
+_SEGMENT_PENETRATION_TAPE_FIELDS = (
+    "tape_primitive_id",
+    "tape_barycentric",
+    "tape_restart_epsilon",
+    "tape_restart_branch",
+    "tape_restart_tie_mask",
+    "tape_direction_denominator_branch",
+)
+
+
+def _validate_segment_penetration_inputs(
+    origins: torch.Tensor,
+    targets: torch.Tensor,
+    input_active: torch.Tensor | None,
+    *,
+    input_active_any: bool,
+) -> None:
+    validate_cuda_tensor(
+        "origins", origins, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "targets", targets, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    if targets.shape != origins.shape:
+        raise ValueError("targets must match origins")
+    if targets.device != origins.device:
+        raise ValueError("targets must share the origins device")
+    if input_active is not None:
+        validate_cuda_tensor("input_active", input_active, dtype=torch.bool, ndim=1)
+        if input_active.shape != (origins.shape[0],):
+            raise ValueError("input_active must match the segment count")
+        if input_active.device != origins.device:
+            raise ValueError("input_active must share the origins device")
+    if type(input_active_any) is not bool:
+        raise TypeError("input_active_any must be a bool")
+    if origins.shape[0] > 0 and not input_active_any and input_active is None:
+        raise ValueError(
+            "input_active_any=false requires an explicit device input_active mask"
+        )
+
+
+def _validate_segment_penetration_host_config(
+    hit_capacity: int,
+    policy: SegmentPenetrationPolicy,
+    scene_diagonal: float,
+) -> float:
+    if type(hit_capacity) is not int:
+        raise TypeError("hit_capacity must be an int")
+    if hit_capacity < 0:
+        raise ValueError("hit_capacity must be non-negative")
+    if not isinstance(policy, SegmentPenetrationPolicy):
+        raise TypeError("policy must be a SegmentPenetrationPolicy")
+    if isinstance(scene_diagonal, bool) or not isinstance(scene_diagonal, (int, float)):
+        raise TypeError("scene_diagonal must be a host number")
+    scene_diagonal_value = float(scene_diagonal)
+    if not math.isfinite(scene_diagonal_value) or scene_diagonal_value < 0.0:
+        raise ValueError("scene_diagonal must be finite and non-negative")
+    return scene_diagonal_value
+
+
+def _segment_penetration_request_args(
+    scene_resource: object,
+    origins: torch.Tensor,
+    targets: torch.Tensor,
+    input_active: torch.Tensor | None,
+    *,
+    input_active_any: bool,
+    hit_capacity: int,
+    policy: SegmentPenetrationPolicy,
+    scene_diagonal: float,
+    failure_state: CapacityFailureState,
+) -> tuple[object, ...]:
+    _validate_segment_penetration_inputs(
+        origins, targets, input_active, input_active_any=input_active_any
+    )
+    scene_diagonal_value = _validate_segment_penetration_host_config(
+        hit_capacity, policy, scene_diagonal
+    )
+    require_capacity_failure_state(failure_state, device=origins.device)
+    return (
+        _rayd_scene_resource(scene_resource),
+        origins,
+        targets,
+        input_active,
+        input_active_any,
+        hit_capacity,
+        int(policy),
+        scene_diagonal_value,
+        failure_state.bits,
+        _SEGMENT_PENETRATION_FAILURE_BIT,
+    )
+
+
+def _segment_penetration_result(
+    values: object,
+    *,
+    hit_capacity: int,
+    failure_state: CapacityFailureState,
+) -> SegmentPenetrationResult:
+    if not isinstance(values, (tuple, list)) or len(values) != len(
+        _SEGMENT_PENETRATION_RESULT_FIELDS
+    ):
+        raise TypeError(
+            "_channel_native.rayd_segment_penetration_forward must return 11 tensors"
+        )
+    return SegmentPenetrationResult(
+        hit_capacity=hit_capacity,
+        failure_state=failure_state,
+        **dict(zip(_SEGMENT_PENETRATION_RESULT_FIELDS, values, strict=True)),
+    )
+
+
+def _segment_penetration_tape_args(
+    tape: SegmentPenetrationTapeResult,
+) -> tuple[torch.Tensor, ...]:
+    result = tape.result
+    return (
+        *(getattr(result, name) for name in _SEGMENT_PENETRATION_RESULT_FIELDS),
+        *(getattr(tape, name) for name in _SEGMENT_PENETRATION_TAPE_FIELDS),
+    )
+
+
+def rayd_segment_penetration_forward(
+    scene_resource: object,
+    origins: torch.Tensor,
+    targets: torch.Tensor,
+    input_active: torch.Tensor | None,
+    *,
+    input_active_any: bool,
+    hit_capacity: int,
+    policy: SegmentPenetrationPolicy,
+    scene_diagonal: float,
+    failure_state: CapacityFailureState,
+) -> SegmentPenetrationResult:
+    """Dispatch the dormant RayD segment-penetration primal."""
+
+    args = _segment_penetration_request_args(
+        scene_resource,
+        origins,
+        targets,
+        input_active,
+        input_active_any=input_active_any,
+        hit_capacity=hit_capacity,
+        policy=policy,
+        scene_diagonal=scene_diagonal,
+        failure_state=failure_state,
+    )
+    values = _required_native_op("rayd_segment_penetration_forward")(*args)
+    return _segment_penetration_result(
+        values, hit_capacity=hit_capacity, failure_state=failure_state
+    )
+
+
+def rayd_segment_penetration_forward_tape(
+    scene_resource: object,
+    origins: torch.Tensor,
+    targets: torch.Tensor,
+    input_active: torch.Tensor | None,
+    *,
+    input_active_any: bool,
+    hit_capacity: int,
+    policy: SegmentPenetrationPolicy,
+    scene_diagonal: float,
+    failure_state: CapacityFailureState,
+) -> SegmentPenetrationTapeResult:
+    """Dispatch the dormant RayD primal and opaque fixed-winner tape."""
+
+    args = _segment_penetration_request_args(
+        scene_resource,
+        origins,
+        targets,
+        input_active,
+        input_active_any=input_active_any,
+        hit_capacity=hit_capacity,
+        policy=policy,
+        scene_diagonal=scene_diagonal,
+        failure_state=failure_state,
+    )
+    values = _required_native_op("rayd_segment_penetration_forward_tape")(*args)
+    expected = len(_SEGMENT_PENETRATION_RESULT_FIELDS) + len(
+        _SEGMENT_PENETRATION_TAPE_FIELDS
+    )
+    if not isinstance(values, (tuple, list)) or len(values) != expected:
+        raise TypeError(
+            "_channel_native.rayd_segment_penetration_forward_tape must return 17 tensors"
+        )
+    result = _segment_penetration_result(
+        values[:11], hit_capacity=hit_capacity, failure_state=failure_state
+    )
+    return SegmentPenetrationTapeResult(
+        result=result,
+        **dict(zip(_SEGMENT_PENETRATION_TAPE_FIELDS, values[11:], strict=True)),
+    )
+
+
+def rayd_segment_penetration_backward(
+    scene_resource: object,
+    origins: torch.Tensor,
+    targets: torch.Tensor,
+    input_active: torch.Tensor | None,
+    *,
+    input_active_any: bool,
+    hit_capacity: int,
+    policy: SegmentPenetrationPolicy,
+    scene_diagonal: float,
+    failure_state: CapacityFailureState,
+    tape: SegmentPenetrationTapeResult,
+    grad_distance: torch.Tensor | None = None,
+    grad_direction: torch.Tensor | None = None,
+    grad_t: torch.Tensor | None = None,
+    grad_position: torch.Tensor | None = None,
+    grad_normal: torch.Tensor | None = None,
+    grad_geometric_normal: torch.Tensor | None = None,
+    need_grad_vertices: bool = False,
+    need_grad_origins: bool = False,
+    need_grad_targets: bool = False,
+) -> SegmentPenetrationBackwardResult:
+    """Dispatch the native fixed-winner VJP companion."""
+
+    args = _segment_penetration_request_args(
+        scene_resource,
+        origins,
+        targets,
+        input_active,
+        input_active_any=input_active_any,
+        hit_capacity=hit_capacity,
+        policy=policy,
+        scene_diagonal=scene_diagonal,
+        failure_state=failure_state,
+    )
+    if not isinstance(tape, SegmentPenetrationTapeResult):
+        raise TypeError("tape must be a SegmentPenetrationTapeResult")
+    if tape.failure_state is not failure_state:
+        raise ValueError("tape must retain the exact request failure_state")
+    if tape.result.segment_count != origins.shape[0] or tape.result.hit_capacity != hit_capacity:
+        raise ValueError("tape must match the segment request shape")
+    rows = int(origins.shape[0])
+    _ad_check_optional_grad("grad_distance", grad_distance, ((rows,),))
+    _ad_check_optional_grad("grad_direction", grad_direction, ((rows, 3),))
+    _ad_check_optional_grad("grad_t", grad_t, ((rows, hit_capacity),))
+    for name, value in (
+        ("grad_position", grad_position),
+        ("grad_normal", grad_normal),
+        ("grad_geometric_normal", grad_geometric_normal),
+    ):
+        _ad_check_optional_grad(name, value, ((rows, hit_capacity, 3),))
+    for name, value in (
+        ("need_grad_vertices", need_grad_vertices),
+        ("need_grad_origins", need_grad_origins),
+        ("need_grad_targets", need_grad_targets),
+    ):
+        if type(value) is not bool:
+            raise TypeError(f"{name} must be a bool")
+    values = _required_native_op("rayd_segment_penetration_backward")(
+        *args,
+        *_segment_penetration_tape_args(tape),
+        grad_distance,
+        grad_direction,
+        grad_t,
+        grad_position,
+        grad_normal,
+        grad_geometric_normal,
+        need_grad_vertices,
+        need_grad_origins,
+        need_grad_targets,
+    )
+    if not isinstance(values, (tuple, list)) or len(values) != 3:
+        raise TypeError(
+            "_channel_native.rayd_segment_penetration_backward must return 3 gradients"
+        )
+    return SegmentPenetrationBackwardResult(*values)
+
+
+def rayd_segment_penetration_jvp(
+    scene_resource: object,
+    origins: torch.Tensor,
+    targets: torch.Tensor,
+    input_active: torch.Tensor | None,
+    *,
+    input_active_any: bool,
+    hit_capacity: int,
+    policy: SegmentPenetrationPolicy,
+    scene_diagonal: float,
+    failure_state: CapacityFailureState,
+    tape: SegmentPenetrationTapeResult,
+    tangent_vertices: torch.Tensor | None = None,
+    tangent_origins: torch.Tensor | None = None,
+    tangent_targets: torch.Tensor | None = None,
+) -> SegmentPenetrationJvpResult:
+    """Dispatch the native fixed-winner JVP companion."""
+
+    args = _segment_penetration_request_args(
+        scene_resource,
+        origins,
+        targets,
+        input_active,
+        input_active_any=input_active_any,
+        hit_capacity=hit_capacity,
+        policy=policy,
+        scene_diagonal=scene_diagonal,
+        failure_state=failure_state,
+    )
+    if not isinstance(tape, SegmentPenetrationTapeResult):
+        raise TypeError("tape must be a SegmentPenetrationTapeResult")
+    if tape.failure_state is not failure_state:
+        raise ValueError("tape must retain the exact request failure_state")
+    if tape.result.segment_count != origins.shape[0] or tape.result.hit_capacity != hit_capacity:
+        raise ValueError("tape must match the segment request shape")
+    rows = int(origins.shape[0])
+    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
+    _ad_check_tangent_vec3("tangent_origins", tangent_origins, rows)
+    _ad_check_tangent_vec3("tangent_targets", tangent_targets, rows)
+    values = _required_native_op("rayd_segment_penetration_jvp")(
+        *args,
+        *_segment_penetration_tape_args(tape),
+        tangent_vertices,
+        tangent_origins,
+        tangent_targets,
+    )
+    if not isinstance(values, (tuple, list)) or len(values) != 6:
+        raise TypeError(
+            "_channel_native.rayd_segment_penetration_jvp must return 6 tangents"
+        )
+    return SegmentPenetrationJvpResult(*values)
 
 
 def rayd_visibility_forward(

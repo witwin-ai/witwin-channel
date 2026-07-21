@@ -169,6 +169,12 @@ def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None
     ):
         assert source.count(f"rayd::torch::{entry}(") == 1
     assert "<<<" not in source
+    request = _function_body(source, "transmission_sequence_request")
+    assert request.index("std::move(path_valid)") < request.index("std::move(source)")
+    for entry in TRANSMISSION_ABI:
+        signature = re.search(rf"\b{entry}\s*\((?P<args>[^;]*?)\)\s*\{{", source, re.DOTALL)
+        assert signature is not None
+        assert signature.group("args").lstrip().startswith("torch::Tensor path_valid,")
 
     assert _dict_keys(_function_body(source, "transmission_sequence_result_dict")) == {
         "field_vector",

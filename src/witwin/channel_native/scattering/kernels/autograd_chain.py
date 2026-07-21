@@ -62,38 +62,39 @@ def _grad_or_none(out: dict, key: str, needed: bool) -> torch.Tensor | None:
 # forwards those geometry tangents (native ``_jvp`` supports them), so the JVP
 # rejection set ``_CHAIN_ENSEMBLE_FIXED_TANGENTS`` excludes them.
 _CHAIN_ENSEMBLE_FIXED_TANGENTS = (
-    (0, "tx_pol"),
-    (1, "rx_pol"),
-    (2, "source"),
-    (3, "vertex"),
-    (4, "target"),
-    (9, "c1_mu_r"),
-    (12, "c1_depth"),
-    (17, "c2_mu_r"),
-    (20, "c2_depth"),
-    (22, "t1r"),
-    (23, "t2r"),
-    (24, "backup_axis"),
-    (25, "wi_local"),
-    (32, "weights"),
-    (33, "material_id"),
-    (36, "table_offset"),
-    (37, "table_dims"),
-    (38, "material_slot"),
+    (0, "valid"),
+    (1, "tx_pol"),
+    (2, "rx_pol"),
+    (3, "source"),
+    (4, "vertex"),
+    (5, "target"),
+    (10, "c1_mu_r"),
+    (13, "c1_depth"),
+    (18, "c2_mu_r"),
+    (21, "c2_depth"),
+    (23, "t1r"),
+    (24, "t2r"),
+    (25, "backup_axis"),
+    (26, "wi_local"),
+    (33, "weights"),
+    (34, "material_id"),
+    (37, "table_offset"),
+    (38, "table_dims"),
+    (39, "material_slot"),
 )
 # Reverse-mode continuous geometry (fixed this wave; forward-mode tangent-able).
 _CHAIN_ENSEMBLE_FIXED_GEOMETRY = (
-    (5, "c1_positions"),
-    (6, "c1_normals"),
-    (13, "c2_positions"),
-    (14, "c2_normals"),
-    (21, "n_o"),
-    (26, "cos_i"),
-    (27, "cos_o"),
-    (28, "d_i"),
-    (29, "d_o"),
-    (30, "l1"),
-    (31, "l2"),
+    (6, "c1_positions"),
+    (7, "c1_normals"),
+    (14, "c2_positions"),
+    (15, "c2_normals"),
+    (22, "n_o"),
+    (27, "cos_i"),
+    (28, "cos_o"),
+    (29, "d_i"),
+    (30, "d_o"),
+    (31, "l1"),
+    (32, "l2"),
 )
 _CHAIN_ENSEMBLE_FIXED = _CHAIN_ENSEMBLE_FIXED_TANGENTS + _CHAIN_ENSEMBLE_FIXED_GEOMETRY
 
@@ -117,6 +118,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
+        valid,
         tx_pol,
         rx_pol,
         source,
@@ -163,6 +165,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
         frequency_value,
     ):
         out = scattering_chain_ensemble_eval(
+            valid,
             tx_pol,
             rx_pol,
             source,
@@ -211,14 +214,14 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        coef = inputs[39]
-        frequency = inputs[40]
+        coef = inputs[40]
+        frequency = inputs[41]
         primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:39]
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:40]
         )
-        ctx.threshold = inputs[41]
-        ctx.coef_value = inputs[42]
-        ctx.frequency_value = inputs[43]
+        ctx.threshold = inputs[42]
+        ctx.coef_value = inputs[43]
+        ctx.frequency_value = inputs[44]
         ctx.coef_meta = (
             (coef.dtype, coef.device) if isinstance(coef, torch.Tensor) else None
         )
@@ -234,7 +237,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
-        none_grads = (None,) * 44
+        none_grads = (None,) * 45
         # Rejects reverse-mode grads on both the structurally frozen inputs and
         # the continuous chain geometry (staged follow-up wave).
         _ad_reject_fixed_inputs(
@@ -242,12 +245,12 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
             ctx.needs_input_grad,
             _CHAIN_ENSEMBLE_FIXED,
         )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(41))
-        need_chain1 = any(needed[i] for i in (7, 8, 10, 11))
-        need_chain2 = any(needed[i] for i in (15, 16, 18, 19))
-        need_tables = needed[34] or needed[35]
-        need_coef = needed[39]
-        need_frequency = needed[40]
+        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(42))
+        need_chain1 = any(needed[i] for i in (8, 9, 11, 12))
+        need_chain2 = any(needed[i] for i in (16, 17, 19, 20))
+        need_tables = needed[35] or needed[36]
+        need_coef = needed[40]
+        need_frequency = needed[41]
         grads = (grad_gain, grad_amplitude, grad_length)
         if not (
             need_chain1
@@ -281,6 +284,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
             else None
         )
         return (
+            None,  # valid
             None,  # tx_pol
             None,  # rx_pol
             None,  # source
@@ -288,19 +292,19 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
             None,  # target
             None,  # c1_positions (geometry: reverse staged)
             None,  # c1_normals
-            _grad_or_none(out, "grad_c1_eps_r", needed[7]),
-            _grad_or_none(out, "grad_c1_sigma_e", needed[8]),
+            _grad_or_none(out, "grad_c1_eps_r", needed[8]),
+            _grad_or_none(out, "grad_c1_sigma_e", needed[9]),
             None,  # c1_mu_r
-            _grad_or_none(out, "grad_c1_gain", needed[10]),
-            _grad_or_none(out, "grad_c1_thickness", needed[11]),
+            _grad_or_none(out, "grad_c1_gain", needed[11]),
+            _grad_or_none(out, "grad_c1_thickness", needed[12]),
             None,  # c1_depth
             None,  # c2_positions (geometry: reverse staged)
             None,  # c2_normals
-            _grad_or_none(out, "grad_c2_eps_r", needed[15]),
-            _grad_or_none(out, "grad_c2_sigma_e", needed[16]),
+            _grad_or_none(out, "grad_c2_eps_r", needed[16]),
+            _grad_or_none(out, "grad_c2_sigma_e", needed[17]),
             None,  # c2_mu_r
-            _grad_or_none(out, "grad_c2_gain", needed[18]),
-            _grad_or_none(out, "grad_c2_thickness", needed[19]),
+            _grad_or_none(out, "grad_c2_gain", needed[19]),
+            _grad_or_none(out, "grad_c2_thickness", needed[20]),
             None,  # c2_depth
             None,  # n_o (geometry: reverse staged)
             None,  # t1r
@@ -315,8 +319,8 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
             None,  # l2 (geometry: reverse staged)
             None,  # weights
             None,  # material_id
-            _grad_or_none(out, "grad_f_te", needed[34]),
-            _grad_or_none(out, "grad_f_tm", needed[35]),
+            _grad_or_none(out, "grad_f_te", needed[35]),
+            _grad_or_none(out, "grad_f_tm", needed[36]),
             None,  # table_offset
             None,  # table_dims
             None,  # material_slot
@@ -330,6 +334,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(
         ctx,
+        t_valid,
         t_tx_pol,
         t_rx_pol,
         t_source,
@@ -380,6 +385,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
         _ad_reject_fixed_tangents(
             "scattering_chain_ensemble_eval_ad",
             (
+                (t_valid, "valid"),
                 (t_tx_pol, "tx_pol"),
                 (t_rx_pol, "rx_pol"),
                 (t_source, "source"),
@@ -403,27 +409,27 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
         saved = ctx.saved_tensors
         op = "scattering_chain_ensemble_eval_ad"
         tangents = {
-            "tangent_c1_eps_r": _ad_geometry_tangent(f"{op} tangent_c1_eps_r", t_c1_eps_r, saved[7]),
-            "tangent_c1_sigma_e": _ad_geometry_tangent(f"{op} tangent_c1_sigma_e", t_c1_sigma_e, saved[8]),
-            "tangent_c1_gain": _ad_geometry_tangent(f"{op} tangent_c1_gain", t_c1_gain, saved[10]),
-            "tangent_c1_thickness": _ad_geometry_tangent(f"{op} tangent_c1_thickness", t_c1_thickness, saved[11]),
-            "tangent_c2_eps_r": _ad_geometry_tangent(f"{op} tangent_c2_eps_r", t_c2_eps_r, saved[15]),
-            "tangent_c2_sigma_e": _ad_geometry_tangent(f"{op} tangent_c2_sigma_e", t_c2_sigma_e, saved[16]),
-            "tangent_c2_gain": _ad_geometry_tangent(f"{op} tangent_c2_gain", t_c2_gain, saved[18]),
-            "tangent_c2_thickness": _ad_geometry_tangent(f"{op} tangent_c2_thickness", t_c2_thickness, saved[19]),
-            "tangent_f_te_flat": _ad_geometry_tangent(f"{op} tangent_f_te_flat", t_f_te_flat, saved[34]),
-            "tangent_f_tm_flat": _ad_geometry_tangent(f"{op} tangent_f_tm_flat", t_f_tm_flat, saved[35]),
-            "tangent_c1_positions": _ad_geometry_tangent(f"{op} tangent_c1_positions", t_c1_positions, saved[5]),
-            "tangent_c1_normals": _ad_geometry_tangent(f"{op} tangent_c1_normals", t_c1_normals, saved[6]),
-            "tangent_c2_positions": _ad_geometry_tangent(f"{op} tangent_c2_positions", t_c2_positions, saved[13]),
-            "tangent_c2_normals": _ad_geometry_tangent(f"{op} tangent_c2_normals", t_c2_normals, saved[14]),
-            "tangent_d_i": _ad_geometry_tangent(f"{op} tangent_d_i", t_d_i, saved[28]),
-            "tangent_d_o": _ad_geometry_tangent(f"{op} tangent_d_o", t_d_o, saved[29]),
-            "tangent_v_normal": _ad_geometry_tangent(f"{op} tangent_v_normal", t_n_o, saved[21]),
-            "tangent_l1": _ad_geometry_tangent(f"{op} tangent_l1", t_l1, saved[30]),
-            "tangent_l2": _ad_geometry_tangent(f"{op} tangent_l2", t_l2, saved[31]),
-            "tangent_cos_i": _ad_geometry_tangent(f"{op} tangent_cos_i", t_cos_i, saved[26]),
-            "tangent_cos_o": _ad_geometry_tangent(f"{op} tangent_cos_o", t_cos_o, saved[27]),
+            "tangent_c1_eps_r": _ad_geometry_tangent(f"{op} tangent_c1_eps_r", t_c1_eps_r, saved[8]),
+            "tangent_c1_sigma_e": _ad_geometry_tangent(f"{op} tangent_c1_sigma_e", t_c1_sigma_e, saved[9]),
+            "tangent_c1_gain": _ad_geometry_tangent(f"{op} tangent_c1_gain", t_c1_gain, saved[11]),
+            "tangent_c1_thickness": _ad_geometry_tangent(f"{op} tangent_c1_thickness", t_c1_thickness, saved[12]),
+            "tangent_c2_eps_r": _ad_geometry_tangent(f"{op} tangent_c2_eps_r", t_c2_eps_r, saved[16]),
+            "tangent_c2_sigma_e": _ad_geometry_tangent(f"{op} tangent_c2_sigma_e", t_c2_sigma_e, saved[17]),
+            "tangent_c2_gain": _ad_geometry_tangent(f"{op} tangent_c2_gain", t_c2_gain, saved[19]),
+            "tangent_c2_thickness": _ad_geometry_tangent(f"{op} tangent_c2_thickness", t_c2_thickness, saved[20]),
+            "tangent_f_te_flat": _ad_geometry_tangent(f"{op} tangent_f_te_flat", t_f_te_flat, saved[35]),
+            "tangent_f_tm_flat": _ad_geometry_tangent(f"{op} tangent_f_tm_flat", t_f_tm_flat, saved[36]),
+            "tangent_c1_positions": _ad_geometry_tangent(f"{op} tangent_c1_positions", t_c1_positions, saved[6]),
+            "tangent_c1_normals": _ad_geometry_tangent(f"{op} tangent_c1_normals", t_c1_normals, saved[7]),
+            "tangent_c2_positions": _ad_geometry_tangent(f"{op} tangent_c2_positions", t_c2_positions, saved[14]),
+            "tangent_c2_normals": _ad_geometry_tangent(f"{op} tangent_c2_normals", t_c2_normals, saved[15]),
+            "tangent_d_i": _ad_geometry_tangent(f"{op} tangent_d_i", t_d_i, saved[29]),
+            "tangent_d_o": _ad_geometry_tangent(f"{op} tangent_d_o", t_d_o, saved[30]),
+            "tangent_v_normal": _ad_geometry_tangent(f"{op} tangent_v_normal", t_n_o, saved[22]),
+            "tangent_l1": _ad_geometry_tangent(f"{op} tangent_l1", t_l1, saved[31]),
+            "tangent_l2": _ad_geometry_tangent(f"{op} tangent_l2", t_l2, saved[32]),
+            "tangent_cos_i": _ad_geometry_tangent(f"{op} tangent_cos_i", t_cos_i, saved[27]),
+            "tangent_cos_o": _ad_geometry_tangent(f"{op} tangent_cos_o", t_cos_o, saved[28]),
         }
         tangent_coef = _ad_frequency_tangent(t_coef)
         tangent_frequency = _ad_frequency_tangent(t_frequency)
@@ -452,6 +458,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
 
 
 def scattering_chain_ensemble_eval_ad(
+    valid: torch.Tensor,
     tx_pol: torch.Tensor,
     rx_pol: torch.Tensor,
     source: torch.Tensor,
@@ -522,34 +529,36 @@ def scattering_chain_ensemble_eval_ad(
 # ---------------------------------------------------------------------------
 
 # Fixed inputs of Op B (index into the apply arg list, which appends the Duffy
-# quadrature nodes as fixed inputs 41/42/43). ``source``/``vertex``/``target``
+# quadrature nodes as fixed inputs 42/43/44). ``source``/``vertex``/``target``
 # are frozen structural endpoints (no tangent, no gradient in either mode).
 _CHAIN_REALIZATION_FIXED = (
-    (0, "patch_tris"),
-    (1, "patch_uvs"),
-    (2, "rows"),
-    (5, "n_rows"),
-    (6, "source"),
-    (7, "vertex"),
-    (8, "target"),
-    (13, "c1_mu_r"),
-    (16, "c1_depth"),
-    (21, "c2_mu_r"),
-    (24, "c2_depth"),
-    (25, "tx_pol"),
-    (26, "rx_pol"),
-    (33, "cos_spec"),
-    (34, "material_id"),
-    (35, "layer_offset"),
-    (36, "layer_count"),
-    (40, "layer_mu_r"),
-    (41, "quad_a"),
-    (42, "quad_b"),
-    (43, "quad_w"),
+    (0, "valid"),
+    (1, "patch_tris"),
+    (2, "patch_uvs"),
+    (3, "rows"),
+    (6, "n_rows"),
+    (7, "source"),
+    (8, "vertex"),
+    (9, "target"),
+    (14, "c1_mu_r"),
+    (17, "c1_depth"),
+    (22, "c2_mu_r"),
+    (25, "c2_depth"),
+    (26, "tx_pol"),
+    (27, "rx_pol"),
+    (34, "cos_spec"),
+    (35, "material_id"),
+    (36, "layer_offset"),
+    (37, "layer_count"),
+    (41, "layer_mu_r"),
+    (42, "quad_a"),
+    (43, "quad_b"),
+    (44, "quad_w"),
 )
 
 
 def _required_chain_realization_forward(
+    valid,
     patch_tris,
     patch_uvs,
     rows,
@@ -604,6 +613,7 @@ def _required_chain_realization_forward(
     """
 
     out = _required_native_op("scattering_chain_realization_eval")(
+        valid,
         patch_tris,
         patch_uvs,
         rows,
@@ -676,6 +686,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
+        valid,
         patch_tris,
         patch_uvs,
         rows,
@@ -726,6 +737,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
         frequency_value,
     ):
         out = _required_chain_realization_forward(
+            valid,
             patch_tris,
             patch_uvs,
             rows,
@@ -778,13 +790,13 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        k0 = inputs[44]
-        frequency = inputs[45]
+        k0 = inputs[45]
+        frequency = inputs[46]
         primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:44]
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:45]
         )
-        ctx.k0_value = inputs[46]
-        ctx.frequency_value = inputs[47]
+        ctx.k0_value = inputs[47]
+        ctx.frequency_value = inputs[48]
         ctx.k0_meta = (k0.dtype, k0.device) if isinstance(k0, torch.Tensor) else None
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
@@ -800,22 +812,22 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
     def backward(
         ctx, grad_total, grad_path_field, grad_path_gain, _grad_integral, _grad_row_value
     ):
-        none_grads = (None,) * 48
+        none_grads = (None,) * 49
         _ad_reject_fixed_inputs(
             "scattering_chain_realization_eval_ad",
             ctx.needs_input_grad,
             _CHAIN_REALIZATION_FIXED,
         )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(46))
-        need_heights = needed[32]
-        need_layers = any(needed[i] for i in (37, 38, 39))
-        need_chain1 = any(needed[i] for i in (11, 12, 14, 15))
-        need_chain2 = any(needed[i] for i in (19, 20, 22, 23))
+        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(47))
+        need_heights = needed[33]
+        need_layers = any(needed[i] for i in (38, 39, 40))
+        need_chain1 = any(needed[i] for i in (12, 13, 15, 16))
+        need_chain2 = any(needed[i] for i in (20, 21, 23, 24))
         need_geometry = any(
-            needed[i] for i in (3, 4, 9, 10, 17, 18, 27, 28, 29, 30, 31)
+            needed[i] for i in (4, 5, 10, 11, 18, 19, 28, 29, 30, 31, 32)
         )
-        need_k0 = needed[44]
-        need_frequency = needed[45]
+        need_k0 = needed[45]
+        need_frequency = needed[46]
         need_flags = (
             need_heights, need_layers, need_chain1, need_chain2,
             need_geometry, need_k0, need_frequency,
@@ -828,9 +840,9 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
         if grad_total is None:
             # path_field-only cotangents (D3 coherent combine) leave the scalar
             # total ungraded; the required ABI slot takes a zero cotangent.
-            grad_total = torch.zeros((), dtype=torch.complex64, device=saved[0].device)
+            grad_total = torch.zeros((), dtype=torch.complex64, device=saved[1].device)
         out = scattering_chain_realization_eval_backward(
-            *saved[:41],
+            *saved[:42],
             k0=ctx.k0_value,
             frequency_hz=ctx.frequency_value,
             grad_total=grad_total,
@@ -851,46 +863,47 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
             else None
         )
         return (
+            None,  # valid
             None,  # patch_tris
             None,  # patch_uvs
             None,  # rows
-            _grad_or_none(out, "grad_d_i", needed[3]),
-            _grad_or_none(out, "grad_d_o", needed[4]),
+            _grad_or_none(out, "grad_d_i", needed[4]),
+            _grad_or_none(out, "grad_d_o", needed[5]),
             None,  # n_rows
             None,  # source
             None,  # vertex
             None,  # target
-            _grad_or_none(out, "grad_c1_positions", needed[9]),
-            _grad_or_none(out, "grad_c1_normals", needed[10]),
-            _grad_or_none(out, "grad_c1_eps_r", needed[11]),
-            _grad_or_none(out, "grad_c1_sigma_e", needed[12]),
+            _grad_or_none(out, "grad_c1_positions", needed[10]),
+            _grad_or_none(out, "grad_c1_normals", needed[11]),
+            _grad_or_none(out, "grad_c1_eps_r", needed[12]),
+            _grad_or_none(out, "grad_c1_sigma_e", needed[13]),
             None,  # c1_mu_r
-            _grad_or_none(out, "grad_c1_gain", needed[14]),
-            _grad_or_none(out, "grad_c1_thickness", needed[15]),
+            _grad_or_none(out, "grad_c1_gain", needed[15]),
+            _grad_or_none(out, "grad_c1_thickness", needed[16]),
             None,  # c1_depth
-            _grad_or_none(out, "grad_c2_positions", needed[17]),
-            _grad_or_none(out, "grad_c2_normals", needed[18]),
-            _grad_or_none(out, "grad_c2_eps_r", needed[19]),
-            _grad_or_none(out, "grad_c2_sigma_e", needed[20]),
+            _grad_or_none(out, "grad_c2_positions", needed[18]),
+            _grad_or_none(out, "grad_c2_normals", needed[19]),
+            _grad_or_none(out, "grad_c2_eps_r", needed[20]),
+            _grad_or_none(out, "grad_c2_sigma_e", needed[21]),
             None,  # c2_mu_r
-            _grad_or_none(out, "grad_c2_gain", needed[22]),
-            _grad_or_none(out, "grad_c2_thickness", needed[23]),
+            _grad_or_none(out, "grad_c2_gain", needed[23]),
+            _grad_or_none(out, "grad_c2_thickness", needed[24]),
             None,  # c2_depth
             None,  # tx_pol
             None,  # rx_pol
-            _grad_or_none(out, "grad_L1", needed[27]),
-            _grad_or_none(out, "grad_L2", needed[28]),
-            _grad_or_none(out, "grad_sp1", needed[29]),
-            _grad_or_none(out, "grad_sp2", needed[30]),
-            _grad_or_none(out, "grad_centroids", needed[31]),
-            _grad_or_none(out, "grad_heights", needed[32]),
+            _grad_or_none(out, "grad_L1", needed[28]),
+            _grad_or_none(out, "grad_L2", needed[29]),
+            _grad_or_none(out, "grad_sp1", needed[30]),
+            _grad_or_none(out, "grad_sp2", needed[31]),
+            _grad_or_none(out, "grad_centroids", needed[32]),
+            _grad_or_none(out, "grad_heights", needed[33]),
             None,  # cos_spec
             None,  # material_id
             None,  # layer_offset
             None,  # layer_count
-            _grad_or_none(out, "grad_layer_thickness", needed[37]),
-            _grad_or_none(out, "grad_layer_eps_r", needed[38]),
-            _grad_or_none(out, "grad_layer_sigma_e", needed[39]),
+            _grad_or_none(out, "grad_layer_thickness", needed[38]),
+            _grad_or_none(out, "grad_layer_eps_r", needed[39]),
+            _grad_or_none(out, "grad_layer_sigma_e", needed[40]),
             None,  # layer_mu_r
             None,  # quad_a
             None,  # quad_b
@@ -904,6 +917,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(
         ctx,
+        t_valid,
         t_patch_tris,
         t_patch_uvs,
         t_rows,
@@ -956,6 +970,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
         _ad_reject_fixed_tangents(
             "scattering_chain_realization_eval_ad",
             (
+                (t_valid, "valid"),
                 (t_patch_tris, "patch_tris"),
                 (t_patch_uvs, "patch_uvs"),
                 (t_rows, "rows"),
@@ -982,29 +997,29 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
         saved = ctx.saved_tensors
         op = "scattering_chain_realization_eval_ad"
         tangents = {
-            "tangent_heights": _ad_geometry_tangent(f"{op} tangent_heights", t_heights, saved[32]),
-            "tangent_layer_thickness": _ad_geometry_tangent(f"{op} tangent_layer_thickness", t_layer_thickness_m, saved[37]),
-            "tangent_layer_eps_r": _ad_geometry_tangent(f"{op} tangent_layer_eps_r", t_layer_eps_r, saved[38]),
-            "tangent_layer_sigma_e": _ad_geometry_tangent(f"{op} tangent_layer_sigma_e", t_layer_sigma_e, saved[39]),
-            "tangent_c1_eps_r": _ad_geometry_tangent(f"{op} tangent_c1_eps_r", t_c1_eps_r, saved[11]),
-            "tangent_c1_sigma_e": _ad_geometry_tangent(f"{op} tangent_c1_sigma_e", t_c1_sigma_e, saved[12]),
-            "tangent_c1_gain": _ad_geometry_tangent(f"{op} tangent_c1_gain", t_c1_gain, saved[14]),
-            "tangent_c1_thickness": _ad_geometry_tangent(f"{op} tangent_c1_thickness", t_c1_thickness, saved[15]),
-            "tangent_c2_eps_r": _ad_geometry_tangent(f"{op} tangent_c2_eps_r", t_c2_eps_r, saved[19]),
-            "tangent_c2_sigma_e": _ad_geometry_tangent(f"{op} tangent_c2_sigma_e", t_c2_sigma_e, saved[20]),
-            "tangent_c2_gain": _ad_geometry_tangent(f"{op} tangent_c2_gain", t_c2_gain, saved[22]),
-            "tangent_c2_thickness": _ad_geometry_tangent(f"{op} tangent_c2_thickness", t_c2_thickness, saved[23]),
-            "tangent_d_i": _ad_geometry_tangent(f"{op} tangent_d_i", t_d_i, saved[3]),
-            "tangent_d_o": _ad_geometry_tangent(f"{op} tangent_d_o", t_d_o, saved[4]),
-            "tangent_c1_positions": _ad_geometry_tangent(f"{op} tangent_c1_positions", t_c1_positions, saved[9]),
-            "tangent_c1_normals": _ad_geometry_tangent(f"{op} tangent_c1_normals", t_c1_normals, saved[10]),
-            "tangent_c2_positions": _ad_geometry_tangent(f"{op} tangent_c2_positions", t_c2_positions, saved[17]),
-            "tangent_c2_normals": _ad_geometry_tangent(f"{op} tangent_c2_normals", t_c2_normals, saved[18]),
-            "tangent_L1": _ad_geometry_tangent(f"{op} tangent_L1", t_L1, saved[27]),
-            "tangent_L2": _ad_geometry_tangent(f"{op} tangent_L2", t_L2, saved[28]),
-            "tangent_sp1": _ad_geometry_tangent(f"{op} tangent_sp1", t_sp1, saved[29]),
-            "tangent_sp2": _ad_geometry_tangent(f"{op} tangent_sp2", t_sp2, saved[30]),
-            "tangent_centroids": _ad_geometry_tangent(f"{op} tangent_centroids", t_centroids, saved[31]),
+            "tangent_heights": _ad_geometry_tangent(f"{op} tangent_heights", t_heights, saved[33]),
+            "tangent_layer_thickness": _ad_geometry_tangent(f"{op} tangent_layer_thickness", t_layer_thickness_m, saved[38]),
+            "tangent_layer_eps_r": _ad_geometry_tangent(f"{op} tangent_layer_eps_r", t_layer_eps_r, saved[39]),
+            "tangent_layer_sigma_e": _ad_geometry_tangent(f"{op} tangent_layer_sigma_e", t_layer_sigma_e, saved[40]),
+            "tangent_c1_eps_r": _ad_geometry_tangent(f"{op} tangent_c1_eps_r", t_c1_eps_r, saved[12]),
+            "tangent_c1_sigma_e": _ad_geometry_tangent(f"{op} tangent_c1_sigma_e", t_c1_sigma_e, saved[13]),
+            "tangent_c1_gain": _ad_geometry_tangent(f"{op} tangent_c1_gain", t_c1_gain, saved[15]),
+            "tangent_c1_thickness": _ad_geometry_tangent(f"{op} tangent_c1_thickness", t_c1_thickness, saved[16]),
+            "tangent_c2_eps_r": _ad_geometry_tangent(f"{op} tangent_c2_eps_r", t_c2_eps_r, saved[20]),
+            "tangent_c2_sigma_e": _ad_geometry_tangent(f"{op} tangent_c2_sigma_e", t_c2_sigma_e, saved[21]),
+            "tangent_c2_gain": _ad_geometry_tangent(f"{op} tangent_c2_gain", t_c2_gain, saved[23]),
+            "tangent_c2_thickness": _ad_geometry_tangent(f"{op} tangent_c2_thickness", t_c2_thickness, saved[24]),
+            "tangent_d_i": _ad_geometry_tangent(f"{op} tangent_d_i", t_d_i, saved[4]),
+            "tangent_d_o": _ad_geometry_tangent(f"{op} tangent_d_o", t_d_o, saved[5]),
+            "tangent_c1_positions": _ad_geometry_tangent(f"{op} tangent_c1_positions", t_c1_positions, saved[10]),
+            "tangent_c1_normals": _ad_geometry_tangent(f"{op} tangent_c1_normals", t_c1_normals, saved[11]),
+            "tangent_c2_positions": _ad_geometry_tangent(f"{op} tangent_c2_positions", t_c2_positions, saved[18]),
+            "tangent_c2_normals": _ad_geometry_tangent(f"{op} tangent_c2_normals", t_c2_normals, saved[19]),
+            "tangent_L1": _ad_geometry_tangent(f"{op} tangent_L1", t_L1, saved[28]),
+            "tangent_L2": _ad_geometry_tangent(f"{op} tangent_L2", t_L2, saved[29]),
+            "tangent_sp1": _ad_geometry_tangent(f"{op} tangent_sp1", t_sp1, saved[30]),
+            "tangent_sp2": _ad_geometry_tangent(f"{op} tangent_sp2", t_sp2, saved[31]),
+            "tangent_centroids": _ad_geometry_tangent(f"{op} tangent_centroids", t_centroids, saved[32]),
         }
         tangent_k0 = _ad_frequency_tangent(t_k0)
         tangent_frequency = _ad_frequency_tangent(t_frequency)
@@ -1016,7 +1031,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
             return (None,) * len(_CHAIN_REALIZATION_OUTPUT_FIELDS)
         with torch_compat.disable_functorch():
             out = scattering_chain_realization_eval_jvp(
-                *(_ad_native_tensor(value) for value in saved[:41]),
+                *(_ad_native_tensor(value) for value in saved[:42]),
                 k0=ctx.k0_value,
                 frequency_hz=ctx.frequency_value,
                 tangent_k0=tangent_k0,
@@ -1033,6 +1048,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
 
 
 def scattering_chain_realization_eval_ad(
+    valid: torch.Tensor,
     patch_tris: torch.Tensor,
     patch_uvs: torch.Tensor,
     rows: torch.Tensor,

@@ -114,7 +114,8 @@ def _quadrature_reference_unpolarized() -> float:
             ((w * t1).sum(-1), (w * t2).sum(-1), (w * n).sum(-1)), dim=-1
         ).contiguous()
 
-    f_te, f_tm = eval_bsdf(table, local(wi), local(wo))
+    valid = torch.ones(wi.shape[0], dtype=torch.bool, device=device)
+    f_te, f_tm = eval_bsdf(table, valid, local(wi), local(wo))
     amplitude_sq = (_LIGHT_SPEED / _FREQUENCY / (4.0 * math.pi)) ** 2
     integrand = (
         0.5 * (f_te + f_tm)

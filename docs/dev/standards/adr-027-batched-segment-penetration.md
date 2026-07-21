@@ -1,6 +1,7 @@
 # ADR-027: Batched segment-penetration geometry
 
-- **Status:** Accepted (2026-07-20); implementation pending
+- **Status:** Accepted (2026-07-20); dormant RayD/Channel Phase P foundation
+  implemented, enumerated and Monte Carlo activation pending
 - **Date:** 2026-07-20
 - **Kind:** Native geometry, launch/fusion, fixed-capacity, automatic
   differentiation, and cross-repository ownership decision.

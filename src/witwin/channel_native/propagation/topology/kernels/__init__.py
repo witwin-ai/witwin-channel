@@ -52,6 +52,7 @@ from .primitives import (
     path_concat_vec3,
 )
 from .reflection import deterministic_reflection_candidate_capacity_block
+from .transmission import enumerated_transmission_topology_pack
 
 
 __all__ = [
@@ -87,6 +88,7 @@ __all__ = [
     "deterministic_selected_edge_count",
     "deterministic_sort_order",
     "enumerated_canonical_capacity_select",
+    "enumerated_transmission_topology_pack",
     "deterministic_topology_base_fields",
     "deterministic_topology_default_fields",
     "mc_selected_edge_indices",

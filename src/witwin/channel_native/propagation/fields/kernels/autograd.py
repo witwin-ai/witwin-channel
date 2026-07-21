@@ -22,6 +22,7 @@ from .functional import (
     _FIELD_AD_OUTPUT_FIELDS,
     _FIELD_AD_TANGENT_FIELDS,
     _WEDGE_OUTPUT_FIELDS,
+    _validate_wedge_valid,
     field_free_space_backward,
     field_free_space_jvp,
     field_reflection_sequence_backward,
@@ -32,14 +33,10 @@ from .functional import (
 
 
 class _FieldFreeSpaceAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable free-space transport (plan 07 AD-1/AD-2).
+    """Fixed-topology differentiable free-space transport.
 
-    Differentiable inputs: frequency (0-d tensor) and the source / target
-    endpoints. tx_power and the polarizations stay fixed; requesting their
-    gradient fails loudly. path_length_m / delay_s are differentiable exactly
-    when an endpoint is on the graph. A float64 input batch routes through
-    the float64 companion forward so torch.autograd.gradcheck can run in
-    strict double precision.
+    Frequency and endpoints are differentiable; power and polarizations are
+    fixed. Float64 inputs use the strict-double companion for gradcheck.
     """
 
     @staticmethod
@@ -251,14 +248,10 @@ def field_free_space_ad(
 
 
 class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable reflection transport (plan 07 AD-1/AD-2).
+    """Fixed-topology differentiable reflection transport.
 
-    Differentiable inputs: per-bounce eps_r / sigma_e / gain / thickness,
-    frequency, and the hit geometry (source, target, interaction_positions,
-    interaction_normals). tx_power, the polarizations and mu_r are fixed;
-    requesting their gradient fails loudly instead of silently returning
-    zeros. path_length_m / delay_s are differentiable exactly when a geometry
-    input is on the graph.
+    Frequency, hit geometry, and per-bounce material scalars except ``mu_r``
+    are differentiable; power, polarizations, and ``mu_r`` stay fixed.
     """
 
     @staticmethod
@@ -584,6 +577,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
+        path_valid,
         source,
         target,
         interaction_positions,
@@ -603,6 +597,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         frequency_value,
     ):
         out = _required_native_op("field_transmission_sequence")(
+            path_valid,
             source,
             target,
             interaction_positions,
@@ -625,18 +620,18 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        frequency = inputs[15]
+        frequency = inputs[16]
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:15]
+            for value in inputs[:16]
         )
-        ctx.frequency_value = inputs[16]
+        ctx.frequency_value = inputs[17]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        ctx.geometry_live = _ad_geometry_live(*inputs[:4])
+        ctx.geometry_live = _ad_geometry_live(*inputs[1:5])
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
         if ctx.geometry_live:
@@ -656,28 +651,28 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         grad_delay,
         _grad_direction,
     ):
-        none_grads = (None,) * 17
+        none_grads = (None,) * 18
         _ad_reject_fixed_inputs(
             "field_transmission_sequence_ad",
             ctx.needs_input_grad,
             (
-                (6, "tx_power"),
-                (7, "tx_polarization"),
-                (8, "rx_polarization"),
-                (14, "layer_mu_r"),
+                (7, "tx_power"),
+                (8, "tx_polarization"),
+                (9, "rx_polarization"),
+                (15, "layer_mu_r"),
             ),
         )
-        # interaction_positions (index 2) never enters the straight-path
+        # interaction_positions (index 3) never enters the straight-path
         # field: its gradient is exactly zero, so it does not drive a launch.
         need_geometry = (
-            bool(ctx.needs_input_grad[0])
-            or bool(ctx.needs_input_grad[1])
-            or bool(ctx.needs_input_grad[3])
+            bool(ctx.needs_input_grad[1])
+            or bool(ctx.needs_input_grad[2])
+            or bool(ctx.needs_input_grad[4])
         )
-        need_thickness = bool(ctx.needs_input_grad[11])
-        need_eps = bool(ctx.needs_input_grad[12])
-        need_sigma = bool(ctx.needs_input_grad[13])
-        need_frequency = bool(ctx.needs_input_grad[15])
+        need_thickness = bool(ctx.needs_input_grad[12])
+        need_eps = bool(ctx.needs_input_grad[13])
+        need_sigma = bool(ctx.needs_input_grad[14])
+        need_frequency = bool(ctx.needs_input_grad[16])
         grads = (
             grad_field_vector,
             grad_coefficient,
@@ -713,10 +708,11 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             else None
         )
         return (
-            out["grad_source"] if ctx.needs_input_grad[0] else None,
-            out["grad_target"] if ctx.needs_input_grad[1] else None,
             None,
-            out["grad_interaction_normals"] if ctx.needs_input_grad[3] else None,
+            out["grad_source"] if ctx.needs_input_grad[1] else None,
+            out["grad_target"] if ctx.needs_input_grad[2] else None,
+            None,
+            out["grad_interaction_normals"] if ctx.needs_input_grad[4] else None,
             None,
             None,
             None,
@@ -735,12 +731,13 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(
         ctx,
+        _t_path_valid,
         t_source,
         t_target,
         t_positions,
         t_normals,
         _t_material_id,
-        _t_valid,
+        _t_interaction_valid,
         t_tx_power,
         t_tx_pol,
         t_rx_pol,
@@ -763,22 +760,22 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             ),
         )
         saved = ctx.saved_tensors
-        layer_shape = tuple(saved[11].shape)
+        layer_shape = tuple(saved[12].shape)
         tangent_source = _ad_geometry_tangent(
-            "field_transmission_sequence_ad tangent_source", t_source, saved[0]
+            "field_transmission_sequence_ad tangent_source", t_source, saved[1]
         )
         tangent_target = _ad_geometry_tangent(
-            "field_transmission_sequence_ad tangent_target", t_target, saved[1]
+            "field_transmission_sequence_ad tangent_target", t_target, saved[2]
         )
         tangent_positions = _ad_geometry_tangent(
             "field_transmission_sequence_ad tangent_interaction_positions",
             t_positions,
-            saved[2],
+            saved[3],
         )
         tangent_normals = _ad_geometry_tangent(
             "field_transmission_sequence_ad tangent_interaction_normals",
             t_normals,
-            saved[3],
+            saved[4],
         )
         tangent_thickness = _ad_checked_tangent(
             "field_transmission_sequence_ad tangent_layer_thickness_m",
@@ -827,6 +824,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
 
 def field_transmission_sequence_ad(
+    path_valid: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     interaction_positions: torch.Tensor,
@@ -856,6 +854,7 @@ def field_transmission_sequence_ad(
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
     values = _FieldTransmissionSequenceAdFunction.apply(
+        path_valid,
         source,
         target,
         interaction_positions,
@@ -880,19 +879,17 @@ def field_transmission_sequence_ad(
 class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
     """Fixed-topology differentiable UTD wedge field (plan 07 AD-4).
 
-    Differentiable inputs: face eps_r / sigma_e / gain for both wedge faces,
-    frequency, the endpoints, and (when the caller supplies the winner
-    vertices) the per-row edge vertices v0/v1 plus the opposite vertex of
-    each wedge face, from which the kernel rebuilds the edge tables so mesh
-    vertex gradients reach the edge geometry. The frozen edge tables (anchor,
-    direction, bounds, face normals, exterior angle), the valid masks, mu_r
-    and tx_power stay fixed; requesting their gradient fails loudly. The
-    stationary point on the edge is re-solved inside the kernel, so endpoint
-    and vertex gradients include the diffraction-point motion.
+    Differentiable inputs: both faces' eps_r / sigma_e / gain, frequency,
+    endpoints, and optional per-row winner vertices v0/v1 plus each face's
+    opposite vertex. The kernel rebuilds edge tables so mesh-vertex gradients
+    reach edge geometry. Frozen edge tables, valid masks, mu_r and tx_power
+    stay fixed and reject gradients. The stationary edge point is re-solved
+    inside the kernel, preserving its endpoint and vertex gradient motion.
     """
 
     @staticmethod
     def forward(
+        valid,
         source,
         target,
         edge_position,
@@ -922,6 +919,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         frequency_value,
     ):
         out = _required_native_op("field_diffraction_wedge")(
+            valid,
             source,
             target,
             edge_position,
@@ -948,8 +946,8 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             vertex_opp0,
             vertex_opp1,
             edge_boundary,
-            # ISB boundary taper (ADR-017), D member. Always 0.0 here: taper + AD
-            # is refused by the deterministic/path pipelines (gate 3, C1 clearance
+            # ISB boundary taper (ADR-017), D member. Always 0.0: taper + AD is
+            # refused by the deterministic/path pipelines (gate 3, C1 clearance
             # companion pending), so the differentiable twin never tapers. The
             # argument is threaded for lockstep completeness of the guarded path.
             0.0,
@@ -959,25 +957,25 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        frequency = inputs[20]
+        frequency = inputs[21]
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:20]
+            for value in inputs[:21]
         )
         vertex_primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
             if isinstance(value, torch.Tensor)
             else value
-            for value in inputs[21:26]
+            for value in inputs[22:27]
         )
         ctx.has_vertices = vertex_primals[0] is not None
-        ctx.frequency_value = inputs[26]
+        ctx.frequency_value = inputs[27]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        ctx.geometry_live = _ad_geometry_live(inputs[0], inputs[1])
+        ctx.geometry_live = _ad_geometry_live(inputs[1], inputs[2])
         saved = primals + tuple(
             value for value in vertex_primals if value is not None
         )
@@ -987,43 +985,40 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
     @staticmethod
     def _unpack_saved(ctx):
         saved = ctx.saved_tensors
-        primals = saved[:20]
-        vertices = saved[20:25] if ctx.has_vertices else (None,) * 5
+        primals = saved[:21]
+        vertices = saved[21:26] if ctx.has_vertices else (None,) * 5
         return primals, vertices
 
     @staticmethod
     @torch.autograd.function.once_differentiable
     def backward(ctx, grad_field_vector, grad_direction):
-        none_grads = (None,) * 27
+        none_grads = (None,) * 28
         _ad_reject_fixed_inputs(
             "field_diffraction_wedge_ad",
             ctx.needs_input_grad,
             (
-                (2, "edge_position"),
-                (3, "edge_direction"),
-                (4, "edge_t_min"),
-                (5, "edge_t_max"),
-                (6, "edge_n0"),
-                (7, "edge_n1"),
-                (8, "exterior_angle"),
-                (9, "face0_valid"),
-                (12, "face0_mu_r"),
-                (14, "face1_valid"),
-                (17, "face1_mu_r"),
-                (19, "tx_power"),
-                (25, "edge_boundary"),
+                (0, "valid"),
+                (3, "edge_position"),
+                (4, "edge_direction"),
+                (5, "edge_t_min"),
+                (6, "edge_t_max"),
+                (7, "edge_n0"),
+                (8, "edge_n1"),
+                (9, "exterior_angle"),
+                (10, "face0_valid"),
+                (13, "face0_mu_r"),
+                (15, "face1_valid"),
+                (18, "face1_mu_r"),
+                (20, "tx_power"),
+                (26, "edge_boundary"),
             ),
         )
-        need_geometry = bool(ctx.needs_input_grad[0]) or bool(
-            ctx.needs_input_grad[1]
-        )
+        need_geometry = bool(ctx.needs_input_grad[1]) or bool(ctx.needs_input_grad[2])
         need_material = any(
-            bool(ctx.needs_input_grad[index]) for index in (10, 11, 13, 15, 16, 18)
+            bool(ctx.needs_input_grad[index]) for index in (11, 12, 14, 16, 17, 19)
         )
-        need_frequency = bool(ctx.needs_input_grad[20])
-        need_vertices = any(
-            bool(ctx.needs_input_grad[index]) for index in (21, 22, 23, 24)
-        )
+        need_frequency = bool(ctx.needs_input_grad[21])
+        need_vertices = any(bool(ctx.needs_input_grad[i]) for i in (22, 23, 24, 25))
         if not (need_geometry or need_material or need_frequency or need_vertices) or (
             grad_field_vector is None and grad_direction is None
         ):
@@ -1048,8 +1043,9 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             else None
         )
         return (
-            out["grad_source"] if ctx.needs_input_grad[0] else None,
-            out["grad_target"] if ctx.needs_input_grad[1] else None,
+            None,
+            out["grad_source"] if ctx.needs_input_grad[1] else None,
+            out["grad_target"] if ctx.needs_input_grad[2] else None,
             None,
             None,
             None,
@@ -1058,21 +1054,21 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             None,
             None,
             None,
-            out["grad_face0_eps_r"] if ctx.needs_input_grad[10] else None,
-            out["grad_face0_sigma_e"] if ctx.needs_input_grad[11] else None,
+            out["grad_face0_eps_r"] if ctx.needs_input_grad[11] else None,
+            out["grad_face0_sigma_e"] if ctx.needs_input_grad[12] else None,
             None,
-            out["grad_face0_gain"] if ctx.needs_input_grad[13] else None,
+            out["grad_face0_gain"] if ctx.needs_input_grad[14] else None,
             None,
-            out["grad_face1_eps_r"] if ctx.needs_input_grad[15] else None,
-            out["grad_face1_sigma_e"] if ctx.needs_input_grad[16] else None,
+            out["grad_face1_eps_r"] if ctx.needs_input_grad[16] else None,
+            out["grad_face1_sigma_e"] if ctx.needs_input_grad[17] else None,
             None,
-            out["grad_face1_gain"] if ctx.needs_input_grad[18] else None,
+            out["grad_face1_gain"] if ctx.needs_input_grad[19] else None,
             None,
             grad_frequency,
-            out["grad_vertex_v0"] if ctx.needs_input_grad[21] else None,
-            out["grad_vertex_v1"] if ctx.needs_input_grad[22] else None,
-            out["grad_vertex_opp0"] if ctx.needs_input_grad[23] else None,
-            out["grad_vertex_opp1"] if ctx.needs_input_grad[24] else None,
+            out["grad_vertex_v0"] if ctx.needs_input_grad[22] else None,
+            out["grad_vertex_v1"] if ctx.needs_input_grad[23] else None,
+            out["grad_vertex_opp0"] if ctx.needs_input_grad[24] else None,
+            out["grad_vertex_opp1"] if ctx.needs_input_grad[25] else None,
             None,
             None,
         )
@@ -1082,34 +1078,33 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         _ad_reject_fixed_tangents(
             "field_diffraction_wedge_ad",
             (
-                (tangents[2], "edge_position"),
-                (tangents[3], "edge_direction"),
-                (tangents[4], "edge_t_min"),
-                (tangents[5], "edge_t_max"),
-                (tangents[6], "edge_n0"),
-                (tangents[7], "edge_n1"),
-                (tangents[8], "exterior_angle"),
-                (tangents[12], "face0_mu_r"),
-                (tangents[17], "face1_mu_r"),
-                (tangents[19], "tx_power"),
+                (tangents[0], "valid"),
+                (tangents[3], "edge_position"),
+                (tangents[4], "edge_direction"),
+                (tangents[5], "edge_t_min"),
+                (tangents[6], "edge_t_max"),
+                (tangents[7], "edge_n0"),
+                (tangents[8], "edge_n1"),
+                (tangents[9], "exterior_angle"),
+                (tangents[13], "face0_mu_r"),
+                (tangents[18], "face1_mu_r"),
+                (tangents[20], "tx_power"),
             ),
         )
         primals, vertices = _FieldDiffractionWedgeAdFunction._unpack_saved(ctx)
-        scalar_shape = tuple(primals[10].shape)
+        scalar_shape = tuple(primals[11].shape)
         tangent_source = _ad_geometry_tangent(
-            "field_diffraction_wedge_ad tangent_source", tangents[0], primals[0]
-        )
+            "field_diffraction_wedge_ad tangent_source", tangents[1], primals[1])
         tangent_target = _ad_geometry_tangent(
-            "field_diffraction_wedge_ad tangent_target", tangents[1], primals[1]
-        )
+            "field_diffraction_wedge_ad tangent_target", tangents[2], primals[2])
         material_tangents = {}
         for index, name in (
-            (10, "face0_eps_r"),
-            (11, "face0_sigma_e"),
-            (13, "face0_gain"),
-            (15, "face1_eps_r"),
-            (16, "face1_sigma_e"),
-            (18, "face1_gain"),
+            (11, "face0_eps_r"),
+            (12, "face0_sigma_e"),
+            (14, "face0_gain"),
+            (16, "face1_eps_r"),
+            (17, "face1_sigma_e"),
+            (19, "face1_gain"),
         ):
             material_tangents[name] = _ad_checked_tangent(
                 f"field_diffraction_wedge_ad tangent_{name}",
@@ -1118,10 +1113,10 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             )
         vertex_tangents = []
         for index, name in (
-            (21, "vertex_v0"),
-            (22, "vertex_v1"),
-            (23, "vertex_opp0"),
-            (24, "vertex_opp1"),
+            (22, "vertex_v0"),
+            (23, "vertex_v1"),
+            (24, "vertex_opp0"),
+            (25, "vertex_opp1"),
         ):
             tangent = tangents[index] if index < len(tangents) else None
             vertex_tangents.append(
@@ -1129,7 +1124,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
                     tangent if isinstance(tangent, torch.Tensor) else None
                 )
             )
-        tangent_frequency = _ad_frequency_tangent(tangents[20])
+        tangent_frequency = _ad_frequency_tangent(tangents[21])
         if (
             tangent_source is None
             and tangent_target is None
@@ -1164,6 +1159,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
 
 
 def field_diffraction_wedge_ad(
+    valid: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     edge_position: torch.Tensor,
@@ -1200,6 +1196,7 @@ def field_diffraction_wedge_ad(
     apply.
     """
 
+    _validate_wedge_valid(valid, source)
     if vertices is not None and len(vertices) != 5:
         raise ValueError(
             "vertices must hold (v0, v1, opp0, opp1, edge_boundary) per row"
@@ -1208,6 +1205,7 @@ def field_diffraction_wedge_ad(
         frequency_value = _ad_frequency_value(frequency)
     vertex_args = vertices if vertices is not None else (None,) * 5
     values = _FieldDiffractionWedgeAdFunction.apply(
+        valid,
         source,
         target,
         edge_position,

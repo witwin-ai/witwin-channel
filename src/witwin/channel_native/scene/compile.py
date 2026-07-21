@@ -75,6 +75,10 @@ def compile_scene(scene: Any) -> CompiledScene:
         version=scene._assignment_version,
         phase_screens=phase_screens,
     )
+    (
+        enumerated_penetration_scene_diagonal_m,
+        montecarlo_penetration_scene_diagonal_m,
+    ) = _compile_penetration_scene_diagonals(scene.structures, rayd=rayd)
     compiled = CompiledScene(
         geometry=geometry,
         materials=materials,
@@ -83,9 +87,46 @@ def compile_scene(scene: Any) -> CompiledScene:
         geometry_version=geometry.version,
         material_version=materials.version,
         assignment_version=assignments.version,
+        enumerated_penetration_scene_diagonal_m=(
+            enumerated_penetration_scene_diagonal_m
+        ),
+        montecarlo_penetration_scene_diagonal_m=(
+            montecarlo_penetration_scene_diagonal_m
+        ),
     )
     object.__setattr__(scene, "_compiled_cache", compiled)
     return compiled
+
+
+def _compile_penetration_scene_diagonals(
+    structures: tuple[Structure, ...], *, rayd: RayDSceneResource
+) -> tuple[float, float]:
+    """Freeze the two distinct ADR-027 scale baselines at compile time.
+
+    The scalar device reads are scene-static compile work. Solves consume only
+    these host values and never reduce scene geometry or synchronize to recover
+    them.
+    """
+
+    if not structures:
+        return 0.0, 0.0
+
+    records = rayd.edge_records()
+    vertices = records.vertices
+    enumerated = float(
+        (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
+    )
+
+    minimum: torch.Tensor | None = None
+    maximum: torch.Tensor | None = None
+    for structure in structures:
+        low = structure.vertices.amin(dim=0)
+        high = structure.vertices.amax(dim=0)
+        minimum = low if minimum is None else torch.minimum(minimum, low)
+        maximum = high if maximum is None else torch.maximum(maximum, high)
+    assert minimum is not None and maximum is not None
+    montecarlo = float((maximum - minimum).norm())
+    return enumerated, montecarlo
 
 
 def _compile_geometry(

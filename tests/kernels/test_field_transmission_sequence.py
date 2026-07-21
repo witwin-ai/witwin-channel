@@ -54,8 +54,10 @@ def _transmission(
     materials: list[list[tuple[float, float, float, float]]],
     frequency_hz: float,
     material_index: int = 0,
+    path_valid: bool = True,
 ) -> dict[str, torch.Tensor]:
     return ops.field_transmission_sequence(
+        torch.tensor([path_valid], device="cuda", dtype=torch.bool),
         torch.tensor([source], device="cuda", dtype=torch.float32),
         torch.tensor([target], device="cuda", dtype=torch.float32),
         torch.tensor([[hit]], device="cuda", dtype=torch.float32),
@@ -68,6 +70,23 @@ def _transmission(
         **_csr(materials),
         frequency_hz=frequency_hz,
     )
+
+
+def test_invalid_path_short_circuits_poisoned_payload():
+    out = _transmission(
+        [math.nan, math.nan, math.nan],
+        [0.0, 0.0, -1.0],
+        [math.nan, math.nan, math.nan],
+        [math.nan, math.nan, math.nan],
+        [0.0, 1.0, 0.0],
+        [[(0.1, 4.0, 0.05, 1.0)]],
+        3.5e9,
+        material_index=2**31 - 1,
+        path_valid=False,
+    )
+    torch.cuda.synchronize()
+    for tensor in out.values():
+        assert torch.count_nonzero(tensor).item() == 0
 
 
 def _free_space(

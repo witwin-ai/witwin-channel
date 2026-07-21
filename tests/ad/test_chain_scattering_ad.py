@@ -186,6 +186,7 @@ def _ensemble_native_args(geo, f_te_flat, f_tm_flat, table_dims, *, dtype=torch.
     # weights = 1 matches the oracle's A_patch = 1 convention (the 1/(L1^2 L2^2)
     # spreading is applied in-kernel).
     args = {
+        "valid": torch.ones(rows, dtype=torch.bool, device=device),
         "tx_pol": f32(geo["tx_pol"]), "rx_pol": f32(geo["rx_pol"]),
         "source": f32(geo["source"]), "vertex": f32(geo["vertex"]),
         "target": f32(geo["target"]),
@@ -210,6 +211,7 @@ def _ensemble_native_args(geo, f_te_flat, f_tm_flat, table_dims, *, dtype=torch.
 def _ensemble_positional(args):
     c1, c2 = args["c1"], args["c2"]
     return (
+        args["valid"],
         args["tx_pol"], args["rx_pol"],
         args["source"], args["vertex"], args["target"],
         c1["positions"], c1["normals"], c1["eps_r"], c1["sigma_e"], c1["mu_r"],
@@ -533,6 +535,7 @@ def _realization_native_args(geo, csr, *, dtype=torch.float32):
         return x.to(dtype).contiguous()
 
     return {
+        "valid": torch.ones(p, dtype=torch.bool, device=device),
         "patch_tris": f32(geo["patch_tris"]), "patch_uvs": f32(geo["patch_uvs"]),
         "rows": geo["rows"], "d_i": f32(geo["d_i"]), "d_o": f32(geo["d_o"]),
         "n_rows": f32(geo["n_rows"]),
@@ -556,6 +559,7 @@ def _realization_native_args(geo, csr, *, dtype=torch.float32):
 def _realization_positional(args):
     c1, c2 = args["c1"], args["c2"]
     return (
+        args["valid"],
         args["patch_tris"], args["patch_uvs"], args["rows"], args["d_i"], args["d_o"],
         args["n_rows"],
         args["source"], args["vertex"], args["target"],

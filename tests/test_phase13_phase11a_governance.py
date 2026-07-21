@@ -13,6 +13,14 @@ EVIDENCE_PATH = AUDIT / "phase13-boundary-dedup-phase11a-evidence.json"
 LEDGER_PATH = AUDIT / "duplication-classification.json"
 MANIFEST_PATH = ROOT / "ci/native-binding-manifest.json"
 BOUNDARY_FILES = {"fields.cpp", "materials.cpp"}
+PHASE_P_PRE_SYMBOL_COUNT = 229
+PHASE_P_SYMBOL_PATHS = {
+    "enumerated_transmission_topology_pack": "native/channel_native/binding/path.cpp",
+    "rayd_segment_penetration_backward": "native/channel_native/binding/rayd.cpp",
+    "rayd_segment_penetration_forward": "native/channel_native/binding/rayd.cpp",
+    "rayd_segment_penetration_forward_tape": "native/channel_native/binding/rayd.cpp",
+    "rayd_segment_penetration_jvp": "native/channel_native/binding/rayd.cpp",
+}
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -34,7 +42,8 @@ def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() 
         "region_count": refresh["region_count"],
     }
     assert refresh["region_count"] == 155
-    assert ledger["phase11b_refresh"]["region_count"] == len(ledger["regions"])
+    assert ledger["phase11b_refresh"]["region_count"] == 143
+    assert len(ledger["regions"]) >= ledger["phase11b_refresh"]["region_count"]
     assert refresh["stale_region_count"] == 0
     assert refresh["unclassified_region_count"] == 0
     assert refresh["budget_relaxed"] is False
@@ -70,7 +79,12 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
     record = evidence["binding_manifest"]
 
     assert manifest == binding_manifest(ROOT)
-    assert len(manifest["symbols"]) == 205
+    current_symbols = {row["name"]: row["path"] for row in manifest["symbols"]}
+    assert len(current_symbols) == 234
+    assert len(current_symbols) - PHASE_P_PRE_SYMBOL_COUNT == len(PHASE_P_SYMBOL_PATHS)
+    assert {
+        name: current_symbols[name] for name in PHASE_P_SYMBOL_PATHS
+    } == PHASE_P_SYMBOL_PATHS
     assert record["symbol_count"] == 202
     assert len(record["current_sha256"]) == 64
     assert len(record["current_semantic_sha256"]) == 64

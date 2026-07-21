@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import torch
@@ -29,6 +30,8 @@ class CompiledScene:
     geometry_version: int
     material_version: int
     assignment_version: int
+    enumerated_penetration_scene_diagonal_m: float = 0.0
+    montecarlo_penetration_scene_diagonal_m: float = 0.0
     # Lazy scattering caches (built on first access so smooth scenes pay no
     # compile cost). A CompiledScene instance is already cache-keyed by the
     # material cache_token in Scene.compile, so instance-level caching is
@@ -39,6 +42,17 @@ class CompiledScene:
     _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
+
+    def __post_init__(self) -> None:
+        for name in (
+            "enumerated_penetration_scene_diagonal_m",
+            "montecarlo_penetration_scene_diagonal_m",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, float):
+                raise TypeError(f"{name} must be a float")
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(f"{name} must be finite and non-negative")
 
     @property
     def kirchhoff_resources(self) -> KirchhoffRuntimeResources:

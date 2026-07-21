@@ -94,7 +94,7 @@ _CHAIN_REALIZATION_BACKWARD_FIELDS = (
 )
 
 _CHAIN_ENSEMBLE_PRIMAL_NAMES = (
-    "tx_pol", "rx_pol", "source", "vertex", "target",
+    "valid", "tx_pol", "rx_pol", "source", "vertex", "target",
     "c1_positions", "c1_normals", "c1_eps_r", "c1_sigma_e", "c1_mu_r",
     "c1_gain", "c1_thickness", "c1_depth",
     "c2_positions", "c2_normals", "c2_eps_r", "c2_sigma_e", "c2_mu_r",
@@ -104,7 +104,7 @@ _CHAIN_ENSEMBLE_PRIMAL_NAMES = (
     "f_tm_flat", "table_offset", "table_dims", "material_slot",
 )
 _CHAIN_REALIZATION_PRIMAL_NAMES = (
-    "patch_tris", "patch_uvs", "rows", "d_i", "d_o", "n_rows", "source",
+    "valid", "patch_tris", "patch_uvs", "rows", "d_i", "d_o", "n_rows", "source",
     "vertex", "target", "c1_positions", "c1_normals", "c1_eps_r",
     "c1_sigma_e", "c1_mu_r", "c1_gain", "c1_thickness", "c1_depth",
     "c2_positions", "c2_normals", "c2_eps_r", "c2_sigma_e", "c2_mu_r",
@@ -175,6 +175,18 @@ def _validate_chain_leg(
     return dmax
 
 
+def _validate_chain_valid(
+    valid: torch.Tensor, rows: int, reference: torch.Tensor
+) -> None:
+    """Validate the caller-owned device row mask without materializing one."""
+
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    if valid.shape != (rows,):
+        raise ValueError(f"valid must have shape ({rows},)")
+    if valid.device != reference.device:
+        raise ValueError("valid must share the chain row CUDA device")
+
+
 def _require_same_device(named: tuple[tuple[str, torch.Tensor], ...]) -> None:
     """Assert every named tensor shares one CUDA device (plan 10a contract)."""
 
@@ -191,6 +203,7 @@ def _require_same_device(named: tuple[tuple[str, torch.Tensor], ...]) -> None:
 
 
 def scattering_chain_ensemble_eval(
+    valid: torch.Tensor,
     tx_pol: torch.Tensor,
     rx_pol: torch.Tensor,
     source: torch.Tensor,
@@ -249,6 +262,7 @@ def scattering_chain_ensemble_eval(
     """
 
     rows = int(tx_pol.shape[0])
+    _validate_chain_valid(valid, rows, tx_pol)
     validate_cuda_tensor("tx_pol", tx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     validate_cuda_tensor("rx_pol", rx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if rx_pol.shape[0] != rows:
@@ -318,6 +332,7 @@ def scattering_chain_ensemble_eval(
 
 
 def scattering_chain_ensemble_eval_backward(
+    valid: torch.Tensor,
     tx_pol: torch.Tensor,
     rx_pol: torch.Tensor,
     source: torch.Tensor,
@@ -382,6 +397,7 @@ def scattering_chain_ensemble_eval_backward(
     """
 
     rows = int(tx_pol.shape[0])
+    _validate_chain_valid(valid, rows, tx_pol)
     validate_cuda_tensor("tx_pol", tx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     _validate_chain_leg(
         "c1", c1_positions, c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain,
@@ -420,6 +436,7 @@ def scattering_chain_ensemble_eval_backward(
 
 
 def scattering_chain_ensemble_eval_jvp(
+    valid: torch.Tensor,
     tx_pol: torch.Tensor,
     rx_pol: torch.Tensor,
     source: torch.Tensor,
@@ -496,6 +513,8 @@ def scattering_chain_ensemble_eval_jvp(
     ``keep`` is non-differentiable so it has no tangent output.
     """
 
+    rows = int(tx_pol.shape[0])
+    _validate_chain_valid(valid, rows, tx_pol)
     validate_cuda_tensor("tx_pol", tx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     primal_args = _ordered_primal_args(locals(), _CHAIN_ENSEMBLE_PRIMAL_NAMES)
     out = _required_native_op("scattering_chain_ensemble_eval_jvp")(
@@ -535,6 +554,7 @@ def scattering_chain_ensemble_eval_jvp(
 
 
 def scattering_chain_realization_eval(
+    valid: torch.Tensor,
     patch_tris: torch.Tensor,
     patch_uvs: torch.Tensor,
     rows: torch.Tensor,
@@ -592,6 +612,7 @@ def scattering_chain_realization_eval(
     """
 
     n = int(d_i.shape[0])
+    _validate_chain_valid(valid, n, d_i)
     validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3, trailing_shape=(3, 3))
     validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3, trailing_shape=(3, 2))
     validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
@@ -668,6 +689,7 @@ def scattering_chain_realization_eval(
 
 
 def scattering_chain_realization_eval_backward(
+    valid: torch.Tensor,
     patch_tris: torch.Tensor,
     patch_uvs: torch.Tensor,
     rows: torch.Tensor,
@@ -733,6 +755,7 @@ def scattering_chain_realization_eval_backward(
     """
 
     n = int(d_i.shape[0])
+    _validate_chain_valid(valid, n, d_i)
     validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3, trailing_shape=(3, 3))
     validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
     validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
@@ -777,6 +800,7 @@ def scattering_chain_realization_eval_backward(
 
 
 def scattering_chain_realization_eval_jvp(
+    valid: torch.Tensor,
     patch_tris: torch.Tensor,
     patch_uvs: torch.Tensor,
     rows: torch.Tensor,
@@ -853,6 +877,8 @@ def scattering_chain_realization_eval_jvp(
     zero tangent. Returns the per-row and total field tangents D3 consumes.
     """
 
+    n = int(d_i.shape[0])
+    _validate_chain_valid(valid, n, d_i)
     validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3, trailing_shape=(3, 3))
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     primal_args = _ordered_primal_args(locals(), _CHAIN_REALIZATION_PRIMAL_NAMES)

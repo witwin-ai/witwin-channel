@@ -172,7 +172,8 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
     assert stale.isdisjoint(ledger["regions"])
     new = evidence["ledger_refresh"]["new_regions_classified"]
     assert [record["region_id"] for record in new] == ["490234d077127261"]
-    assert ledger["regions"]["490234d077127261"]["category"] == "fixture_boilerplate"
+    assert new[0]["category"] == "fixture_boilerplate"
+    assert "490234d077127261" not in ledger["regions"]
     assert evidence["ledger_refresh"]["stale_region_count"] == 0
     assert evidence["ledger_refresh"]["unclassified_region_count"] == 0
     assert evidence["source_sha256"] == _PHASE11B_SOURCE_SHA256

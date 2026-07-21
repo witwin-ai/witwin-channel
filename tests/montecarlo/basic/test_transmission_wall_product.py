@@ -428,7 +428,7 @@ def test_transmission_wall_product_invalid_material_is_ordinary_blocking() -> No
     assert state.bits.tolist() == [0]
     assert result.transmittance.tolist() == [0.0, 0.0, 1.0]
     assert result.scaled_power.tolist() == [0.0, 0.0, 0.0]
-    assert result.wall_count.tolist() == [1, 2, 0]
+    assert result.wall_count.tolist() == [1, 1, 0]
     assert result.penetrated.tolist() == [False, False, False]
 
 

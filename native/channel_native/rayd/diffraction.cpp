@@ -59,7 +59,7 @@ pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
     torch::Tensor tx_pos,
     torch::Tensor tx_pol,
     torch::Tensor rx_pos,
-    pybind11::object active,
+    torch::Tensor active,
     torch::Tensor state_edge_index,
     torch::Tensor state_edge_pos,
     torch::Tensor state_edge_dir,
@@ -90,7 +90,7 @@ pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
         tx_pos,
         tx_pol,
         rx_pos,
-        optional_tensor(active),
+        active,
         {state_edge_index, state_edge_pos, state_edge_dir, state_edge_t_min,
          state_edge_t_max, state_n0, state_n1, state_prim0, state_prim1,
          state_exterior_angle, state_src, state_src_power, std::nullopt,
@@ -100,7 +100,8 @@ pybind11::tuple cn_rayd_diffraction_paths_order1_forward(
         state_limit,
         capacity,
         wavelength,
-        isb_taper_width_scale};
+        isb_taper_width_scale,
+        rayd::torch::DiffractionPathLayout::Compact};
     return diffraction_path_tuple(
         rayd::torch::diffraction_paths_order1_forward(scene.resource(), config));
 }

@@ -15,7 +15,8 @@
   },
   "resident_contract": {
     "input_layout": "fixed [pair_count, hit_capacity] RayD penetration result",
-    "payload_order": "valid and canonical num_hits before primitive/material/CSR payload",
+    "payload_order": "failure first, then canonical num_hits, then slot < num_hits and valid before primitive/material/CSR payload; tail slots are inert even if poisoned",
+    "canonical_prefix": "valid slots form exactly the prefix [0,num_hits); a hole, valid tail, or count mismatch records PAIR_CONTRACT_ERROR before any payload read",
     "failure_state": "exact solve-owned CUDA int32[1] CapacityFailureState",
     "failure_bit": "PAIR_CONTRACT_ERROR for canonical layout or resident index violations",
     "failure_publication": "final sanitizer makes the complete primal, VJP, or JVP result inert"
@@ -65,7 +66,25 @@
     "device_count_read": false,
     "partial_result_on_failure": false
   },
+  "logical_resident_byte_budget": {
+    "variables": {
+      "N": "pair_count",
+      "D": "hit_capacity",
+      "L": "resident layer count"
+    },
+    "primal": "13*N",
+    "vjp": "16*N + 12*N*D + 12*L + 4",
+    "jvp": "8*N",
+    "units": "bytes; excludes caller-owned penetration inputs and allocator rounding"
+  },
+  "phase_p_extension": {
+    "status": "canonical valid-prefix contract implemented; refreshed build/CUDA evidence owned by the Phase P commit",
+    "rayd_lock": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "live_switch_performed": false,
+    "resource_rollup": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
+  },
   "acceptance": {
+    "scope": "historical dormant-family evidence before the Phase P canonical-prefix tightening; refreshed evidence is recorded by the Phase P commit",
     "direct_contract_test": "tests/montecarlo/basic/test_transmission_wall_product.py (28 passed; capacity, N=0/D=0, stream, poison, ordered product, and all-or-nothing failures)",
     "ad_test": "native VJP/JVP duality, repeat-exactness, custom autograd, optional-none, stride-0/non-contiguous views, CSR-offset, and failure-inert cases passed",
     "no_fallback_test": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_has_one_owner_and_no_fallback",

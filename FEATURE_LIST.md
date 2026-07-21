@@ -14,7 +14,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `102470daf44b649030df3b2554d9ace5c1eea482` and calls the typed
+  `474c122aa3cd6b6d098675e076a73e6f485bd6be` and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
   legacy `extern "C"` Torch integration entry points are retired.
@@ -23,10 +23,16 @@ priority `scattering > diffraction > transmission > reflection > los`.
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration header is
   `backends/torch/include/rayd/torch/integration.h` with SHA-256
-  `65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435`
+  `57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`
   and identity
-  `rayd.torch.integration`. The numeric API version remains 2 and is validated
+  `rayd.torch.integration`. The numeric API version is 6 and is validated
   independently from this stable, capability-neutral source name.
+- ADR-027 Phase P exposes the complete RayD fixed-capacity straight-segment
+  penetration primal/tape/VJP/JVP family, Channel named facades, shared
+  capacity-failure wiring, compile-frozen policy diagonals, component-5
+  topology pack, and MC wall-product prefix semantics. These producers are
+  dormant until the enumerated and MC atomic switch commits; current solver
+  routes remain unchanged and retain no compatibility alias.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and

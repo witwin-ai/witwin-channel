@@ -12,7 +12,8 @@
 namespace {
 
 #define CN_TRANSMISSION_SEQUENCE_ARGUMENTS        \
-    std::move(source),                             \
+    std::move(path_valid),                         \
+        std::move(source),                         \
         std::move(target),                         \
         std::move(interaction_positions),          \
         std::move(interaction_normals),            \
@@ -30,7 +31,8 @@ namespace {
         frequency_hz
 
 #define CN_DIFFRACTION_WEDGE_COMMON_ARGUMENTS \
-    std::move(source),                         \
+    std::move(valid),                          \
+        std::move(source),                     \
         std::move(target),                     \
         std::move(edge_position),              \
         std::move(edge_direction),             \
@@ -58,6 +60,7 @@ namespace {
         std::move(edge_boundary)
 
 rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
+    torch::Tensor path_valid,
     torch::Tensor source,
     torch::Tensor target,
     torch::Tensor interaction_positions,
@@ -75,6 +78,7 @@ rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
     torch::Tensor layer_mu_r,
     double frequency_hz) {
     return {
+        std::move(path_valid),
         std::move(source),
         std::move(target),
         std::move(interaction_positions),
@@ -96,6 +100,7 @@ rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
 std::optional<at::Tensor> optional_tensor(pybind11::handle value);
 
 rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
+    at::Tensor valid,
     at::Tensor source,
     at::Tensor target,
     at::Tensor edge_position,
@@ -124,6 +129,7 @@ rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
     pybind11::object edge_boundary,
     double isb_boundary_taper_width) {
     rayd::torch::DiffractionWedgeRequest request;
+    request.valid = std::move(valid);
     request.source = std::move(source);
     request.target = std::move(target);
     request.edge_position = std::move(edge_position);
@@ -242,6 +248,7 @@ pybind11::dict cn_coupled_rd_prepare_jvp(
     pybind11::object tangent_source,
     pybind11::object tangent_receiver);
 pybind11::dict cn_field_diffraction_wedge(
+    at::Tensor valid,
     at::Tensor source,
     at::Tensor target,
     at::Tensor edge_position,
@@ -275,6 +282,7 @@ pybind11::dict cn_field_diffraction_wedge(
             isb_boundary_taper_width)));
 }
 pybind11::dict cn_field_diffraction_wedge_backward(
+    at::Tensor valid,
     at::Tensor source,
     at::Tensor target,
     at::Tensor edge_position,
@@ -343,6 +351,7 @@ pybind11::dict cn_field_diffraction_wedge_backward(
     return out;
 }
 pybind11::dict cn_field_diffraction_wedge_jvp(
+    at::Tensor valid,
     at::Tensor source,
     at::Tensor target,
     at::Tensor edge_position,
@@ -625,6 +634,7 @@ pybind11::dict cn_field_reflection_sequence(
     torch::Tensor thickness,
     double frequency_hz);
 pybind11::dict cn_field_transmission_sequence(
+    torch::Tensor path_valid,
     torch::Tensor source,
     torch::Tensor target,
     torch::Tensor interaction_positions,
@@ -727,6 +737,7 @@ pybind11::dict cn_field_reflection_sequence_jvp(
     pybind11::object tangent_interaction_positions,
     pybind11::object tangent_interaction_normals);
 pybind11::dict cn_field_transmission_sequence_backward(
+    torch::Tensor path_valid,
     torch::Tensor source,
     torch::Tensor target,
     torch::Tensor interaction_positions,
@@ -789,6 +800,7 @@ pybind11::dict cn_field_transmission_sequence_backward(
     return out;
 }
 pybind11::dict cn_field_transmission_sequence_jvp(
+    torch::Tensor path_valid,
     torch::Tensor source,
     torch::Tensor target,
     torch::Tensor interaction_positions,

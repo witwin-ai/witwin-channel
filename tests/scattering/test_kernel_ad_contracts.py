@@ -141,6 +141,7 @@ def _ensemble_case(
     material_slot = torch.zeros(1, dtype=torch.int32, device=device)
 
     return {
+        "valid": torch.ones(rows, dtype=torch.bool, device=device),
         "wo_rows": wo_rows,
         "r2_rows": r2_rows,
         "cos_o_rows": cos_o_rows,
@@ -173,6 +174,7 @@ def _ensemble_case(
 
 
 _ENSEMBLE_FORWARD_ARGS = (
+    "valid",
     "wo_rows",
     "r2_rows",
     "cos_o_rows",
@@ -268,6 +270,23 @@ def test_ensemble_forward_matches_reference():
         assert (
             relative_error(native[name], ref[name], abs_floor=ABS_TOL) <= _REL_TOL_DIRECT
         ), name
+
+
+def test_ensemble_invalid_row_short_circuits_poisoned_payload():
+    case = _ensemble_case(seed=19)
+    row = 3
+    case["valid"][row] = False
+    case["wo_rows"][row].fill_(float("nan"))
+    case["r2_rows"][row] = float("nan")
+    case["cos_o_rows"][row] = float("nan")
+    case["rc_idx"][row] = torch.iinfo(torch.int64).max
+    case["sc_idx"][row] = torch.iinfo(torch.int64).max
+
+    out = _ensemble_forward(case)
+
+    assert not bool(out["keep"][row])
+    for name in ("gain", "amplitude", "length"):
+        assert out[name][row].item() == 0.0, name
 
 
 def test_ensemble_backward_matches_reference_autograd():
@@ -810,6 +829,7 @@ def _patch_case(
     k0 = 2.0 * math.pi * frequency_hz / 299792458.0
 
     return {
+        "valid": torch.ones(rows, dtype=torch.bool, device=device),
         "patch_tris": patch_tris,
         "patch_uvs": patch_uvs,
         "rows": row_index,
@@ -829,6 +849,7 @@ def _patch_case(
 
 
 _PATCH_FORWARD_ARGS = (
+    "valid",
     "patch_tris",
     "patch_uvs",
     "rows",
@@ -901,6 +922,22 @@ def test_patch_forward_matches_reference():
     native = _patch_forward(case)
     ref, _leaves, _k0 = _patch_reference(case)
     assert relative_error(native["total"], ref["total"], abs_floor=ABS_TOL) <= _REL_TOL_DIRECT
+
+
+def test_patch_invalid_row_short_circuits_poisoned_payload():
+    case = _patch_case(seed=207)
+    row = 2
+    case["valid"][row] = False
+    case["rows"][row] = torch.iinfo(torch.int64).max
+    case["d_i"][row].fill_(float("nan"))
+    case["d_o"][row].fill_(float("nan"))
+
+    out = _patch_forward(case)
+
+    assert out["integral"][row].item() == 0.0j
+    assert out["row_value"][row].item() == 0.0j
+    assert torch.isfinite(out["total"].real)
+    assert torch.isfinite(out["total"].imag)
 
 
 def test_patch_backward_matches_reference_autograd():
@@ -1186,8 +1223,8 @@ def test_patch_ad_mode_none_has_no_autograd_function():
 # ADR-015 op 1: resident Kirchhoff table lookup (scattering_table_eval)
 # backward / jvp companions. Lockstep against the float64 bsdf_table_interp
 # oracle in tests.reference.kirchhoff_ensemble (the same helper the ensemble
-# op-1 lockstep uses). All four inputs (wi, wo, f_te, f_tm) are live; there is
-# no fixed-input reject list.
+# op-1 lockstep uses). The explicit valid mask is fixed; all four continuous
+# inputs (wi, wo, f_te, f_tm) are live.
 # ---------------------------------------------------------------------------
 
 
@@ -1208,6 +1245,7 @@ def _table_case(*, seed, rows=24, nti=8, npi=1, nto=8, npo=8, device="cuda"):
         return torch.stack((randn(n), randn(n), 0.3 + 0.5 * rand(n)), dim=-1).contiguous()
 
     return {
+        "valid": torch.ones(rows, dtype=torch.bool, device=device),
         "wi": dirs(rows),
         "wo": dirs(rows),
         "f_te": (0.2 + rand(nti, npi, nto, npo)).contiguous(),
@@ -1215,11 +1253,12 @@ def _table_case(*, seed, rows=24, nti=8, npi=1, nto=8, npo=8, device="cuda"):
     }
 
 
-_TABLE_ARGS = ("wi", "wo", "f_te", "f_tm")
+_TABLE_ARGS = ("valid", "wi", "wo", "f_te", "f_tm")
+_TABLE_LIVE_ARGS = ("wi", "wo", "f_te", "f_tm")
 
 
 def _table_reference(case, *, make_leaves=False):
-    leaves = {name: case[name].double().clone() for name in _TABLE_ARGS}
+    leaves = {name: case[name].double().clone() for name in _TABLE_LIVE_ARGS}
     if make_leaves:
         for value in leaves.values():
             value.requires_grad_(True)
@@ -1235,6 +1274,21 @@ def test_table_eval_forward_matches_reference():
     ref_te, ref_tm, _ = _table_reference(case)
     assert relative_error(te, ref_te, abs_floor=ABS_TOL) <= _REL_TOL_DIRECT
     assert relative_error(tm, ref_tm, abs_floor=ABS_TOL) <= _REL_TOL_DIRECT
+
+
+def test_table_eval_invalid_row_short_circuits_poisoned_payload():
+    case = _table_case(seed=312)
+    row = 5
+    case["valid"][row] = False
+    case["wi"][row].fill_(float("nan"))
+    case["wo"][row].fill_(float("nan"))
+
+    te, tm = scattering_functional.scattering_table_eval(
+        *(case[name] for name in _TABLE_ARGS)
+    )
+
+    assert te[row].item() == 0.0
+    assert tm[row].item() == 0.0
 
 
 @pytest.mark.parametrize("npi", (1, 6))
@@ -1277,7 +1331,7 @@ def test_table_eval_jvp_matches_reference_autograd():
     def tangent_like(value):
         return torch.randn(*value.shape, generator=generator, device="cuda", dtype=torch.float32)
 
-    tangents = {name: tangent_like(case[name]) for name in _TABLE_ARGS}
+    tangents = {name: tangent_like(case[name]) for name in _TABLE_LIVE_ARGS}
     native = scattering_functional.scattering_table_eval_jvp(
         *(case[n] for n in _TABLE_ARGS),
         tangent_wi=tangents["wi"],
@@ -1290,7 +1344,7 @@ def test_table_eval_jvp_matches_reference_autograd():
             name: torch.autograd.forward_ad.make_dual(
                 case[name].double(), tangents[name].double()
             )
-            for name in _TABLE_ARGS
+            for name in _TABLE_LIVE_ARGS
         }
         te, tm = ref_ensemble.bsdf_table_interp(
             duals["wi"], duals["wo"], duals["f_te"], duals["f_tm"]
@@ -1315,7 +1369,7 @@ def test_table_eval_jvp_vjp_inner_product_identity():
     def randn(*shape):
         return torch.randn(*shape, generator=generator, device="cuda", dtype=torch.float32)
 
-    tangents = {name: randn(*case[name].shape) for name in _TABLE_ARGS}
+    tangents = {name: randn(*case[name].shape) for name in _TABLE_LIVE_ARGS}
     g_te, g_tm = randn(rows), randn(rows)
 
     jvp = scattering_functional.scattering_table_eval_jvp(
@@ -1346,7 +1400,7 @@ def test_table_eval_jvp_matches_native_forward_fd():
     def randn(*shape):
         return torch.randn(*shape, generator=generator, device="cuda", dtype=torch.float32)
 
-    tangents = {name: randn(*case[name].shape) for name in _TABLE_ARGS}
+    tangents = {name: randn(*case[name].shape) for name in _TABLE_LIVE_ARGS}
     jvp = scattering_functional.scattering_table_eval_jvp(
         *(case[n] for n in _TABLE_ARGS),
         tangent_wi=tangents["wi"], tangent_wo=tangents["wo"],
@@ -1354,8 +1408,10 @@ def test_table_eval_jvp_matches_native_forward_fd():
     )
 
     def forward_at(step):
-        shifted = [case[name] + step * tangents[name] for name in _TABLE_ARGS]
-        return scattering_functional.scattering_table_eval(*shifted)
+        shifted = [
+            case[name] + step * tangents[name] for name in _TABLE_LIVE_ARGS
+        ]
+        return scattering_functional.scattering_table_eval(case["valid"], *shifted)
 
     plus = forward_at(_FD_STEP)
     minus = forward_at(-_FD_STEP)
@@ -1456,14 +1512,18 @@ def test_table_eval_backward_requires_native_kernel(monkeypatch):
 
 def test_table_eval_ad_wrapper_matches_functional_backward():
     case = _table_case(seed=347)
-    leaves = {name: case[name].clone().requires_grad_(True) for name in _TABLE_ARGS}
-    te, tm = scattering_autograd.scattering_table_eval_ad(*(leaves[n] for n in _TABLE_ARGS))
+    leaves = {
+        name: case[name].clone().requires_grad_(True) for name in _TABLE_LIVE_ARGS
+    }
+    te, tm = scattering_autograd.scattering_table_eval_ad(
+        case["valid"], *(leaves[name] for name in _TABLE_LIVE_ARGS)
+    )
     generator = torch.Generator(device="cuda").manual_seed(543)
     rows = case["wi"].shape[0]
     g_te = torch.randn(rows, generator=generator, device="cuda")
     g_tm = torch.randn(rows, generator=generator, device="cuda")
     (g_te * te + g_tm * tm).sum().backward()
-    for name in _TABLE_ARGS:
+    for name in _TABLE_LIVE_ARGS:
         assert leaves[name].grad is not None, name
         assert torch.isfinite(leaves[name].grad).all(), name
 

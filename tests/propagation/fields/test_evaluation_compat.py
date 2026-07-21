@@ -40,6 +40,37 @@ def test_component_field_helpers_do_not_clone_output_buffers():
         )
 
 
+def test_transmission_field_helper_forwards_selected_topology_validity_first():
+    helper = _function_node("_evaluate_transmission_fields")
+    transmission_args = next(
+        node.value
+        for node in ast.walk(helper)
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "transmission_args"
+    )
+    assert isinstance(transmission_args, ast.Tuple)
+    assert ast.unparse(transmission_args.elts[0]) == "topology.valid[rows].contiguous()"
+
+
+def test_diffraction_field_helper_forwards_selected_topology_validity_first():
+    helper = _function_node("_evaluate_diffraction_fields")
+    wedge_args = next(
+        node.value
+        for node in ast.walk(helper)
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "wedge_args"
+    )
+    assert isinstance(wedge_args, ast.Tuple)
+    assert (
+        ast.unparse(wedge_args.elts[0])
+        == "topology.valid[diffraction_rows].contiguous()"
+    )
+
+
 def test_typed_field_orchestrator_preserves_component_order_and_clone_count():
     orchestrator = _function_node("evaluate_path_fields")
     clones = sorted(

@@ -12,6 +12,7 @@ enum FailureBit : int {
     kPairContractError = 1 << 4,
     kCoupledCandidateOverflow = 1 << 5,
     kReflectionCandidateOverflow = 1 << 6,
+    kSegmentPenetrationFailure = 1 << 7,
 };
 
 void validate_failure_state(

@@ -357,7 +357,7 @@
             "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu"
         }
     ],
-    "binding_count_delta": -8,
+    "binding_count_delta": 23,
     "implementation_owner_delta": {
         "Channel Native": -26,
         "RayD": 26
@@ -1233,5 +1233,40 @@
             "final clean-checkout release tier",
             "final wheel, PE/DSO, and build-fingerprint evidence"
         ]
+    },
+    "phase6c_adr027_penetration_foundation": {
+        "status": "dormant foundation implemented; solver activation pending",
+        "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+        "integration_header": "backends/torch/include/rayd/torch/integration.h",
+        "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+        "integration_header_identity": "rayd.torch.integration",
+        "integration_api_version": 6,
+        "binding_count_before": 229,
+        "binding_count_after": 234,
+        "binding_count_delta": 5,
+        "added_symbols": [
+            "rayd_segment_penetration_forward",
+            "rayd_segment_penetration_forward_tape",
+            "rayd_segment_penetration_backward",
+            "rayd_segment_penetration_jvp",
+            "enumerated_transmission_topology_pack"
+        ],
+        "owner_counts_after": {
+            "RayD": 47,
+            "layered": 3,
+            "Channel Native": 184
+        },
+        "api6_explicit_valid": {
+            "transmission_symbol_count": 3,
+            "scattering_symbol_count": 17,
+            "diffraction_active_required": true,
+            "implicit_all_valid": false,
+            "compatibility_mask": false
+        },
+        "failure_contract": "SEGMENT_PENETRATION_FAILURE = 1 << 7 covers overflow, contract contradiction, and non-finite state through the shared solve-owned CapacityFailureState",
+        "live_solver_route_changed": false,
+        "public_api_delta": false,
+        "compatibility_alias": false,
+        "resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
     }
 }

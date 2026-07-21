@@ -13,6 +13,9 @@ contracts they share. It is not itself a solver API: callers select either
   Its dormant ADR-027 wall-product primal/VJP/JVP facade consumes fixed RayD
   penetration storage and a solve-owned failure state; it has no live solver
   caller until the MonteCarloTargetInset atomic switch/delete commit.
+  The fixed-capacity product checks validity before every hit, uses only the
+  canonical valid prefix bounded by the device `num_hits`, multiplies walls in
+  ascending slot order, and never treats poisoned tail storage as an event.
 - `bdpt/` owns bidirectional path tracing, including subpaths, connections,
   MIS, optional path-sample export, accumulation, and its solver-local kernel
   facades. Its package loads `solve` lazily to keep the public import light.
@@ -97,6 +100,10 @@ promises. The parent `montecarlo` package exports no solver symbols.
   frequency. Discrete validity/IDs, geometry mode, permeability, and transmitter
   polarization remain fixed. Wall products and shared-parameter reductions use
   deterministic ascending orders without floating-point atomics.
+- The future `MonteCarloTargetInset` traversal is one flattened RayD batch,
+  not one trace per transmitter. Phase P exposes its dormant typed geometry
+  and estimator contracts only; the current live solver is unchanged until
+  the dedicated switch/delete commit.
 - BDPT supports only `ad_mode="none"`. Any other mode is rejected by
   `Config`; detached or zero gradients are not a substitute.
 

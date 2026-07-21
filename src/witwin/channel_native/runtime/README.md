@@ -19,6 +19,14 @@ failure when any bit is set. It performs no host read, synchronization, scalar
 extraction, result allocation, or payload sanitization; every producer must
 publish its canonical inert result before the terminal launch.
 
+ADR-027 penetration failure owns the stable transaction bit
+`SEGMENT_PENETRATION_FAILURE = 1 << 7`. It covers overflow, request/device-mask
+contract contradiction, and non-finite penetration state. The dormant RayD penetration family
+and Channel transmission-topology pack receive the exact same
+`CapacityFailureState` object/storage; neither may clear, replace, observe, or
+trap it. Their future solver switch does not create a penetration-local
+failure observer.
+
 `runtime.profiling` owns the closed semantic NVTX annotation vocabulary used
 by performance evidence. It may emit only balanced ranges and point marks: it
 does not evaluate tensors, allocate results, launch CUDA work, synchronize,

@@ -67,6 +67,7 @@ def _random_case(patches, rows, *, device, seed, resolution=64, height_rms=0.004
 
 def _native(case):
     return ops.scattering_patch_integral_eval(
+        torch.ones(case["rows"].shape[0], dtype=torch.bool, device=case["rows"].device),
         case["patch_tris"], case["patch_uvs"], case["rows"], case["d_i"],
         case["d_o"], case["n_rows"], case["r_te"], case["r_tm"], case["pol_t"],
         case["pol_r"], case["r1_rows"], case["r2_rows"], case["centroids"],
