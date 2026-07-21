@@ -101,7 +101,7 @@ def _enumerated() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
     device = torch.device("cuda")
     tx, _ = transmitter_positions(scene, device=device)
     rx = receiver_positions(scene, device=device, reference=tx)
-    block, launch_count, candidate_count, guardrail_count = _transmission_topology(
+    block, _launch_count, candidate_count, guardrail_count = _transmission_topology(
         scene, compiled, tx, rx, max_depth=2
     )
     names = (
@@ -110,13 +110,30 @@ def _enumerated() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
         "material_id", "primitive_sequence", "material_sequence",
         "interaction_positions", "interaction_normals",
     )
-    arrays = {name: block[name] for name in names}
-    reference = arrays["valid"]
+    # Diagnostics run outside the timed production path and may compact the
+    # public fixed-capacity block for a semantic A/B comparison with the old
+    # K-row owner. Production never performs this device-selected compaction.
+    valid = block["valid"]
+    arrays = {name: block[name][valid] for name in names}
+    reference = valid
+    candidate_count_value = (
+        candidate_count
+        if isinstance(candidate_count, torch.Tensor)
+        else torch.full(
+            (1,), candidate_count, device=reference.device, dtype=torch.int32
+        )
+    )
+    guardrail_count_value = (
+        guardrail_count
+        if isinstance(guardrail_count, torch.Tensor)
+        else torch.full(
+            (1,), guardrail_count, device=reference.device, dtype=torch.int32
+        )
+    )
     arrays.update(
         {
-            "launch_count": torch.full((1,), launch_count, device=reference.device, dtype=torch.int32),
-            "candidate_count": torch.full((1,), candidate_count, device=reference.device, dtype=torch.int32),
-            "guardrail_count": torch.full((1,), guardrail_count, device=reference.device, dtype=torch.int32),
+            "candidate_count": candidate_count_value,
+            "guardrail_count": guardrail_count_value,
         }
     )
     return arrays, {"mode": "high_level_owner"}

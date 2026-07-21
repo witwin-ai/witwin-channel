@@ -19,7 +19,7 @@
       "arrays": [
         "candidate_count", "component_id", "depth", "edge_id", "guardrail_count",
         "interaction_normal", "interaction_normals", "interaction_position",
-        "interaction_positions", "launch_count", "material_id", "material_sequence",
+        "interaction_positions", "material_id", "material_sequence",
         "path_length_m", "primitive_id", "primitive_sequence", "rx_id", "tx_id", "valid"
       ]
     },

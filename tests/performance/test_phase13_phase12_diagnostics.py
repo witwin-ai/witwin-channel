@@ -35,6 +35,7 @@ def test_diagnostic_contract_freezes_stable_owner_and_source_lane_availability()
     groups = contract["groups"]
     assert groups["diffraction"]["variants"]["baseline"]["source_lane_available"] is False
     assert groups["diffraction"]["variants"]["candidate"]["source_lane_available"] is True
+    assert "launch_count" not in groups["enumerated_penetration"]["arrays"]
 
 
 def test_float64_oracle_uses_pair_major_state_fast_valid_rows() -> None:
