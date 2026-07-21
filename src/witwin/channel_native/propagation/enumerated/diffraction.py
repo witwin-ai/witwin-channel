@@ -35,6 +35,11 @@ from witwin.channel_native.propagation.topology.kernels import (
 from witwin.channel_native.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
+from witwin.channel_native.runtime.profiling import (
+    CudaProfileRange,
+    cuda_profile_range,
+    profiled_cuda_range,
+)
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
@@ -69,6 +74,7 @@ def _deterministic_diffraction_states(
     )
 
 
+@profiled_cuda_range(CudaProfileRange.DIFFRACTION_TOTAL_STAGE)
 def _diffraction_topology_order1(
     scene: Scene,
     compiled: object,
@@ -163,45 +169,49 @@ def _diffraction_topology_order1(
             rx_start = rx_request.rx_start
             rx_end = rx_request.rx_end
             rx_chunk = rx_positions[rx_start:rx_end].contiguous()
-            out = query_diffraction_order1(
-                DiffractionOrder1Query(
-                    handle=handle,
-                    tx_position=tx.reshape(1, 3).contiguous(),
-                    tx_polarization=tx_polarizations[tx_index]
-                    .reshape(1, 3)
-                    .contiguous(),
-                    rx_positions=rx_chunk,
-                    active=visible_plan.active,
-                    states=visible_plan,
-                    material_eta_r=face_eps_r,
-                    material_sigma=face_sigma_e,
-                    material_mu_r=face_mu_r,
-                    material_gain=material_gain,
-                    material_valid=material_valid,
-                    state_count=state_count,
-                    capacity=rx_request.capacity,
-                    wavelength=float(wavelength),
-                    # ISB boundary taper (ADR-017), D member. 0.0 when the
-                    # switch is off keeps the RayD export bit-identical; the
-                    # width notches the incident-boundary odd part in the header.
-                    isb_taper_width_scale=float(isb_boundary_taper_width),
+            with cuda_profile_range(CudaProfileRange.DIFFRACTION_EXPORTER):
+                out = query_diffraction_order1(
+                    DiffractionOrder1Query(
+                        handle=handle,
+                        tx_position=tx.reshape(1, 3).contiguous(),
+                        tx_polarization=tx_polarizations[tx_index]
+                        .reshape(1, 3)
+                        .contiguous(),
+                        rx_positions=rx_chunk,
+                        active=visible_plan.active,
+                        states=visible_plan,
+                        material_eta_r=face_eps_r,
+                        material_sigma=face_sigma_e,
+                        material_mu_r=face_mu_r,
+                        material_gain=material_gain,
+                        material_valid=material_valid,
+                        state_count=state_count,
+                        capacity=rx_request.capacity,
+                        wavelength=float(wavelength),
+                        # ISB boundary taper (ADR-017), D member. 0.0 when the
+                        # switch is off keeps the RayD export bit-identical; the
+                        # width notches the incident-boundary odd part in the header.
+                        isb_taper_width_scale=float(isb_boundary_taper_width),
+                    )
                 )
-            )
             launch_count += 1
-            compacted = topology_compaction.deterministic_diffraction_order1_compact(
-                valid=out.valid,
-                rx_id=out.rx_id,
-                depth=out.depth,
-                edge_id=out.edge_id,
-                delay_s=out.delay_s,
-                x_re=out.x_re,
-                x_im=out.x_im,
-                y_re=out.y_re,
-                y_im=out.y_im,
-                z_re=out.z_re,
-                z_im=out.z_im,
-                interaction_position=out.interaction_position,
-            )
+            with cuda_profile_range(CudaProfileRange.DIFFRACTION_TOPOLOGY_PACKING):
+                compacted = (
+                    topology_compaction.deterministic_diffraction_order1_compact(
+                        valid=out.valid,
+                        rx_id=out.rx_id,
+                        depth=out.depth,
+                        edge_id=out.edge_id,
+                        delay_s=out.delay_s,
+                        x_re=out.x_re,
+                        x_im=out.x_im,
+                        y_re=out.y_re,
+                        y_im=out.y_im,
+                        z_re=out.z_re,
+                        z_im=out.z_im,
+                        interaction_position=out.interaction_position,
+                    )
+                )
             if int(compacted["rx_id"].numel()) == 0:
                 continue
             if rx_start > 0:

@@ -23,11 +23,16 @@ from witwin.channel_native.propagation.topology.discovery.transmission import (
     select_transmission_winner_rows,
 )
 from witwin.channel_native.propagation.topology.export import _ensure_topology_fields
+from witwin.channel_native.runtime.profiling import (
+    CudaProfileRange,
+    profiled_cuda_range,
+)
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
 
 
+@profiled_cuda_range(CudaProfileRange.ENUMERATED_PENETRATION_DISCOVERY)
 def _transmission_topology(
     scene: Scene,
     compiled: object,

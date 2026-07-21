@@ -19,6 +19,13 @@ failure when any bit is set. It performs no host read, synchronization, scalar
 extraction, result allocation, or payload sanitization; every producer must
 publish its canonical inert result before the terminal launch.
 
+`runtime.profiling` owns the closed semantic NVTX annotation vocabulary used
+by performance evidence. It may emit only balanced ranges and point marks: it
+does not evaluate tensors, allocate results, launch CUDA work, synchronize,
+copy data, or affect numerical/error behavior. Payloads describe stable domain
+operations and must not encode a plan phase, candidate identity, or temporary
+generation name.
+
 ## Public entry points
 
 The stable root entry is `witwin.channel_native.build_info`. `runtime.__all__`
@@ -29,8 +36,10 @@ owner and scene/core modules compatibility-re-export the same object.
 ## Dependency rules
 
 Runtime code may depend on the standard library and the supported Torch runtime
-only for ABI inspection. It must not import solver, scene, propagation, or
-scattering modules. Higher layers may depend on runtime, never the reverse.
+only for ABI inspection and non-numerical NVTX annotation. Profiling code may
+not evaluate tensors, launch kernels, synchronize, or copy data. Runtime must
+not import solver, scene, propagation, or scattering modules. Higher layers may
+depend on runtime, never the reverse.
 
 ## Numerical and AD contract
 

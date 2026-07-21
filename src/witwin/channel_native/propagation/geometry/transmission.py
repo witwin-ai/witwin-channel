@@ -7,6 +7,10 @@ from dataclasses import dataclass
 import torch
 
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.runtime.profiling import (
+    CudaProfileMark,
+    cuda_profile_mark,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +34,7 @@ class TransmissionClosestHitResult:
 def query_transmission_closest_hit(
     query: TransmissionClosestHitQuery,
 ) -> TransmissionClosestHitResult:
+    cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
     raw = geometry_bridge.rayd_intersect_forward(
         query.handle,
         query.origin,

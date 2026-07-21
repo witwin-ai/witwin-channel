@@ -25,6 +25,12 @@ from witwin.channel_native.materials.kernels.autograd import em_layer_stack_ad
 from witwin.channel_native.materials.kernels.functional import em_layer_stack_eval
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.runtime.autograd_contracts import _ad_frequency_value
+from witwin.channel_native.runtime.profiling import (
+    CudaProfileMark,
+    CudaProfileRange,
+    cuda_profile_mark,
+    profiled_cuda_range,
+)
 
 
 _MIN_EPSILON_M = 1.0e-6
@@ -175,6 +181,7 @@ def transmission_event_probability(
     )
 
 
+@profiled_cuda_range(CudaProfileRange.MONTECARLO_BASIC_PENETRATION_DISCOVERY)
 def straight_transmission_chains(
     rayd: Any,
     origins: torch.Tensor,
@@ -233,6 +240,7 @@ def straight_transmission_chains(
     for depth in range(int(max_depth) + 1):
         if not bool(active.any()):
             break
+        cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
         hit = geometry_bridge.rayd_intersect_forward(
             handle,
             origin.contiguous(),

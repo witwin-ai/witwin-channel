@@ -11,6 +11,10 @@ from witwin.channel_native.core.diffraction_geometry import (
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel_native.runtime.profiling import (
+    CudaProfileMark,
+    cuda_profile_mark,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +198,8 @@ def query_diffraction_order1(
     query: DiffractionOrder1Query,
 ) -> DiffractionOrder1Geometry:
     states = query.states
+    cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
+    cuda_profile_mark(CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
     raw = geometry_bridge.rayd_diffraction_paths_order1_forward(
         query.handle,
         query.tx_position,
