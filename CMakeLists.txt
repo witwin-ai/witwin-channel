@@ -501,6 +501,7 @@ Python_add_library(
     native/channel_native/kernels/evaluated_paths_capacity_pack.cu
     native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu
     native/channel_native/kernels/deterministic_path_table_capacity_pack.cu
+    native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu
     native/channel_native/kernels/path_result_capacity_pack.cu
     native/channel_native/kernels/path_result_capacity_pack_ad.cu
     native/channel_native/kernels/deterministic_field.cu
@@ -537,6 +538,11 @@ target_compile_features(_channel_native PRIVATE cxx_std_17)
 # interpolation, are unaffected).
 set_source_files_properties(
     native/channel_native/kernels/kirchhoff_table_ad.cu
+    PROPERTIES COMPILE_OPTIONS "--fmad=false")
+# ADR-030 freezes the source-state-serial additions and the separate
+# multiply/add power, VJP, and JVP expressions for the pair reducer.
+set_source_files_properties(
+    native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 # ADR-029 PathResult packing freezes the former Torch endpoint-angle operation
 # order. Contraction across those per-op multiply/add boundaries changes the

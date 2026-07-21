@@ -24,6 +24,18 @@
       ]
     }
   ],
+  "adr030_lockstep_duplicates": [
+    {
+      "owner": "deterministic diffraction source-lane pair reduction",
+      "source": "native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu::deterministic_diffraction_pair_reduce_kernel",
+      "lockstep_with": "native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu::deterministic_diffraction_pair_reduce_jvp_kernel",
+      "reason": "ADR-030 freezes the same warp-per-pair lane-0 ascending-state shuffle/add order for primal fields and input tangents; deduplication may not change registers, launch geometry, evaluation order, or compiler output.",
+      "lockstep_tests": [
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_source_contract_is_frozen",
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_autograd_and_forward_ad_use_native_companions"
+      ]
+    }
+  ],
   "categories": [
     "host_check",
     "indexing_packing",
@@ -592,6 +604,21 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
       "token_count": 119
+    },
+    "4a4431ace8749e13": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_diffraction_pair_reduce.cu"
+      ],
+      "lockstep_tests": [
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_source_contract_is_frozen",
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_autograd_and_forward_ad_use_native_companions"
+      ],
+      "owner": "deterministic",
+      "provenance": "ADR-030 dormant pair-reducer hand-reviewed classification",
+      "reason": "Primal and JVP intentionally repeat the frozen warp-per-pair lane-0 ascending-state shuffle/add sequence; sharing or reordering it requires separate compiler-output and exactness evidence.",
+      "token_count": 129
     },
     "4c160fa53e86cc03": {
       "category": "numeric_sensitive_exempt",

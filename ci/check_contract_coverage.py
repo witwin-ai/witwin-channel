@@ -150,6 +150,10 @@ BOOTSTRAP_E2E_SCENARIOS = {
         "tests/deterministic/test_path_table_capacity_pack.py::"
         "test_path_table_capacity_pack_matches_live_export_bitwise"
     ),
+    "deterministic-diffraction-pair-reduction": (
+        "tests/deterministic/test_diffraction_pair_reduce.py::"
+        "test_diffraction_pair_reduce_multi_pair_sparse_valid_skips_poison"
+    ),
     "deterministic-diffraction": (
         "tests/deterministic/test_diffraction_single_wedge.py::"
         "test_single_wedge_diffraction_matches_path_reference"
@@ -470,6 +474,8 @@ def _initial_native_scenario(name: str) -> str:
             return "field-free-space"
         return "field-reflection"
     if name.startswith("deterministic_"):
+        if name.startswith("deterministic_diffraction_pair_reduce"):
+            return "deterministic-diffraction-pair-reduction"
         if any(token in name for token in ("backward", "jvp", "fwd64")):
             return "deterministic-ad"
         if "diffraction" in name or "edge" in name:
@@ -536,6 +542,12 @@ def _initial_native_contract(name: str) -> str:
             return "native-field-free-space"
         return "native-field-reflection"
     if name.startswith("deterministic_"):
+        if name == "deterministic_diffraction_pair_reduce":
+            return "native-deterministic-diffraction-pair-reduce"
+        if name == "deterministic_diffraction_pair_reduce_backward":
+            return "native-deterministic-diffraction-pair-reduce-backward"
+        if name == "deterministic_diffraction_pair_reduce_jvp":
+            return "native-deterministic-diffraction-pair-reduce-jvp"
         if "accumulate" in name or name == "deterministic_component_counts":
             return "native-deterministic-accumulation"
         if any(
@@ -684,6 +696,18 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
             "native-deterministic-accumulation": (
                 "tests/kernels/test_ops_facade.py::"
                 "test_deterministic_accumulate_flat_validity_masks_poison_rows"
+            ),
+            "native-deterministic-diffraction-pair-reduce": (
+                "tests/deterministic/test_diffraction_pair_reduce.py::"
+                "test_diffraction_pair_reduce_capacity_boundaries"
+            ),
+            "native-deterministic-diffraction-pair-reduce-backward": (
+                "tests/deterministic/test_diffraction_pair_reduce.py::"
+                "test_diffraction_pair_reduce_backward_formula_and_missing_cotangents"
+            ),
+            "native-deterministic-diffraction-pair-reduce-jvp": (
+                "tests/deterministic/test_diffraction_pair_reduce.py::"
+                "test_diffraction_pair_reduce_jvp_vjp_duality_and_poison_gating"
             ),
             "native-deterministic-fields": (
                 "tests/kernels/test_ops_facade.py::"

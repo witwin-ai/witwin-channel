@@ -1,6 +1,7 @@
 # ADR-030: Deterministic diffraction pair reduction
 
-- **Status:** Accepted (2026-07-20); implementation pending
+- **Status:** Accepted (2026-07-20); dormant native reducer family implemented
+  (2026-07-21), live activation pending
 - **Date:** 2026-07-20
 - **Kind:** Numerical-order, cross-repository typed storage, native reduction,
   AD, and performance decision.
@@ -106,10 +107,11 @@ deterministic_diffraction_pair_reduce_backward
 deterministic_diffraction_pair_reduce_jvp
 ```
 
-Its typed primal input contains the shared `CapacityFailureState`, CUDA Boolean
-source-lane validity, the six CUDA float32 field component tensors, and the
-host-known `pair_count` and `state_capacity=M`. All row-aligned tensors have
-capacity `pair_count * M`. Its named result contains:
+Its typed primal input contains the shared `CapacityFailureState`, RayD's CUDA
+contiguous `int32[1]` reported count, CUDA Boolean source-lane validity, the six
+CUDA float32 field component tensors, and the host-known `pair_count` and
+`state_capacity=M`. All row-aligned tensors have capacity `pair_count * M`.
+Its named result contains:
 
 ```text
 field_xyz : CUDA complex64 [pair_count, 3]
@@ -174,8 +176,9 @@ power parentheses are part of the frozen numerical contract.
 ### Capacity, validity, and transaction failure
 
 The reducer participates in the exact ADR-029 solve-owned
-`CapacityFailureState`. A device status operation validates the RayD count and
-source-lane capacity contract before numerical reduction without copying a
+`CapacityFailureState`. A same-stream device status operation counts valid
+source lanes and compares them with RayD's reported count. A mismatch ORs
+`DIFFRACTION_PATH_CONTRACT_ERROR` before numerical reduction, without copying a
 count or flag to the host. Failure bits, upstream overflow, and validity are
 checked in that order before any payload or identifier read.
 

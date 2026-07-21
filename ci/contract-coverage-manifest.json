@@ -25,6 +25,9 @@
     "native-bootstrap": "tests/kernels/test_extension_loading.py::test_missing_bootstrap_symbol_fails_before_any_computation",
     "native-capacity-failure-state": "tests/runtime/test_capacity_failure_state.py::test_capacity_failure_state_is_native_zeroed_on_current_stream",
     "native-deterministic-accumulation": "tests/kernels/test_ops_facade.py::test_deterministic_accumulate_flat_validity_masks_poison_rows",
+    "native-deterministic-diffraction-pair-reduce": "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_capacity_boundaries",
+    "native-deterministic-diffraction-pair-reduce-backward": "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_backward_formula_and_missing_cotangents",
+    "native-deterministic-diffraction-pair-reduce-jvp": "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_jvp_vjp_duality_and_poison_gating",
     "native-deterministic-fields": "tests/kernels/test_ops_facade.py::test_deterministic_reflection_field_returns_native_complex_field",
     "native-deterministic-topology": "tests/kernels/test_ops_facade.py::test_deterministic_los_topology_block_compacts_and_fills_extended_fields",
     "native-reflection-candidate-capacity": "tests/propagation/topology/test_reflection_candidate_capacity.py::test_reflection_candidate_capacity_matches_multibounce_compact_order",
@@ -79,6 +82,7 @@
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
     "capacity-failure-state": "tests/runtime/test_capacity_failure_state.py::test_capacity_failure_bits_accumulate_and_every_block_stays_inert",
     "deterministic-ad": "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality",
+    "deterministic-diffraction-pair-reduction": "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_multi_pair_sparse_valid_skips_poison",
     "deterministic-path-table-capacity": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
     "enumerated-canonical-capacity": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order",
@@ -990,6 +994,33 @@
       "native-evaluated-paths-capacity-pack-ad",
       [
         "evaluated-paths-capacity"
+      ]
+    ],
+    [
+      "deterministic_diffraction_pair_reduce",
+      "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce",
+      "named_wrapper",
+      "native-deterministic-diffraction-pair-reduce",
+      [
+        "deterministic-diffraction-pair-reduction"
+      ]
+    ],
+    [
+      "deterministic_diffraction_pair_reduce_backward",
+      "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_backward",
+      "named_wrapper",
+      "native-deterministic-diffraction-pair-reduce-backward",
+      [
+        "deterministic-diffraction-pair-reduction"
+      ]
+    ],
+    [
+      "deterministic_diffraction_pair_reduce_jvp",
+      "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_jvp",
+      "named_wrapper",
+      "native-deterministic-diffraction-pair-reduce-jvp",
+      [
+        "deterministic-diffraction-pair-reduction"
       ]
     ],
     [

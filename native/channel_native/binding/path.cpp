@@ -493,6 +493,38 @@ pybind11::dict cn_deterministic_path_table_capacity_pack_jvp(
     std::optional<torch::Tensor> tangent_field_xyz,
     std::optional<torch::Tensor> tangent_coefficient,
     int64_t sequence_width);
+pybind11::dict cn_deterministic_diffraction_pair_reduce(
+    torch::Tensor failure_state,
+    torch::Tensor reported_count,
+    torch::Tensor valid,
+    torch::Tensor x_re,
+    torch::Tensor x_im,
+    torch::Tensor y_re,
+    torch::Tensor y_im,
+    torch::Tensor z_re,
+    torch::Tensor z_im,
+    int64_t pair_count,
+    int64_t state_capacity);
+pybind11::dict cn_deterministic_diffraction_pair_reduce_backward(
+    torch::Tensor failure_state,
+    torch::Tensor valid,
+    torch::Tensor field_xyz,
+    std::optional<torch::Tensor> grad_field_xyz,
+    std::optional<torch::Tensor> grad_power,
+    int64_t pair_count,
+    int64_t state_capacity);
+pybind11::dict cn_deterministic_diffraction_pair_reduce_jvp(
+    torch::Tensor failure_state,
+    torch::Tensor valid,
+    torch::Tensor field_xyz,
+    std::optional<torch::Tensor> tangent_x_re,
+    std::optional<torch::Tensor> tangent_x_im,
+    std::optional<torch::Tensor> tangent_y_re,
+    std::optional<torch::Tensor> tangent_y_im,
+    std::optional<torch::Tensor> tangent_z_re,
+    std::optional<torch::Tensor> tangent_z_im,
+    int64_t pair_count,
+    int64_t state_capacity);
 pybind11::dict cn_path_result_capacity_pack(
     torch::Tensor failure_state,
     torch::Tensor overflow,
@@ -1004,6 +1036,47 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("tangent_field_xyz"),
         pybind11::arg("tangent_coefficient"),
         pybind11::arg("sequence_width"));
+    module.def(
+        "deterministic_diffraction_pair_reduce",
+        &cn_deterministic_diffraction_pair_reduce,
+        "Reduce fixed source-lane diffraction fields in source-state order.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("reported_count"),
+        pybind11::arg("valid"),
+        pybind11::arg("x_re"),
+        pybind11::arg("x_im"),
+        pybind11::arg("y_re"),
+        pybind11::arg("y_im"),
+        pybind11::arg("z_re"),
+        pybind11::arg("z_im"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("state_capacity"));
+    module.def(
+        "deterministic_diffraction_pair_reduce_backward",
+        &cn_deterministic_diffraction_pair_reduce_backward,
+        "Native fixed-valid diffraction pair-reduction VJP companion.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("valid"),
+        pybind11::arg("field_xyz"),
+        pybind11::arg("grad_field_xyz"),
+        pybind11::arg("grad_power"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("state_capacity"));
+    module.def(
+        "deterministic_diffraction_pair_reduce_jvp",
+        &cn_deterministic_diffraction_pair_reduce_jvp,
+        "Native fixed-valid diffraction pair-reduction JVP companion.",
+        pybind11::arg("failure_state"),
+        pybind11::arg("valid"),
+        pybind11::arg("field_xyz"),
+        pybind11::arg("tangent_x_re"),
+        pybind11::arg("tangent_x_im"),
+        pybind11::arg("tangent_y_re"),
+        pybind11::arg("tangent_y_im"),
+        pybind11::arg("tangent_z_re"),
+        pybind11::arg("tangent_z_im"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("state_capacity"));
     module.def(
         "path_result_capacity_pack",
         &cn_path_result_capacity_pack,

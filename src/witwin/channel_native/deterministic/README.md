@@ -52,6 +52,19 @@ device counts. Valid rows are bitwise identical to `build_path_table` for both
 export contract and is non-differentiable; only the existing eleven continuous
 evaluated-path inputs have native backward/JVP companions.
 
+Under ADR-030, `deterministic.kernels.diffraction_pair` owns the dormant native
+source-lane pair-reduction primal/VJP/JVP family. One warp owns each endpoint
+pair, lane 0 adds valid source states strictly in ascending ordinal order, and
+an in-stream status kernel compares RayD's contiguous CUDA `int32[1]` reported
+count with the source-lane validity population. A mismatch ORs the shared
+`DIFFRACTION_PATH_CONTRACT_ERROR` bit before the reducer makes every pair
+inert; the shared `CapacityFailureState` is checked before validity or field
+payload.
+The result is a typed CUDA complex64 `[pair_count, 3]` field plus float32
+`[pair_count]` power. This family has no live solver caller yet: the current
+ReceiverGrid Torch `index_add_` route remains authoritative until the separate
+atomic RayD pin/switch/delete commit.
+
 ### AD contract
 
 `Config.ad_mode` accepts `none`, `jvp`, and `vjp`. AD uses fixed topology and
