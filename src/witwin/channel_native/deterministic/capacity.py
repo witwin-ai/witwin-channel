@@ -206,6 +206,14 @@ class _DeterministicPathTableCapacityPackFunction(torch.autograd.Function):
         if not any(ctx.needs_input_grad[_CONTINUOUS_INPUT_SLICE]):
             return none_grads
         (valid,) = ctx.saved_tensors
+        # Autograd commonly supplies expanded stride-zero cotangents for
+        # reductions such as ``sum``.  This companion's typed CUDA contract
+        # consumes contiguous row-major buffers, so normalize only the live
+        # cotangent slots at the dispatch boundary and keep ``None`` sparse.
+        continuous_grads = tuple(
+            None if value is None else value.contiguous()
+            for value in continuous_grads
+        )
         raw = _required_native_op("deterministic_path_table_capacity_pack_backward")(
             valid,
             ctx.include_fields,
