@@ -97,7 +97,14 @@ __device__ __forceinline__ Float3 subtract(Float3 lhs, Float3 rhs) {
 }
 
 __device__ __forceinline__ Float3 negate(Float3 value) {
-    return {-value.x, -value.y, -value.z};
+    return {
+        __uint_as_float(__float_as_uint(value.x) ^ 0x80000000u),
+        __uint_as_float(__float_as_uint(value.y) ^ 0x80000000u),
+        __uint_as_float(__float_as_uint(value.z) ^ 0x80000000u)};
+}
+
+__device__ __forceinline__ float negate(float value) {
+    return __uint_as_float(__float_as_uint(value) ^ 0x80000000u);
 }
 
 __device__ __forceinline__ Float3 load_float3(const float *data, int64_t row) {
@@ -182,23 +189,33 @@ __device__ __forceinline__ Float3 endpoint_angle_vjp(
         clamp_preserve_nan(unclamped_cosine, -1.0f, 1.0f);
     Float3 grad = make_vec3(0.0f, 0.0f, 0.0f);
     if (has_theta) {
-        float grad_cosine = -grad_theta / sqrtf(1.0f - cosine * cosine);
-        if (unclamped_cosine < -1.0f || unclamped_cosine > 1.0f) {
+        // Mirror the eager Torch backward graph operation by operation:
+        // acos -> clamp -> div -> clamp_min -> vector_norm.
+        float grad_cosine =
+            grad_theta * -rsqrtf(-cosine * cosine + 1.0f);
+        if (!(unclamped_cosine >= -1.0f && unclamped_cosine <= 1.0f)) {
             grad_cosine = 0.0f;
         }
         grad.z += grad_cosine / safe;
-        const float grad_safe = -grad_cosine * direction.z / (safe * safe);
-        if (norm >= FLT_MIN && norm != 0.0f) {
-            grad.x += grad_safe * (direction.x / norm);
-            grad.y += grad_safe * (direction.y / norm);
-            grad.z += grad_safe * (direction.z / norm);
-        }
+        const float grad_safe =
+            negate(grad_cosine) * ((direction.z / safe) / safe);
+        const float grad_norm = norm >= FLT_MIN ? grad_safe : 0.0f;
+        const float norm_x = norm == 0.0f ? 0.0f : direction.x / norm;
+        const float norm_y = norm == 0.0f ? 0.0f : direction.y / norm;
+        const float norm_z = norm == 0.0f ? 0.0f : direction.z / norm;
+        grad.x += grad_norm * norm_x;
+        grad.y += grad_norm * norm_y;
+        grad.z += grad_norm * norm_z;
     }
     if (has_phi) {
         const float xy_squared =
-            direction.x * direction.x + direction.y * direction.y;
-        grad.x += (grad_phi * -direction.y) / xy_squared;
-        grad.y += (grad_phi * direction.x) / xy_squared;
+            direction.y * direction.y + direction.x * direction.x;
+        const float numerator_x = grad_phi * negate(direction.y);
+        const float numerator_y = grad_phi * direction.x;
+        const float reciprocal =
+            xy_squared == 0.0f ? 0.0f : 1.0f / xy_squared;
+        grad.x += numerator_x * reciprocal;
+        grad.y += numerator_y * reciprocal;
     }
     return grad;
 }
@@ -213,26 +230,28 @@ __device__ __forceinline__ void endpoint_angle_jvp(
         direction.z * direction.z;
     const float norm = sqrtf(squared);
     const float safe = norm < FLT_MIN ? FLT_MIN : norm;
-    float tangent_safe = 0.0f;
-    if (norm >= FLT_MIN && norm != 0.0f) {
-        tangent_safe =
-            (direction.x * tangent.x + direction.y * tangent.y +
-             direction.z * tangent.z) /
-            norm;
+    const float dot =
+        direction.x * tangent.x + direction.y * tangent.y +
+        direction.z * tangent.z;
+    float tangent_norm = dot / norm;
+    if (norm == 0.0f) {
+        tangent_norm = 0.0f;
     }
+    const float tangent_safe = norm >= FLT_MIN ? tangent_norm : 0.0f;
     const float unclamped_cosine = direction.z / safe;
     const float cosine =
         clamp_preserve_nan(unclamped_cosine, -1.0f, 1.0f);
     float tangent_cosine =
-        tangent.z / safe - direction.z * tangent_safe / (safe * safe);
-    if (unclamped_cosine < -1.0f || unclamped_cosine > 1.0f) {
+        (tangent.z - tangent_safe * unclamped_cosine) / safe;
+    if (!(unclamped_cosine >= -1.0f && unclamped_cosine <= 1.0f)) {
         tangent_cosine = 0.0f;
     }
-    tangent_theta = -tangent_cosine / sqrtf(1.0f - cosine * cosine);
+    tangent_theta =
+        tangent_cosine * -rsqrtf(-cosine * cosine + 1.0f);
     const float xy_squared =
-        direction.x * direction.x + direction.y * direction.y;
+        direction.y * direction.y + direction.x * direction.x;
     tangent_phi =
-        (direction.x * tangent.y - direction.y * tangent.x) / xy_squared;
+        (-direction.y * tangent.x + direction.x * tangent.y) / xy_squared;
 }
 
 __device__ __forceinline__ int64_t bounded_last_slot(
@@ -417,6 +436,7 @@ __global__ void path_result_capacity_backward_endpoints_kernel(
          endpoint < endpoint_count;
          endpoint += stride) {
         Float3 total = make_vec3(0.0f, 0.0f, 0.0f);
+        bool has_total = false;
         if (endpoint < num_tx) {
             const int64_t tx = endpoint;
             for (int64_t rx = 0; rx < num_rx; ++rx) {
@@ -440,10 +460,18 @@ __global__ void path_result_capacity_backward_endpoints_kernel(
                         grad_output,
                         departure_grad,
                         receiver_grad);
-                    total = subtract(total, departure_grad);
-                    if (!(sequence_width > 0 && depth[row] > 0)) {
-                        total = add(total, receiver_grad);
+                    Float3 contribution;
+                    if (sequence_width > 0 && depth[row] > 0) {
+                        contribution = negate(departure_grad);
+                    } else {
+                        // Eager Torch accumulates both angle branches on the
+                        // shared direct tensor before the subtraction VJP.
+                        const Float3 direct_grad =
+                            subtract(departure_grad, receiver_grad);
+                        contribution = negate(direct_grad);
                     }
+                    total = has_total ? add(total, contribution) : contribution;
+                    has_total = true;
                 }
             }
             const int64_t base = tx * 3;
@@ -473,12 +501,16 @@ __global__ void path_result_capacity_backward_endpoints_kernel(
                         grad_output,
                         departure_grad,
                         receiver_grad);
+                    Float3 contribution;
                     if (sequence_width > 0 && depth[row] > 0) {
-                        total = subtract(total, receiver_grad);
+                        contribution = negate(receiver_grad);
                     } else {
-                        total = add(total, departure_grad);
-                        total = subtract(total, receiver_grad);
+                        const Float3 direct_grad =
+                            subtract(departure_grad, receiver_grad);
+                        contribution = direct_grad;
                     }
+                    total = has_total ? add(total, contribution) : contribution;
+                    has_total = true;
                 }
             }
             const int64_t base = rx * 3;
@@ -569,7 +601,7 @@ __global__ void path_result_capacity_jvp_kernel(
         const Float3 tangent_tx = optional_float3(tangent_input.tx_positions, tx);
         const Float3 tangent_rx = optional_float3(tangent_input.rx_positions, rx);
         Float3 tangent_departure = subtract(tangent_rx, tangent_tx);
-        Float3 tangent_receiver = subtract(tangent_tx, tangent_rx);
+        Float3 tangent_receiver = negate(tangent_departure);
         if (sequence_width > 0 && depth[row] > 0) {
             const Float3 tangent_first =
                 optional_sequence_float3(tangent_input.interaction_positions, row, 0);

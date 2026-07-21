@@ -824,6 +824,21 @@
       "reason": "Optional tangent and cotangent reads are duplicated locally so both dormant native capacity AD companions preserve identical fixed-valid zero semantics without changing the established evaluated-path compiler unit.",
       "token_count": 160
     },
+    "33b858162352529b": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/path/test_path_result_capacity.py::test_path_result_capacity_endpoint_vjp_is_bitwise_current_torch_reduction",
+        "tests/path/test_path_result_capacity.py::test_endpoint_angle_singular_vjp_and_jvp_match_torch_branches"
+      ],
+      "owner": "path fixed-capacity endpoint VJP reduction",
+      "provenance": "ADR-029 C2-P exact endpoint branch fix",
+      "reason": "TX and RX pair-major serial loops deliberately repeat the fixed-row angle VJP contribution sequence while applying opposite endpoint signs; refactoring the loops risks changing public float32 reduction bits.",
+      "token_count": 101
+    },
     "8541f60b5d49f5f9": {
       "category": "other",
       "corpus": "native",

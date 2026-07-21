@@ -73,7 +73,10 @@ __device__ __forceinline__ Float3 subtract(Float3 lhs, Float3 rhs) {
 }
 
 __device__ __forceinline__ Float3 negate(Float3 value) {
-    return {-value.x, -value.y, -value.z};
+    return {
+        __uint_as_float(__float_as_uint(value.x) ^ 0x80000000u),
+        __uint_as_float(__float_as_uint(value.y) ^ 0x80000000u),
+        __uint_as_float(__float_as_uint(value.z) ^ 0x80000000u)};
 }
 
 __device__ __forceinline__ float clamp_preserve_nan(
@@ -167,19 +170,26 @@ __global__ void path_result_capacity_pack_kernel(
         const Float3 direct = subtract(rx_position, tx_position);
         const int32_t depth = input.depth[row];
         Float3 departure = direct;
-        Float3 arrival = direct;
+        Float3 receiver_direction = negate(direct);
         if (sequence_width > 0 && depth > 0) {
             const Float3 first = load_float3(input.interaction_positions, sequence_base);
             const int64_t last_slot = static_cast<int64_t>(depth) - 1;
             const Float3 last =
                 load_float3(input.interaction_positions, sequence_base + last_slot);
             departure = subtract(first, tx_position);
-            arrival = subtract(rx_position, last);
+            const Float3 arrival = subtract(rx_position, last);
+            receiver_direction = negate(arrival);
+            // The zero-length endpoint branch is canonicalized by the fixed-
+            // capacity contract to the direct last-rx subtraction. For every
+            // nonzero direction, retain the former eager -(rx-last) bits.
+            if (arrival.x == 0.0f && arrival.y == 0.0f && arrival.z == 0.0f) {
+                receiver_direction = subtract(last, rx_position);
+            }
         }
         endpoint_angles(
             departure, output.theta_t[row], output.phi_t[row]);
         endpoint_angles(
-            negate(arrival), output.theta_r[row], output.phi_r[row]);
+            receiver_direction, output.theta_r[row], output.phi_r[row]);
 
         output.a[row] = input.coefficient[row];
         output.tau[row] = input.delay_s[row];
