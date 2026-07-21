@@ -350,31 +350,21 @@ __device__ int preflight_row_materials(
     return all_eligible ? 0 : -1;
 }
 
+#define CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS                               \
+    int64_t row_count, int64_t hit_capacity, const bool* valid,               \
+        const int* num_hits, const bool* reached_target,                      \
+        const float* direction, const float* normal,                          \
+        const int* primitive_id, const int* face_material_id,                 \
+        int64_t face_count, const int* geometry_mode_id,                      \
+        const int* layer_offset, const int* layer_count,                      \
+        const float* layer_thickness, const float* layer_eps,                 \
+        const float* layer_sigma, const float* layer_mu,                      \
+        int64_t material_count, int64_t layer_total,                          \
+        const float* polarization, const float* base_power,                   \
+        float frequency_hz, int* failure_state, int failure_bit
+
 __global__ void wall_product_kernel(
-    int64_t row_count,
-    int64_t hit_capacity,
-    const bool* valid,
-    const int* num_hits,
-    const bool* reached_target,
-    const float* direction,
-    const float* normal,
-    const int* primitive_id,
-    const int* face_material_id,
-    int64_t face_count,
-    const int* geometry_mode_id,
-    const int* layer_offset,
-    const int* layer_count,
-    const float* layer_thickness,
-    const float* layer_eps,
-    const float* layer_sigma,
-    const float* layer_mu,
-    int64_t material_count,
-    int64_t layer_total,
-    const float* polarization,
-    const float* base_power,
-    float frequency_hz,
-    int* failure_state,
-    int failure_bit,
+    CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS,
     float* scaled_power,
     float* transmittance,
     int* wall_count,
@@ -457,30 +447,7 @@ __global__ void wall_product_kernel(
 }
 
 __global__ void wall_product_backward_kernel(
-    int64_t row_count,
-    int64_t hit_capacity,
-    const bool* valid,
-    const int* num_hits,
-    const bool* reached_target,
-    const float* direction,
-    const float* normal,
-    const int* primitive_id,
-    const int* face_material_id,
-    int64_t face_count,
-    const int* geometry_mode_id,
-    const int* layer_offset,
-    const int* layer_count,
-    const float* layer_thickness,
-    const float* layer_eps,
-    const float* layer_sigma,
-    const float* layer_mu,
-    int64_t material_count,
-    int64_t layer_total,
-    const float* polarization,
-    const float* base_power,
-    float frequency_hz,
-    int* failure_state,
-    int failure_bit,
+    CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS,
     OptionalFloatView grad_scaled,
     OptionalFloatView grad_transmittance,
     float* grad_direction,
@@ -645,30 +612,7 @@ __global__ void wall_product_backward_kernel(
 // Each owner adds in ascending row then slot order, so VJP bits are independent
 // of CUDA block scheduling.
 __global__ void wall_product_shared_backward_kernel(
-    int64_t row_count,
-    int64_t hit_capacity,
-    const bool* valid,
-    const int* num_hits,
-    const bool* reached_target,
-    const float* direction,
-    const float* normal,
-    const int* primitive_id,
-    const int* face_material_id,
-    int64_t face_count,
-    const int* geometry_mode_id,
-    const int* layer_offset,
-    const int* layer_count,
-    const float* layer_thickness,
-    const float* layer_eps,
-    const float* layer_sigma,
-    const float* layer_mu,
-    int64_t material_count,
-    int64_t layer_total,
-    const float* polarization,
-    const float* base_power,
-    float frequency_hz,
-    int* failure_state,
-    int failure_bit,
+    CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS,
     OptionalFloatView grad_scaled,
     OptionalFloatView grad_transmittance,
     float* grad_layer_thickness,
@@ -816,30 +760,7 @@ __global__ void wall_product_shared_backward_kernel(
 }
 
 __global__ void wall_product_jvp_kernel(
-    int64_t row_count,
-    int64_t hit_capacity,
-    const bool* valid,
-    const int* num_hits,
-    const bool* reached_target,
-    const float* direction,
-    const float* normal,
-    const int* primitive_id,
-    const int* face_material_id,
-    int64_t face_count,
-    const int* geometry_mode_id,
-    const int* layer_offset,
-    const int* layer_count,
-    const float* layer_thickness,
-    const float* layer_eps,
-    const float* layer_sigma,
-    const float* layer_mu,
-    int64_t material_count,
-    int64_t layer_total,
-    const float* polarization,
-    const float* base_power,
-    float frequency_hz,
-    int* failure_state,
-    int failure_bit,
+    CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS,
     OptionalFloatView tangent_direction,
     OptionalFloatView tangent_normal,
     OptionalFloatView tangent_layer_thickness,
@@ -918,6 +839,8 @@ __global__ void wall_product_jvp_kernel(
             tangent_base * product.value + base_power[row] * product.tangent;
     }
 }
+
+#undef CN_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS
 
 __global__ void sanitize_primal_kernel(
     const int* failure_state,
