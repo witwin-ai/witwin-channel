@@ -12,7 +12,13 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel_native import (
+    ReceiverGrid,
+    ReceiverPoint,
+    Scene,
+    Structure,
+    Transmitter,
+)
 from witwin.channel_native.core.kernels.extension import build_info
 from witwin.channel_native.core.materials import Layer, PhysicalSurface, Roughness
 from witwin.channel_native.montecarlo.basic import Config, solve
@@ -41,9 +47,7 @@ def _require_native() -> None:
 
 
 def _roughness(sigma_h: float = _SIGMA_H) -> Roughness:
-    return Roughness(
-        rms_height_m=sigma_h, corr_length_x_m=_CORR, corr_length_y_m=_CORR
-    )
+    return Roughness(rms_height_m=sigma_h, corr_length_x_m=_CORR, corr_length_y_m=_CORR)
 
 
 def _material(roughness: Roughness | None) -> PhysicalSurface:
@@ -54,7 +58,9 @@ def _material(roughness: Roughness | None) -> PhysicalSurface:
     )
 
 
-def _wall(material: PhysicalSurface, *, x: float = 2.5, surface_id: int = 1) -> Structure:
+def _wall(
+    material: PhysicalSurface, *, x: float = 2.5, surface_id: int = 1
+) -> Structure:
     return Structure(
         vertices=torch.tensor(
             [[x, -4.0, -4.0], [x, 4.0, -4.0], [x, -4.0, 4.0], [x, 4.0, 4.0]]
@@ -89,7 +95,9 @@ def _quadrature_reference_unpolarized() -> float:
     """Direct area quadrature of the unpolarized scattering gain at _RX."""
 
     device = torch.device("cuda")
-    table = build_kirchhoff_table(_roughness(), list(_LAYERS), _FREQUENCY, device=device)
+    table = build_kirchhoff_table(
+        _roughness(), list(_LAYERS), _FREQUENCY, device=device
+    )
     n = torch.tensor([-1.0, 0.0, 0.0], device=device)
     res = 640
     axis = torch.linspace(-4.0, 4.0, res, device=device)
@@ -104,7 +112,8 @@ def _quadrature_reference_unpolarized() -> float:
     r2 = to_rx.norm(dim=-1)
     wo = to_rx / r2[:, None]
     t1 = torch.linalg.cross(
-        torch.tensor([0.0, 0.0, 1.0], device=device).expand_as(points), n.expand_as(points)
+        torch.tensor([0.0, 0.0, 1.0], device=device).expand_as(points),
+        n.expand_as(points),
     )
     t1 = t1 / t1.norm(dim=-1, keepdim=True)
     t2 = torch.linalg.cross(n.expand_as(points), t1)
@@ -118,7 +127,8 @@ def _quadrature_reference_unpolarized() -> float:
     f_te, f_tm = eval_bsdf(table, valid, local(wi), local(wo))
     amplitude_sq = (_LIGHT_SPEED / _FREQUENCY / (4.0 * math.pi)) ** 2
     integrand = (
-        0.5 * (f_te + f_tm)
+        0.5
+        * (f_te + f_tm)
         * (wi * n).sum(-1).clamp_min(0.0)
         * (wo * n).sum(-1).clamp_min(0.0)
         * amplitude_sq
@@ -176,9 +186,9 @@ def test_basic_smooth_limit_and_energy_bound():
     )
     reflection_config = Config(samples=16_384, seed=5, components={"reflection"})
     smooth_reflection = float(
-        solve(
-            _grid_scene([_wall(_material(None))]), reflection_config
-        ).component_power["reflection"]
+        solve(_grid_scene([_wall(_material(None))]), reflection_config).component_power[
+            "reflection"
+        ]
     )
     rough_reflection = float(
         solve(
@@ -228,9 +238,7 @@ def test_basic_results_unchanged_when_scattering_not_requested():
         shape=(4, 4),
         spacing=(2.0 / 3.0, 1.0 / 3.0),
     )
-    config = Config(
-        samples=4096, seed=7, max_depth=2, components={"los", "reflection"}
-    )
+    config = Config(samples=4096, seed=7, max_depth=2, components={"los", "reflection"})
     rough_scene = _grid_scene([_wall(_material(_roughness()))], grid)
     rough_run = solve(rough_scene, config)
     rough_rerun = solve(rough_scene, config)
@@ -266,6 +274,7 @@ def test_basic_scattering_requires_unobstructed_incident_segment():
     )
     assert float(result.component_maps["scattering"].abs().max()) == 0.0
     assert result.metadata["scattering"]["tx_visible_samples"] == 0
+    assert result.metadata["contribution_capacity"] == 1
 
 
 def test_basic_point_receivers_report_zero_scattering_power():
@@ -276,7 +285,9 @@ def test_basic_point_receivers_report_zero_scattering_power():
         receivers=[ReceiverPoint(position=_RX)],
         frequency=_FREQUENCY,
     )
-    result = solve(scene, Config(samples=1024, seed=5, components={"los", "scattering"}))
+    result = solve(
+        scene, Config(samples=1024, seed=5, components={"los", "scattering"})
+    )
     # MC basic carries scattering on grid maps only; point receivers report
     # a truthful zero (mirrors the transmission point-receiver contract).
     assert float(result.component_power["scattering"]) == 0.0

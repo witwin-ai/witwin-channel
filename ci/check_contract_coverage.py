@@ -145,6 +145,18 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "witwin.channel_native.propagation.fields.kernels.autograd."
         "_FieldProjectComplex3AdFunction.jvp"
     ),
+    "mc_capacity_failure_component_maps_sanitize": (
+        "witwin.channel_native.montecarlo.basic.kernels.capacity."
+        "_mc_capacity_failure_component_maps_sanitize_native"
+    ),
+    "mc_capacity_failure_component_maps_sanitize_backward": (
+        "witwin.channel_native.montecarlo.basic.kernels.capacity."
+        "_mc_capacity_failure_component_maps_sanitize_backward_native"
+    ),
+    "mc_capacity_failure_component_maps_sanitize_jvp": (
+        "witwin.channel_native.montecarlo.basic.kernels.capacity."
+        "_mc_capacity_failure_component_maps_sanitize_jvp_native"
+    ),
 }
 BOOTSTRAP_E2E_SCENARIOS = {
     "bdpt-diffraction": (

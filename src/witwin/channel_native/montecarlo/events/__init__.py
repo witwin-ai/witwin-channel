@@ -23,7 +23,6 @@ from .scattering import (
 )
 from .transmission import (
     event_uniforms,
-    incident_te_tm_fractions,
     layer_csr_view,
     scene_diagonal_m,
     straight_transmission_chains,
@@ -34,7 +33,6 @@ from .transmission import (
 __all__ = [
     "RoughMaterialRuntime",
     "event_uniforms",
-    "incident_te_tm_fractions",
     "layer_csr_view",
     "local_frames",
     "rough_material_runtimes",

@@ -11380,6 +11380,142 @@
       "doc": "Apply RayD LoS visibility to one transmitter component map with a CUDA kernel."
     },
     {
+      "name": "mc_capacity_failure_component_maps_sanitize",
+      "target": "cn_mc_capacity_failure_component_maps_sanitize",
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 72,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "los",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reflection",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "diffraction",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "transmission",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "scattering",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Sanitize all MC Basic component maps through one capacity failure state."
+    },
+    {
+      "name": "mc_capacity_failure_component_maps_sanitize_backward",
+      "target": "cn_mc_capacity_failure_component_maps_sanitize_backward",
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 76,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reference",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "grad_los",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "grad_reflection",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "grad_diffraction",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "grad_transmission",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "grad_scattering",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Apply the MC Basic capacity-map sanitizer adjoint on CUDA."
+    },
+    {
+      "name": "mc_capacity_failure_component_maps_sanitize_jvp",
+      "target": "cn_mc_capacity_failure_component_maps_sanitize_jvp",
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 80,
+      "return_type": "pybind11::dict",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "reference",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_los",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "tangent_reflection",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "tangent_diffraction",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "tangent_transmission",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        },
+        {
+          "name": "tangent_scattering",
+          "type": "std::optional<torch::Tensor>",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Apply the MC Basic capacity-map sanitizer pushforward on CUDA."
+    },
+    {
       "name": "mc_component_map_buffer",
       "target": "cn_mc_component_map_buffer",
       "path": "native/channel_native/binding/montecarlo.cpp",
@@ -13392,7 +13528,7 @@
       "name": "mc_transmission_wall_product",
       "target": "cn_mc_transmission_wall_product",
       "path": "native/channel_native/binding/montecarlo_transmission.cpp",
-      "line": 47,
+      "line": 84,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -13499,7 +13635,7 @@
       "name": "mc_transmission_wall_product_backward",
       "target": "cn_mc_transmission_wall_product_backward",
       "path": "native/channel_native/binding/montecarlo_transmission.cpp",
-      "line": 51,
+      "line": 88,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13616,7 +13752,7 @@
       "name": "mc_transmission_wall_product_jvp",
       "target": "cn_mc_transmission_wall_product_jvp",
       "path": "native/channel_native/binding/montecarlo_transmission.cpp",
-      "line": 55,
+      "line": 92,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [

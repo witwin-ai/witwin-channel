@@ -5,6 +5,12 @@ exactly (within float tolerance), a lossy wall attenuates it by the stack
 power transmittance, and a PEC wall transmits nothing.
 """
 
+import os
+from pathlib import Path
+import subprocess
+import sys
+import textwrap
+
 import pytest
 import torch
 
@@ -16,11 +22,18 @@ from witwin.channel_native.core.materials import (
     PhysicalSurface,
 )
 from witwin.channel_native.montecarlo.basic import Config, solve
+from witwin.channel_native.montecarlo.basic import pipeline as basic_pipeline
 from witwin.channel_native.physics.oracle import layer_stack_rt
+from witwin.channel_native.runtime.capacity import (
+    CapacityFailureBit,
+    SolveCapacityTransaction,
+)
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
 )
+
+_ROOT = Path(__file__).resolve().parents[3]
 
 _FREQUENCY = 3.0e9
 
@@ -116,14 +129,10 @@ def test_lossy_wall_attenuates_by_stack_power_transmittance():
         name="lossy-wall",
     )
     # 1x1 grid straight behind the wall: exact normal incidence.
-    walled = _solve(
-        _scene([_wall(lossy)], grid_shape=(1, 1)), {"transmission"}
-    )
+    walled = _solve(_scene([_wall(lossy)], grid_shape=(1, 1)), {"transmission"})
     empty = _solve(_scene([], grid_shape=(1, 1)), {"los"})
 
-    oracle = layer_stack_rt(
-        [(thickness, eps_r, sigma_e, 1.0)], 1.0, _FREQUENCY
-    )
+    oracle = layer_stack_rt([(thickness, eps_r, sigma_e, 1.0)], 1.0, _FREQUENCY)
     # ADR-020: the per-wall transmittance is the Jones-derived power projected on
     # the incident polarization, not the unpolarized TE/TM mean. At this exact
     # normal incidence the plane of incidence is degenerate and T_te == T_tm, so
@@ -144,9 +153,10 @@ def test_pec_wall_transmits_nothing():
     walled = _solve(_scene([_wall(PerfectConductor())]), {"transmission"})
     assert float(walled.component_maps["transmission"].abs().max()) < 1.0e-20
     assert float(walled.component_power["transmission"]) < 1.0e-20
+    assert walled.metadata["contribution_capacity"] == 16
 
 
-def test_transmission_respects_max_depth_budget():
+def test_transmission_exact_capacity_recovers_unobstructed_map():
     _require_native()
     vacuum = PhysicalSurface(
         layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
@@ -154,10 +164,8 @@ def test_transmission_respects_max_depth_budget():
     scene = _scene([_wall(vacuum, x=2.0), _wall(vacuum, x=3.0)])
     empty = _solve(_scene([]), {"los"})
 
-    # Two walls need two penetrations: max_depth=1 truthfully blocks.
-    capped = _solve(scene, {"transmission"}, max_depth=1)
-    assert torch.count_nonzero(capped.component_maps["transmission"]) == 0
-    # max_depth=2 penetrates both vacuum walls and recovers the LoS map.
+    # Exactly D=2 accepted hits succeeds; the mandatory D+1 probe sees a
+    # clear tail and does not report overflow.
     full = _solve(scene, {"transmission"}, max_depth=2)
     torch.testing.assert_close(
         full.component_maps["transmission"],
@@ -165,3 +173,143 @@ def test_transmission_respects_max_depth_budget():
         rtol=1.0e-4,
         atol=1.0e-12,
     )
+
+
+def test_transmission_d_plus_one_capacity_failure_is_loud_in_subprocess():
+    _require_native()
+    code = textwrap.dedent(
+        """
+        import torch
+
+        from tests.montecarlo.basic.test_basic_transmission import (
+            _scene,
+            _solve,
+            _wall,
+        )
+        from witwin.channel_native.core.materials import Layer, PhysicalSurface
+
+        vacuum = PhysicalSurface(
+            layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+        )
+        scene = _scene([_wall(vacuum, x=2.0), _wall(vacuum, x=3.0)])
+        result = _solve(scene, {"transmission"}, max_depth=1)
+        assert result.component_maps is not None
+        print("RESULT_ASSEMBLED", flush=True)
+        try:
+            torch.cuda.synchronize()
+        except RuntimeError:
+            print("TERMINAL_SYNC_ERROR", flush=True)
+        else:
+            raise AssertionError("D+1 capacity overflow was not device-fail-loud")
+        """
+    )
+    environment = os.environ.copy()
+    source_root = str(_ROOT / "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (str(_ROOT), source_root, environment.get("PYTHONPATH"))
+        if value
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "RESULT_ASSEMBLED" in completed.stdout
+    assert "TERMINAL_SYNC_ERROR" in completed.stdout
+
+
+def test_transmission_d_plus_one_sanitizes_complete_result_before_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _require_native()
+    observed = []
+
+    def observe(transaction: SolveCapacityTransaction) -> None:
+        observed.append(transaction.failure_state)
+
+    monkeypatch.setattr(SolveCapacityTransaction, "terminal_check", observe)
+    vacuum = PhysicalSurface(
+        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+    )
+    scene = _scene([_wall(vacuum, x=2.0), _wall(vacuum, x=3.0)])
+    result = _solve(
+        scene,
+        {"los", "reflection", "diffraction", "transmission", "scattering"},
+        max_depth=1,
+    )
+    torch.cuda.synchronize()
+
+    assert len(observed) == 1
+    assert observed[0].bits.tolist() == [
+        int(CapacityFailureBit.SEGMENT_PENETRATION_FAILURE)
+    ]
+    assert result.component_maps is not None
+    assert set(result.component_maps) == {
+        "los",
+        "reflection",
+        "diffraction",
+        "transmission",
+        "scattering",
+    }
+    assert torch.count_nonzero(result.path_gain).item() == 0
+    for value in result.component_maps.values():
+        assert torch.count_nonzero(value).item() == 0
+        assert not torch.signbit(value).any().item()
+    for value in result.component_power.values():
+        assert torch.count_nonzero(value).item() == 0
+        assert not torch.signbit(value).any().item()
+
+
+def test_transmission_solve_shares_exact_failure_state_through_final_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _require_native()
+    original_component = basic_pipeline.transmission_component_map
+    original_sanitize = basic_pipeline.mc_capacity_failure_component_maps_sanitize
+    observed = {}
+
+    def component(*args, failure_state, **kwargs):
+        observed["component"] = failure_state
+        return original_component(*args, failure_state=failure_state, **kwargs)
+
+    def sanitize(*args, failure_state, **kwargs):
+        observed["sanitize"] = failure_state
+        return original_sanitize(*args, failure_state=failure_state, **kwargs)
+
+    def terminal(transaction: SolveCapacityTransaction) -> None:
+        observed["terminal"] = transaction.failure_state
+
+    monkeypatch.setattr(basic_pipeline, "transmission_component_map", component)
+    monkeypatch.setattr(
+        basic_pipeline,
+        "mc_capacity_failure_component_maps_sanitize",
+        sanitize,
+    )
+    monkeypatch.setattr(SolveCapacityTransaction, "terminal_check", terminal)
+    vacuum = PhysicalSurface(
+        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+    )
+    result = _solve(
+        _scene([_wall(vacuum)], grid_shape=(1, 1)),
+        {"transmission"},
+        max_depth=1,
+    )
+    torch.cuda.synchronize()
+
+    assert set(observed) == {"component", "sanitize", "terminal"}
+    assert observed["component"] is observed["sanitize"] is observed["terminal"]
+    assert (
+        observed["component"].bits.data_ptr()
+        == observed["sanitize"].bits.data_ptr()
+        == observed["terminal"].bits.data_ptr()
+    )
+    assert observed["component"].bits.tolist() == [0]
+    assert result.component_maps is not None
+    assert torch.count_nonzero(result.component_maps["transmission"]).item() == 1

@@ -118,9 +118,7 @@ def _call_zero_jvp(
 
 def test_transmission_wall_product_capacity_poison_and_product_order() -> None:
     inputs, state = _case()
-    result = mc_transmission_wall_product(
-        *inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
 
     assert result.scaled_power.shape == (3,)
     assert result.transmittance.shape == (3,)
@@ -128,7 +126,9 @@ def test_transmission_wall_product_capacity_poison_and_product_order() -> None:
     assert result.penetrated.tolist() == [True, True, False]
     first = result.transmittance[0]
     assert torch.equal(result.transmittance[1], first * first)
-    assert torch.equal(result.scaled_power[:2], result.transmittance[:2] * inputs[15][:2])
+    assert torch.equal(
+        result.scaled_power[:2], result.transmittance[:2] * inputs[15][:2]
+    )
     assert result.transmittance[2].item() == 1.0
     assert result.scaled_power[2].item() == 0.0
     assert state.bits.tolist() == [0]
@@ -143,9 +143,7 @@ def test_transmission_wall_product_zero_rows_preserve_all_family_shapes() -> Non
     )
     state = create_capacity_failure_state(empty_inputs[0])
 
-    result = mc_transmission_wall_product(
-        *empty_inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*empty_inputs, state, frequency_hz=3.5e9)
     gradients = mc_transmission_wall_product_backward(
         *empty_inputs,
         frequency_hz=3.5e9,
@@ -179,9 +177,7 @@ def test_transmission_wall_product_zero_hit_capacity_is_transparent() -> None:
         *inputs[6:],
     )
     state = create_capacity_failure_state(zero_depth_inputs[0])
-    result = mc_transmission_wall_product(
-        *zero_depth_inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*zero_depth_inputs, state, frequency_hz=3.5e9)
 
     assert result.transmittance.tolist() == [1.0, 1.0, 1.0]
     assert result.scaled_power.tolist() == [0.0, 0.0, 0.0]
@@ -194,9 +190,7 @@ def test_transmission_wall_product_preexisting_failure_is_preserved_and_inert() 
     inputs, state = _case()
     preexisting = int(CapacityFailureBit.REFLECTION_CANDIDATE_OVERFLOW)
     state.bits.fill_(preexisting)
-    result = mc_transmission_wall_product(
-        *inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
     gradients = mc_transmission_wall_product_backward(
         *inputs,
         frequency_hz=3.5e9,
@@ -218,7 +212,12 @@ def test_transmission_wall_product_preexisting_failure_is_preserved_and_inert() 
     )
 
     _assert_tensors_are_zero(
-        (result.scaled_power, result.transmittance, result.wall_count, result.penetrated)
+        (
+            result.scaled_power,
+            result.transmittance,
+            result.wall_count,
+            result.penetrated,
+        )
     )
     _assert_tensors_are_zero(gradients)
     _assert_tensors_are_zero(tangents)
@@ -229,9 +228,7 @@ def test_transmission_wall_product_uses_non_default_current_stream() -> None:
     stream = torch.cuda.Stream()
     with torch.cuda.stream(stream):
         inputs, state = _case()
-        result = mc_transmission_wall_product(
-            *inputs, state, frequency_hz=3.5e9
-        )
+        result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
         gradients = mc_transmission_wall_product_backward(
             *inputs,
             frequency_hz=3.5e9,
@@ -260,9 +257,7 @@ def test_transmission_wall_product_contract_error_makes_entire_result_inert(
         inputs[5][0, 0] = 2_000_000_000
     else:
         inputs[9][0] = 2
-    result = mc_transmission_wall_product(
-        *inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
 
     assert state.bits.tolist() == [int(CapacityFailureBit.PAIR_CONTRACT_ERROR)]
     assert torch.count_nonzero(result.scaled_power).item() == 0
@@ -306,9 +301,7 @@ def test_transmission_wall_product_contract_error_makes_ad_results_inert(
         tangent_frequency=1.0,
     )
     _assert_tensors_are_zero(tangents)
-    assert jvp_state.bits.tolist() == [
-        int(CapacityFailureBit.PAIR_CONTRACT_ERROR)
-    ]
+    assert jvp_state.bits.tolist() == [int(CapacityFailureBit.PAIR_CONTRACT_ERROR)]
 
 
 @pytest.mark.parametrize("later_corruption", ["primitive", "csr"])
@@ -323,15 +316,16 @@ def test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_err
     else:
         inputs[9][0] = 2
 
-    result = mc_transmission_wall_product(
-        *inputs, primal_state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*inputs, primal_state, frequency_hz=3.5e9)
     _assert_tensors_are_zero(
-        (result.scaled_power, result.transmittance, result.wall_count, result.penetrated)
+        (
+            result.scaled_power,
+            result.transmittance,
+            result.wall_count,
+            result.penetrated,
+        )
     )
-    assert primal_state.bits.tolist() == [
-        int(CapacityFailureBit.PAIR_CONTRACT_ERROR)
-    ]
+    assert primal_state.bits.tolist() == [int(CapacityFailureBit.PAIR_CONTRACT_ERROR)]
 
     backward_state = create_capacity_failure_state(inputs[0])
     gradients = mc_transmission_wall_product_backward(
@@ -342,9 +336,7 @@ def test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_err
         grad_transmittance=torch.ones(3, device="cuda"),
     )
     _assert_tensors_are_zero(gradients)
-    assert backward_state.bits.tolist() == [
-        int(CapacityFailureBit.PAIR_CONTRACT_ERROR)
-    ]
+    assert backward_state.bits.tolist() == [int(CapacityFailureBit.PAIR_CONTRACT_ERROR)]
 
     jvp_state = create_capacity_failure_state(inputs[0])
     tangents = mc_transmission_wall_product_jvp(
@@ -360,9 +352,7 @@ def test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_err
         tangent_frequency=1.0,
     )
     _assert_tensors_are_zero(tangents)
-    assert jvp_state.bits.tolist() == [
-        int(CapacityFailureBit.PAIR_CONTRACT_ERROR)
-    ]
+    assert jvp_state.bits.tolist() == [int(CapacityFailureBit.PAIR_CONTRACT_ERROR)]
 
 
 def test_transmission_wall_product_all_optional_ad_inputs_absent_are_zero() -> None:
@@ -386,9 +376,7 @@ def test_transmission_wall_product_unreached_rows_do_not_read_poison_payload() -
     inputs[2].fill_(False)
     inputs[4].fill_(float("nan"))
     inputs[5].fill_(2_000_000_000)
-    result = mc_transmission_wall_product(
-        *inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
     gradients = mc_transmission_wall_product_backward(
         *inputs,
         frequency_hz=3.5e9,
@@ -421,9 +409,7 @@ def test_transmission_wall_product_unreached_rows_do_not_read_poison_payload() -
 def test_transmission_wall_product_invalid_material_is_ordinary_blocking() -> None:
     inputs, state = _case()
     inputs[6].fill_(-1)
-    result = mc_transmission_wall_product(
-        *inputs, state, frequency_hz=3.5e9
-    )
+    result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
 
     assert state.bits.tolist() == [0]
     assert result.transmittance.tolist() == [0.0, 0.0, 1.0]
@@ -537,12 +523,16 @@ def test_transmission_wall_product_nonzero_csr_offset_uses_global_layer_seed() -
     assert gradients[4][0].item() == 0.0
     assert gradients[2][1].item() != 0.0
     torch.testing.assert_close(
-        tangent_trans[0], gradients[2][1] * thickness_tangent[1],
-        rtol=2.0e-5, atol=2.0e-6,
+        tangent_trans[0],
+        gradients[2][1] * thickness_tangent[1],
+        rtol=2.0e-5,
+        atol=2.0e-6,
     )
     torch.testing.assert_close(
-        tangent_scaled[0], 2.0 * tangent_trans[0],
-        rtol=2.0e-5, atol=2.0e-6,
+        tangent_scaled[0],
+        2.0 * tangent_trans[0],
+        rtol=2.0e-5,
+        atol=2.0e-6,
     )
     assert state.bits.tolist() == [0]
 
@@ -582,9 +572,7 @@ def test_transmission_wall_product_pins_left_to_right_three_wall_product() -> No
             torch.ones(1, device="cuda"),
         )
         state = create_capacity_failure_state(valid)
-        result = mc_transmission_wall_product(
-            *inputs, state, frequency_hz=3.5e9
-        )
+        result = mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
         assert state.bits.tolist() == [0]
         return result.transmittance[0]
 
@@ -607,9 +595,7 @@ def test_transmission_wall_product_rejects_nonfinite_or_zero_frequency(
 ) -> None:
     inputs, state = _case()
     with pytest.raises(ValueError, match="frequency_hz must be finite and positive"):
-        mc_transmission_wall_product(
-            *inputs, state, frequency_hz=frequency_hz
-        )
+        mc_transmission_wall_product(*inputs, state, frequency_hz=frequency_hz)
 
 
 def test_transmission_wall_product_autograd_uses_native_family() -> None:
@@ -664,9 +650,7 @@ def test_transmission_wall_product_ad_views_are_zero_copy_stride_aware() -> None
     tangent_thickness = torch.tensor([0.002, 9.0], device="cuda")[::2]
     tangent_eps = torch.tensor([0.04, 9.0], device="cuda")[::2]
     tangent_sigma = torch.tensor([-0.001, 9.0], device="cuda")[::2]
-    tangent_base = torch.tensor(
-        [0.1, 9.0, -0.2, 9.0, 0.3, 9.0], device="cuda"
-    )[::2]
+    tangent_base = torch.tensor([0.1, 9.0, -0.2, 9.0, 0.3, 9.0], device="cuda")[::2]
     assert not tangent_direction.is_contiguous()
     assert not tangent_normal.is_contiguous()
     assert not tangent_base.is_contiguous()
@@ -705,7 +689,10 @@ def test_transmission_wall_product_has_one_owner_and_no_fallback(monkeypatch) ->
         "mc_transmission_wall_product_backward",
         "mc_transmission_wall_product_jvp",
     ):
-        assert inspect.unwrap(getattr(transmission, name)).__globals__ is transmission.__dict__
+        assert (
+            inspect.unwrap(getattr(transmission, name)).__globals__
+            is transmission.__dict__
+        )
 
     inputs, state = _case()
     requested: list[str] = []
@@ -725,8 +712,7 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
         _ROOT / "native/channel_native/kernels/mc_transmission_wall_product.cu"
     ).read_text(encoding="utf-8")
     live_route = (
-        _ROOT
-        / "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
+        _ROOT / "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
     ).read_text(encoding="utf-8")
     assert "wall_product_shared_backward_kernel" in source
     assert "frequency_owner" in source
@@ -736,27 +722,25 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
     assert "cudaMemcpy" not in source
     assert ".contiguous()" not in source
     assert "kTransmissionAdMaxDepth" not in source
-    assert "mc_transmission_wall_product" not in live_route
+    assert "mc_transmission_wall_product" in live_route
 
 
-def test_transmission_wall_product_dormant_owner_ledgers_are_complete() -> None:
+def test_transmission_wall_product_live_owner_ledgers_are_complete() -> None:
     inventory = json.loads(
-        (_ROOT / "docs/dev/audit/phase13-current-native-owner-inventory.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            _ROOT / "docs/dev/audit/phase13-current-native-owner-inventory.json"
+        ).read_text(encoding="utf-8")
     )
-    family = inventory["adr027_dormant_mc_transmission_wall_product"]
     symbols = [
         "mc_transmission_wall_product",
         "mc_transmission_wall_product_backward",
         "mc_transmission_wall_product_jvp",
     ]
-    assert family["symbols"] == symbols
-    assert family["numerical_owner"] == "Channel Native"
     rows = {row["symbol"]: row for row in inventory["symbols"]}
     for symbol in symbols:
-        assert rows[symbol]["production_callers"] == []
-        assert rows[symbol]["liveness"] == "dormant-native-producer"
+        assert rows[symbol]["production_callers"]
+        assert rows[symbol]["liveness"] == "live-static-production-consumer"
+        assert rows[symbol]["numerical_owner"] == "Channel Native"
 
     ledger = json.loads(
         (
@@ -764,8 +748,10 @@ def test_transmission_wall_product_dormant_owner_ledgers_are_complete() -> None:
             / "docs/dev/audit/adr-027-mc-transmission-wall-product-resource-ledger.json"
         ).read_text(encoding="utf-8")
     )
-    assert ledger["status"] == "dormant native family; live MC transmission march unchanged"
-    assert ledger["ownership"]["live_callers"] == []
+    assert ledger["status"] == (
+        "live Phase M native family; flattened MC transmission route active"
+    )
+    assert ledger["ownership"]["live_callers"]
     assert ledger["numerical_contract"]["floating_point_atomics"] is False
     assert ledger["capacity_contract"]["ad_hit_capacity_limit"] is None
-    assert ledger["acceptance"]["live_switch_performed"] is False
+    assert ledger["acceptance"]["live_switch_performed"] is True

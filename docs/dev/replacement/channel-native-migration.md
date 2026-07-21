@@ -330,9 +330,39 @@ the same ADR-029 Phase D capacity-pack activation.
 The former `TransmissionClosestHitQuery`,
 `query_transmission_closest_hit`, `iter_transmission_active_rows`, their source
 modules, Python depth loop, Torch restart/normalization math, and compatibility
-exports are deleted in the same atomic switch. Monte Carlo Basic is not part of
-this commit and retains its prior route until the separate
-`MonteCarloTargetInset` switch.
+exports are deleted in the same atomic switch.
+
+### Plan 13 Phase 6C Phase M: Monte Carlo Basic penetration activation
+
+Monte Carlo Basic now flattens all transmitter/receiver endpoint pairs in
+transmitter-major, receiver-minor order and submits one explicit
+`MonteCarloTargetInset` RayD fixed-capacity batch. The resulting resident hit
+block is consumed directly by the Channel-owned
+`mc_transmission_wall_product` primal/VJP/JVP family; there is no per-transmitter
+traversal, Python depth march, host Boolean break/compaction, Torch incidence
+basis, or Torch wall-product computation on the live production route.
+
+RayD penetration and the Channel estimator receive the exact same solve-owned
+`CapacityFailureState`. A `D + 1` hit or downstream resident-contract failure
+makes every geometry, estimator, component-map, and final-result output inert.
+The sole terminal observer is enqueued once at the final MC Basic result
+boundary, after sanitization and assembly, so no partial result is returned.
+The existing RayD four-entry penetration family and Channel three-entry
+wall-product family changed from dormant to live governance state. One new
+three-symbol internal primal/backward/JVP family rooted at
+`mc_capacity_failure_component_maps_sanitize` gives Basic a solver-local
+five-map sanitizer without importing enumerated internals; binding count moves
+from 238 to 241. Public exports, Config, and Result fields remain unchanged.
+Basic metadata intentionally replaces `valid_contribution_count` with
+`contribution_capacity`: the former promised an actual nonzero count and would
+require a forbidden device count read, while the latter is exactly the
+host-known component capacity. There is no compatibility alias and no silent
+reinterpretation of an actual-count field as capacity.
+
+Phase M does not complete ADR-029. The enumerated canonical selector and Path
+post-sanitizer device-selected-shape compactions remain explicit Phase D
+blockers, so complete solver no-D2H/public-capacity and final Phase 12
+performance acceptance remain pending.
 
 ## API surface changes
 

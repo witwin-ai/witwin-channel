@@ -3,6 +3,31 @@
 #include "registry.h"
 
 #include <cstdint>
+#include <optional>
+
+pybind11::dict cn_mc_capacity_failure_component_maps_sanitize(
+    torch::Tensor failure_state,
+    torch::Tensor los,
+    torch::Tensor reflection,
+    torch::Tensor diffraction,
+    torch::Tensor transmission,
+    torch::Tensor scattering);
+pybind11::dict cn_mc_capacity_failure_component_maps_sanitize_backward(
+    torch::Tensor failure_state,
+    torch::Tensor reference,
+    std::optional<torch::Tensor> grad_los,
+    std::optional<torch::Tensor> grad_reflection,
+    std::optional<torch::Tensor> grad_diffraction,
+    std::optional<torch::Tensor> grad_transmission,
+    std::optional<torch::Tensor> grad_scattering);
+pybind11::dict cn_mc_capacity_failure_component_maps_sanitize_jvp(
+    torch::Tensor failure_state,
+    torch::Tensor reference,
+    std::optional<torch::Tensor> tangent_los,
+    std::optional<torch::Tensor> tangent_reflection,
+    std::optional<torch::Tensor> tangent_diffraction,
+    std::optional<torch::Tensor> tangent_transmission,
+    std::optional<torch::Tensor> tangent_scattering);
 
 pybind11::dict cn_mc_transmission_wall_product(
     torch::Tensor valid, torch::Tensor num_hits, torch::Tensor reached_target,
@@ -44,6 +69,18 @@ pybind11::dict cn_mc_transmission_wall_product_jvp(
     double tangent_frequency);
 
 void register_montecarlo_transmission(pybind11::module_ &module) {
+    module.def(
+        "mc_capacity_failure_component_maps_sanitize",
+        &cn_mc_capacity_failure_component_maps_sanitize,
+        "Sanitize all MC Basic component maps through one capacity failure state.");
+    module.def(
+        "mc_capacity_failure_component_maps_sanitize_backward",
+        &cn_mc_capacity_failure_component_maps_sanitize_backward,
+        "Apply the MC Basic capacity-map sanitizer adjoint on CUDA.");
+    module.def(
+        "mc_capacity_failure_component_maps_sanitize_jvp",
+        &cn_mc_capacity_failure_component_maps_sanitize_jvp,
+        "Apply the MC Basic capacity-map sanitizer pushforward on CUDA.");
     module.def(
         "mc_transmission_wall_product",
         &cn_mc_transmission_wall_product,

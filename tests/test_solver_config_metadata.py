@@ -6,11 +6,17 @@ import torch
 
 from witwin.channel_native import ReceiverGrid
 from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic.solver import _metadata as deterministic_metadata
+from witwin.channel_native.deterministic.solver import (
+    _metadata as deterministic_metadata,
+)
 from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic.metadata import make_solver_metadata as basic_metadata
+from witwin.channel_native.montecarlo.basic.metadata import (
+    make_solver_metadata as basic_metadata,
+)
 from witwin.channel_native.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel_native.montecarlo.bdpt.metadata import make_solver_metadata as bdpt_metadata
+from witwin.channel_native.montecarlo.bdpt.metadata import (
+    make_solver_metadata as bdpt_metadata,
+)
 from witwin.channel_native.montecarlo.bdpt.solver import solve as bdpt_solve
 
 
@@ -31,7 +37,9 @@ def test_deterministic_metadata_reports_effective_component_depths():
     assert metadata["requested_max_depth"] == 3
     assert metadata["effective_max_depth"] == 3
     assert metadata["component_max_depth"]["reflection"] == 3
-    assert set(metadata["requested_config"]) == {field.name for field in fields(DeterministicConfig)}
+    assert set(metadata["requested_config"]) == {
+        field.name for field in fields(DeterministicConfig)
+    }
 
 
 def test_deterministic_rejects_depth_above_public_capability_at_config_time():
@@ -43,7 +51,7 @@ def test_basic_metadata_reports_requested_and_effective_config():
     metadata = basic_metadata(
         config=BasicConfig(max_depth=2, components={"reflection"}),
         path_count=1,
-        valid_contribution_count=1,
+        contribution_capacity=1,
         reflection_available=True,
         diffraction_available=True,
     )
@@ -56,14 +64,18 @@ def test_basic_metadata_reports_requested_and_effective_config():
         "transmission": -1,
         "scattering": -1,
     }
-    assert set(metadata["requested_config"]) == {field.name for field in fields(BasicConfig)}
+    assert set(metadata["requested_config"]) == {
+        field.name for field in fields(BasicConfig)
+    }
 
 
 @pytest.mark.parametrize("config_type", [BasicConfig, BdptConfig])
 @pytest.mark.parametrize(
     "component", ["reflection", "diffraction", "transmission", "scattering"]
 )
-def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(config_type, component):
+def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(
+    config_type, component
+):
     with pytest.raises(RuntimeError, match="max_depth >= 1"):
         config_type(max_depth=0, components={component})
 
@@ -121,4 +133,6 @@ def test_bdpt_metadata_exposes_depth_clamp():
     assert metadata["effective_max_depth"] == 2
     assert metadata["effective_config"]["max_depth"] == 2
     assert metadata["component_max_depth"]["reflection"] == 2
-    assert set(metadata["requested_config"]) == {field.name for field in fields(BdptConfig)}
+    assert set(metadata["requested_config"]) == {
+        field.name for field in fields(BdptConfig)
+    }

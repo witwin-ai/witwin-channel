@@ -2,12 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel_native.scene.models import ReceiverGrid
-from witwin.channel_native.core.ad_geometry import transmitter_positions_ad
-from typing import TYPE_CHECKING
+from witwin.channel_native.core.ad_geometry import (
+    scene_vertex_table,
+    transmitter_positions_ad,
+)
+from witwin.channel_native.core.diffraction_geometry import (
+    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
+    diffraction_edge_geometry as _diffraction_edge_geometry,
+)
+from witwin.channel_native.core.receiver_geometry import (
+    axis_aligned_grid_spec as grid_spec,
+    component_grid_shape,
+)
+from witwin.channel_native.materials.encoding import face_material_field_bundle
+from witwin.channel_native.montecarlo.basic.kernels import sampling as sampling_kernels
 from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
@@ -21,10 +33,13 @@ from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_store_component_map,
     mc_store_scaled_component_map,
 )
-from witwin.channel_native.montecarlo.basic.kernels import sampling as sampling_kernels
-from witwin.channel_native.core.diffraction_geometry import (
-    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
-    diffraction_edge_geometry as _diffraction_edge_geometry,
+from witwin.channel_native.montecarlo.basic.kernels.transmission import (
+    mc_transmission_wall_product,
+    mc_transmission_wall_product_ad,
+)
+from witwin.channel_native.montecarlo.events.scattering import scattering_map_matrix
+from witwin.channel_native.montecarlo.events.transmission import (
+    straight_transmission_chains,
 )
 from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel_native.propagation.geometry.kernels import (
@@ -34,22 +49,17 @@ from witwin.channel_native.propagation.topology.kernels.primitives import (
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
 )
-
-from witwin.channel_native.core.receiver_geometry import (
-    axis_aligned_grid_spec as grid_spec,
-    component_grid_shape,
-)
-from witwin.channel_native.materials.encoding import face_material_field_bundle
+from witwin.channel_native.runtime.capacity import CapacityFailureState
 from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
-from witwin.channel_native.montecarlo.events.scattering import scattering_map_matrix
-from witwin.channel_native.montecarlo.events.transmission import (
-    layer_csr_view,
-    scene_diagonal_m,
-    straight_transmission_chains,
-)
-
-from .backend import _LIGHT_SPEED_M_PER_S, los_path_gain, receiver_grid_points, transmitter_positions
+from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.scene.tensors import transmitter_polarizations
+
+from .backend import (
+    _LIGHT_SPEED_M_PER_S,
+    los_path_gain,
+    receiver_grid_points,
+    transmitter_positions,
+)
 
 if TYPE_CHECKING:
     from witwin.channel_native.scene.models import Scene
@@ -132,7 +142,9 @@ def _grid_visibility_masks(
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     masks: list[torch.Tensor] = []
     for tx_index in range(tx_pos.shape[0]):
-        inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
+        inputs = mc_los_visibility_inputs(
+            tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0]
+        )
         masks.append(
             geometry_bridge.rayd_visibility_forward(
                 handle, inputs["start"], rx_pos, inputs["active"]
@@ -158,14 +170,16 @@ def los_component_map(
         visible = None
         if scene.structures:
             if not rayd.available:
-                raise RuntimeError("LoS visibility requires RayD native scene capability")
+                raise RuntimeError(
+                    "LoS visibility requires RayD native scene capability"
+                )
             visible = _grid_visibility_masks(scene, rayd, grid, device=device)
         if ledger is not None:
             ledger.add(visible)
-        return mc_los_grid_maps_ad(
-            los, visible, rows=grid.shape[0], cols=grid.shape[1]
-        )
-    maps = mc_los_component_maps_from_matrix(los, rows=grid.shape[0], cols=grid.shape[1])
+        return mc_los_grid_maps_ad(los, visible, rows=grid.shape[0], cols=grid.shape[1])
+    maps = mc_los_component_maps_from_matrix(
+        los, rows=grid.shape[0], cols=grid.shape[1]
+    )
     if not scene.structures:
         return maps
     if not rayd.available:
@@ -174,7 +188,9 @@ def los_component_map(
     tx_pos, _ = transmitter_positions(scene, device=device)
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     for tx_index in range(tx_pos.shape[0]):
-        inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0])
+        inputs = mc_los_visibility_inputs(
+            tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0]
+        )
         visible = geometry_bridge.rayd_visibility_forward(
             handle, inputs["start"], rx_pos, inputs["active"]
         )[0]
@@ -193,6 +209,7 @@ def transmission_component_map(
     *,
     max_depth: int,
     device: torch.device,
+    failure_state: CapacityFailureState,
     los: torch.Tensor | None = None,
     ad: bool = False,
     ledger: object | None = None,
@@ -202,13 +219,14 @@ def transmission_component_map(
 
     Mirrors the LoS map's geometric convention exactly: the analytic per-cell
     Friis gain along the straight tx->cell segment, with the binary LoS
-    visibility mask replaced by the through-wall power transmittance product
-    (unpolarized TE/TM mean per wall, evaluated at the straight-line incidence
-    angle). Cells whose segment crosses no wall belong to the exclusive los
+    visibility mask replaced by the native ADR-020 incident-polarized TE/TM
+    wall product, evaluated in ascending resident-hit order. Cells whose
+    segment crosses no wall belong to the exclusive los
     path class and stay zero here, so los + transmission never double counts.
     A single eps_r=1 vacuum wall has unit power transmittance, which makes
     this map reproduce the unobstructed LoS map exactly (acceptance test);
-    chains needing more than ``max_depth`` penetrations are truthfully zero.
+    the mandatory ``max_depth + 1`` probe makes over-capacity chains poison the
+    shared solve transaction instead of returning a truncated map.
     """
 
     if not scene.structures:
@@ -227,57 +245,80 @@ def transmission_component_map(
     # (and with it every per-wall transmittance) moves with the transmitter,
     # so the chain march must see the graph, not the detached native table
     # (plan 07 section 9.3 TX x transmission for M).
-    tx_march = (
-        transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
-    )
+    tx_march = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     if ad:
         bundle = face_material_field_bundle(scene, device=device)
     else:
         with torch.no_grad():
             bundle = face_material_field_bundle(scene, device=device)
-    layer_csr = layer_csr_view(bundle)
-    diagonal = scene_diagonal_m(scene)
+    compiled = scene.compile()
     rx_count = int(rx_pos.shape[0])
-    # One host read of a tensor frequency for every per-tx chain march below
-    # (audit M3); the AD march additionally keeps the live tensor so the
-    # carrier gradient survives.
+    tx_count = int(tx_pos.shape[0])
+    origins = tx_march.repeat_interleave(rx_count, dim=0).contiguous()
+    targets = rx_pos.repeat(tx_count, 1).contiguous()
     frequency_value = _frequency_scalar(scene)
-    frequency_hz = scene.frequency if ad else frequency_value
-    # ADR-020: per-tx incident polarization drives the polarized wall
-    # transmittance (frozen physical vector; a detached AD winner).
     tx_pol = transmitter_polarizations(scene, device=device)
-    gains = []
-    for tx_index in range(int(tx_pos.shape[0])):
-        origins = tx_march[tx_index].unsqueeze(0).repeat(rx_count, 1)
-        chain = straight_transmission_chains(
-            rayd,
-            origins,
-            rx_pos,
-            face_material_id=bundle["material_id"],
-            layer_csr=layer_csr,
-            polarization=tx_pol[tx_index],
-            frequency_hz=frequency_hz,
-            frequency_value=frequency_value if ad else None,
-            max_depth=int(max_depth),
-            scene_diagonal=diagonal,
-            ad=ad,
-            ledger=ledger,
-        )
-        gains.append(
-            torch.where(
-                chain["penetrated"],
-                chain["transmittance"],
-                torch.zeros_like(chain["transmittance"]),
+    pair_polarization = tx_pol.repeat_interleave(rx_count, dim=0).contiguous()
+    base_power = los_matrix.reshape(-1).contiguous()
+    vertices = scene_vertex_table(scene, compiled) if ad else None
+    if ad and ledger is not None:
+        ledger.add(vertices, origins, targets)
+    penetration = straight_transmission_chains(
+        rayd,
+        origins,
+        targets,
+        vertices=vertices,
+        max_depth=int(max_depth),
+        scene_diagonal=compiled.montecarlo_penetration_scene_diagonal_m,
+        failure_state=failure_state,
+        ad=ad,
+    )
+    wall_product_args = (
+        penetration.valid,
+        penetration.num_hits,
+        penetration.reached_target,
+        penetration.direction,
+        penetration.normal,
+        penetration.global_primitive_id,
+        bundle["material_id"],
+        bundle["geometry_mode_id"],
+        bundle["layer_offset"],
+        bundle["layer_count"],
+        bundle["layer_thickness_m"],
+        bundle["layer_eps_r"],
+        bundle["layer_sigma_e"],
+        bundle["layer_mu_r"],
+        pair_polarization,
+        base_power,
+    )
+    if ad:
+        if ledger is not None:
+            ledger.add(
+                penetration.direction,
+                penetration.normal,
+                bundle["layer_thickness_m"],
+                bundle["layer_eps_r"],
+                bundle["layer_sigma_e"],
+                base_power,
             )
+        product = mc_transmission_wall_product_ad(
+            *wall_product_args,
+            scene.frequency,
+            failure_state,
+            frequency_value=frequency_value,
         )
-    matrix = los_matrix * torch.stack(gains, dim=0)
+    else:
+        product = mc_transmission_wall_product(
+            *wall_product_args,
+            failure_state,
+            frequency_hz=frequency_value,
+        )
+    matrix = product.scaled_power.reshape(tx_count, rx_count)
     if ad:
         if ledger is not None:
             ledger.add()
-        return mc_los_grid_maps_ad(
-            matrix, None, rows=grid.shape[0], cols=grid.shape[1]
-        )
+        return mc_los_grid_maps_ad(matrix, None, rows=grid.shape[0], cols=grid.shape[1])
     return mc_los_component_maps_from_matrix(
         matrix, rows=grid.shape[0], cols=grid.shape[1]
     )
@@ -317,7 +358,12 @@ def scattering_component_map(
         maps = mc_component_map_buffer(
             tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
         )
-        return maps, {"sample_count": 0, "rough_face_count": 0, "tx_visible_samples": 0, "deposited_rows": 0}
+        return maps, {
+            "sample_count": 0,
+            "rough_face_count": 0,
+            "tx_visible_samples": 0,
+            "deposited_rows": 0,
+        }
     if not rayd.available:
         raise RuntimeError("scattering requires RayD native scene capability")
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
@@ -337,9 +383,7 @@ def scattering_component_map(
         if ledger is not None:
             ledger.add()
         return (
-            mc_los_grid_maps_ad(
-                matrix, None, rows=grid.shape[0], cols=grid.shape[1]
-            ),
+            mc_los_grid_maps_ad(matrix, None, rows=grid.shape[0], cols=grid.shape[1]),
             stats,
         )
     return (
@@ -366,7 +410,9 @@ def reflection_component_maps_with_wedges(
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
-        maps = mc_component_map_buffer(tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1)
+        maps = mc_component_map_buffer(
+            tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
+        )
         return ReflectionComponentResult(
             maps=maps,
             wedge_events=(),
@@ -376,9 +422,7 @@ def reflection_component_maps_with_wedges(
     spec = grid_spec(grid)
     handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
-    tx_live = (
-        transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
-    )
+    tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     # R5: per-transmitter polarization seeds the reflection field's unnormalized
     # transverse projection (short-dipole sin(theta) pattern).
     tx_pol = transmitter_polarizations(scene, device=device)
@@ -397,7 +441,9 @@ def reflection_component_maps_with_wedges(
     ad_maps: list[torch.Tensor] = []
     maps = None
     if not ad:
-        maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
+        maps = mc_component_map_buffer(
+            tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1
+        )
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
         ray_d = _sample_directions(samples, reference=tx_pos)
@@ -506,9 +552,7 @@ def reflection_component_maps_with_wedges(
                 ray_o.index_select(0, valid_indices)
                 + trace[1][:, 0].index_select(0, valid_indices)[:, None] * ray_dir
             )
-            hit_n = face_normals.detach().index_select(
-                0, prim_id.to(dtype=torch.int64)
-            )
+            hit_n = face_normals.detach().index_select(0, prim_id.to(dtype=torch.int64))
             wedge_batches.append(
                 WedgeEventBatch(
                     tx_pos=tx,
@@ -526,7 +570,9 @@ def reflection_component_maps_with_wedges(
     return ReflectionComponentResult(maps=maps, wedge_events=tuple(wedge_batches))
 
 
-def _native_surface_group_edge_candidates(records, selected: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def _native_surface_group_edge_candidates(
+    records, selected: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
     return geometry_primitives.mc_surface_group_edge_candidates(
         records.vertices,
         records.faces,
@@ -574,7 +620,11 @@ def _discover_diffraction_edges_from_wedges(
         _face0,
         face1,
         _exterior_angle,
-    ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(rayd)
+    ) = (
+        edge_geometry
+        if edge_geometry is not None
+        else _cached_diffraction_edge_geometry(rayd)
+    )
     if edge_candidates is None:
         edge_candidates = _cached_primitive_edge_candidates(rayd, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
@@ -636,7 +686,11 @@ def _diffraction_states_from_edge_indices(
         face0,
         face1,
         exterior_angle,
-    ) = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(rayd)
+    ) = (
+        edge_geometry
+        if edge_geometry is not None
+        else _cached_diffraction_edge_geometry(rayd)
+    )
     return deterministic_diffraction_state_pack(
         edge_indices,
         edge_pos,
@@ -663,7 +717,11 @@ def _diffraction_states(
     edge_geometry: tuple[torch.Tensor, ...] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     del scene
-    geometry = edge_geometry if edge_geometry is not None else _cached_diffraction_edge_geometry(rayd)
+    geometry = (
+        edge_geometry
+        if edge_geometry is not None
+        else _cached_diffraction_edge_geometry(rayd)
+    )
     (
         selected,
         edge_pos,
@@ -710,15 +768,15 @@ def diffraction_component_map(
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
         dim0, dim1 = component_grid_shape(grid)
-        return mc_component_map_buffer(tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1)
+        return mc_component_map_buffer(
+            tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
+        )
     if not rayd.available:
         raise RuntimeError("diffraction requires RayD native scene capability")
     spec = grid_spec(grid)
     handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
-    tx_live = (
-        transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
-    )
+    tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     # R5: per-transmitter polarization fed into direct_source_vector's incident
     # basis (replaces the fabricated z-axis).
     tx_pol = transmitter_polarizations(scene, device=device)
@@ -735,13 +793,14 @@ def diffraction_component_map(
     ad_maps: list[torch.Tensor] = []
     maps = None
     if not ad:
-        maps = mc_component_map_buffer(tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1)
+        maps = mc_component_map_buffer(
+            tx_pos, tx_count=tx_pos.shape[0], dim0=dim0, dim1=dim1
+        )
     edge_geometry: tuple[torch.Tensor, ...] | None = None
     edge_candidates: tuple[torch.Tensor, torch.Tensor] | None = None
     mitsuba_metadata = scene.metadata.get("mitsuba", {})
-    preserve_imported_edges = (
-        isinstance(mitsuba_metadata, dict)
-        and bool(mitsuba_metadata.get("merge_shapes", False))
+    preserve_imported_edges = isinstance(mitsuba_metadata, dict) and bool(
+        mitsuba_metadata.get("merge_shapes", False)
     )
 
     def get_edge_geometry() -> tuple[torch.Tensor, ...]:
@@ -753,7 +812,9 @@ def diffraction_component_map(
             )
         return edge_geometry
 
-    def get_edge_candidates(geometry: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_edge_candidates(
+        geometry: tuple[torch.Tensor, ...],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         nonlocal edge_candidates
         if edge_candidates is None:
             edge_candidates = _cached_primitive_edge_candidates(rayd, geometry[0])
@@ -829,14 +890,47 @@ def diffraction_component_map(
         )
         state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
         sampled = geometry_bridge.rayd_diffraction_sample_tape_forward(
-            handle, None, *states, state_wi, state_wi,
-            material_eta_r, material_sigma, material_mu_r, material_gain, material_valid,
-            state_count, int(spec.axis), float(spec.position), float(spec.coord0_min),
-            float(spec.coord0_max), float(spec.coord1_min), float(spec.coord1_max),
-            int(spec.resolution0), int(spec.resolution1), float(spec.cell_area), float(wavelength),
-            0, int(samples), 0, int(seed), 1, 0,
-            None, None, None, None, None, None, None, None, None, None, None,
-            1, sample_state_index, sample_edge_weight,
+            handle,
+            None,
+            *states,
+            state_wi,
+            state_wi,
+            material_eta_r,
+            material_sigma,
+            material_mu_r,
+            material_gain,
+            material_valid,
+            state_count,
+            int(spec.axis),
+            float(spec.position),
+            float(spec.coord0_min),
+            float(spec.coord0_max),
+            float(spec.coord1_min),
+            float(spec.coord1_max),
+            int(spec.resolution0),
+            int(spec.resolution1),
+            float(spec.cell_area),
+            float(wavelength),
+            0,
+            int(samples),
+            0,
+            int(seed),
+            1,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            sample_state_index,
+            sample_edge_weight,
         )
         if ad:
             # Same tape-accumulate kernel behind the autograd Function
@@ -885,13 +979,39 @@ def diffraction_component_map(
             ad_maps.append(diffraction_map)
             continue
         diffraction_map = mc_sionna_diffraction_tape_accumulate(
-            sampled[14], sampled[15], sampled[16], sampled[18],
-            states[1], states[2], states[3], states[4], states[5], states[6],
-            states[7], states[8], states[9], states[10], states[11],
-            material_eta_r, material_sigma, material_mu_r, material_gain, material_valid, material_thickness,
-            int(spec.axis), float(spec.position), float(spec.coord0_min), float(spec.coord0_max),
-            float(spec.coord1_min), float(spec.coord1_max), int(spec.resolution0),
-            int(spec.resolution1), float(wavelength), float(spec.cell_area), int(seed), total_edge_length,
+            sampled[14],
+            sampled[15],
+            sampled[16],
+            sampled[18],
+            states[1],
+            states[2],
+            states[3],
+            states[4],
+            states[5],
+            states[6],
+            states[7],
+            states[8],
+            states[9],
+            states[10],
+            states[11],
+            material_eta_r,
+            material_sigma,
+            material_mu_r,
+            material_gain,
+            material_valid,
+            material_thickness,
+            int(spec.axis),
+            float(spec.position),
+            float(spec.coord0_min),
+            float(spec.coord0_max),
+            float(spec.coord1_min),
+            float(spec.coord1_max),
+            int(spec.resolution0),
+            int(spec.resolution1),
+            float(wavelength),
+            float(spec.cell_area),
+            int(seed),
+            total_edge_length,
             tx_pol[tx_index],
         )
         mc_store_component_map(maps, diffraction_map, tx_index=tx_index)

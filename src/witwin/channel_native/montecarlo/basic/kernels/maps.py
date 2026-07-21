@@ -69,13 +69,7 @@ def mc_finalize_component_maps(
 
 
 class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
-    """Differentiable component-map finalization (plan 07 AD-3).
-
-    The finalize kernel is a purely linear elementwise sum plus per-component
-    power reductions, so the map cotangent is the path_gain cotangent viewed
-    back to map layout plus the broadcast power cotangent, and the
-    pushforward is the finalize kernel itself applied to the tangents.
-    """
+    """Native linear map finalization and power-reduction AD (plan 07 AD-3)."""
 
     @staticmethod
     def forward(los, reflection, diffraction, transmission, scattering):
@@ -117,8 +111,14 @@ class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(ctx, t_los, t_reflection, t_diffraction, t_transmission, t_scattering):
         tangents = [
-            _ad_native_tangent_or_none(value) for value in
-            (t_los, t_reflection, t_diffraction, t_transmission, t_scattering)
+            _ad_native_tangent_or_none(value)
+            for value in (
+                t_los,
+                t_reflection,
+                t_diffraction,
+                t_transmission,
+                t_scattering,
+            )
         ]
         if all(value is None for value in tangents):
             return (None,) * len(_MC_FINALIZE_FIELDS)
@@ -174,13 +174,7 @@ def mc_los_component_maps_adjoint(
 
 
 class _McLosGridMapsAdFunction(torch.autograd.Function):
-    """Differentiable LoS/transmission component-map layout (plan 07 AD-3).
-
-    The forward is the primal layout kernel plus the per-tx visibility mask
-    application, a permutation times a frozen 0/1 mask of the (tx, cells)
-    matrix; its adjoint is one masked gather kernel and its pushforward is
-    the forward itself on the tangent matrix.
-    """
+    """Native AD for the visibility-masked matrix-to-map layout (plan 07 AD-3)."""
 
     @staticmethod
     def forward(matrix, visible, rows, cols):
@@ -510,9 +504,7 @@ def mc_los_path_gain_backward(
     validate_cuda_tensor(
         "grad_rx", gradients[2], dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
-    validate_cuda_tensor(
-        "grad_frequency", gradients[3], dtype=torch.float32, ndim=1
-    )
+    validate_cuda_tensor("grad_frequency", gradients[3], dtype=torch.float32, ndim=1)
     if gradients[0].shape != tx_positions.shape:
         raise ValueError(
             "_channel_native.mc_los_path_gain_backward returned bad grad_tx shape"
@@ -623,7 +615,9 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol):
+    def forward(
+        tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol
+    ):
         exported = path_los_export(
             tx_positions,
             tx_power,
@@ -636,7 +630,9 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
-        tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol = inputs
+        tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol = (
+            inputs
+        )
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in (tx_positions, tx_power, rx_positions, tx_pol)
@@ -685,9 +681,7 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(ctx, t_tx, t_power, t_rx, t_frequency, _t_frequency_value, _t_tx_pol):
-        _ad_reject_fixed_tangents(
-            "mc_los_path_gain_ad", ((t_power, "tx_power"),)
-        )
+        _ad_reject_fixed_tangents("mc_los_path_gain_ad", ((t_power, "tx_power"),))
         saved = ctx.saved_tensors
         tangent_tx = _ad_geometry_tangent(
             "mc_los_path_gain_ad tangent_tx", t_tx, saved[0]
@@ -704,9 +698,13 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
                 _ad_native_tensor(tx_positions),
                 _ad_native_tensor(tx_power),
                 _ad_native_tensor(rx_positions),
-                tangent_tx if tangent_tx is not None else _ad_native_tensor(tx_positions),
+                tangent_tx
+                if tangent_tx is not None
+                else _ad_native_tensor(tx_positions),
                 _ad_native_tensor(tx_power),
-                tangent_rx if tangent_rx is not None else _ad_native_tensor(rx_positions),
+                tangent_rx
+                if tangent_rx is not None
+                else _ad_native_tensor(rx_positions),
                 tangent_tx is not None,
                 False,
                 tangent_rx is not None,
@@ -1019,8 +1017,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
         primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:5]
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:5]
         )
         frequency = inputs[5]
         ctx.frequency_meta = (
@@ -1193,9 +1190,12 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             and tangent_thickness is None
             and tangent_frequency == 0.0
         ):
-            if _ad_native_tangent_or_none(
-                t_anchor if isinstance(t_anchor, torch.Tensor) else None
-            ) is None:
+            if (
+                _ad_native_tangent_or_none(
+                    t_anchor if isinstance(t_anchor, torch.Tensor) else None
+                )
+                is None
+            ):
                 return None
             # Transmitter-anchor-only tangent: the deposit weight carries no
             # ray-origin dependence (frozen binning), so the map tangent is
@@ -1250,9 +1250,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
                 wavelength=wavelength,
                 solid_angle_per_ray=params["solid_angle_per_ray"],
                 grid_cell_area=params["grid_cell_area"],
-                wavelength_tangent=(
-                    -wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD
-                )
+                wavelength_tangent=(-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD)
                 * tangent_frequency,
             )
 
@@ -1349,6 +1347,7 @@ def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
 # transmitter-position gradient of the reflection map is exactly zero and is
 # returned without a kernel launch.
 # ---------------------------------------------------------------------------
+
 
 def mc_sionna_diffraction_tape_accumulate_backward(
     tape_tensors: tuple[torch.Tensor, ...],
@@ -1555,8 +1554,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
     def setup_context(ctx, inputs, output):
         ctx.set_materialize_grads(False)
         primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:5]
+            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:5]
         )
         frequency = inputs[5]
         ctx.frequency_meta = (
@@ -1729,9 +1727,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
                 grid_cell_area=params["grid_cell_area"],
                 seed=params["seed"],
                 total_edge_length=params["total_edge_length"],
-                wavelength_tangent=(
-                    -wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD
-                )
+                wavelength_tangent=(-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD)
                 * tangent_frequency,
             )
 

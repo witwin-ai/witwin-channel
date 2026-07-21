@@ -4,9 +4,9 @@
   "applied_count_delta": -9,
   "projected_final_count": 202,
   "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
-  "live_binding_count": 238,
-  "live_count_delta_from_plan13_baseline": 27,
-  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings = 238",
+  "live_binding_count": 241,
+  "live_count_delta_from_plan13_baseline": 30,
+  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings = 241",
   "phase6c_phase_p_delta": {
     "before": 229,
     "added": 5,
@@ -16,6 +16,11 @@
     "before": 234,
     "added": 4,
     "after": 238
+  },
+  "phase6c_phase_m_delta": {
+    "before": 238,
+    "added": 3,
+    "after": 241
   },
   "actions": [
     {
@@ -663,24 +668,48 @@
       "action": "add",
       "replacement": null,
       "count_delta": 1,
-      "status": "dormant ADR-027 foundation",
-      "reason": "fixed-capacity MC incident-polarized wall-product estimator"
+      "status": "activated in Phase 6C Phase M",
+      "reason": "live fixed-capacity MC incident-polarized wall-product estimator"
     },
     {
       "symbol": "mc_transmission_wall_product_backward",
       "action": "add",
       "replacement": null,
       "count_delta": 1,
-      "status": "dormant ADR-027 foundation",
-      "reason": "MC wall-product VJP companion"
+      "status": "activated in Phase 6C Phase M",
+      "reason": "live MC wall-product VJP companion"
     },
     {
       "symbol": "mc_transmission_wall_product_jvp",
       "action": "add",
       "replacement": null,
       "count_delta": 1,
-      "status": "dormant ADR-027 foundation",
-      "reason": "MC wall-product JVP companion"
+      "status": "activated in Phase 6C Phase M",
+      "reason": "live MC wall-product JVP companion"
+    },
+    {
+      "symbol": "mc_capacity_failure_component_maps_sanitize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase M",
+      "reason": "single-kernel failure-first sanitizer for all five MC Basic component maps"
+    },
+    {
+      "symbol": "mc_capacity_failure_component_maps_sanitize_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase M",
+      "reason": "native VJP companion for the MC Basic component-map sanitizer"
+    },
+    {
+      "symbol": "mc_capacity_failure_component_maps_sanitize_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase M",
+      "reason": "native JVP companion for the MC Basic component-map sanitizer"
     },
     {
       "symbol": "rayd_segment_penetration_forward",

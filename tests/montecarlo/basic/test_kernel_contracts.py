@@ -5,7 +5,7 @@ import inspect
 import pytest
 
 from witwin.channel_native.montecarlo.basic import kernels
-from witwin.channel_native.montecarlo.basic.kernels import maps, sampling
+from witwin.channel_native.montecarlo.basic.kernels import capacity, maps, sampling
 from witwin.channel_native.propagation import topology
 from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel_native.runtime import (
@@ -35,6 +35,11 @@ _FROZEN_NATIVE_BUFFER_OWNER_NAMES = (
 )
 
 _OWNER_NAMES = _SAMPLING_OWNER_NAMES + _NATIVE_BUFFER_OWNER_NAMES
+
+_CAPACITY_OWNER_NAMES = (
+    "_McCapacityFailureComponentMapsSanitizeFunction",
+    "mc_capacity_failure_component_maps_sanitize",
+)
 
 _MAP_OWNER_NAMES = (
     "_McDiffractionMapAdFunction",
@@ -67,6 +72,14 @@ _MAP_OWNER_NAMES = (
     "mc_store_component_map",
     "mc_store_scaled_component_map",
     "mc_zero_matrix",
+)
+
+_CAPACITY_CONTRACT_IDS = (
+    "_McCapacityFailureComponentMapsSanitizeFunction.backward",
+    "_McCapacityFailureComponentMapsSanitizeFunction.forward",
+    "_McCapacityFailureComponentMapsSanitizeFunction.jvp",
+    "_McCapacityFailureComponentMapsSanitizeFunction.setup_context",
+    "mc_capacity_failure_component_maps_sanitize",
 )
 
 _MAP_CONTRACT_IDS = (
@@ -145,6 +158,26 @@ def test_runtime_native_buffers_uses_canonical_runtime_dependencies():
     assert native_buffers.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
 
 
+@pytest.mark.parametrize("name", _CAPACITY_OWNER_NAMES)
+def test_mc_basic_capacity_is_the_single_object_owner(name: str):
+    owner = getattr(capacity, name)
+
+    assert owner.__module__ == capacity.__name__
+    assert not hasattr(maps, name)
+    assert not hasattr(kernels, name)
+
+
+def test_mc_basic_capacity_uses_canonical_runtime_dependencies():
+    assert capacity._required_native_op is symbols.required_symbol
+    assert capacity.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert capacity.torch_compat is torch_compat
+    assert (
+        capacity._ad_native_tangent_or_none
+        is autograd_contracts._ad_native_tangent_or_none
+    )
+    assert capacity._ad_native_tensor is autograd_contracts._ad_native_tensor
+
+
 @pytest.mark.parametrize("name", _MAP_OWNER_NAMES)
 def test_mc_basic_maps_is_the_single_object_owner(name: str):
     owner = getattr(maps, name)
@@ -163,14 +196,12 @@ def test_mc_basic_maps_uses_canonical_runtime_dependencies():
     assert maps._ad_frequency_value is autograd_contracts._ad_frequency_value
     assert maps._ad_geometry_tangent is autograd_contracts._ad_geometry_tangent
     assert (
-        maps._ad_native_tangent_or_none
-        is autograd_contracts._ad_native_tangent_or_none
+        maps._ad_native_tangent_or_none is autograd_contracts._ad_native_tangent_or_none
     )
     assert maps._ad_native_tensor is autograd_contracts._ad_native_tensor
     assert maps._ad_reject_fixed_inputs is autograd_contracts._ad_reject_fixed_inputs
     assert (
-        maps._ad_reject_fixed_tangents
-        is autograd_contracts._ad_reject_fixed_tangents
+        maps._ad_reject_fixed_tangents is autograd_contracts._ad_reject_fixed_tangents
     )
     assert maps._LIGHT_SPEED_M_PER_S_AD == 299_792_458.0
     assert maps._MC_FINALIZE_FIELDS
@@ -188,12 +219,40 @@ def test_mc_basic_maps_los_ad_methods_resolve_canonical_siblings():
         inspect.unwrap(function.backward).__globals__["mc_los_path_gain_backward"]
         is maps.mc_los_path_gain_backward
     )
+    assert function.jvp.__globals__["mc_los_path_gain_jvp"] is maps.mc_los_path_gain_jvp
+    assert maps.mc_los_path_gain_ad.__globals__["_McLosPathGainAdFunction"] is function
+
+
+def test_mc_basic_capacity_map_sanitizer_resolves_native_siblings():
+    function = capacity._McCapacityFailureComponentMapsSanitizeFunction
+
+    assert function.forward.__globals__ is capacity.__dict__
+    assert function.setup_context.__globals__ is capacity.__dict__
+    assert inspect.unwrap(function.backward).__globals__ is capacity.__dict__
+    assert function.jvp.__globals__ is capacity.__dict__
     assert (
-        function.jvp.__globals__["mc_los_path_gain_jvp"]
-        is maps.mc_los_path_gain_jvp
+        function.forward.__globals__[
+            "_mc_capacity_failure_component_maps_sanitize_native"
+        ]
+        is capacity._mc_capacity_failure_component_maps_sanitize_native
     )
     assert (
-        maps.mc_los_path_gain_ad.__globals__["_McLosPathGainAdFunction"] is function
+        inspect.unwrap(function.backward).__globals__[
+            "_mc_capacity_failure_component_maps_sanitize_backward_native"
+        ]
+        is capacity._mc_capacity_failure_component_maps_sanitize_backward_native
+    )
+    assert (
+        function.jvp.__globals__[
+            "_mc_capacity_failure_component_maps_sanitize_jvp_native"
+        ]
+        is capacity._mc_capacity_failure_component_maps_sanitize_jvp_native
+    )
+    assert (
+        capacity.mc_capacity_failure_component_maps_sanitize.__globals__[
+            "_McCapacityFailureComponentMapsSanitizeFunction"
+        ]
+        is function
     )
 
 
@@ -236,9 +295,7 @@ def test_mc_basic_maps_grid_ad_methods_resolve_canonical_siblings():
         is maps.mc_apply_los_visibility
     )
     assert (
-        inspect.unwrap(function.backward).__globals__[
-            "mc_los_component_maps_adjoint"
-        ]
+        inspect.unwrap(function.backward).__globals__["mc_los_component_maps_adjoint"]
         is maps.mc_los_component_maps_adjoint
     )
     assert (
@@ -249,9 +306,7 @@ def test_mc_basic_maps_grid_ad_methods_resolve_canonical_siblings():
         function.jvp.__globals__["mc_apply_los_visibility"]
         is maps.mc_apply_los_visibility
     )
-    assert (
-        maps.mc_los_grid_maps_ad.__globals__["_McLosGridMapsAdFunction"] is function
-    )
+    assert maps.mc_los_grid_maps_ad.__globals__["_McLosGridMapsAdFunction"] is function
 
 
 @pytest.mark.parametrize(
@@ -287,9 +342,8 @@ def test_mc_basic_maps_component_ad_methods_resolve_canonical_siblings(
     assert inspect.unwrap(function.backward).__globals__ is maps.__dict__
     assert function.jvp.__globals__ is maps.__dict__
     assert function.forward.__globals__[forward_name] is getattr(maps, forward_name)
-    assert (
-        inspect.unwrap(function.backward).__globals__[backward_name]
-        is getattr(maps, backward_name)
+    assert inspect.unwrap(function.backward).__globals__[backward_name] is getattr(
+        maps, backward_name
     )
     assert function.jvp.__globals__[jvp_name] is getattr(maps, jvp_name)
     assert getattr(maps, entry_name).__globals__[class_name] is function

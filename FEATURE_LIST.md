@@ -27,15 +27,23 @@ priority `scattering > diffraction > transmission > reflection > los`.
   and identity
   `rayd.torch.integration`. The numeric API version is 6 and is validated
   independently from this stable, capability-neutral source name.
-- ADR-027 Phase P exposes the complete RayD fixed-capacity straight-segment
+- ADR-027 exposes the complete RayD fixed-capacity straight-segment
   penetration primal/tape/VJP/JVP family, Channel named facades, shared
   capacity-failure wiring, compile-frozen policy diagonals, component-5
   topology pack, and MC wall-product prefix semantics. Path, Deterministic,
   and the ADR-008 BDPT oracle now share one live pair-major
   `EnumeratedFullDistance` batch through the enumerated engine. The old
   per-depth active-row/closest-hit march is deleted without a compatibility
-  alias. Monte Carlo Basic retains its existing route until its separate
-  `MonteCarloTargetInset` atomic switch.
+  alias. Phase M also switches Monte Carlo Basic to one flattened pair-major
+  `MonteCarloTargetInset` batch and the Channel-native polarized wall-product
+  family. Its former per-transmitter Python/Torch march and Torch TE/TM/product
+  route have no production caller. A Basic-owned native five-component-map
+  sanitizer primal/VJP/JVP family makes every map and derivative inert on
+  shared failure before finalization. Both activations use the same solve-owned
+  failure state and observe it once after final result assembly.
+  Basic metadata reports this resident work bound as `contribution_capacity`;
+  it does not expose a host `valid_contribution_count` that would require a
+  device nonzero-count synchronization.
 - RayD is the unique numerical source owner of the shared complex, medium,
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and

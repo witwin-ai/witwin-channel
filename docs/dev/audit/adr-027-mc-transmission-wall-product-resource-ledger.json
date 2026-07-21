@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "scope": "dormant ADR-027 MC straight-penetration wall-product estimator",
-  "status": "dormant native family; live MC transmission march unchanged",
+  "scope": "live ADR-027 MC straight-penetration wall-product estimator",
+  "status": "live Phase M native family; flattened MC transmission route active",
   "symbols": [
     "mc_transmission_wall_product",
     "mc_transmission_wall_product_backward",
@@ -10,8 +10,10 @@
   "ownership": {
     "numerical_owner": "Channel Native",
     "python_owner": "witwin.channel_native.montecarlo.basic.kernels.transmission",
-    "live_callers": [],
-    "activation_commit": "ADR-027 MonteCarloTargetInset atomic switch/delete"
+    "live_callers": [
+      "witwin.channel_native.montecarlo.basic.rayd_components.transmission_component_map"
+    ],
+    "activation_commit": "ADR-027 Phase M MonteCarloTargetInset atomic switch/delete"
   },
   "resident_contract": {
     "input_layout": "fixed [pair_count, hit_capacity] RayD penetration result",
@@ -78,17 +80,39 @@
     "units": "bytes; excludes caller-owned penetration inputs and allocator rounding"
   },
   "phase_p_extension": {
-    "status": "canonical valid-prefix contract implemented; refreshed build/CUDA evidence owned by the Phase P commit",
+    "status": "canonical valid-prefix contract live in the Phase M solver route",
     "rayd_lock": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
-    "live_switch_performed": false,
+    "live_switch_performed": true,
     "resource_rollup": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
   },
+  "phase_m_activation": {
+    "status": "live flattened MonteCarloTargetInset batch and native wall-product family",
+    "pair_order": "transmitter-major, receiver-minor",
+    "transaction": "one solve-owned CapacityFailureState shared by RayD penetration, wall product, five-map sanitizer, and final terminal observer",
+    "component_map_sanitizer": {
+      "symbols": [
+        "mc_capacity_failure_component_maps_sanitize",
+        "mc_capacity_failure_component_maps_sanitize_backward",
+        "mc_capacity_failure_component_maps_sanitize_jvp"
+      ],
+      "python_owner": "witwin.channel_native.montecarlo.basic.kernels.capacity.mc_capacity_failure_component_maps_sanitize",
+      "contract": "one fused current-stream pass over five equal-shaped maps; success is exact identity and failure makes every primal/VJP/JVP value positive zero before finalization"
+    },
+    "binding_delta": {
+      "before": 238,
+      "added": 3,
+      "after": 241
+    },
+    "terminal_order": "five-map sanitizer, component finalization, metadata/diagnostics and Result construction, then exactly one terminal_check",
+    "adr029_complete": false,
+    "final_performance_evidence": "pending Phase 12 independent-process profiling and release closure"
+  },
   "acceptance": {
-    "scope": "historical dormant-family evidence before the Phase P canonical-prefix tightening; refreshed evidence is recorded by the Phase P commit",
+    "scope": "historical dormant-family CUDA evidence retained; Phase M activation and final performance evidence are recorded separately",
     "direct_contract_test": "tests/montecarlo/basic/test_transmission_wall_product.py (28 passed; capacity, N=0/D=0, stream, poison, ordered product, and all-or-nothing failures)",
     "ad_test": "native VJP/JVP duality, repeat-exactness, custom autograd, optional-none, stride-0/non-contiguous views, CSR-offset, and failure-inert cases passed",
     "no_fallback_test": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_has_one_owner_and_no_fallback",
-    "live_switch_performed": false,
+    "live_switch_performed": true,
     "cuda_build_and_test": {
       "configure": "fresh Ninja Release tree; CMAKE_CUDA_ARCHITECTURES=120-real; TORCH_CUDA_ARCH_LIST=12.0; RayD 102470daf44b649030df3b2554d9ace5c1eea482",
       "build": "single fresh _channel_native target linked successfully; subsequent build ran only the identity validator with no compile or link",

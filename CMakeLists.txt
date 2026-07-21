@@ -515,6 +515,7 @@ Python_add_library(
     native/channel_native/kernels/los.cu
     native/channel_native/kernels/los_silhouette_clearance.cu
     native/channel_native/kernels/material.cu
+    native/channel_native/kernels/mc_capacity_failure_component_maps_sanitize.cu
     native/channel_native/kernels/mc_transmission_wall_product.cu
     native/channel_native/kernels/path_compaction.cu
     native/channel_native/kernels/reflection_candidate_capacity.cu

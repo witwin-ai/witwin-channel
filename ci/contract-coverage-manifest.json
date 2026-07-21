@@ -58,6 +58,8 @@
     "native-field-transmission": "tests/kernels/test_field_transmission_sequence.py::test_lossy_wall_attenuates_consistently_with_layer_stack_eval",
     "native-material-layer-stack": "tests/kernels/test_em_layer_stack.py::test_single_layer_matches_complex128_oracle_at_oblique_lossy_conditions",
     "native-mc-maps": "tests/kernels/test_ops_facade.py::test_mc_component_map_buffer_and_store_kernels_write_tx_slots",
+    "native-mc-capacity-failure-component-maps-sanitize": "tests/montecarlo/basic/test_capacity_failure_component_maps.py::test_component_map_sanitizer_success_is_exact_on_current_stream",
+    "native-mc-capacity-failure-component-maps-sanitize-ad": "tests/montecarlo/basic/test_capacity_failure_component_maps.py::test_component_map_sanitizer_vjp_jvp_and_duality",
     "native-mc-transmission-wall-product": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_capacity_poison_and_product_order",
     "native-mc-transmission-wall-product-ad": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
     "native-mc-sampling": "tests/kernels/test_ops_facade.py::test_mc_diffraction_state_pack_gathers_edge_state_tensors",
@@ -119,6 +121,7 @@
     "mc-basic-diffraction": "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_diffraction_component_map_when_available",
     "mc-basic-los": "tests/montecarlo/basic/test_basic_solver_smoke.py::test_basic_solver_los_smoke_returns_cuda_result",
     "mc-basic-reflection": "tests/montecarlo/basic/test_basic_component_maps.py::test_basic_solver_returns_native_reflection_component_map_when_available",
+    "mc-basic-transmission": "tests/montecarlo/basic/test_basic_transmission.py::test_transmission_solve_shares_exact_failure_state_through_final_terminal",
     "mc-basic-transmission-wall-product": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family",
     "path-coupled": "tests/path/test_path_reflection_diffraction_sequences.py::test_solve_exports_bounded_reflection_diffraction_sequences",
     "path-diffraction": "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available",
@@ -2037,6 +2040,33 @@
       "native-mc-maps",
       [
         "mc-basic-diffraction"
+      ]
+    ],
+    [
+      "mc_capacity_failure_component_maps_sanitize",
+      "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_native",
+      "native_call_site",
+      "native-mc-capacity-failure-component-maps-sanitize",
+      [
+        "mc-basic-transmission"
+      ]
+    ],
+    [
+      "mc_capacity_failure_component_maps_sanitize_backward",
+      "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_backward_native",
+      "native_call_site",
+      "native-mc-capacity-failure-component-maps-sanitize-ad",
+      [
+        "mc-basic-transmission"
+      ]
+    ],
+    [
+      "mc_capacity_failure_component_maps_sanitize_jvp",
+      "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_jvp_native",
+      "native_call_site",
+      "native-mc-capacity-failure-component-maps-sanitize-ad",
+      [
+        "mc-basic-transmission"
       ]
     ],
     [

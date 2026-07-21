@@ -1,7 +1,7 @@
 # ADR-027: Batched segment-penetration geometry
 
-- **Status:** Accepted (2026-07-20); RayD/Channel foundation and enumerated
-  activation implemented, Monte Carlo activation pending
+- **Status:** Accepted (2026-07-20); RayD/Channel foundation, enumerated
+  activation, and Monte Carlo Basic activation implemented; final evidence pending
 - **Date:** 2026-07-20
 - **Kind:** Native geometry, launch/fusion, fixed-capacity, automatic
   differentiation, and cross-repository ownership decision.
@@ -293,11 +293,23 @@ path unreachable.
    downstream legacy canonical valid-row compaction until ADR-029 activation;
    that device-selected-shape boundary remains a release/performance blocker
    and is not counted as completion of the public capacity-result contract.
-5. **Monte Carlo atomic switch:** switch MC Basic to one flattened
+5. **Monte Carlo atomic switch (implemented 2026-07-21):** switch MC Basic to one flattened
    `MonteCarloTargetInset` batch, route its resident hit block through the
    Channel native estimator, and delete the Torch depth loop, host Boolean
    breaks, row compaction/index-update physics, and Torch TE/TM/product
    expressions. Keep unrelated scattering users of shared epsilon utilities.
+   The flattened batch preserves transmitter-major/receiver-minor order and
+    shares one solve transaction through penetration, wall-product sanitization,
+    the Basic-owned native five-component-map primal/backward/JVP sanitizer
+    family before finalization,
+    final result assembly, and the unique terminal observer.
+   The switch removes the misleading host metadata key
+   `valid_contribution_count`. A host integer cannot truthfully expose the
+   device-resident number of nonzero map contributions without a forbidden
+   count read and synchronization. Basic therefore reports only the
+   host-known `contribution_capacity`; actual values remain in the CUDA result
+   maps. This is an intentional metadata schema migration with no compatibility
+   alias, not a reinterpretation of an `actual` field as capacity.
 6. **Evidence and closure:** record exactness, AD, launch/timeline, memory,
    performance, packaging, and clean-checkout evidence in both repositories;
    update the RayD lock/fingerprint, owner inventory, duplication ledger,

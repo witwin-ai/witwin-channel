@@ -10,12 +10,14 @@ contracts they share. It is not itself a solver API: callers select either
 - `basic/` owns the incoherent Monte Carlo power-map solver, including its
   configuration, result type, orchestration, sampling, metadata, and
   solver-local kernel facades.
-  Its dormant ADR-027 wall-product primal/VJP/JVP facade consumes fixed RayD
-  penetration storage and a solve-owned failure state; it has no live solver
-  caller until the MonteCarloTargetInset atomic switch/delete commit.
+  Its live ADR-027 wall-product primal/VJP/JVP facade consumes fixed RayD
+  penetration storage and the solve-owned failure state after one flattened
+  `MonteCarloTargetInset` traversal batch.
   The fixed-capacity product checks validity before every hit, uses only the
   canonical valid prefix bounded by the device `num_hits`, multiplies walls in
   ascending slot order, and never treats poisoned tail storage as an event.
+  Basic metadata exposes only the host-known `contribution_capacity`; it does
+  not perform a device nonzero-count read or publish a host actual-count key.
 - `bdpt/` owns bidirectional path tracing, including subpaths, connections,
   MIS, optional path-sample export, accumulation, and its solver-local kernel
   facades. Its package loads `solve` lazily to keep the public import light.
@@ -100,10 +102,18 @@ promises. The parent `montecarlo` package exports no solver symbols.
   frequency. Discrete validity/IDs, geometry mode, permeability, and transmitter
   polarization remain fixed. Wall products and shared-parameter reductions use
   deterministic ascending orders without floating-point atomics.
-- The future `MonteCarloTargetInset` traversal is one flattened RayD batch,
-  not one trace per transmitter. Phase P exposes its dormant typed geometry
-  and estimator contracts only; the current live solver is unchanged until
-  the dedicated switch/delete commit.
+- The live `MonteCarloTargetInset` traversal is one flattened pair-major RayD
+  batch, not one trace per transmitter. It preserves transmitter-major,
+  receiver-minor order and routes the resident fixed-capacity hit block through
+  the Channel-native wall-product primal/VJP/JVP family. Penetration and the
+  estimator share one `CapacityFailureState`; failed work is sanitized before
+  the Basic-owned native five-component-map primal/VJP/JVP sanitizer family
+  runs before finalization, and the solve enqueues the unique terminal observer
+  once after final result assembly.
+- The former Python depth march, host Boolean breaks, active-row compaction,
+  Torch restart/normalization, incident TE/TM, and wall-product expressions are
+  not production backends or compatibility routes. Scattering retains only its
+  independently owned event utilities.
 - BDPT supports only `ad_mode="none"`. Any other mode is rejected by
   `Config`; detached or zero gradients are not a substitute.
 

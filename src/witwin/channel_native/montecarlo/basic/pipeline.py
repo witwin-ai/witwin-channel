@@ -5,18 +5,20 @@ from typing import TYPE_CHECKING, Any
 import torch
 
 from witwin.channel_native import build_info
-from witwin.channel_native.scene.models import ReceiverGrid
 from witwin.channel_native.core.antenna import validate_scalar_endpoint_features
 from witwin.channel_native.core.edge_selection import resolve_scene_edge_policy
-from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.core.memory_budget import (
     enforce_memory_budget,
     estimate_monte_carlo_memory,
 )
+from witwin.channel_native.core.receiver_geometry import first_receiver_grid
+from witwin.channel_native.materials.encoding import face_material_field_bundle
 from witwin.channel_native.materials.evaluation import (
     _require_frequency_ad_constant_materials,
 )
-from witwin.channel_native.core.receiver_geometry import first_receiver_grid
+from witwin.channel_native.montecarlo.basic.kernels.capacity import (
+    mc_capacity_failure_component_maps_sanitize,
+)
 from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_component_map_buffer,
     mc_finalize_component_maps,
@@ -25,6 +27,12 @@ from witwin.channel_native.montecarlo.basic.kernels.maps import (
     mc_reflection_ad_max_depth,
     mc_zero_matrix,
 )
+from witwin.channel_native.runtime.capacity import (
+    SolveCapacityTransaction,
+    create_solve_capacity_transaction,
+)
+from witwin.channel_native.scene.models import ReceiverGrid
+
 from .backend import apply_point_los_visibility, los_path_gain
 from .config import Config
 from .metadata import AdLaunchLedger, make_solver_metadata
@@ -36,7 +44,6 @@ from .rayd_components import (
     scattering_component_map,
     transmission_component_map,
 )
-
 from .result import Result
 from .sampling import make_cuda_generator
 
@@ -122,7 +129,7 @@ def _mc_scattering_component(
     ledger,
     zero_component_map,
 ) -> tuple[torch.Tensor, dict[str, int] | None, int, int]:
-    """Scattering component map and (path, valid) row-count deltas.
+    """Scattering component map and (path, capacity) row-count deltas.
 
     Grid receivers with structures carry the native scattering map; otherwise the
     component is a zero map with no row-count contribution. Preserves the exact
@@ -141,9 +148,53 @@ def _mc_scattering_component(
             ledger=ledger if ad else None,
         )
         path_delta = stats["sample_count"]
-        valid_delta = int(torch.count_nonzero(component_map))
-        return component_map, stats, path_delta, valid_delta
+        capacity_delta = int(component_map.numel())
+        return component_map, stats, path_delta, capacity_delta
     return zero_component_map(), None, 0, 0
+
+
+def _validate_native_component_capabilities(
+    config: Config,
+    *,
+    reflection_available: bool,
+    diffraction_available: bool,
+    transmission_available: bool,
+    scattering_available: bool,
+) -> None:
+    if "reflection" in config.components and not reflection_available:
+        raise RuntimeError("reflection requires RayD native capability")
+    if "diffraction" in config.components and not diffraction_available:
+        raise RuntimeError("diffraction requires RayD native capability")
+    if "transmission" in config.components and not transmission_available:
+        raise RuntimeError("transmission requires RayD native capability")
+    if "scattering" in config.components and not scattering_available:
+        raise RuntimeError("scattering requires RayD native capability")
+
+
+def _initial_los_state(
+    scene: Scene,
+    config: Config,
+    *,
+    device: torch.device,
+    rayd: object,
+    grid: ReceiverGrid | None,
+    ad: bool,
+    ledger: AdLaunchLedger,
+) -> tuple[torch.Tensor, int, int]:
+    if "los" in config.components:
+        los = los_path_gain(scene, device=device, ad=ad, ledger=ledger if ad else None)
+        if grid is None:
+            los = apply_point_los_visibility(scene, rayd, los, device=device)
+        return los, config.samples, config.samples
+
+    tx_count = len(scene.transmitters)
+    rx_count = sum(
+        receiver.points().shape[0] if hasattr(receiver, "points") else 1
+        for receiver in scene.receivers
+    )
+    reference = torch.empty((1, 1), device=device, dtype=torch.float32)
+    los = mc_zero_matrix(reference, rows=tx_count, cols=rx_count)
+    return los, 0, 0
 
 
 def solve_pipeline(
@@ -175,51 +226,43 @@ def solve_pipeline(
     diffraction_available = bool(info["uses_rayd_native"])
     transmission_available = bool(info["uses_rayd_native"])
     scattering_available = bool(info["uses_rayd_native"])
-    if "reflection" in config.components and not reflection_available:
-        raise RuntimeError("reflection requires RayD native capability")
-    if "diffraction" in config.components and not diffraction_available:
-        raise RuntimeError("diffraction requires RayD native capability")
-    if "transmission" in config.components and not transmission_available:
-        raise RuntimeError("transmission requires RayD native capability")
-    if "scattering" in config.components and not scattering_available:
-        raise RuntimeError("scattering requires RayD native capability")
+    _validate_native_component_capabilities(
+        config,
+        reflection_available=reflection_available,
+        diffraction_available=diffraction_available,
+        transmission_available=transmission_available,
+        scattering_available=scattering_available,
+    )
 
     device = torch.device("cuda")
     make_cuda_generator_fn(config.seed)
     rayd = scene.rayd_scene()
     grid = first_receiver_grid(scene)
     ledger = AdLaunchLedger()
-    if "los" in config.components:
-        los = los_path_gain(
-            scene, device=device, ad=ad, ledger=ledger if ad else None
-        )
-        if grid is None:
-            los = apply_point_los_visibility(scene, rayd, los, device=device)
-        path_count = config.samples
-        valid_contribution_count = config.samples
-    else:
-        tx_count = len(scene.transmitters)
-        rx_count = sum(
-            receiver.points().shape[0] if hasattr(receiver, "points") else 1
-            for receiver in scene.receivers
-        )
-        reference = torch.empty((1, 1), device=device, dtype=torch.float32)
-        los = mc_zero_matrix(reference, rows=tx_count, cols=rx_count)
-        path_count = 0
-        valid_contribution_count = 0
+    los, path_count, contribution_capacity = _initial_los_state(
+        scene,
+        config,
+        device=device,
+        rayd=rayd,
+        grid=grid,
+        ad=ad,
+        ledger=ledger,
+    )
 
     component_maps: dict[str, torch.Tensor] | None = None
     scattering_stats: dict[str, int] | None = None
+    capacity_transaction: SolveCapacityTransaction | None = None
     if grid is not None:
         component_maps = {}
         grid_dim0, grid_dim1 = component_grid_shape(grid)
+
         def zero_component_map() -> torch.Tensor:
             return mc_component_map_buffer(
                 los,
                 tx_count=len(scene.transmitters),
                 dim0=grid_dim0,
                 dim1=grid_dim1,
-        )
+            )
 
         if "los" in config.components:
             component_maps["los"] = los_component_map(
@@ -233,18 +276,24 @@ def solve_pipeline(
             )
         else:
             component_maps["los"] = zero_component_map()
-        needs_reflection_launch = (
-            reflection_available
-            and (("reflection" in config.components) or ("diffraction" in config.components and diffraction_available))
+        needs_reflection_launch = reflection_available and (
+            ("reflection" in config.components)
+            or ("diffraction" in config.components and diffraction_available)
         )
         material_tensors = None
-        if needs_reflection_launch or ("diffraction" in config.components and diffraction_available):
+        if needs_reflection_launch or (
+            "diffraction" in config.components and diffraction_available
+        ):
             material_tensors = _face_material_tensors(scene, device=device, ad=ad)
         reflection_result = None
-        collect_diffraction_wedges = "diffraction" in config.components and diffraction_available
+        collect_diffraction_wedges = (
+            "diffraction" in config.components and diffraction_available
+        )
         if needs_reflection_launch:
             if material_tensors is None:
-                raise RuntimeError("material tensors are required for native reflection")
+                raise RuntimeError(
+                    "material tensors are required for native reflection"
+                )
             # A diffraction-only AD solve still needs the reflection launch
             # for wedge discovery, but its (discarded) reflection map stays
             # primal so no spurious companions are registered.
@@ -261,15 +310,21 @@ def solve_pipeline(
                 ad=reflection_ad,
                 ledger=ledger if reflection_ad else None,
             )
-        if "reflection" in config.components and reflection_available and reflection_result is not None:
+        if (
+            "reflection" in config.components
+            and reflection_available
+            and reflection_result is not None
+        ):
             component_maps["reflection"] = reflection_result.maps
             path_count += config.samples
-            valid_contribution_count += int(component_maps["reflection"].numel())
+            contribution_capacity += int(component_maps["reflection"].numel())
         else:
             component_maps["reflection"] = zero_component_map()
         if "diffraction" in config.components and diffraction_available:
             if material_tensors is None:
-                raise RuntimeError("material tensors are required for native diffraction")
+                raise RuntimeError(
+                    "material tensors are required for native diffraction"
+                )
             component_maps["diffraction"] = diffraction_component_map(
                 scene,
                 rayd,
@@ -287,24 +342,30 @@ def solve_pipeline(
                 ledger=ledger if ad else None,
             )
             path_count += config.samples
-            valid_contribution_count += int(component_maps["diffraction"].numel())
+            contribution_capacity += int(component_maps["diffraction"].numel())
         else:
             component_maps["diffraction"] = zero_component_map()
-        if "transmission" in config.components and scene.structures:
+        transmission_has_rows = (
+            "transmission" in config.components
+            and bool(scene.structures)
+            and len(scene.transmitters) > 0
+            and grid_dim0 * grid_dim1 > 0
+        )
+        if transmission_has_rows:
+            capacity_transaction = create_solve_capacity_transaction(los)
             component_maps["transmission"] = transmission_component_map(
                 scene,
                 rayd,
                 grid,
                 max_depth=config.max_depth,
                 device=device,
+                failure_state=capacity_transaction.failure_state,
                 los=los if "los" in config.components else None,
                 ad=ad,
                 ledger=ledger if ad else None,
             )
             path_count += len(scene.transmitters) * grid_dim0 * grid_dim1
-            valid_contribution_count += int(
-                torch.count_nonzero(component_maps["transmission"])
-            )
+            contribution_capacity += int(component_maps["transmission"].numel())
         elif "transmission" in config.components:
             component_maps["transmission"] = zero_component_map()
         if "scattering" in config.components:
@@ -312,7 +373,7 @@ def solve_pipeline(
                 component_maps["scattering"],
                 scattering_stats,
                 scattering_path_delta,
-                scattering_valid_delta,
+                scattering_capacity_delta,
             ) = _mc_scattering_component(
                 scene,
                 rayd,
@@ -324,17 +385,47 @@ def solve_pipeline(
                 zero_component_map=zero_component_map,
             )
             path_count += scattering_path_delta
-            valid_contribution_count += scattering_valid_delta
+            contribution_capacity += scattering_capacity_delta
 
     path_gain = los
     if component_maps is not None:
+        transmission_map = (
+            component_maps["transmission"]
+            if "transmission" in component_maps
+            else zero_component_map()
+        )
+        scattering_map = (
+            component_maps["scattering"]
+            if "scattering" in component_maps
+            else zero_component_map()
+        )
+        final_component_maps = {
+            "los": component_maps["los"],
+            "reflection": component_maps["reflection"],
+            "diffraction": component_maps["diffraction"],
+            "transmission": transmission_map,
+            "scattering": scattering_map,
+        }
+        if capacity_transaction is not None:
+            if ad:
+                ledger.add(*final_component_maps.values())
+            final_component_maps = mc_capacity_failure_component_maps_sanitize(
+                final_component_maps["los"],
+                final_component_maps["reflection"],
+                final_component_maps["diffraction"],
+                final_component_maps["transmission"],
+                final_component_maps["scattering"],
+                failure_state=capacity_transaction.failure_state,
+            )
+            for name in tuple(component_maps):
+                component_maps[name] = final_component_maps[name]
         finalize = mc_finalize_component_maps_ad if ad else mc_finalize_component_maps
         finalized = finalize(
-            component_maps["los"],
-            component_maps["reflection"],
-            component_maps["diffraction"],
-            component_maps.get("transmission", zero_component_map()),
-            component_maps.get("scattering", zero_component_map()),
+            final_component_maps["los"],
+            final_component_maps["reflection"],
+            final_component_maps["diffraction"],
+            final_component_maps["transmission"],
+            final_component_maps["scattering"],
         )
         path_gain = finalized["path_gain"]
         component_power = {
@@ -359,7 +450,7 @@ def solve_pipeline(
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,
-        valid_contribution_count=valid_contribution_count,
+        contribution_capacity=contribution_capacity,
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
         ad_ledger=ledger,
@@ -383,13 +474,18 @@ def solve_pipeline(
             "device": str(los.device),
             "component_power_keys": tuple(component_power),
             "component_map_shapes": (
-                None if component_maps is None else {key: tuple(value.shape) for key, value in component_maps.items()}
+                None
+                if component_maps is None
+                else {key: tuple(value.shape) for key, value in component_maps.items()}
             ),
         }
-    return Result(
+    result = Result(
         path_gain=path_gain,
         component_power=component_power,
         metadata=metadata,
         diagnostics=diagnostics,
         component_maps=component_maps,
     )
+    if capacity_transaction is not None:
+        capacity_transaction.terminal_check()
+    return result

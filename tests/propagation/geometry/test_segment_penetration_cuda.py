@@ -76,12 +76,13 @@ def _request(
     targets: torch.Tensor,
     *,
     hit_capacity: int = 2,
+    policy: SegmentPenetrationPolicy = SegmentPenetrationPolicy.EnumeratedFullDistance,
 ):
     failure_state = create_capacity_failure_state(origins)
     kwargs = {
         "input_active_any": True,
         "hit_capacity": hit_capacity,
-        "policy": SegmentPenetrationPolicy.EnumeratedFullDistance,
+        "policy": policy,
         "scene_diagonal": 23.0,
         "failure_state": failure_state,
     }
@@ -324,3 +325,78 @@ def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
     assert not packed.valid.any().item()
     assert packed.execution.device_candidate_count.tolist() == [0]
     assert packed.execution.device_guardrail_count.tolist() == [0]
+
+
+def test_monte_carlo_policy_batches_clear_one_exact_capacity_and_zero_length() -> None:
+    rayd, _vertices = _scene()
+    origins = torch.tensor(
+        [
+            [7.0, 7.0, -1.0],
+            [0.0, 0.0, -1.0],
+            [0.0, 0.0, -1.0],
+            [3.0, 3.0, 0.5],
+        ],
+        dtype=torch.float32,
+        device="cuda",
+    )
+    targets = torch.tensor(
+        [
+            [7.0, 7.0, 1.5],
+            [0.0, 0.0, 0.5],
+            [0.0, 0.0, 1.5],
+            [3.0, 3.0, 0.5],
+        ],
+        dtype=torch.float32,
+        device="cuda",
+    )
+    stream = torch.cuda.Stream()
+    with torch.cuda.stream(stream):
+        failure_state, kwargs = _request(
+            rayd,
+            origins,
+            targets,
+            policy=SegmentPenetrationPolicy.MonteCarloTargetInset,
+        )
+        result = bridge.rayd_segment_penetration_forward(
+            rayd, origins, targets, None, **kwargs
+        )
+    stream.synchronize()
+
+    assert failure_state.bits.tolist() == [0]
+    assert result.num_hits.tolist() == [0, 1, 2, 0]
+    assert result.reached_target.tolist() == [True, True, True, True]
+    assert result.valid.tolist() == [
+        [False, False],
+        [True, False],
+        [True, True],
+        [False, False],
+    ]
+    assert result.global_primitive_id[1].tolist() == [0, -1]
+    assert result.global_primitive_id[2].tolist() == [0, 1]
+
+
+def test_monte_carlo_d_plus_one_overflow_poison_is_batch_wide() -> None:
+    rayd, _vertices = _scene()
+    origins = torch.tensor(
+        [[0.0, 0.0, -1.0], [7.0, 7.0, -1.0]],
+        dtype=torch.float32,
+        device="cuda",
+    )
+    targets = torch.tensor(
+        [[0.0, 0.0, 3.0], [7.0, 7.0, 3.0]],
+        dtype=torch.float32,
+        device="cuda",
+    )
+    failure_state, kwargs = _request(
+        rayd,
+        origins,
+        targets,
+        policy=SegmentPenetrationPolicy.MonteCarloTargetInset,
+    )
+    result = bridge.rayd_segment_penetration_forward(
+        rayd, origins, targets, None, **kwargs
+    )
+
+    assert failure_state.bits.tolist() == [1 << 7]
+    assert result.overflow.tolist() == [True, False]
+    _assert_result_inert(result)

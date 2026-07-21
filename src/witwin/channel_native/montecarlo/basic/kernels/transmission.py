@@ -87,9 +87,7 @@ def _validate_inputs(
         "layer_thickness_m", layer_thickness_m, dtype=torch.float32, ndim=1
     )
     validate_cuda_tensor("layer_eps_r", layer_eps_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "layer_sigma_e", layer_sigma_e, dtype=torch.float32, ndim=1
-    )
+    validate_cuda_tensor("layer_sigma_e", layer_sigma_e, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("layer_mu_r", layer_mu_r, dtype=torch.float32, ndim=1)
     validate_cuda_tensor(
         "pair_polarization",
@@ -199,12 +197,8 @@ def _result(exported: object, *, rows: int) -> McTransmissionWallProduct:
     transmittance = exported["transmittance"]
     wall_count = exported["wall_count"]
     penetrated = exported["penetrated"]
-    validate_cuda_tensor(
-        "scaled_power", scaled_power, dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "transmittance", transmittance, dtype=torch.float32, ndim=1
-    )
+    validate_cuda_tensor("scaled_power", scaled_power, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("transmittance", transmittance, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("wall_count", wall_count, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("penetrated", penetrated, dtype=torch.bool, ndim=1)
     if any(
@@ -241,7 +235,7 @@ def mc_transmission_wall_product(
     *,
     frequency_hz: float,
 ) -> McTransmissionWallProduct:
-    """Evaluate the dormant ADR-027 fixed-capacity MC estimator."""
+    """Evaluate the live ADR-027 fixed-capacity MC estimator."""
 
     rows, _ = _validate_inputs(
         valid,
@@ -297,9 +291,7 @@ def mc_transmission_wall_product_backward(
 ) -> tuple[torch.Tensor, ...]:
     if len(inputs) != 16:
         raise ValueError("MC transmission wall-product backward requires 16 inputs")
-    rows, _ = _validate_inputs(
-        *inputs, failure_state, frequency_hz=float(frequency_hz)
-    )
+    rows, _ = _validate_inputs(*inputs, failure_state, frequency_hz=float(frequency_hz))
     for name, gradient in (
         ("grad_scaled_power", grad_scaled_power),
         ("grad_transmittance", grad_transmittance),
@@ -320,7 +312,9 @@ def mc_transmission_wall_product_backward(
         grad_transmittance,
     )
     if not isinstance(exported, tuple) or len(exported) != 7:
-        raise TypeError("native MC transmission wall-product backward must return 7 tensors")
+        raise TypeError(
+            "native MC transmission wall-product backward must return 7 tensors"
+        )
     expected = (
         (torch.float32, inputs[3].shape),
         (torch.float32, inputs[4].shape),
@@ -330,7 +324,9 @@ def mc_transmission_wall_product_backward(
         (torch.float32, inputs[15].shape),
         (torch.float32, (1,)),
     )
-    for index, (tensor, (dtype, shape)) in enumerate(zip(exported, expected, strict=True)):
+    for index, (tensor, (dtype, shape)) in enumerate(
+        zip(exported, expected, strict=True)
+    ):
         validate_cuda_tensor(f"gradient[{index}]", tensor, dtype=dtype, ndim=len(shape))
         if tensor.shape != shape:
             raise ValueError(f"gradient[{index}] has the wrong shape")
@@ -351,9 +347,7 @@ def mc_transmission_wall_product_jvp(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if len(inputs) != 16:
         raise ValueError("MC transmission wall-product JVP requires 16 inputs")
-    rows, _ = _validate_inputs(
-        *inputs, failure_state, frequency_hz=float(frequency_hz)
-    )
+    rows, _ = _validate_inputs(*inputs, failure_state, frequency_hz=float(frequency_hz))
     exported = required_symbol("mc_transmission_wall_product_jvp")(
         *_arguments(*inputs, float(frequency_hz), failure_state),
         tangent_direction,
@@ -374,7 +368,9 @@ def mc_transmission_wall_product_jvp(
     ):
         validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
         if tensor.shape != (rows,):
-            raise ValueError(f"native MC transmission wall-product JVP {name} has wrong rows")
+            raise ValueError(
+                f"native MC transmission wall-product JVP {name} has wrong rows"
+            )
     return scaled_power, transmittance
 
 
@@ -481,9 +477,7 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
         tangent_direction = _ad_geometry_tangent(
             "tangent_direction", tangents[3], inputs[3]
         )
-        tangent_normal = _ad_geometry_tangent(
-            "tangent_normal", tangents[4], inputs[4]
-        )
+        tangent_normal = _ad_geometry_tangent("tangent_normal", tangents[4], inputs[4])
         continuous_tangents = tuple(
             _ad_checked_tangent(
                 name, _ad_native_tangent_or_none(tangent), tuple(primal.shape)

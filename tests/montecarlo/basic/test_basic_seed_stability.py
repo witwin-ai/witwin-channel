@@ -16,7 +16,10 @@ def test_basic_solver_fixed_seed_is_stable_for_counts_and_outputs():
     second = solve(scene, config)
 
     assert first.metadata["path_count"] == second.metadata["path_count"]
-    assert first.metadata["valid_contribution_count"] == second.metadata["valid_contribution_count"]
+    assert (
+        first.metadata["contribution_capacity"]
+        == second.metadata["contribution_capacity"]
+    )
     torch.testing.assert_close(first.path_gain, second.path_gain, rtol=0.0, atol=0.0)
 
 

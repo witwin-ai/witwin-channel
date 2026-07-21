@@ -27,13 +27,13 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 238,
+    "bindings": 241,
     "rayd_numerical": 47,
     "layered": 3,
-    "channel_numerical": 188
+    "channel_numerical": 191
   },
   "current_phase": 12,
-  "current_subphase": "ADR-027 Phase E live enumerated batched penetration",
+  "current_subphase": "ADR-027 Phase M live Monte Carlo batched penetration",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -12332,12 +12332,159 @@
     "plan13_disposition": "ADR-030 native source-state-serial deterministic diffraction pair JVP companion"
   },
   {
+    "symbol": "mc_capacity_failure_component_maps_sanitize",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_mc_capacity_failure_component_maps_sanitize",
+    "binding_registration": {
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 73
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+        "lines": [7],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/mc_capacity_failure_component_maps_sanitize.cu",
+        "lines": [146],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_native",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 59
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/pipeline.py",
+        "line": 414
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 64
+      }
+    ],
+    "contract_test": "tests/montecarlo/basic/test_capacity_failure_component_maps.py::test_component_map_sanitizer_success_is_exact_on_current_stream",
+    "e2e_callers": [
+      "tests/montecarlo/basic/test_basic_transmission.py::test_transmission_solve_shares_exact_failure_state_through_final_terminal"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027/029 MC Basic final component-map failure sanitizer"
+  },
+  {
+    "symbol": "mc_capacity_failure_component_maps_sanitize_backward",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_mc_capacity_failure_component_maps_sanitize_backward",
+    "binding_registration": {
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 77
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+        "lines": [14],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/mc_capacity_failure_component_maps_sanitize.cu",
+        "lines": [158],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_backward_native",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 70
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 115
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 75
+      }
+    ],
+    "contract_test": "tests/montecarlo/basic/test_capacity_failure_component_maps.py::test_component_map_sanitizer_vjp_jvp_and_duality",
+    "e2e_callers": [
+      "tests/montecarlo/basic/test_basic_transmission.py::test_transmission_solve_shares_exact_failure_state_through_final_terminal"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027/029 MC Basic component-map sanitizer VJP"
+  },
+  {
+    "symbol": "mc_capacity_failure_component_maps_sanitize_jvp",
+    "abi_owner": "Channel Native _channel_native",
+    "binding_target": "cn_mc_capacity_failure_component_maps_sanitize_jvp",
+    "binding_registration": {
+      "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+      "line": 81
+    },
+    "target_source_evidence": [
+      {
+        "path": "native/channel_native/binding/montecarlo_transmission.cpp",
+        "lines": [23],
+        "count": 1
+      },
+      {
+        "path": "native/channel_native/kernels/mc_capacity_failure_component_maps_sanitize.cu",
+        "lines": [172],
+        "count": 1
+      }
+    ],
+    "numerical_owner": "Channel Native",
+    "owner_kind": "Channel native implementation",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_jvp_native",
+    "python_definitions": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 81
+      }
+    ],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 135
+      }
+    ],
+    "native_dispatch_evidence": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/capacity.py",
+        "line": 86
+      }
+    ],
+    "contract_test": "tests/montecarlo/basic/test_capacity_failure_component_maps.py::test_component_map_sanitizer_vjp_jvp_and_duality",
+    "e2e_callers": [
+      "tests/montecarlo/basic/test_basic_transmission.py::test_transmission_solve_shares_exact_failure_state_through_final_terminal"
+    ],
+    "surface": "internal-native-ABI",
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027/029 MC Basic component-map sanitizer JVP"
+  },
+  {
     "symbol": "mc_transmission_wall_product",
     "abi_owner": "Channel Native _channel_native",
     "binding_target": "cn_mc_transmission_wall_product",
     "binding_registration": {
       "path": "native/channel_native/binding/montecarlo_transmission.cpp",
-      "line": 47
+      "line": 85
     },
     "target_source_evidence": [
       {
@@ -12360,7 +12507,12 @@
         "line": 224
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/rayd_components.py",
+        "line": 308
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
@@ -12372,8 +12524,8 @@
       "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant MC fixed-capacity straight-penetration wall-product estimator"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live MC fixed-capacity straight-penetration wall-product estimator"
   },
   {
     "symbol": "mc_transmission_wall_product_backward",
@@ -12381,7 +12533,7 @@
     "binding_target": "cn_mc_transmission_wall_product_backward",
     "binding_registration": {
       "path": "native/channel_native/binding/montecarlo_transmission.cpp",
-      "line": 51
+      "line": 89
     },
     "target_source_evidence": [
       {
@@ -12404,7 +12556,12 @@
         "line": 292
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 443
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
@@ -12416,8 +12573,8 @@
       "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant deterministic fixed-topology MC wall-product VJP"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live deterministic fixed-topology MC wall-product VJP"
   },
   {
     "symbol": "mc_transmission_wall_product_jvp",
@@ -12425,7 +12582,7 @@
     "binding_target": "cn_mc_transmission_wall_product_jvp",
     "binding_registration": {
       "path": "native/channel_native/binding/montecarlo_transmission.cpp",
-      "line": 55
+      "line": 93
     },
     "target_source_evidence": [
       {
@@ -12448,7 +12605,12 @@
         "line": 341
       }
     ],
-    "production_callers": [],
+    "production_callers": [
+      {
+        "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
+        "line": 507
+      }
+    ],
     "native_dispatch_evidence": [
       {
         "path": "src/witwin/channel_native/montecarlo/basic/kernels/transmission.py",
@@ -12460,8 +12622,8 @@
       "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_autograd_uses_native_family"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "dormant-native-producer",
-    "plan13_disposition": "ADR-027 dormant fixed-topology MC wall-product JVP"
+    "liveness": "live-static-production-consumer",
+    "plan13_disposition": "ADR-027 live fixed-topology MC wall-product JVP"
   },
   {
     "symbol": "rayd_segment_penetration_forward",
@@ -12955,8 +13117,8 @@
     "activation_contract": "later atomic RayD pin/switch/delete commit only",
     "launch_resource_ledger": "docs/dev/audit/adr-030-diffraction-pair-reducer-launch-resource-ledger.json"
   },
-  "adr027_dormant_mc_transmission_wall_product": {
-    "status": "dormant producer; live MC straight_transmission_chains route unchanged",
+  "adr027_mc_transmission_wall_product": {
+    "status": "live MC Basic flattened target-inset penetration and native wall-product route",
     "symbols": [
       "mc_transmission_wall_product",
       "mc_transmission_wall_product_backward",
@@ -12965,11 +13127,11 @@
     "numerical_owner": "Channel Native",
     "failure_contract": "the exact solve-owned CapacityFailureState is checked before validity and payload; valid must equal the exact [0,num_hits) prefix, and prefix/count or resident index failures OR PAIR_CONTRACT_ERROR before any payload read so every primal/VJP/JVP output is inert",
     "reduction_contract": "wall products use ascending state order; shared layer and frequency VJP owners add in fixed row-then-state order without floating-point atomics",
-    "activation_contract": "later ADR-027 MonteCarloTargetInset atomic switch/delete commit only",
+    "activation_contract": "ADR-027 MonteCarloTargetInset atomic switch/delete implemented",
     "launch_resource_ledger": "docs/dev/audit/adr-027-mc-transmission-wall-product-resource-ledger.json"
   },
   "phase6c_adr027_penetration_foundation": {
-    "status": "enumerated switch live; Monte Carlo switch pending",
+    "status": "enumerated and Monte Carlo switches live; final evidence pending",
     "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
     "integration_header": "backends/torch/include/rayd/torch/integration.h",
     "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
@@ -12984,12 +13146,18 @@
       "enumerated_transmission_topology_pack_backward",
       "enumerated_transmission_topology_pack_jvp",
       "enumerated_capacity_failure_sanitize",
-      "enumerated_capacity_failure_vector_sanitize"
+      "enumerated_capacity_failure_vector_sanitize",
+      "mc_transmission_wall_product",
+      "mc_transmission_wall_product_backward",
+      "mc_transmission_wall_product_jvp",
+      "mc_capacity_failure_component_maps_sanitize",
+      "mc_capacity_failure_component_maps_sanitize_backward",
+      "mc_capacity_failure_component_maps_sanitize_jvp"
     ],
     "owner_counts": {
       "RayD": 47,
       "layered": 3,
-      "Channel Native": 188
+      "Channel Native": 191
     },
     "public_api_delta": false,
     "compatibility_alias": false,

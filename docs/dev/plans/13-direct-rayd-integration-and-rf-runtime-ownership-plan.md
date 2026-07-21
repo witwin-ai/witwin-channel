@@ -3,8 +3,8 @@
 **状态：** EXECUTION IN PROGRESS（用户于 2026-07-20 选择 Phase 8B 方案 2 并要求完成
 Phase 11/12）；ADR-023/024/025/026/027/028/029/030 已接受；Phase 8B、Phase 10A/10B、Phase
 11A/11B、RayD legacy extern-C 删除和稳定 integration 命名已完成。Phase 6C 的 Phase P
-dormant penetration foundation 已完成实现并进入验证；enumerated/MC live switch 仍待独立
-原子提交。Phase 11 live governance/docs 已收口；最终 clean-checkout nightly/release、
+foundation、Phase E enumerated switch 与 Phase M Monte Carlo Basic switch 已实现；Phase M
+最终 CUDA/nightly/performance 证据仍待收口。Phase 11 live governance/docs 已收口；最终 clean-checkout nightly/release、
 wheel/fingerprint 证据和 Phase 12 profiling-driven 性能验收仍在执行
 
 **计划日期：** 2026-07-18
@@ -25,8 +25,8 @@ dependency closure，并修正 immutable owner baseline 与 scattering C1/C2 语
 primal/JVP/VJP family。本文的 owner moves 不改变物理模型、数值顺序、fusion 边界或
 solver 行为；Phase 12 经独立接受的 ADR-030 只把不稳定的 diffraction pair atomic reduction
 改为冻结的 source-state-serial 数值顺序。ADR-027 batched penetration 的 dormant typed
-family、Channel capacity topology pack 和 MC wall-product foundation 已落地，solver 激活仍按
-两个独立 atomic switch/delete 提交执行。
+family、Channel capacity topology pack 和 MC wall-product foundation 已落地；两个 solver
+atomic switch/delete 已分别由 Phase E 与 Phase M 执行。
 
 **关联记录：** [Plan 08](./08-channel-native-modular-architecture-hardening-plan.md)、
 [Plan 10](./10-scattering-v2-multibounce-coherent-ad-plan.md)、
@@ -614,8 +614,8 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ### Phase 6C — ADR-027 后续：Batched penetration / MC glue native 化
 
-**状态：IN PROGRESS（2026-07-21）；Phase P foundation 与 enumerated atomic
-switch/delete 已实现，MC atomic switch/delete 尚未执行。**
+**状态：IN PROGRESS（2026-07-21）；Phase P foundation、Phase E enumerated atomic
+switch/delete 与 Phase M MC Basic atomic switch/delete 已实现；最终两仓 evidence 尚待收口。**
 
 ADR-027 已冻结第 5.5 节两套显式 march policy、稳定 typed API、固定 `[N,D]` hit/tape、一次
 batched traversal、`D+1` overflow probe、device fail-loud/no partial、完整
@@ -646,7 +646,7 @@ implicit-all-valid、optional-mask compatibility 或 Torch 合成 fallback。该
 2. Channel dormant façade、failure-state wiring、component-5 topology pack 与 native MC
    estimator foundation；**已完成**；
 3. enumerated atomic pin/switch/delete；**已实现，待最终 CUDA/nightly 性能证据收口**；
-4. MC Basic atomic switch/delete；
+4. MC Basic atomic switch/delete；**已实现，待最终 CUDA/nightly 性能证据收口**；
 5. 两仓 exact/AD/Nsight/performance/packaging 证据与文档收口。
 
 第 3 步只原子替换 penetration discovery：旧 canonical selector 仍对 fixed-capacity block
@@ -656,6 +656,25 @@ host read，但该既有 compaction/D2H shape 边界必须在后续 ADR-029 capa
 Path 还在 final failure sanitizer 后、legacy result converter 前保留第二个 valid-row structural
 compaction，确保 overflow 后的 `-1` identifiers 不被旧 converter 读取；它与 pre-selector
 compaction 同属 Phase D 必删 blocker，不是新的长期契约。
+
+Phase M 只替换 MC Basic straight penetration。它把所有 transmitter/receiver endpoint 对按
+transmitter-major、receiver-minor 顺序展平，以显式 `MonteCarloTargetInset` 和 compile-cached
+MC scene diagonal 提交一个 RayD fixed-capacity batch；同一 resident hit/tape block随后由
+Channel-native `mc_transmission_wall_product` primal/VJP/JVP 消费。penetration 与 estimator
+共享同一个 solve-owned `CapacityFailureState`，overflow 或 resident contract failure 先使
+geometry 与 wall product inert；Basic-owned `mc_capacity_failure_component_maps_sanitize`
+primal/backward/JVP family 随后在 finalize 前一次清零五个 component maps 及其导数，使最终 result 全部 inert，最后只在最终
+result boundary 调用一次 `capacity_failure_terminal_check`。旧 per-transmitter trace、Python depth loop、host
+Boolean break/compaction、Torch TE/TM 与 product math 已从 production route 删除且无兼容 alias。
+旧 Basic metadata `valid_contribution_count` 需要 device nonzero count 才能保持其“实际数量”
+语义，因此不能在 no-D2H route 上继续伪装为 host 容量。Phase M 将它有意迁移为
+`contribution_capacity`，只报告 host-known capacity；实际 map 值保持 device-resident，且不保留
+兼容 alias。
+
+这不是 ADR-029 完成声明。Path/Deterministic 的 legacy canonical compaction、Path 的
+post-sanitizer compaction，以及其他已列明 Phase D capacity-pack activation blocker 仍然存在；
+在它们被原子删除并完成全套 evidence 前，不得宣称完整 solver no-D2H、public capacity result
+或 Phase 12 性能验收完成。
 
 不得与 ADR-024 move-only 提交混合，也不得使用临时 generation 名称或兼容 alias。激活前必须
 证明每个非空 batch 恰有一次 OptiX traversal、无 host Boolean/count read、target stage median
