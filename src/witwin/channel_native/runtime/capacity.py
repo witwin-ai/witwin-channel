@@ -69,8 +69,19 @@ def require_capacity_failure_state(
     return state
 
 
+def capacity_failure_terminal_check(failure_state: CapacityFailureState) -> None:
+    """Enqueue the one terminal failure observation for a capacity solve."""
+
+    if not isinstance(failure_state, CapacityFailureState):
+        raise TypeError("failure_state must be a CapacityFailureState")
+    from .symbols import required_symbol
+
+    required_symbol("capacity_failure_terminal_check")(failure_state.bits)
+
+
 __all__ = [
     "CapacityFailureBit",
     "CapacityFailureState",
+    "capacity_failure_terminal_check",
     "create_capacity_failure_state",
 ]

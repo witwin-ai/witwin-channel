@@ -12,7 +12,12 @@ protocol. Native creation asynchronously zeros one contiguous CUDA `int32[1]`
 bitmask on the caller's current stream. Capacity producers receive and retain
 the same typed object/storage, atomically OR owner-specific bits, and never read
 the state on the host. Intermediates do not trap; the solve/result boundary owns
-the single terminal failure observation.
+the single `capacity_failure_terminal_check` observation. That runtime-owned
+native operation launches on the caller's current stream, leaves the bitmask
+unchanged, does nothing when it is zero, and raises an asynchronous device
+failure when any bit is set. It performs no host read, synchronization, scalar
+extraction, result allocation, or payload sanitization; every producer must
+publish its canonical inert result before the terminal launch.
 
 ## Public entry points
 

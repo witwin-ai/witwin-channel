@@ -156,6 +156,17 @@ native asynchronous failure operation after all device outputs are inert. This
 permits multiple producer failures to accumulate without poisoning subsequent
 initialization kernels or exposing a partial result.
 
+The dormant runtime owner is named `capacity_failure_terminal_check`. It
+consumes the typed state's exact CUDA `int32[1]` storage, enqueues one 1x1
+kernel on the caller's current stream, leaves the bitmask unchanged, and does
+nothing for zero bits. Any nonzero bit executes the one production device trap;
+the operation has no output, allocation, payload read, sanitizer, host copy, or
+synchronization. It has no live solver caller until the atomic capacity-result
+switch installs exactly one call after all result sanitizers.
+Its frozen launch/memory budget and uniqueness audit are recorded in the
+[terminal resource ledger](../audit/phase13-adr029-capacity-terminal-resource-ledger.json)
+and [terminal duplication ledger](../audit/phase13-adr029-capacity-terminal-duplication-ledger.json).
+
 This error is fail-loud at the next normal CUDA synchronization boundary. The
 solver call must not return a usable partial numerical result. It is expressly
 forbidden to copy the overflow flag or count to the host, call

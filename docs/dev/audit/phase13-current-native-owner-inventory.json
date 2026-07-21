@@ -7,7 +7,7 @@
     "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
     "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
     "binding_count": 222,
-    "binding_manifest_sha256": "a38238e365b7d4baa6ca9c471df24f0a8c3375b6aff3da449e8a52ac5ca25ff7",
+    "binding_manifest_sha256": "d45130301e1455d9b696bde801407ef516cc6c756cc839d3a7b522d3a8c31223",
     "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
     "rayd_lock": {
       "schema_version": 1,
@@ -27,13 +27,13 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 222,
+    "bindings": 223,
     "rayd_numerical": 43,
     "layered": 3,
-    "channel_numerical": 176
+    "channel_numerical": 177
   },
   "current_phase": 12,
-  "current_subphase": "ADR-030 dormant deterministic diffraction pair reducer",
+  "current_subphase": "ADR-029 dormant capacity terminal and ADR-030 dormant pair reducer",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -373,6 +373,22 @@
     "terminal_failure": "single solve/result-boundary native observer in later atomic switch",
     "native_abi_symbol_delta": 1,
     "public_api_delta": false
+  },
+  "phase8b_c1b_capacity_failure_terminal": {
+    "status": "dormant terminal observer; live solvers unchanged",
+    "binding_count": 220,
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 3,
+      "Channel Native": 174
+    },
+    "state_contract": "consumes the exact solve-owned contiguous CUDA int32[1] bitmask",
+    "launch_contract": "one 1x1 kernel on the caller current CUDA stream; zero bits no-op; nonzero bits asynchronous device failure",
+    "forbidden_work": "no D2H, synchronization, scalar extraction, allocation, payload reads, sanitization, or bit clearing",
+    "activation_contract": "later atomic switch installs exactly one call per solve after every result is inert",
+    "native_abi_symbol_delta": 1,
+    "public_api_delta": false,
+    "resource_ledger": "docs/dev/audit/phase13-adr029-capacity-terminal-resource-ledger.json"
   },
   "symbols": [
     {
@@ -2958,7 +2974,7 @@
       "binding_target": "cn_capacity_failure_state_create",
       "binding_registration": {
         "path": "native/channel_native/binding/runtime.cpp",
-        "line": 9
+        "line": 10
       },
       "target_source_evidence": [
         {
@@ -3004,6 +3020,59 @@
       "surface": "internal-native-ABI",
       "liveness": "dormant-native-producer",
       "plan13_disposition": "Phase 8B C1a runtime-owned shared capacity failure state"
+    },
+    {
+      "symbol": "capacity_failure_terminal_check",
+      "abi_owner": "Channel Native _channel_native",
+      "binding_target": "cn_capacity_failure_terminal_check",
+      "binding_registration": {
+        "path": "native/channel_native/binding/runtime.cpp",
+        "line": 15
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel_native/binding/runtime.cpp",
+          "lines": [
+            6
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/capacity_failure_terminal.cu",
+          "lines": [
+            18
+          ],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native runtime protocol implementation",
+      "numerical_source": {
+        "path": "native/channel_native/kernels/capacity_failure_terminal.cu",
+        "implementation_line": 9,
+        "export_line": 18
+      },
+      "python_owner": "witwin.channel_native.runtime.capacity.capacity_failure_terminal_check",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel_native/runtime/capacity.py",
+          "line": 72
+        }
+      ],
+      "production_callers": [],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel_native/runtime/capacity.py",
+          "line": 79
+        }
+      ],
+      "contract_test": "tests/runtime/test_capacity_failure_terminal.py::test_capacity_failure_terminal_zero_state_is_current_stream_noop",
+      "e2e_callers": [
+        "tests/runtime/test_capacity_failure_terminal.py::test_capacity_failure_terminal_trap_isolated_to_subprocess"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "dormant-native-terminal-observer",
+      "plan13_disposition": "ADR-029 unique runtime-owned terminal capacity failure observer"
     },
     {
       "symbol": "core_diffraction_edge_count",

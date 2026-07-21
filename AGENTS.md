@@ -44,6 +44,13 @@ compiled native CUDA/RayD extension.
   typed object/storage, atomically OR its owned failure bit, publish only inert
   outputs after any failure, and never trap or return a partial result. Terminal
   failure observation belongs to the solve/result boundary, not intermediates.
+- `capacity_failure_terminal_check` is the unique runtime-owned terminal
+  observer. It consumes that typed state once after all result sanitizers,
+  launches on the caller's current CUDA stream, preserves the bitmask, and
+  device-fails only when a bit is set. It must never read the state on the host,
+  synchronize, allocate a result, sanitize payload, or gain an intermediate or
+  duplicate owner. It remains dormant until the atomic solver switch installs
+  exactly one call per solve transaction.
 
 Python and Torch may perform non-numerical boundary work: API validation,
 typed-contract construction, dispatch, orchestration, row selection, structural

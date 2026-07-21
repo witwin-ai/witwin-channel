@@ -2220,7 +2220,7 @@
       "name": "capacity_failure_state_create",
       "target": "cn_capacity_failure_state_create",
       "path": "native/channel_native/binding/runtime.cpp",
-      "line": 8,
+      "line": 9,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2237,6 +2237,28 @@
         }
       ],
       "doc": "Create a zeroed device-resident capacity failure state."
+    },
+    {
+      "name": "capacity_failure_terminal_check",
+      "target": "cn_capacity_failure_terminal_check",
+      "path": "native/channel_native/binding/runtime.cpp",
+      "line": 14,
+      "return_type": "void",
+      "return_arity": 0,
+      "parameters": [
+        {
+          "name": "failure_state",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [
+        {
+          "name": "failure_state",
+          "default": null
+        }
+      ],
+      "doc": "Enqueue the terminal device failure for a capacity transaction."
     },
     {
       "name": "core_diffraction_edge_count",

@@ -483,6 +483,7 @@ Python_add_library(
     native/channel_native/kernels/bdpt_maps.cu
     native/channel_native/kernels/coupled_candidate_capacity.cu
     native/channel_native/kernels/capacity_failure_state.cu
+    native/channel_native/kernels/capacity_failure_terminal.cu
     native/channel_native/kernels/coupled_topology.cu
     native/channel_native/kernels/field_transport.cu
     native/channel_native/kernels/field_transport_free_space.cu
