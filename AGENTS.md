@@ -143,6 +143,17 @@ requires them.
   topology/packing, RNG/MIS/event policy, accumulation, and results. Preserve
   per-TU flags and the as-built chain AD split: ensemble geometry is JVP-only,
   while realization geometry supports VJP and JVP.
+- Under ADR-027, RayD is the sole numerical owner of solver-neutral batched
+  straight-segment penetration geometry and its forward-tape/VJP/JVP family.
+  Callers must explicitly choose `EnumeratedFullDistance` (full endpoint,
+  strict hit test, L2 restart) or `MonteCarloTargetInset` (target inset,
+  inclusive hit test, L-infinity restart). Results use fixed `[N, D]` resident
+  hit/tape storage and one batched traversal with a mandatory `D + 1` probe.
+  Overflow joins the solve-owned device failure transaction, makes the entire
+  result inert, and fails asynchronously without a host count read. Channel
+  retains material/geometry-mode encoding, thin-sheet eligibility, topology,
+  and the MC incident-TE/TM wall-product estimator. Do not reintroduce a Python
+  depth march, Torch geometry/estimator physics, or a per-transmitter trace.
 - Under ADR-029, dormant deterministic PathTable capacity export consumes the
   exact shared `CapacityFailureState` from its layout and preserves pair-major
   `P*C` rows. Native primal checks failure/overflow/valid before payload or ID
@@ -276,6 +287,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
 - `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
 - `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
+- `docs/dev/standards/adr-027-batched-segment-penetration.md`
 - `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
 - `docs/dev/standards/adr-029-device-resident-capacity-results.md`
 - `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`

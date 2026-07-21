@@ -151,8 +151,9 @@ capability fallbacks, two compiled owners, and temporary shims are forbidden.
 ### 7. Deferred fusion work
 
 Batched penetration tracing and MC event-glue fusion alter launch/fusion
-boundaries. They remain deferred to ADR-027 with exact-equivalence and profiler
-evidence and do not block this move-only migration.
+boundaries. They are outside this move-only decision and are now governed by
+accepted ADR-027 with exact-equivalence and profiler evidence; they did not
+block this migration.
 
 ## Consequences
 

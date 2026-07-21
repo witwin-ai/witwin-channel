@@ -6,8 +6,8 @@
   decision.
 - **Related:** [Plan 13](../plans/13-direct-rayd-integration-and-rf-runtime-ownership-plan.md),
   ADR-009 (native fusion ownership), ADR-023 (direct typed RayD integration),
-  ADR-025 (diffraction operation-family ownership), and ADR-027 (batched
-  penetration and Monte Carlo native glue, deferred/proposed).
+  ADR-025 (diffraction operation-family ownership), and accepted ADR-027
+  (batched segment-penetration geometry and Monte Carlo native glue).
 
 ## Context
 

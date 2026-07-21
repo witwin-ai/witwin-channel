@@ -1,7 +1,7 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** EXECUTION IN PROGRESS（用户于 2026-07-20 选择 Phase 8B 方案 2 并要求完成
-Phase 11/12）；ADR-023/024/025/026/028/029/030 已接受；Phase 8B、Phase 10A/10B、Phase
+Phase 11/12）；ADR-023/024/025/026/027/028/029/030 已接受；Phase 8B、Phase 10A/10B、Phase
 11A/11B、RayD legacy extern-C 删除和稳定 integration 命名已完成。Phase 11 live
 governance/docs 已收口；最终 clean-checkout nightly/release、wheel/fingerprint 证据和 Phase
 12 profiling-driven 性能验收仍在执行
@@ -41,13 +41,14 @@ solver 行为；Phase 12 经独立接受的 ADR-030 只把不稳定的 diffracti
 [ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)、
 [ADR-025](../standards/adr-025-diffraction-operation-family-ownership.md)、
 [ADR-026](../standards/adr-026-rayd-generic-scattering-runtime-ownership.md)、
+[ADR-027](../standards/adr-027-batched-segment-penetration.md)、
 [ADR-028](../standards/adr-028-device-resident-diffraction-state-selection.md)、
 [ADR-029](../standards/adr-029-device-resident-capacity-results.md)、
 [ADR-030](../standards/adr-030-deterministic-diffraction-pair-reduction.md)。
 
 ## 1. 执行结论
 
-本计划作出六项结论：
+本计划作出八项结论：
 
 1. `RayDN` 不是应继续保留的第二个 backend。当前实现已经通过同一 CMake graph
    source-link RayD，但 Channel Native 又在其上叠加了 raw `int64_t` handle、
@@ -71,6 +72,13 @@ solver 行为；Phase 12 经独立接受的 ADR-030 只把不稳定的 diffracti
    原生能力；solver event policy、拓扑、资源生命周期、MIS/累积和结果组装仍属于
    Channel Native。迁移必须按完整 primal/JVP/VJP family 执行，尤其不能拆开新加入的
    chain fused operations；chain 迁移必须等待 shared EM/transmission dependency closure。
+7. Straight-segment penetration 几何以接受的 ADR-027 收口为 RayD typed complete family，
+   显式保留 enumerated full-distance 与 MC target-inset 两套数值 policy；Channel 继续拥有
+   eligibility/material encoding 与 MC polarized wall-product estimator。固定 `[N,D]` hit/tape、
+   单 batch traversal 和 `D+1` device overflow probe替代生产 Python/Torch depth march。
+8. ReceiverGrid diffraction 使用 RayD `SourceLane` 固定行布局和 Channel-owned
+   pair-serial native reducer；每 pair 按 state 升序冻结归约顺序。旧 exporter atomic reservation
+   与 Torch `index_add_`/power 数值路径在激活时原子删除，新的确定性 hash 成为唯一基线。
 
 最终目标不是“Channel Native 只剩 Python”。Channel Native 仍拥有 RF contracts、solver、
 离散路径策略、solver-fused operations 和求解器归约；RayD 拥有通用 ray/geometry、shared
@@ -335,8 +343,15 @@ binding 的 owner move。Phase 0 必须量化其生产 hot-path 占比并建立�
 2. 若 MC Basic wall-product/active-state update 已构成 hot-path physics，将其收口为 Channel
    native CUDA estimator kernel，保持 ADR-020 数值、RNG 和 estimator domain。
 
-这两项会改变 fusion/launch boundary，必须用独立 ADR-027 + profiler/equivalence evidence，
-不能混入 move-only ADR-024，也不阻塞 shared RF header 和两套 family 的迁移。
+这两项会改变 fusion/launch boundary，已由接受的
+[ADR-027](../standards/adr-027-batched-segment-penetration.md) 冻结，不能混入 move-only
+ADR-024。RayD typed API 以显式 `SegmentPenetrationPolicy` 区分两套既有几何语义：
+`EnumeratedFullDistance` 使用完整 endpoint distance、strict endpoint hit 与 L2 restart；
+`MonteCarloTargetInset` 使用 target inset、inclusive endpoint hit 与 L∞ restart。两者均输出
+固定 `[N,D]` resident hit/tape、在一次显式 batched OptiX launch 内执行 `D+1` probe，并以
+shared device failure state 实现 overflow fail-loud/no partial。RayD 拥有完整几何
+forward-tape/VJP/JVP family；Channel 保留 eligibility/material encoding、component-5 packing
+和 MC incident TE/TM/product estimator。
 
 ## 6. Diffraction primal/JVP/VJP 所有权统一
 
@@ -596,7 +611,22 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ### Phase 6C — ADR-027 后续：Batched penetration / MC glue native 化
 
-只有独立 fusion ADR、Nsight基线和 exact证据完成后才实现第 5.5 节；不与 move-only提交混合。
+**状态：ADR-027 已接受（2026-07-20）；实现待按独立提交执行。**
+
+ADR-027 已冻结第 5.5 节两套显式 march policy、稳定 typed API、固定 `[N,D]` hit/tape、一次
+batched traversal、`D+1` overflow probe、device fail-loud/no partial、完整
+forward-tape/VJP/JVP family 和 Channel/RayD owner split。实施提交顺序为：
+
+1. RayD dormant typed family + direct tests；
+2. Channel dormant façade、failure-state wiring 与 native MC estimator；
+3. enumerated atomic pin/switch/delete；
+4. MC Basic atomic switch/delete；
+5. 两仓 exact/AD/Nsight/performance/packaging 证据与文档收口。
+
+不得与 ADR-024 move-only 提交混合，也不得使用临时 generation 名称或兼容 alias。激活前必须
+证明每个非空 batch 恰有一次 OptiX traversal、无 host Boolean/count read、target stage median
+至少改善 10%、对应 solver 端到端 median 至少改善 5%，且非目标 median/p95 退化不超过
+5%/10%。
 
 ### Phase 7 — ADR-025：Diffraction operation-family ownership
 
@@ -828,12 +858,14 @@ inputs 的 RayD source-lane/fixed-valid exporter AD family 前，
 | 18 | Channel | pin/switch 6 个 bindings并删除本地 chain kernels | 否 |
 | 19 | 两仓 | nightly/release/packaging evidence和文档收口 | 否 |
 | 20 | RayD | 经所有 consumer审计删除旧 extern-C API | 否 |
-| 21 | Channel docs | 接受 ADR-030，冻结 source-lane 与 pair-serial 数值/AD/perf 契约 | 是（决策） |
-| 22 | RayD | dormant `SourceLane` typed exporter layout + direct tests；compact 默认保持 | 否 |
-| 23 | Channel | dormant `deterministic_diffraction_pair_reduce` primal/VJP/JVP + manifests/tests | 否（尚未 live） |
-| 24 | Channel | pin RayD，原子 switch/delete Torch atomic grid reduction，冻结新 baseline | 是 |
-| 25 | 两仓 | ADR-029/030 independent-process、性能、wheel/fingerprint 与 release evidence | 否 |
-| 后续 | 独立 ADR-027/PR | batched penetration、tape-only或其他 fusion/数值能力 | 是/可能是 |
+| 21 | RayD | ADR-027 dormant batched penetration forward/tape/VJP/JVP | 否（边界/launch改变） |
+| 22 | Channel | ADR-027 enumerated与MC atomic switch/delete + native MC estimator | 否（边界/launch改变） |
+| 23 | Channel docs | 接受 ADR-030，冻结 source-lane 与 pair-serial 数值/AD/perf 契约 | 是（决策） |
+| 24 | RayD | dormant `SourceLane` typed exporter layout + direct tests；compact 默认保持 | 否 |
+| 25 | Channel | dormant `deterministic_diffraction_pair_reduce` primal/VJP/JVP + manifests/tests | 否（尚未 live） |
+| 26 | Channel | pin RayD，原子 switch/delete Torch atomic grid reduction，冻结新 baseline | 是 |
+| 27 | 两仓 | ADR-027/029/030 independent-process、性能、wheel/fingerprint 与 release evidence | 否 |
+| 后续 | 独立 ADR/PR | tape-only或其他 fusion/数值能力 | 是/可能是 |
 
 RayD PR 必须先合并并产生固定 commit；Channel 随后只 pin 已合并 commit。不得让 Channel
 依赖未固定 branch、dirty worktree 或本地未提交 header。
@@ -855,6 +887,7 @@ conda run -n witwin2 python ci/run_ci_tier.py release
 | typed RayD API / Channel direct switch | Channel `quick` + `cuda`，RayD direct suite | old/new exact lockstep、handle lifecycle、negative contract、wheel single-extension |
 | RayDN rename/owner cleanup | `quick` + targeted CUDA E2E | zero-reference scan、manifest/public snapshot/import graph |
 | shared RF + transmission Phase 6A/6B | `cuda` + `nightly` | complex oracle、AD duality、four-solver parity、precise-math、atomic/tape/launch |
+| batched penetration Phase 6C | `cuda` + `nightly` | 两套policy exact、D+1 overflow、forward-tape/VJP/JVP、单batch traversal、MC ADR-020 parity |
 | diffraction Phase 8A/8B | `cuda` + `nightly` | exporter parity、fast-math/codegen、fixed-tape/coupled lockstep、legacy reachability |
 | diffraction Phase 12 ADR-029/030 | `cuda` + `nightly` + `release` | capacity/failure inertness、source-lane indexing、pair-serial primal/VJP/JVP、跨进程 bitwise、新 baseline、Nsight/launch/memory |
 | scattering Phase 10A/10B | `cuda` + `nightly` | exact outputs、AD lockstep、Nsight/launch/memory、逐 TU 默认 flags / `--fmad=false` parity |
@@ -959,16 +992,19 @@ fallback 回滚。删除本地 kernel 只发生在新 owner 的 exact/cuda gates
    caller或被治理完整删除。
 7. ADR-026 接受后，第 7.2 节17个 scattering runtime contracts的 numerical implementation
    只有RayD一个owner；Channel无对应本地`.cu/.cuh` duplicate。
-8. scattering v2两套 chain family完整迁移，shared RF依赖闭合，fusion/AD/compile flags/
+8. ADR-027 接受后，两套 straight-segment penetration policy 由 RayD stable typed family
+   完整拥有，固定 `[N,D]` hit/tape、单次 batched traversal、D+1 overflow 和完整 AD family
+   激活；Channel 保持 material/eligibility 与 MC estimator owner，旧 Python/Torch march 为零。
+9. scattering v2两套 chain family完整迁移，shared RF依赖闭合，fusion/AD/compile flags/
    row/tape/output与`a741f8d`一致。
-9. Channel保留第 5.4、6.1和7.3节 solver/resource/policy owners，没有把BDPT state、MIS、
+10. Channel保留第 5.4、6.1和7.3节 solver/resource/policy owners，没有把BDPT state、MIS、
    event policy、topology或accumulation错误下沉RayD。
-10. ADR-030 接受后，RayD source-lane layout 与 Channel pair-serial reducer是唯一 live
+11. ADR-030 接受后，RayD source-lane layout 与 Channel pair-serial reducer是唯一 live
     ReceiverGrid diffraction vector/power 路径；旧 Torch atomic reduction不可达，新目标 hash
     跨 chunk/process bitwise，且未接受完整 exporter AD前相应 grid AD组合 fail loudly。
-11. quick/cuda/nightly/release、exactness、AD、performance、packaging 和 no-fallback evidence
+12. quick/cuda/nightly/release、exactness、AD、performance、packaging 和 no-fallback evidence
     达到各阶段要求；没有通过放宽 tolerance/budget/allowlist 获得通过。
-12. 所有live manifests、current-owner delta、lock、build fingerprint、migration docs、
+13. 所有live manifests、current-owner delta、lock、build fingerprint、migration docs、
    `AGENTS.md` 和
    `CLAUDE.md` 同步且可审计。
 
