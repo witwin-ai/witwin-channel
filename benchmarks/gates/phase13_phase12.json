@@ -1,0 +1,168 @@
+{
+  "schema": {
+    "name": "witwin.channel_native.phase13-phase12-gate",
+    "version": 3
+  },
+  "history_policy": {
+    "accepted": true,
+    "ordered_groups": [
+      "enumerated_penetration",
+      "montecarlo_penetration",
+      "diffraction"
+    ],
+    "enumerated_role": "adr027_enumerated_atomic_switch",
+    "montecarlo_role": "adr027_montecarlo_atomic_switch",
+    "diffraction_role": "adr030_source_lane_atomic_switch",
+    "montecarlo_baseline_equals_enumerated_candidate": true,
+    "diffraction_baseline_directly_follows_montecarlo_candidate": true,
+    "evidence_parent_is_diffraction_candidate": true
+  },
+  "measurement_policy": {
+    "independent_process_pairs": 5,
+    "warmup_per_process": 1,
+    "steady_repeats_per_process": 7,
+    "pair_order": ["AB", "BA", "AB", "BA", "AB"],
+    "paired_bootstrap_resamples": 100000,
+    "paired_bootstrap_confidence": 0.95,
+    "target_point_estimator": "pooled_median",
+    "paired_interval_estimator": "mean_of_process_median_improvements"
+  },
+  "frozen_inputs": {
+    "munich_scene_xml_sha256": null,
+    "tensor_hash": {
+      "format": "semantic-dtype-shape-little-endian-contiguous",
+      "schema_version": 1
+    },
+    "runner_blob_sha256": null,
+    "profile_contract_sha256": null,
+    "diagnostic_contract_sha256": null,
+    "python_executable_sha256": null,
+    "tool_executable_sha256": null,
+    "runtime_dependency_sha256": null
+  },
+  "munich": {
+    "state_rows": 51640,
+    "active_states": 5682,
+    "receiver_count": 1024,
+    "exporter_pair_budget": 4194304,
+    "diffraction_state_capacity": 8192,
+    "compact_exporter_chunks": null,
+    "capacity_exporter_chunks": null,
+    "logical_source_lanes": 8388608,
+    "source_lane_field_bytes": 201326592,
+    "source_lane_valid_bytes": 8388608,
+    "second_full_field_workspace_bytes_max": 0,
+    "capacity_active_ratio_zero_active": "undefined_fail_closed"
+  },
+  "non_target_metrics": [
+    "receiver_point_end_to_end",
+    "path_non_diffraction_end_to_end",
+    "deterministic_non_diffraction_end_to_end",
+    "bdpt_end_to_end"
+  ],
+  "non_target_regression_policy": {
+    "maximum_median_regression_percent": 5.0,
+    "maximum_p95_regression_percent": 10.0
+  },
+  "comparison_groups": {
+    "enumerated_penetration": {
+      "target_stage_metric": "enumerated_penetration_discovery",
+      "target_end_to_end_metric": "enumerated_penetration_end_to_end",
+      "minimum_stage_improvement_percent": 10.0,
+      "minimum_end_to_end_improvement_percent": 5.0,
+      "range_multiplicity_per_solve": {
+        "baseline": {"witwin.channel_native:enumerated_penetration_discovery": 1},
+        "candidate": {"witwin.channel_native:enumerated_penetration_discovery": null}
+      },
+      "marker_multiplicity_per_solve": {
+        "baseline": {"witwin.channel_native:optix_traversal": null},
+        "candidate": {"witwin.channel_native:optix_traversal": null}
+      },
+      "correctness": null,
+      "resource_budgets": null
+    },
+    "montecarlo_penetration": {
+      "target_stage_metric": "montecarlo_basic_penetration_discovery",
+      "target_end_to_end_metric": "montecarlo_basic_penetration_end_to_end",
+      "minimum_stage_improvement_percent": 10.0,
+      "minimum_end_to_end_improvement_percent": 5.0,
+      "range_multiplicity_per_solve": {
+        "baseline": {"witwin.channel_native:montecarlo_basic_penetration_discovery": 1},
+        "candidate": {"witwin.channel_native:montecarlo_basic_penetration_discovery": null}
+      },
+      "marker_multiplicity_per_solve": {
+        "baseline": {"witwin.channel_native:optix_traversal": null},
+        "candidate": {"witwin.channel_native:optix_traversal": null}
+      },
+      "correctness": null,
+      "resource_budgets": null
+    },
+    "diffraction": {
+      "target_stage_metric": "diffraction_total_stage",
+      "target_end_to_end_metric": "deterministic_munich_end_to_end",
+      "minimum_stage_improvement_percent": 10.0,
+      "minimum_end_to_end_improvement_percent": 5.0,
+      "range_multiplicity_per_solve": {
+        "baseline": {
+          "witwin.channel_native:diffraction_exporter": null,
+          "witwin.channel_native:diffraction_topology_packing": null,
+          "witwin.channel_native:diffraction_total_stage": 1
+        },
+        "candidate": {
+          "witwin.channel_native:diffraction_exporter": null,
+          "witwin.channel_native:capacity_status": null,
+          "witwin.channel_native:diffraction_pair_reducer": null,
+          "witwin.channel_native:diffraction_topology_packing": null,
+          "witwin.channel_native:diffraction_total_stage": 1
+        }
+      },
+      "marker_multiplicity_per_solve": {
+        "baseline": {
+          "witwin.channel_native:optix_traversal": null,
+          "witwin.channel_native:diffraction_exporter_request": null
+        },
+        "candidate": {
+          "witwin.channel_native:optix_traversal": null,
+          "witwin.channel_native:diffraction_exporter_request": null
+        }
+      },
+      "correctness": null,
+      "resource_budgets": null
+    }
+  },
+  "required_unaffected_hashes": [
+    "receiver_point",
+    "path_export",
+    "path_non_diffraction",
+    "deterministic_non_diffraction",
+    "coherent_total_field",
+    "winner",
+    "topology",
+    "metadata"
+  ],
+  "required_release_checks": [
+    "channel_quick",
+    "channel_cuda",
+    "channel_nightly",
+    "channel_release",
+    "rayd_fresh_configure",
+    "rayd_fresh_build",
+    "rayd_direct",
+    "rayd_ctest",
+    "multiarch_wheel",
+    "wheel_smoke",
+    "pe_audit",
+    "build_fingerprint",
+    "clean_channel_checkout",
+    "clean_rayd_checkout",
+    "no_generation_or_temporary_names"
+  ],
+  "wheel_cuda_architectures": [
+    "75-real",
+    "80-real",
+    "86-real",
+    "89-real",
+    "120-real",
+    "120-virtual"
+  ]
+}

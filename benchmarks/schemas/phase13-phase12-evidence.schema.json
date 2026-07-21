@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://witwin.local/schemas/phase13-phase12-evidence.schema.json",
+  "title": "Channel Native Plan 13 Phase 12 evidence",
+  "oneOf": [
+    {"$ref": "#/$defs/dryRun"},
+    {"$ref": "#/$defs/measured"}
+  ],
+  "$defs": {
+    "schemaIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "witwin.channel_native.phase13-phase12-evidence"},
+        "version": {"const": 2}
+      }
+    },
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "pattern": "^(?![A-Za-z]:|[/\\\\]).+"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "argv", "cwd", "returncode", "timed_out", "started_time_ns",
+        "completed_time_ns", "stdout_artifact", "stderr_artifact"
+      ],
+      "properties": {
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "cwd": {"type": "string", "minLength": 1},
+        "returncode": {"type": "integer"},
+        "timed_out": {"type": "boolean"},
+        "started_time_ns": {"type": "integer", "minimum": 1},
+        "completed_time_ns": {"type": "integer", "minimum": 1},
+        "stdout_artifact": {"$ref": "#/$defs/artifact"},
+        "stderr_artifact": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "compilerVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "capture"],
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)+$"},
+        "capture": {"$ref": "#/$defs/capture"}
+      }
+    },
+    "gatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "benchmarks/gates/phase13_phase12.json"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "gateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "passed", "checks"],
+      "properties": {
+        "status": {"enum": ["not_evaluated", "passed"]},
+        "passed": {"type": ["boolean", "null"]},
+        "checks": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_pairs", "comparisons", "correctness", "resources",
+        "nsight_systems", "diagnostics", "checks"
+      ],
+      "properties": {
+        "process_pairs": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"type": "object"}},
+        "comparisons": {"type": "array", "items": {"type": "object"}},
+        "correctness": {"type": "object"},
+        "resources": {"type": "object"},
+        "nsight_systems": {"type": "object"},
+        "diagnostics": {"$ref": "#/$defs/diagnostics"},
+        "checks": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "errorMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_abs_error", "max_rel_error", "max_ulp_error"],
+      "properties": {
+        "max_abs_error": {"type": "number", "minimum": 0},
+        "max_rel_error": {"type": "number", "minimum": 0},
+        "max_ulp_error": {"type": "integer", "minimum": 0}
+      }
+    },
+    "diagnosticRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "group", "variant", "process_index", "array_names",
+        "array_shapes", "array_dtypes", "hash_format", "hash_schema_version",
+        "semantic_sha256", "peak_device_bytes", "host_array_bytes",
+        "peak_host_bytes", "metadata"
+      ],
+      "properties": {
+        "schema": {
+          "type": "object", "additionalProperties": false,
+          "required": ["name", "version"],
+          "properties": {
+            "name": {"const": "witwin.channel_native.phase13-phase12-diagnostic-worker"},
+            "version": {"const": 1}
+          }
+        },
+        "group": {"enum": ["enumerated_penetration", "montecarlo_penetration", "diffraction"]},
+        "variant": {"enum": ["baseline", "candidate"]},
+        "process_index": {"type": "integer", "minimum": 0, "maximum": 4},
+        "array_names": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "array_shapes": {
+          "type": "object",
+          "additionalProperties": {"type": "array", "items": {"type": "integer", "minimum": 0}}
+        },
+        "array_dtypes": {"type": "object", "additionalProperties": {"type": "string"}},
+        "hash_format": {"const": "semantic-dtype-shape-little-endian-contiguous"},
+        "hash_schema_version": {"const": 1},
+        "semantic_sha256": {"$ref": "#/$defs/sha256"},
+        "peak_device_bytes": {"type": "integer", "minimum": 0},
+        "host_array_bytes": {"type": "integer", "minimum": 0},
+        "peak_host_bytes": {"type": "integer", "minimum": 0},
+        "metadata": {"type": "object"}
+      }
+    },
+    "diagnosticCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group", "process_index", "order", "variant", "record",
+        "arrays_artifact", "capture"
+      ],
+      "properties": {
+        "group": {"enum": ["enumerated_penetration", "montecarlo_penetration", "diffraction"]},
+        "process_index": {"type": "integer", "minimum": 0, "maximum": 4},
+        "order": {"enum": ["AB", "BA"]},
+        "variant": {"enum": ["baseline", "candidate"]},
+        "record": {"$ref": "#/$defs/diagnosticRecord"},
+        "arrays_artifact": {"$ref": "#/$defs/artifact"},
+        "capture": {"$ref": "#/$defs/capture"}
+      }
+    },
+    "diagnosticResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "peak_device_bytes_max", "peak_host_bytes_max", "artifact_bytes_max",
+        "checks", "passed"
+      ],
+      "properties": {
+        "peak_device_bytes_max": {"type": "integer", "minimum": 0},
+        "peak_host_bytes_max": {"type": "integer", "minimum": 0},
+        "artifact_bytes_max": {"type": "integer", "minimum": 0},
+        "checks": {"type": "object", "additionalProperties": {"type": "boolean"}},
+        "passed": {"const": true}
+      }
+    },
+    "diagnosticAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_semantic_sha256", "baseline_semantic_sha256_values",
+        "timed_target_crosscheck",
+        "candidate_bitwise_stable", "exact_ab_required", "exact_ab_passed",
+        "ab_target_error_metrics", "float64_oracle", "resources", "passed"
+      ],
+      "properties": {
+        "candidate_semantic_sha256": {"$ref": "#/$defs/sha256"},
+        "timed_target_crosscheck": {
+          "type": "object", "additionalProperties": false,
+          "required": ["applicable", "sha256", "passed"],
+          "properties": {
+            "applicable": {"type": "boolean"},
+            "sha256": {"type": "string", "pattern": "^(?:|[0-9a-f]{64})$"},
+            "passed": {"const": true}
+          }
+        },
+        "baseline_semantic_sha256_values": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        },
+        "candidate_bitwise_stable": {"const": true},
+        "exact_ab_required": {"type": "boolean"},
+        "exact_ab_passed": {"const": true},
+        "ab_target_error_metrics": {"type": "array", "items": {"type": "object"}},
+        "float64_oracle": {"type": "array", "items": {"type": "object"}},
+        "resources": {"$ref": "#/$defs/diagnosticResources"},
+        "passed": {"const": true}
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["captures", "analysis", "passed"],
+      "properties": {
+        "captures": {
+          "type": "array", "minItems": 10, "maxItems": 10,
+          "items": {"$ref": "#/$defs/diagnosticCapture"}
+        },
+        "analysis": {"$ref": "#/$defs/diagnosticAnalysis"},
+        "passed": {"const": true}
+      }
+    },
+    "buildRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role", "commit", "initially_absent", "source", "build", "install",
+        "clone", "checkout", "source_tree", "source_tree_capture",
+        "source_archive_capture", "source_archive", "configure", "build_capture",
+        "install_capture", "cmake_cache_values", "toolchain",
+        "installed_python_manifest", "installed_python_manifest_sha256",
+        "extension", "fingerprint", "post_build_clean_status",
+        "compiler_resource_capture", "compiler_resources"
+      ],
+      "properties": {
+        "role": {"enum": ["P", "E", "M", "D", "S"]},
+        "commit": {"$ref": "#/$defs/sha"},
+        "initially_absent": {"const": true},
+        "source": {"type": "string", "minLength": 1},
+        "build": {"type": "string", "minLength": 1},
+        "install": {"type": "string", "minLength": 1},
+        "clone": {"$ref": "#/$defs/capture"},
+        "checkout": {"$ref": "#/$defs/capture"},
+        "source_tree": {"$ref": "#/$defs/sha"},
+        "source_tree_capture": {"$ref": "#/$defs/capture"},
+        "source_archive_capture": {"$ref": "#/$defs/capture"},
+        "source_archive": {"$ref": "#/$defs/artifact"},
+        "configure": {"$ref": "#/$defs/capture"},
+        "build_capture": {"$ref": "#/$defs/capture"},
+        "install_capture": {"$ref": "#/$defs/capture"},
+        "cmake_cache_values": {"type": "object", "additionalProperties": {"type": "string"}},
+        "toolchain": {
+          "type": "object", "additionalProperties": false,
+          "required": ["cmake_cache", "configure_log", "cxx_compiler", "cuda_compiler"],
+          "properties": {
+            "cmake_cache": {"$ref": "#/$defs/artifact"},
+            "configure_log": {"$ref": "#/$defs/artifact"},
+            "cxx_compiler": {"$ref": "#/$defs/artifact"},
+            "cuda_compiler": {"$ref": "#/$defs/artifact"}
+          }
+        },
+        "installed_python_manifest": {"$ref": "#/$defs/artifact"},
+        "installed_python_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "extension": {"$ref": "#/$defs/artifact"},
+        "fingerprint": {"$ref": "#/$defs/artifact"}
+        ,"post_build_clean_status": {"$ref": "#/$defs/capture"}
+        ,"compiler_resource_capture": {"$ref": "#/$defs/capture"}
+        ,"compiler_resources": {"type": "array", "minItems": 1, "items": {"type": "object"}}
+      }
+    },
+    "channelBuilds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "unique_commit_count", "rayd_source", "msvc_environment", "bindings", "records", "compiler_resource_checks"],
+      "properties": {
+        "root": {"type": "string", "minLength": 1},
+        "unique_commit_count": {"const": 5},
+        "msvc_environment": {
+          "type": "object", "additionalProperties": false,
+          "required": ["capture", "manifest", "keys", "sha256", "compiler_versions"],
+          "properties": {
+            "capture": {"$ref": "#/$defs/capture"},
+            "manifest": {"$ref": "#/$defs/artifact"},
+            "keys": {"type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true, "items": {"type": "string"}},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "compiler_versions": {
+              "type": "object", "additionalProperties": false,
+              "required": ["cl", "link", "nvcc"],
+              "properties": {
+                "cl": {"$ref": "#/$defs/compilerVersion"},
+                "link": {"$ref": "#/$defs/compilerVersion"},
+                "nvcc": {"$ref": "#/$defs/compilerVersion"}
+              }
+            }
+          }
+        },
+        "rayd_source": {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "commit", "tree", "initially_absent", "clean", "integration_api_version",
+            "integration_identity", "clone", "checkout", "remote", "tree_capture",
+            "clean_status", "source_archive_capture", "source_archive", "integration_header"
+            ,"post_build_clean_status"
+          ],
+          "properties": {
+            "commit": {"$ref": "#/$defs/sha"},
+            "tree": {"$ref": "#/$defs/sha"},
+            "initially_absent": {"const": true},
+            "clean": {"const": true},
+            "integration_api_version": {"const": 6},
+            "integration_identity": {"const": "rayd.torch.integration"},
+            "clone": {"$ref": "#/$defs/capture"},
+            "checkout": {"$ref": "#/$defs/capture"},
+            "remote": {"$ref": "#/$defs/capture"},
+            "tree_capture": {"$ref": "#/$defs/capture"},
+            "clean_status": {"$ref": "#/$defs/capture"},
+            "source_archive_capture": {"$ref": "#/$defs/capture"},
+            "source_archive": {"$ref": "#/$defs/artifact"},
+            "integration_header": {"$ref": "#/$defs/artifact"}
+            ,"post_build_clean_status": {"$ref": "#/$defs/capture"}
+          }
+        },
+        "bindings": {"type": "object", "minProperties": 6, "maxProperties": 6, "additionalProperties": {"enum": ["P", "E", "M", "D", "S"]}},
+        "compiler_resource_checks": {"type": "object"},
+        "records": {
+          "type": "object", "additionalProperties": false,
+          "required": ["P", "E", "M", "D", "S"],
+          "properties": {
+            "P": {"$ref": "#/$defs/buildRecord"},
+            "E": {"$ref": "#/$defs/buildRecord"},
+            "M": {"$ref": "#/$defs/buildRecord"},
+            "D": {"$ref": "#/$defs/buildRecord"},
+            "S": {"$ref": "#/$defs/buildRecord"}
+          }
+        }
+      }
+    },
+    "rawArtifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_id", "inventory"],
+      "properties": {
+        "bundle_id": {"type": "string", "minLength": 1},
+        "inventory": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}}
+      }
+    },
+    "measured": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "status", "release_claim", "generated_at_utc", "gate_policy",
+        "implementation", "measurement_policy", "munich", "groups",
+        "channel_builds", "nsight_compute", "release", "raw_artifacts", "gate"
+      ],
+      "properties": {
+        "schema": {"$ref": "#/$defs/schemaIdentity"},
+        "status": {"const": "measured"},
+        "release_claim": {"const": true},
+        "generated_at_utc": {"type": "string", "format": "date-time"},
+        "gate_policy": {"$ref": "#/$defs/gatePolicy"},
+        "implementation": {"type": "object"},
+        "measurement_policy": {"type": "object"},
+        "munich": {"type": "object"},
+        "groups": {
+          "type": "object", "additionalProperties": false,
+          "required": ["enumerated_penetration", "montecarlo_penetration", "diffraction"],
+          "properties": {
+            "enumerated_penetration": {"$ref": "#/$defs/group"},
+            "montecarlo_penetration": {"$ref": "#/$defs/group"},
+            "diffraction": {"$ref": "#/$defs/group"}
+          }
+        },
+        "channel_builds": {"$ref": "#/$defs/channelBuilds"},
+        "nsight_compute": {"type": "object"},
+        "release": {"type": "object"},
+        "raw_artifacts": {"$ref": "#/$defs/rawArtifacts"},
+        "gate": {"$ref": "#/$defs/gateResult"}
+      }
+    },
+    "dryRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "status", "release_claim", "generated_at_utc", "gate_policy",
+        "implementation", "measurement_policy", "munich", "planned_groups",
+        "blockers", "gate"
+      ],
+      "properties": {
+        "schema": {"$ref": "#/$defs/schemaIdentity"},
+        "status": {"const": "dry_run"},
+        "release_claim": {"const": false},
+        "generated_at_utc": {"type": "string", "format": "date-time"},
+        "gate_policy": {"$ref": "#/$defs/gatePolicy"},
+        "implementation": {"type": "object"},
+        "measurement_policy": {"type": "object"},
+        "munich": {"type": "object"},
+        "planned_groups": {"type": "object"},
+        "blockers": {"type": "array", "items": {"type": "string"}},
+        "gate": {"$ref": "#/$defs/gateResult"}
+      }
+    }
+  }
+}

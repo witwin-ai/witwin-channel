@@ -1,0 +1,52 @@
+{
+  "schema": {
+    "name": "witwin.channel_native.phase13-phase12-diagnostic-contract",
+    "version": 1
+  },
+  "execution": {
+    "after_timed_and_nsys": true,
+    "separate_process_per_variant_pair_member": true,
+    "timed_gate_includes_diagnostic_memory": false,
+    "record_device_host_and_artifact_bytes": true
+  },
+  "groups": {
+    "enumerated_penetration": {
+      "callable": "witwin.channel_native.propagation.enumerated.transmission._transmission_topology",
+      "variants": {
+        "baseline": {"mode": "high_level_owner", "source_lane_available": false},
+        "candidate": {"mode": "high_level_owner", "source_lane_available": false}
+      },
+      "arrays": [
+        "candidate_count", "component_id", "depth", "edge_id", "guardrail_count",
+        "interaction_normal", "interaction_normals", "interaction_position",
+        "interaction_positions", "launch_count", "material_id", "material_sequence",
+        "path_length_m", "primitive_id", "primitive_sequence", "rx_id", "tx_id", "valid"
+      ]
+    },
+    "montecarlo_penetration": {
+      "callable": "witwin.channel_native.montecarlo.events.transmission.straight_transmission_chains",
+      "variants": {
+        "baseline": {"mode": "high_level_owner", "source_lane_available": false},
+        "candidate": {"mode": "high_level_owner", "source_lane_available": false}
+      },
+      "arrays": ["distance", "penetrated", "transmittance", "wall_count"]
+    },
+    "diffraction": {
+      "callable": "witwin.channel_native.propagation.enumerated.diffraction._diffraction_topology_order1",
+      "variants": {
+        "baseline": {"mode": "old_compact_atomic_target", "source_lane_available": false},
+        "candidate": {"mode": "source_lane_pair_reduce", "source_lane_available": true}
+      },
+      "baseline_arrays": ["target"],
+      "candidate_arrays": [
+        "failure", "num_paths", "target", "valid", "x_im", "x_re", "y_im", "y_re", "z_im", "z_re"
+      ],
+      "candidate_metadata": [
+        "failure_state_storage_alias_verified", "pair_count", "row_order", "state_capacity"
+      ],
+      "diffraction_state_capacity": 8192,
+      "row_order": "pair-major-state-fast",
+      "float64_oracle": "six-component ascending-state serial sum followed by non-contracted component power"
+    }
+  }
+}
