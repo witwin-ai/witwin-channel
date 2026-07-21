@@ -305,6 +305,13 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
 - `docs/dev/standards/adr-029-device-resident-capacity-results.md`
 - `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`
+- `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
+- `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
+- `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
+- `docs/dev/standards/adr-027-batched-segment-penetration.md`
+- `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
+- `docs/dev/standards/adr-029-device-resident-capacity-results.md`
+- `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or

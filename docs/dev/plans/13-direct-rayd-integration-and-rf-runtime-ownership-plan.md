@@ -775,7 +775,7 @@ manifests、current-owner delta、final RayD lock 与三个 CUDA workflows；历
 **实现状态：IN PROGRESS（2026-07-20）；ADR-029 capacity-result 与 ADR-030 deterministic
 diffraction pair reduction 契约已接受，生产实现与性能验收待完成。** 先以独立进程冻结
 diffraction/scattering 候选
-微基准（每进程 1 warmup + 7 steady，默认 2 进程，波动显著时扩至 5 进程），记录 hash、
+微基准（5 个独立 A/B process pairs，AB/BA 交替，每 build/process 1 warmup + 7 steady），记录 hash、
 CUDA 时间、launch/sync/copy、temporary bytes 与 capacity/active ratio；再用 Nsight Systems
 定位 launch/synchronization hot path，并仅对有证据的一个假设进行独立提交优化。RTX 5080
 当前 Nsight Compute performance-counter 权限受限，若管理员权限仍不可用则保存明确 blocker，
@@ -790,10 +790,10 @@ CUDA Graph、stochastic/chain reverse geometry AD、cross-pol table、GPU table 
 最终 Phase 12 验收还必须清除 diffraction output compaction 中既有的 device-to-host count
 copies 和 `cudaStreamSynchronize`：将其迁为 capacity+valid contract，并让无效 rows 在 native
 vector accumulation/topology packing 中保持 inert；不得把动态 shape 或数值筛选转回 Python/
-Torch。目标 stage 每个独立进程 median 至少改善 10%，端到端 median 至少改善 5%，非目标
-median/p95 回退分别不超过 5%/10%；未受 ADR-030 影响的 hash exact，目标 diffraction map
-匹配新冻结的确定性 hash。边界结果扩为 5 进程并要求 paired 95% bootstrap CI 的改善下界
-大于零。
+Torch。目标 stage 的 pooled paired steady median 至少改善 10%，端到端 pooled median 至少
+改善 5%，非目标 pooled median/p95 回退分别不超过 5%/10%；逐进程 median 作为诊断完整报告
+但不另设阈值。未受 ADR-030 影响的 hash exact，目标 diffraction map 匹配新冻结的确定性
+hash；固定 100,000 次重采样的 paired 95% bootstrap CI 改善下界必须大于零。
 
 ADR-029 冻结最终契约：`path_capacity_per_pair=C` 是 Path/Deterministic public result 的
 host-known 每 endpoint-pair 存储容量，shape 与 `max_num_paths` 表示 capacity；CUDA Boolean
@@ -828,6 +828,14 @@ D2H count、scalar extraction 或同步。旧 exporter reservation + Torch `inde
 和至少 5 个独立进程 bitwise 一致，其余 per-path/topology/ReceiverPoint/Path/non-diffraction hash
 保持 exact。详细数值、AD、迁移、删除、性能和 stop conditions 见
 [ADR-030](../standards/adr-030-deterministic-diffraction-pair-reduction.md)。
+
+为保证 Phase 12 A/B 使用同一 RayD header、lock 与 toolchain，提交顺序采用已接受的两提交
+附录：canonical evidence runner 与全部 dormant producer 先落库；随后 Channel A baseline 只
+锁定已推送 RayD revision 并暴露编译该 revision 所需的 dormant typed integration，所有生产
+caller 仍走旧 compact route；A 的直接子提交 B 再一次性切换 source-lane/reducer、增加 AD
+fail-loud gate 并删除旧 Torch/compact route。A/B 的 runner/schema 不变且 packaged extension
+fingerprint 必须不同。失败的 B 不得继续叠加修复；应从 A 重新建立干净的 replacement direct
+child。该序列不拆分生产激活：A 无 live source-lane caller，B 的切换和删除仍为原子操作。
 
 当前 exact ReceiverGrid sidecar 的 RayD exporter 输出是 detached。Reducer 自身仍必须提供完整
 native VJP/JVP，但在独立 ADR 接受真实 transmitter polarization 与全部 advertised continuous
@@ -866,8 +874,9 @@ inputs 的 RayD source-lane/fixed-valid exporter AD family 前，
 | 23 | Channel docs | 接受 ADR-030，冻结 source-lane 与 pair-serial 数值/AD/perf 契约 | 是（决策） |
 | 24 | RayD | dormant `SourceLane` typed exporter layout + direct tests；compact 默认保持 | 否 |
 | 25 | Channel | dormant `deterministic_diffraction_pair_reduce` primal/VJP/JVP + manifests/tests | 否（尚未 live） |
-| 26 | Channel | pin RayD，原子 switch/delete Torch atomic grid reduction，冻结新 baseline | 是 |
-| 27 | 两仓 | ADR-027/029/030 independent-process、性能、wheel/fingerprint 与 release evidence | 否 |
+| 26 | Channel | A baseline：pin 已推送 RayD 与 dormant typed integration；live compact route 不变 | 否 |
+| 27 | Channel | A 的直接子提交 B：原子 switch/delete Torch atomic grid reduction，冻结新 baseline | 是 |
+| 28 | 两仓 | ADR-027/029/030 independent-process、性能、wheel/fingerprint 与 release evidence | 否 |
 | 后续 | 独立 ADR/PR | tape-only或其他 fusion/数值能力 | 是/可能是 |
 
 RayD PR 必须先合并并产生固定 commit；Channel 随后只 pin 已合并 commit。不得让 Channel

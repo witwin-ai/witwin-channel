@@ -1,6 +1,7 @@
 # ADR-030: Deterministic diffraction pair reduction
 
-- **Status:** Accepted (2026-07-20); dormant native reducer family implemented
+- **Status:** Accepted (2026-07-20), including the comparable-baseline sequence
+  addendum accepted on 2026-07-20; dormant native reducer family implemented
   (2026-07-21), live activation pending
 - **Date:** 2026-07-20
 - **Kind:** Numerical-order, cross-repository typed storage, native reduction,
@@ -295,17 +296,33 @@ unaffected hashes remain exact.
    primal/VJP/JVP family, typed facade, binding/coverage manifests, owner
    inventory, direct numerical/AD tests, and compiler-flag checks. It has no
    live solver caller yet.
-4. In one Channel pin/switch/delete commit, lock the accepted RayD revision,
-   request source-lane storage, switch the ReceiverGrid sidecar to the native
-   reducer, add the AD fail-loud gate, and delete the old Channel Torch
-   numerical route without aliases.
-5. Record independent-process bitwise, float64-oracle, Nsight Systems,
+4. After the canonical evidence runner and every dormant Channel producer are
+   committed, make one Channel baseline commit that locks the accepted RayD
+   revision and exposes only the dormant typed integration needed to compile
+   that revision. Every production call site retains its old live compact
+   route and old numerical behavior. This clean commit is the frozen A build.
+5. Its direct child is the single Channel switch/delete commit: request
+   source-lane storage, switch the ReceiverGrid sidecar to the native reducer,
+   add the AD fail-loud gate, and delete the old Channel Torch numerical route
+   without aliases. This clean direct child is the B build.
+6. Record independent-process bitwise, float64-oracle, Nsight Systems,
    launch/copy/sync, memory, Munich target, non-target, clean wheel,
    fingerprint, nightly, and release evidence.
 
 Each step is independently reviewable and bisectable. A dormant producer
 precedes its consumer. The live switch and deletion are atomic. Channel never
 pins an uncommitted, dirty, branch-only, or unpushed RayD state.
+
+The A and B commits use the identical RayD lock, normalized public-header hash,
+compiler toolchain, dependency set, build configuration, benchmark worker, and
+evidence schema. Their Channel commit and packaged-extension fingerprints must
+be distinct. The evidence runner must be committed before A and may not change
+between A and B. If a B candidate fails a correctness, performance, or resource
+gate, fixes are prepared separately and a replacement clean B direct child is
+created from A; failed candidates are never stacked into the accepted A/B
+lineage. This two-commit arrangement does not split production activation: A
+has no live source-lane caller, while B performs the switch and deletion
+atomically.
 
 ## Migration and deletion
 
@@ -381,10 +398,14 @@ temporary and peak bytes; register/shared-memory/spill data; and the
 capacity/active ratio. It compares the accepted warp-per-pair implementation
 with rejected single-thread-per-pair and parallel-tree candidates.
 
-The Phase 12 targets remain at least 10% median improvement for the target
-stage and at least 5% end-to-end median improvement, with non-target median and
-p95 regressions no worse than 5% and 10%. Borderline results use five processes
-and a paired 95% bootstrap improvement lower bound above zero. Because the new
+The Phase 12 comparison uses five independent A/B process pairs, alternates
+AB/BA order, and records one warmup plus seven steady observations per build
+and process. Gates use the pooled paired steady observations: at least 10%
+median improvement for the target stage and at least 5% end-to-end median
+improvement, with non-target median and p95 regressions no worse than 5% and
+10%. Per-process medians remain reported diagnostics but are not separate
+thresholds. A deterministic 100,000-resample paired 95% bootstrap improvement
+lower bound must be above zero. Because the new
 deterministic numerical contract is mandatory correctness rather than an
 optional old-hash optimization, failure to improve does not authorize the old
 atomic path. Phase 12 cannot close until the improvement gates pass; exceeding
