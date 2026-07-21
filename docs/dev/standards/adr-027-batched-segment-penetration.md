@@ -64,12 +64,27 @@ Python extension.
 
 `SegmentPenetrationRequest` contains the typed `SceneResource`, contiguous CUDA
 `float32` origins and targets of shape `[N, 3]`, an optional contiguous CUDA
-`bool[N]` input-active mask, a host-known non-negative `hit_capacity` `D`, the
-explicit policy, the frozen scene-diagonal value used by the selected policy,
-and the solve-owned capacity failure state. Origins, targets, the active mask,
-the scene resource, all output tensors, and the failure state must share one
-CUDA device. RayD validates rank, dtype, contiguity, shape, device, CUDA/SM,
-Torch ABI, numeric API version, and build identity before partial computation.
+`bool[N]` input-active mask, an explicit host-known `input_active_any`, a
+host-known non-negative `hit_capacity` `D`, the explicit policy, the frozen
+scene-diagonal value used by the selected policy, the solve-owned contiguous
+CUDA `int32[1]` capacity failure state, and a caller-assigned non-zero
+single-bit `failure_bit`. Origins, targets, the active mask, the scene resource,
+all output tensors, and the failure state must share one CUDA device. RayD
+validates rank, dtype, contiguity, shape, device, CUDA/SM, Torch ABI, numeric API
+version, build identity, and `failure_bit` before partial computation. RayD
+never clears the caller-owned failure state.
+
+`input_active_any` is structural request metadata, not a value recovered from a
+CUDA tensor. The caller may set it false only when orchestration already knows
+that every row is inactive. In that case RayD submits no OptiX traversal and
+uses a same-stream CUDA status operation to verify that the optional device
+mask contains no true row; a contradiction atomically ORs `failure_bit` and
+keeps the complete result inert. This validation may not copy the mask or a
+reduction to the host, synchronize the stream, or perform a host Boolean test.
+When a mask is absent and `N > 0`, `input_active_any` must be true. A caller
+whose arbitrary device mask has no host-known all-inactive guarantee must set
+`input_active_any=true`; manufacturing that guarantee through a device-to-host
+read is forbidden.
 
 ### 2. The two geometry policies are not interchangeable
 
@@ -135,7 +150,11 @@ companions but may not reconstruct intersection derivatives in Torch or CUDA.
 Unused slots are canonical inert rows: `valid=false`, identifiers `-1`, `t=-1`,
 and all floating vectors and tape values positive zero. `num_hits` equals the
 device sum of `valid` for a successful row. Input-inactive rows have zero hits,
-`reached_target=false`, and inert storage.
+`reached_target=false`, and inert storage. A non-input-inactive
+`EnumeratedFullDistance` row with `L <= 1e-9`, and a non-input-inactive
+`MonteCarloTargetInset` row whose initial inset remaining distance is zero, has
+zero hits and `reached_target=true`. This distinction is discrete and is
+preserved by tape/VJP/JVP.
 
 RayD does not return material ids. Channel maps the stable global primitive ids
 through its own face/material and geometry-mode resources, checks every valid
@@ -144,16 +163,20 @@ topology packing.
 
 ### 4. One batched traversal and the `D + 1` probe
 
-For `N > 0` with at least one input-active row, each forward entry issues
-exactly one explicit batched OptiX traversal launch. Each raygen lane performs
-at most `D + 1` ordered closest-hit probes internally. The final probe is
-mandatory: it distinguishes a clear tail after exactly `D` accepted hits from
-an over-capacity segment. There is no per-depth host loop, host-shaped active
-compaction, per-transmitter traversal call, or device count read.
+For `N > 0` with `input_active_any=true`, each forward entry issues exactly one
+explicit batched OptiX traversal launch. The caller must have a structural
+guarantee that at least one row is active; it may not infer the flag by reading
+the device mask. Each raygen lane performs at most `D + 1` ordered closest-hit
+probes internally. The final probe is mandatory: it distinguishes a clear tail
+after exactly `D` accepted hits from an over-capacity segment. There is no
+per-depth host loop, host-shaped active compaction, per-transmitter traversal
+call, or device count read.
 
-`N == 0` and all-inactive input perform no traversal launch and return correctly
-shaped inert tensors. `D == 0` is valid; an active clear segment succeeds with
-zero hits, while its first accepted hit is the overflow probe.
+`N == 0` and a structurally all-inactive request declared with
+`input_active_any=false` perform no traversal launch and return correctly shaped
+inert tensors, subject to the asynchronous device-mask consistency check above.
+`D == 0` is valid; an active clear segment succeeds with zero hits, while its
+first accepted hit is the overflow probe.
 
 Initialization and transaction-finalization CUDA work is separately visible in
 the launch ledger and must have a depth-independent count. It may not be hidden
@@ -316,6 +339,11 @@ accepted decision changes that budget.
   clear, one hit, exactly `D`, `D + 1`, mixed overflow/non-overflow lanes,
   degenerate endpoints, exact endpoint hits, non-finite hits, and non-default
   streams;
+- `input_active_any=false` proves zero traversal launches, validates the device
+  mask on the same stream, and makes a contradictory true mask fail through the
+  shared transaction without a host read; active degenerate/full-distance and
+  zero-inset rows prove `reached_target=true` while input-inactive rows remain
+  false;
 - policy tests lock every table row above, including L2 versus L-infinity
   restart, strict versus inclusive endpoint comparisons, target inset, normal
   source, and normalization;

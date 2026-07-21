@@ -615,7 +615,10 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ADR-027 已冻结第 5.5 节两套显式 march policy、稳定 typed API、固定 `[N,D]` hit/tape、一次
 batched traversal、`D+1` overflow probe、device fail-loud/no partial、完整
-forward-tape/VJP/JVP family 和 Channel/RayD owner split。实施提交顺序为：
+forward-tape/VJP/JVP family 和 Channel/RayD owner split。零 traversal 的 all-inactive 快路由
+必须由显式 host-known `input_active_any=false` 声明，并由同流 CUDA 校验 device mask；不得从
+device mask 回读或同步推断。非 input-inactive 的退化 full-distance 与零 target-inset row 以
+`reached_target=true` 完成。实施提交顺序为：
 
 1. RayD dormant typed family + direct tests；
 2. Channel dormant façade、failure-state wiring 与 native MC estimator；

@@ -149,6 +149,11 @@ requires them.
   strict hit test, L2 restart) or `MonteCarloTargetInset` (target inset,
   inclusive hit test, L-infinity restart). Results use fixed `[N, D]` resident
   hit/tape storage and one batched traversal with a mandatory `D + 1` probe.
+  A zero-traversal all-inactive request requires explicit host-known
+  `input_active_any=false` and a same-stream device-mask consistency check; do
+  not read the mask to the host. Active degenerate/full-distance and zero-inset
+  rows complete with `reached_target=true`, while input-inactive rows remain
+  false.
   Overflow joins the solve-owned device failure transaction, makes the entire
   result inert, and fails asynchronously without a host count read. Channel
   retains material/geometry-mode encoding, thin-sheet eligibility, topology,
