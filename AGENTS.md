@@ -149,6 +149,18 @@ requires them.
   reads; derivative companions consume only canonical output validity. Phase
   export remains non-differentiable, while the existing eleven continuous
   evaluated-path inputs retain native VJP/JVP.
+- Under ADR-030, Channel requests RayD's typed `SourceLane` diffraction layout
+  with row `((tx * rx_count + rx) * diffraction_state_capacity) + state` and is
+  the sole owner of `deterministic_diffraction_pair_reduce` primal/VJP/JVP. One
+  warp owns one endpoint pair; lanes may load consecutive states in parallel,
+  but lane 0 must add all six float32 components in ascending state order with
+  frozen non-contracted power evaluation. Floating-point atomics/tree
+  reductions, pair splitting across chunks, a second full lane-field workspace,
+  and the deleted Torch `index_add_`/power route are forbidden. The reducer
+  inherits the exact ADR-029 transaction failure state and publishes only inert
+  output after failure. Until a separate accepted ADR supplies complete RayD
+  source-lane exporter AD with real transmitter polarization,
+  ReceiverGrid diffraction with non-`none` AD must fail loudly before compute.
 - Phase-screen mode resolution and scene-static realization resources are
   CompiledScene-owned and lazy. The first phase-screen consumer atomically
   caches immutable resident heights, structure/material ids, face ranges, UV
@@ -266,6 +278,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
 - `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
 - `docs/dev/standards/adr-029-device-resident-capacity-results.md`
+- `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or

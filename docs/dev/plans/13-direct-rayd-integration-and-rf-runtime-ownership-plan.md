@@ -1,7 +1,7 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
 **状态：** EXECUTION IN PROGRESS（用户于 2026-07-20 选择 Phase 8B 方案 2 并要求完成
-Phase 11/12）；ADR-023/024/025/026/028 已接受；Phase 8B、Phase 10A/10B、Phase
+Phase 11/12）；ADR-023/024/025/026/028/029/030 已接受；Phase 8B、Phase 10A/10B、Phase
 11A/11B、RayD legacy extern-C 删除和稳定 integration 命名已完成。Phase 11 live
 governance/docs 已收口；最终 clean-checkout nightly/release、wheel/fingerprint 证据和 Phase
 12 profiling-driven 性能验收仍在执行
@@ -21,8 +21,9 @@ dependency closure，并修正 immutable owner baseline 与 scattering C1/C2 语
 **范围：** Channel Native ↔ RayD 原生边界、历史 `RayDN/raydn` 命名与胶水层、
 通用 EM/layer-stack 与 transmission runtime、diffraction operation-family ownership、
 通用 scattering runtime，以及刚合并的 scattering v2 multi-bounce coherent
-primal/JVP/VJP family。除明确独立立项的 batched penetration trace 外，本文不改变物理
-模型、数值顺序、fusion 边界或 solver 行为。
+primal/JVP/VJP family。本文的 owner moves 不改变物理模型、数值顺序、fusion 边界或
+solver 行为；Phase 12 经独立接受的 ADR-030 只把不稳定的 diffraction pair atomic reduction
+改为冻结的 source-state-serial 数值顺序。batched penetration trace 仍须独立立项。
 
 **关联记录：** [Plan 08](./08-channel-native-modular-architecture-hardening-plan.md)、
 [Plan 10](./10-scattering-v2-multibounce-coherent-ad-plan.md)、
@@ -40,7 +41,9 @@ primal/JVP/VJP family。除明确独立立项的 batched penetration trace 外�
 [ADR-024](../standards/adr-024-shared-rf-transmission-ownership.md)、
 [ADR-025](../standards/adr-025-diffraction-operation-family-ownership.md)、
 [ADR-026](../standards/adr-026-rayd-generic-scattering-runtime-ownership.md)、
-[ADR-028](../standards/adr-028-device-resident-diffraction-state-selection.md)。
+[ADR-028](../standards/adr-028-device-resident-diffraction-state-selection.md)、
+[ADR-029](../standards/adr-029-device-resident-capacity-results.md)、
+[ADR-030](../standards/adr-030-deterministic-diffraction-pair-reduction.md)。
 
 ## 1. 执行结论
 
@@ -736,8 +739,9 @@ manifests、current-owner delta、final RayD lock 与三个 CUDA workflows；历
 
 ### Phase 12 — Profiling-driven 性能收口
 
-**实现状态：IN PROGRESS（2026-07-20）；ADR-029 capacity-result 契约已接受，生产实现与
-性能验收待完成。** 先以独立进程冻结 diffraction/scattering 候选
+**实现状态：IN PROGRESS（2026-07-20）；ADR-029 capacity-result 与 ADR-030 deterministic
+diffraction pair reduction 契约已接受，生产实现与性能验收待完成。** 先以独立进程冻结
+diffraction/scattering 候选
 微基准（每进程 1 warmup + 7 steady，默认 2 进程，波动显著时扩至 5 进程），记录 hash、
 CUDA 时间、launch/sync/copy、temporary bytes 与 capacity/active ratio；再用 Nsight Systems
 定位 launch/synchronization hot path，并仅对有证据的一个假设进行独立提交优化。RTX 5080
@@ -754,8 +758,9 @@ CUDA Graph、stochastic/chain reverse geometry AD、cross-pol table、GPU table 
 copies 和 `cudaStreamSynchronize`：将其迁为 capacity+valid contract，并让无效 rows 在 native
 vector accumulation/topology packing 中保持 inert；不得把动态 shape 或数值筛选转回 Python/
 Torch。目标 stage 每个独立进程 median 至少改善 10%，端到端 median 至少改善 5%，非目标
-median/p95 回退分别不超过 5%/10%，hash exact；边界结果扩为 5 进程并要求 paired 95% bootstrap
-CI 的改善下界大于零。
+median/p95 回退分别不超过 5%/10%；未受 ADR-030 影响的 hash exact，目标 diffraction map
+匹配新冻结的确定性 hash。边界结果扩为 5 进程并要求 paired 95% bootstrap CI 的改善下界
+大于零。
 
 ADR-029 冻结最终契约：`path_capacity_per_pair=C` 是 Path/Deterministic public result 的
 host-known 每 endpoint-pair 存储容量，shape 与 `max_num_paths` 表示 capacity；CUDA Boolean
@@ -772,6 +777,30 @@ inert，再由标准 CUDA 异步错误 fail loudly，禁止为返回前主机异
 前提下恢复为 2 exporter chunks。selector launches/scratch 与 capacity result memory 必须纳入
 同一 Phase 12 证据，不能只报告 exporter 局部收益。详细公共 shape、overflow、AD、提交顺序、
 验收和 stop conditions 见 [ADR-029](../standards/adr-029-device-resident-capacity-results.md)。
+
+ADR-030 冻结 RayD `SourceLane` layout：一个 exporter 请求中的固定行号为
+`((tx * rx_count + rx) * M) + state`，CUDA `valid` 决定该行是否参与；现有 RayD consumer 的
+compact layout 保持默认，而 Channel direct integration 只请求 source-lane layout。Channel
+拥有 `deterministic_diffraction_pair_reduce` primal/VJP/JVP family：每 endpoint pair 一个 warp，
+warp lanes 只并行加载连续 state，lane 0 按 `state=0..M-1` 的固定 shuffle 顺序串行累加六个
+binary32 分量并用冻结的非融合公式计算功率。不得使用 atomic/tree floating-point reduction，
+不得把 pair 跨 receiver chunks 拆分，也不得为排序复制第二份完整六分量 capacity workspace。
+
+该 reducer 在 public `max_paths`/capacity selection 前消费所有有效 order-1 lanes，因此 exact
+grid diffraction 不随 path export、`max_paths` 或 `path_capacity_per_pair` 改变。它继承同一个
+ADR-029 `CapacityFailureState`；任一 upstream overflow/contract failure 先使全部 pair field/power
+和所有结果 inert，再由唯一 terminal asynchronous CUDA failure fail loudly，禁止 partial map、
+D2H count、scalar extraction 或同步。旧 exporter reservation + Torch `index_add_` + Torch
+`abs().square().sum(-1)` 字节不再是基线；新 source-state-serial hash 必须跨 chunking、重复运行
+和至少 5 个独立进程 bitwise 一致，其余 per-path/topology/ReceiverPoint/Path/non-diffraction hash
+保持 exact。详细数值、AD、迁移、删除、性能和 stop conditions 见
+[ADR-030](../standards/adr-030-deterministic-diffraction-pair-reduction.md)。
+
+当前 exact ReceiverGrid sidecar 的 RayD exporter 输出是 detached。Reducer 自身仍必须提供完整
+native VJP/JVP，但在独立 ADR 接受真实 transmitter polarization 与全部 advertised continuous
+inputs 的 RayD source-lane/fixed-valid exporter AD family 前，
+`ReceiverGrid + diffraction + ad_mode != "none"` 必须在 solve planning 阶段 fail loudly；不得继续
+返回 detached exact power，也不得退回 selected public paths 或 fabricated-polarization wedge。
 
 ## 9. 跨仓 PR/提交顺序
 
@@ -799,6 +828,11 @@ inert，再由标准 CUDA 异步错误 fail loudly，禁止为返回前主机异
 | 18 | Channel | pin/switch 6 个 bindings并删除本地 chain kernels | 否 |
 | 19 | 两仓 | nightly/release/packaging evidence和文档收口 | 否 |
 | 20 | RayD | 经所有 consumer审计删除旧 extern-C API | 否 |
+| 21 | Channel docs | 接受 ADR-030，冻结 source-lane 与 pair-serial 数值/AD/perf 契约 | 是（决策） |
+| 22 | RayD | dormant `SourceLane` typed exporter layout + direct tests；compact 默认保持 | 否 |
+| 23 | Channel | dormant `deterministic_diffraction_pair_reduce` primal/VJP/JVP + manifests/tests | 否（尚未 live） |
+| 24 | Channel | pin RayD，原子 switch/delete Torch atomic grid reduction，冻结新 baseline | 是 |
+| 25 | 两仓 | ADR-029/030 independent-process、性能、wheel/fingerprint 与 release evidence | 否 |
 | 后续 | 独立 ADR-027/PR | batched penetration、tape-only或其他 fusion/数值能力 | 是/可能是 |
 
 RayD PR 必须先合并并产生固定 commit；Channel 随后只 pin 已合并 commit。不得让 Channel
@@ -822,6 +856,7 @@ conda run -n witwin2 python ci/run_ci_tier.py release
 | RayDN rename/owner cleanup | `quick` + targeted CUDA E2E | zero-reference scan、manifest/public snapshot/import graph |
 | shared RF + transmission Phase 6A/6B | `cuda` + `nightly` | complex oracle、AD duality、four-solver parity、precise-math、atomic/tape/launch |
 | diffraction Phase 8A/8B | `cuda` + `nightly` | exporter parity、fast-math/codegen、fixed-tape/coupled lockstep、legacy reachability |
+| diffraction Phase 12 ADR-029/030 | `cuda` + `nightly` + `release` | capacity/failure inertness、source-lane indexing、pair-serial primal/VJP/JVP、跨进程 bitwise、新 baseline、Nsight/launch/memory |
 | scattering Phase 10A/10B | `cuda` + `nightly` | exact outputs、AD lockstep、Nsight/launch/memory、逐 TU 默认 flags / `--fmad=false` parity |
 | packaging/release boundary | `release` | clean locked checkouts、fingerprint、wheel inspection、supported SM |
 
@@ -837,6 +872,9 @@ conda run -n witwin2 python ci/run_ci_tier.py release
   frequency AD、atomic layer gradients、ADR-020 polarized oblique-wall和BDPT state/PDF/RNG；
 - pure-wedge/exporter parity、fixed-winner/vertex AD、ISB/RSB/finite-edge，以及 coupled RD/DD
   和 MC fixed-tape各自完整 primal/JVP/VJP；
+- source-lane `((tx*R+rx)*M)+state` mapping、`M=0/1/31/32/33`、poison-invalid、non-default
+  stream、receiver chunk invariance、非结合输入、pair-serial primal/VJP/JVP、overflow 后全结果
+  inert，以及 ReceiverGrid diffraction AD fail-loud；
 - scattering table eval/sample/pdf normalization、boundary bins、invalid tables；
 - ensemble/patch integral 的 energy、reciprocity、Jones basis 和 phase convention；
 - chain depth 0/1/max、reflection-only C1/C2 + diffuse-vertex layer-stack response、
@@ -858,6 +896,9 @@ conda run -n witwin2 python ci/run_ci_tier.py release
   继续使用 `--fmad=false`；
 - 若 compiler output 因路径/target 变化而不同，必须解释差异并通过 exact/ULP、resource、
   benchmark 证据；无法证明等价则停止 owner move，不放宽 tolerance。
+- ADR-030 reducer 每 pair 一个 warp且 lane 0 按 state 串行；必须冻结 shuffle/括号与
+  `--fmad=false`，删除三个 Torch `index_add_` launches，不增加第二份 192 MiB 六分量 Munich
+  lane workspace，并满足 target 10%、E2E 5%、非目标 median/p95 5%/10% gate。
 
 ### 10.3 Manifest 与治理同步
 
@@ -922,9 +963,12 @@ fallback 回滚。删除本地 kernel 只发生在新 owner 的 exact/cuda gates
    row/tape/output与`a741f8d`一致。
 9. Channel保留第 5.4、6.1和7.3节 solver/resource/policy owners，没有把BDPT state、MIS、
    event policy、topology或accumulation错误下沉RayD。
-10. quick/cuda/nightly/release、exactness、AD、performance、packaging 和 no-fallback evidence
-   达到各阶段要求；没有通过放宽 tolerance/budget/allowlist 获得通过。
-11. 所有live manifests、current-owner delta、lock、build fingerprint、migration docs、
+10. ADR-030 接受后，RayD source-lane layout 与 Channel pair-serial reducer是唯一 live
+    ReceiverGrid diffraction vector/power 路径；旧 Torch atomic reduction不可达，新目标 hash
+    跨 chunk/process bitwise，且未接受完整 exporter AD前相应 grid AD组合 fail loudly。
+11. quick/cuda/nightly/release、exactness、AD、performance、packaging 和 no-fallback evidence
+    达到各阶段要求；没有通过放宽 tolerance/budget/allowlist 获得通过。
+12. 所有live manifests、current-owner delta、lock、build fingerprint、migration docs、
    `AGENTS.md` 和
    `CLAUDE.md` 同步且可审计。
 
