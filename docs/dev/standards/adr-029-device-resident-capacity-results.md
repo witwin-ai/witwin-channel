@@ -263,11 +263,13 @@ switch that makes the old path unreachable.
 - the Munich record includes `N=51,640`, `K=5,682`, `R=1,024`,
   `P=4,194,304`, old compact `2` chunks, ADR-028 capacity `13` chunks, and the
   accepted `M=8,192` target of `2` exporter chunks;
-- each target-stage independent-process median improves by at least 10%, the
-  end-to-end median improves by at least 5%, non-target median/p95 regression
-  is no worse than 5%/10%, and output hashes are identical; borderline timing
-  expands from two to five processes and requires a paired 95% bootstrap
-  improvement lower bound above zero;
+- the accepted ADR-030 comparable-baseline protocol uses five independent A/B
+  process pairs with AB/BA order, one warmup, and seven steady observations;
+  pooled paired target-stage and end-to-end medians improve by at least 10%
+  and 5%, pooled non-target median/p95 regression is no worse than 5%/10%, and
+  output hashes are identical; per-process medians remain diagnostics and a
+  deterministic 100,000-resample paired 95% bootstrap improvement lower bound
+  must be above zero;
 - selector scratch, exporter workspace, launch/sync/copy counts, and peak
   temporary bytes remain within an explicitly frozen budget;
 - public API snapshot, migration note, binding/coverage manifests, owner
