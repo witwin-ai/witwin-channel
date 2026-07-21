@@ -7,6 +7,7 @@
 
 #include "../tensor_checks.h"
 #include "deterministic_capacity_finalize.h"
+#include "evaluated_paths_payload_plumbing.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -194,18 +195,6 @@ int launch_blocks(int64_t count) {
     return static_cast<int>((count + kPackBlockSize - 1) / kPackBlockSize);
 }
 
-void check_row_tensor(
-    const at::Tensor& tensor,
-    const char *name,
-    c10::ScalarType dtype,
-    int64_t rank,
-    int64_t rows,
-    int device) {
-    check_tensor(tensor, name, dtype, rank);
-    TORCH_CHECK(tensor.size(0) == rows, name, " must match candidate rows");
-    TORCH_CHECK(tensor.get_device() == device, name, " must share candidate device");
-}
-
 }  // namespace
 
 pybind11::dict cn_evaluated_paths_capacity_pack(
@@ -239,61 +228,15 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
     check_tensor(valid, "valid", at::kBool, 1);
     const int64_t candidate_count = valid.size(0);
     const int device = valid.get_device();
-    for (const auto& item : std::initializer_list<std::tuple<at::Tensor, const char *, c10::ScalarType>>{
-             {tx_id, "tx_id", at::kInt},
-             {rx_id, "rx_id", at::kInt},
-             {depth, "depth", at::kInt},
-             {component_id, "component_id", at::kInt},
-             {primitive_id, "primitive_id", at::kInt},
-             {edge_id, "edge_id", at::kInt},
-             {material_id, "material_id", at::kInt},
-             {path_length_m, "path_length_m", at::kFloat},
-             {delay_s, "delay_s", at::kFloat},
-             {path_gain, "path_gain", at::kFloat},
-             {path_field, "path_field", at::kComplexFloat},
-             {coefficient, "coefficient", at::kComplexFloat}}) {
-        check_row_tensor(
-            std::get<0>(item),
-            std::get<1>(item),
-            std::get<2>(item),
-            1,
-            candidate_count,
-            device);
-    }
-    for (const auto& item : std::initializer_list<std::tuple<at::Tensor, const char *, c10::ScalarType>>{
-             {field_direction, "field_direction", at::kFloat},
-             {interaction_position, "interaction_position", at::kFloat},
-             {interaction_normal, "interaction_normal", at::kFloat},
-             {field_xyz, "field_xyz", at::kComplexFloat}}) {
-        check_row_tensor(
-            std::get<0>(item),
-            std::get<1>(item),
-            std::get<2>(item),
-            2,
-            candidate_count,
-            device);
-        TORCH_CHECK(std::get<0>(item).size(1) == 3, std::get<1>(item), " must be vec3 rows");
-    }
-    check_row_tensor(
-        primitive_sequence, "primitive_sequence", at::kInt, 2, candidate_count, device);
-    const int64_t sequence_width = primitive_sequence.size(1);
-    for (const auto& item : std::initializer_list<std::pair<at::Tensor, const char *>>{
-             {material_sequence, "material_sequence"},
-             {interaction_type, "interaction_type"}}) {
-        check_row_tensor(
-            item.first, item.second, at::kInt, 2, candidate_count, device);
-        TORCH_CHECK(item.first.size(1) == sequence_width, item.second, " has wrong width");
-    }
-    for (const auto& item : std::initializer_list<std::pair<at::Tensor, const char *>>{
-             {interaction_positions, "interaction_positions"},
-             {interaction_normals, "interaction_normals"}}) {
-        check_row_tensor(
-            item.first, item.second, at::kFloat, 3, candidate_count, device);
-        TORCH_CHECK(
-            item.first.size(1) == sequence_width && item.first.size(2) == 3,
-            item.second,
-            " must have shape (rows, width, 3)");
-    }
+    const channel_native::evaluated_paths::PayloadTensors payload{
+        tx_id, rx_id, depth, component_id, primitive_id, edge_id, material_id,
+        primitive_sequence, material_sequence, interaction_type, path_length_m,
+        delay_s, field_direction, interaction_position, interaction_normal,
+        interaction_positions, interaction_normals, path_gain, path_field,
+        field_xyz, coefficient};
+    const int64_t sequence_width =
+        channel_native::evaluated_paths::validate_payload(
+            payload, candidate_count, device);
     const int64_t row_capacity =
         channel_native::capacity::deterministic_capacity_validate(
             valid,
@@ -307,35 +250,12 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
     auto bool_options = valid.options().dtype(at::kBool);
     auto int_options = valid.options().dtype(at::kInt);
     auto long_options = valid.options().dtype(at::kLong);
-    auto float_options = valid.options().dtype(at::kFloat);
-    auto complex_options = valid.options().dtype(at::kComplexFloat);
     auto selected_row_index = at::empty({row_capacity}, long_options);
     auto out_valid = at::empty({row_capacity}, bool_options);
     auto num_paths = at::empty({pair_count}, int_options);
     auto overflow = at::empty({1}, bool_options);
-    auto out_tx_id = at::empty({row_capacity}, int_options);
-    auto out_rx_id = at::empty({row_capacity}, int_options);
-    auto out_depth = at::empty({row_capacity}, int_options);
-    auto out_component_id = at::empty({row_capacity}, int_options);
-    auto out_primitive_id = at::empty({row_capacity}, int_options);
-    auto out_edge_id = at::empty({row_capacity}, int_options);
-    auto out_material_id = at::empty({row_capacity}, int_options);
-    auto out_primitive_sequence = at::empty({row_capacity, sequence_width}, int_options);
-    auto out_material_sequence = at::empty({row_capacity, sequence_width}, int_options);
-    auto out_interaction_type = at::empty({row_capacity, sequence_width}, int_options);
-    auto out_path_length_m = at::empty({row_capacity}, float_options);
-    auto out_delay_s = at::empty({row_capacity}, float_options);
-    auto out_field_direction = at::empty({row_capacity, 3}, float_options);
-    auto out_interaction_position = at::empty({row_capacity, 3}, float_options);
-    auto out_interaction_normal = at::empty({row_capacity, 3}, float_options);
-    auto out_interaction_positions =
-        at::empty({row_capacity, sequence_width, 3}, float_options);
-    auto out_interaction_normals =
-        at::empty({row_capacity, sequence_width, 3}, float_options);
-    auto out_path_gain = at::empty({row_capacity}, float_options);
-    auto out_path_field = at::empty({row_capacity}, complex_options);
-    auto out_field_xyz = at::empty({row_capacity, 3}, complex_options);
-    auto out_coefficient = at::empty({row_capacity}, complex_options);
+    auto out = channel_native::evaluated_paths::allocate_payload(
+        valid, row_capacity, sequence_width);
 
     const PackInput input{
         tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), depth.data_ptr<int>(),
@@ -350,17 +270,17 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
         coefficient.data_ptr<cfloat>()};
     const PackOutput output{
         selected_row_index.data_ptr<int64_t>(), out_valid.data_ptr<bool>(),
-        num_paths.data_ptr<int>(), overflow.data_ptr<bool>(), out_tx_id.data_ptr<int>(),
-        out_rx_id.data_ptr<int>(), out_depth.data_ptr<int>(),
-        out_component_id.data_ptr<int>(), out_primitive_id.data_ptr<int>(),
-        out_edge_id.data_ptr<int>(), out_material_id.data_ptr<int>(),
-        out_primitive_sequence.data_ptr<int>(), out_material_sequence.data_ptr<int>(),
-        out_interaction_type.data_ptr<int>(), out_path_length_m.data_ptr<float>(),
-        out_delay_s.data_ptr<float>(), out_field_direction.data_ptr<float>(),
-        out_interaction_position.data_ptr<float>(), out_interaction_normal.data_ptr<float>(),
-        out_interaction_positions.data_ptr<float>(), out_interaction_normals.data_ptr<float>(),
-        out_path_gain.data_ptr<float>(), out_path_field.data_ptr<cfloat>(),
-        out_field_xyz.data_ptr<cfloat>(), out_coefficient.data_ptr<cfloat>()};
+        num_paths.data_ptr<int>(), overflow.data_ptr<bool>(), out.tx_id.data_ptr<int>(),
+        out.rx_id.data_ptr<int>(), out.depth.data_ptr<int>(),
+        out.component_id.data_ptr<int>(), out.primitive_id.data_ptr<int>(),
+        out.edge_id.data_ptr<int>(), out.material_id.data_ptr<int>(),
+        out.primitive_sequence.data_ptr<int>(), out.material_sequence.data_ptr<int>(),
+        out.interaction_type.data_ptr<int>(), out.path_length_m.data_ptr<float>(),
+        out.delay_s.data_ptr<float>(), out.field_direction.data_ptr<float>(),
+        out.interaction_position.data_ptr<float>(), out.interaction_normal.data_ptr<float>(),
+        out.interaction_positions.data_ptr<float>(), out.interaction_normals.data_ptr<float>(),
+        out.path_gain.data_ptr<float>(), out.path_field.data_ptr<cfloat>(),
+        out.field_xyz.data_ptr<cfloat>(), out.coefficient.data_ptr<cfloat>()};
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     const int64_t init_count = std::max<int64_t>(1, std::max(row_capacity, pair_count));
     evaluated_paths_capacity_init_kernel<<<
@@ -400,26 +320,6 @@ pybind11::dict cn_evaluated_paths_capacity_pack(
     result["valid"] = out_valid;
     result["num_paths"] = num_paths;
     result["overflow"] = overflow;
-    result["tx_id"] = out_tx_id;
-    result["rx_id"] = out_rx_id;
-    result["depth"] = out_depth;
-    result["component_id"] = out_component_id;
-    result["primitive_id"] = out_primitive_id;
-    result["edge_id"] = out_edge_id;
-    result["material_id"] = out_material_id;
-    result["primitive_sequence"] = out_primitive_sequence;
-    result["material_sequence"] = out_material_sequence;
-    result["interaction_type"] = out_interaction_type;
-    result["path_length_m"] = out_path_length_m;
-    result["delay_s"] = out_delay_s;
-    result["field_direction"] = out_field_direction;
-    result["interaction_position"] = out_interaction_position;
-    result["interaction_normal"] = out_interaction_normal;
-    result["interaction_positions"] = out_interaction_positions;
-    result["interaction_normals"] = out_interaction_normals;
-    result["path_gain"] = out_path_gain;
-    result["path_field"] = out_path_field;
-    result["field_xyz"] = out_field_xyz;
-    result["coefficient"] = out_coefficient;
+    out.append_to(result);
     return result;
 }

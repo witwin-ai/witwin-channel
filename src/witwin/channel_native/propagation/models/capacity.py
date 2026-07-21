@@ -153,6 +153,8 @@ class CanonicalPathSelection:
 
     candidate_capacity: int
     pair_count: int
+    num_tx: int
+    num_rx: int
     failure_state: CapacityFailureState
     selected_row_index: torch.Tensor
     valid: torch.Tensor
@@ -164,6 +166,10 @@ class CanonicalPathSelection:
             "candidate_capacity", self.candidate_capacity
         )
         pair_count = _require_host_count("pair_count", self.pair_count)
+        num_tx = _require_host_count("num_tx", self.num_tx)
+        num_rx = _require_host_count("num_rx", self.num_rx)
+        if pair_count != num_tx * num_rx:
+            raise ValueError("pair_count must equal num_tx * num_rx")
         selected = _require_cuda_tensor(
             "selected_row_index",
             self.selected_row_index,
@@ -199,6 +205,24 @@ class CanonicalPathSelection:
 
 
 @dataclass(frozen=True, slots=True, eq=False)
+class CanonicalEvaluatedPaths:
+    """Canonical fixed-capacity rows gathered from one selector result."""
+
+    selection: CanonicalPathSelection
+    evaluated: EvaluatedPaths
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.selection, CanonicalPathSelection):
+            raise TypeError("selection must be a CanonicalPathSelection")
+        if not isinstance(self.evaluated, EvaluatedPaths):
+            raise TypeError("evaluated must be EvaluatedPaths")
+        if self.evaluated.row_count != self.selection.candidate_capacity:
+            raise ValueError("evaluated rows must match canonical candidate capacity")
+        if self.evaluated.topology.valid is not self.selection.valid:
+            raise ValueError("evaluated topology must share canonical validity")
+
+
+@dataclass(frozen=True, slots=True, eq=False)
 class CapacityEvaluatedPaths:
     """Packed evaluated rows and their shared capacity selection contract."""
 
@@ -217,6 +241,7 @@ class CapacityEvaluatedPaths:
 
 
 __all__ = [
+    "CanonicalEvaluatedPaths",
     "CanonicalPathSelection",
     "CapacityEvaluatedPaths",
     "CapacityPathLayout",

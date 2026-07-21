@@ -364,6 +364,9 @@ def test_selector_contract_needs_no_public_result_capacity() -> None:
         assert state.bits.tolist() == [0]
         torch.testing.assert_close(selected.selected_row_index[:count], expected)
         assert selected.candidate_capacity == 8
+        assert selected.num_tx == 1
+        assert selected.num_rx == 2
+        assert selected.pair_count == selected.num_tx * selected.num_rx
         assert not hasattr(selected, "path_capacity_per_pair")
         assert not hasattr(selected, "overflow")
 

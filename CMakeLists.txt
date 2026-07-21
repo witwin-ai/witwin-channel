@@ -499,6 +499,8 @@ Python_add_library(
     native/channel_native/kernels/deterministic_accum.cu
     native/channel_native/kernels/deterministic_capacity_finalize.cu
     native/channel_native/kernels/enumerated_canonical_capacity_select.cu
+    native/channel_native/kernels/evaluated_paths_canonical_capacity_gather.cu
+    native/channel_native/kernels/evaluated_paths_canonical_capacity_gather_ad.cu
     native/channel_native/kernels/evaluated_paths_capacity_pack.cu
     native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu
     native/channel_native/kernels/deterministic_path_table_capacity_pack.cu

@@ -216,6 +216,15 @@ requires them.
   failure state, has no AD companion, must remain before scattering append,
   and must not be replaced by early pair-slot padding before deterministic
   accumulation.
+- `evaluated_paths_canonical_capacity_gather` is the dormant ADR-029
+  continuous gather immediately after canonical selection. It produces a new
+  sanitized compact-prefix `CanonicalEvaluatedPaths` at candidate capacity,
+  keeps selector validity/counts device-resident, and validates compact-prefix,
+  source-unique, endpoint-pair, and count contracts before any payload read.
+  Its native VJP/JVP cover all eleven continuous evaluated-path fields; invalid
+  or failed rows and derivatives are exact inert values. It is distinct from
+  the later public pair-major capacity pack and remains dormant until the
+  atomic solver switch.
 - `path_result_capacity_pack` is the dormant Path-owned ADR-029 terminal
   storage packer. It consumes pair-major `CapacityEvaluatedPaths`, inherits the
   exact shared `CapacityFailureState`, and produces the public base tensor

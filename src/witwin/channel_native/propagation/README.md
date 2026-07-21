@@ -71,6 +71,17 @@ enforced only by later result export/packing. This lets the selector feed
 non-export enumeration and the ADR-008 BDPT oracle without requiring public
 result storage, although it has no live caller before the atomic switch.
 
+`propagation.enumerated.canonical_capacity.evaluated_paths_canonical_capacity_gather`
+is the dormant continuous owner immediately after canonical selection. It
+sanitizes the selector into a new `CanonicalPathSelection`, validates the
+compact prefix, source-index uniqueness, source validity, endpoint IDs, and
+device counts before reading candidate payload, and gathers all topology,
+geometry, and field rows at the original candidate capacity. Its native VJP
+uses source-unique scatter and its JVP uses valid-first gather for all eleven
+continuous evaluated-path fields. Failure leaves the new selection, counts,
+rows, and derivatives inert. It does not perform public pair-major padding,
+consume `path_capacity_per_pair`, or have a live solver caller.
+
 `propagation.enumerated.capacity.evaluated_paths_capacity_pack` is the dormant
 complete-row producer layered on that same no-trap finalizer helper. One native
 initialization pass makes every topology, geometry, field, and layout slot

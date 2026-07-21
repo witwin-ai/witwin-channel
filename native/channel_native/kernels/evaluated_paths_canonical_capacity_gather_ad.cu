@@ -6,14 +6,16 @@
 #include <torch/extension.h>
 
 #include "../tensor_checks.h"
+#include "capacity_failure_state.h"
 #include "evaluated_paths_continuous_gather_ad.cuh"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 namespace {
 
-constexpr int kPackAdBlockSize = 256;
+constexpr int kGatherAdBlockSize = 256;
 using cfloat = c10::complex<float>;
 using channel_native::check_tensor;
 using channel_native::evaluated_paths_ad::AllocatedContinuous;
@@ -26,7 +28,7 @@ struct OptionalView {
     int64_t stride0;
     int64_t stride1;
     int64_t stride2;
-    bool present;
+    bool conjugated;
 };
 
 struct ContinuousViews {
@@ -43,7 +45,53 @@ struct ContinuousViews {
     OptionalView<cfloat> coefficient;
 };
 
-__global__ void evaluated_paths_capacity_continuous_init_kernel(
+__device__ __forceinline__ float apply_conjugation(float value, bool) {
+    return value;
+}
+
+__device__ __forceinline__ cfloat apply_conjugation(
+    cfloat value,
+    bool conjugated) {
+    return conjugated ? cfloat(value.real(), -value.imag()) : value;
+}
+
+template <typename T>
+__device__ __forceinline__ T read_scalar(
+    const OptionalView<T>& view,
+    int64_t row) {
+    return view.data == nullptr
+        ? T(0)
+        : apply_conjugation(view.data[row * view.stride0], view.conjugated);
+}
+
+template <typename T>
+__device__ __forceinline__ T read_vector(
+    const OptionalView<T>& view,
+    int64_t row,
+    int64_t component) {
+    return view.data == nullptr
+        ? T(0)
+        : apply_conjugation(
+              view.data[row * view.stride0 + component * view.stride1],
+              view.conjugated);
+}
+
+template <typename T>
+__device__ __forceinline__ T read_sequence_vector(
+    const OptionalView<T>& view,
+    int64_t row,
+    int64_t slot,
+    int64_t component) {
+    return view.data == nullptr
+        ? T(0)
+        : apply_conjugation(
+              view.data[
+                  row * view.stride0 + slot * view.stride1 +
+                  component * view.stride2],
+              view.conjugated);
+}
+
+__global__ void canonical_gather_ad_init_kernel(
     ContinuousOutputs output,
     int64_t rows,
     int64_t sequence_width) {
@@ -71,42 +119,52 @@ __global__ void evaluated_paths_capacity_continuous_init_kernel(
     }
 }
 
-template <typename T>
-__device__ __forceinline__ T read_scalar(
-    const OptionalView<T>& view,
-    int64_t row) {
-    return view.present ? view.data[row * view.stride0] : T(0);
+__global__ void canonical_gather_ad_selection_kernel(
+    int *__restrict__ failure_state,
+    const bool *__restrict__ valid,
+    const int64_t *__restrict__ selected_row_index,
+    unsigned int *__restrict__ seen_source,
+    int64_t row_capacity,
+    int64_t candidate_count) {
+    if (failure_state[0] != 0) {
+        return;
+    }
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         row < row_capacity;
+         row += stride) {
+        if (!valid[row]) {
+            continue;
+        }
+        if (row > 0 && !valid[row - 1]) {
+            atomicOr(failure_state, channel_native::capacity::kPairContractError);
+            continue;
+        }
+        const int64_t source = selected_row_index[row];
+        if (source < 0 || source >= candidate_count) {
+            atomicOr(failure_state, channel_native::capacity::kPairContractError);
+            continue;
+        }
+        const int64_t word = source >> 5;
+        const unsigned int mask = 1u << static_cast<unsigned int>(source & 31);
+        const unsigned int previous = atomicOr(seen_source + word, mask);
+        if ((previous & mask) != 0) {
+            atomicOr(failure_state, channel_native::capacity::kPairContractError);
+        }
+    }
 }
 
-template <typename T>
-__device__ __forceinline__ T read_vector(
-    const OptionalView<T>& view,
-    int64_t row,
-    int64_t component) {
-    return view.present
-        ? view.data[row * view.stride0 + component * view.stride1]
-        : T(0);
-}
-
-template <typename T>
-__device__ __forceinline__ T read_sequence_vector(
-    const OptionalView<T>& view,
-    int64_t row,
-    int64_t slot,
-    int64_t component) {
-    return view.present
-        ? view.data[
-              row * view.stride0 + slot * view.stride1 + component * view.stride2]
-        : T(0);
-}
-
-__global__ void evaluated_paths_capacity_backward_scatter_kernel(
+__global__ void canonical_gather_backward_kernel(
+    const int *__restrict__ failure_state,
     const bool *__restrict__ valid,
     const int64_t *__restrict__ selected_row_index,
     ContinuousViews grad_output,
     ContinuousOutputs grad_input,
     int64_t row_capacity,
     int64_t sequence_width) {
+    if (failure_state[0] != 0) {
+        return;
+    }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t destination =
              static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -152,13 +210,17 @@ __global__ void evaluated_paths_capacity_backward_scatter_kernel(
     }
 }
 
-__global__ void evaluated_paths_capacity_jvp_gather_kernel(
+__global__ void canonical_gather_jvp_kernel(
+    const int *__restrict__ failure_state,
     const bool *__restrict__ valid,
     const int64_t *__restrict__ selected_row_index,
     ContinuousViews tangent_input,
     ContinuousOutputs tangent_output,
     int64_t row_capacity,
     int64_t sequence_width) {
+    if (failure_state[0] != 0) {
+        return;
+    }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t destination =
              static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -201,25 +263,51 @@ __global__ void evaluated_paths_capacity_jvp_gather_kernel(
 }
 
 int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kPackAdBlockSize - 1) / kPackAdBlockSize);
+    return static_cast<int>((count + kGatherAdBlockSize - 1) / kGatherAdBlockSize);
 }
 
 void check_selection(
+    const at::Tensor& failure_state,
     const at::Tensor& valid,
-    const at::Tensor& selected_row_index) {
+    const at::Tensor& selected_row_index,
+    int64_t candidate_count) {
     check_tensor(valid, "valid", at::kBool, 1);
     check_tensor(selected_row_index, "selected_row_index", at::kLong, 1);
-    TORCH_CHECK(
-        selected_row_index.sizes() == valid.sizes(),
-        "selected_row_index must match valid");
-    TORCH_CHECK(
-        selected_row_index.get_device() == valid.get_device(),
-        "selected_row_index must share valid device");
+    TORCH_CHECK(selected_row_index.sizes() == valid.sizes(), "selected_row_index must match valid");
+    TORCH_CHECK(selected_row_index.get_device() == valid.get_device(), "selected_row_index must share valid device");
+    channel_native::capacity::validate_failure_state(failure_state, valid);
+    TORCH_CHECK(candidate_count >= 0, "candidate_count must be non-negative");
+    TORCH_CHECK(candidate_count <= std::numeric_limits<int>::max(), "candidate_count exceeds int32 status capacity");
+}
+
+void launch_selection_status(
+    at::Tensor failure_state,
+    const at::Tensor& valid,
+    const at::Tensor& selected_row_index,
+    int64_t candidate_count,
+    cudaStream_t stream) {
+    const int64_t row_capacity = valid.size(0);
+    const int64_t seen_words = (candidate_count + 31) / 32;
+    auto seen_source = at::empty({seen_words}, valid.options().dtype(at::kInt));
+    if (seen_words > 0) {
+        C10_CUDA_CHECK(cudaMemsetAsync(
+            seen_source.data_ptr<int>(), 0, seen_words * sizeof(int), stream));
+    }
+    if (row_capacity > 0) {
+        canonical_gather_ad_selection_kernel<<<
+            launch_blocks(row_capacity), kGatherAdBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(), valid.data_ptr<bool>(),
+            selected_row_index.data_ptr<int64_t>(),
+            reinterpret_cast<unsigned int *>(seen_source.data_ptr<int>()),
+            row_capacity, candidate_count);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
 }
 
 }  // namespace
 
-pybind11::dict cn_evaluated_paths_capacity_pack_backward(
+pybind11::dict cn_evaluated_paths_canonical_capacity_gather_backward(
+    at::Tensor failure_state,
     at::Tensor valid,
     at::Tensor selected_row_index,
     std::optional<at::Tensor> grad_path_length_m,
@@ -235,51 +323,40 @@ pybind11::dict cn_evaluated_paths_capacity_pack_backward(
     std::optional<at::Tensor> grad_coefficient,
     int64_t candidate_count,
     int64_t sequence_width) {
-    check_selection(valid, selected_row_index);
-    TORCH_CHECK(candidate_count >= 0, "candidate_count must be non-negative");
+    check_selection(failure_state, valid, selected_row_index, candidate_count);
     TORCH_CHECK(sequence_width >= 0, "sequence_width must be non-negative");
     const int device = valid.get_device();
     const int64_t row_capacity = valid.size(0);
     auto views = channel_native::evaluated_paths_ad::make_continuous_views<
         ContinuousViews, OptionalView<float>, OptionalView<cfloat>>(
-        grad_path_length_m,
-        grad_delay_s,
-        grad_field_direction,
-        grad_interaction_position,
-        grad_interaction_normal,
-        grad_interaction_positions,
-        grad_interaction_normals,
-        grad_path_gain,
-        grad_path_field,
-        grad_field_xyz,
-        grad_coefficient,
-        row_capacity,
-        sequence_width,
-        device,
-        false);
+        grad_path_length_m, grad_delay_s, grad_field_direction,
+        grad_interaction_position, grad_interaction_normal,
+        grad_interaction_positions, grad_interaction_normals, grad_path_gain,
+        grad_path_field, grad_field_xyz, grad_coefficient, row_capacity,
+        sequence_width, device, true);
     auto outputs = allocate_continuous(valid, candidate_count, sequence_width);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     if (candidate_count > 0) {
-        evaluated_paths_capacity_continuous_init_kernel<<<
-            launch_blocks(candidate_count), kPackAdBlockSize, 0, stream>>>(
+        canonical_gather_ad_init_kernel<<<
+            launch_blocks(candidate_count), kGatherAdBlockSize, 0, stream>>>(
             outputs.view(), candidate_count, sequence_width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+    launch_selection_status(
+        failure_state, valid, selected_row_index, candidate_count, stream);
     if (row_capacity > 0) {
-        evaluated_paths_capacity_backward_scatter_kernel<<<
-            launch_blocks(row_capacity), kPackAdBlockSize, 0, stream>>>(
-            valid.data_ptr<bool>(),
-            selected_row_index.data_ptr<int64_t>(),
-            views,
-            outputs.view(),
-            row_capacity,
-            sequence_width);
+        canonical_gather_backward_kernel<<<
+            launch_blocks(row_capacity), kGatherAdBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(), valid.data_ptr<bool>(),
+            selected_row_index.data_ptr<int64_t>(), views, outputs.view(),
+            row_capacity, sequence_width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return outputs.dict();
 }
 
-pybind11::dict cn_evaluated_paths_capacity_pack_jvp(
+pybind11::dict cn_evaluated_paths_canonical_capacity_gather_jvp(
+    at::Tensor failure_state,
     at::Tensor valid,
     at::Tensor selected_row_index,
     std::optional<at::Tensor> tangent_path_length_m,
@@ -295,43 +372,33 @@ pybind11::dict cn_evaluated_paths_capacity_pack_jvp(
     std::optional<at::Tensor> tangent_coefficient,
     int64_t candidate_count,
     int64_t sequence_width) {
-    check_selection(valid, selected_row_index);
-    TORCH_CHECK(candidate_count >= 0, "candidate_count must be non-negative");
+    check_selection(failure_state, valid, selected_row_index, candidate_count);
     TORCH_CHECK(sequence_width >= 0, "sequence_width must be non-negative");
     const int device = valid.get_device();
     const int64_t row_capacity = valid.size(0);
     auto views = channel_native::evaluated_paths_ad::make_continuous_views<
         ContinuousViews, OptionalView<float>, OptionalView<cfloat>>(
-        tangent_path_length_m,
-        tangent_delay_s,
-        tangent_field_direction,
-        tangent_interaction_position,
-        tangent_interaction_normal,
-        tangent_interaction_positions,
-        tangent_interaction_normals,
-        tangent_path_gain,
-        tangent_path_field,
-        tangent_field_xyz,
-        tangent_coefficient,
-        candidate_count,
-        sequence_width,
-        device,
-        false);
+        tangent_path_length_m, tangent_delay_s, tangent_field_direction,
+        tangent_interaction_position, tangent_interaction_normal,
+        tangent_interaction_positions, tangent_interaction_normals,
+        tangent_path_gain, tangent_path_field, tangent_field_xyz,
+        tangent_coefficient, candidate_count, sequence_width, device, true);
     auto outputs = allocate_continuous(valid, row_capacity, sequence_width);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     if (row_capacity > 0) {
-        evaluated_paths_capacity_continuous_init_kernel<<<
-            launch_blocks(row_capacity), kPackAdBlockSize, 0, stream>>>(
+        canonical_gather_ad_init_kernel<<<
+            launch_blocks(row_capacity), kGatherAdBlockSize, 0, stream>>>(
             outputs.view(), row_capacity, sequence_width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        evaluated_paths_capacity_jvp_gather_kernel<<<
-            launch_blocks(row_capacity), kPackAdBlockSize, 0, stream>>>(
-            valid.data_ptr<bool>(),
-            selected_row_index.data_ptr<int64_t>(),
-            views,
-            outputs.view(),
-            row_capacity,
-            sequence_width);
+    }
+    launch_selection_status(
+        failure_state, valid, selected_row_index, candidate_count, stream);
+    if (row_capacity > 0) {
+        canonical_gather_jvp_kernel<<<
+            launch_blocks(row_capacity), kGatherAdBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(), valid.data_ptr<bool>(),
+            selected_row_index.data_ptr<int64_t>(), views, outputs.view(),
+            row_capacity, sequence_width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return outputs.dict();

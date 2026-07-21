@@ -886,6 +886,8 @@ def enumerated_canonical_capacity_select(
     return CanonicalPathSelection(
         candidate_capacity=int(valid.shape[0]),
         pair_count=pair_count,
+        num_tx=num_tx,
+        num_rx=num_rx,
         failure_state=failure_state,
         selected_row_index=raw["selected_row_index"],
         valid=raw["valid"],

@@ -236,6 +236,18 @@ existing stable topology sort, canonical event/object deduplication,
 shortest-path winner, and `max_paths` policy before scattering append. Its
 decisions are frozen and non-differentiable; continuous AD belongs to the
 subsequent native gather.
+The internal `CanonicalPathSelection` also retains host-known `num_tx` and
+`num_rx`, with `pair_count == num_tx * num_rx`, so that gather validation can
+prove every reported per-pair count without reading a device scalar. The
+dormant `evaluated_paths_canonical_capacity_gather` primal/VJP/JVP family
+creates a new sanitized selection and fixed candidate-capacity
+`CanonicalEvaluatedPaths`: it validates compact-prefix validity, source-index
+range and uniqueness, source validity, endpoint IDs, selected count, and every
+pair count before payload reads. A device bitset of `ceil(N / 32)` words makes
+the uniqueness proof deterministic without a floating-point atomic or
+quadratic scan. Failure makes the new index, validity, counts, evaluated rows,
+VJP, and JVP wholly inert. This stage is not the later public pair-major
+capacity pack and has no live caller before atomic activation.
 The dormant launch, synchronization, copy, output, and CUB scratch formulas are
 recorded in
 [`phase13-adr029-canonical-selector-resource-ledger.json`](../audit/phase13-adr029-canonical-selector-resource-ledger.json);

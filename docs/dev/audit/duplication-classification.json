@@ -824,33 +824,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 172
     },
-    "a4ca552d088020e2": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "path.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "ADR-029 canonical selector capacity-decoupling hand-reviewed fingerprint refresh",
-      "reason": "Repeated explicit pybind registration argument lists at the typed ABI boundary.",
-      "token_count": 200
-    },
-    "2252eaab35758773": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_capacity_pack_ad.cu",
-        "path_result_capacity_pack_ad.cu"
-      ],
-      "lockstep_tests": [
-        "tests/propagation/enumerated/test_capacity_pack.py",
-        "tests/path/test_path_result_capacity.py"
-      ],
-      "owner": "propagation enumerated and path AD pack owners",
-      "provenance": "ADR-029 C2-P hand-reviewed classification",
-      "reason": "Optional tangent and cotangent reads are duplicated locally so both dormant native capacity AD companions preserve identical fixed-valid zero semantics without changing the established evaluated-path compiler unit.",
-      "token_count": 160
-    },
     "33b858162352529b": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -865,18 +838,6 @@
       "provenance": "ADR-029 C2-P exact endpoint branch fix",
       "reason": "TX and RX pair-major serial loops deliberately repeat the fixed-row angle VJP contribution sequence while applying opposite endpoint signs; refactoring the loops risks changing public float32 reduction bits.",
       "token_count": 101
-    },
-    "8541f60b5d49f5f9": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_capacity_pack_ad.cu",
-        "path_result_capacity_pack_ad.cu"
-      ],
-      "owner": "native AD boundary validation",
-      "provenance": "ADR-029 C2-P hand-reviewed classification",
-      "reason": "Repeated optional tensor contract validation is boundary boilerplate for two independently owned dormant capacity AD operations.",
-      "token_count": 191
     },
     "63472b1e830460ad": {
       "category": "numeric_sensitive_exempt",
@@ -963,18 +924,6 @@
       "provenance": "ADR-029 C2-D hand-reviewed refresh",
       "reason": "Repeated CUDA tensor shape/dtype/device facade validation.",
       "token_count": 112
-    },
-    "69b89588fe2ab2cf": {
-      "category": "host_check",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_capacity_pack.cu",
-        "evaluated_paths_capacity_pack_ad.cu"
-      ],
-      "owner": "propagation.enumerated",
-      "provenance": "ADR-029 C2-D hand-reviewed refresh",
-      "reason": "Repeated fixed-capacity tensor metadata validation shared by primal and AD owners.",
-      "token_count": 113
     },
     "6a6cd66ce1fb7900": {
       "category": "numeric_sensitive_exempt",
@@ -1322,18 +1271,6 @@
       "provenance": "Phase 6A hand-reviewed refresh",
       "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
       "token_count": 121
-    },
-    "93a5bcb1d9edaf0e": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "evaluated_paths_capacity_pack.cu",
-        "evaluated_paths_capacity_pack_ad.cu"
-      ],
-      "owner": "propagation.enumerated",
-      "provenance": "ADR-029 C2-D hand-reviewed refresh",
-      "reason": "Repeated fixed-capacity output tensor allocation and row-shape construction.",
-      "token_count": 100
     },
     "93bfe40c3a26d66d": {
       "category": "host_check",
@@ -1910,18 +1847,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 299
     },
-    "d63033cc2f0facff": {
-      "category": "indexing_packing",
-      "corpus": "native",
-      "files": [
-        "deterministic_path_table_capacity_pack.cu",
-        "evaluated_paths_capacity_pack_ad.cu"
-      ],
-      "owner": "propagation.enumerated",
-      "provenance": "ADR-029 C2-D hand-reviewed refresh",
-      "reason": "Repeated native fixed-capacity tangent allocation and row-aligned packing structure.",
-      "token_count": 112
-    },
     "d8c17ba0c2e5de8e": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -2182,17 +2107,6 @@
       "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
       "token_count": 151
     },
-    "fc3e02cfa3f9df21": {
-      "category": "other",
-      "corpus": "native",
-      "files": [
-        "path.cpp"
-      ],
-      "owner": "bindings",
-      "provenance": "ADR-029 C2-D hand-reviewed refresh",
-      "reason": "Repeated typed backward/JVP ABI declarations with optional tensor companions.",
-      "token_count": 112
-    },
     "fdae13a3851322c5": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -2203,6 +2117,211 @@
       "provenance": "ADR-029 C2-D hand-reviewed refresh",
       "reason": "Repeated reflection candidate capacity indexing and canonical inert packing.",
       "token_count": 130
+    },
+    "003356bd2408db73": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity AD gather",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated source-unique cotangent row scatter for the same eleven continuous tensor fields; no reduction or floating-point formula is shared.",
+      "token_count": 353
+    },
+    "04cd2d0f72ab3a86": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity payload boundary",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated typed payload pointer packing into independently owned fixed-capacity kernels.",
+      "token_count": 269
+    },
+    "089e31c8c3dd4d1e": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "deterministic_path_table_capacity_pack.cu",
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "native fixed-capacity AD boundaries",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated explicit JVP callable signatures at independently owned typed ABI boundaries.",
+      "token_count": 129
+    },
+    "08a840fb2cb6b4ab": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated optional-tensor JVP declaration argument lists at the explicit pybind boundary.",
+      "token_count": 130
+    },
+    "1ff5b21e55e98990": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated optional-tensor backward declaration argument lists at the explicit pybind boundary.",
+      "token_count": 130
+    },
+    "251ea6d7f75cd0c4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_continuous_gather_ad.cuh",
+        "evaluated_paths_payload_plumbing.h"
+      ],
+      "owner": "propagation.enumerated typed allocation plumbing",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated host-side tensor allocation shapes for continuous and complete evaluated-path payload contracts.",
+      "token_count": 140
+    },
+    "2a9712cb1837b5b2": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated explicit pybind registration lambdas and argument names preserve stable typed operation signatures.",
+      "token_count": 214
+    },
+    "3c3a1f2a3207af65": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity payload boundary",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated device pointer schema for the same EvaluatedPaths payload fields.",
+      "token_count": 108
+    },
+    "484beedcf38e9196": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_continuous_gather_ad.cuh",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "owner": "native AD boundary validation",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated optional CUDA tensor shape, dtype, device, and stride extraction at typed AD boundaries.",
+      "token_count": 146
+    },
+    "5aa45e642061d3d0": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu",
+        "evaluated_paths_continuous_gather_ad.cuh"
+      ],
+      "owner": "propagation.enumerated fixed-capacity payload boundary",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated pointer-view assembly for resident evaluated-path output tensors.",
+      "token_count": 191
+    },
+    "81d4155d89c9472f": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack.cu",
+        "evaluated_paths_capacity_pack_ad.cu",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "owner": "fixed-capacity inert output initialization",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated inert zero and sentinel initialization for structurally identical fixed-capacity output fields.",
+      "token_count": 400
+    },
+    "87dc65b298223cb1": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity AD boundary",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated explicit backward signatures for eleven optional continuous cotangents.",
+      "token_count": 129
+    },
+    "b16b638493336889": {
+      "category": "indexing_packing",
+      "corpus": "python",
+      "files": [
+        "canonical_capacity.py",
+        "capacity.py"
+      ],
+      "owner": "propagation.enumerated typed result assembly",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated non-numerical assembly of PathTopology, PathGeometry, and PathFields from native named outputs.",
+      "token_count": 191
+    },
+    "b1d3bce5770d44ca": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated explicit backward and JVP native declarations preserve complete typed signatures.",
+      "token_count": 107
+    },
+    "b4bc76bbb585e393": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity payload boundary",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated construction of resident source payload pointer views before native launch.",
+      "token_count": 107
+    },
+    "c4e136228e78907b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity primal packing",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated valid-first resident row payload copy for the same EvaluatedPaths schema; no reduction or floating-point formula is shared.",
+      "token_count": 436
+    },
+    "dc657c2d5c0f6110": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity AD gather",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated valid-first tangent row gather for the same eleven continuous tensor fields; no reduction or floating-point formula is shared.",
+      "token_count": 367
     },
     "fdeb673e3d1c15bb": {
       "category": "numeric_sensitive_exempt",

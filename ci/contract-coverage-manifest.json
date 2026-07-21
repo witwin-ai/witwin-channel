@@ -37,6 +37,8 @@
     "native-diffraction-path-capacity": "tests/propagation/topology/test_diffraction_path_capacity.py::test_diffraction_order1_capacity_block_handles_empty_input_and_capacity",
     "native-deterministic-capacity-finalize": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
     "native-enumerated-canonical-capacity-select": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_contract_needs_no_public_result_capacity",
+    "native-evaluated-paths-canonical-capacity-gather": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
+    "native-evaluated-paths-canonical-capacity-gather-ad": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_jvp_all_continuous_fields_and_duality",
     "native-evaluated-paths-capacity-pack": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "native-evaluated-paths-capacity-pack-ad": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_jvp_gathers_every_continuous_field_and_preserves_zero_slots",
     "native-deterministic-path-table-capacity-pack": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
@@ -88,6 +90,7 @@
     "deterministic-path-table-capacity": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
     "enumerated-canonical-capacity": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order",
+    "evaluated-paths-canonical-capacity": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
     "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "coupled-candidate-capacity": "tests/propagation/topology/test_coupled_candidate_capacity.py::test_coupled_candidate_capacity_matches_frozen_rd_dd_order",
     "deterministic-los": "tests/deterministic/test_los_empty_space.py::test_empty_space_los_matches_analytic_reference",
@@ -978,6 +981,33 @@
       "native-enumerated-canonical-capacity-select",
       [
         "enumerated-canonical-capacity"
+      ]
+    ],
+    [
+      "evaluated_paths_canonical_capacity_gather",
+      "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.forward",
+      "native_call_site",
+      "native-evaluated-paths-canonical-capacity-gather",
+      [
+        "evaluated-paths-canonical-capacity"
+      ]
+    ],
+    [
+      "evaluated_paths_canonical_capacity_gather_backward",
+      "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.backward",
+      "native_call_site",
+      "native-evaluated-paths-canonical-capacity-gather-ad",
+      [
+        "evaluated-paths-canonical-capacity"
+      ]
+    ],
+    [
+      "evaluated_paths_canonical_capacity_gather_jvp",
+      "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.jvp",
+      "native_call_site",
+      "native-evaluated-paths-canonical-capacity-gather-ad",
+      [
+        "evaluated-paths-canonical-capacity"
       ]
     ],
     [

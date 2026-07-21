@@ -1,6 +1,7 @@
 """Internal row-aligned propagation data contracts."""
 
 from .capacity import (
+    CanonicalEvaluatedPaths,
     CanonicalPathSelection,
     CapacityEvaluatedPaths,
     CapacityPathLayout,
@@ -15,6 +16,7 @@ from .reflection import ReflectionCandidateCapacity
 from .topology import PathTopology
 
 __all__ = [
+    "CanonicalEvaluatedPaths",
     "CanonicalPathSelection",
     "CapacityEvaluatedPaths",
     "CapacityPathLayout",
