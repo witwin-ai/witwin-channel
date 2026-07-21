@@ -400,28 +400,6 @@ __global__ void final_pair_count_kernel(
     }
 }
 
-__global__ void overflow_kernel(
-    int* __restrict__ failure_state,
-    const int* __restrict__ pair_count,
-    int* __restrict__ overflow,
-    int64_t count,
-    int64_t capacity_per_pair) {
-    if (failure_state[0] != 0) {
-        return;
-    }
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         pair < count;
-         pair += stride) {
-        if (static_cast<int64_t>(pair_count[pair]) > capacity_per_pair) {
-            atomicExch(overflow, 1);
-            atomicOr(
-                failure_state,
-                channel_native::capacity::kPairCapacityOverflow);
-        }
-    }
-}
-
 __global__ void publish_kernel(
     const int* __restrict__ failure_state,
     const int64_t* __restrict__ private_index,
@@ -450,14 +428,6 @@ __global__ void publish_kernel(
     }
     if (blockIdx.x == 0 && threadIdx.x == 0) {
         num_selected[0] = private_count[0];
-    }
-}
-
-__global__ void publish_overflow_kernel(
-    const int* __restrict__ overflow_flag,
-    bool* __restrict__ overflow) {
-    if (blockIdx.x == 0 && threadIdx.x == 0) {
-        overflow[0] = overflow_flag[0] != 0;
     }
 }
 
@@ -497,7 +467,6 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
     int64_t pair_count,
     int64_t num_tx,
     int64_t num_rx,
-    int64_t path_capacity_per_pair,
     int64_t max_paths,
     int64_t max_paths_scope) {
     check_tensor(valid, "valid", at::kBool, 1);
@@ -525,7 +494,6 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
     TORCH_CHECK(pair_count >= 0, "pair_count must be non-negative");
     TORCH_CHECK(num_tx >= 0, "num_tx must be non-negative");
     TORCH_CHECK(num_rx >= 0, "num_rx must be non-negative");
-    TORCH_CHECK(path_capacity_per_pair >= 0, "path_capacity_per_pair must be non-negative");
     TORCH_CHECK(max_paths == -1 || max_paths > 0, "max_paths must be -1 or positive");
     TORCH_CHECK(
         max_paths_scope == kGlobalScope || max_paths_scope == kPerPairScope,
@@ -536,18 +504,6 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
     TORCH_CHECK(pair_count == num_tx * num_rx, "pair_count must equal num_tx * num_rx");
     TORCH_CHECK(count <= std::numeric_limits<int>::max(), "candidate capacity exceeds CUB int32 item capacity");
     TORCH_CHECK(pair_count <= std::numeric_limits<int>::max(), "pair_count exceeds int32 capacity");
-    TORCH_CHECK(path_capacity_per_pair <= std::numeric_limits<int>::max(), "path capacity exceeds int32 capacity");
-    TORCH_CHECK(
-        path_capacity_per_pair == 0 ||
-            pair_count <= std::numeric_limits<int64_t>::max() / path_capacity_per_pair,
-        "result row capacity overflows int64 indexing");
-    const int64_t total_capacity = pair_count * path_capacity_per_pair;
-    TORCH_CHECK(
-        max_paths < 0 || max_paths_scope != kPerPairScope || max_paths <= path_capacity_per_pair,
-        "per-pair max_paths cannot exceed path_capacity_per_pair");
-    TORCH_CHECK(
-        max_paths < 0 || max_paths_scope != kGlobalScope || max_paths <= total_capacity,
-        "global max_paths cannot exceed total path capacity");
 
     const int device = valid.get_device();
     const int64_t width = primitive_sequence.size(1);
@@ -558,9 +514,7 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
     auto selected_valid = at::empty({count}, bool_options);
     auto num_selected = at::empty({1}, int_options);
     auto num_paths = at::empty({pair_count}, int_options);
-    auto overflow = at::empty({1}, bool_options);
     auto valid_count = at::empty({1}, int_options);
-    auto local_overflow = at::empty({1}, int_options);
     auto order = at::empty({count}, long_options);
     auto keys = at::empty({count}, long_options);
     auto sorted_order = at::empty({count}, long_options);
@@ -615,9 +569,7 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
     if (pair_count > 0) {
         C10_CUDA_CHECK(cudaMemsetAsync(num_paths.data_ptr<int>(), 0, pair_count * sizeof(int), stream));
     }
-    C10_CUDA_CHECK(cudaMemsetAsync(overflow.data_ptr<bool>(), 0, sizeof(bool), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(valid_count.data_ptr<int>(), 0, sizeof(int), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(local_overflow.data_ptr<int>(), 0, sizeof(int), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(dedup_count.data_ptr<int>(), 0, sizeof(int), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(private_selected_count.data_ptr<int>(), 0, sizeof(int), stream));
 
@@ -724,12 +676,6 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
             pair_counts.data_ptr<int>(), count, num_tx);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    if (pair_count > 0) {
-        overflow_kernel<<<launch_blocks(pair_count), kBlockSize, 0, stream>>>(
-            failure_state.data_ptr<int>(), pair_counts.data_ptr<int>(), local_overflow.data_ptr<int>(),
-            pair_count, path_capacity_per_pair);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
     const int64_t publish_count = count > pair_count ? count : pair_count;
     if (publish_count > 0) {
         publish_kernel<<<launch_blocks(publish_count), kBlockSize, 0, stream>>>(
@@ -739,15 +685,10 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
             num_selected.data_ptr<int>(), num_paths.data_ptr<int>(), count, pair_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    publish_overflow_kernel<<<1, 1, 0, stream>>>(
-        local_overflow.data_ptr<int>(), overflow.data_ptr<bool>());
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
-
     pybind11::dict result;
     result["selected_row_index"] = selected_row_index;
     result["valid"] = selected_valid;
     result["num_selected"] = num_selected;
     result["num_paths"] = num_paths;
-    result["overflow"] = overflow;
     return result;
 }

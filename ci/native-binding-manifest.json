@@ -2242,7 +2242,7 @@
       "name": "core_diffraction_edge_count",
       "target": "cn_core_diffraction_edge_count",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 663,
+      "line": 662,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -2309,7 +2309,7 @@
       "name": "core_pack_int2",
       "target": "cn_core_pack_int2",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 659,
+      "line": 658,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2331,7 +2331,7 @@
       "name": "coupled_candidate_capacity_block",
       "target": "cn_coupled_candidate_capacity_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 876,
+      "line": 875,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2756,7 +2756,7 @@
       "name": "deterministic_accumulate_flat",
       "target": "cn_deterministic_accumulate_flat",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1115,
+      "line": 1113,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2868,7 +2868,7 @@
       "name": "deterministic_accumulate_flat_backward",
       "target": "cn_deterministic_accumulate_flat_backward",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1145,
+      "line": 1143,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3052,7 +3052,7 @@
       "name": "deterministic_accumulate_flat_fwd64",
       "target": "cn_deterministic_accumulate_flat_fwd64",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1130,
+      "line": 1128,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3164,7 +3164,7 @@
       "name": "deterministic_accumulate_flat_jvp",
       "target": "cn_deterministic_accumulate_flat_jvp",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1168,
+      "line": 1166,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3303,7 +3303,7 @@
       "name": "deterministic_capacity_finalize",
       "target": "cn_deterministic_capacity_finalize",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 920,
+      "line": 918,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3388,7 +3388,7 @@
       "name": "deterministic_component_counts",
       "target": "cn_deterministic_component_counts",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 721,
+      "line": 720,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3405,7 +3405,7 @@
       "name": "deterministic_concat_topology_blocks",
       "target": "cn_deterministic_concat_topology_blocks",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 868,
+      "line": 867,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3427,7 +3427,7 @@
       "name": "deterministic_delay_to_path_length",
       "target": "cn_deterministic_delay_to_path_length",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 758,
+      "line": 757,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3444,7 +3444,7 @@
       "name": "deterministic_diffraction_order1_capacity_block",
       "target": "cn_deterministic_diffraction_order1_capacity_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 856,
+      "line": 855,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3531,7 +3531,7 @@
       "name": "deterministic_diffraction_order1_compact",
       "target": "cn_deterministic_diffraction_order1_compact",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 852,
+      "line": 851,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3603,7 +3603,7 @@
       "name": "deterministic_diffraction_pair_reduce",
       "target": "cn_deterministic_diffraction_pair_reduce",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1039,
+      "line": 1037,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3715,7 +3715,7 @@
       "name": "deterministic_diffraction_pair_reduce_backward",
       "target": "cn_deterministic_diffraction_pair_reduce_backward",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1054,
+      "line": 1052,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3791,7 +3791,7 @@
       "name": "deterministic_diffraction_pair_reduce_jvp",
       "target": "cn_deterministic_diffraction_pair_reduce_jvp",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1065,
+      "line": 1063,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3903,7 +3903,7 @@
       "name": "deterministic_diffraction_state_capacity_select",
       "target": "cn_deterministic_diffraction_state_capacity_select",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 678,
+      "line": 677,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -3990,7 +3990,7 @@
       "name": "deterministic_diffraction_state_pack",
       "target": "cn_deterministic_diffraction_state_pack",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 670,
+      "line": 669,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -4067,7 +4067,7 @@
       "name": "deterministic_diffraction_state_pack_selected",
       "target": "cn_deterministic_diffraction_state_pack_selected",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 674,
+      "line": 673,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -4144,7 +4144,7 @@
       "name": "deterministic_diffraction_vector_field",
       "target": "cn_deterministic_diffraction_vector_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 746,
+      "line": 745,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4186,7 +4186,7 @@
       "name": "deterministic_face_anchor_points",
       "target": "cn_deterministic_face_anchor_points",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 806,
+      "line": 805,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4208,7 +4208,7 @@
       "name": "deterministic_face_groups",
       "target": "cn_deterministic_face_groups",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 888,
+      "line": 887,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4240,7 +4240,7 @@
       "name": "deterministic_face_sequence_chunk",
       "target": "cn_deterministic_face_sequence_chunk",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 814,
+      "line": 813,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4282,7 +4282,7 @@
       "name": "deterministic_field_from_power_phase",
       "target": "cn_deterministic_field_from_power_phase",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 778,
+      "line": 777,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4304,7 +4304,7 @@
       "name": "deterministic_gather_topology_block",
       "target": "cn_deterministic_gather_topology_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 872,
+      "line": 871,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4336,7 +4336,7 @@
       "name": "deterministic_los_field",
       "target": "cn_deterministic_los_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 732,
+      "line": 731,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4363,7 +4363,7 @@
       "name": "deterministic_los_topology_block",
       "target": "cn_deterministic_los_topology_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 782,
+      "line": 781,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4415,7 +4415,7 @@
       "name": "deterministic_los_topology_block_all_visible",
       "target": "cn_deterministic_los_topology_block_all_visible",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 786,
+      "line": 785,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4462,7 +4462,7 @@
       "name": "deterministic_mapped_face_sequence_chunk",
       "target": "cn_deterministic_mapped_face_sequence_chunk",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 818,
+      "line": 817,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4499,7 +4499,7 @@
       "name": "deterministic_normalize_vec3",
       "target": "cn_deterministic_normalize_vec3",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 860,
+      "line": 859,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4521,7 +4521,7 @@
       "name": "deterministic_pack_complex",
       "target": "cn_deterministic_pack_complex",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 762,
+      "line": 761,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4543,7 +4543,7 @@
       "name": "deterministic_pad_topology_sequences",
       "target": "cn_deterministic_pad_topology_sequences",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 794,
+      "line": 793,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4605,7 +4605,7 @@
       "name": "deterministic_path_table_capacity_pack",
       "target": "cn_deterministic_path_table_capacity_pack",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 971,
+      "line": 969,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4861,7 +4861,7 @@
       "name": "deterministic_path_table_capacity_pack_backward",
       "target": "cn_deterministic_path_table_capacity_pack_backward",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1002,
+      "line": 1000,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5009,7 +5009,7 @@
       "name": "deterministic_path_table_capacity_pack_jvp",
       "target": "cn_deterministic_path_table_capacity_pack_jvp",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1021,
+      "line": 1019,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5148,7 +5148,7 @@
       "name": "deterministic_phase_from_field",
       "target": "cn_deterministic_phase_from_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 766,
+      "line": 765,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5170,7 +5170,7 @@
       "name": "deterministic_phase_from_length",
       "target": "cn_deterministic_phase_from_length",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 774,
+      "line": 773,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5192,7 +5192,7 @@
       "name": "deterministic_reflect_points",
       "target": "cn_deterministic_reflect_points",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 864,
+      "line": 863,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5219,7 +5219,7 @@
       "name": "deterministic_reflection_candidate_capacity_block",
       "target": "cn_deterministic_reflection_candidate_capacity_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 830,
+      "line": 829,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5394,7 +5394,7 @@
       "name": "deterministic_reflection_epc_input_batch",
       "target": "cn_deterministic_reflection_epc_input_batch",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 810,
+      "line": 809,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5441,7 +5441,7 @@
       "name": "deterministic_reflection_field",
       "target": "cn_deterministic_reflection_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 750,
+      "line": 749,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5503,7 +5503,7 @@
       "name": "deterministic_reflection_order1_compact",
       "target": "cn_deterministic_reflection_order1_compact",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 822,
+      "line": 821,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5595,7 +5595,7 @@
       "name": "deterministic_reflection_sequence_compact",
       "target": "cn_deterministic_reflection_sequence_compact",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 826,
+      "line": 825,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5682,7 +5682,7 @@
       "name": "deterministic_reflection_sequence_field",
       "target": "cn_deterministic_reflection_sequence_field",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 754,
+      "line": 753,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5744,7 +5744,7 @@
       "name": "deterministic_repeat_range",
       "target": "cn_deterministic_repeat_range",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 802,
+      "line": 801,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5776,7 +5776,7 @@
       "name": "deterministic_selected_edge_count",
       "target": "cn_deterministic_selected_edge_count",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 725,
+      "line": 724,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -5793,7 +5793,7 @@
       "name": "deterministic_sort_order",
       "target": "cn_deterministic_sort_order",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 896,
+      "line": 895,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5845,7 +5845,7 @@
       "name": "deterministic_surface_face_groups",
       "target": "cn_deterministic_surface_face_groups",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 892,
+      "line": 891,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5862,7 +5862,7 @@
       "name": "deterministic_topology_base_fields",
       "target": "cn_deterministic_topology_base_fields",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 798,
+      "line": 797,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5934,7 +5934,7 @@
       "name": "deterministic_topology_default_fields",
       "target": "cn_deterministic_topology_default_fields",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 790,
+      "line": 789,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5951,7 +5951,7 @@
       "name": "deterministic_zero_field_phase",
       "target": "cn_deterministic_zero_field_phase",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 770,
+      "line": 769,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6226,7 +6226,7 @@
       "name": "enumerated_canonical_capacity_select",
       "target": "cn_enumerated_canonical_capacity_select",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 900,
+      "line": 899,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6296,11 +6296,6 @@
           "default": null
         },
         {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        },
-        {
           "name": "max_paths",
           "type": "int64_t",
           "default": null
@@ -6365,10 +6360,6 @@
           "default": null
         },
         {
-          "name": "path_capacity_per_pair",
-          "default": null
-        },
-        {
           "name": "max_paths",
           "default": null
         },
@@ -6383,7 +6374,7 @@
       "name": "evaluated_paths_capacity_pack",
       "target": "cn_evaluated_paths_capacity_pack",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 932,
+      "line": 930,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6639,7 +6630,7 @@
       "name": "evaluated_paths_capacity_pack_backward",
       "target": "cn_evaluated_paths_capacity_pack_backward",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 963,
+      "line": 961,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6726,7 +6717,7 @@
       "name": "evaluated_paths_capacity_pack_jvp",
       "target": "cn_evaluated_paths_capacity_pack_jvp",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 967,
+      "line": 965,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10247,7 +10238,7 @@
       "name": "los_silhouette_clearance",
       "target": "cn_los_silhouette_clearance",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 736,
+      "line": 735,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10289,7 +10280,7 @@
       "name": "los_taper_apply",
       "target": "cn_los_taper_apply",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 741,
+      "line": 740,
       "return_type": "std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>",
       "return_arity": 4,
       "parameters": [
@@ -12416,7 +12407,7 @@
       "name": "path_concat_vec3",
       "target": "cn_path_concat_vec3",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 689,
+      "line": 688,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12433,7 +12424,7 @@
       "name": "path_diffraction_block",
       "target": "cn_path_diffraction_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 709,
+      "line": 708,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12455,7 +12446,7 @@
       "name": "path_filter_block",
       "target": "cn_path_filter_block",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 705,
+      "line": 704,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12482,7 +12473,7 @@
       "name": "path_filter_los",
       "target": "cn_path_filter_los",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 697,
+      "line": 696,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12524,7 +12515,7 @@
       "name": "path_finalize_blocks",
       "target": "cn_path_finalize_blocks",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 717,
+      "line": 716,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12566,7 +12557,7 @@
       "name": "path_los_export",
       "target": "cn_path_los_export",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 685,
+      "line": 684,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12603,7 +12594,7 @@
       "name": "path_los_visibility_inputs",
       "target": "cn_path_los_visibility_inputs",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 693,
+      "line": 692,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12635,7 +12626,7 @@
       "name": "path_merge_blocks",
       "target": "cn_path_merge_blocks",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 713,
+      "line": 712,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12662,7 +12653,7 @@
       "name": "path_reflection_candidates",
       "target": "cn_path_reflection_candidates",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 701,
+      "line": 700,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12714,7 +12705,7 @@
       "name": "path_result_capacity_pack",
       "target": "cn_path_result_capacity_pack",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1080,
+      "line": 1078,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12934,7 +12925,7 @@
       "name": "path_result_capacity_pack_backward",
       "target": "cn_path_result_capacity_pack_backward",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1107,
+      "line": 1105,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -13056,7 +13047,7 @@
       "name": "path_result_capacity_pack_jvp",
       "target": "cn_path_result_capacity_pack_jvp",
       "path": "native/channel_native/binding/path.cpp",
-      "line": 1111,
+      "line": 1109,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [

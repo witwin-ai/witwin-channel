@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pytest
@@ -54,7 +55,6 @@ def _block() -> dict[str, torch.Tensor]:
 def _select(
     block: dict[str, torch.Tensor],
     *,
-    capacity: int = 8,
     max_paths: int | None = None,
     scope: str = "per_pair",
 ):
@@ -62,7 +62,6 @@ def _select(
         block,
         num_tx=1,
         num_rx=2,
-        capacity=capacity,
         max_paths=max_paths,
         scope=scope,
     )
@@ -73,7 +72,6 @@ def _select_layout(
     *,
     num_tx: int,
     num_rx: int,
-    capacity: int,
     max_paths: int | None,
     scope: str,
 ):
@@ -92,7 +90,6 @@ def _select_layout(
         pair_count=num_tx * num_rx,
         num_tx=num_tx,
         num_rx=num_rx,
-        path_capacity_per_pair=capacity,
         max_paths=max_paths,
         max_paths_scope=scope,
     )
@@ -126,9 +123,7 @@ def _live_source_order(
 @pytest.mark.parametrize("max_paths", [None, 2, 5])
 def test_selector_is_exact_live_order(scope: str, max_paths: int | None) -> None:
     block = _block()
-    _state, selected = _select(
-        block, capacity=8, max_paths=max_paths, scope=scope
-    )
+    _state, selected = _select(block, max_paths=max_paths, scope=scope)
     expected = _live_source_order(block, max_paths=max_paths, scope=scope)
     count = int(expected.numel())
 
@@ -140,7 +135,6 @@ def test_selector_is_exact_live_order(scope: str, max_paths: int | None) -> None
         block["rx_id"][expected].to(torch.int64), minlength=2
     ).to(torch.int32)
     torch.testing.assert_close(selected.num_paths, expected_counts)
-    assert selected.overflow.tolist() == [False]
 
 
 def test_multi_endpoint_pair_order_caps_and_source_stability_are_frozen() -> None:
@@ -173,7 +167,6 @@ def test_multi_endpoint_pair_order_caps_and_source_stability_are_frozen() -> Non
         block,
         num_tx=3,
         num_rx=2,
-        capacity=2,
         max_paths=1,
         scope="per_pair",
     )
@@ -184,7 +177,6 @@ def test_multi_endpoint_pair_order_caps_and_source_stability_are_frozen() -> Non
         block,
         num_tx=3,
         num_rx=2,
-        capacity=2,
         max_paths=4,
         scope="global",
     )
@@ -269,7 +261,6 @@ def test_randomized_multi_pair_selector_is_exact_live_oracle(
         block,
         num_tx=3,
         num_rx=2,
-        capacity=count,
         max_paths=max_paths,
         scope=scope,
     )
@@ -341,24 +332,40 @@ def test_single_valid_nan_preserves_live_k_one_special_case() -> None:
 
 def test_global_and_per_pair_caps_are_applied_after_dedup() -> None:
     block = _block()
-    _state, per_pair = _select(block, capacity=2, max_paths=2, scope="per_pair")
+    _state, per_pair = _select(block, max_paths=2, scope="per_pair")
     assert per_pair.num_paths.tolist() == [2, 2]
-    _state, global_selection = _select(
-        block, capacity=3, max_paths=3, scope="global"
-    )
+    _state, global_selection = _select(block, max_paths=3, scope="global")
     assert global_selection.num_selected.tolist() == [3]
     assert global_selection.num_paths.tolist() == [3, 0]
 
 
-def test_pair_overflow_sets_shared_bit_and_publishes_no_partial_selection() -> None:
+def test_selector_does_not_apply_public_pair_capacity_overflow() -> None:
     block = _block()
-    state, selected = _select(block, capacity=2, max_paths=None, scope="global")
-    assert state.bits.tolist() == [int(CapacityFailureBit.PAIR_CAPACITY_OVERFLOW)]
-    assert selected.selected_row_index.tolist() == [-1] * 8
-    assert selected.valid.tolist() == [False] * 8
-    assert selected.num_selected.tolist() == [0]
-    assert selected.num_paths.tolist() == [0, 0]
-    assert selected.overflow.tolist() == [True]
+    state, selected = _select(block, max_paths=None, scope="global")
+    expected = _live_source_order(block, max_paths=None, scope="global")
+    count = int(expected.numel())
+
+    assert state.bits.tolist() == [0]
+    torch.testing.assert_close(selected.selected_row_index[:count], expected)
+    assert selected.valid.tolist() == [True] * count + [False] * (8 - count)
+    assert selected.num_selected.tolist() == [count]
+    assert max(selected.num_paths.tolist()) > 2
+
+
+def test_selector_contract_needs_no_public_result_capacity() -> None:
+    parameters = inspect.signature(enumerated_canonical_capacity_select).parameters
+    assert "path_capacity_per_pair" not in parameters
+
+    for scope in ("global", "per_pair"):
+        block = _block()
+        state, selected = _select(block, max_paths=100, scope=scope)
+        expected = _live_source_order(block, max_paths=100, scope=scope)
+        count = int(expected.numel())
+        assert state.bits.tolist() == [0]
+        torch.testing.assert_close(selected.selected_row_index[:count], expected)
+        assert selected.candidate_capacity == 8
+        assert not hasattr(selected, "path_capacity_per_pair")
+        assert not hasattr(selected, "overflow")
 
 
 def test_prior_failure_and_valid_bad_endpoint_are_inert() -> None:
@@ -379,7 +386,6 @@ def test_prior_failure_and_valid_bad_endpoint_are_inert() -> None:
         pair_count=2,
         num_tx=1,
         num_rx=2,
-        path_capacity_per_pair=8,
         max_paths=None,
         max_paths_scope="per_pair",
     )
@@ -393,14 +399,16 @@ def test_prior_failure_and_valid_bad_endpoint_are_inert() -> None:
     assert selected.valid.tolist() == [False] * 8
 
 
-def test_zero_capacity_empty_and_current_stream() -> None:
+def test_zero_candidate_capacity_and_current_stream() -> None:
     block = _block()
-    block["valid"].fill_(False)
+    block = {name: value[:0] for name, value in block.items()}
     stream = torch.cuda.Stream()
     with torch.cuda.stream(stream):
-        state, selected = _select(block, capacity=0)
+        state, selected = _select(block)
     stream.synchronize()
     assert state.bits.tolist() == [0]
+    assert selected.selected_row_index.shape == (0,)
+    assert selected.valid.shape == (0,)
     assert selected.num_selected.tolist() == [0]
     assert selected.num_paths.tolist() == [0, 0]
 
@@ -445,7 +453,6 @@ def test_missing_native_symbol_fails_without_fallback(monkeypatch) -> None:
             pair_count=2,
             num_tx=1,
             num_rx=2,
-            path_capacity_per_pair=8,
             max_paths=None,
             max_paths_scope="per_pair",
         )
@@ -476,4 +483,7 @@ def test_selector_has_no_fallback_sync_or_intermediate_trap() -> None:
         assert forbidden not in native
     assert 'required_symbol as _required_native_op' in facade
     assert "enumerated_canonical_capacity_select" in facade
+    assert "path_capacity_per_pair" not in native
+    assert "kPairCapacityOverflow" not in native
+    assert 'result["overflow"]' not in native
     assert "enumerated_canonical_capacity_select" not in live_engine

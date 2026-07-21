@@ -149,26 +149,21 @@ class CapacityPathSelection:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class CanonicalPathSelection:
-    """Canonical compact-prefix indices over a host-known candidate capacity."""
+    """Canonical candidate-prefix indices independent of public pair storage."""
 
     candidate_capacity: int
     pair_count: int
-    path_capacity_per_pair: int
     failure_state: CapacityFailureState
     selected_row_index: torch.Tensor
     valid: torch.Tensor
     num_selected: torch.Tensor
     num_paths: torch.Tensor
-    overflow: torch.Tensor
 
     def __post_init__(self) -> None:
         candidate_capacity = _require_host_count(
             "candidate_capacity", self.candidate_capacity
         )
         pair_count = _require_host_count("pair_count", self.pair_count)
-        _require_host_count(
-            "path_capacity_per_pair", self.path_capacity_per_pair
-        )
         selected = _require_cuda_tensor(
             "selected_row_index",
             self.selected_row_index,
@@ -195,13 +190,6 @@ class CanonicalPathSelection:
             self.num_paths,
             dtype=torch.int32,
             shape=(pair_count,),
-            device=selected.device,
-        )
-        _require_cuda_tensor(
-            "overflow",
-            self.overflow,
-            dtype=torch.bool,
-            shape=(1,),
             device=selected.device,
         )
 

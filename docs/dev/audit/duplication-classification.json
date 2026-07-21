@@ -824,14 +824,14 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 172
     },
-    "b92ae6a7fae0c61d": {
+    "a4ca552d088020e2": {
       "category": "other",
       "corpus": "native",
       "files": [
         "path.cpp"
       ],
       "owner": "bindings",
-      "provenance": "ADR-029 canonical selector hand-reviewed fingerprint refresh",
+      "provenance": "ADR-029 canonical selector capacity-decoupling hand-reviewed fingerprint refresh",
       "reason": "Repeated explicit pybind registration argument lists at the typed ABI boundary.",
       "token_count": 200
     },

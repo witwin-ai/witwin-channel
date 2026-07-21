@@ -50,9 +50,12 @@ The existing `max_paths` and `max_paths_scope` fields keep their algorithmic
 selection semantics. They may intentionally select or truncate paths before
 result packing. `path_capacity_per_pair` never silently truncates. If the
 selected valid rows for any endpoint pair exceed `C`, the result-capacity
-overflow contract below applies. A per-pair `max_paths` value must not exceed
-`C`; a global limit must not exceed the host-known total capacity formed from
-the endpoint-pair count and `C`.
+overflow contract below applies. When a capacity-backed public result is
+requested, a per-pair `max_paths` value must not exceed `C` and a global limit
+must not exceed the host-known total capacity formed from the endpoint-pair
+count and `C`. The canonical selector itself is independent of `C`, so
+non-export enumeration and the ADR-008 BDPT oracle do not require public result
+storage.
 
 For `PathResult`, the path axis is exactly `C`; consequently
 `PathResult.max_num_paths` means capacity, not the maximum actual valid count.
@@ -143,8 +146,9 @@ bit; after any bit is set it must not consume upstream payload, and it publishes
 only the canonical inert representation: all selected-state and result-capacity
 rows inert, every `valid` bit false, every device count zero, and no vector/grid
 accumulation. Typed per-operation overflow/count outputs remain available for
-direct contract diagnostics, but they do not replace the shared transaction
-state.
+direct contract diagnostics when that operation owns a capacity boundary, but
+they do not replace the shared transaction state. The canonical selector owns
+no public pair-capacity boundary and therefore returns no overflow tensor.
 
 Intermediate capacity operations never trap. The solve/result boundary reads
 the shared state on the same ordered CUDA stream and owns exactly one terminal
@@ -211,13 +215,16 @@ separate profiler and exactness evidence.
 
 The dormant canonical selector in step 3 uses the complete host-known candidate
 capacity `N` for its internal output, with selected rows in a CUDA-valid compact
-prefix and a CUDA `int32[1]` selected count. This is not the public `P*C`
-layout. It preserves live compact valid-row ordinals until deterministic
-accumulation; public pair-major padding remains a later result-packing
-operation. The selector reproduces the existing stable topology sort,
-canonical event/object deduplication, shortest-path winner, and `max_paths`
-policy before scattering append. Its decisions are frozen and
-non-differentiable; continuous AD belongs to the subsequent native gather.
+prefix, a CUDA `int32[1]` selected count, and CUDA `int32[P]` per-pair counts.
+This is not the public `P*C` layout. The selector has no
+`path_capacity_per_pair` input, does not test `PAIR_CAPACITY_OVERFLOW`, and
+returns no local overflow output. It preserves live compact valid-row ordinals
+until deterministic accumulation; public pair-major padding and capacity
+failure remain later result-packing operations. The selector reproduces the
+existing stable topology sort, canonical event/object deduplication,
+shortest-path winner, and `max_paths` policy before scattering append. Its
+decisions are frozen and non-differentiable; continuous AD belongs to the
+subsequent native gather.
 The dormant launch, synchronization, copy, output, and CUB scratch formulas are
 recorded in
 [`phase13-adr029-canonical-selector-resource-ledger.json`](../audit/phase13-adr029-canonical-selector-resource-ledger.json);

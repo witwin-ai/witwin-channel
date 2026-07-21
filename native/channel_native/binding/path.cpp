@@ -362,7 +362,6 @@ pybind11::dict cn_enumerated_canonical_capacity_select(
     int64_t pair_count,
     int64_t num_tx,
     int64_t num_rx,
-    int64_t path_capacity_per_pair,
     int64_t max_paths,
     int64_t max_paths_scope);
 pybind11::dict cn_deterministic_capacity_finalize(
@@ -914,7 +913,6 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("pair_count"),
         pybind11::arg("num_tx"),
         pybind11::arg("num_rx"),
-        pybind11::arg("path_capacity_per_pair"),
         pybind11::arg("max_paths"),
         pybind11::arg("max_paths_scope"));
     module.def(

@@ -64,8 +64,12 @@ compact valid prefix at the host-known candidate capacity, rather than early
 pair slots, so later deterministic accumulation retains live valid-row
 ordinals. Selection is frozen and has no AD companion; a later native gather
 owns continuous primal/JVP/VJP. The selector shares the solve failure state,
-publishes no partial rows on pair overflow or bad valid endpoint ids, and has
-no live caller before the atomic capacity switch.
+publishes no partial rows after a contract failure, and returns device
+`num_paths` for every pair. It neither consumes public
+`path_capacity_per_pair` nor publishes a local overflow: that capacity is
+enforced only by later result export/packing. This lets the selector feed
+non-export enumeration and the ADR-008 BDPT oracle without requiring public
+result storage, although it has no live caller before the atomic switch.
 
 `propagation.enumerated.capacity.evaluated_paths_capacity_pack` is the dormant
 complete-row producer layered on that same no-trap finalizer helper. One native

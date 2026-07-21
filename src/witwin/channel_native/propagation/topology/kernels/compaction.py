@@ -714,7 +714,6 @@ _CANONICAL_SELECTION_FIELDS = (
     "valid",
     "num_selected",
     "num_paths",
-    "overflow",
 )
 _CANONICAL_SCOPE = {"global": 0, "per_pair": 1}
 
@@ -724,13 +723,12 @@ class _EnumeratedCanonicalCapacitySelectFunction(torch.autograd.Function):
     def forward(*inputs):
         tensors = list(inputs[:10])
         tensors[9] = torch.autograd.forward_ad.unpack_dual(tensors[9]).primal
-        pair_count, num_tx, num_rx, capacity, max_paths, scope = inputs[10:]
+        pair_count, num_tx, num_rx, max_paths, scope = inputs[10:]
         raw = _required_native_op("enumerated_canonical_capacity_select")(
             *tensors,
             int(pair_count),
             int(num_tx),
             int(num_rx),
-            int(capacity),
             int(max_paths),
             int(scope),
         )
@@ -746,7 +744,7 @@ class _EnumeratedCanonicalCapacitySelectFunction(torch.autograd.Function):
     @staticmethod
     def backward(ctx, *grad_outputs):
         del ctx, grad_outputs
-        return (None,) * 16
+        return (None,) * 15
 
     @staticmethod
     def jvp(ctx, *tangents):
@@ -802,7 +800,6 @@ def _canonical_selection_policy(
     pair_count: int,
     num_tx: int,
     num_rx: int,
-    path_capacity_per_pair: int,
     max_paths: int | None,
     max_paths_scope: str,
 ) -> tuple[int, int]:
@@ -810,7 +807,6 @@ def _canonical_selection_policy(
         ("pair_count", pair_count),
         ("num_tx", num_tx),
         ("num_rx", num_rx),
-        ("path_capacity_per_pair", path_capacity_per_pair),
     ):
         if type(value) is not int:
             raise TypeError(f"{name} must be an int")
@@ -820,36 +816,13 @@ def _canonical_selection_policy(
         raise ValueError("pair_count must equal num_tx * num_rx")
     if max_paths_scope not in _CANONICAL_SCOPE:
         raise ValueError("max_paths_scope must be 'global' or 'per_pair'")
-    native_max_paths = _canonical_max_paths(
-        max_paths=max_paths,
-        max_paths_scope=max_paths_scope,
-        path_capacity_per_pair=path_capacity_per_pair,
-        total_capacity=pair_count * path_capacity_per_pair,
-    )
+    native_max_paths = _canonical_max_paths(max_paths=max_paths)
     return native_max_paths, _CANONICAL_SCOPE[max_paths_scope]
 
 
-def _canonical_max_paths(
-    *,
-    max_paths: int | None,
-    max_paths_scope: str,
-    path_capacity_per_pair: int,
-    total_capacity: int,
-) -> int:
+def _canonical_max_paths(*, max_paths: int | None) -> int:
     if max_paths is not None and (type(max_paths) is not int or max_paths <= 0):
         raise ValueError("max_paths must be a positive int or None")
-    if (
-        max_paths is not None
-        and max_paths_scope == "per_pair"
-        and max_paths > path_capacity_per_pair
-    ):
-        raise ValueError("per-pair max_paths cannot exceed path_capacity_per_pair")
-    if (
-        max_paths is not None
-        and max_paths_scope == "global"
-        and max_paths > total_capacity
-    ):
-        raise ValueError("global max_paths cannot exceed total path capacity")
     return -1 if max_paths is None else max_paths
 
 
@@ -868,7 +841,6 @@ def enumerated_canonical_capacity_select(
     pair_count: int,
     num_tx: int,
     num_rx: int,
-    path_capacity_per_pair: int,
     max_paths: int | None,
     max_paths_scope: str,
 ) -> CanonicalPathSelection:
@@ -889,7 +861,6 @@ def enumerated_canonical_capacity_select(
         pair_count=pair_count,
         num_tx=num_tx,
         num_rx=num_rx,
-        path_capacity_per_pair=path_capacity_per_pair,
         max_paths=max_paths,
         max_paths_scope=max_paths_scope,
     )
@@ -908,7 +879,6 @@ def enumerated_canonical_capacity_select(
         pair_count,
         num_tx,
         num_rx,
-        path_capacity_per_pair,
         native_max_paths,
         native_scope,
     )
@@ -916,13 +886,11 @@ def enumerated_canonical_capacity_select(
     return CanonicalPathSelection(
         candidate_capacity=int(valid.shape[0]),
         pair_count=pair_count,
-        path_capacity_per_pair=path_capacity_per_pair,
         failure_state=failure_state,
         selected_row_index=raw["selected_row_index"],
         valid=raw["valid"],
         num_selected=raw["num_selected"],
         num_paths=raw["num_paths"],
-        overflow=raw["overflow"],
     )
 
 

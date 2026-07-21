@@ -15,7 +15,7 @@
     "tie_order": "original source-row ordinal preserved by stable least-significant-first passes"
   },
   "logical_device_work": {
-    "explicit_kernels": "S + 18",
+    "explicit_kernels": "S + 16",
     "stable_radix_sort_operations": "S + 7",
     "device_select_operations": 2,
     "host_device_copies": 0,
@@ -23,12 +23,12 @@
     "stream_waits": 0
   },
   "memory_bytes_excluding_allocator_rounding": {
-    "published_outputs": "9*N + 4*P + 5",
-    "base_temporary": "51*N + 8*P + 16",
+    "published_outputs": "9*N + 4*P + 4",
+    "base_temporary": "51*N + 8*P + 12",
     "additional_peak": "max(CUB radix-sort scratch(N), CUB DeviceSelect scratch(N))",
     "scratch_allocations": "one host-known max-sized CUB scratch allocation per call, reused by all S+7 radix passes and both DeviceSelect operations",
     "notes": "CUB scratch tensors are stream-ordered; no device count is copied to the host for sizing."
   },
   "activation_status": "dormant-no-live-caller",
-  "acceptance": "Exact-vs-live tests freeze stable source-row order, canonical deduplication, shortest winner, global/per-pair max_paths, invalid poison handling, and all-or-nothing overflow."
+  "acceptance": "Exact-vs-live tests freeze stable source-row order, canonical deduplication, shortest winner, global/per-pair max_paths, invalid poison handling, all-or-nothing contract failure, and independence from public pair capacity."
 }
