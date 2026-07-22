@@ -96,22 +96,15 @@
     "capacity-failure-state": "tests/runtime/test_capacity_failure_state.py::test_capacity_failure_bits_accumulate_and_every_block_stays_inert",
     "capacity-failure-terminal": "tests/runtime/test_capacity_failure_terminal.py::test_capacity_failure_terminal_trap_isolated_to_subprocess",
     "deterministic-ad": "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality",
-    "deterministic-diffraction-pair-reduction": "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_multi_pair_sparse_valid_skips_poison",
-    "deterministic-path-table-capacity": "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise",
     "deterministic-diffraction": "tests/deterministic/test_diffraction_single_wedge.py::test_single_wedge_diffraction_matches_path_reference",
-    "enumerated-canonical-capacity": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_is_exact_live_order",
     "enumerated-capacity-failure": "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert",
     "enumerated-capacity-failure-ad": "tests/propagation/enumerated/test_capacity_pack.py::test_vector_failure_sanitizer_is_native_vjp_jvp_identity_on_success",
     "enumerated-transmission": "tests/path/test_path_transmission.py::test_transmission_path_result_events_and_delay",
     "enumerated-transmission-ad": "tests/ad/test_solver_geometry_ad.py::test_mesh_vertex_transmission_grad_matches_fd",
-    "evaluated-paths-canonical-capacity": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_preserves_live_bits_and_shared_row_identity",
-    "evaluated-paths-capacity": "tests/propagation/enumerated/test_capacity_pack.py::test_capacity_pack_is_exact_pair_major_inert_and_identity_shared",
     "segment-penetration-capacity": "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_tape_and_topology_pack_share_capacity_transaction",
     "segment-penetration-ad": "tests/propagation/geometry/test_segment_penetration_cuda.py::test_forward_jvp_and_backward_obey_adjoint_identity",
-    "coupled-candidate-capacity": "tests/propagation/topology/test_coupled_candidate_capacity.py::test_coupled_candidate_capacity_matches_frozen_rd_dd_order",
     "deterministic-los": "tests/deterministic/test_los_empty_space.py::test_empty_space_los_matches_analytic_reference",
     "deterministic-reflection": "tests/deterministic/test_reflection_single_plane.py::test_single_plane_reflection_matches_path_reference",
-    "reflection-candidate-capacity": "tests/propagation/topology/test_reflection_candidate_capacity.py::test_reflection_candidate_capacity_matches_multibounce_compact_order",
     "field-coupled": "tests/ad/test_solver_diffraction_coupled_ad.py::test_coupled_material_grad_matches_fd",
     "field-diffraction": "tests/ad/test_solver_diffraction_coupled_ad.py::test_wedge_material_grad_matches_fd",
     "field-free-space": "tests/ad/test_field_em_ad.py::test_free_space_frequency_vjp_matches_reference_oracle",
@@ -127,7 +120,6 @@
     "path-diffraction": "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_diffraction_paths_when_available",
     "path-los": "tests/path/test_path_solver_smoke.py::test_path_solver_empty_space_los_returns_one_path_per_pair",
     "path-reflection": "tests/path/test_path_solver_smoke.py::test_path_solver_exports_native_reflection_paths_when_available",
-    "path-result-capacity": "tests/path/test_path_result_capacity.py::test_path_result_capacity_is_pair_major_exact_and_inert",
     "public-capabilities": "tests/test_capabilities.py::test_capability_manifest_is_versioned_serializable_and_defensive",
     "public-core": "tests/core/test_public_scene.py::test_public_scene_objects_capture_structured_inputs",
     "public-deployment": "tests/performance/test_deployment_contract.py::test_pipeline_cache_key_is_stable_and_invalidates_all_contract_inputs",
@@ -986,20 +978,16 @@
     [
       "deterministic_capacity_finalize",
       "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_capacity_finalize",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-deterministic-capacity-finalize",
-      [
-        "deterministic-diffraction"
-      ]
+      []
     ],
     [
       "enumerated_canonical_capacity_select",
       "witwin.channel_native.propagation.topology.kernels.compaction._EnumeratedCanonicalCapacitySelectFunction.forward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-enumerated-canonical-capacity-select",
-      [
-        "enumerated-canonical-capacity"
-      ]
+      []
     ],
     [
       "enumerated_transmission_topology_pack",
@@ -1054,110 +1042,86 @@
     [
       "evaluated_paths_canonical_capacity_gather",
       "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.forward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-evaluated-paths-canonical-capacity-gather",
-      [
-        "evaluated-paths-canonical-capacity"
-      ]
+      []
     ],
     [
       "evaluated_paths_canonical_capacity_gather_backward",
       "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.backward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-evaluated-paths-canonical-capacity-gather-ad",
-      [
-        "evaluated-paths-canonical-capacity"
-      ]
+      []
     ],
     [
       "evaluated_paths_canonical_capacity_gather_jvp",
       "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.jvp",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-evaluated-paths-canonical-capacity-gather-ad",
-      [
-        "evaluated-paths-canonical-capacity"
-      ]
+      []
     ],
     [
       "evaluated_paths_capacity_pack",
       "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.forward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-evaluated-paths-capacity-pack",
-      [
-        "evaluated-paths-capacity"
-      ]
+      []
     ],
     [
       "evaluated_paths_capacity_pack_backward",
       "witwin.channel_native.propagation.enumerated.capacity._evaluated_paths_capacity_pack_backward_native",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-evaluated-paths-capacity-pack-ad",
-      [
-        "evaluated-paths-capacity"
-      ]
+      []
     ],
     [
       "evaluated_paths_capacity_pack_jvp",
       "witwin.channel_native.propagation.enumerated.capacity._evaluated_paths_capacity_pack_jvp_native",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-evaluated-paths-capacity-pack-ad",
-      [
-        "evaluated-paths-capacity"
-      ]
+      []
     ],
     [
       "deterministic_diffraction_pair_reduce",
       "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-deterministic-diffraction-pair-reduce",
-      [
-        "deterministic-diffraction-pair-reduction"
-      ]
+      []
     ],
     [
       "deterministic_diffraction_pair_reduce_backward",
       "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_backward",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-deterministic-diffraction-pair-reduce-backward",
-      [
-        "deterministic-diffraction-pair-reduction"
-      ]
+      []
     ],
     [
       "deterministic_diffraction_pair_reduce_jvp",
       "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_jvp",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-deterministic-diffraction-pair-reduce-jvp",
-      [
-        "deterministic-diffraction-pair-reduction"
-      ]
+      []
     ],
     [
       "deterministic_path_table_capacity_pack",
       "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.forward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-deterministic-path-table-capacity-pack",
-      [
-        "deterministic-path-table-capacity"
-      ]
+      []
     ],
     [
       "deterministic_path_table_capacity_pack_backward",
       "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.backward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-deterministic-path-table-capacity-pack-backward",
-      [
-        "deterministic-path-table-capacity"
-      ]
+      []
     ],
     [
       "deterministic_path_table_capacity_pack_jvp",
       "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.jvp",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-deterministic-path-table-capacity-pack-jvp",
-      [
-        "deterministic-path-table-capacity"
-      ]
+      []
     ],
     [
       "deterministic_component_counts",
@@ -1189,11 +1153,9 @@
     [
       "deterministic_diffraction_order1_capacity_block",
       "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_diffraction_order1_capacity_block",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-diffraction-path-capacity",
-      [
-        "deterministic-diffraction"
-      ]
+      []
     ],
     [
       "deterministic_diffraction_order1_compact",
@@ -1207,11 +1169,9 @@
     [
       "deterministic_diffraction_state_capacity_select",
       "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_diffraction_state_capacity_select",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-diffraction-state-capacity",
-      [
-        "deterministic-diffraction"
-      ]
+      []
     ],
     [
       "deterministic_diffraction_state_pack",
@@ -1378,11 +1338,9 @@
     [
       "deterministic_reflection_candidate_capacity_block",
       "witwin.channel_native.propagation.topology.kernels.reflection.deterministic_reflection_candidate_capacity_block",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-reflection-candidate-capacity",
-      [
-        "reflection-candidate-capacity"
-      ]
+      []
     ],
     [
       "deterministic_reflection_epc_input_batch",
@@ -2198,38 +2156,30 @@
     [
       "path_result_capacity_pack",
       "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.forward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-path-result-capacity-pack",
-      [
-        "path-result-capacity"
-      ]
+      []
     ],
     [
       "path_result_capacity_pack_backward",
       "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.backward",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-path-result-capacity-pack-ad",
-      [
-        "path-result-capacity"
-      ]
+      []
     ],
     [
       "path_result_capacity_pack_jvp",
       "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.jvp",
-      "native_call_site",
+      "dormant_native_call_site",
       "native-path-result-capacity-pack-ad",
-      [
-        "path-result-capacity"
-      ]
+      []
     ],
     [
       "coupled_candidate_capacity_block",
       "witwin.channel_native.propagation.topology.kernels.coupled.coupled_candidate_capacity_block",
-      "named_wrapper",
+      "dormant_named_wrapper",
       "native-coupled-candidate-capacity",
-      [
-        "coupled-candidate-capacity"
-      ]
+      []
     ],
     [
       "coupled_dd_geometry_forward",

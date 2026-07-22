@@ -12,6 +12,8 @@ from benchmarks.phase13_phase12.builds import (
     parse_cuobjdump_resource_usage,
 )
 from benchmarks.phase13_phase12.contracts import (
+    ADDENDUM_ACCEPTED,
+    ADR030_PRODUCTION_CANDIDATE_SUPERSEDED,
     COMPARISON_GROUPS,
     DEFAULT_GATE,
     EvidenceError,
@@ -33,7 +35,13 @@ def test_formal_builds_pin_the_complete_accepted_rayd_commit() -> None:
 def test_infrastructure_gate_is_explicitly_non_claiming_until_freeze() -> None:
     gate = load_gate(DEFAULT_GATE)
 
-    with pytest.raises(EvidenceError, match="accepted facts are frozen"):
+    assert ADDENDUM_ACCEPTED is False
+    assert ADR030_PRODUCTION_CANDIDATE_SUPERSEDED is True
+    assert gate["history_policy"]["accepted"] is False
+    assert gate["history_policy"]["diffraction_role"] == (
+        "adr030_dormant_source_lane_experiment"
+    )
+    with pytest.raises(EvidenceError, match="superseded by ADR-032"):
         require_measured_policy_ready(gate)
     assert gate["frozen_inputs"]["profile_contract_sha256"] is None
     assert all(

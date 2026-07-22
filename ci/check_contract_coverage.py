@@ -1,4 +1,4 @@
-"""Validate complete public-API and native-binding contract/E2E coverage."""
+"""Validate public/API native contracts, live E2E, and dormant caller-zero rows."""
 
 from __future__ import annotations
 
@@ -34,7 +34,137 @@ NATIVE_COLUMNS = (
     "contract_test",
     "e2e_callers",
 )
-OWNER_KINDS = frozenset({"named_wrapper", "native_call_site"})
+OWNER_KINDS = frozenset(
+    {
+        "named_wrapper",
+        "native_call_site",
+        "dormant_named_wrapper",
+        "dormant_native_call_site",
+    }
+)
+DORMANT_SYMBOL_FACADES = {
+    "coupled_candidate_capacity_block": "coupled_candidate_capacity_block",
+    "deterministic_capacity_finalize": "deterministic_capacity_finalize",
+    "deterministic_diffraction_order1_capacity_block": (
+        "deterministic_diffraction_order1_capacity_block"
+    ),
+    "deterministic_diffraction_pair_reduce": "deterministic_diffraction_pair_reduce",
+    "deterministic_diffraction_pair_reduce_backward": (
+        "deterministic_diffraction_pair_reduce_backward"
+    ),
+    "deterministic_diffraction_pair_reduce_jvp": (
+        "deterministic_diffraction_pair_reduce_jvp"
+    ),
+    "deterministic_diffraction_state_capacity_select": (
+        "deterministic_diffraction_state_capacity_select"
+    ),
+    "deterministic_path_table_capacity_pack": (
+        "deterministic_path_table_capacity_pack"
+    ),
+    "deterministic_path_table_capacity_pack_backward": (
+        "deterministic_path_table_capacity_pack"
+    ),
+    "deterministic_path_table_capacity_pack_jvp": (
+        "deterministic_path_table_capacity_pack"
+    ),
+    "deterministic_reflection_candidate_capacity_block": (
+        "deterministic_reflection_candidate_capacity_block"
+    ),
+    "enumerated_canonical_capacity_select": "enumerated_canonical_capacity_select",
+    "evaluated_paths_canonical_capacity_gather": (
+        "evaluated_paths_canonical_capacity_gather"
+    ),
+    "evaluated_paths_canonical_capacity_gather_backward": (
+        "evaluated_paths_canonical_capacity_gather"
+    ),
+    "evaluated_paths_canonical_capacity_gather_jvp": (
+        "evaluated_paths_canonical_capacity_gather"
+    ),
+    "evaluated_paths_capacity_pack": "evaluated_paths_capacity_pack",
+    "evaluated_paths_capacity_pack_backward": "evaluated_paths_capacity_pack",
+    "evaluated_paths_capacity_pack_jvp": "evaluated_paths_capacity_pack",
+    "path_result_capacity_pack": "from_capacity_evaluated_paths",
+    "path_result_capacity_pack_backward": "from_capacity_evaluated_paths",
+    "path_result_capacity_pack_jvp": "from_capacity_evaluated_paths",
+}
+DORMANT_EXPERIMENT_SYMBOLS = frozenset(DORMANT_SYMBOL_FACADES)
+DORMANT_FACADE_OWNERS = {
+    "coupled_candidate_capacity_block": (
+        "witwin.channel_native.propagation.topology.kernels.coupled."
+        "coupled_candidate_capacity_block"
+    ),
+    "deterministic_capacity_finalize": (
+        "witwin.channel_native.propagation.topology.kernels.compaction."
+        "deterministic_capacity_finalize"
+    ),
+    "deterministic_diffraction_order1_capacity_block": (
+        "witwin.channel_native.propagation.topology.kernels.compaction."
+        "deterministic_diffraction_order1_capacity_block"
+    ),
+    "deterministic_diffraction_pair_reduce": (
+        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "deterministic_diffraction_pair_reduce"
+    ),
+    "deterministic_diffraction_pair_reduce_backward": (
+        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "deterministic_diffraction_pair_reduce_backward"
+    ),
+    "deterministic_diffraction_pair_reduce_jvp": (
+        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "deterministic_diffraction_pair_reduce_jvp"
+    ),
+    "deterministic_diffraction_pair_reduce_ad": (
+        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "deterministic_diffraction_pair_reduce_ad"
+    ),
+    "deterministic_diffraction_state_capacity_select": (
+        "witwin.channel_native.propagation.topology.kernels.primitives."
+        "deterministic_diffraction_state_capacity_select"
+    ),
+    "deterministic_path_table_capacity_pack": (
+        "witwin.channel_native.deterministic.capacity."
+        "deterministic_path_table_capacity_pack"
+    ),
+    "deterministic_reflection_candidate_capacity_block": (
+        "witwin.channel_native.propagation.topology.kernels.reflection."
+        "deterministic_reflection_candidate_capacity_block"
+    ),
+    "enumerated_canonical_capacity_select": (
+        "witwin.channel_native.propagation.topology.kernels.compaction."
+        "enumerated_canonical_capacity_select"
+    ),
+    "evaluated_paths_canonical_capacity_gather": (
+        "witwin.channel_native.propagation.enumerated.canonical_capacity."
+        "evaluated_paths_canonical_capacity_gather"
+    ),
+    "evaluated_paths_capacity_pack": (
+        "witwin.channel_native.propagation.enumerated.capacity."
+        "evaluated_paths_capacity_pack"
+    ),
+    "from_capacity_evaluated_paths": (
+        "witwin.channel_native.path.capacity.from_capacity_evaluated_paths"
+    ),
+}
+DORMANT_ALLOWED_FACADE_CALLERS = {
+    "deterministic_diffraction_pair_reduce": frozenset(
+        {
+            "witwin.channel_native.deterministic.kernels.diffraction_pair."
+            "_DeterministicDiffractionPairReduceFunction.forward"
+        }
+    ),
+    "deterministic_diffraction_pair_reduce_backward": frozenset(
+        {
+            "witwin.channel_native.deterministic.kernels.diffraction_pair."
+            "_DeterministicDiffractionPairReduceFunction.backward"
+        }
+    ),
+    "deterministic_diffraction_pair_reduce_jvp": frozenset(
+        {
+            "witwin.channel_native.deterministic.kernels.diffraction_pair."
+            "_DeterministicDiffractionPairReduceFunction.jvp"
+        }
+    ),
+}
 BOOTSTRAP_CALL_SITE_OWNERS = {
     "coupled_rd_prepare": (
         "witwin.channel_native.propagation.fields.kernels.autograd."
@@ -353,6 +483,43 @@ class _DefinitionVisitor(ast.NodeVisitor):
         self.stack.pop()
 
 
+class _CallSiteVisitor(ast.NodeVisitor):
+    def __init__(self, module: str, targets: frozenset[str]) -> None:
+        self.module = module
+        self.targets = targets
+        self.stack: list[str] = []
+        self.call_sites: dict[str, list[tuple[str, int]]] = defaultdict(list)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # noqa: N802
+        self.stack.append(node.name)
+        self.generic_visit(node)
+        self.stack.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
+        self._visit_function(node)
+
+    def visit_AsyncFunctionDef(  # noqa: N802
+        self, node: ast.AsyncFunctionDef
+    ) -> None:
+        self._visit_function(node)
+
+    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        self.stack.append(node.name)
+        self.generic_visit(node)
+        self.stack.pop()
+
+    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+        name: str | None = None
+        if isinstance(node.func, ast.Name):
+            name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            name = node.func.attr
+        if name in self.targets:
+            caller = ".".join((self.module, *self.stack))
+            self.call_sites[name].append((caller, node.lineno))
+        self.generic_visit(node)
+
+
 def _python_definitions(repo: Path) -> dict[str, ast.AST]:
     root = repo / PYTHON_PACKAGE_PATH
     definitions: dict[str, ast.AST] = {}
@@ -371,6 +538,27 @@ def _python_definitions(repo: Path) -> dict[str, ast.AST]:
             )
         definitions.update(visitor.definitions)
     return definitions
+
+
+def _python_call_sites(
+    repo: Path, targets: frozenset[str]
+) -> dict[str, list[tuple[str, str, int]]]:
+    root = repo / PYTHON_PACKAGE_PATH
+    call_sites: dict[str, list[tuple[str, str, int]]] = defaultdict(list)
+    for path in sorted(root.rglob("*.py")):
+        suffix = list(path.relative_to(root).with_suffix("").parts)
+        if suffix[-1] == "__init__":
+            suffix.pop()
+        module = ".".join(("witwin", "channel_native", *suffix))
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        visitor = _CallSiteVisitor(module, targets)
+        visitor.visit(tree)
+        relative = path.relative_to(repo).as_posix()
+        for name, rows in visitor.call_sites.items():
+            call_sites[name].extend(
+                (caller, relative, line) for caller, line in rows
+            )
+    return call_sites
 
 
 def _native_reference_count(node: ast.AST, symbol: str) -> int:
@@ -452,7 +640,14 @@ def _validate_native_rows(
             issues.append(f"duplicate native binding coverage: {symbol}")
         if owner_kind not in OWNER_KINDS:
             issues.append(f"unsupported owner kind for {symbol}: {owner_kind}")
-        if not callers:
+        dormant = owner_kind.startswith("dormant_")
+        if dormant and symbol not in DORMANT_EXPERIMENT_SYMBOLS:
+            issues.append(f"unapproved dormant native binding: {symbol}")
+        if not dormant and symbol in DORMANT_EXPERIMENT_SYMBOLS:
+            issues.append(f"dormant native binding uses live owner kind: {symbol}")
+        if dormant and callers:
+            issues.append(f"dormant native binding has E2E caller: {symbol}")
+        if not dormant and not callers:
             issues.append(f"native binding has no E2E caller: {symbol}")
         entries[symbol] = (owner, owner_kind, contract_test, tuple(callers))
     return entries, issues
@@ -686,19 +881,23 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
                 )
             owner = candidates[0]
             owner_kind = "named_wrapper"
+        dormant = symbol in DORMANT_EXPERIMENT_SYMBOLS
+        if dormant:
+            owner_kind = f"dormant_{owner_kind}"
         native_rows.append(
             [
                 symbol,
                 owner,
                 owner_kind,
                 _initial_native_contract(symbol),
-                [_initial_native_scenario(symbol)],
+                [] if dormant else [_initial_native_scenario(symbol)],
             ]
         )
 
     used_scenarios = {
-        str(row[-1][0])
-        for row in [*public_rows, *native_rows]  # type: ignore[index]
+        str(scenario)
+        for row in [*public_rows, *native_rows]
+        for scenario in row[-1]  # type: ignore[union-attr]
     }
     return {
         "schema_version": 1,
@@ -915,6 +1114,29 @@ def check_contract_coverage(repo: Path, manifest: dict[str, Any]) -> list[str]:
     for qualified_name in definitions:
         by_terminal[qualified_name.rsplit(".", maxsplit=1)[-1]].append(qualified_name)
 
+    unmapped_facades = set(DORMANT_SYMBOL_FACADES.values()) - set(
+        DORMANT_FACADE_OWNERS
+    )
+    if unmapped_facades:
+        issues.append(
+            "dormant native symbols have no facade owner: "
+            + ", ".join(sorted(unmapped_facades))
+        )
+    for facade, owner in sorted(DORMANT_FACADE_OWNERS.items()):
+        if owner not in definitions:
+            issues.append(f"dormant facade owner does not exist: {facade}: {owner}")
+    dormant_call_sites = _python_call_sites(
+        repo, frozenset(DORMANT_FACADE_OWNERS)
+    )
+    for facade, rows in sorted(dormant_call_sites.items()):
+        allowed = DORMANT_ALLOWED_FACADE_CALLERS.get(facade, frozenset())
+        for caller, path, line in rows:
+            if caller not in allowed:
+                issues.append(
+                    "dormant facade has production caller: "
+                    f"{facade}: {caller} at {path}:{line}"
+                )
+
     for symbol, (owner, owner_kind, contract_test, callers) in native_entries.items():
         used_contracts.add(contract_test)
         used_scenarios.update(callers)
@@ -934,14 +1156,15 @@ def check_contract_coverage(repo: Path, manifest: dict[str, Any]) -> list[str]:
                 f"native binding Python owner does not exist: {symbol}: {owner}"
             )
             continue
-        if owner_kind == "named_wrapper":
+        live_owner_kind = owner_kind.removeprefix("dormant_")
+        if live_owner_kind == "named_wrapper":
             candidates = sorted(by_terminal.get(symbol, []))
             if candidates != [owner]:
                 issues.append(
                     f"native binding named wrapper is not unique: {symbol}: "
                     + ", ".join(candidates)
                 )
-        elif owner_kind == "native_call_site":
+        elif live_owner_kind == "native_call_site":
             reference_owners = sorted(
                 qualified_name
                 for qualified_name, node in definitions.items()

@@ -127,7 +127,9 @@ def test_phase_p_live_duplication_refresh_is_closed_without_budget_relaxation() 
             "acceptance remains met"
         ),
     }
-    assert len(duplication["regions"]) == refresh["region_count"]
+    assert len(duplication["regions"]) == duplication[
+        "adr032_stable_recovery_refresh"
+    ]["region_count"]
     assert refresh["coverage_percent"] < refresh["frozen_coverage_percent"]
     assert duplication["phase11a_refresh"]["region_count"] == 155
     assert duplication["phase11b_refresh"]["region_count"] == 143

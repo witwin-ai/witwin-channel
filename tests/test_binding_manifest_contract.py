@@ -85,7 +85,10 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert baseline["duplicate_symbols"] == []
     assert current["duplicate_symbols"] == []
     assert migration["current_phase"] == 12
-    assert migration["current_subphase"] == "profiling-driven performance closure"
+    assert migration["current_subphase"] == (
+        "ADR-032 compact stable recovery accepted; "
+        "ADR-027 comparative evidence closure open"
+    )
     assert len(renames) == len(rename_sources) == len(rename_targets) == 21
     assert rename_sources.isdisjoint(rename_targets)
     assert baseline_name_set & (rename_sources | rename_targets) == rename_targets

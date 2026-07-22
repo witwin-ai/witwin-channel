@@ -27,13 +27,17 @@ compiled native CUDA/RayD extension.
   numerical operation. Finite-difference production derivatives are forbidden.
 - Do not recompute geometry already owned by RayD in Python or Torch.
 - Device data must remain resident through the compute pipeline except at the
-  single ADR-032 compact-cardinality allocation boundary. That owner may copy
+  sole ADR-032-accepted new compact-cardinality allocation boundary. That owner
+  may copy
   only audited integer count metadata to the host and explicitly synchronize
   the caller's current stream to allocate exact `O(K)` output. It may not run
   CPU/Torch physics or numerical selection, hide the transfer behind allocation
   or Boolean indexing, or become a fallback. Other hot-path `.cpu()`, `.numpy()`,
   `.tolist()`, scalar extraction, host iteration, implicit synchronization, or
-  avoidable host/device copies remain forbidden.
+  avoidable host/device copies remain forbidden. This is not a claim that the
+  whole solve has only one D2H/synchronization: pre-existing observed boundaries
+  remain measurable optimization debt and require named owners plus E2E,
+  memory, throughput, and exactness evidence before any change.
 - Under ADR-032, production Path and Deterministic result shapes and
   `max_num_paths` represent actual compact rows, not provisioned storage.
   `path_capacity_per_pair`, `diffraction_state_capacity`, capacity-shaped
@@ -136,8 +140,11 @@ requires them.
 - C++ Torch bridges validate tensor/shape/dtype/device/ABI state and launch
   kernels. They must not contain a second host implementation of RF physics.
 - Every native ABI symbol has one Python owner and must appear in
-  `ci/native-binding-manifest.json` with direct contract coverage and at least
-  one end-to-end caller.
+  `ci/native-binding-manifest.json` with direct contract coverage. A live symbol
+  must have at least one production end-to-end caller. A retained dormant
+  ADR-029/030 experiment instead requires an explicit dormant owner kind,
+  direct execution coverage, and a caller-zero static gate; it must not appear
+  in production E2E coverage, capabilities, defaults, or the public API.
 - Native ownership follows ABI operation, fusion/launch contract, tape lifetime,
   device primitive, and numerical order—not the Python directory layout.
 - Under ADR-025 and the completed Phase 8A atomic pin/switch/delete, RayD is
@@ -171,13 +178,14 @@ requires them.
   retains material/geometry-mode encoding, thin-sheet eligibility, topology,
   and the MC incident-TE/TM wall-product estimator. Do not reintroduce a Python
   depth march, Torch geometry/estimator physics, or a per-transmitter trace.
-- The dormant Channel-owned `mc_transmission_wall_product` primal/VJP/JVP
+- The live Channel-owned `mc_transmission_wall_product` primal/VJP/JVP
   family consumes fixed `[pair, hit_capacity]` penetration storage and the
   exact solve failure state. It checks canonical validity before every payload,
   has no AD depth cap or hidden contiguous copy, multiplies walls in ascending
   slot order, and reduces shared layer/frequency VJPs with fixed owners in
-  ascending pair/slot order. It remains caller-free until the dedicated
-  MonteCarloTargetInset atomic switch/delete commit.
+  ascending pair/slot order. The completed ADR-027 Phase M atomic switch makes
+  it the Monte Carlo Basic `MonteCarloTargetInset` production estimator; the
+  prior scalar/per-transmitter route is deleted and must not be restored.
 - The superseded ADR-029 deterministic PathTable capacity export remains a
   caller-free experiment. It consumes the
   exact shared `CapacityFailureState` from its layout and preserves pair-major

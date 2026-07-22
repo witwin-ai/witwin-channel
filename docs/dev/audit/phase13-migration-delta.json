@@ -20,7 +20,7 @@
         }
     },
     "current_phase": 12,
-    "current_subphase": "profiling-driven performance closure",
+    "current_subphase": "ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
     "transfers_applied": [
         {
             "phase": 3,
@@ -1104,7 +1104,7 @@
         "public_api_delta": false
     },
     "phase11b_current": {
-        "status": "complete; frozen duplication acceptance met",
+        "status": "historical Phase 11B implementation snapshot; frozen duplication acceptance met and later release closure completed",
         "scope": "mechanical Python facade and native launch/configuration boilerplate deduplication",
         "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json",
         "duplication_refresh": {
@@ -1167,14 +1167,14 @@
         "callable_signature_change": false,
         "launch_contract_change": false,
         "public_api_delta": false,
-        "remaining_phase11_work": [
+        "remaining_at_snapshot": [
             "RayD legacy extern-C consumer retirement",
             "wheel and PE/DSO packaging audit",
             "nightly and release acceptance from clean locked checkouts"
         ]
     },
     "phase11_stable_integration_naming": {
-        "status": "active",
+        "status": "historical API-2 activation snapshot; stable unsuffixed naming remains active and the current boundary advanced to API 6 in Phase 6C",
         "scope": "stable typed RayD source boundary naming",
         "rayd_commit": "3869c2ab76bb06498dc95e3cf634fdf117529906",
         "integration_header": "backends/torch/include/rayd/torch/integration.h",
@@ -1218,8 +1218,9 @@
         "public_api_delta": false
     },
     "phase11_release_governance_closure": {
-        "status": "governance complete; final release evidence pending",
-        "evidence": "docs/dev/audit/phase13-phase11-release-acceptance.json",
+        "status": "historical Phase 11 pending snapshot; release execution was completed by later ADR-032 stable-recovery acceptance",
+        "historical_evidence": "docs/dev/audit/phase13-phase11-release-acceptance.json",
+        "superseding_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
         "completed": [
             "Phase 11A and 11B frozen duplication acceptance",
             "RayD legacy extern-C retirement",
@@ -1228,14 +1229,10 @@
             "live-surface version-suffixed WIP boundary scan"
         ],
         "historical_evidence_mutated": false,
-        "pending": [
-            "final clean-checkout nightly tier",
-            "final clean-checkout release tier",
-            "final wheel, PE/DSO, and build-fingerprint evidence"
-        ]
+        "pending": []
     },
     "phase6c_adr027_penetration_foundation": {
-        "status": "dormant foundation implemented; solver activation pending",
+        "status": "immutable Phase P dormant-foundation snapshot; solver activation completed later in Phase E and Phase M",
         "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
         "integration_header": "backends/torch/include/rayd/torch/integration.h",
         "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
@@ -1268,5 +1265,42 @@
         "public_api_delta": false,
         "compatibility_alias": false,
         "resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
+    },
+    "phase6c_adr027_activation_closure": {
+        "status": "Phase P/E/M production activation complete; original independent P-to-E and E-to-M comparative performance/resource evidence remains open",
+        "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+        "integration_header": "backends/torch/include/rayd/torch/integration.h",
+        "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+        "integration_header_identity": "rayd.torch.integration",
+        "integration_api_version": 6,
+        "binding_count_after": 241,
+        "live_symbols": [
+            "rayd_segment_penetration_forward",
+            "rayd_segment_penetration_forward_tape",
+            "rayd_segment_penetration_backward",
+            "rayd_segment_penetration_jvp",
+            "enumerated_transmission_topology_pack",
+            "enumerated_transmission_topology_pack_backward",
+            "enumerated_transmission_topology_pack_jvp",
+            "enumerated_capacity_failure_sanitize",
+            "enumerated_capacity_failure_vector_sanitize",
+            "mc_transmission_wall_product",
+            "mc_transmission_wall_product_backward",
+            "mc_transmission_wall_product_jvp",
+            "mc_capacity_failure_component_maps_sanitize",
+            "mc_capacity_failure_component_maps_sanitize_backward",
+            "mc_capacity_failure_component_maps_sanitize_jvp"
+        ],
+        "owner_counts_after": {
+            "RayD": 47,
+            "layered": 3,
+            "Channel Native": 191
+        },
+        "live_solver_route_changed": true,
+        "public_api_delta": false,
+        "compatibility_alias": false,
+        "foundation_resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json",
+        "stable_recovery_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
+        "comparative_evidence_open": true
     }
 }

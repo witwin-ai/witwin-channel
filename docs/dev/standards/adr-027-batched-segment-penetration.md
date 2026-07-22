@@ -1,15 +1,18 @@
 # ADR-027: Batched segment-penetration geometry
 
 - **Status:** Accepted (2026-07-20); RayD/Channel foundation, enumerated
-  activation, and Monte Carlo Basic activation implemented; final evidence pending
+  activation, and Monte Carlo Basic activation are live. Functional/release
+  closure is complete; the original independent P→E and E→M comparative
+  performance/resource evidence remains open.
 - **Date:** 2026-07-20
 - **Kind:** Native geometry, launch/fusion, fixed-capacity, automatic
   differentiation, and cross-repository ownership decision.
 - **Related:** [Plan 13](../plans/13-direct-rayd-integration-and-rf-runtime-ownership-plan.md),
   ADR-007 (propagation data ownership), ADR-009 (native fusion ownership),
   ADR-020 (Monte Carlo transmission polarization), ADR-023 (direct typed RayD
-  integration), ADR-024 (shared RF/transmission ownership), and ADR-029
-  (device-resident capacity results).
+  integration), ADR-024 (shared RF/transmission ownership), ADR-029
+  (superseded device-resident capacity results), and ADR-032 (controlled
+  compact cardinality boundary).
 
 ## Context
 
@@ -290,10 +293,10 @@ path unreachable.
    array packing work. Those solvers enqueue the single runtime observer after
    final assembly; the default ADR-008 oracle observes after field evaluation
    because it has no later owner. The switch deliberately retains the
-   downstream legacy canonical valid-row compaction until ADR-029 activation;
-   that device-selected-shape boundary remains a release/performance blocker
-   and is not counted as completion of the public capacity-result contract.
-5. **Monte Carlo atomic switch (implemented 2026-07-21):** switch MC Basic to one flattened
+   downstream canonical valid-row compaction. ADR-032 subsequently accepted
+   that explicit `O(K)` boundary as production-authoritative and superseded
+   ADR-029 activation; no public capacity-result switch remains pending.
+5. **Monte Carlo atomic switch (completed 2026-07-21):** switch MC Basic to one flattened
    `MonteCarloTargetInset` batch, route its resident hit block through the
    Channel native estimator, and delete the Torch depth loop, host Boolean
    breaks, row compaction/index-update physics, and Torch TE/TM/product
@@ -309,12 +312,17 @@ path unreachable.
    count read and synchronization. Basic therefore reports only the
    host-known `contribution_capacity`; actual values remain in the CUDA result
    maps. This is an intentional metadata schema migration with no compatibility
-   alias, not a reinterpretation of an `actual` field as capacity.
+   alias, not a reinterpretation of an `actual` field as capacity. It is not
+   accepted as a proven E2E optimization: restoring actual-count semantics or
+   removing a pre-existing host scalar boundary requires measured latency,
+   peak-memory, throughput, synchronization, and exactness evidence.
 6. **Evidence and closure:** record exactness, AD, launch/timeline, memory,
    performance, packaging, and clean-checkout evidence in both repositories;
    update the RayD lock/fingerprint, owner inventory, duplication ledger,
    launch/resource ledger, migration note, FEATURE_LIST, and authoritative
-   documentation.
+   documentation. Functional, packaging, and stable-recovery evidence is
+   complete; the original P→E and E→M independent comparative gate remains
+   open and may not be replaced by ADR-032 compact-recovery measurements.
 
 The switch commits must remove dead `TransmissionClosestHitQuery`,
 `query_transmission_closest_hit`, `iter_transmission_active_rows`, and related
@@ -358,6 +366,11 @@ memory or launch increase cannot be traded for a timing win unless a separate
 accepted decision changes that budget.
 
 ## Acceptance
+
+Implementation and release acceptance below is complete. The quantitative
+10% stage / 5% target-solver comparative gate in the preceding section is not
+yet supported by an auditable independent-process P→E and E→M record, so the
+parent Plan 13 remains evidence-partial without weakening this ADR's thresholds.
 
 - direct RayD contract tests cover both policies, `N=0`, all inactive, `D=0`,
   clear, one hit, exactly `D`, `D + 1`, mixed overflow/non-overflow lanes,

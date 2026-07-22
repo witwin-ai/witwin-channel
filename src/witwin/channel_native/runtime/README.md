@@ -21,19 +21,22 @@ failure when any bit is set. It performs no host read, synchronization, scalar
 extraction, result allocation, or payload sanitization; every producer must
 publish its canonical inert result before the terminal launch.
 
-ADR-032 restores the enumerated `O(K)` compact production result. Its one
-explicit count D2H/synchronization allocation boundary is owned by propagation,
-not runtime, and does not weaken this failure protocol. ADR-029 capacity-result
-operations and ADR-031/030 candidates remain caller-free; runtime must not make
-them reachable through a capability, loader choice, or fallback.
+ADR-032 restores the enumerated `O(K)` compact production result. Its sole new
+accepted count D2H/synchronization allocation boundary is owned by propagation,
+not runtime, and does not weaken this failure protocol. This does not imply a
+whole solve has only one transfer or synchronization: pre-existing observed
+boundaries remain named measurement debt. ADR-029 capacity-result operations
+and ADR-031/030 candidates remain caller-free; runtime must not make them
+reachable through a capability, loader choice, or fallback.
 
 ADR-027 penetration failure owns the stable transaction bit
 `SEGMENT_PENETRATION_FAILURE = 1 << 7`. It covers overflow, request/device-mask
-contract contradiction, and non-finite penetration state. The dormant RayD penetration family
-and Channel transmission-topology pack receive the exact same
-`CapacityFailureState` object/storage; neither may clear, replace, observe, or
-trap it. Their future solver switch does not create a penetration-local
-failure observer.
+contract contradiction, and non-finite penetration state. The live RayD
+penetration family, Channel transmission-topology pack, and Monte Carlo Basic
+wall-product estimator receive the exact same
+`CapacityFailureState` object/storage; none may clear, replace, observe, or
+trap it. The completed ADR-027 Phase P/E/M switches do not create a
+penetration-local failure observer.
 
 `runtime.profiling` owns the closed semantic NVTX annotation vocabulary used
 by performance evidence. It may emit only balanced ranges and point marks: it

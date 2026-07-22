@@ -11,7 +11,7 @@ from .tensor_contracts import validate_cuda_tensor
 
 
 class CapacityFailureBit(enum.IntFlag):
-    """Stable device failure bits recorded by ADR-029 intermediate owners."""
+    """Stable device failure bits recorded by shared solve transactions."""
 
     DIFFRACTION_STATE_OVERFLOW = 1 << 0
     DIFFRACTION_PATH_OVERFLOW = 1 << 1
@@ -94,7 +94,7 @@ def create_capacity_failure_state(reference: torch.Tensor) -> CapacityFailureSta
 def create_solve_capacity_transaction(
     reference: torch.Tensor,
 ) -> SolveCapacityTransaction:
-    """Create the one ADR-029 capacity transaction owned by a solve."""
+    """Create the one capacity transaction owned by a participating solve."""
 
     return SolveCapacityTransaction(
         failure_state=create_capacity_failure_state(reference)

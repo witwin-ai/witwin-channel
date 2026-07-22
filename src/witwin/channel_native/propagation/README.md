@@ -27,7 +27,9 @@ Deterministic, and the ADR-008 BDPT oracle all enter the same enumerated engine,
 which submits one pair-major `EnumeratedFullDistance` batch, consumes the
 compile-cached enumerated scene diagonal, and retains device actual counts in a
 sidecar. The former per-depth active-row/closest-hit march is deleted. Monte
-Carlo Basic remains on its previous route until its separate atomic switch.
+Carlo Basic completed its Phase M atomic switch and now consumes the same
+`MonteCarloTargetInset` penetration family through its solver-owned
+wall-product estimator; the previous scalar/per-transmitter route is deleted.
 The canonical selector still compacts valid candidate rows after this
 fixed-capacity producer. ADR-032 accepts this explicit, audited compact boundary
 as the authoritative `O(K)` production route. Complete no-D2H and public

@@ -18,6 +18,12 @@ contracts they share. It is not itself a solver API: callers select either
   ascending slot order, and never treats poisoned tail storage as an event.
   Basic metadata exposes only the host-known `contribution_capacity`; it does
   not perform a device nonzero-count read or publish a host actual-count key.
+  That capacity label is not an actual visible-contribution count and must not
+  be used to claim an improved capacity/active ratio. Changing it back to an
+  actual-count contract, or removing the pre-existing carrier/edge-length host
+  scalar reads, is measurement-required optimization debt: compare E2E
+  latency, peak memory, steady throughput, synchronization cost, and result
+  exactness before changing production semantics.
 - `bdpt/` owns bidirectional path tracing, including subpaths, connections,
   MIS, optional path-sample export, accumulation, and its solver-local kernel
   facades. Its package loads `solve` lazily to keep the public import light.

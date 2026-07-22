@@ -1,9 +1,9 @@
-"""Strict, versioned Phase 12 gate and runner contracts.
+"""Strict, versioned historical Phase 12 ADR-030 runner contracts.
 
-Measured execution intentionally remains disabled until the accepted ADR-030
-addendum creates a legal dormant-pin/direct-switch commit pair and the final
-candidate hash and resource budgets are frozen.  Dry-run planning remains
-available so the missing facts are visible without manufacturing evidence.
+Measured execution remains fail-closed. ADR-032 superseded this production
+candidate after the capacity route regressed Munich E2E latency, peak memory,
+and throughput. Dry-run planning remains available to audit the historical
+contract; it cannot activate ADR-030 or manufacture missing evidence.
 """
 
 from __future__ import annotations
@@ -51,9 +51,10 @@ PYTHON_INJECTION_ENV = (
     "PYTHONUSERBASE",
 )
 
-# These facts require an accepted architecture addendum or measured candidate.
-# None may be changed to True/non-null merely to make the runner proceed.
-ADDENDUM_ACCEPTED = True
+# This historical runner cannot become a production switch by filling its
+# frozen inputs. ADR-032 keeps the compact route authoritative.
+ADDENDUM_ACCEPTED = False
+ADR030_PRODUCTION_CANDIDATE_SUPERSEDED = True
 
 
 class EvidenceError(RuntimeError):
@@ -490,7 +491,9 @@ def require_measured_policy_ready(gate: Mapping[str, object]) -> None:
     history = gate["history_policy"]
     assert isinstance(history, dict)
     blockers: list[str] = []
-    if not ADDENDUM_ACCEPTED or history.get("accepted") is not True:
+    if ADR030_PRODUCTION_CANDIDATE_SUPERSEDED:
+        blockers.append("ADR-030 production candidate superseded by ADR-032")
+    elif not ADDENDUM_ACCEPTED or history.get("accepted") is not True:
         blockers.append("accepted ADR-030 dormant-pin/direct-switch addendum")
     frozen_inputs = gate["frozen_inputs"]
     if not isinstance(frozen_inputs, dict):
@@ -571,7 +574,8 @@ def validate_exact_schedule(pairs: Sequence[Mapping[str, object]], gate: Mapping
 
 
 __all__ = [
-    "ADDENDUM_ACCEPTED", "CANONICAL_GATE_REPO_PATH", "COMPARISON_GROUPS", "DEFAULT_GATE",
+    "ADDENDUM_ACCEPTED", "ADR030_PRODUCTION_CANDIDATE_SUPERSEDED",
+    "CANONICAL_GATE_REPO_PATH", "COMPARISON_GROUPS", "DEFAULT_GATE",
     "DEFAULT_SCHEMA", "DEVELOPER_OVERRIDE_ENV", "EvidenceError", "ROOT",
     "ComparisonConfig", "DatasetConfig", "RunnerConfig", "SCHEMA_NAME", "SCHEMA_VERSION", "SUPPORT_SCHEMA_NAME",
     "SUPPORT_SCHEMA_VERSION", "ToolConfig", "VARIANTS", "VariantConfig",

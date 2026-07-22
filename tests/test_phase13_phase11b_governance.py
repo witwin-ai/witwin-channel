@@ -13,6 +13,9 @@ AUDIT = ROOT / "docs/dev/audit"
 EVIDENCE_PATH = AUDIT / "phase13-boundary-dedup-phase11b-evidence.json"
 LEDGER_PATH = AUDIT / "duplication-classification.json"
 RELEASE_EVIDENCE_PATH = AUDIT / "phase13-phase11-release-acceptance.json"
+STABLE_RECOVERY_EVIDENCE_PATH = (
+    AUDIT / "phase13-adr032-stable-recovery-final-report.json"
+)
 PHASE11_IMPLEMENTATION_BOUNDARY = "d2681c5810d78fdd1132a60a88b568c00581f6e2"
 _EXPECTED_PENDING_FINAL_ACCEPTANCE = {
     "clean-checkout nightly tier at the final Channel commit",
@@ -320,12 +323,19 @@ def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
         "agents_claude_sha256",
     ):
         assert re.fullmatch(r"[0-9a-f]{64}", verified[key])
-    assert inventory["phase11_release_governance_closure"]["evidence"] == str(
-        RELEASE_EVIDENCE_PATH.relative_to(ROOT)
+    historical_path = str(RELEASE_EVIDENCE_PATH.relative_to(ROOT)).replace(
+        "\\", "/"
+    )
+    superseding_path = str(
+        STABLE_RECOVERY_EVIDENCE_PATH.relative_to(ROOT)
     ).replace("\\", "/")
-    assert migration["phase11_release_governance_closure"]["evidence"] == str(
-        RELEASE_EVIDENCE_PATH.relative_to(ROOT)
-    ).replace("\\", "/")
+    for current_record in (
+        inventory["phase11_release_governance_closure"],
+        migration["phase11_release_governance_closure"],
+    ):
+        assert current_record["historical_evidence"] == historical_path
+        assert current_record["superseding_evidence"] == superseding_path
+        assert current_record["pending"] == []
     pending = evidence["pending_final_acceptance"]
     if evidence["release_claim"]:
         assert evidence["status"] == "release accepted"

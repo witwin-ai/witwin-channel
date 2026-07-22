@@ -6,21 +6,11 @@ from pathlib import Path
 import re
 
 from benchmarks.phase13_phase12.release import _naming_audit
+from ci import check_contract_coverage as coverage
 
 
 ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / "benchmarks/gates/stable_recovery_munich.sm120.v1.json"
-
-_DORMANT_CAPACITY_CALLS = (
-    "deterministic_reflection_candidate_capacity_block",
-    "deterministic_diffraction_order1_capacity_block",
-    "enumerated_canonical_capacity_select",
-    "evaluated_paths_canonical_capacity_gather",
-    "evaluated_paths_capacity_pack",
-    "path_result_capacity_pack",
-    "deterministic_path_table_capacity_pack",
-)
-
 
 def _source(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8-sig")
@@ -78,22 +68,18 @@ def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
     assert "deterministic_diffraction_order1_compact" in diffraction_calls
 
 
-def test_adr029_capacity_producers_have_no_production_caller() -> None:
-    source_root = ROOT / "src/witwin/channel_native"
-    offenders: list[str] = []
-    for path in source_root.rglob("*.py"):
-        relative = path.relative_to(ROOT).as_posix()
-        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=relative)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            name = None
-            if isinstance(node.func, ast.Name):
-                name = node.func.id
-            elif isinstance(node.func, ast.Attribute):
-                name = node.func.attr
-            if name in _DORMANT_CAPACITY_CALLS:
-                offenders.append(f"{relative}:{node.lineno}:{name}")
+def test_dormant_adr029_and_adr030_producers_have_no_production_caller() -> None:
+    call_sites = coverage._python_call_sites(
+        ROOT, frozenset(coverage.DORMANT_FACADE_OWNERS)
+    )
+    offenders = []
+    for facade, rows in sorted(call_sites.items()):
+        allowed = coverage.DORMANT_ALLOWED_FACADE_CALLERS.get(facade, frozenset())
+        offenders.extend(
+            f"{path}:{line}:{facade}:{caller}"
+            for caller, path, line in rows
+            if caller not in allowed
+        )
     assert offenders == []
 
 
@@ -139,6 +125,8 @@ def test_public_configs_do_not_expose_retired_capacity_controls() -> None:
     for relative in (
         "src/witwin/channel_native/path/config.py",
         "src/witwin/channel_native/deterministic/config.py",
+        "src/witwin/channel_native/montecarlo/basic/config.py",
+        "src/witwin/channel_native/montecarlo/bdpt/config.py",
     ):
         tree = ast.parse(_source(relative), filename=relative)
         config = next(

@@ -1,13 +1,16 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
-**状态：** STABLE RECOVERY COMPLETE（2026-07-21）；ADR-032 已接受并选择恢复
+**状态：** STABLE RECOVERY ACCEPTANCE COMPLETE / OVERALL EVIDENCE CLOSURE PARTIAL
+（2026-07-22）；ADR-032 已接受并选择恢复
 `e7d82d2` 的 `O(K)` compact production boundary。ADR-029 已因 Munich E2E/显存/吞吐
 回归被 production supersede，仅保留 caller-free 实验；ADR-031 为 Proposed 且不进入公开
 API/production caller；ADR-030 reducer 保持 dormant，live activation deferred。Phase 8B、
 Phase 10A/10B、Phase 11A/11B、RayD legacy extern-C 删除和稳定 integration 命名保持完成，
 不回退已接受的 owner migration。Phase 12 已完成最小稳定恢复、nightly/release、
 wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
-`docs/dev/audit/phase13-adr032-stable-recovery-final-report.md`，未开发新的大功能。
+`docs/dev/audit/phase13-adr032-stable-recovery-final-report.md`，未开发新的大功能。Plan 13
+仍不能整体标记完成：Phase 6C 原始 P→E 与 E→M 独立 comparative E2E/resource gate 尚无
+可审计证据；这项开放项不得由 Phase 12 compact 恢复数据替代或通过放宽阈值关闭。
 
 **计划日期：** 2026-07-18
 
@@ -26,9 +29,9 @@ dependency closure，并修正 immutable owner baseline 与 scattering C1/C2 语
 通用 scattering runtime，以及刚合并的 scattering v2 multi-bounce coherent
 primal/JVP/VJP family。本文的 owner moves 不改变物理模型、数值顺序、fusion 边界或
 solver 行为；ADR-030 的 source-state-serial diffraction pair reducer 只作为 dormant
-实验保留，不在稳定恢复中激活。ADR-027 batched penetration 的 dormant typed
-family、Channel capacity topology pack 和 MC wall-product foundation 已落地；两个 solver
-atomic switch/delete 已分别由 Phase E 与 Phase M 执行。
+实验保留，不在稳定恢复中激活。ADR-027 batched penetration typed family、Channel capacity
+topology pack 和 MC wall-product 已落地并进入 production；两个 solver atomic switch/delete
+已分别由 Phase E 与 Phase M 执行。
 
 **关联记录：** [Plan 08](./08-channel-native-modular-architecture-hardening-plan.md)、
 [Plan 10](./10-scattering-v2-multibounce-coherent-ad-plan.md)、
@@ -622,8 +625,10 @@ gradients、无 persistent tape、precise-math和四 solver ADR-020 parity。BDP
 
 ### Phase 6C — ADR-027 后续：Batched penetration / MC glue native 化
 
-**状态：IN PROGRESS（2026-07-21）；Phase P foundation、Phase E enumerated atomic
-switch/delete 与 Phase M MC Basic atomic switch/delete 已实现；最终两仓 evidence 尚待收口。**
+**状态：IMPLEMENTATION COMPLETE / COMPARATIVE EVIDENCE PARTIAL（2026-07-22）；Phase P
+foundation、Phase E enumerated atomic switch/delete 与 Phase M MC Basic atomic
+switch/delete 均已进入 production；原始 P→E 与 E→M 独立 comparative E2E/resource
+验收证据仍待收口。**
 
 ADR-027 已冻结第 5.5 节两套显式 march policy、稳定 typed API、固定 `[N,D]` hit/tape、一次
 batched traversal、`D+1` overflow probe、device fail-loud/no partial、完整
@@ -653,9 +658,10 @@ implicit-all-valid、optional-mask compatibility 或 Torch 合成 fallback。该
 1. RayD dormant typed family + direct tests；**已完成**；
 2. Channel dormant façade、failure-state wiring、component-5 topology pack 与 native MC
    estimator foundation；**已完成**；
-3. enumerated atomic pin/switch/delete；**已实现，待最终 CUDA/nightly 性能证据收口**；
-4. MC Basic atomic switch/delete；**已实现，待最终 CUDA/nightly 性能证据收口**；
-5. 两仓 exact/AD/Nsight/performance/packaging 证据与文档收口。
+3. enumerated atomic pin/switch/delete；**已完成并进入 production**；
+4. MC Basic atomic switch/delete；**已完成并进入 production**；
+5. 两仓 exact/AD/Nsight/performance/packaging 证据与文档收口；**功能与 release 回归已由
+   Phase 11/ADR-032 覆盖，但原始 P→E、E→M comparative gate 仍开放**。
 
 第 3 步只原子替换 penetration discovery：旧 canonical selector 仍对 fixed-capacity block
 执行 valid-row device-selected shape compaction。实际 candidate/guardrail count 不进入 metadata
@@ -676,9 +682,11 @@ primal/backward/JVP family 随后在 finalize 前一次清零五个 component ma
 result boundary 调用一次 `capacity_failure_terminal_check`。旧 per-transmitter trace、Python depth loop、host
 Boolean break/compaction、Torch TE/TM 与 product math 已从 production route 删除且无兼容 alias。
 旧 Basic metadata `valid_contribution_count` 需要 device nonzero count 才能保持其“实际数量”
-语义，因此不能在 no-D2H route 上继续伪装为 host 容量。Phase M 将它有意迁移为
+语义。Phase M 将它迁移为
 `contribution_capacity`，只报告 host-known capacity；实际 map 值保持 device-resident，且不保留
-兼容 alias。
+兼容 alias。该迁移不得被表述为已证明的 E2E 优化；恢复 actual-count 语义或删除既有
+carrier/edge-length host scalar boundary 都是 measurement-required debt，必须先比较 E2E、peak
+memory、steady throughput、sync cost 与 result exactness。
 
 ADR-029 capacity-pack activation 已由 ADR-032 取消。Path/Deterministic 的 canonical compact
 和 Path post-sanitizer compact 保持 production authoritative；ADR-029 capacity selector/gather/
@@ -686,9 +694,10 @@ public packer 仅可 caller-free dormant。Phase 12 不得再宣称或追求 pub
 完整 solver no-D2H。
 
 不得与 ADR-024 move-only 提交混合，也不得使用临时 generation 名称或兼容 alias。激活前必须
-证明每个非空 penetration batch 恰有一次 OptiX traversal；ADR-032 compact boundary 以外无
-host Boolean/count read。对应 solver 必须满足冻结 exactness、E2E、峰值显存、吞吐与 copy/sync
-预算，不得以局部 launch/copy 减少掩盖整体回归。
+证明每个非空 penetration batch 恰有一次 OptiX traversal；不得新增未经命名和计量的 host
+Boolean/count read。ADR-032 compact boundary 以外的既有 host scalar/sync 必须作为审计债显式
+列出。对应 solver 必须满足冻结 exactness、E2E、峰值显存、吞吐与 copy/sync 预算，不得以局部
+launch/copy 减少掩盖整体回归。
 
 ### Phase 7 — ADR-025：Diffraction operation-family ownership
 
@@ -773,8 +782,8 @@ delta/duplication/launch/coverage。
 
 ### Phase 10B — Scattering v2 chain families
 
-**实现状态：COMPLETE（2026-07-19）；最终 duplication/release acceptance 待 Phase
-11。** RayD 提交 `768b96e42a95f70c32d55f98a72000085317e288` 已 push；Channel
+**实现状态：COMPLETE（2026-07-19）；最终 duplication/release acceptance 已由 Phase
+11B 关闭。** RayD 提交 `768b96e42a95f70c32d55f98a72000085317e288` 已 push；Channel
 已原子 pin/switch/delete 六个 chain contracts 和四个本地 chain CUDA TUs。integration
 v2、typed scattering、shared table header SHA-256 分别为
 `0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654`、
@@ -800,7 +809,7 @@ move-only 实现已将 duplication 从 Phase 10A 的 11.913070% 降至 11.170566
 
 **实现状态：COMPLETE（2026-07-21）。** RayD
 legacy extern-C API 已经 consumer/reachability 审计并删除；stable typed boundary 使用
-`rayd/torch/integration.h` 与 `rayd.torch.integration`，numeric API version 2 独立校验且没有
+`rayd/torch/integration.h` 与 `rayd.torch.integration`，numeric API version 6 独立校验且没有
 version-suffixed compatibility alias。Phase 11A 仅在
 `fields.cpp` 与 `materials.cpp` 使用 TU-local compile-time helpers 收敛 typed request/
 parameter packing；显式 pybind signatures、参数和 validation/error 顺序、typed
@@ -831,7 +840,7 @@ build fingerprint 和 RayD lock identity 验收；后续事实由
 ### Phase 12 — Profiling-driven 性能收口
 
 **实现状态：STABLE RECOVERY COMPLETE（2026-07-21）。** Phase 12 不再以“绝对无
-D2H”为目标。ADR-032 接受唯一、明确且可审计的 compact count D2H/sync boundary，恢复
+D2H”为目标。ADR-032 接受唯一新增、明确且可审计的 compact count D2H/sync boundary，恢复
 `e7d82d2` 的 `O(K)` production caller；ADR-029 已 production superseded，ADR-031 保持
 Proposed 且无公开 API/caller，ADR-030 reducer 保持 dormant。禁止在本阶段开发 GPU tiled
 EPC、incremental canonical merge、完整 exporter AD、CUDA Graph 或其他大功能。
@@ -870,6 +879,10 @@ wheel/fingerprint 与 Munich final acceptance。每阶段独立 commit。失败�
 1,071,486,464 bytes，24 个 logical path fields 与冻结 A 相同。full Phase-E 共 385 个 release
 checks 全部通过。BDPT 相对旧 Channel 的独立 steady-state 对比仍只有 0.160x-0.179x，作为
 既有性能债保留，不以 cold-start 或绝对 latency gate 掩盖。
+
+以上 Phase 12 结论只关闭 ADR-029 引入的 `O(N)` 显存/吞吐回归，不替代 Phase 6C 原始
+P→E、E→M comparative gate。因此 stable recovery 可接受，但本计划的整体完成定义仍保持
+开放，直至该独立证据被实际测量并记录。
 
 ## 9. 跨仓 PR/提交顺序
 
@@ -1067,6 +1080,10 @@ ADR-032 stable recovery 不回滚 RayD owner migration，也不删除已完成�
 16. 所有live manifests、current-owner delta、lock、build fingerprint、migration docs、
     `AGENTS.md` 和
     `CLAUDE.md` 同步且可审计。
+
+截至 2026-07-22，第 1-14、16 项的 stable-recovery/release 事实已收口；第 15 项中 Phase
+6C 原始 P→E 与 E→M comparative performance/resource evidence 仍开放，因此 Plan 13
+整体状态必须保持 `EVIDENCE CLOSURE PARTIAL`。
 
 ADR-024/025/026分别是条件边界：任一未接受，对应 transmission/diffraction/scattering
 保持当前完整 owner，不得半迁移；ADR-023直接集成与RayDN退役仍可独立完成。

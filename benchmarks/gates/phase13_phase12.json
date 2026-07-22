@@ -4,7 +4,7 @@
     "version": 3
   },
   "history_policy": {
-    "accepted": true,
+    "accepted": false,
     "ordered_groups": [
       "enumerated_penetration",
       "montecarlo_penetration",
@@ -12,7 +12,7 @@
     ],
     "enumerated_role": "adr027_enumerated_atomic_switch",
     "montecarlo_role": "adr027_montecarlo_atomic_switch",
-    "diffraction_role": "adr030_source_lane_atomic_switch",
+    "diffraction_role": "adr030_dormant_source_lane_experiment",
     "montecarlo_baseline_equals_enumerated_candidate": true,
     "diffraction_baseline_directly_follows_montecarlo_candidate": true,
     "evidence_parent_is_diffraction_candidate": true
