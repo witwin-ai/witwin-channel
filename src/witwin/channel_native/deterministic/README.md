@@ -27,23 +27,23 @@ IDs, path depth, row order, visibility, phase convention, and accumulation
 order are contractual. Expression-order or tolerance changes are separate
 numerical changes, not architecture cleanup.
 
-Under ADR-029, exported `PathTable` storage is endpoint-pair-major with exactly
-`path_capacity_per_pair` rows per pair. Its row length is capacity, not actual
-cardinality; CUDA Boolean `valid` and CUDA contiguous `int32 num_paths` carry
-actual validity/counts. Native primal/backward/JVP accumulation skips invalid
-rows before reading IDs or numerical fields. Diffraction exporter work uses the
-explicit device-selected `diffraction_state_capacity`, and capacity overflow
-makes the entire result inert before surfacing a standard asynchronous CUDA
-error; it never returns a usable partial result or synchronizes to raise early.
+Under ADR-032, exported `PathTable` storage contains actual compact rows in the
+stable order and its row length is actual cardinality. The single owning
+compact allocation boundary may copy audited integer count metadata and
+explicitly synchronize to establish exact `O(K)` storage. Public
+`path_capacity_per_pair`, `diffraction_state_capacity`, capacity-shaped
+PathTable validity/counts, and ADR-031 `Qr` are not production contracts.
+Native contract, overflow, allocation, or CUDA failure never returns a usable
+partial or silently truncated result.
 
-`deterministic.capacity.deterministic_path_table_capacity_pack` is the dormant
-fixed-capacity exporter. It consumes the shared `CapacityFailureState` carried
+`deterministic.capacity.deterministic_path_table_capacity_pack` is a caller-free
+ADR-029 fixed-capacity experiment. It consumes the shared
+`CapacityFailureState` carried
 by `CapacityPathLayout`, preserves the exact flat `pair * C + slot` row map,
 and returns a strictly internal typed bundle containing every existing
 `PathTable` field plus CUDA `valid`, CUDA int32 `num_paths`, and host-known
 pair/capacity metadata. This bundle is not a `Result.paths` type and is not
-exported from the package root; the later atomic solver switch must merge its
-capacity metadata into stable `PathTable` and delete the internal bundle.
+exported from the package root; no production solver switch is pending.
 Failure bits and local
 overflow are tested before any payload or ID read; every failed or invalid row
 is canonical inert. The constructor validates metadata only and never reduces
@@ -60,7 +60,7 @@ sanitizes after scattering, completes accumulation, optional PathTable export,
 and `Result` construction, then enqueues the runtime-owned terminal observer
 exactly once. It does not reconstruct or specialize the penetration route.
 
-Under ADR-030, `deterministic.kernels.diffraction_pair` owns the dormant native
+Under ADR-030, `deterministic.kernels.diffraction_pair` owns a dormant native
 source-lane pair-reduction primal/VJP/JVP family. One warp owns each endpoint
 pair, lane 0 adds valid source states strictly in ascending ordinal order, and
 an in-stream status kernel compares RayD's contiguous CUDA `int32[1]` reported
@@ -70,8 +70,10 @@ inert; the shared `CapacityFailureState` is checked before validity or field
 payload.
 The result is a typed CUDA complex64 `[pair_count, 3]` field plus float32
 `[pair_count]` power. This family has no live solver caller yet: the current
-ReceiverGrid Torch `index_add_` route remains authoritative until the separate
-atomic RayD pin/switch/delete commit.
+compact ReceiverGrid route remains authoritative under ADR-032. SourceLane's
+`O(P*M)` storage did not repair the measured capacity regression, so no atomic
+switch/delete is pending; reactivation needs a separate accepted ADR and full
+E2E/resource evidence.
 
 ### AD contract
 

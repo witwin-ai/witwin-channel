@@ -316,16 +316,16 @@ therefore makes penetration, topology, fields, diffraction-vector sidecar, and
 the returned solve result inert before the asynchronous failure becomes loud;
 no intermediate traps or returns a partial result.
 
-This activation replaces penetration discovery only. The legacy canonical
-selector still compacts valid rows from the fixed-capacity block and therefore
-retains a device-selected result-shape boundary. The CUDA actual-count sidecars
-are not read for metadata, but the remaining selector compaction must be
-removed by the ADR-029 capacity activation before the complete solver no-D2H,
-public-capacity, or Phase 12 performance gates can be claimed.
+This activation replaces penetration discovery only. The canonical selector
+still compacts valid rows from the fixed-capacity block and therefore retains a
+device-selected result-shape boundary. ADR-032 accepts that explicit, audited
+compact boundary because it preserves `O(K)` storage and wins the measured
+E2E/memory/throughput comparison. Complete solver no-D2H and public-capacity
+results are no longer migration goals.
 Path additionally performs a post-sanitizer valid-row compaction before its
 legacy result converter so failed `-1` identifiers cannot be gathered. This is
-a temporary safety boundary, not a second result contract, and is deleted with
-the same ADR-029 Phase D capacity-pack activation.
+a stable safety boundary, not a second result contract; it is not replaced by
+the superseded ADR-029 Phase D capacity pack.
 
 The former `TransmissionClosestHitQuery`,
 `query_transmission_closest_hit`, `iter_transmission_active_rows`, their source
@@ -359,10 +359,10 @@ require a forbidden device count read, while the latter is exactly the
 host-known component capacity. There is no compatibility alias and no silent
 reinterpretation of an actual-count field as capacity.
 
-Phase M does not complete ADR-029. The enumerated canonical selector and Path
-post-sanitizer device-selected-shape compactions remain explicit Phase D
-blockers, so complete solver no-D2H/public-capacity and final Phase 12
-performance acceptance remain pending.
+Phase M does not activate ADR-029. The enumerated canonical selector and Path
+post-sanitizer compact boundaries remain authoritative under ADR-032. Final
+Phase 12 acceptance uses compact E2E, peak-memory, throughput, exactness,
+headroom, and explicit copy/sync budgets rather than complete solver no-D2H.
 
 ## API surface changes
 
@@ -516,32 +516,60 @@ new primal symbol: it rides a defaulted `scattering_combine_domain` argument on
 the existing `deterministic_accumulate_flat` op (and its `_backward`/`_jvp`),
 mirroring ADR-019's `combine_domain`.
 
-### ADR-029: explicit device-resident capacities (2026-07-20)
+### ADR-032: compact cardinality stable recovery (2026-07-21)
 
-`witwin.channel_native.path.Config` and
-`witwin.channel_native.deterministic.Config` each gain two stable fields:
+ADR-029's device-capacity result design is superseded for production. The
+measured Munich candidate changed reflection storage from actual `K=2,629`
+rows to theoretical `N=4,552,704` rows, increased peak allocated CUDA memory
+from 1,071,493,120 to 17,854,649,344 bytes, changed median solve latency from
+66.467 to 1,009.587 ms, and reduced throughput from 15.374 to 0.793 solve/s.
+Its reserved peak exceeded physical device memory. ADR-031's minimum-sufficient
+`Qr=20` candidate still used 11,671,543,808 bytes and 226.429 ms. These are
+failed production experiments, not migration benefits.
 
-- `path_capacity_per_pair: int | None = None`
-- `diffraction_state_capacity: int | None = None`
+The stable production boundary returns to the `e7d82d2` `O(K)` compact route.
+Its owning cardinality boundary is the sole accepted exception to the general
+no-hot-path-D2H rule: it may copy the required integer count metadata, explicitly
+synchronize the current stream, allocate exact compact storage, and perform
+structural device packing. This is not CPU physics, numerical selection, or a
+fallback. For the frozen depth-3 Munich solve the complete reflection budget is
+at most six 4-byte D2H copies, 24 bytes total; the measured copy plus immediate
+synchronization cost was approximately 0.152 ms.
 
-This first activation step adds construction-time contracts only. `None`
-remains constructible so the producer/consumer switch can be staged, but the
-completed ADR-029 solver path will reject it before enumeration whenever the
-corresponding capacity is required. A non-`None` value must have exact Python
-type `int` and be non-negative; floats, NaN, and Boolean values are rejected,
-while zero explicitly represents empty capacity. When
-`max_paths_scope="per_pair"`, `max_paths` cannot exceed
-`path_capacity_per_pair`. Deterministic's global `max_paths` comparison is
-intentionally deferred until solve knows the endpoint-pair count.
+`e7d82d2` is only the compact numerical/caller base. That historical commit
+still contains construction-only `path_capacity_per_pair` and
+`diffraction_state_capacity` fields that are silent no-ops on its live route.
+Recovery R2 removes them with the snapshot; they must not be mistaken for an
+already-clean historical public schema.
 
-These capacities are storage and launch-planning bounds, not implicit path
-selection or truncation policy. No compatibility alias, generation-suffixed
-name, solver dispatch, result-shape change, or native ABI change is introduced
-by this configuration-only step. The public export count remains 37; only the
-two Config `contract_sha256` values change.
+Public Path/PathTable shapes again represent actual compact rows and
+`max_num_paths` represents the maximum actual count, not provisioned capacity.
+The intermediate ADR-029 fields `path_capacity_per_pair` and
+`diffraction_state_capacity`, capacity-shaped public `valid`/`num_paths`, and
+the ADR-031 `reflection_candidate_capacity_per_pair` (`Qr`) field are not part
+of the recovered formal public API or production planning contract. They are
+removed with the public API snapshot; no ignored compatibility field, alias,
+generation-suffixed name, or dual dispatch is retained.
 
-The dormant internal `propagation.models.CapacityPathLayout` contract records
-host pair/capacity metadata and exact CUDA `valid`, `num_paths`, and `overflow`
-tensor metadata without reading or recomputing device values. It is exported
-only from the internal `propagation.models` package; it is not a root public
-export, solver result, or active solver boundary.
+ADR-029 capacity producers/selector/gather/packers, ADR-031 raw reflection
+capacity code, and ADR-030 SourceLane/pair-reducer code may remain as strictly
+internal caller-free experiments with their direct tests. They must not appear
+in capabilities, defaults, formal Config, solver E2E dispatch, or fallback.
+The existing `CapacityFailureState`, inert-output sanitizers, and unique
+terminal observer remain authoritative for accepted fixed-capacity operations;
+stable recovery does not permit silent truncation or a partial result.
+
+Final migration acceptance requires Munich median latency no greater than
+76 ms, steady throughput at least 13.8 solve/s, peak allocated memory no greater
+than 1.25 GiB, at least 1 GiB physical device headroom, successful reflection
+capacity/active ratio exactly 1, no more than six count copies/24 bytes, and
+bitwise equality of all 24 logical PathTable fields with the compact baseline.
+It also requires quick/cuda/nightly/release, wheel/fingerprint, public snapshot,
+manifest, and no-partial-result evidence. Whole-map atomic nondeterminism must
+be reported honestly rather than relabelled as exact.
+
+No GPU tiled EPC, incremental canonical merge, SourceLane activation, exporter
+AD family, CUDA Graph, or other large feature is included in this recovery.
+Such work requires a future separately accepted ADR and evidence that improves
+E2E latency, peak memory, throughput, capacity utilization, exactness, and
+concurrency together.

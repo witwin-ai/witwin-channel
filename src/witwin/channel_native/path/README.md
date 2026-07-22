@@ -24,10 +24,10 @@ geometry re-evaluation, and electromagnetic field evaluation remain owned by
   sanitizes evaluated rows and the diffraction sidecar before result packing,
   and enqueues the runtime-owned terminal observer exactly once after synthetic
   or explicit array packing.
-- Until ADR-029 Phase D activates the native public capacity pack, Path performs
-  one explicit post-sanitizer valid-row structural compaction before the legacy
-  result converter. This prevents failed `-1` identifiers from reaching that
-  converter but remains a declared device-selected-shape/D2H blocker.
+- Under ADR-032, Path keeps one explicit post-sanitizer valid-row structural
+  compaction before the result converter. This prevents failed `-1` identifiers
+  from reaching that converter and is part of the authoritative `O(K)` compact
+  production route, not a pending no-D2H blocker.
 
 ## Public entry points
 
@@ -79,24 +79,28 @@ import them directly.
   `exp(+j*2*pi*f*t)`. CFR evaluation therefore applies
   `exp(-j*2*pi*tau*f)`. Synthetic array steering applies
   `exp(+j*k*element_position_dot_endpoint_direction)`.
-- Under ADR-029, the `path` axis and `max_num_paths` are exactly the configured
-  host-known `path_capacity_per_pair`; they are not actual-count values.
-  `num_paths` is a CUDA contiguous `int32` tensor equal to the device-valid
-  count for each endpoint pair, and `valid` is the row truth. Filtering and
-  array packing preserve capacity. Production solve never derives a result
-  shape from a CUDA count or silently truncates on capacity overflow.
+- Under ADR-032, the `path` axis and `max_num_paths` represent actual compact
+  rows. The owning allocation boundary may copy only audited integer count
+  metadata and explicitly synchronize to allocate exact `O(K)` storage; the
+  frozen depth-3 Munich reflection budget is at most six 4-byte copies. Public
+  `path_capacity_per_pair`, `diffraction_state_capacity`, capacity-shaped
+  PathResult validity/counts, and ADR-031 `Qr` are not solver contracts.
+  Structural compaction must preserve stable row order and publish either every
+  valid row or no usable result; silent truncation and partial success are
+  forbidden.
 - Ragged paths are stably grouped by pair before padding. Synthetic arrays
   share a centre geometric path set and use far-field phase weighting;
   explicit arrays trace element positions independently and currently require
   point receivers.
-- `path.capacity.from_capacity_evaluated_paths` is the dormant ADR-029 native
-  replacement for production Ragged padding. It consumes the fixed
+- `path.capacity.from_capacity_evaluated_paths` is a caller-free ADR-029 native
+  experiment retained for direct tests. It consumes the fixed
   receiver-major pair layout, preserves path capacity `C`, derives endpoint
   angles and canonical interaction storage in one native row pass, and carries
   CUDA `valid`/`num_paths` without a host count. Its primal, backward, and JVP
   operations all gate validity before endpoint identifiers or numerical
   payloads. The shared failure state or upstream overflow makes the complete
-  packed result inert; this producer does not trap or switch the live solver.
+  packed result inert; this producer does not trap and may not switch or appear
+  as an alternate to the live compact solver.
 - Interaction bits are `REFLECTION=1`, `DIFFRACTION=2`,
   `TRANSMISSION=4`, and `SCATTERING=8`; `NONE=0` denotes LoS/no
   interaction.

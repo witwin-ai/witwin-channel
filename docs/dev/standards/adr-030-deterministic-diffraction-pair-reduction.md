@@ -1,8 +1,7 @@
 # ADR-030: Deterministic diffraction pair reduction
 
-- **Status:** Accepted (2026-07-20), including the comparable-baseline sequence
-  addendum accepted on 2026-07-20; dormant native reducer family implemented
-  (2026-07-21), live activation pending
+- **Status:** Accepted for a dormant numerical experiment (2026-07-20);
+  dormant reducer family retained, live activation deferred by ADR-032
 - **Date:** 2026-07-20
 - **Kind:** Numerical-order, cross-repository typed storage, native reduction,
   AD, and performance decision.
@@ -11,6 +10,27 @@
   ADR-023 (direct typed RayD integration), ADR-025 (diffraction
   operation-family ownership), ADR-028 (device-resident diffraction state
   selection), and ADR-029 (device-resident capacity results).
+
+## Stable-recovery disposition
+
+The `deterministic_diffraction_pair_reduce` primal/VJP/JVP family and RayD
+`SourceLane` layout may remain implemented and directly tested, but they have
+no production solver caller. Live activation, deletion of the working compact
+route, and any public/API consequence are deferred. ADR-032's `O(K)` compact
+production boundary is authoritative.
+
+This reducer cannot repair ADR-029's memory regression. `SourceLane` requires
+`P * M` rows and six full float32 field components before reduction; the Munich
+case's downstream candidate/canonical/field pipeline remained capacity-sized.
+Changing only the pair reduction would retain the dominant `O(P*M)` lane
+storage and does not satisfy the measured E2E, peak-memory, throughput, or
+capacity/active gates. No stable-recovery commit may activate it or add another
+large feature around it.
+
+All later wording that says Channel "requests" SourceLane, deletes the old
+route, or establishes a new production baseline describes the deferred design,
+not current production state. Reactivation requires a separate accepted ADR
+with evidence against the ADR-032 compact baseline.
 
 ## Context
 
@@ -434,6 +454,11 @@ an unfrozen compiler/evaluation order, a second full lane-field workspace, or
 performance/resource results outside the accepted regression budgets.
 
 ## Consequences
+
+While live activation is deferred, the consequences below are properties of
+the dormant candidate only. Production retains the compact path and its frozen
+result behavior; no new target hash or public AD restriction is activated by
+this ADR in the stable recovery.
 
 ReceiverGrid diffraction power gains a canonical, reproducible numerical
 meaning independent of GPU scheduling and exporter compaction order. RayD pays

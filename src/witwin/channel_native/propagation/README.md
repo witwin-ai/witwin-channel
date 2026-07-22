@@ -28,10 +28,11 @@ which submits one pair-major `EnumeratedFullDistance` batch, consumes the
 compile-cached enumerated scene diagonal, and retains device actual counts in a
 sidecar. The former per-depth active-row/closest-hit march is deleted. Monte
 Carlo Basic remains on its previous route until its separate atomic switch.
-The legacy canonical selector still compacts valid candidate rows after this
-fixed-capacity producer; removing that device-selected shape boundary belongs
-to the later ADR-029 atomic capacity activation and remains an explicit blocker
-for claiming the complete no-D2H/public-capacity solver contract.
+The canonical selector still compacts valid candidate rows after this
+fixed-capacity producer. ADR-032 accepts this explicit, audited compact boundary
+as the authoritative `O(K)` production route. Complete no-D2H and public
+capacity results are no longer solver goals; E2E latency, peak memory, steady
+throughput, capacity/active ratio, exactness, and device headroom are the gates.
 
 `propagation.topology.kernels.enumerated_transmission_topology_pack` is the
 live component-5 capacity producer for the enumerated route. It consumes the
@@ -45,8 +46,8 @@ accumulation, or public packing work. Path and Deterministic sanitize after
 scattering and enqueue the unique runtime observer only after their final
 result/array/PathTable assembly. The default ADR-008 oracle has no later owner,
 so the engine sanitizes after fields and observes there. This producer-local
-statement does not waive the legacy selector compaction blocker described
-above.
+statement does not create another count owner or waive the compact boundary's
+copy/synchronization budget.
 
 ADR-025 freezes diffraction ownership by complete operation. After the atomic
 Phase 8A pin/switch/delete, RayD is the sole numerical owner of the pure-wedge
@@ -62,21 +63,22 @@ aliases at capacity `N` and carries validity only as a CUDA Boolean mask from
 the typed RayD axial-edge visibility primitive; it never obtains a host count
 or performs Torch compaction.
 
-ADR-029 defines the downstream closure. A device-stable capacity state block
-with explicit `diffraction_state_capacity=M` drives RayD exporter planning;
-actual counts remain CUDA `int32` tensors. Propagation contracts keep
-host-known capacity rows plus CUDA `valid`, and every invalid row is inert
-before topology, field, accumulation, backward, or JVP reads it. Dynamic ATen
-row shapes, count D2H copies, host compaction, and compatibility/generation-
-suffixed facades are forbidden.
+ADR-029's downstream capacity closure is superseded for production by ADR-032.
+The live compact-cardinality owner may copy only audited integer count metadata,
+explicitly synchronize the current stream, allocate exact `O(K)` rows, and pack
+them on device in stable order. For the frozen depth-3 Munich reflection case it
+may issue at most six 4-byte copies, 24 bytes total. This is structural boundary
+work, not CPU numerical selection or fallback. Compatibility/generation-
+suffixed facades, partial results, and silent truncation remain forbidden.
 
 `propagation.models.CapacityPathLayout` is the dormant typed contract for this
-layout. It carries host `pair_count` and `path_capacity_per_pair` metadata plus
+experimental layout. It carries host `pair_count` and historical
+`path_capacity_per_pair` metadata plus
 the same runtime-owned `CapacityFailureState`, CUDA-resident row validity,
 per-pair counts, and typed local overflow state. Construction is metadata-only
 and zero-copy; native producers own the numerical relationship among those
-device tensors. It is not a solver result or a live solver boundary until the
-ADR-029 atomic activation.
+device tensors. It is not a solver result or a live solver boundary; no
+ADR-029 activation is pending.
 
 `propagation.topology.kernels.deterministic_capacity_finalize` is the dormant
 native index producer for the final all-component candidate list. It stable-
@@ -96,11 +98,12 @@ pair slots, so later deterministic accumulation retains live valid-row
 ordinals. Selection is frozen and has no AD companion; a later native gather
 owns continuous primal/JVP/VJP. The selector shares the solve failure state,
 publishes no partial rows after a contract failure, and returns device
-`num_paths` for every pair. It neither consumes public
+`num_paths` for every pair. It neither consumes the historical
 `path_capacity_per_pair` nor publishes a local overflow: that capacity is
-enforced only by later result export/packing. This lets the selector feed
+enforced only by later experimental result export/packing. This lets the
+selector feed
 non-export enumeration and the ADR-008 BDPT oracle without requiring public
-result storage, although it has no live caller before the atomic switch.
+result storage, and it remains caller-free under ADR-032.
 
 `propagation.enumerated.canonical_capacity.evaluated_paths_canonical_capacity_gather`
 is the dormant continuous owner immediately after canonical selection. It
@@ -111,7 +114,7 @@ geometry, and field rows at the original candidate capacity. Its native VJP
 uses source-unique scatter and its JVP uses valid-first gather for all eleven
 continuous evaluated-path fields. Failure leaves the new selection, counts,
 rows, and derivatives inert. It does not perform public pair-major padding,
-consume `path_capacity_per_pair`, or have a live solver caller.
+consume the historical `path_capacity_per_pair`, or have a live solver caller.
 
 `propagation.enumerated.capacity.evaluated_paths_capacity_pack` is the dormant
 complete-row producer layered on that same no-trap finalizer helper. One native
@@ -124,7 +127,7 @@ scatter and its JVP uses valid-first gather for all continuous geometry and
 real/complex field tensors; absent cotangents/tangents and invalid rows are
 native zeros. Topology is non-differentiable, row identity is shared throughout
 the packed `EvaluatedPaths`, and no Torch numerical gather or live solver caller
-is introduced before the atomic activation.
+is introduced; no atomic activation is pending.
 
 `propagation.topology.kernels.coupled_candidate_capacity_block` is the dormant
 discrete producer for coupled R-D, D-R, and D-D candidate axes. Its internal
@@ -145,13 +148,14 @@ multibounce consumer schemas, stable-selects `visible[N]` rows in their frozen
 input order into explicit host capacity `Q`, and carries CUDA `valid`,
 `candidate_count`, and overflow state. At activation `Q` comes from the
 host-known theoretical EPC batch row count `N` (or an equivalent explicit
-upper bound), never the device-selected count or public
+upper bound), never the device-selected count or the historical experimental
 `path_capacity_per_pair`. Invalid rows are tested before any resolved face,
 hit, receiver, or material payload is read. Overflow leaves the complete
 candidate block inert and records the reflection bit without an intermediate
-trap. The producer is
-dormant; the existing compact operations remain the live owner until the
-atomic ADR-029 switch.
+trap. The producer is dormant; the existing compact operations are the
+production owner under ADR-032 and no ADR-029 switch is pending. ADR-031's
+per-pair `Qr` remains a Proposed caller-free experiment and is not public solver
+policy.
 
 ## Public entry points
 

@@ -1,6 +1,7 @@
 # ADR-029: Device-resident capacity results
 
-- **Status:** Accepted (2026-07-20); implementation pending
+- **Status:** Superseded for production by ADR-032 (2026-07-21); retained as a
+  Proposed, caller-free experiment
 - **Date:** 2026-07-20
 - **Kind:** Public result, dynamic-cardinality, native selection, AD, and
   launch-contract decision.
@@ -8,6 +9,23 @@
   ADR-007 (propagation data ownership), ADR-009 (native fusion ownership),
   ADR-023 (direct typed RayD integration), ADR-025 (diffraction operation-family
   ownership), and ADR-028 (device-resident diffraction state selection).
+
+## Production disposition
+
+ADR-029 is not an accepted production or public-API contract. ADR-032 restores
+the measured `O(K)` compact result boundary and permits its single explicit,
+audited count D2H/synchronization. The `path_capacity_per_pair`,
+`diffraction_state_capacity`, capacity-shaped public Path/PathTable,
+capacity-selector/gather, and no-count-D2H requirements below describe a
+retained experiment only. They must not be reached by a production solver,
+advertised as a capability, or treated as architecture guardrails.
+
+The dormant capacity producers, shared failure-state protocol, inert-output
+sanitizers, and direct tests may remain for research and for already accepted
+fixed-capacity operations. They do not authorize propagation of theoretical
+capacity through reflection, diffraction, canonical selection, field
+evaluation, or public result storage. ADR-032 controls wherever this text
+conflicts with the compact production boundary.
 
 ## Context
 
@@ -258,7 +276,30 @@ Each implementation step is a separately reviewable commit. A dormant producer
 must precede a consumer switch, and deletion occurs in the same commit as the
 switch that makes the old path unreachable.
 
-## Acceptance
+## Original acceptance gates and measured failure
+
+The production candidate failed its own performance and resource stop
+conditions on 2026-07-21. With the identical Munich configuration, RayD lock,
+header, toolchain, and GPU, compact A at `e7d82d2` used 1,071,493,120 bytes
+peak allocated memory, completed in a 66.467 ms median, and sustained 15.374
+solve/s. ADR-029 B at `768718e` used 17,854,649,344 bytes, completed in
+1,009.587 ms, and sustained 0.793 solve/s. Its reflection capacity/active ratio
+was 1,731.725 (`N=4,552,704`, `K=2,629`), and its 19,727,908,864-byte reserved
+peak exceeded the 17,094,475,776-byte physical device capacity.
+
+The count-transfer cost that B removed was six 4-byte D2H copies, 24 bytes per
+solve, with approximately 0.152 ms of copy API plus immediate post-copy
+synchronization time. Eliminating that cost increased peak allocated memory by
+16.663 times, latency by 15.189 times, and reduced throughput by 94.84%.
+Logical PathTable hashes remained exact, so the regression cannot be justified
+as a correctness trade. ADR-031 `Qr=20` still used 11,671,543,808 bytes and
+226.429 ms, proving that a smaller raw reflection capacity did not repair the
+capacity-sized downstream pipeline.
+
+Therefore the following original gates are retained as historical criteria,
+not as an outstanding production implementation checklist. The performance,
+peak-memory, capacity-utilization, and physical-headroom conditions failed;
+ADR-032 supersedes activation.
 
 - contract tests cover `N=0`, `M=0`, `K=0`, `K=1`, `K=M`, `K=M+1`, all-invalid,
   sparse, dense, all-valid, multi-transmitter/receiver/chunk, and non-default
@@ -300,7 +341,11 @@ order, a Torch/CPU fallback, a second numerical owner, a compatibility shim, a
 generation-suffixed name, changed valid-row hashes, an unfrozen memory increase,
 or performance outside the accepted gates.
 
-## Consequences
+## Consequences of the retained proposal
+
+The following consequences are not active production behavior. ADR-032's
+compact-result semantics are authoritative unless a future ADR supplies new
+evidence and explicitly re-accepts a capacity design.
 
 Public shapes become explicit capacity contracts and actual cardinality remains
 device resident. Callers that previously treated `max_num_paths` or a flat

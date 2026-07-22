@@ -26,31 +26,36 @@ compiled native CUDA/RayD extension.
   Torch autograd may dispatch those companions but may not reconstruct the
   numerical operation. Finite-difference production derivatives are forbidden.
 - Do not recompute geometry already owned by RayD in Python or Torch.
-- Device data must remain resident through the compute pipeline. Do not add
-  hot-path `.cpu()`, `.numpy()`, `.tolist()`, scalar extraction, host iteration,
-  implicit synchronization, or avoidable host/device copies.
-- Device-selected dynamic cardinality must use an accepted capacity-plus-device-
-  mask/count contract when host-shaped compaction would require synchronization.
-  Do not hide a device-to-host count transfer behind tensor allocation or row
-  selection.
-- Under ADR-029, public Path/Deterministic path shapes and `max_num_paths` mean
-  the explicit host-known `path_capacity_per_pair`; CUDA `valid` plus contiguous
-  `int32 num_paths` hold actual cardinality. Diffraction uses the explicit
-  `diffraction_state_capacity`. Overflow must make the entire device result
-  inert and fail asynchronously; never synchronize just to raise earlier.
-- Each ADR-029 solve transaction owns one runtime `CapacityFailureState`: a
-  contiguous CUDA `int32[1]` bitmask initialized asynchronously on the caller's
-  current stream. Every capacity intermediate must receive and retain that same
-  typed object/storage, atomically OR its owned failure bit, publish only inert
-  outputs after any failure, and never trap or return a partial result. Terminal
-  failure observation belongs to the solve/result boundary, not intermediates.
+- Device data must remain resident through the compute pipeline except at the
+  single ADR-032 compact-cardinality allocation boundary. That owner may copy
+  only audited integer count metadata to the host and explicitly synchronize
+  the caller's current stream to allocate exact `O(K)` output. It may not run
+  CPU/Torch physics or numerical selection, hide the transfer behind allocation
+  or Boolean indexing, or become a fallback. Other hot-path `.cpu()`, `.numpy()`,
+  `.tolist()`, scalar extraction, host iteration, implicit synchronization, or
+  avoidable host/device copies remain forbidden.
+- Under ADR-032, production Path and Deterministic result shapes and
+  `max_num_paths` represent actual compact rows, not provisioned storage.
+  `path_capacity_per_pair`, `diffraction_state_capacity`, capacity-shaped
+  public Path/PathTable results, and ADR-031 `Qr` are not production public API
+  or solver requirements. The measured depth-3 Munich reflection boundary may
+  issue at most six 4-byte count D2H copies, 24 bytes total, and must report the
+  copy/synchronization time.
+- Accepted genuinely fixed-capacity operations retain one runtime
+  `CapacityFailureState`: a contiguous CUDA `int32[1]` bitmask initialized
+  asynchronously on the caller's current stream. Every participant receives
+  and retains that same typed object/storage, atomically ORs its owned failure
+  bit, publishes only inert outputs after failure, and never traps or returns a
+  partial result. Compact output must likewise be all-or-nothing: exact complete
+  `K` rows in stable order or no usable result. Capacity is never a silent
+  truncation policy.
 - `capacity_failure_terminal_check` is the unique runtime-owned terminal
   observer. It consumes that typed state once after all result sanitizers,
   launches on the caller's current CUDA stream, preserves the bitmask, and
   device-fails only when a bit is set. It must never read the state on the host,
   synchronize, allocate a result, sanitize payload, or gain an intermediate or
-  duplicate owner. It remains dormant until the atomic solver switch installs
-  exactly one call per solve transaction.
+  duplicate owner. A transaction that uses it installs exactly one call after
+  all result sanitizers; dormant experiments may not add a production caller.
 
 Python and Torch may perform non-numerical boundary work: API validation,
 typed-contract construction, dispatch, orchestration, row selection, structural
@@ -173,24 +178,25 @@ requires them.
   slot order, and reduces shared layer/frequency VJPs with fixed owners in
   ascending pair/slot order. It remains caller-free until the dedicated
   MonteCarloTargetInset atomic switch/delete commit.
-- Under ADR-029, dormant deterministic PathTable capacity export consumes the
+- The superseded ADR-029 deterministic PathTable capacity export remains a
+  caller-free experiment. It consumes the
   exact shared `CapacityFailureState` from its layout and preserves pair-major
   `P*C` rows. Native primal checks failure/overflow/valid before payload or ID
   reads; derivative companions consume only canonical output validity. Phase
   export remains non-differentiable, while the existing eleven continuous
   evaluated-path inputs retain native VJP/JVP.
-- Under ADR-030, Channel requests RayD's typed `SourceLane` diffraction layout
-  with row `((tx * rx_count + rx) * diffraction_state_capacity) + state` and is
-  the sole owner of `deterministic_diffraction_pair_reduce` primal/VJP/JVP. One
+- Under ADR-030, RayD's typed `SourceLane` layout and Channel's
+  `deterministic_diffraction_pair_reduce` primal/VJP/JVP remain dormant and
+  caller-free. Their experimental row is
+  `((tx * rx_count + rx) * diffraction_state_capacity) + state`. One
   warp owns one endpoint pair; lanes may load consecutive states in parallel,
   but lane 0 must add all six float32 components in ascending state order with
   frozen non-contracted power evaluation. Floating-point atomics/tree
-  reductions, pair splitting across chunks, a second full lane-field workspace,
-  and the deleted Torch `index_add_`/power route are forbidden. The reducer
-  inherits the exact ADR-029 transaction failure state and publishes only inert
-  output after failure. Until a separate accepted ADR supplies complete RayD
-  source-lane exporter AD with real transmitter polarization,
-  ReceiverGrid diffraction with non-`none` AD must fail loudly before compute.
+  reductions, pair splitting across chunks, and a second full lane-field
+  workspace are forbidden in direct tests. The reducer publishes only inert
+  output after failure. It cannot repair ADR-029's `O(P*M)` amplification and
+  must not replace or delete the working compact production route without a new
+  accepted ADR and complete E2E/resource evidence.
 - Phase-screen mode resolution and scene-static realization resources are
   CompiledScene-owned and lazy. The first phase-screen consumer atomically
   caches immutable resident heights, structure/material ids, face ranges, UV
@@ -206,33 +212,33 @@ requires them.
   Its cache key may record `id(RayDSceneResource)` solely as Python wrapper
   identity while CompiledScene owns that wrapper; this is never a native
   pointer, scene handle, or ABI argument.
-- `deterministic_reflection_candidate_capacity_block` is the dormant ADR-029
+- `deterministic_reflection_candidate_capacity_block` is a dormant ADR-029
   post-EPC reflection producer for both order-1 and multibounce rows. Its
   internal `candidate_capacity` comes from the host-known theoretical EPC batch
   row count (or an equivalent explicit upper bound), never from a CUDA-selected
   count or public `path_capacity_per_pair`. It preserves visible input order,
   checks validity before reading any EPC/material payload, and fails
   asynchronously with a completely inert block on overflow. The existing live
-  compact operations remain authoritative until the atomic capacity switch.
-- `enumerated_canonical_capacity_select` is the dormant ADR-029 discrete
-  selector. It reproduces the live stable topology order, canonical
+  compact operations are production authoritative under ADR-032; no capacity
+  switch is pending.
+- `enumerated_canonical_capacity_select` is a caller-free ADR-029 experimental
+  discrete selector. It reproduces the live stable topology order, canonical
   event/object deduplication, shortest-path winner, and global/per-pair
   `max_paths` policy into a candidate-capacity compact prefix. It has no public
   `path_capacity_per_pair` input or overflow output; pair-capacity enforcement
   belongs only to later result export/packing. The selector shares the solve
   failure state, has no AD companion, must remain before scattering append,
-  and must not be replaced by early pair-slot padding before deterministic
-  accumulation.
-- `evaluated_paths_canonical_capacity_gather` is the dormant ADR-029
+  and must not be reached by production or replaced by early pair-slot padding
+  before deterministic accumulation.
+- `evaluated_paths_canonical_capacity_gather` is a caller-free ADR-029
   continuous gather immediately after canonical selection. It produces a new
   sanitized compact-prefix `CanonicalEvaluatedPaths` at candidate capacity,
   keeps selector validity/counts device-resident, and validates compact-prefix,
   source-unique, endpoint-pair, and count contracts before any payload read.
   Its native VJP/JVP cover all eleven continuous evaluated-path fields; invalid
   or failed rows and derivatives are exact inert values. It is distinct from
-  the later public pair-major capacity pack and remains dormant until the
-  atomic solver switch.
-- `path_result_capacity_pack` is the dormant Path-owned ADR-029 terminal
+  the experimental public pair-major capacity pack and remains dormant.
+- `path_result_capacity_pack` is the caller-free Path-owned ADR-029 terminal
   storage packer. It consumes pair-major `CapacityEvaluatedPaths`, inherits the
   exact shared `CapacityFailureState`, and produces the public base tensor
   layout at the configured capacity without Ragged conversion, Boolean
@@ -276,7 +282,8 @@ For architecture moves:
 
 Reject a review if it introduces production Torch/CPU computation, a fallback,
 duplicate physics, solver-to-solver imports, raw extension access outside the
-owning facade, an unowned ABI symbol, or a new hot-path transfer/synchronization.
+owning facade, an unowned ABI symbol, or any hot-path transfer/synchronization
+outside the frozen ADR-032 compact owner and budget.
 
 ## Validation
 
@@ -328,13 +335,12 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
 - `docs/dev/standards/adr-029-device-resident-capacity-results.md`
 - `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`
-- `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
-- `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
-- `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
-- `docs/dev/standards/adr-027-batched-segment-penetration.md`
-- `docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md`
-- `docs/dev/standards/adr-029-device-resident-capacity-results.md`
-- `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`
+- `docs/dev/standards/adr-031-per-pair-raw-reflection-epc-capacity.md`
+- `docs/dev/standards/adr-032-controlled-compact-cardinality-boundary.md`
+
+ADR-029 is superseded for production, ADR-031 is Proposed, and ADR-030 live
+activation is deferred. They are retained for experimental contract audit;
+ADR-032 is the authoritative production cardinality decision.
 
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or

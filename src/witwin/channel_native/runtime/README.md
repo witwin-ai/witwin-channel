@@ -7,17 +7,25 @@ identity, tensor/AD call contracts, native buffers, and pure-stdlib native
 handle normalization. It does not own solver policy, scene construction,
 materials, propagation algorithms, or RF numerical kernels.
 
-`runtime.capacity.CapacityFailureState` owns the ADR-029 transaction failure
-protocol. Native creation asynchronously zeros one contiguous CUDA `int32[1]`
-bitmask on the caller's current stream. Capacity producers receive and retain
-the same typed object/storage, atomically OR owner-specific bits, and never read
-the state on the host. Intermediates do not trap; the solve/result boundary owns
-the single `capacity_failure_terminal_check` observation. That runtime-owned
+`runtime.capacity.CapacityFailureState` owns the shared failure protocol used
+by accepted genuinely fixed-capacity operations and retained caller-free
+experiments. Native creation asynchronously zeros one contiguous CUDA
+`int32[1]` bitmask on the caller's current stream. Participants receive and
+retain the same typed object/storage, atomically OR owner-specific bits, and
+never read the state on the host. Intermediates do not trap; a participating
+solve/result boundary owns the single `capacity_failure_terminal_check`
+observation. That runtime-owned
 native operation launches on the caller's current stream, leaves the bitmask
 unchanged, does nothing when it is zero, and raises an asynchronous device
 failure when any bit is set. It performs no host read, synchronization, scalar
 extraction, result allocation, or payload sanitization; every producer must
 publish its canonical inert result before the terminal launch.
+
+ADR-032 restores the enumerated `O(K)` compact production result. Its one
+explicit count D2H/synchronization allocation boundary is owned by propagation,
+not runtime, and does not weaken this failure protocol. ADR-029 capacity-result
+operations and ADR-031/030 candidates remain caller-free; runtime must not make
+them reachable through a capability, loader choice, or fallback.
 
 ADR-027 penetration failure owns the stable transaction bit
 `SEGMENT_PENETRATION_FAILURE = 1 << 7`. It covers overflow, request/device-mask
