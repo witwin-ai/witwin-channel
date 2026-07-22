@@ -84,13 +84,13 @@ requests of each chunk; the per-block budget uses
 existing rx-streamed wrapper and the 1M cap govern the union. Depth = 2,
 `interaction_type_sequence = [2, 2]` (two diffraction events).
 
-### D2: native discovery kernels (channel-native owned)
+### D2: native discovery kernels (channel owned)
 
 New symbols alongside the coupled ones in
-`native/channel_native/kernels/coupled_topology.cu` and
-`native/channel_native/rayd/geometry.cpp`:
+`native/channel/kernels/coupled_topology.cu` and
+`native/channel/rayd/geometry.cpp`:
 
-- `cn_coupled_dd_prepare_cuda`: per candidate (tx, rx, e1, e2) solve the
+- `channel_coupled_dd_prepare_cuda`: per candidate (tx, rx, e1, e2) solve the
   two-edge Fermat point pair (Q1, Q2) minimizing
   |tx-Q1| + |Q1-Q2| + |Q2-rx| by alternating the existing closed-form
   single-edge projection (fixed 16 iterations, deterministic order,
@@ -101,10 +101,10 @@ New symbols alongside the coupled ones in
 - visibility: three segment queries (tx->Q1, Q1->Q2, Q2->rx) through the
   existing `raydn_visibility_forward` C-ABI batch call (geometry.cpp:291
   pattern), ANDed into the row validity.
-- `cn_coupled_dd_finalize_cuda`: assemble the 2-interaction sequence
+- `channel_coupled_dd_finalize_cuda`: assemble the 2-interaction sequence
   (edge ids in both slots), path length, delay, valid mask.
 - `raydn_coupled_dd_geometry_forward`: the orchestrator bound to Python
-  (mirrors `cn_raydn_coupled_rd_geometry_forward`, geometry.cpp:204).
+  (mirrors `channel_raydn_coupled_rd_geometry_forward`, geometry.cpp:204).
 
 Python: `propagation/geometry/coupled.py` gains `query_coupled_dd_geometry`
 (typed facade over the new bridge symbol);
@@ -115,7 +115,7 @@ wedge materials, resolved by the field stage exactly as coupled rows do).
 ### D3: native field kernel (two sequential wedge operators, one launch)
 
 New `coupled_dd_field_kernel` in
-`native/channel_native/kernels/field_transport.cu` (pattern:
+`native/channel/kernels/field_transport.cu` (pattern:
 `coupled_rd_field_kernel`, field_transport.cu:348-537):
 
 - **Leg 1** (e1): `PairInputs` with `sourcePos = tx`,
@@ -151,7 +151,7 @@ leg-2 coefficient evaluation must stay a single call site so P4 can swap it.
 
 ### D4: AD companions
 
-`cn_field_coupled_dd_backward` / `cn_field_coupled_dd_jvp` twins (pattern:
+`channel_field_coupled_dd_backward` / `channel_field_coupled_dd_jvp` twins (pattern:
 `field_wedge_ad_coupled.cu::coupled_rd_row_dual` after ADR-012 G4-3, which
 calls `compute_pair_vector_contribution` directly so the truncation/mend
 derivatives flow in lockstep). tx/rx gradients flow through the live
@@ -179,7 +179,7 @@ lockstep entries go into the duplication ledger.
 ### D6: governance (moves together, per CLAUDE.md)
 
 New ABI symbols (`raydn_coupled_dd_geometry_forward`, `field_coupled_dd`,
-`field_coupled_dd_backward`, `field_coupled_dd_jvp`; internal `cn_*_cuda`
+`field_coupled_dd_backward`, `field_coupled_dd_jvp`; internal `channel_*_cuda`
 helpers are not pybind symbols): `ci/native-binding-manifest.json` (179 ->
 183), `ci/check_contract_coverage.py::EXPECTED_NATIVE_BINDING_COUNT`,
 `ci/contract-coverage-manifest.json` (contract test + e2e caller per

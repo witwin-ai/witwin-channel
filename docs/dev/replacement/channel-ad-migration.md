@@ -1,8 +1,8 @@
-# Channel Native AD decision and migration contract
+# Channel AD decision and migration contract
 
 ## Decision
 
-The first Channel Native replacement release is primal-only. The public
+The first Channel replacement release is primal-only. The public
 capability manifest reports `supports_ad=False`, and Path, Deterministic,
 Monte Carlo Basic, and Monte Carlo BDPT accept only `ad_mode="none"`.
 Requesting `jvp`, `vjp`, `forward`, `reverse`, or any other AD mode fails while
@@ -17,7 +17,7 @@ omitting topology, visibility, polarization, material, or stochastic terms.
 
 The 2026-07-11 audit searched the repository-owned production consumer roots
 `core`, `genesis`, `maxwell`, `radar`, and `studio`. It found no imports or
-calls that couple those packages to legacy Channel AD or Channel Native AD.
+calls that couple those packages to legacy Channel AD or Channel AD.
 
 The legacy `channel/examples`, `channel/tests`, `channel/tutorials`, and
 `channel/scripts` reference roots contain 19 files with an explicit
@@ -26,7 +26,7 @@ tests, tutorials, and validation tools. They remain offline migration oracles;
 they are not production dependencies. External consumers are not visible to
 this repository and must be audited before a release removes legacy Channel.
 
-Channel Native also contains two low-level MC LoS derivative primitives:
+Channel also contains two low-level MC LoS derivative primitives:
 `mc_los_path_gain_backward` and `mc_los_path_gain_jvp`. They are exercised by
 kernel tests against the free-space analytic derivative and central finite
 differences. No public solver calls them. Their presence does not imply
@@ -69,4 +69,4 @@ stages below:
 
 Until then, optimization workflows must stay on legacy Channel as an offline
 tool or use an application-owned finite-difference loop around primal Channel
-Native solves. Such a loop is outside the Channel Native solver contract.
+Native solves. Such a loop is outside the Channel solver contract.

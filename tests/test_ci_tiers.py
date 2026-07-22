@@ -46,6 +46,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "quick.contract-coverage",
         "quick.public-api-binding-contract-manifests",
         "quick.production-dependencies",
+        "quick.product-identity",
         "quick.repository-hygiene",
         "quick.secret-scan",
         "quick.maintenance-budgets",
@@ -231,21 +232,21 @@ def test_workflows_use_only_the_verified_windows_cuda_runner() -> None:
         assert "torch.cuda.get_device_capability() == (12, 0)" in source
         assert "-m cmake -S . -B $buildDir" in source
         assert "-m cmake --build $buildDir" in source
-        assert "WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE=1" in source
-        assert "WITWIN_CHANNEL_NATIVE_EXTENSION_PATH=" in source
-        assert "WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT=" in source
+        assert "WITWIN_CHANNEL_DEVELOPER_OVERRIDE=1" in source
+        assert "WITWIN_CHANNEL_EXTENSION_PATH=" in source
+        assert "WITWIN_CHANNEL_EXPECTED_FINGERPRINT=" in source
         assert "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd" in source
         assert "WITWIN_RAYD_DIR" in source
 
     cuda = (WORKFLOWS / "cuda-pr.yml").read_text(encoding="utf-8")
     nightly_source = (WORKFLOWS / "nightly.yml").read_text(encoding="utf-8")
     release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" in cuda
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" not in cuda
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" in nightly_source
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" not in nightly_source
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" in release
-    assert "-DCHANNEL_NATIVE_RELEASE_BUILD=OFF" not in release
+    assert "-DCHANNEL_RELEASE_BUILD=OFF" in cuda
+    assert "-DCHANNEL_RELEASE_BUILD=ON" not in cuda
+    assert "-DCHANNEL_RELEASE_BUILD=ON" in nightly_source
+    assert "-DCHANNEL_RELEASE_BUILD=OFF" not in nightly_source
+    assert "-DCHANNEL_RELEASE_BUILD=ON" in release
+    assert "-DCHANNEL_RELEASE_BUILD=OFF" not in release
     assert "actions/upload-artifact@v4" in nightly_source
     assert "artifacts/nightly/wheel-smoke-pe-audit.v1.json" in nightly_source
     assert "actions/upload-artifact@v4" in release

@@ -49,8 +49,8 @@ implementation owner of exactly these 17 Channel-facing contracts:
 | chain realization | `scattering_chain_realization_eval`, `scattering_chain_realization_eval_backward`, `scattering_chain_realization_eval_jvp` | 10B |
 
 Primal, backward/VJP, and JVP companions move as complete families. Channel
-continues to own the stable `_channel_native` symbol names and the Python domain
-facades under `witwin.channel_native.scattering.kernels`. A Channel C++ adapter
+continues to own the stable `_channel` symbol names and the Python domain
+facades under `witwin.channel.scattering.kernels`. A Channel C++ adapter
 packs named RayD requests and converts named RayD results to the existing
 Python-facing dictionaries/tuples. It contains validation and packing only; it
 must not reconstruct scattering math.
@@ -150,7 +150,7 @@ attributes, explicit `fmaf` interpolation order, horizon behavior, periodic
 axis behavior, 16-corner index/weight order, and primal/dual relationship are
 frozen. After Channel activates 10A, every remaining Channel consumer includes
 the public RayD header and the private
-`native/channel_native/kernels/scattering_table.cuh` is deleted. RayD never
+`native/channel/kernels/scattering_table.cuh` is deleted. RayD never
 includes a Channel-private header. `kirchhoff_table_ad.cu` has no current
 dependency on this header and must not gain a decorative or unused include.
 
@@ -277,7 +277,7 @@ Activation is ordered and atomic by family group:
 4. Channel pins it, switches all six contracts, proves parity, and deletes all
    four local chain TUs in one 10B switch commit.
 
-A dormant RayD candidate is not compiled into or called by `_channel_native`
+A dormant RayD candidate is not compiled into or called by `_channel`
 and is not a supported dual-owner state. Channel never pins a branch, dirty
 worktree, or unmerged candidate. Rollback selects the previous accepted RayD
 commit through the lock file; it never introduces a runtime feature flag,
@@ -297,7 +297,7 @@ Channel retains all eleven ABI symbols and typed Python facades but no longer
 contains their numerical CUDA bodies or the private scattering-table header.
 The retained event-policy kernel and all six Phase 10B chain contracts remain
 complete Channel owners. The binding count stays 202 and the active numerical
-owner split is RayD 37, layered Channel/RayD 2, and Channel Native 163. Exact
+owner split is RayD 37, layered Channel/RayD 2, and Channel 163. Exact
 launch, current-stream, compile-flag, codegen/resource, direct-contract,
 dependency, deletion, and no-fallback evidence is recorded in
 `docs/dev/audit/phase13-scattering-phase10a-evidence.json`.
@@ -339,7 +339,7 @@ separately in `docs/dev/audit/phase13-phase11-release-acceptance.json`.
 After both activation phases, RayD is the only numerical source owner of the
 17 generic runtime contracts and seven shared table helpers, while Channel
 retains its stable extension ABI, domain facades, resident-resource lifecycle,
-and solver/estimator policy. The wheel still contains one `_channel_native`
+and solver/estimator policy. The wheel still contains one `_channel`
 production extension and no RayD Python extension or undeclared DSO.
 
 This decision narrows RayD's former statement that it contains no BSDFs: RayD

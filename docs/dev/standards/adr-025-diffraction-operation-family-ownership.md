@@ -43,14 +43,14 @@ operation family, not to a substring in a symbol name.
 | Operation family | Complete entries or boundary | Authoritative numerical owner after activation | Decision |
 |---|---|---|---|
 | order-1 path export / visibility and sample-tape production | `rayd_diffraction_paths_order1_forward`; renamed sample-tape producer | RayD | Keep exporter and producer distinct typed operations; discrete winner selection is not differentiated. |
-| pure-wedge fixed-winner field | `field_diffraction_wedge`, `field_diffraction_wedge_backward`, `field_diffraction_wedge_jvp` | RayD | Move all three entries together in Phase 8A; retain Channel fields/autograd facades and stable `_channel_native` names. |
-| MC Sionna fixed-tape estimator | `mc_sionna_diffraction_tape_accumulate`, backward, JVP | Channel Native | Keep the three-entry estimator whole. Do not extract a UTD sub-launch. |
-| coupled R-D field | `field_coupled_rd`, backward, JVP | Channel Native | Keep reflection-slab plus UTD row fusion whole; consume RayD public device primitives. |
-| coupled D-D field | `field_coupled_dd`, backward, JVP | Channel Native | Keep the two-wedge one-launch row fusion whole; consume RayD public device primitives. |
-| coupled R-D stationary geometry | `coupled_rd_prepare`, backward, JVP | Channel Native | Keep the continuous stationary-geometry family whole. A future move needs a separate ADR and evidence. |
+| pure-wedge fixed-winner field | `field_diffraction_wedge`, `field_diffraction_wedge_backward`, `field_diffraction_wedge_jvp` | RayD | Move all three entries together in Phase 8A; retain Channel fields/autograd facades and stable `_channel` names. |
+| MC Sionna fixed-tape estimator | `mc_sionna_diffraction_tape_accumulate`, backward, JVP | Channel | Keep the three-entry estimator whole. Do not extract a UTD sub-launch. |
+| coupled R-D field | `field_coupled_rd`, backward, JVP | Channel | Keep reflection-slab plus UTD row fusion whole; consume RayD public device primitives. |
+| coupled D-D field | `field_coupled_dd`, backward, JVP | Channel | Keep the two-wedge one-launch row fusion whole; consume RayD public device primitives. |
+| coupled R-D stationary geometry | `coupled_rd_prepare`, backward, JVP | Channel | Keep the continuous stationary-geometry family whole. A future move needs a separate ADR and evidence. |
 | composed R-D/D-D geometry | `coupled_rd_geometry_forward`, `coupled_dd_geometry_forward` | Channel operation / RayD primitives | Channel owns prepare/finalize and row semantics; RayD owns typed EPC/visibility primitives. |
-| deterministic/path/MC packing, compaction, vector accumulation, and edge discovery | current `deterministic_*`, `path_diffraction_block`, `mc_diffraction_*` operations | Channel Native | Keep solver/propagation policy in Channel. |
-| BDPT connection, PDF, MIS, and storage | no dedicated live diffraction ABI after Phase 4; standalone diffraction uses ADR-018 enumerated paths | Channel Native, only when a real BDPT caller exists | Do not recreate deleted bindings. Any future entry needs a real BDPT E2E caller and complete governance coverage. |
+| deterministic/path/MC packing, compaction, vector accumulation, and edge discovery | current `deterministic_*`, `path_diffraction_block`, `mc_diffraction_*` operations | Channel | Keep solver/propagation policy in Channel. |
+| BDPT connection, PDF, MIS, and storage | no dedicated live diffraction ABI after Phase 4; standalone diffraction uses ADR-018 enumerated paths | Channel, only when a real BDPT caller exists | Do not recreate deleted bindings. Any future entry needs a real BDPT E2E caller and complete governance coverage. |
 
 The machine-readable copy is
 `docs/dev/audit/phase13-diffraction-family-matrix.json`. It records the current

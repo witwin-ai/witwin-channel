@@ -1,8 +1,8 @@
-# Channel Native migration and runtime-dependency boundary
+# Channel migration and runtime-dependency boundary
 
 ## Current decision
 
-`witwin.channel_native` is the native entrypoint for the capabilities it
+`witwin.channel` is the native entrypoint for the capabilities it
 advertises. Repository-owned production Python must not import DrJit, Mitsuba,
 Sionna, a RayD Python dispatcher, or `witwin.channel`. The old Channel may remain in tests
 and benchmarks as an offline correctness oracle; it must never be a production
@@ -14,15 +14,15 @@ contain no production Channel imports. This does not prove that external users,
 deployed jobs, plugins, or private repositories have migrated.
 
 The platform `core` package's `channel` and `all` extras now route to
-`witwin-channel-native>=0.1,<0.2` (companion commit `9ee6655`) instead of the old
+`witwin-channel>=0.1,<0.2` (companion commit `9ee6655`) instead of the old
 `witwin-channel` distribution. This establishes the repository-owned default
 installation route; application-level canary/default-on state still requires
 confirmation from each consumer owner.
 
 ### Plan 13 Phase 3: direct typed RayD integration
 
-Channel Native now source-links RayD commit
-`adf0ea2d1481f7548c5ef30c31b4adbaf831f963` into its single `_channel_native`
+Channel now source-links RayD commit
+`adf0ea2d1481f7548c5ef30c31b4adbaf831f963` into its single `_channel`
 extension and calls `rayd::torch` through
 `backends/torch/include/rayd/torch/integration_v2.h` (SHA-256
 `d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928`).
@@ -59,28 +59,28 @@ is unchanged. Exact deletion and body-hash evidence lives in
 
 ### Plan 13 Phase 6A: shared RF and resident layer-stack ownership
 
-Channel Native now pins the pushed RayD candidate
+Channel now pins the pushed RayD candidate
 `4cb400acbfcc2da7fda4110d1298d311816905f1`; the locked
 `backends/torch/include/rayd/torch/integration_v2.h` SHA-256 is
 `c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b`.
 RayD is the unique numerical source owner of the ADR-024 shared RF
 complex/medium/Fresnel/layer-stack/Jones primal/dual closure and the complete
 `em_layer_stack_eval/backward/jvp` family. Channel still owns all three stable
-`_channel_native` names, the materials facade, Material ABI v3/CSR encoding,
+`_channel` names, the materials facade, Material ABI v3/CSR encoding,
 validation, caches and resources.
 
-All Channel native consumers include the versioned RayD public headers. The
+All Channel consumers include the versioned RayD public headers. The
 former Channel-private numerical headers and `kernels/em_debug.cu` are removed
 without forwarding aliases or a runtime fallback. Of the 129 frozen helper
 records, 112 now have RayD as their active unique source owner, 10 remain
 Channel boundary-only tensor/launch adapters, and 7 scattering-table helpers
 remain Channel-owned pending Phase 10A activation under accepted ADR-026. The
 live binding count remains 202; the
-current owner split is RayD 20, layered Channel/RayD 2, and Channel Native 180.
+current owner split is RayD 20, layered Channel/RayD 2, and Channel 180.
 
 ### Plan 13 Phase 6B: complete-row transmission ownership
 
-Channel Native now pins the pushed RayD candidate
+Channel now pins the pushed RayD candidate
 `3988f0934fec7b521ee5190b0defc0883c84b9e6`; the integration v2 header
 SHA-256 is
 `6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989`
@@ -89,7 +89,7 @@ and its identity is
 
 The complete `field_transmission_sequence/backward/jvp` family now dispatches
 through the source-linked typed `rayd::torch` API. Channel retains the three
-stable `_channel_native` names, field-row schemas, Python/autograd facades and
+stable `_channel` names, field-row schemas, Python/autograd facades and
 solver orchestration. RayD is the unique numerical source owner of the primal,
 backward and JVP kernels; the former Channel AD translation unit and the
 transmission primal section of `field_transport.cu` are removed without a
@@ -101,7 +101,7 @@ existing shared-layer atomic accumulation order. The fused
 `bdpt_transmitted_light_subpath_state/backward/jvp` family remains a complete
 Channel owner and consumes the same RayD shared RF headers. The live binding
 count remains 202; the owner split is now RayD 23, layered Channel/RayD 2, and
-Channel Native 177. The frozen 129-helper partition remains 112/10/7 because
+Channel 177. The frozen 129-helper partition remains 112/10/7 because
 Phase 6B moved an operation family, not a new helper source closure.
 
 ### Plan 13 Phase 7: diffraction operation-family decision
@@ -120,7 +120,7 @@ Phase 8B renamed the misleading live
 `rayd_diffraction_sample_tape_forward` without an alias or output trimming.
 The five dead BDPT diffraction bindings deleted in Phase 4 remain deleted under
 the four-axis reachability rule. The live transmitter visibility prefilter will
-become a complete Channel native planning/selection operation while preserving
+become a complete Channel planning/selection operation while preserving
 the ordered fractions `(0.02, 1/3, 2/3, 0.98)`, any-visible rule, and stable row
 selection. The accepted contracts and stop conditions are recorded in
 `docs/dev/audit/phase13-diffraction-family-matrix.json` and
@@ -128,7 +128,7 @@ selection. The accepted contracts and stop conditions are recorded in
 
 ### Plan 13 Phase 8A: pure-wedge diffraction ownership
 
-Channel Native now pins pushed RayD commit
+Channel now pins pushed RayD commit
 `11e72526cdddf669678975c8921a9d44c6504e20`. The locked integration v2 header
 SHA-256 is
 `7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef`,
@@ -137,7 +137,7 @@ with identity
 
 The complete `field_diffraction_wedge/backward/jvp` family now dispatches
 through the source-linked typed `rayd::torch` API. Channel retains all three
-stable `_channel_native` names, field/autograd facades, row contracts and
+stable `_channel` names, field/autograd facades, row contracts and
 solver orchestration. RayD is the unique numerical source owner; the former
 Channel pure-wedge CUDA translation unit is deleted without a forwarding shim,
 fallback, or second compiled owner.
@@ -172,7 +172,7 @@ chain-realization geometry retains its implemented VJP/JVP support. See
 
 ### Plan 13 Phase 10A: table and single-bounce scattering activation
 
-Channel Native now pins pushed RayD commit
+Channel now pins pushed RayD commit
 `4577e744adfe8665f7817e3aff5e8e533ec896e7`. The typed scattering header and
 integration-v2 header SHA-256 values are respectively
 `66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a`
@@ -182,7 +182,7 @@ the RayD shared scattering-table header SHA-256 is
 
 The complete table-evaluation AD, table-sampling, single-bounce ensemble, and
 patch-integral families now dispatch through typed `rayd::torch` requests and
-results. Channel keeps all eleven `_channel_native` names, Python facades,
+results. Channel keeps all eleven `_channel` names, Python facades,
 resident-resource lifecycle, and solver policy. The five former dedicated
 Channel numerical TUs and private table helper header are deleted; the retained
 `scattering.cu` contains only `scattering_event_probabilities`. Remaining chain
@@ -190,7 +190,7 @@ consumers include RayD's public table header directly, while
 `kirchhoff_table_ad.cu` gains no unused dependency.
 
 The live binding count remains 202. The numerical-owner split is RayD 37,
-layered Channel/RayD 2, and Channel Native 163. Table primal/sample/PDF and the
+layered Channel/RayD 2, and Channel 163. Table primal/sample/PDF and the
 retained event-policy TU remain on their default CUDA flags; table AD, ensemble,
 and patch owners retain `--fmad=false` in RayD. Launch count, current stream,
 reduction order, atomics, resident tensors, and public API remain unchanged.
@@ -200,7 +200,7 @@ Detailed Phase 10A activation, codegen/resource, deletion, and direct-test evide
 
 ### Plan 13 Phase 10B: fused scattering-chain activation
 
-Channel Native now pins pushed RayD commit
+Channel now pins pushed RayD commit
 `768b96e42a95f70c32d55f98a72000085317e288`. The typed scattering,
 integration-v2, and shared scattering-table header SHA-256 values are
 respectively
@@ -210,14 +210,14 @@ and `38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38`.
 
 The complete ensemble-chain and realization-chain primal/backward/JVP families
 now dispatch through typed `rayd::torch` requests/results. Channel keeps all six
-`_channel_native` names and typed Python/autograd facades, while the four local
+`_channel` names and typed Python/autograd facades, while the four local
 chain CUDA TUs are deleted. `scattering_event_probabilities`, table/phase-screen
 lifecycle, topology/C1-C2 packing, RNG/MIS/event policy, solver accumulation,
 and results remain Channel owners. The geometry AD truth is unchanged:
 ensemble is JVP-only with loud VJP rejection; realization supports VJP/JVP.
 
 The live binding count remains 202. The numerical-owner split is RayD 43,
-layered Channel/RayD 2, and Channel Native 157. All four RayD chain TUs retain
+layered Channel/RayD 2, and Channel 157. All four RayD chain TUs retain
 source-local `--fmad=false`; launch count, current stream, reduction order,
 atomics, resident tensors, and public API are unchanged. Detailed activation,
 codegen/resource, deletion, and direct-test evidence is recorded in
@@ -263,7 +263,7 @@ Channel now locks pushed RayD
 `474c122aa3cd6b6d098675e076a73e6f485bd6be`, stable integration-header SHA-256
 `57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`, identity
 `rayd.torch.integration`, and independent numeric API version 6. Four new
-internal `_channel_native` entries expose RayD's complete fixed-capacity
+internal `_channel` entries expose RayD's complete fixed-capacity
 straight-segment primal/tape/VJP/JVP family. One Channel-owned
 `enumerated_transmission_topology_pack` entry converts valid hit slots into
 pair-major component-5 capacity rows. The live binding universe therefore
@@ -458,7 +458,7 @@ classify Radar's independent DrJit/RayD tracer as a Channel runtime fallback.
 
 ### ADR-019: `montecarlo.bdpt` coherent combine (2026-07-18)
 
-`witwin.channel_native.montecarlo.bdpt.Config` gains one field:
+`witwin.channel.montecarlo.bdpt.Config` gains one field:
 
 - `coherent: bool = False`
 
@@ -488,15 +488,15 @@ Three public `Config` classes gain purely additive, opt-in fields. Every default
 preserves the existing behaviour BIT-IDENTICALLY, so no existing caller,
 benchmark, or preset changes.
 
-- `witwin.channel_native.deterministic.Config` gains four fields:
+- `witwin.channel.deterministic.Config` gains four fields:
   `scattering_coherent: bool = False`, `scattering_chain_max_depth: int = 0`,
   `scattering_chain_samples_per_m2: float = 2.0`,
   `scattering_chain_max_rows: int = 256`.
-- `witwin.channel_native.path.Config` gains three fields:
+- `witwin.channel.path.Config` gains three fields:
   `scattering_chain_max_depth: int = 0`,
   `scattering_chain_samples_per_m2: float = 2.0`,
   `scattering_chain_max_rows: int = 256`.
-- `witwin.channel_native.montecarlo.bdpt.Config` gains one field:
+- `witwin.channel.montecarlo.bdpt.Config` gains one field:
   `max_scattering_order: int = 1`.
 
 `scattering_chain_max_depth = 0` disables chain discovery (no allocation, launch,

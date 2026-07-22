@@ -20,7 +20,7 @@ Initial native BDPT gates use `benchmarks/bench_bdpt_basic.py` and
 - Single-plane open-mesh original/native BDPT speed gate: use
   `tests.support.bin.benchmark_single_plane_bdpt_native_vs_original`. This script
   runs original `witwin.channel` BDPT in a subprocess and native
-  `witwin.channel_native.montecarlo.bdpt` in-process on the same hand-authored
+  `witwin.channel.montecarlo.bdpt` in-process on the same hand-authored
   open two-triangle plane scene. Strict gates require matching radiomap shape,
   nonzero native/original maps, and native median solve time faster than original
   with at least the configured minimum speedup.

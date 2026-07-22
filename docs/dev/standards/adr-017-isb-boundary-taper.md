@@ -36,7 +36,7 @@ One switch, smoothing BOTH members of the compensation pair with CONGRUENT
 windows (the single-sided taper is falsified twice: rsb-taper 24/24
 variants; the LoS-only ISB control regresses ISB p95 excess to +24/+27 dB):
 
-- **LoS member (channel-native):** the hard occlusion gate becomes
+- **LoS member (channel):** the hard occlusion gate becomes
   membership tau(c/w): c = signed clearance of the tx->rx segment past the
   occluding cube silhouette edge (positive lit), w = width_scale * w_F of
   the grazed edge; tau = C1 smoothstep through 1/2 at c = 0. LoS rows
@@ -84,7 +84,7 @@ Deep-multipath fringing seams are intentionally untouched (plan-10 scope).
 
 Implementation landed end to end (RayD PairInputsT.isbTaperWidthScale +
 mend notch + receiver-plane-magnified window derivation; torch-backend op
-threading; channel-native clearance kernel with the (d1+d2)/d1
+threading; channel clearance kernel with the (d1+d2)/d1
 magnification; config/AD-guard/governance at 185 bindings). Verified:
 taper-OFF bit-identity (frozen path-table SHA exact, three independent
 sweeps); D member live and congruent at the seam median (D/LoS ON-OFF

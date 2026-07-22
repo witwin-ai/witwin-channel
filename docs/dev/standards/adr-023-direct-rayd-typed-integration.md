@@ -16,8 +16,8 @@
 
 ## Context
 
-Channel Native already builds RayD in the same CMake graph and links RayD's
-native Torch target into `_channel_native`. The production path nevertheless
+Channel already builds RayD in the same CMake graph and links RayD's
+native Torch target into `_channel`. The production path nevertheless
 crosses a historical compatibility boundary made of raw `int64_t` scene
 handles, duplicated `extern "C"` array signatures, function-pointer getters,
 capacity-managed outputs, and `RayDN/raydn`-named facades. This makes one native
@@ -26,7 +26,7 @@ tensors less protection than they have at the Python boundary.
 
 The desired direct integration is not a Python import of `rayd.torch`, a second
 extension, a second dispatcher, or a second scene registry. It is a source-level
-C++ API used inside the one `_channel_native` extension. RayD remains the owner
+C++ API used inside the one `_channel` extension. RayD remains the owner
 of generic scene, acceleration-structure, OptiX trace, intersection,
 visibility, and generic path-geometry primitives. Channel remains the owner of
 RF contracts, solver policy, topology, reductions, and Channel-fused
@@ -64,7 +64,7 @@ Channel's C++ Torch bindings include `rayd/torch/integration.h` and call these f
 directly. There is no copied integration signature, function-pointer getter,
 raw output-capacity protocol, dynamic symbol lookup, or Channel compatibility
 adapter between the binding and this API. Python domain kernel facades and the
-`_channel_native` pybind registry remain necessary typed validation, dispatch,
+`_channel` pybind registry remain necessary typed validation, dispatch,
 error-translation, and result-assembly boundaries; they do not reimplement
 geometry or physics.
 
@@ -128,7 +128,7 @@ not hide a missing capability, ABI mismatch, stale resource, or device error.
 
 Invalid shape/dtype/device/resource/ABI state and CUDA/OptiX failures fail
 loudly before partial computation is reported as success. RayD raises a typed
-C++/c10 exception with operation and contract context; `_channel_native`
+C++/c10 exception with operation and contract context; `_channel`
 translates it once at the pybind boundary. Channel must not catch it to return
 zeros, empty success, detached outputs, a reduced algorithm, or any Torch/CPU
 fallback. No error-code tensor or partially filled output array is a valid typed
@@ -136,7 +136,7 @@ result.
 
 ### 4. Single extension and build/package boundary
 
-`_channel_native` remains the only production Python extension and the only
+`_channel` remains the only production Python extension and the only
 Torch-facing dispatcher. RayD is source-linked as a locked native target in the
 same build graph. Normal builds and wheels must not:
 
@@ -234,7 +234,7 @@ feature list, and migration note. The immutable Phase-9 owner inventory is not
 edited.
 
 Packaging acceptance requires a clean locked checkout and wheel inspection
-showing exactly one production extension (`_channel_native`), the declared
+showing exactly one production extension (`_channel`), the declared
 metadata, no RayD Python extension, and no undeclared runtime DSO. Compiler and
 resource evidence must explain any output difference caused by the target/header
 move. An unexplained numerical, codegen, resource, stream, lifecycle, or package

@@ -6,10 +6,10 @@ Status: Accepted.
 
 The `montecarlo.bdpt` solver accumulates real per-path POWER only. Every
 connection sample carries `contribution = |coeff|^2`
-(`native/channel_native/kernels/bdpt_connect_samples.cu:104-106,240,376`), and
+(`native/channel/kernels/bdpt_connect_samples.cu:104-106,240,376`), and
 the accumulator atomic-adds `contribution * mis_weight` into per-(tx, rx,
 component) real matrices
-(`native/channel_native/kernels/bdpt_connect_accumulation.cu:32-33`). The
+(`native/channel/kernels/bdpt_connect_accumulation.cu:32-33`). The
 connection-sample schema (`_BDPT_CONNECTION_SCHEMA`) carries no complex
 coefficient, so paths that land in the same (tx, rx, component) bin combine
 INCOHERENTLY (their powers add).
@@ -153,7 +153,7 @@ with the fresh `artifacts/cmake-p1` extension; guarded by
   `ci/native-binding-manifest.json` is regenerated for the signature.
 - Owner inventory: `docs/dev/audit/phase9-native-owner-inventory.json`
   `bdpt.connection_storage` multiset refreshes the
-  `cn_bdpt_accumulate_connection_samples_cuda` body hash and adds the two new
+  `channel_bdpt_accumulate_connection_samples_cuda` body hash and adds the two new
   coherent kernels; `manifest_sha256` recomputed. `abi_owner` set unchanged.
 - Contract coverage: unchanged (owner, E2E callers, and count for the
   accumulate op are all the same).

@@ -260,7 +260,7 @@ Channel owns:
 - the solve-owned capacity failure transaction and terminal asynchronous
   failure boundary.
 
-The MC wall product must execute in a Channel native CUDA operation after the
+The MC wall product must execute in a Channel CUDA operation after the
 switch. Moving that estimator into RayD, fusing it with traversal, changing its
 TE/TM basis or product order, or changing layer-stack launch/reduction behavior
 requires a separate accepted ADR. RayD receives no material-policy callback and
@@ -279,7 +279,7 @@ path unreachable.
    direct forward/tape/VJP/JVP tests. No Channel lock or production caller
    changes.
 3. **Dormant Channel contracts:** add the single owning Python/native facades,
-   binding/coverage manifests, failure-state wiring, and the Channel-native MC
+   binding/coverage manifests, failure-state wiring, and the Channel MC
    material/TE-TM/product operation. The live solvers still use the old path.
 4. **Enumerated atomic switch (completed 2026-07-21):** pin the pushed RayD commit, switch Path and
    Deterministic to `EnumeratedFullDistance`, preserve pair-major order, and
@@ -298,7 +298,7 @@ path unreachable.
    ADR-029 activation; no public capacity-result switch remains pending.
 5. **Monte Carlo atomic switch (completed 2026-07-21):** switch MC Basic to one flattened
    `MonteCarloTargetInset` batch, route its resident hit block through the
-   Channel native estimator, and delete the Torch depth loop, host Boolean
+   Channel estimator, and delete the Torch depth loop, host Boolean
    breaks, row compaction/index-update physics, and Torch TE/TM/product
    expressions. Keep unrelated scattering users of shared epsilon utilities.
    The flattened batch preserves transmitter-major/receiver-minor order and
@@ -394,7 +394,7 @@ parent Plan 13 remains evidence-partial without weakening this ADR's thresholds.
 - Channel exact integration tests cover Path, Deterministic, and MC Basic,
   including ADR-020 polarized oblique incidence and material/frequency/endpoint
   AD;
-- every new `_channel_native` symbol has one Python owner, manifest coverage,
+- every new `_channel` symbol has one Python owner, manifest coverage,
   a direct contract test, an end-to-end caller, and a no-fallback test;
 - deleted helpers and old call paths have zero production references and no
   compatibility aliases; and

@@ -35,6 +35,7 @@ QUICK_GATES = (
         ),
     ),
     Gate("quick.production-dependencies", ("ci/check_production_dependencies.py",)),
+    Gate("quick.product-identity", ("ci/check_product_identity.py",)),
     Gate("quick.repository-hygiene", ("ci/check_repository_hygiene.py",)),
     Gate("quick.secret-scan", ("ci/check_secrets.py",)),
     Gate("quick.maintenance-budgets", ("ci/check_maintenance_budgets.py",)),
@@ -44,7 +45,7 @@ QUICK_GATES = (
             "-c",
             "import sys; sys.path.insert(0, 'src'); "
             "import torch, witwin.channel; "
-            "assert 'witwin.channel._channel_native' not in sys.modules; "
+            "assert 'witwin.channel._channel' not in sys.modules; "
             "assert not torch.cuda.is_initialized()",
         ),
     ),

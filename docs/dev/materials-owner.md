@@ -2,8 +2,8 @@
 
 ## Migration state
 
-The current public module is `witwin.channel_native.materials`, implemented by
-`src/witwin/channel_native/materials.py`. A same-named package would shadow that
+The current public module is `witwin.channel.materials`, implemented by
+`src/witwin/channel/materials.py`. A same-named package would shadow that
 module on import, so Phase 3 deliberately does not create `materials/` or move
 its implementation. Conversion requires a dedicated move-only change with an
 identity-preserving facade and API snapshot evidence.
@@ -17,8 +17,8 @@ or solver accumulation.
 
 ## Public entry points
 
-`witwin.channel_native.materials` and the material names already re-exported by
-`witwin.channel_native` remain stable. No Phase 3 export is added or removed.
+`witwin.channel.materials` and the material names already re-exported by
+`witwin.channel` remain stable. No Phase 3 export is added or removed.
 
 ## Dependency rules
 

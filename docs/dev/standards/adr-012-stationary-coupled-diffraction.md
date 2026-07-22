@@ -89,8 +89,8 @@ re-extrapolation is exact. The slab face operators (frozen at the Keller point v
 
 ### G4-3: ABI, AD lockstep, governance
 
-`cn_field_coupled_rd`, `cn_field_coupled_rd_backward`, and
-`cn_field_coupled_rd_jvp` each grow two tensor arguments (`edge_line_min`,
+`channel_field_coupled_rd`, `channel_field_coupled_rd_backward`, and
+`channel_field_coupled_rd_jvp` each grow two tensor arguments (`edge_line_min`,
 `edge_line_max`) appended before `frequency_hz`. No new pybind symbol is
 introduced, so the 174-binding baseline is unchanged; the binding manifest
 baseline, the owner-inventory body hashes, and the Python facade/autograd wrappers

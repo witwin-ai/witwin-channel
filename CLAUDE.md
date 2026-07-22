@@ -1,4 +1,4 @@
-# Channel Native Architecture Guardrails
+# Channel Architecture Guardrails
 
 ADR-033 accepts the breaking replacement product identity `witwin.channel`,
 the `witwin-channel` distribution, and the single `_channel` extension. The
@@ -7,14 +7,15 @@ identifiers must not retain the predecessor suffix or add a compatibility
 alias. During the bounded migration, follow ADR-033 whenever an older name in
 this file conflicts with that accepted target.
 
-These repository instructions apply to every file under `channel_native/` and
+These repository instructions apply to every file under the checkout directory
+`channel/` and
 take precedence over the monorepo-level agent guide. Keep `AGENTS.md` and
 `CLAUDE.md` identical. Architecture changes must update both files in the same
 commit.
 
 ## Non-negotiable compute policy
 
-`witwin.channel_native` has exactly one production compute backend: the
+`witwin.channel` has exactly one production compute backend: the
 compiled native CUDA/RayD extension.
 
 - Every production hot path must execute in a native CUDA kernel. This includes
@@ -123,7 +124,7 @@ requires them.
 
 ## Native boundary and fusion
 
-- `_channel_native` is the only production Python extension. It source-links
+- `_channel` is the only production Python extension. It source-links
   the locked RayD target and calls the versioned `rayd::torch` typed C++ API
   directly; do not build/import a RayD Python extension, add a second
   dispatcher/registry, or route through copied `extern "C"` signatures,
@@ -166,14 +167,14 @@ requires them.
   device primitive, and numerical order—not the Python directory layout.
 - Under ADR-025 and the completed Phase 8A atomic pin/switch/delete, RayD is
   the sole numerical owner of pure-wedge diffraction primal/backward/JVP;
-  Channel retains only its `_channel_native` ABI and typed field/autograd
+  Channel retains only its `_channel` ABI and typed field/autograd
   facades. MC Sionna and coupled RD/DD diffraction stay complete Channel
   owners; do not extract a UTD sub-launch or spread the pure-wedge fast-math
   flag into their precise-math translation units.
 - Under ADR-026 and the completed Phase 10A/10B atomic pin/switch/delete, RayD
   is the sole numerical owner of all 17 generic resident scattering runtime
   contracts and the seven shared scattering-table helpers. Channel retains
-  their `_channel_native` ABI and typed facades. RayD only consumes
+  their `_channel` ABI and typed facades. RayD only consumes
   caller-owned resident tensors;
   Channel retains table/phase-screen lifecycle, `scattering_event_probabilities`,
   topology/packing, RNG/MIS/event policy, accumulation, and results. Preserve
@@ -340,7 +341,7 @@ to make a change pass.
 These instructions summarize the accepted architecture. Detailed contracts and
 acceptance evidence live in:
 
-- `docs/dev/plans/08-channel-native-modular-architecture-hardening-plan.md`
+- `docs/dev/plans/08-channel-modular-architecture-hardening-plan.md`
 - `docs/dev/standards/adr-001-python-native-dispatch.md`
 - `docs/dev/standards/adr-003-public-internal-api.md`
 - `docs/dev/standards/adr-004-numerical-duplication.md`

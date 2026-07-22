@@ -1,4 +1,4 @@
-# Channel Native — Differentiable Solving: Capability Boundary
+# Channel — Differentiable Solving: Capability Boundary
 
 Status as of plan 07 completion (2026-07-14). This document is the authoritative
 statement of what the automatic-differentiation (AD) support does and does not
@@ -7,7 +7,7 @@ where it is a documented structural zero, and where the solver refuses to
 differentiate rather than return a misleading value.
 
 The machine-readable form of this boundary lives in
-`src/witwin/channel_native/capabilities.py` (`ad_contract` and each solver's
+`src/witwin/channel/capabilities.py` (`ad_contract` and each solver's
 `ad_excluded`). If this document and that file disagree, the file is the source
 of truth and this document is stale — reconcile them.
 
@@ -117,7 +117,7 @@ named reason) instead of silently degrading:
   not instrumented; a nonzero value there would mean the primal was paying an AD
   cost.
 - **AD-mode forward values for diffraction / coupled rows.** Pure diffraction and
-  coupled fields are re-evaluated inside channel_native under AD (RayD's order-1
+  coupled fields are re-evaluated inside channel under AD (RayD's order-1
   export is detached and has no adjoint). The re-evaluation is gated against the
   export to a tight tolerance, but it is a re-evaluation, so `ad_mode="jvp"/"vjp"`
   is not guaranteed bit-identical to `none` for those two components (it is for
@@ -133,9 +133,9 @@ path is a CUDA kernel and the `torch.autograd.Function` layer is dispatch only
   come from RayD's own fixed-winner EPC chain adjoint (`reflection_epc_paths_backward/_jvp`),
   a plain CUDA kernel with no OptiX (the winner is frozen, so only continuous
   geometry remains). The discovery raygen and the adjoint share one chain
-  implementation (`shared/reflection/epc_chain.h`). channel_native never
+  implementation (`shared/reflection/epc_chain.h`). channel never
   re-solves hit geometry in torch.
-- **Layer 2 — EM response (channel_native).** Native CUDA backward/jvp companions
+- **Layer 2 — EM response (channel).** Native CUDA backward/jvp companions
   of the field kernels (`field_free_space`, `field_reflection_sequence`,
   `field_transmission_sequence`) and the accumulators. UTD diffraction uses
   RayD's UTD pair forward, templated over its scalar type so the float

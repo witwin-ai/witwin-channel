@@ -90,15 +90,15 @@
  "migration": {
   "production_runtime_dependency_contract": "enforced_in_repository",
   "shadow_run": {
-   "artifact_contract": "docs/dev/replacement/channel-native-migration.md#shadow-evidence-artifact",
+   "artifact_contract": "docs/dev/replacement/channel-migration.md#shadow-evidence-artifact",
    "maintained_artifacts": 0,
    "attempt_artifacts": 1,
    "last_attempt": "docs/dev/replacement/path-threeway-shadow-attempt-2026-07-11.json",
    "status": "attempt_failed_oracle_environment"
   },
   "default_on": {
-   "repository_native_entrypoint": "witwin.channel_native",
-   "platform_core_optional_dependency": "witwin-channel-native>=0.1,<0.2",
+   "repository_native_entrypoint": "witwin.channel",
+   "platform_core_optional_dependency": "witwin-channel>=0.1,<0.2",
    "platform_core_cutover_commit": "9ee6655",
    "consumer_router_status": "not_verifiable_from_this_repository"
   },
@@ -193,7 +193,7 @@
    "legacy_api": "AntennaArray",
    "observed_calls": 8,
    "priority": "P1",
-   "native_api": "channel_native.AntennaArray",
+   "native_api": "channel.AntennaArray",
    "status": "supported"
   },
   {
@@ -228,14 +228,14 @@
    "legacy_api": "Material",
    "observed_calls": 115,
    "priority": "P1",
-   "native_api": "channel_native Dielectric/DispersiveMaterial/ITUMaterial/PerfectConductor",
+   "native_api": "channel Dielectric/DispersiveMaterial/ITUMaterial/PerfectConductor",
    "status": "supported_7a"
   },
   {
    "legacy_api": "PlanarArray",
    "observed_calls": 8,
    "priority": "P1",
-   "native_api": "channel_native.AntennaArray.ura",
+   "native_api": "channel.AntennaArray.ura",
    "status": "supported_with_adapter"
   },
   {
@@ -256,84 +256,84 @@
    "legacy_api": "ReceiverGrid",
    "observed_calls": 45,
    "priority": "P1",
-   "native_api": "channel_native.ReceiverGrid",
+   "native_api": "channel.ReceiverGrid",
    "status": "supported"
   },
   {
    "legacy_api": "Scene",
    "observed_calls": 181,
    "priority": "P0",
-   "native_api": "channel_native.Scene",
+   "native_api": "channel.Scene",
    "status": "supported"
   },
   {
    "legacy_api": "Structure",
    "observed_calls": 91,
    "priority": "P0",
-   "native_api": "channel_native.Structure",
+   "native_api": "channel.Structure",
    "status": "supported"
   },
   {
    "legacy_api": "Transmitter",
    "observed_calls": 74,
    "priority": "P0",
-   "native_api": "channel_native.Transmitter",
+   "native_api": "channel.Transmitter",
    "status": "supported"
   },
   {
    "legacy_api": "ULA",
    "observed_calls": 7,
    "priority": "P1",
-   "native_api": "channel_native.AntennaArray.ula",
+   "native_api": "channel.AntennaArray.ula",
    "status": "supported_with_adapter"
   },
   {
    "legacy_api": "UPA",
    "observed_calls": 0,
    "priority": "P2",
-   "native_api": "channel_native.AntennaArray.ura",
+   "native_api": "channel.AntennaArray.ura",
    "status": "supported_with_adapter"
   },
   {
    "legacy_api": "path",
    "observed_calls": 236,
    "priority": "P0",
-   "native_api": "channel_native.path",
+   "native_api": "channel.path",
    "status": "supported_with_advertised_limits"
   },
   {
    "legacy_api": "deterministic",
    "observed_calls": 134,
    "priority": "P1",
-   "native_api": "channel_native.deterministic",
+   "native_api": "channel.deterministic",
    "status": "partial"
   },
   {
    "legacy_api": "montecarlo",
    "observed_calls": 91,
    "priority": "P1",
-   "native_api": "channel_native.montecarlo",
+   "native_api": "channel.montecarlo",
    "status": "partial"
   },
   {
    "legacy_api": "path.Config",
    "observed_calls": 25,
    "priority": "P0",
-   "native_api": "channel_native.path.Config",
+   "native_api": "channel.path.Config",
    "status": "supported_with_advertised_limits"
   },
   {
    "legacy_api": "path.InteractionType",
    "observed_calls": 13,
    "priority": "P0",
-   "native_api": "channel_native.path.InteractionType",
+   "native_api": "channel.path.InteractionType",
    "status": "supported"
   },
   {
    "legacy_api": "path.PathResult",
    "observed_calls": 6,
    "priority": "P0",
-   "native_api": "channel_native.path.PathResult",
+   "native_api": "channel.path.PathResult",
    "status": "supported"
   },
   {
@@ -347,7 +347,7 @@
    "legacy_api": "path.solve",
    "observed_calls": 25,
    "priority": "P0",
-   "native_api": "channel_native.path.solve",
+   "native_api": "channel.path.solve",
    "status": "supported_with_advertised_limits"
   },
   {
@@ -382,7 +382,7 @@
    "legacy_api": "deterministic.Config",
    "observed_calls": 5,
    "priority": "P1",
-   "native_api": "channel_native.deterministic.Config",
+   "native_api": "channel.deterministic.Config",
    "status": "partial"
   },
   {
@@ -431,7 +431,7 @@
    "legacy_api": "deterministic.solve",
    "observed_calls": 5,
    "priority": "P1",
-   "native_api": "channel_native.deterministic.solve",
+   "native_api": "channel.deterministic.solve",
    "status": "partial"
   },
   {

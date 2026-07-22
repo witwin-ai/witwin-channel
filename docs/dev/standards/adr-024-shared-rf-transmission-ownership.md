@@ -72,7 +72,7 @@ legacy, or reduced-algorithm fallback.
 
 ### 3. Complete operation families
 
-The following six `_channel_native` ABI names and Python facades remain stable,
+The following six `_channel` ABI names and Python facades remain stable,
 but their numerical implementation owner transfers as complete families:
 
 1. `em_layer_stack_eval`;
@@ -136,7 +136,7 @@ owner or receive an explicit duplication decision.
 ### 6. Dormant candidate and atomic switch
 
 Each RayD implementation lands first as a dormant candidate. Before Channel
-pins that pushed commit it is not a production owner and `_channel_native`
+pins that pushed commit it is not a production owner and `_channel`
 must not compile or call it. The corresponding Channel switch commit atomically:
 
 1. pins the pushed RayD commit and integration-header SHA;

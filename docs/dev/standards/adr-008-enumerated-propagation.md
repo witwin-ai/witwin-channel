@@ -18,7 +18,7 @@ them by calling `evaluate_enumerated_paths` from
 `montecarlo.bdpt.pipeline`.
 
 The dependency was invisible to the gate. The import edge targets the
-`witwin.channel_native.propagation` package, whose `__init__` re-exports
+`witwin.channel.propagation` package, whose `__init__` re-exports
 `evaluate_enumerated_paths` from `propagation.enumerated.engine`. The
 `mc_enumerated_dependency` rule matches `propagation.enumerated`, not the package
 facade, so the edge never fired: the gate was green while the architectural

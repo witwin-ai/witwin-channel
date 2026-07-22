@@ -1,4 +1,4 @@
-# witwin.channel_native Feature List
+# witwin.channel Feature List
 
 User-visible features of the native channel solver package. Solver-internal
 mechanics live in `docs/dev/plans/`.
@@ -13,7 +13,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Native runtime boundary
 
-- `_channel_native` is the single production extension. It source-links RayD
+- `_channel` is the single production extension. It source-links RayD
   `402262d3b0c07dffb9d51d1852abb97ab2280f2f` and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
@@ -40,7 +40,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `EnumeratedFullDistance` batch through the enumerated engine. The old
   per-depth active-row/closest-hit march is deleted without a compatibility
   alias. Phase M also switches Monte Carlo Basic to one flattened pair-major
-  `MonteCarloTargetInset` batch and the Channel-native polarized wall-product
+  `MonteCarloTargetInset` batch and the Channel polarized wall-product
   family. Its former per-transmitter Python/Torch march and Torch TE/TM/product
   route have no production caller. A Basic-owned native five-component-map
   sanitizer primal/VJP/JVP family makes every map and derivative inert on
@@ -53,7 +53,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   Fresnel, layer-stack, Jones/field-transport primal/dual headers and of
   `em_layer_stack_eval/backward/jvp` and
   `field_transmission_sequence/backward/jvp`. Channel retains the material
-  ABI/CSR, field-row schemas, validation, cache, `_channel_native` bindings,
+  ABI/CSR, field-row schemas, validation, cache, `_channel` bindings,
   Python facades, and the fused BDPT transmitted-state family; there is no
   Channel-private transmission-sequence numerical copy or compatibility
   forwarding header.
@@ -388,7 +388,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Reference implementation
 
-- `witwin.channel_native.physics.oracle`: CPU complex128 electromagnetic
+- `witwin.channel.physics.oracle`: CPU complex128 electromagnetic
   oracle (Fresnel, multilayer transfer matrix, Kirchhoff lobes, phase-screen
   patch integrals) backing the golden test suite in `tests/physics/`.
 - `tests/ad/_reference_fields.py`: pure-torch complex128 mirrors of the

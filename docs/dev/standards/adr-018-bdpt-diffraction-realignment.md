@@ -39,7 +39,7 @@ reference on the grid fixture (the audit reports 430x grid / 2175x point).
 Root cause: BDPT's standalone diffraction did not evaluate UTD/Fresnel edge
 physics. It called a crude native power heuristic,
 `bdpt_diffraction_contribution` in
-`native/channel_native/kernels/bdpt_connect_common.cuh:226-243`, which forms the
+`native/channel/kernels/bdpt_connect_common.cuh:226-243`, which forms the
 per-connection power as
 
 ```
@@ -112,7 +112,7 @@ native ABI symbols `bdpt_diffraction_point_connection_samples` and
    is out of scope, so the helper still has a live in-tree caller. The task's
    native-removal branch is gated on this helper being fully dead, and it is not.
 
-2. Removing the `cn_bdpt_diffraction_point_connection_samples_cuda` ABI symbol is
+2. Removing the `channel_bdpt_diffraction_point_connection_samples_cuda` ABI symbol is
    a native-surgery + governance change of a different class: it would edit the
    frozen phase-9 owner inventory
    (`docs/dev/audit/phase9-native-owner-inventory.json`) `abi_owner` set and its

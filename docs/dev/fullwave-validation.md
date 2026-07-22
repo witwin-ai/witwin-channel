@@ -1,6 +1,6 @@
 # Deterministic versus full-wave validation
 
-This workflow compares the channel-native deterministic solver with a Tidy3D
+This workflow compares the channel deterministic solver with a Tidy3D
 full-wave reference on the same geometry, material, source polarization,
 frequency, and observation plane.
 
@@ -13,10 +13,10 @@ The versioned manifest is
   example;
 - `three_cube` using the three centers and transmitter layout of the original
   channel three-cube example;
-- `metal`, represented by `PerfectConductor` in channel-native and
+- `metal`, represented by `PerfectConductor` in channel and
   `PECMedium` in Tidy3D;
 - `dielectric`, represented by a single-layer `PhysicalSurface` per crossed
-  interface in channel-native and a true finite dielectric volume in Tidy3D.
+  interface in channel and a true finite dielectric volume in Tidy3D.
 
 The geometry is scaled by 0.1 and the current carrier is 5 GHz. The single-cube
 analysis plane uses 256 by 256 samples and a 6.25 mm full-wave grid (about 9.6
@@ -57,7 +57,7 @@ converts lengths from metres to micrometres and conductivity from S/m to S/um
 at its boundary, then converts monitor coordinates back to metres.
 
 The dielectric comparison intentionally exposes a model difference:
-channel-native transmission uses a straight thin-sheet interface chain,
+channel transmission uses a straight thin-sheet interface chain,
 whereas Tidy3D solves the finite volume and includes refraction, internal
 multiple scattering, and near-field coupling.
 
@@ -112,18 +112,18 @@ $env:WITWIN_FULLWAVE_OUTPUT_DIR = Join-Path (
 ) 'artifacts\fullwave\single-cube-metal-z042'
 ```
 
-The experiment creates the output directory. An installed channel-native
+The experiment creates the output directory. An installed channel
 extension needs no extra configuration. For a developer build,
 point the validated loader at a `.pyd` and its sidecar fingerprint:
 
 ```powershell
 $nativeDir = Resolve-Path 'artifacts\cmake-ad'
-$env:WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE = '1'
-$env:WITWIN_CHANNEL_NATIVE_EXTENSION_PATH = (
-  Get-ChildItem $nativeDir -Filter '_channel_native*.pyd' | Select-Object -First 1
+$env:WITWIN_CHANNEL_DEVELOPER_OVERRIDE = '1'
+$env:WITWIN_CHANNEL_EXTENSION_PATH = (
+  Get-ChildItem $nativeDir -Filter '_channel*.pyd' | Select-Object -First 1
 ).FullName
-$env:WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT = (
-  Get-Content "$nativeDir\_channel_native.build-fingerprint" -Raw
+$env:WITWIN_CHANNEL_EXPECTED_FINGERPRINT = (
+  Get-Content "$nativeDir\_channel.build-fingerprint" -Raw
 ).Trim()
 ```
 
@@ -136,7 +136,7 @@ python benchmarks\fullwave_validation\experiments\run_maxwell_single_cube.py
 python benchmarks\fullwave_validation\experiments\run_empty_baseline.py
 ```
 
-Each command runs both channel-native and witwin-maxwell. The two FDTD runs
+Each command runs both channel and witwin-maxwell. The two FDTD runs
 took about 70 seconds each on the recorded machine. Generate the 6K Matplotlib
 comparison:
 

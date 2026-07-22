@@ -1,4 +1,4 @@
-# Channel Native replacement matrix
+# Channel replacement matrix
 
 This is the human-readable companion to `channel-api-inventory.json`; the JSON
 is authoritative for automated checks. Counts cover repository-owned
@@ -27,6 +27,6 @@ Python `raydn`, or `witwin.channel`. Tests and benchmarks may retain the old
 stack only as an offline oracle. `ci/check_production_dependencies.py` enforces
 this boundary and can also scan sibling repository roots.
 
-Phase 10 is not a deletion approval. See `channel-native-migration.md` for the
+Phase 10 is not a deletion approval. See `channel-migration.md` for the
 shadow artifact, default-on boundary, and outstanding external/two-release
 blockers.

@@ -197,7 +197,7 @@ Public-API and capability surface:
   `ci/public-api-snapshot.json`, so the snapshot needs an intentional update and
   migration note.
 - The deterministic `Config` contract hash
-  (`ci/public-api-snapshot.json`, `witwin.channel_native.deterministic` ->
+  (`ci/public-api-snapshot.json`, `witwin.channel.deterministic` ->
   `Config` -> `contract_sha256`) changes because two fields are added. Intentional
   snapshot update + migration note required (ADR-003).
 
@@ -294,7 +294,7 @@ evidence. Collect:
    (`_evaluate_coupled_fields:583-590`), matching the path solver's
    `coupled_paths_mesh_vertex` ad-exclusion.
 6. **Manifest / owner governance.** No new pybind ABI symbol is introduced (the
-   change is internal to `cn_deterministic_accumulate_flat` and its
+   change is internal to `channel_deterministic_accumulate_flat` and its
    backward/jvp/fwd64), so the 174-symbol binding baseline
    (`docs/dev/baselines/.../static/bindings.json`, `EXPECTED_BINDING_COUNT = 174`)
    is unchanged; confirm the semantic projection still matches. Update the

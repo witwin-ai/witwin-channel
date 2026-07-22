@@ -6,7 +6,7 @@ evidence:
 - `benchmarks.harness.measure_cold_import()` measures a fresh interpreter against
   the source tree/build directory. It is not wheel evidence.
 - `ci/wheel_smoke.py <wheel.whl>` installs one already-built wheel into a temporary
-  target, starts Python with isolated-path mode, imports Channel Native, and calls
+  target, starts Python with isolated-path mode, imports Channel, and calls
   the native `build_info()` ABI. The wheel gate remains `not_run`/false until that
   command succeeds for an artifact.
 - `pipeline_cache_key()` defines only the versioned invalidation-key ABI.
