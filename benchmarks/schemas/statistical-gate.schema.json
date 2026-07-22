@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://witwin.invalid/channel/statistical-gate.schema.json",
+  "title": "Channel statistical gate report",
+  "type": "object",
+  "required": ["schema", "mode", "seeds", "cases", "passed"],
+  "properties": {
+    "schema": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "witwin.channel.statistics"},
+        "version": {"const": "1.0.0"}
+      },
+      "additionalProperties": false
+    },
+    "mode": {"enum": ["reduced", "full"]},
+    "seeds": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1},
+    "cases": {"type": "object", "minProperties": 1},
+    "passed": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

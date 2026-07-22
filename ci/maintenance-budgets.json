@@ -1,0 +1,221 @@
+{
+  "file_exemptions": {
+    "src/witwin/channel/montecarlo/basic/kernels/maps.py": {
+      "ceiling": 1794,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/basic maintainers",
+      "reason": "Existing file-size debt scheduled for decomposition; grew by the MC-basic transmitter-polarization threading (F1/R5) and is frozen at the new surface pending that decomposition."
+    },
+    "src/witwin/channel/propagation/fields/kernels/autograd.py": {
+      "ceiling": 1778,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing file-size debt scheduled for decomposition; grew by the coupled R-D/D-R AD companions (ADR-011) and is frozen at the new surface pending that decomposition."
+    },
+    "src/witwin/channel/propagation/geometry/kernels/autograd.py": {
+      "ceiling": 1248,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
+    }
+  },
+  "function_exemptions": {
+    "src/witwin/channel/core/kernels/metadata.py::validate_metadata": {
+      "ceiling": 18,
+      "expires_on": "2027-01-31",
+      "owner": "core maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/deterministic/pipeline.py::_metadata": {
+      "ceiling": 19,
+      "expires_on": "2027-01-31",
+      "owner": "deterministic maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/deterministic/pipeline.py::solve": {
+      "ceiling": 25,
+      "expires_on": "2027-01-31",
+      "owner": "deterministic maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/basic/kernels/maps.py::mc_los_path_gain_backward": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/basic maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/basic/metadata.py::make_solver_metadata": {
+      "ceiling": 18,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/basic maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/basic/pipeline.py::solve_pipeline": {
+      "ceiling": 52,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/basic maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/basic/rayd_components.py::diffraction_component_map": {
+      "ceiling": 19,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/basic maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/bdpt/config.py::Config.__post_init__": {
+      "ceiling": 26,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/bdpt maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/bdpt/kernels/paths.py::bdpt_reflected_light_subpath_state": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/bdpt maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/montecarlo/bdpt/pipeline.py::_collect_connection_samples": {
+      "ceiling": 37,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/bdpt maintainers",
+      "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
+    },
+    "src/witwin/channel/montecarlo/bdpt/pipeline.py::_prepare_workspace_and_capabilities": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "montecarlo/bdpt maintainers",
+      "reason": "Workspace-sizing and native-capability validation stage extracted verbatim from the former solve() monolith."
+    },
+    "src/witwin/channel/path/config.py::Config.__post_init__": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "path maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/path/metadata.py::_metadata": {
+      "ceiling": 18,
+      "expires_on": "2027-01-31",
+      "owner": "path maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/path/result.py::PathResult.__post_init__": {
+      "ceiling": 29,
+      "expires_on": "2027-01-31",
+      "owner": "path maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/path/schema.py::RaggedPathSoA.from_flat": {
+      "ceiling": 21,
+      "expires_on": "2027-01-31",
+      "owner": "path maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/enumerated/engine.py::evaluate_enumerated_paths": {
+      "ceiling": 23,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/fields/evaluation.py::_evaluate_coupled_fields": {
+      "ceiling": 17,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/fields/kernels/autograd.py::_FieldCoupledRdAdFunction.backward": {
+      "ceiling": 19,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/fields/kernels/autograd.py::_FieldDiffractionWedgeAdFunction.backward": {
+      "ceiling": 23,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/fields/kernels/autograd.py::_FieldReflectionSequenceAdFunction.backward": {
+      "ceiling": 19,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/fields/kernels/autograd.py::_FieldTransmissionSequenceAdFunction.backward": {
+      "ceiling": 17,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/topology/export.py::_ensure_topology_fields": {
+      "ceiling": 17,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/topology/kernels/compaction.py::deterministic_reflection_order1_compact": {
+      "ceiling": 24,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/topology/kernels/compaction.py::deterministic_reflection_sequence_compact": {
+      "ceiling": 21,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/topology/kernels/construction.py::deterministic_pad_topology_sequences": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/propagation/topology/kernels/construction.py::deterministic_reflection_epc_input_batch": {
+      "ceiling": 18,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/runtime/extension.py::_validate_build_info": {
+      "ceiling": 24,
+      "expires_on": "2027-01-31",
+      "owner": "runtime maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/scene/loader.py::_load_mitsuba_native_ply": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "scene maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/scene/loader.py::_load_ply_mesh": {
+      "ceiling": 16,
+      "expires_on": "2027-01-31",
+      "owner": "scene maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    },
+    "src/witwin/channel/scene/loader.py::_read_ply_header": {
+      "ceiling": 23,
+      "expires_on": "2027-01-31",
+      "owner": "scene maintainers",
+      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+    }
+  },
+  "limits": {
+    "file_lines": {
+      "hard": 2000,
+      "recommended": 1200
+    },
+    "function_complexity": {
+      "recommended": 15
+    },
+    "native_file_lines": {
+      "hard": 3000,
+      "recommended": 2000
+    }
+  },
+  "native_file_exemptions": {},
+  "native_source_root": "native/channel",
+  "schema_version": 1,
+  "source_root": "src/witwin/channel"
+}

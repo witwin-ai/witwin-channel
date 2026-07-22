@@ -1,0 +1,508 @@
+{
+ "schema_version": 1,
+ "generated_from_commit": "91d11ca",
+ "scan_scope": {
+  "consumer_roots": [
+   "core",
+   "genesis",
+   "maxwell",
+   "radar",
+   "studio"
+  ],
+  "reference_roots": [
+   "channel/examples",
+   "channel/tests",
+   "channel/tutorials",
+   "channel/scripts"
+  ],
+  "production_import_references": 0,
+  "production_dependency_contract": "ci/check_production_dependencies.py",
+  "forbidden_production_modules": [
+   "drjit",
+   "mitsuba",
+   "raydn",
+   "sionna",
+   "witwin.channel"
+  ],
+  "offline_oracle_roots_allowed": [
+   "tests",
+   "benchmarks",
+   "channel/examples",
+   "channel/tests",
+   "channel/tutorials",
+   "channel/scripts"
+  ],
+  "notes": "Observed calls are token or qualified-call counts in repository-owned Python reference roots. The static contract scans production source only; offline oracle roots are intentionally outside that contract. External consumers are not visible to this repository."
+ },
+ "ad_audit": {
+  "audit_date": "2026-07-14",
+  "consumer_roots": [
+   "core",
+   "genesis",
+   "maxwell",
+   "radar",
+   "studio"
+  ],
+  "production_channel_ad_references": 0,
+  "legacy_reference_roots": [
+   "channel/examples",
+   "channel/tests",
+   "channel/tutorials",
+   "channel/scripts"
+  ],
+  "legacy_reference_files_with_explicit_ad": 19,
+  "native_public_solver_ad_callers": 14,
+  "native_public_solver_ad_call_sites": [
+   "core/path_topology.py:_evaluate_shared_fields:field_free_space_ad",
+   "core/path_topology.py:_evaluate_shared_fields:field_reflection_sequence_ad",
+   "core/path_topology.py:_evaluate_shared_fields:field_transmission_sequence_ad",
+   "core/path_topology.py:_evaluate_shared_fields:field_diffraction_wedge_ad",
+   "core/path_topology.py:_evaluate_shared_fields:field_project_complex3_ad",
+   "core/path_topology.py:_evaluate_shared_fields:field_coupled_rd_ad",
+   "core/path_topology.py:_evaluate_shared_fields:coupled_rd_prepare_ad",
+   "montecarlo/basic/backend.py:los_path_gain:mc_los_path_gain_ad",
+   "montecarlo/basic/raydn_components.py:reflection_component_maps_with_wedges:mc_sionna_reflection_accumulate_ad",
+   "montecarlo/basic/raydn_components.py:diffraction_component_map:mc_sionna_diffraction_tape_accumulate_ad",
+   "montecarlo/basic/raydn_components.py:los_component_map:mc_los_grid_maps_ad",
+   "montecarlo/basic/raydn_components.py:transmission_component_map:mc_los_grid_maps_ad",
+   "montecarlo/basic/solver.py:solve:mc_finalize_component_maps_ad",
+   "montecarlo/transmission.py:straight_transmission_chains:em_layer_stack_ad"
+  ],
+  "native_experimental_low_level_primitives": [
+   "mc_los_path_gain_backward",
+   "mc_los_path_gain_jvp"
+  ],
+  "decision": "fixed_topology_material_frequency_ad_t1",
+  "supports_ad": true,
+  "notes": "Plan 07 AD-1: the shared field seam of the deterministic and path solvers routes LoS/reflection/transmission through native backward/jvp companion kernels when ad_mode is jvp/vjp (materials eps_r/sigma_e/gain/thickness and frequency; hit geometry detached). Plan 07 AD-4: the same seam re-evaluates the UTD wedge field from the frozen topology and differentiates it together with the receiver projection, the coupled R-D transport and the fixed-winner coupled stationary geometry re-solve (wedge/wall materials, frequency, endpoints). Plan 07 AD-3: montecarlo.basic routes its incoherent power map through the LoS, reflection-radiomap, layer-stack, grid-layout and finalize AD Functions (compiled material store leaves, frequency, LoS endpoints; the diffraction map differentiates through the frozen Keller-cone sampling tape since plan 07 AD-4b; the scattering map keeps failing loudly). Capability manifests advertise fixed-topology jvp/vjp for path/deterministic/montecarlo_basic since the plan 07 completion gate (AD-4b); montecarlo_bdpt stays primal-only. Repository production consumers still do not import Channel AD; legacy references remain offline evidence. The low-level LoS derivative primitives are consumed by the AD-3 LoS Function and keep their standalone facades."
+ },
+ "phase_status": {
+  "complex_field_and_polarization": "supported_with_solver_specific_limits",
+  "arrays": "supported_by_path",
+  "materials_7a": "supported",
+  "materials_7b_events": "unsupported_capability_false",
+  "ad": "t1_material_frequency_ad_capability_flip_pending",
+  "performance_harness": "implemented",
+  "pipeline_cache": "not_implemented",
+  "sm_matrix": "declared_unverified",
+  "wheel_smoke": "not_verified"
+ },
+ "migration": {
+  "production_runtime_dependency_contract": "enforced_in_repository",
+  "shadow_run": {
+   "artifact_contract": "docs/dev/replacement/channel-migration.md#shadow-evidence-artifact",
+   "maintained_artifacts": 0,
+   "attempt_artifacts": 1,
+   "last_attempt": "docs/dev/replacement/path-threeway-shadow-attempt-2026-07-11.json",
+   "status": "attempt_failed_oracle_environment"
+  },
+  "default_on": {
+   "repository_native_entrypoint": "witwin.channel",
+   "platform_core_optional_dependency": "witwin-channel>=0.1,<0.2",
+   "platform_core_cutover_commit": "9ee6655",
+   "consumer_router_status": "not_verifiable_from_this_repository"
+  },
+  "deletion_status": "blocked",
+  "blockers": [
+   "external_consumer_inventory",
+   "maintained_shadow_and_canary_evidence",
+   "consumer_owner_default_on_confirmation",
+   "two_release_cycles_without_fallback_demand",
+   "phase9_wheel_sm_pipeline_cache_runtime_evidence"
+  ]
+ },
+ "apis": [
+  {
+   "legacy_api": "Bool",
+   "observed_calls": 37,
+   "priority": "P2",
+   "native_api": "torch.bool",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Complex2f",
+   "observed_calls": 95,
+   "priority": "P2",
+   "native_api": "torch.complex64",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Float",
+   "observed_calls": 719,
+   "priority": "P2",
+   "native_api": "torch.float32",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Int32",
+   "observed_calls": 211,
+   "priority": "P2",
+   "native_api": "torch.int32",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Matrix4f",
+   "observed_calls": 0,
+   "priority": "P2",
+   "native_api": "torch.Tensor",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Point2f",
+   "observed_calls": 4,
+   "priority": "P2",
+   "native_api": "torch.Tensor",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Point3f",
+   "observed_calls": 279,
+   "priority": "P2",
+   "native_api": "torch.Tensor",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "UInt32",
+   "observed_calls": 78,
+   "priority": "P2",
+   "native_api": "torch.int64",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Vector2f",
+   "observed_calls": 0,
+   "priority": "P2",
+   "native_api": "torch.Tensor",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Vector3f",
+   "observed_calls": 82,
+   "priority": "P2",
+   "native_api": "torch.Tensor",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "Vector3u",
+   "observed_calls": 5,
+   "priority": "P2",
+   "native_api": "torch.Tensor",
+   "status": "replaced_by_torch"
+  },
+  {
+   "legacy_api": "AntennaArray",
+   "observed_calls": 8,
+   "priority": "P1",
+   "native_api": "channel.AntennaArray",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "Box",
+   "observed_calls": 48,
+   "priority": "P1",
+   "native_api": "witwin.core.Box",
+   "status": "shared_core"
+  },
+  {
+   "legacy_api": "EdgePolicy",
+   "observed_calls": 74,
+   "priority": "P1",
+   "native_api": null,
+   "status": "partial"
+  },
+  {
+   "legacy_api": "Grid",
+   "observed_calls": 14,
+   "priority": "P1",
+   "native_api": "ReceiverGrid",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "GridSpec",
+   "observed_calls": 12,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "Material",
+   "observed_calls": 115,
+   "priority": "P1",
+   "native_api": "channel Dielectric/DispersiveMaterial/ITUMaterial/PerfectConductor",
+   "status": "supported_7a"
+  },
+  {
+   "legacy_api": "PlanarArray",
+   "observed_calls": 8,
+   "priority": "P1",
+   "native_api": "channel.AntennaArray.ura",
+   "status": "supported_with_adapter"
+  },
+  {
+   "legacy_api": "RadioMapResult",
+   "observed_calls": 18,
+   "priority": "P1",
+   "native_api": "solver-specific Result",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "Receiver",
+   "observed_calls": 35,
+   "priority": "P1",
+   "native_api": "ReceiverPoint",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "ReceiverGrid",
+   "observed_calls": 45,
+   "priority": "P1",
+   "native_api": "channel.ReceiverGrid",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "Scene",
+   "observed_calls": 181,
+   "priority": "P0",
+   "native_api": "channel.Scene",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "Structure",
+   "observed_calls": 91,
+   "priority": "P0",
+   "native_api": "channel.Structure",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "Transmitter",
+   "observed_calls": 74,
+   "priority": "P0",
+   "native_api": "channel.Transmitter",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "ULA",
+   "observed_calls": 7,
+   "priority": "P1",
+   "native_api": "channel.AntennaArray.ula",
+   "status": "supported_with_adapter"
+  },
+  {
+   "legacy_api": "UPA",
+   "observed_calls": 0,
+   "priority": "P2",
+   "native_api": "channel.AntennaArray.ura",
+   "status": "supported_with_adapter"
+  },
+  {
+   "legacy_api": "path",
+   "observed_calls": 236,
+   "priority": "P0",
+   "native_api": "channel.path",
+   "status": "supported_with_advertised_limits"
+  },
+  {
+   "legacy_api": "deterministic",
+   "observed_calls": 134,
+   "priority": "P1",
+   "native_api": "channel.deterministic",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "montecarlo",
+   "observed_calls": 91,
+   "priority": "P1",
+   "native_api": "channel.montecarlo",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "path.Config",
+   "observed_calls": 25,
+   "priority": "P0",
+   "native_api": "channel.path.Config",
+   "status": "supported_with_advertised_limits"
+  },
+  {
+   "legacy_api": "path.InteractionType",
+   "observed_calls": 13,
+   "priority": "P0",
+   "native_api": "channel.path.InteractionType",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "path.PathResult",
+   "observed_calls": 6,
+   "priority": "P0",
+   "native_api": "channel.path.PathResult",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "path.Tuning",
+   "observed_calls": 96,
+   "priority": "P2",
+   "native_api": null,
+   "status": "not_planned"
+  },
+  {
+   "legacy_api": "path.solve",
+   "observed_calls": 25,
+   "priority": "P0",
+   "native_api": "channel.path.solve",
+   "status": "supported_with_advertised_limits"
+  },
+  {
+   "legacy_api": "PathResult.cir",
+   "observed_calls": 3,
+   "priority": "P0",
+   "native_api": "PathResult.cir",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "PathResult.cfr",
+   "observed_calls": 3,
+   "priority": "P0",
+   "native_api": "PathResult.cfr",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "PathResult.taps",
+   "observed_calls": 1,
+   "priority": "P0",
+   "native_api": "PathResult.taps",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "PathResult.filter_by_type",
+   "observed_calls": 4,
+   "priority": "P0",
+   "native_api": "PathResult.filter_by_type",
+   "status": "supported"
+  },
+  {
+   "legacy_api": "deterministic.Config",
+   "observed_calls": 5,
+   "priority": "P1",
+   "native_api": "channel.deterministic.Config",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "deterministic.FieldResult",
+   "observed_calls": 9,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "deterministic.FieldSpec",
+   "observed_calls": 23,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "deterministic.NativeExtension",
+   "observed_calls": 10,
+   "priority": "P2",
+   "native_api": "build_info",
+   "status": "replaced"
+  },
+  {
+   "legacy_api": "deterministic.RadioMapResult",
+   "observed_calls": 18,
+   "priority": "P1",
+   "native_api": "deterministic.Result",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "deterministic.Tuning",
+   "observed_calls": 96,
+   "priority": "P2",
+   "native_api": null,
+   "status": "not_planned"
+  },
+  {
+   "legacy_api": "deterministic.native_extension_available",
+   "observed_calls": 0,
+   "priority": "P2",
+   "native_api": "build_info",
+   "status": "replaced"
+  },
+  {
+   "legacy_api": "deterministic.solve",
+   "observed_calls": 5,
+   "priority": "P1",
+   "native_api": "channel.deterministic.solve",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "deterministic.solve_field",
+   "observed_calls": 15,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "montecarlo.Config",
+   "observed_calls": 6,
+   "priority": "P1",
+   "native_api": "montecarlo.basic.Config / montecarlo.bdpt.Config",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "montecarlo.ComponentFilterConfig",
+   "observed_calls": 19,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "montecarlo.DiffractionExecutionConfig",
+   "observed_calls": 22,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "montecarlo.FilterConfig",
+   "observed_calls": 8,
+   "priority": "P1",
+   "native_api": null,
+   "status": "missing"
+  },
+  {
+   "legacy_api": "montecarlo.IntegratorOptions",
+   "observed_calls": 51,
+   "priority": "P1",
+   "native_api": null,
+   "status": "partial"
+  },
+  {
+   "legacy_api": "montecarlo.NativeExtension",
+   "observed_calls": 10,
+   "priority": "P2",
+   "native_api": "build_info",
+   "status": "replaced"
+  },
+  {
+   "legacy_api": "montecarlo.RadioMapResult",
+   "observed_calls": 18,
+   "priority": "P1",
+   "native_api": "solver-specific Result",
+   "status": "partial"
+  },
+  {
+   "legacy_api": "montecarlo.Tuning",
+   "observed_calls": 96,
+   "priority": "P2",
+   "native_api": null,
+   "status": "not_planned"
+  },
+  {
+   "legacy_api": "montecarlo.solve",
+   "observed_calls": 6,
+   "priority": "P1",
+   "native_api": "montecarlo.basic.solve / montecarlo.bdpt.solve",
+   "status": "partial"
+  }
+ ]
+}

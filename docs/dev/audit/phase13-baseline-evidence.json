@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "plan": 13,
+  "phase": 0,
+  "channel_native": {
+    "commit": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+    "branch_at_capture": "main",
+    "native_binding_count": 211,
+    "build_fingerprint": "9f7cc07004d218bf51fc5bf11444746d6cd1a6dc07a95adf13336deaffefa7ec",
+    "build_type": "Release",
+    "cuda_architectures": [
+      "120-real",
+      "120-virtual"
+    ]
+  },
+  "rayd": {
+    "repository": "https://github.com/Asixa/RayD.git",
+    "commit": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "13cf52d0d2e45638b3262faed249bded739887129ede09c2f8c5c0774f64d939",
+    "release_capture_requirement": "Use a clean checkout; the developer checkout contains an unrelated user-owned untracked document."
+  },
+  "immutable_owner_baseline": {
+    "path": "docs/dev/audit/phase9-native-owner-inventory.json",
+    "git_blob": "e18765c37e165d91da0fdb107c3990c0dee825dd"
+  },
+  "toolchain": {
+    "python": "3.11.14",
+    "torch": "2.10.0",
+    "torch_cuda": "12.8",
+    "nvcc": "12.9.41",
+    "cmake": "4.3.0",
+    "msvc": "19.44.35207.1",
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "driver": "596.49",
+    "compute_capability": "12.0",
+    "gpu_memory_mib": 16303
+  },
+  "runtime_capture": {
+    "profile": "extended",
+    "independent_processes": 2,
+    "warmup_per_process": 1,
+    "steady_repeats_per_process": 7,
+    "frozen_cell_count": 38,
+    "excluded_cell_count": 1,
+    "excluded_cells": [
+      {
+        "solver": "deterministic",
+        "scenario": "rough-scattering-ensemble",
+        "reason": "The baseline result hash differed across independent processes; the two fingerprints are retained in extended.json rather than being hidden or tolerance-relaxed."
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "docs/dev/baselines/a741f8d2a0ff5ba353be60584f21ee7f910f03ad/runtime/extended.json",
+        "sha256": "e399462a9d6af97334bf67a85e9fbb87454dde8f873c24b7f98449b5913a3683"
+      },
+      {
+        "path": "docs/dev/baselines/a741f8d2a0ff5ba353be60584f21ee7f910f03ad/runtime/extended-launch-ledger.json",
+        "sha256": "df62ce35f6770e8a672813c4cc1cbe9df734739b98549d370730c7c0a95f4430"
+      },
+      {
+        "path": "docs/dev/baselines/a741f8d2a0ff5ba353be60584f21ee7f910f03ad/runtime/extended-performance.json",
+        "sha256": "8bd6176ca859761268ff6ffb4bc33efb5dd1552fd3b58400fdfe524974fc1a9f"
+      },
+      {
+        "path": "docs/dev/baselines/a741f8d2a0ff5ba353be60584f21ee7f910f03ad/runtime/extended-solver-results.json",
+        "sha256": "5fae2d498dfbba8a8831ab850a7d90111fc3686d9d27f73deebee3cc5ae208bc"
+      }
+    ]
+  },
+  "performance_evidence_scope": {
+    "captured": [
+      "registered launch/tape aggregates",
+      "CUDA allocator peak memory",
+      "independent-process wall and CUDA timing distributions",
+      "exact serialized solver results and row metadata"
+    ],
+    "deferred_until_owner_move_comparison": [
+      "Nsight Systems memcpy/synchronization timelines",
+      "Nsight Compute registers/occupancy counters",
+      "PTX/SASS before-after comparison for moved translation units"
+    ]
+  }
+}

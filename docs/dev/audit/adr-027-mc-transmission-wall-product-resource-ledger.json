@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "scope": "live ADR-027 MC straight-penetration wall-product estimator",
+  "status": "live Phase M native family; flattened MC transmission route active",
+  "symbols": [
+    "mc_transmission_wall_product",
+    "mc_transmission_wall_product_backward",
+    "mc_transmission_wall_product_jvp"
+  ],
+  "ownership": {
+    "numerical_owner": "Channel Native",
+    "python_owner": "witwin.channel_native.montecarlo.basic.kernels.transmission",
+    "live_callers": [
+      "witwin.channel_native.montecarlo.basic.rayd_components.transmission_component_map"
+    ],
+    "activation_commit": "ADR-027 Phase M MonteCarloTargetInset atomic switch/delete"
+  },
+  "resident_contract": {
+    "input_layout": "fixed [pair_count, hit_capacity] RayD penetration result",
+    "payload_order": "failure first, then canonical num_hits, then slot < num_hits and valid before primitive/material/CSR payload; tail slots are inert even if poisoned",
+    "canonical_prefix": "valid slots form exactly the prefix [0,num_hits); a hole, valid tail, or count mismatch records PAIR_CONTRACT_ERROR before any payload read",
+    "failure_state": "exact solve-owned CUDA int32[1] CapacityFailureState",
+    "failure_bit": "PAIR_CONTRACT_ERROR for canonical layout or resident index violations",
+    "failure_publication": "final sanitizer makes the complete primal, VJP, or JVP result inert"
+  },
+  "numerical_contract": {
+    "wall_product_order": "ascending state slot",
+    "polarization": "incident TE/TM fractions from fixed transmitter polarization",
+    "layer_response": "shared precise-math RayD layer-stack primal and dual device headers",
+    "invalid_material": "negative material or non-thin-sheet material is an ordinary blocked row",
+    "shared_vjp_reduction": "one owner per layer parameter and one frequency owner; each adds in ascending pair then state order",
+    "floating_point_atomics": false,
+    "fma_contraction": false
+  },
+  "launch_contract": {
+    "primal": [
+      "pair-parallel wall product",
+      "whole-result failure sanitizer"
+    ],
+    "vjp": [
+      "pair-parallel geometry/base-power adjoint",
+      "deterministic shared layer/frequency reduction",
+      "whole-result failure sanitizer"
+    ],
+    "jvp": [
+      "pair-parallel pushforward",
+      "whole-result failure sanitizer"
+    ],
+    "host_device_transfers": 0,
+    "host_synchronizations": 0,
+    "persistent_tape_bytes": 0,
+    "hidden_contiguous_copies": 0
+  },
+  "resource_usage_sm120": {
+    "tool": "CUDA 12.9.41 cuobjdump --dump-resource-usage",
+    "primal": "REG=60 STACK=32 SHARED=0 LOCAL=0",
+    "vjp_pair": "REG=102 STACK=40 SHARED=0 LOCAL=0",
+    "vjp_shared": "REG=114 STACK=32 SHARED=0 LOCAL=0",
+    "jvp": "REG=101 STACK=32 SHARED=0 LOCAL=0",
+    "sanitize_primal": "REG=28 STACK=0 SHARED=0 LOCAL=0",
+    "sanitize_backward": "REG=34 STACK=0 SHARED=0 LOCAL=0",
+    "sanitize_jvp": "REG=28 STACK=0 SHARED=0 LOCAL=0",
+    "translation_unit_object_bytes": 3523271
+  },
+  "capacity_contract": {
+    "ad_hit_capacity_limit": null,
+    "host_shaped_compaction": false,
+    "device_count_read": false,
+    "partial_result_on_failure": false
+  },
+  "logical_resident_byte_budget": {
+    "variables": {
+      "N": "pair_count",
+      "D": "hit_capacity",
+      "L": "resident layer count"
+    },
+    "primal": "13*N",
+    "vjp": "16*N + 12*N*D + 12*L + 4",
+    "jvp": "8*N",
+    "units": "bytes; excludes caller-owned penetration inputs and allocator rounding"
+  },
+  "phase_p_extension": {
+    "status": "canonical valid-prefix contract live in the Phase M solver route",
+    "rayd_lock": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "live_switch_performed": true,
+    "resource_rollup": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
+  },
+  "phase_m_activation": {
+    "status": "live flattened MonteCarloTargetInset batch and native wall-product family",
+    "pair_order": "transmitter-major, receiver-minor",
+    "transaction": "one solve-owned CapacityFailureState shared by RayD penetration, wall product, five-map sanitizer, and final terminal observer",
+    "component_map_sanitizer": {
+      "symbols": [
+        "mc_capacity_failure_component_maps_sanitize",
+        "mc_capacity_failure_component_maps_sanitize_backward",
+        "mc_capacity_failure_component_maps_sanitize_jvp"
+      ],
+      "python_owner": "witwin.channel_native.montecarlo.basic.kernels.capacity.mc_capacity_failure_component_maps_sanitize",
+      "contract": "one fused current-stream pass over five equal-shaped maps; success is exact identity and failure makes every primal/VJP/JVP value positive zero before finalization"
+    },
+    "binding_delta": {
+      "before": 238,
+      "added": 3,
+      "after": 241
+    },
+    "terminal_order": "five-map sanitizer, component finalization, metadata/diagnostics and Result construction, then exactly one terminal_check",
+    "adr029_complete": false,
+    "final_performance_evidence": "pending Phase 12 independent-process profiling and release closure"
+  },
+  "acceptance": {
+    "scope": "historical dormant-family CUDA evidence retained; Phase M activation and final performance evidence are recorded separately",
+    "direct_contract_test": "tests/montecarlo/basic/test_transmission_wall_product.py (28 passed; capacity, N=0/D=0, stream, poison, ordered product, and all-or-nothing failures)",
+    "ad_test": "native VJP/JVP duality, repeat-exactness, custom autograd, optional-none, stride-0/non-contiguous views, CSR-offset, and failure-inert cases passed",
+    "no_fallback_test": "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_has_one_owner_and_no_fallback",
+    "live_switch_performed": true,
+    "cuda_build_and_test": {
+      "configure": "fresh Ninja Release tree; CMAKE_CUDA_ARCHITECTURES=120-real; TORCH_CUDA_ARCH_LIST=12.0; RayD 102470daf44b649030df3b2554d9ace5c1eea482",
+      "build": "single fresh _channel_native target linked successfully; subsequent build ran only the identity validator with no compile or link",
+      "targeted_cuda": "28 passed in 0.35s",
+      "capacity_runtime": "14 passed in 2.38s",
+      "owner_negative_governance": "60 passed, 1 skipped in 6.45s",
+      "quick": "complete quick tier passed on the committed Foundation: ruff, mypy, import graph, 226-binding coverage, 10 public/binding manifest tests, production dependencies, repository hygiene for 808 tracked files, secret scan, maintenance budgets, import-without-native, 87 CPU import/config tests, and final repository hygiene",
+      "duplication": "160 regions; 8714/90566 duplicate lines = 9.6217%; frozen 10.211512% budget not relaxed; 0 stale and 0 unclassified; gate passed"
+    },
+    "artifact": {
+      "path": "artifacts/cmake-adr027-foundation-release-sm120-clean/_channel_native.cp311-win_amd64.pyd",
+      "bytes": 32417792,
+      "sha256": "dea850f3d08c6eaed92d68449e927ef95ef25817a785a6eddd3fe82df4d99bf7",
+      "build_fingerprint": "760d98edef1422f092500d3ce6e852328e0a7e51bd21ed56f0d0ee8693091c88",
+      "channel_git": "0b117fe17e990ac60364a89ccfb998b870aec301 (dirty Foundation build)",
+      "rayd_git": "102470daf44b649030df3b2554d9ace5c1eea482 (clean)",
+      "toolchain": "MSVC 19.44.35207.1; CUDA compiler 12.9.41; Torch 2.10.0/CUDA 12.8; SM120-real"
+    },
+    "performance": "owned by the later live switch and Phase 12 acceptance; no live performance claim is made by this dormant commit"
+  }
+}

@@ -1,0 +1,33 @@
+name: Quick PR
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WITWIN_CI_ENVIRONMENT: witwin2
+  WITWIN_CI_PYTHON: '${{ vars.WITWIN2_PYTHON }}'
+
+jobs:
+  quick:
+    name: Quick / Python 3.11 / Windows X64
+    runs-on: [self-hosted, Windows, X64, CUDA]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - name: Verify the supported witwin2 runtime
+        shell: pwsh
+        run: |
+          $python = $env:WITWIN_CI_PYTHON
+          if ([string]::IsNullOrWhiteSpace($python)) { throw 'Repository variable WITWIN2_PYTHON is required' }
+          if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "WITWIN2_PYTHON does not exist: $python" }
+          & $python -c "import pathlib, sys, torch; assert sys.version_info[:2] == (3, 11); assert pathlib.Path(sys.prefix).name == 'witwin2'; assert torch.__version__.split('+')[0] == '2.10.0'; assert torch.version.cuda == '12.8'"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run quick tier
+        shell: pwsh
+        run: '& $env:WITWIN_CI_PYTHON ci/run_ci_tier.py quick'

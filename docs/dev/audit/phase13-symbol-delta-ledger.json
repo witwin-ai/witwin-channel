@@ -1,0 +1,787 @@
+{
+  "schema_version": 1,
+  "baseline_binding_count": 211,
+  "applied_count_delta": -9,
+  "projected_final_count": 202,
+  "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
+  "live_binding_count": 241,
+  "live_count_delta_from_plan13_baseline": 30,
+  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings = 241",
+  "phase6c_phase_p_delta": {
+    "before": 229,
+    "added": 5,
+    "after": 234
+  },
+  "phase6c_phase_e_delta": {
+    "before": 234,
+    "added": 4,
+    "after": 238
+  },
+  "phase6c_phase_m_delta": {
+    "before": 238,
+    "added": 3,
+    "after": 241
+  },
+  "actions": [
+    {
+      "symbol": "raydn_scene_create",
+      "action": "rename",
+      "replacement": "rayd_scene_create",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_scene_edge_records",
+      "action": "rename",
+      "replacement": "rayd_scene_edge_records",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_intersect_backward",
+      "action": "rename",
+      "replacement": "rayd_intersect_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_intersect_jvp",
+      "action": "rename",
+      "replacement": "rayd_intersect_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_forward",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_forward_tape",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_forward_tape",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_backward",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_trace_reflections_jvp",
+      "action": "rename",
+      "replacement": "rayd_trace_reflections_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_reflection_epc_paths_forward",
+      "action": "rename",
+      "replacement": "rayd_reflection_epc_paths_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_reflection_epc_paths_backward",
+      "action": "rename",
+      "replacement": "rayd_reflection_epc_paths_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_reflection_epc_paths_jvp",
+      "action": "rename",
+      "replacement": "rayd_reflection_epc_paths_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_scene_face_normals_backward",
+      "action": "rename",
+      "replacement": "rayd_scene_face_normals_backward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_scene_face_normals_jvp",
+      "action": "rename",
+      "replacement": "rayd_scene_face_normals_jvp",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_diffraction_paths_order1_forward",
+      "action": "rename",
+      "replacement": "rayd_diffraction_paths_order1_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_coupled_rd_geometry_forward",
+      "action": "rename",
+      "replacement": "rayd_coupled_rd_geometry_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "raydn_coupled_dd_geometry_forward",
+      "action": "rename",
+      "replacement": "rayd_coupled_dd_geometry_forward",
+      "count_delta": 0,
+      "status": "planned",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_intersect_forward",
+      "action": "rename",
+      "replacement": "rayd_intersect_forward",
+      "count_delta": 0,
+      "status": "applied in Phase 4",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_visibility_forward",
+      "action": "rename",
+      "replacement": "rayd_visibility_forward",
+      "count_delta": 0,
+      "status": "applied in Phase 4",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_diffraction_accumulation_forward",
+      "action": "rename",
+      "replacement": "rayd_diffraction_sample_tape_forward",
+      "count_delta": 0,
+      "status": "applied in Phase 8B",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_diffraction_discover_edges",
+      "action": "rename",
+      "replacement": "mc_diffraction_discover_edges",
+      "count_delta": 0,
+      "status": "applied in Phase 4",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "bdpt_diffraction_discover_edges_counted",
+      "action": "rename",
+      "replacement": "mc_diffraction_discover_edges_counted",
+      "count_delta": 0,
+      "status": "applied in Phase 4",
+      "reason": "retire RayDN/BDPT-misattributed identity without compatibility alias"
+    },
+    {
+      "symbol": "em_layer_stack_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "em_layer_stack_eval",
+      "count_delta": 0,
+      "status": "applied in Phase 6A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "em_layer_stack_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "em_layer_stack_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 6A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "em_layer_stack_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "em_layer_stack_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 6A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_transmission_sequence",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_transmission_sequence",
+      "count_delta": 0,
+      "status": "applied in Phase 6B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_transmission_sequence_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_transmission_sequence_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 6B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_transmission_sequence_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_transmission_sequence_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 6B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_diffraction_wedge",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_diffraction_wedge",
+      "count_delta": 0,
+      "status": "applied in Phase 8A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_diffraction_wedge_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_diffraction_wedge_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 8A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "field_diffraction_wedge_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "field_diffraction_wedge_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 8A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_eval",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_eval_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_eval_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_sample",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_sample",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_table_pdf",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_table_pdf",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_ensemble_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_ensemble_eval",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_ensemble_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_ensemble_eval_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_ensemble_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_ensemble_eval_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_patch_integral_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_patch_integral_eval",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_patch_integral_eval_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_patch_integral_eval_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 10A",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_ensemble_eval",
+      "count_delta": 0,
+      "status": "applied in Phase 10B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_ensemble_eval_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 10B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_ensemble_eval_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 10B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_realization_eval",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_realization_eval",
+      "count_delta": 0,
+      "status": "applied in Phase 10B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_backward",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_realization_eval_backward",
+      "count_delta": 0,
+      "status": "applied in Phase 10B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_jvp",
+      "action": "implementation-owner-transfer",
+      "replacement": "scattering_chain_realization_eval_jvp",
+      "count_delta": 0,
+      "status": "applied in Phase 10B",
+      "reason": "move complete operation family while preserving Channel-facing ABI"
+    },
+    {
+      "symbol": "bdpt_diffraction_connection_samples_from_tape",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_diffraction_point_connection_samples",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_pack",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_diffraction_state_wi",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_diffraction_edge_geometry",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_reflection_accumulation_forward",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_selected_edge_indices",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "bdpt_surface_group_edge_candidates",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "path_diffraction_paths_order1",
+      "action": "delete",
+      "replacement": null,
+      "count_delta": -1,
+      "status": "applied in Phase 4",
+      "reason": "failed static production caller, dynamic binding, public import and real BDPT E2E reachability checks"
+    },
+    {
+      "symbol": "diffraction_tx_visible_state_plan",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "active in Phase 8B",
+      "reason": "ADR-028 device-resident transmitter-visible diffraction planning"
+    },
+    {
+      "symbol": "capacity_failure_state_create",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "create the solve-owned current-stream CUDA failure bitmask"
+    },
+    {
+      "symbol": "capacity_failure_terminal_check",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "unique terminal asynchronous failure observer"
+    },
+    {
+      "symbol": "coupled_candidate_capacity_block",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "fixed-capacity coupled R-D/D-R/D-D candidate producer"
+    },
+    {
+      "symbol": "deterministic_capacity_finalize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "stable pair-major capacity finalizer"
+    },
+    {
+      "symbol": "enumerated_canonical_capacity_select",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical device-resident enumerated selector"
+    },
+    {
+      "symbol": "evaluated_paths_canonical_capacity_gather",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical continuous evaluated-path gather"
+    },
+    {
+      "symbol": "evaluated_paths_canonical_capacity_gather_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical evaluated-path VJP companion"
+    },
+    {
+      "symbol": "evaluated_paths_canonical_capacity_gather_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "canonical evaluated-path JVP companion"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "pair-major evaluated-path capacity packer"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "evaluated-path capacity VJP companion"
+    },
+    {
+      "symbol": "evaluated_paths_capacity_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "evaluated-path capacity JVP companion"
+    },
+    {
+      "symbol": "deterministic_path_table_capacity_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "fixed-capacity deterministic PathTable packer"
+    },
+    {
+      "symbol": "deterministic_path_table_capacity_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "deterministic PathTable capacity VJP companion"
+    },
+    {
+      "symbol": "deterministic_path_table_capacity_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "deterministic PathTable capacity JVP companion"
+    },
+    {
+      "symbol": "deterministic_diffraction_order1_capacity_block",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "fixed-capacity order-1 diffraction path block"
+    },
+    {
+      "symbol": "deterministic_diffraction_state_capacity_select",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "stable device selection into diffraction_state_capacity"
+    },
+    {
+      "symbol": "deterministic_reflection_candidate_capacity_block",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "post-EPC reflection candidate-capacity producer"
+    },
+    {
+      "symbol": "path_result_capacity_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "Path-owned fixed-capacity result packer"
+    },
+    {
+      "symbol": "path_result_capacity_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "Path result-capacity VJP companion"
+    },
+    {
+      "symbol": "path_result_capacity_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-029 foundation",
+      "reason": "Path result-capacity JVP companion"
+    },
+    {
+      "symbol": "deterministic_diffraction_pair_reduce",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-030 foundation",
+      "reason": "source-state-serial deterministic diffraction pair reducer"
+    },
+    {
+      "symbol": "deterministic_diffraction_pair_reduce_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-030 foundation",
+      "reason": "deterministic diffraction pair-reducer VJP companion"
+    },
+    {
+      "symbol": "deterministic_diffraction_pair_reduce_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "dormant ADR-030 foundation",
+      "reason": "deterministic diffraction pair-reducer JVP companion"
+    },
+    {
+      "symbol": "mc_transmission_wall_product",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in Phase 6C Phase M",
+      "reason": "live fixed-capacity MC incident-polarized wall-product estimator"
+    },
+    {
+      "symbol": "mc_transmission_wall_product_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in Phase 6C Phase M",
+      "reason": "live MC wall-product VJP companion"
+    },
+    {
+      "symbol": "mc_transmission_wall_product_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in Phase 6C Phase M",
+      "reason": "live MC wall-product JVP companion"
+    },
+    {
+      "symbol": "mc_capacity_failure_component_maps_sanitize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase M",
+      "reason": "single-kernel failure-first sanitizer for all five MC Basic component maps"
+    },
+    {
+      "symbol": "mc_capacity_failure_component_maps_sanitize_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase M",
+      "reason": "native VJP companion for the MC Basic component-map sanitizer"
+    },
+    {
+      "symbol": "mc_capacity_failure_component_maps_sanitize_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase M",
+      "reason": "native JVP companion for the MC Basic component-map sanitizer"
+    },
+    {
+      "symbol": "rayd_segment_penetration_forward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated for enumerated propagation in Phase 6C Phase E",
+      "reason": "RayD-owned fixed-capacity segment-penetration primal"
+    },
+    {
+      "symbol": "rayd_segment_penetration_forward_tape",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated for enumerated AD in Phase 6C Phase E",
+      "reason": "RayD-owned fixed-winner segment-penetration tape"
+    },
+    {
+      "symbol": "rayd_segment_penetration_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated for enumerated AD in Phase 6C Phase E",
+      "reason": "RayD-owned segment-penetration VJP companion"
+    },
+    {
+      "symbol": "rayd_segment_penetration_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated for enumerated AD in Phase 6C Phase E",
+      "reason": "RayD-owned segment-penetration JVP companion"
+    },
+    {
+      "symbol": "enumerated_transmission_topology_pack",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in Phase 6C Phase E",
+      "reason": "Channel-owned pair-major component-5 transmission topology producer"
+    },
+    {
+      "symbol": "enumerated_transmission_topology_pack_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase E",
+      "reason": "Channel-owned topology-pack VJP companion for RayD penetration geometry"
+    },
+    {
+      "symbol": "enumerated_transmission_topology_pack_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented and live in Phase 6C Phase E",
+      "reason": "Channel-owned topology-pack JVP companion for RayD penetration geometry"
+    },
+    {
+      "symbol": "enumerated_capacity_failure_sanitize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented as Phase E transition; removed by ADR-029 Phase D",
+      "reason": "failure-first complete EvaluatedPaths sanitizer before terminal observation"
+    },
+    {
+      "symbol": "enumerated_capacity_failure_vector_sanitize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "implemented as Phase E transition; removed by ADR-029 Phase D",
+      "reason": "failure-first complex diffraction-vector sidecar sanitizer"
+    }
+  ]
+}

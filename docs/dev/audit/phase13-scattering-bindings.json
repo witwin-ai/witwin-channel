@@ -1,0 +1,862 @@
+{
+  "schema_version": 1,
+  "binding_count": 18,
+  "move_count": 17,
+  "retain_count": 1,
+  "phase10a_activation": {
+    "status": "active",
+    "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
+    "activated_contract_count": 11,
+    "pending_phase10b_contract_count": 6,
+    "retained_channel_policy_contract_count": 1,
+    "owner_counts": {
+      "RayD": 11,
+      "Channel Native": 7
+    },
+    "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp",
+    "rayd_ctest": "rayd_torch_scattering"
+  },
+  "phase10b_activation": {
+    "status": "active",
+    "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
+    "activated_contract_count": 6,
+    "total_rayd_contract_count": 17,
+    "retained_channel_policy_contract_count": 1,
+    "owner_counts": {
+      "RayD": 17,
+      "Channel Native": 1
+    },
+    "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp",
+    "rayd_ctest": "rayd_torch_scattering_chain",
+    "ad_contract": {
+      "ensemble_geometry": "JVP-only; VJP fails loudly",
+      "realization_geometry": "VJP and JVP supported"
+    }
+  },
+  "contracts": [
+    {
+      "symbol": "scattering_table_eval",
+      "family": "table evaluation AD",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1168
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            300
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+          "lines": [
+            128
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 407
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 543
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_forward_matches_reference",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_table_nonempty_primal_ad_sample_pdf",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "RayD scattering.cu uses target-default CUDA flags; no --fmad=false or --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_eval_backward",
+      "family": "table evaluation AD",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1188
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            667
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+          "lines": [
+            297
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 427
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_backward_matches_reference_autograd",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_table_nonempty_primal_ad_sample_pdf",
+      "e2e_callers": [
+        "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd"
+      ],
+      "compile_contract": "RayD scattering_table_eval_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_eval_jvp",
+      "family": "table evaluation AD",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1190
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            691
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+          "lines": [
+            312
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 461
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_table_eval_jvp_matches_reference_autograd",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_table_nonempty_primal_ad_sample_pdf",
+      "e2e_callers": [
+        "tests/ad/test_mc_basic_scattering_ad.py::test_scattering_table_value_grad_matches_fd"
+      ],
+      "compile_contract": "RayD scattering_table_eval_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_sample",
+      "family": "table sampling",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1172
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            330
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+          "lines": [
+            140
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 354
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 568
+        }
+      ],
+      "contract_test": "tests/scattering/test_sampling.py::test_sample_matches_pdf_binned",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_table_nonempty_primal_ad_sample_pdf",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "RayD scattering.cu uses target-default CUDA flags; no --fmad=false or --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_table_pdf",
+      "family": "table sampling",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1170
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            315
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+          "lines": [
+            134
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 588
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/tables.py",
+          "line": 603
+        }
+      ],
+      "contract_test": "tests/scattering/test_sampling.py::test_pdf_integrates_to_one",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_table_nonempty_primal_ad_sample_pdf",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "RayD scattering.cu uses target-default CUDA flags; no --fmad=false or --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_ensemble_eval",
+      "family": "single-bounce ensemble",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1176
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            374
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu",
+          "lines": [
+            254
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+          "line": 471
+        },
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 113
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_ensemble_eval.py::test_scattering_ensemble_eval_contract_shapes_and_dtypes",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_ensemble_nonempty_primal_ad",
+      "e2e_callers": [
+        "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit"
+      ],
+      "compile_contract": "RayD scattering_ensemble.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_ensemble_eval_backward",
+      "family": "single-bounce ensemble",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1180
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            432
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+          "lines": [
+            780
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 175
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_backward_matches_reference_autograd",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_ensemble_nonempty_primal_ad",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "RayD scattering_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_ensemble_eval_jvp",
+      "family": "single-bounce ensemble",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1182
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            515
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+          "lines": [
+            795
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 311
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_ensemble_jvp_matches_reference_autograd",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_ensemble_nonempty_primal_ad",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "RayD scattering_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_patch_integral_eval",
+      "family": "phase-screen patch integral",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1178
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            543
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral.cu",
+          "lines": [
+            377
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+          "line": 782
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_patch_integral_eval.py::test_patch_integral_contract_shapes_and_dtypes",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_patch_nonempty_primal_ad",
+      "e2e_callers": [
+        "tests/deterministic/test_scattering.py::test_realization_coherent_flat_screen_matches_smooth_reflection"
+      ],
+      "compile_contract": "RayD scattering_patch_integral.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_backward",
+      "family": "phase-screen patch integral",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1184
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            589
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu",
+          "lines": [
+            936
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 571
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_patch_backward_matches_reference_autograd",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_patch_nonempty_primal_ad",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "RayD scattering_patch_integral_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_patch_integral_eval_jvp",
+      "family": "phase-screen patch integral",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1186
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            646
+          ],
+          "count": 1
+        },
+        {
+          "path": "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu",
+          "lines": [
+            948
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd.py",
+          "line": 681
+        }
+      ],
+      "contract_test": "tests/scattering/test_kernel_ad_contracts.py::test_patch_jvp_matches_reference_autograd",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_test.cpp::test_patch_nonempty_primal_ad",
+      "e2e_callers": [
+        "tests/ad/test_solver_scattering_ad.py::test_ensemble_frequency_grad_matches_fd"
+      ],
+      "compile_contract": "RayD scattering_patch_integral_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval",
+      "family": "chain ensemble",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1192
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            802
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 162
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_forward_schema",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "RayD scattering_chain_ensemble.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_backward",
+      "family": "chain ensemble",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1194
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            835
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 257
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "RayD scattering_chain_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_ensemble_eval_jvp",
+      "family": "chain ensemble",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1196
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            893
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 434
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_ensemble_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "RayD scattering_chain_ensemble_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; chain geometry reverse mode remains fail-loud",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_realization_eval",
+      "family": "chain realization",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1198
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            964
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "RayD scattering_chain_realization.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; realization geometry VJP and JVP are supported",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_backward",
+      "family": "chain realization",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1200
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            1002
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 866
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "RayD scattering_chain_realization_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; realization geometry VJP and JVP are supported",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_chain_realization_eval_jvp",
+      "family": "chain realization",
+      "current_numerical_owner": "RayD",
+      "target_numerical_owner": "RayD after ADR-026",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1202
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            1077
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/scattering/kernels/autograd_chain.py",
+          "line": 1052
+        }
+      ],
+      "contract_test": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
+      "rayd_direct_test": "backends/torch/tests/cpp/scattering_chain_test.cpp::test_max_depth_primal_and_ad",
+      "e2e_callers": [
+        "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection"
+      ],
+      "compile_contract": "RayD scattering_chain_realization_ad.cu uses source-local --fmad=false; no --use_fast_math",
+      "fusion_contract": "complete Dmax=8 C1/scatter/C2 row-fused operation; no split or materialized intermediate",
+      "tape_contract": "fixed topology/sample/visibility/PDF/MIS; realization geometry VJP and JVP are supported",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    },
+    {
+      "symbol": "scattering_event_probabilities",
+      "family": "unaffected",
+      "current_numerical_owner": "Channel Native",
+      "target_numerical_owner": "Channel Native",
+      "channel_abi_owner_after_move": "_channel_native binding and domain façade",
+      "binding": {
+        "path": "native/channel_native/binding/materials.cpp",
+        "line": 1174
+      },
+      "implementation_evidence": [
+        {
+          "path": "native/channel_native/binding/materials.cpp",
+          "lines": [
+            338
+          ],
+          "count": 1
+        },
+        {
+          "path": "native/channel_native/kernels/scattering.cu",
+          "lines": [
+            153
+          ],
+          "count": 1
+        }
+      ],
+      "python_callers": [
+        {
+          "path": "src/witwin/channel_native/montecarlo/events/scattering.py",
+          "line": 201
+        }
+      ],
+      "contract_test": "tests/kernels/test_scattering_kernels.py::test_scattering_event_probabilities_require_native_kernel",
+      "e2e_callers": [
+        "tests/montecarlo/bdpt/test_scattering.py::test_bdpt_scattering_matches_area_quadrature_reference"
+      ],
+      "compile_contract": "retained Channel scattering.cu uses target-default CUDA flags; no --fmad=false or --use_fast_math",
+      "fusion_contract": "preserve current launch geometry, numerical order and resident tensors",
+      "tape_contract": "preserve current primal/AD companion and resource lifetime",
+      "acceptance": [
+        "exact/ULP parity",
+        "primal/JVP/VJP lockstep",
+        "launch and stream parity",
+        "no fallback"
+      ]
+    }
+  ],
+  "retained_channel_owners": [
+    "scattering_event_probabilities",
+    "Kirchhoff table builder/cache/version/validation",
+    "ScatteringTableRuntime and PhaseScreenRuntime resource lifecycles",
+    "rough C_r composition",
+    "chain discovery/join/row budget/C1-C2 packing",
+    "coherent combine and deterministic accumulation",
+    "BDPT continuation/NEE/MIS/event glue/AD companions",
+    "MC Basic estimator and result/metadata assembly"
+  ]
+}

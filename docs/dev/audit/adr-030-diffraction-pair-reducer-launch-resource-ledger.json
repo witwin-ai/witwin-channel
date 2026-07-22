@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "decision": "ADR-030 deterministic diffraction source-lane pair reduction",
+  "status": "dormant native family; no live solver caller",
+  "symbols": [
+    "deterministic_diffraction_pair_reduce",
+    "deterministic_diffraction_pair_reduce_backward",
+    "deterministic_diffraction_pair_reduce_jvp"
+  ],
+  "live_switch": {
+    "performed": false,
+    "rayd_lock_changed": false,
+    "receiver_grid_torch_index_add_deleted": false,
+    "note": "The later atomic RayD pin/switch/delete commit owns activation and deletion."
+  },
+  "launch_contract": {
+    "primal": "one single-thread status launch plus one reducer launch; one warp per endpoint pair",
+    "backward": "one CUDA kernel launch; one thread per source row and no floating-point reduction",
+    "jvp": "one CUDA kernel launch; one warp per endpoint pair",
+    "current_stream": true,
+    "host_synchronization": false,
+    "floating_point_atomics": false,
+    "tree_or_chunk_reduction": false
+  },
+  "resource_contract": {
+    "persistent_tape": false,
+    "full_lane_workspace": false,
+    "dynamic_shared_memory_bytes": 0,
+    "primal_allocations": [
+      "complex64[pair_count,3] field_xyz",
+      "float32[pair_count] power"
+    ],
+    "backward_allocations": [
+      "six float32[pair_count*state_capacity] input gradients"
+    ],
+    "jvp_allocations": [
+      "complex64[pair_count,3] tangent field_xyz",
+      "float32[pair_count] tangent power"
+    ]
+  },
+  "numerical_contract": {
+    "source_order": "pair-major, state ordinal ascending, lane 0 serial additions",
+    "invalid_payload": "valid checked before six field loads; invalid rows contribute positive zero",
+    "failure": "the in-stream status launch compares contiguous CUDA int32[1] reported_count with the valid population and ORs DIFFRACTION_PATH_CONTRACT_ERROR on mismatch; the reducer then checks shared CapacityFailureState before validity/payload and all outputs remain positive zero",
+    "compile_options": [
+      "--fmad=false"
+    ]
+  },
+  "static_evidence": [
+    "native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu",
+    "CMakeLists.txt",
+    "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_source_contract_is_frozen"
+  ],
+  "runtime_evidence": {
+    "dormant_direct_tests": "20 passed in witwin2 against a clean Release/SM120 build, including count mismatch failure, positive-zero primal/VJP/JVP, poison gating, current-stream, boundary, order, and AD contracts",
+    "governance_tests": "14 passed for binding manifest, contract coverage, current owner inventory, and dormant ledger ownership",
+    "nsight_and_munich_performance": "owned by the later live switch and Phase 12 acceptance; no performance claim is made by this dormant commit"
+  }
+}

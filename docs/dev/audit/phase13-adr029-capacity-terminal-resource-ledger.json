@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "scope": "dormant ADR-029 capacity failure terminal observer",
+  "symbol": "capacity_failure_terminal_check",
+  "owner": "witwin.channel_native.runtime",
+  "activation_status": "dormant-no-live-solver-caller",
+  "input_contract": {
+    "failure_state": "borrowed contiguous CUDA int32[1] from the solve-owned CapacityFailureState",
+    "host_reads": 0,
+    "bit_mutations": 0
+  },
+  "launch_contract": {
+    "cuda_kernel_launches_per_call": 1,
+    "grid_blocks": 1,
+    "threads_per_block": 1,
+    "stream": "caller current CUDA stream for failure_state device",
+    "device_work": "one int32 load, one nonzero branch, and a device trap only for nonzero bits"
+  },
+  "resource_budget": {
+    "published_output_bytes": 0,
+    "temporary_device_bytes": 0,
+    "host_to_device_bytes": 0,
+    "device_to_host_bytes": 0,
+    "allocations": 0,
+    "host_synchronizations": 0,
+    "stream_waits": 0,
+    "scalar_extractions": 0
+  },
+  "failure_contract": {
+    "zero_bits": "kernel returns without side effects",
+    "nonzero_bits": "asynchronous CUDA device failure observed at the next normal synchronization boundary",
+    "producer_precondition": "all result payload, validity, and count tensors are canonical inert before this operation is enqueued",
+    "test_isolation": "nonzero direct test runs in a subprocess because the device failure poisons that CUDA context"
+  },
+  "activation_budget": {
+    "calls_per_solve_transaction": 1,
+    "additional_kernel_launches_per_solve": 1,
+    "additional_temporary_device_bytes": 0,
+    "additional_host_device_copies": 0,
+    "additional_host_synchronizations": 0
+  },
+  "acceptance": "Direct zero-state/current-stream and subprocess nonzero-state tests; static no-transfer/no-sync/no-allocation audit; no live caller until the atomic solver switch."
+}

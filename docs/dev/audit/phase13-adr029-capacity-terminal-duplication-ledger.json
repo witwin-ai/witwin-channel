@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "scope": "ADR-029 capacity failure terminal observer",
+  "owner": "witwin.channel_native.runtime",
+  "source": "native/channel_native/kernels/capacity_failure_terminal.cu",
+  "implementation_model": {
+    "terminal_device_observers": 1,
+    "production_trap_sites": 1,
+    "python_numerical_implementations": 0,
+    "torch_fallbacks": 0,
+    "cpu_fallbacks": 0,
+    "compatibility_aliases": 0,
+    "live_solver_callers": 0
+  },
+  "separation_from_intermediates": {
+    "intermediate_trap_sites": 0,
+    "intermediate_host_observers": 0,
+    "terminal_payload_sanitizers": 0,
+    "reason": "capacity producers own canonical inert output publication; runtime owns only the one terminal device observation"
+  },
+  "central_duplication_budget": {
+    "classification_file": "docs/dev/audit/duplication-classification.json",
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_numerical_duplication_authorized": false
+  },
+  "validation": {
+    "static_review": "complete",
+    "generated_duplication_gate": "passed in witwin2 on 2026-07-21",
+    "required_command": "conda run -n witwin2 python ci/check_duplication.py --repo . --ledger docs/dev/audit/duplication-classification.json"
+  }
+}

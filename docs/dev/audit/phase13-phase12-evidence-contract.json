@@ -1,0 +1,80 @@
+{
+  "schema_version": 2,
+  "phase": "Plan 13 Phase 12 three-group profiling and release evidence",
+  "status": "infrastructure frozen; measured facts intentionally null",
+  "release_claim": false,
+  "runner": "tools/phase13_phase12_evidence.py",
+  "profile_contract": "benchmarks/phase13_phase12_profile_contract.json",
+  "diagnostic_contract": "benchmarks/phase13_phase12_diagnostic_contract.json",
+  "gate_policy": "benchmarks/gates/phase13_phase12.json",
+  "output_schema": "benchmarks/schemas/phase13-phase12-evidence.schema.json",
+  "ci_validator": "ci/check_phase13_phase12_evidence.py",
+  "history": {
+    "roles": ["P", "E", "M", "D", "S"],
+    "enumerated": "P baseline and direct-child E candidate",
+    "montecarlo": "E baseline and direct-child M candidate",
+    "diffraction": "D baseline directly follows M; S is D's direct live-switch/delete child",
+    "shared_identity": "one exact RayD commit, integration header, runner, profile contract, diagnostic contract, and gate across all commits",
+    "freeze_ancestry": "the independent gate-freeze commit must be an ancestor of P"
+  },
+  "measurement_policy": {
+    "groups": ["enumerated_penetration", "montecarlo_penetration", "diffraction"],
+    "independent_process_pairs_per_group": 5,
+    "warmup_per_process": 1,
+    "steady_repeats_per_process": 7,
+    "pair_order": ["AB", "BA", "AB", "BA", "AB"],
+    "paired_bootstrap_resamples": 100000,
+    "paired_bootstrap_confidence": 0.95
+  },
+  "fresh_channel_builds": {
+    "unique_commits": 5,
+    "config_accepts_prebuilt_extension": false,
+    "python_environment": "witwin2",
+    "build_type": "Release",
+    "cuda_architectures": ["120-real"],
+    "initial_state": "source, build, and install directories absent",
+    "rayd_source": "one runner-owned clean 474c122 clone with locked origin, API 6 header identity and SHA; never the caller's working tree",
+    "ordering": "P, E, M, D, and S build sequentially against the shared read-only RayD source",
+    "msvc_environment": "frozen cmd.exe/vcvars64.bat; retained output is restricted to the explicit compiler/SDK path allowlist; raw cl/link/nvcc version probes cross-check CMake compiler facts",
+    "retained": [
+      "clone, checkout, source-tree, configure, build, and install stdout/stderr",
+      "source archive and Git tree identity",
+      "CMakeCache and CXX/CUDA compiler configuration",
+      "installed Python source manifest",
+      "native extension bytes and build fingerprint"
+    ]
+  },
+  "profiling": {
+    "semantic_source": "central profile contract only",
+    "stable_range_prefix": "witwin.channel_native:",
+    "stage_timing": "all correlated GPU activities first-start to last-end; kernel-active and copy-active time remain separate",
+    "range_copy_audit": "correlated H2D, D2H, and device-copy counts/bytes plus explicit copy stream ids and caller-stream mismatch",
+    "fail_closed": [
+      "missing or duplicate correlation",
+      "ambiguous multi-stream stage",
+      "correlation shared by non-nested sibling ranges",
+      "missing required or present forbidden stable range"
+    ]
+  },
+  "diagnostics": {
+    "ordering": "after timed workers and Nsight; one independent process per A/B member",
+    "timed_gate_includes_diagnostic_memory": false,
+    "enumerated": "real old/new high-level transmission topology owner arrays compare bitwise",
+    "montecarlo": "real old/new straight transmission chain owner arrays compare bitwise",
+    "diffraction_baseline": "old compact/atomic target distribution only",
+    "diffraction_candidate": "target plus pair-major/state-fast valid, six components, int32[1] num_paths, and aliased CapacityFailureState bits",
+    "oracle": "test-only float64 ascending-state six-component serial sum followed by non-contracted component power",
+    "retained": [
+      "strict worker stdout/stderr",
+      "uncompressed NPZ arrays with dtype/shape-aware semantic hashes",
+      "device peak, host process peak, host-array bytes, and artifact bytes"
+    ]
+  },
+  "anti_fabrication_rules": [
+    "dry-run is non-claiming and measured mode rejects every remaining null gate fact",
+    "raw inventory must exactly equal the recursively referenced retained artifacts",
+    "all executable, source, build, profiler, worker, wheel, and release identities replay from retained bytes",
+    "developer extension overrides and externally supplied native extensions are rejected",
+    "gate freeze is a separate commit based on controlled measurements, never an infrastructure default"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "schema": {
+    "name": "witwin.channel.fullwave-validation-scenarios",
+    "version": "1.0.0"
+  },
+  "electromagnetic_scaling": {
+    "frequency_hz": 5000000000.0,
+    "geometry_scale_from_original_channel_examples": 0.1,
+    "note": "Relative layouts follow the original channel single/three-cube examples; geometry is scaled to keep full-wave runs bounded."
+  },
+  "materials": {
+    "metal": {
+      "ground_truth_model": "PECMedium",
+      "deterministic_model": "PerfectConductor",
+      "eps_r": 1.0,
+      "sigma_e": 0.0
+    },
+    "dielectric": {
+      "ground_truth_model": "Medium(permittivity=4, conductivity=0.01)",
+      "deterministic_model": "PhysicalSurface(single layer, half-cube thickness per interface)",
+      "eps_r": 4.0,
+      "sigma_e": 0.01
+    }
+  },
+  "scenarios": {
+    "single_cube": {
+      "source_layout": "channel/examples/deterministic_radiomap_single_cube.py",
+      "analysis_bounds_xy": [[-0.8, 0.8], [-0.8, 0.8]],
+      "domain_bounds_xyz": [[-0.996875, 1.003125], [-0.996875, 1.003125], [-0.296875, 0.603125]],
+      "plane_z": 0.1,
+      "tx_position": [-0.2, -0.5, 0.42],
+      "cube_centers": [[0.0, 0.0, 0.15]],
+      "cube_size_m": 0.2,
+      "receiver_shape": [256, 256],
+      "fullwave_dl_m": 0.00625,
+      "fullwave_pml_layers": 12,
+      "max_depth": 2
+    },
+    "three_cube": {
+      "source_layout": "channel/examples/deterministic_radiomap_three_cubes.py",
+      "analysis_bounds_xy": [[-1.0, 1.0], [-1.0, 1.0]],
+      "domain_bounds_xyz": [[-1.4, 1.4], [-1.4, 1.4], [-0.5, 0.9]],
+      "plane_z": 0.1,
+      "tx_position": [0.0, -0.5, 0.4],
+      "cube_centers": [[-0.25, -0.3, 0.15], [0.2, 0.05, 0.15], [-0.05, 0.35, 0.15]],
+      "cube_size_m": 0.2,
+      "receiver_shape": [256, 256],
+      "fullwave_dl_m": 0.00625,
+      "fullwave_pml_layers": 12,
+      "max_depth": 5
+    },
+    "three_cube_320": {
+      "source_layout": "channel/examples/deterministic_radiomap_three_cubes.py",
+      "analysis_bounds_xy": [[-1.0, 1.0], [-1.0, 1.0]],
+      "domain_bounds_xyz": [
+        [-1.396875, 1.403125],
+        [-1.396875, 1.403125],
+        [-0.496875, 0.903125]
+      ],
+      "plane_z": 0.1,
+      "tx_position": [0.0, -0.5, 0.4],
+      "cube_centers": [[-0.25, -0.3, 0.15], [0.2, 0.05, 0.15], [-0.05, 0.35, 0.15]],
+      "cube_size_m": 0.2,
+      "receiver_shape": [320, 320],
+      "fullwave_dl_m": 0.00625,
+      "fullwave_pml_layers": 12,
+      "max_depth": 5
+    }
+  }
+}

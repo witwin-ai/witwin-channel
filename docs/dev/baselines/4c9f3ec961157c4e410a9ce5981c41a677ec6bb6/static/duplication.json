@@ -1,0 +1,4208 @@
+{
+  "combined": {
+    "coverage_percent": 10.211512,
+    "duplicate_lines": 6479,
+    "files": 231,
+    "region_count": 121,
+    "total_lines": 63448
+  },
+  "corpora": {
+    "native": {
+      "coverage_percent": 16.033989,
+      "duplicate_lines": 4925,
+      "files": 61,
+      "region_count": 87,
+      "total_lines": 30716
+    },
+    "python": {
+      "coverage_percent": 4.747648,
+      "duplicate_lines": 1554,
+      "files": 170,
+      "region_count": 34,
+      "total_lines": 32732
+    }
+  },
+  "generated_by": "tools/duplication_report.py",
+  "metric": "exact-token-duplicate-regions",
+  "min_tokens": 100,
+  "per_file": [
+    {
+      "corpus": "native",
+      "coverage_percent": 20.303867,
+      "duplicate_lines": 294,
+      "file": "native/channel_native/bdpt.cpp",
+      "total_lines": 1448
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/binding/bdpt.cpp",
+      "total_lines": 413
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/binding/build.cpp",
+      "total_lines": 13
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 30.623819,
+      "duplicate_lines": 162,
+      "file": "native/channel_native/binding/fields.cpp",
+      "total_lines": 529
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/binding/materials.cpp",
+      "total_lines": 91
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/binding/module.cpp",
+      "total_lines": 20
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 16.510903,
+      "duplicate_lines": 53,
+      "file": "native/channel_native/binding/montecarlo.cpp",
+      "total_lines": 321
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 3.776978,
+      "duplicate_lines": 21,
+      "file": "native/channel_native/binding/path.cpp",
+      "total_lines": 556
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 28.101266,
+      "duplicate_lines": 111,
+      "file": "native/channel_native/binding/rayd.cpp",
+      "total_lines": 395
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/binding/registry.h",
+      "total_lines": 19
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/build_info.cpp",
+      "total_lines": 61
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/em/complex.cuh",
+      "total_lines": 60
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/em/fresnel.cuh",
+      "total_lines": 57
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/em/layer_stack.cuh",
+      "total_lines": 167
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/em/medium.cuh",
+      "total_lines": 47
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/field_transport.cuh",
+      "total_lines": 411
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/field_transport_ad.cuh",
+      "total_lines": 1422
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 9.830508,
+      "duplicate_lines": 29,
+      "file": "native/channel_native/kernels/accum.cu",
+      "total_lines": 295
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 1.767677,
+      "duplicate_lines": 7,
+      "file": "native/channel_native/kernels/bdpt_accum.cu",
+      "total_lines": 396
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 6.21118,
+      "duplicate_lines": 30,
+      "file": "native/channel_native/kernels/bdpt_connect_accumulation.cu",
+      "total_lines": 483
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/bdpt_connect_common.cuh",
+      "total_lines": 302
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/bdpt_connect_mis.cu",
+      "total_lines": 58
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 22.962963,
+      "duplicate_lines": 217,
+      "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+      "total_lines": 945
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 22.881356,
+      "duplicate_lines": 135,
+      "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+      "total_lines": 590
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 9.160305,
+      "duplicate_lines": 12,
+      "file": "native/channel_native/kernels/bdpt_sampling.cu",
+      "total_lines": 131
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 29.073756,
+      "duplicate_lines": 339,
+      "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+      "total_lines": 1166
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/coupled_topology.cu",
+      "total_lines": 352
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 8.62423,
+      "duplicate_lines": 84,
+      "file": "native/channel_native/kernels/deterministic_accum.cu",
+      "total_lines": 974
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 5.517241,
+      "duplicate_lines": 48,
+      "file": "native/channel_native/kernels/deterministic_field.cu",
+      "total_lines": 870
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 25.166826,
+      "duplicate_lines": 264,
+      "file": "native/channel_native/kernels/deterministic_topology.cu",
+      "total_lines": 1049
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 22.348485,
+      "duplicate_lines": 413,
+      "file": "native/channel_native/kernels/diffraction.cu",
+      "total_lines": 1848
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 15.517241,
+      "duplicate_lines": 27,
+      "file": "native/channel_native/kernels/diffraction_discovery.cu",
+      "total_lines": 174
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/em_debug.cu",
+      "total_lines": 606
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 30.461538,
+      "duplicate_lines": 297,
+      "file": "native/channel_native/kernels/field_transport.cu",
+      "total_lines": 975
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 19.402985,
+      "duplicate_lines": 39,
+      "file": "native/channel_native/kernels/field_transport_ad_common.cuh",
+      "total_lines": 201
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 10.877863,
+      "duplicate_lines": 57,
+      "file": "native/channel_native/kernels/field_transport_free_space.cu",
+      "total_lines": 524
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 14.715719,
+      "duplicate_lines": 132,
+      "file": "native/channel_native/kernels/field_transport_reflection.cu",
+      "total_lines": 897
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 18.573046,
+      "duplicate_lines": 164,
+      "file": "native/channel_native/kernels/field_transport_transmission.cu",
+      "total_lines": 883
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 24.096386,
+      "duplicate_lines": 20,
+      "file": "native/channel_native/kernels/field_wedge_ad_common.cuh",
+      "total_lines": 83
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 3.444317,
+      "duplicate_lines": 30,
+      "file": "native/channel_native/kernels/field_wedge_ad_coupled.cu",
+      "total_lines": 871
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 12.875121,
+      "duplicate_lines": 133,
+      "file": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+      "total_lines": 1033
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/field_wedge_ad_prepare.cu",
+      "total_lines": 310
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 11.162791,
+      "duplicate_lines": 24,
+      "file": "native/channel_native/kernels/field_wedge_ad_project.cu",
+      "total_lines": 215
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 10.729614,
+      "duplicate_lines": 100,
+      "file": "native/channel_native/kernels/los.cu",
+      "total_lines": 932
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/material.cu",
+      "total_lines": 164
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 48.393443,
+      "duplicate_lines": 738,
+      "file": "native/channel_native/kernels/path_compaction.cu",
+      "total_lines": 1525
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 7.272727,
+      "duplicate_lines": 8,
+      "file": "native/channel_native/kernels/path_compaction_common.cuh",
+      "total_lines": 110
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 17.97207,
+      "duplicate_lines": 296,
+      "file": "native/channel_native/kernels/path_trace.cu",
+      "total_lines": 1647
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 25.864124,
+      "duplicate_lines": 217,
+      "file": "native/channel_native/kernels/reflection.cu",
+      "total_lines": 839
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/sampling.cu",
+      "total_lines": 49
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/kernels/scattering.cu",
+      "total_lines": 215
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 19.148936,
+      "duplicate_lines": 126,
+      "file": "native/channel_native/montecarlo_basic.cpp",
+      "total_lines": 658
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/path_block.h",
+      "total_lines": 58
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 8.077994,
+      "duplicate_lines": 29,
+      "file": "native/channel_native/path_solver.cpp",
+      "total_lines": 359
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 18.80109,
+      "duplicate_lines": 69,
+      "file": "native/channel_native/rayd/bridge.h",
+      "total_lines": 367
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 5.084746,
+      "duplicate_lines": 6,
+      "file": "native/channel_native/rayd/common.cpp",
+      "total_lines": 118
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 25.32833,
+      "duplicate_lines": 135,
+      "file": "native/channel_native/rayd/diffraction.cpp",
+      "total_lines": 533
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 4.075235,
+      "duplicate_lines": 13,
+      "file": "native/channel_native/rayd/geometry.cpp",
+      "total_lines": 319
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 10.154525,
+      "duplicate_lines": 46,
+      "file": "native/channel_native/rayd/reflection.cpp",
+      "total_lines": 453
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/rayd/scene.cpp",
+      "total_lines": 79
+    },
+    {
+      "corpus": "native",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "native/channel_native/tensor_checks.h",
+      "total_lines": 30
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/__init__.py",
+      "total_lines": 37
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/capabilities.py",
+      "total_lines": 209
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/ad_geometry.py",
+      "total_lines": 84
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/antenna.py",
+      "total_lines": 266
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/components.py",
+      "total_lines": 54
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/diffraction_geometry.py",
+      "total_lines": 45
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/edge_policy.py",
+      "total_lines": 49
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/edge_selection.py",
+      "total_lines": 131
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/field_state.py",
+      "total_lines": 104
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/kernels/__init__.py",
+      "total_lines": 5
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/kernels/extension.py",
+      "total_lines": 6
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/kernels/metadata.py",
+      "total_lines": 176
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/material_runtime.py",
+      "total_lines": 18
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/materials.py",
+      "total_lines": 31
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/memory_budget.py",
+      "total_lines": 145
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/objects.py",
+      "total_lines": 28
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/receiver_geometry.py",
+      "total_lines": 93
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/_validation.py",
+      "total_lines": 5
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/assignments.py",
+      "total_lines": 13
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/compiled_scene.py",
+      "total_lines": 19
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/geometry.py",
+      "total_lines": 8
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/material_store.py",
+      "total_lines": 8
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/runtime/raydn.py",
+      "total_lines": 30
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/scene.py",
+      "total_lines": 57
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/scene_loader.py",
+      "total_lines": 42
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/scene_tensors.py",
+      "total_lines": 23
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/core/tensor_math.py",
+      "total_lines": 9
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deployment.py",
+      "total_lines": 183
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/__init__.py",
+      "total_lines": 7
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 10.4,
+      "duplicate_lines": 26,
+      "file": "src/witwin/channel_native/deterministic/accumulation.py",
+      "total_lines": 250
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/config.py",
+      "total_lines": 81
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/field.py",
+      "total_lines": 130
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/kernels/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/kernels/accumulation.py",
+      "total_lines": 419
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/kernels/fields.py",
+      "total_lines": 14
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 5.172414,
+      "duplicate_lines": 18,
+      "file": "src/witwin/channel_native/deterministic/pipeline.py",
+      "total_lines": 348
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/result.py",
+      "total_lines": 45
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/deterministic/solver.py",
+      "total_lines": 40
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/__init__.py",
+      "total_lines": 32
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/encoding.py",
+      "total_lines": 131
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 24.864865,
+      "duplicate_lines": 46,
+      "file": "src/witwin/channel_native/materials/evaluation.py",
+      "total_lines": 185
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/kernels/__init__.py",
+      "total_lines": 26
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/kernels/autograd.py",
+      "total_lines": 220
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/kernels/contracts.py",
+      "total_lines": 45
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 10.687023,
+      "duplicate_lines": 28,
+      "file": "src/witwin/channel_native/materials/kernels/functional.py",
+      "total_lines": 262
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/models.py",
+      "total_lines": 536
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/materials/scene_loader.py",
+      "total_lines": 11
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/__init__.py",
+      "total_lines": 7
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/backend.py",
+      "total_lines": 87
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/config.py",
+      "total_lines": 48
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/kernels/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 1.430206,
+      "duplicate_lines": 25,
+      "file": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
+      "total_lines": 1748
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 33.757962,
+      "duplicate_lines": 53,
+      "file": "src/witwin/channel_native/montecarlo/basic/kernels/sampling.py",
+      "total_lines": 157
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 13.861386,
+      "duplicate_lines": 14,
+      "file": "src/witwin/channel_native/montecarlo/basic/metadata.py",
+      "total_lines": 101
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/pipeline.py",
+      "total_lines": 369
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 3.259604,
+      "duplicate_lines": 28,
+      "file": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+      "total_lines": 859
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/result.py",
+      "total_lines": 15
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/sampling.py",
+      "total_lines": 9
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/basic/solver.py",
+      "total_lines": 55
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/__init__.py",
+      "total_lines": 20
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/config.py",
+      "total_lines": 108
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/connections.py",
+      "total_lines": 56
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 19.493671,
+      "duplicate_lines": 77,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py",
+      "total_lines": 395
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 7.284768,
+      "duplicate_lines": 66,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
+      "total_lines": 906
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 30.38674,
+      "duplicate_lines": 55,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
+      "total_lines": 181
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/metadata.py",
+      "total_lines": 184
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/mis.py",
+      "total_lines": 25
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/pipeline.py",
+      "total_lines": 1440
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/result.py",
+      "total_lines": 33
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/sampling.py",
+      "total_lines": 17
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/solver.py",
+      "total_lines": 56
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/bdpt/subpaths.py",
+      "total_lines": 57
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/scattering_events.py",
+      "total_lines": 778
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/montecarlo/transmission.py",
+      "total_lines": 279
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/__init__.py",
+      "total_lines": 18
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/arrays.py",
+      "total_lines": 349
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/config.py",
+      "total_lines": 78
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/metadata.py",
+      "total_lines": 149
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/pipeline.py",
+      "total_lines": 192
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/result.py",
+      "total_lines": 683
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/schema.py",
+      "total_lines": 199
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/path/solver.py",
+      "total_lines": 42
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/physics/__init__.py",
+      "total_lines": 45
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/physics/conventions.py",
+      "total_lines": 16
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/physics/oracle.py",
+      "total_lines": 49
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/physics/reference/__init__.py",
+      "total_lines": 41
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 14.042553,
+      "duplicate_lines": 66,
+      "file": "src/witwin/channel_native/physics/reference/oracle.py",
+      "total_lines": 470
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/__init__.py",
+      "total_lines": 12
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/__init__.py",
+      "total_lines": 3
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/contracts.py",
+      "total_lines": 11
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/coupled.py",
+      "total_lines": 218
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 9.689922,
+      "duplicate_lines": 25,
+      "file": "src/witwin/channel_native/propagation/enumerated/diffraction.py",
+      "total_lines": 258
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/engine.py",
+      "total_lines": 254
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/los.py",
+      "total_lines": 87
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 20.907298,
+      "duplicate_lines": 106,
+      "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+      "total_lines": 507
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/scattering.py",
+      "total_lines": 1153
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/enumerated/transmission.py",
+      "total_lines": 213
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/fields/__init__.py",
+      "total_lines": 72
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 2.231237,
+      "duplicate_lines": 22,
+      "file": "src/witwin/channel_native/propagation/fields/evaluation.py",
+      "total_lines": 986
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/fields/kernels/__init__.py",
+      "total_lines": 62
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 4.959128,
+      "duplicate_lines": 91,
+      "file": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+      "total_lines": 1835
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 16.504854,
+      "duplicate_lines": 68,
+      "file": "src/witwin/channel_native/propagation/fields/kernels/deterministic.py",
+      "total_lines": 412
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 14.391144,
+      "duplicate_lines": 117,
+      "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+      "total_lines": 813
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/__init__.py",
+      "total_lines": 7
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/coupled.py",
+      "total_lines": 82
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/diffraction.py",
+      "total_lines": 207
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/endpoints.py",
+      "total_lines": 63
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/kernels/__init__.py",
+      "total_lines": 96
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 9.775641,
+      "duplicate_lines": 122,
+      "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+      "total_lines": 1248
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/kernels/bridge.py",
+      "total_lines": 293
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 40.162272,
+      "duplicate_lines": 198,
+      "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+      "total_lines": 493
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/reevaluate.py",
+      "total_lines": 180
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/reflection.py",
+      "total_lines": 60
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/transmission.py",
+      "total_lines": 46
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/geometry/visibility.py",
+      "total_lines": 57
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/models/__init__.py",
+      "total_lines": 15
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/models/contracts.py",
+      "total_lines": 15
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/models/evaluated.py",
+      "total_lines": 48
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/models/fields.py",
+      "total_lines": 59
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/models/geometry.py",
+      "total_lines": 69
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/models/topology.py",
+      "total_lines": 132
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/__init__.py",
+      "total_lines": 7
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 5.429864,
+      "duplicate_lines": 12,
+      "file": "src/witwin/channel_native/propagation/topology/concatenate.py",
+      "total_lines": 221
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/discovery/__init__.py",
+      "total_lines": 1
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/discovery/coupled.py",
+      "total_lines": 111
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/discovery/diffraction.py",
+      "total_lines": 76
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/discovery/los.py",
+      "total_lines": 29
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/discovery/reflection.py",
+      "total_lines": 305
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/discovery/transmission.py",
+      "total_lines": 83
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/export.py",
+      "total_lines": 324
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/__init__.py",
+      "total_lines": 87
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 4.75,
+      "duplicate_lines": 19,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/blocks.py",
+      "total_lines": 400
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 9.933775,
+      "duplicate_lines": 15,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/candidates.py",
+      "total_lines": 151
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 6.311637,
+      "duplicate_lines": 32,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+      "total_lines": 507
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/construction.py",
+      "total_lines": 544
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 38.626609,
+      "duplicate_lines": 90,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/primitives.py",
+      "total_lines": 233
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/propagation/topology/kernels/sampling.py",
+      "total_lines": 25
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/__init__.py",
+      "total_lines": 19
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/autograd_contracts.py",
+      "total_lines": 283
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/extension.py",
+      "total_lines": 421
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 27.731092,
+      "duplicate_lines": 33,
+      "file": "src/witwin/channel_native/runtime/native_buffers.py",
+      "total_lines": 119
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/native_handles.py",
+      "total_lines": 20
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/symbols.py",
+      "total_lines": 61
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/tensor_contracts.py",
+      "total_lines": 31
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/runtime/torch_compat.py",
+      "total_lines": 70
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scattering/__init__.py",
+      "total_lines": 34
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scattering/energy.py",
+      "total_lines": 83
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scattering/kernels/__init__.py",
+      "total_lines": 16
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scattering/kernels/functional.py",
+      "total_lines": 109
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scattering/phase_screen.py",
+      "total_lines": 250
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 7.521368,
+      "duplicate_lines": 44,
+      "file": "src/witwin/channel_native/scattering/tables.py",
+      "total_lines": 585
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/__init__.py",
+      "total_lines": 3
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/compile.py",
+      "total_lines": 379
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/compiled.py",
+      "total_lines": 103
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/kernels/__init__.py",
+      "total_lines": 12
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/kernels/rayd_scene.py",
+      "total_lines": 219
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/loader.py",
+      "total_lines": 786
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 12.946429,
+      "duplicate_lines": 58,
+      "file": "src/witwin/channel_native/scene/models.py",
+      "total_lines": 448
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/native_handles.py",
+      "total_lines": 8
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/scattering_resources.py",
+      "total_lines": 119
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/stores/__init__.py",
+      "total_lines": 3
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/stores/_validation.py",
+      "total_lines": 23
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/stores/assignments.py",
+      "total_lines": 50
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/stores/geometry.py",
+      "total_lines": 53
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/stores/materials.py",
+      "total_lines": 144
+    },
+    {
+      "corpus": "python",
+      "coverage_percent": 0.0,
+      "duplicate_lines": 0,
+      "file": "src/witwin/channel_native/scene/tensors.py",
+      "total_lines": 124
+    }
+  ],
+  "regions": [
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 835,
+          "file": "native/channel_native/kernels/deterministic_topology.cu",
+          "start_line": 729
+        },
+        {
+          "end_line": 966,
+          "file": "native/channel_native/kernels/deterministic_topology.cu",
+          "start_line": 860
+        }
+      ],
+      "region_id": "600d5db5bbda0ae8",
+      "token_count": 885
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 6,
+      "occurrences": [
+        {
+          "end_line": 125,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 98
+        },
+        {
+          "end_line": 154,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 126
+        },
+        {
+          "end_line": 830,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 805
+        },
+        {
+          "end_line": 918,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 844
+        },
+        {
+          "end_line": 1071,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 998
+        },
+        {
+          "end_line": 1166,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 1143
+        }
+      ],
+      "region_id": "1cdcaaca7932bf99",
+      "token_count": 587
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 7,
+      "occurrences": [
+        {
+          "end_line": 893,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 864
+        },
+        {
+          "end_line": 932,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 903
+        },
+        {
+          "end_line": 1116,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1087
+        },
+        {
+          "end_line": 1156,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1127
+        },
+        {
+          "end_line": 1290,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1279
+        },
+        {
+          "end_line": 1196,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1187
+        },
+        {
+          "end_line": 1217,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1208
+        }
+      ],
+      "region_id": "885d871c81128e0f",
+      "token_count": 465
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 1100,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1071
+        },
+        {
+          "end_line": 1210,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1181
+        },
+        {
+          "end_line": 257,
+          "file": "native/channel_native/rayd/diffraction.cpp",
+          "start_line": 251
+        }
+      ],
+      "region_id": "2f5e4651ce09bac9",
+      "token_count": 396
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 11,
+      "occurrences": [
+        {
+          "end_line": 530,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 500
+        },
+        {
+          "end_line": 544,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 533
+        },
+        {
+          "end_line": 644,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 612
+        },
+        {
+          "end_line": 659,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 649
+        },
+        {
+          "end_line": 842,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 803
+        },
+        {
+          "end_line": 1052,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1020
+        },
+        {
+          "end_line": 1255,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1222
+        },
+        {
+          "end_line": 1367,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1327
+        },
+        {
+          "end_line": 1477,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1444
+        },
+        {
+          "end_line": 1487,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1477
+        },
+        {
+          "end_line": 1609,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1599
+        }
+      ],
+      "region_id": "31d668c835805b7b",
+      "token_count": 368
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 721,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 671
+        },
+        {
+          "end_line": 887,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 837
+        }
+      ],
+      "region_id": "63472b1e830460ad",
+      "token_count": 365
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 5,
+      "occurrences": [
+        {
+          "end_line": 333,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 288
+        },
+        {
+          "end_line": 374,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 334
+        },
+        {
+          "end_line": 642,
+          "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+          "start_line": 567
+        },
+        {
+          "end_line": 816,
+          "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+          "start_line": 744
+        },
+        {
+          "end_line": 919,
+          "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+          "start_line": 905
+        }
+      ],
+      "region_id": "fce60ebaf4025545",
+      "token_count": 334
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 187,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 165
+        },
+        {
+          "end_line": 356,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 330
+        },
+        {
+          "end_line": 563,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 537
+        }
+      ],
+      "region_id": "c054ffde843f8e08",
+      "token_count": 312
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 6,
+      "occurrences": [
+        {
+          "end_line": 66,
+          "file": "native/channel_native/binding/fields.cpp",
+          "start_line": 40
+        },
+        {
+          "end_line": 99,
+          "file": "native/channel_native/binding/fields.cpp",
+          "start_line": 67
+        },
+        {
+          "end_line": 139,
+          "file": "native/channel_native/binding/fields.cpp",
+          "start_line": 100
+        },
+        {
+          "end_line": 721,
+          "file": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+          "start_line": 684
+        },
+        {
+          "end_line": 782,
+          "file": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+          "start_line": 739
+        },
+        {
+          "end_line": 962,
+          "file": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+          "start_line": 912
+        }
+      ],
+      "region_id": "016da97ced65aee8",
+      "token_count": 300
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 7,
+      "occurrences": [
+        {
+          "end_line": 588,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 566
+        },
+        {
+          "end_line": 712,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 676
+        },
+        {
+          "end_line": 828,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 789
+        },
+        {
+          "end_line": 737,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 722
+        },
+        {
+          "end_line": 871,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 856
+        },
+        {
+          "end_line": 721,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 703
+        },
+        {
+          "end_line": 859,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 841
+        }
+      ],
+      "region_id": "42d3dfefb13c0fce",
+      "token_count": 297
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 4,
+      "occurrences": [
+        {
+          "end_line": 437,
+          "file": "native/channel_native/kernels/deterministic_accum.cu",
+          "start_line": 407
+        },
+        {
+          "end_line": 453,
+          "file": "native/channel_native/kernels/deterministic_accum.cu",
+          "start_line": 440
+        },
+        {
+          "end_line": 199,
+          "file": "native/channel_native/kernels/field_transport_ad_common.cuh",
+          "start_line": 151
+        },
+        {
+          "end_line": 74,
+          "file": "native/channel_native/kernels/field_wedge_ad_common.cuh",
+          "start_line": 54
+        }
+      ],
+      "region_id": "e3a2e88d2ed37a9c",
+      "token_count": 297
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 7,
+      "occurrences": [
+        {
+          "end_line": 68,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 46
+        },
+        {
+          "end_line": 414,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 372
+        },
+        {
+          "end_line": 446,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 428
+        },
+        {
+          "end_line": 266,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 252
+        },
+        {
+          "end_line": 636,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 611
+        },
+        {
+          "end_line": 650,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 636
+        },
+        {
+          "end_line": 704,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 679
+        }
+      ],
+      "region_id": "2f7a18e890358ba8",
+      "token_count": 288
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1167,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1123
+        },
+        {
+          "end_line": 1278,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1234
+        }
+      ],
+      "region_id": "7da298b872725188",
+      "token_count": 258
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 346,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 334
+        },
+        {
+          "end_line": 522,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 510
+        }
+      ],
+      "region_id": "1ec83ce5841f084b",
+      "token_count": 240
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1121,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1104
+        },
+        {
+          "end_line": 1232,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1215
+        }
+      ],
+      "region_id": "4888c0cae87b4acb",
+      "token_count": 239
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 305,
+          "file": "native/channel_native/binding/rayd.cpp",
+          "start_line": 253
+        },
+        {
+          "end_line": 425,
+          "file": "native/channel_native/rayd/diffraction.cpp",
+          "start_line": 373
+        }
+      ],
+      "region_id": "eb11754503d51afc",
+      "token_count": 227
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 693,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 667
+        },
+        {
+          "end_line": 677,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 651
+        }
+      ],
+      "region_id": "5d78a718c5126f67",
+      "token_count": 225
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 4,
+      "occurrences": [
+        {
+          "end_line": 576,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 550
+        },
+        {
+          "end_line": 1404,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1371
+        },
+        {
+          "end_line": 1525,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1502
+        },
+        {
+          "end_line": 1634,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1613
+        }
+      ],
+      "region_id": "d11a824d77939ed5",
+      "token_count": 213
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 138,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 127
+        },
+        {
+          "end_line": 297,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 286
+        },
+        {
+          "end_line": 500,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 489
+        }
+      ],
+      "region_id": "70363529ade759ad",
+      "token_count": 211
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 749,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 727
+        },
+        {
+          "end_line": 585,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 562
+        }
+      ],
+      "region_id": "4a4f58ac213e92a5",
+      "token_count": 206
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 195,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 163
+        },
+        {
+          "end_line": 242,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 216
+        }
+      ],
+      "region_id": "4bc5cc61cfa99fc6",
+      "token_count": 205
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 474,
+          "file": "native/channel_native/kernels/field_transport_free_space.cu",
+          "start_line": 465
+        },
+        {
+          "end_line": 854,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 838
+        },
+        {
+          "end_line": 839,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 823
+        }
+      ],
+      "region_id": "73e9347304ea8676",
+      "token_count": 204
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 1710,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1704
+        },
+        {
+          "end_line": 1783,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1773
+        },
+        {
+          "end_line": 1833,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1823
+        }
+      ],
+      "region_id": "68eb65eef2af709c",
+      "token_count": 201
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 789,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 774
+        },
+        {
+          "end_line": 1002,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 987
+        }
+      ],
+      "region_id": "190b2f1a5403dd8b",
+      "token_count": 184
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 113,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 84
+        },
+        {
+          "end_line": 112,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 83
+        }
+      ],
+      "region_id": "bbc3f98551f23d7a",
+      "token_count": 183
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 1495,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1482
+        },
+        {
+          "end_line": 94,
+          "file": "native/channel_native/path_solver.cpp",
+          "start_line": 65
+        },
+        {
+          "end_line": 52,
+          "file": "native/channel_native/rayd/diffraction.cpp",
+          "start_line": 23
+        }
+      ],
+      "region_id": "6295de755885f51c",
+      "token_count": 179
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 5,
+      "occurrences": [
+        {
+          "end_line": 140,
+          "file": "native/channel_native/binding/montecarlo.cpp",
+          "start_line": 128
+        },
+        {
+          "end_line": 156,
+          "file": "native/channel_native/binding/montecarlo.cpp",
+          "start_line": 141
+        },
+        {
+          "end_line": 471,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 465
+        },
+        {
+          "end_line": 491,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 479
+        },
+        {
+          "end_line": 518,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 503
+        }
+      ],
+      "region_id": "52e8af17d440a0a5",
+      "token_count": 177
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 5,
+      "occurrences": [
+        {
+          "end_line": 1694,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1688
+        },
+        {
+          "end_line": 1751,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1739
+        },
+        {
+          "end_line": 1816,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1803
+        },
+        {
+          "end_line": 135,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 123
+        },
+        {
+          "end_line": 149,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 136
+        }
+      ],
+      "region_id": "8cd88c46a7d8ec3c",
+      "token_count": 177
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 278,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 253
+        },
+        {
+          "end_line": 462,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 437
+        }
+      ],
+      "region_id": "08e995cd62aad4d1",
+      "token_count": 174
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1213,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 1202
+        },
+        {
+          "end_line": 99,
+          "file": "native/channel_native/kernels/path_compaction_common.cuh",
+          "start_line": 92
+        }
+      ],
+      "region_id": "60fcd47087ddd4ff",
+      "token_count": 172
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 199,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 161
+        },
+        {
+          "end_line": 466,
+          "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+          "start_line": 428
+        }
+      ],
+      "region_id": "3b374aa97121b317",
+      "token_count": 167
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 767,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 754
+        },
+        {
+          "end_line": 865,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 852
+        }
+      ],
+      "region_id": "e19c2341dd990fc4",
+      "token_count": 164
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 86,
+          "file": "native/channel_native/kernels/deterministic_accum.cu",
+          "start_line": 73
+        },
+        {
+          "end_line": 179,
+          "file": "native/channel_native/kernels/deterministic_accum.cu",
+          "start_line": 166
+        },
+        {
+          "end_line": 286,
+          "file": "native/channel_native/kernels/deterministic_accum.cu",
+          "start_line": 269
+        }
+      ],
+      "region_id": "7628230603aa65f6",
+      "token_count": 160
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 311,
+          "file": "native/channel_native/kernels/deterministic_field.cu",
+          "start_line": 297
+        },
+        {
+          "end_line": 447,
+          "file": "native/channel_native/kernels/deterministic_field.cu",
+          "start_line": 433
+        }
+      ],
+      "region_id": "20469b8ba1e2057d",
+      "token_count": 157
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 4,
+      "occurrences": [
+        {
+          "end_line": 559,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 547
+        },
+        {
+          "end_line": 675,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 662
+        },
+        {
+          "end_line": 788,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 775
+        },
+        {
+          "end_line": 281,
+          "file": "native/channel_native/kernels/field_transport_free_space.cu",
+          "start_line": 271
+        }
+      ],
+      "region_id": "9113ddc6192ba484",
+      "token_count": 156
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1165,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 1150
+        },
+        {
+          "end_line": 203,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 188
+        }
+      ],
+      "region_id": "0ecf372b6f3684da",
+      "token_count": 151
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 647,
+          "file": "native/channel_native/kernels/deterministic_field.cu",
+          "start_line": 637
+        },
+        {
+          "end_line": 719,
+          "file": "native/channel_native/kernels/deterministic_field.cu",
+          "start_line": 709
+        }
+      ],
+      "region_id": "e1a50386e879093e",
+      "token_count": 150
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 629,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 617
+        },
+        {
+          "end_line": 821,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 809
+        }
+      ],
+      "region_id": "e8af5708739b8969",
+      "token_count": 150
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 170,
+          "file": "native/channel_native/binding/fields.cpp",
+          "start_line": 140
+        },
+        {
+          "end_line": 210,
+          "file": "native/channel_native/binding/fields.cpp",
+          "start_line": 180
+        },
+        {
+          "end_line": 857,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 828
+        }
+      ],
+      "region_id": "0856d52ffda63e53",
+      "token_count": 145
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 227,
+          "file": "native/channel_native/kernels/accum.cu",
+          "start_line": 220
+        },
+        {
+          "end_line": 375,
+          "file": "native/channel_native/kernels/bdpt_accum.cu",
+          "start_line": 369
+        }
+      ],
+      "region_id": "5b13f8cb8d030e64",
+      "token_count": 142
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 826,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 816
+        },
+        {
+          "end_line": 1044,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1034
+        }
+      ],
+      "region_id": "b0a73040392baa4b",
+      "token_count": 142
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 375,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 346
+        },
+        {
+          "end_line": 360,
+          "file": "native/channel_native/kernels/field_wedge_ad_coupled.cu",
+          "start_line": 331
+        }
+      ],
+      "region_id": "7cbdfdef8c6a096d",
+      "token_count": 141
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 629,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 609
+        },
+        {
+          "end_line": 672,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 652
+        }
+      ],
+      "region_id": "edf2e4d1b98e3f59",
+      "token_count": 141
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 320,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 307
+        },
+        {
+          "end_line": 516,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 501
+        }
+      ],
+      "region_id": "704e20e8bd10c483",
+      "token_count": 140
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 282,
+          "file": "native/channel_native/rayd/bridge.h",
+          "start_line": 257
+        },
+        {
+          "end_line": 310,
+          "file": "native/channel_native/rayd/bridge.h",
+          "start_line": 286
+        }
+      ],
+      "region_id": "8d9d9183e90b55c6",
+      "token_count": 140
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 244,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 229
+        },
+        {
+          "end_line": 263,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 248
+        }
+      ],
+      "region_id": "1448a12824b7d62c",
+      "token_count": 135
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 24,
+          "file": "native/channel_native/kernels/deterministic_topology.cu",
+          "start_line": 1
+        },
+        {
+          "end_line": 24,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1
+        }
+      ],
+      "region_id": "29a332634beff929",
+      "token_count": 135
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 153,
+          "file": "native/channel_native/kernels/accum.cu",
+          "start_line": 142
+        },
+        {
+          "end_line": 188,
+          "file": "native/channel_native/kernels/accum.cu",
+          "start_line": 177
+        }
+      ],
+      "region_id": "3da511e52cacd4b7",
+      "token_count": 135
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 54,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 39
+        },
+        {
+          "end_line": 251,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 236
+        }
+      ],
+      "region_id": "a34b1b0e14359094",
+      "token_count": 135
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 4,
+      "occurrences": [
+        {
+          "end_line": 247,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 224
+        },
+        {
+          "end_line": 313,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 289
+        },
+        {
+          "end_line": 396,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 371
+        },
+        {
+          "end_line": 606,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 581
+        }
+      ],
+      "region_id": "0c0107d82028ece4",
+      "token_count": 134
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 988,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 974
+        },
+        {
+          "end_line": 1135,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 1121
+        }
+      ],
+      "region_id": "a81c3138c5e0c778",
+      "token_count": 134
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 897,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 879
+        },
+        {
+          "end_line": 883,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 865
+        }
+      ],
+      "region_id": "e17f003d27d57878",
+      "token_count": 133
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 775,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 764
+        },
+        {
+          "end_line": 111,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 100
+        }
+      ],
+      "region_id": "9694e29e51052cb8",
+      "token_count": 131
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 121,
+          "file": "native/channel_native/binding/montecarlo.cpp",
+          "start_line": 109
+        },
+        {
+          "end_line": 444,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 432
+        }
+      ],
+      "region_id": "d6538cb05b5ced4e",
+      "token_count": 131
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 715,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 705
+        },
+        {
+          "end_line": 99,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 89
+        }
+      ],
+      "region_id": "f434a45f5cb4b0a1",
+      "token_count": 131
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 684,
+          "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+          "start_line": 677
+        },
+        {
+          "end_line": 845,
+          "file": "native/channel_native/kernels/bdpt_connect_samples.cu",
+          "start_line": 838
+        }
+      ],
+      "region_id": "8a9d6ca55a021baf",
+      "token_count": 128
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 572,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 548
+        },
+        {
+          "end_line": 635,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 611
+        }
+      ],
+      "region_id": "a1280c3b7f87cac6",
+      "token_count": 128
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 192,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 182
+        },
+        {
+          "end_line": 516,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 506
+        }
+      ],
+      "region_id": "dfbd316a356c80ae",
+      "token_count": 128
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 769,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 758
+        },
+        {
+          "end_line": 610,
+          "file": "native/channel_native/kernels/field_transport_transmission.cu",
+          "start_line": 595
+        }
+      ],
+      "region_id": "622329f8a478cc73",
+      "token_count": 127
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 386,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 378
+        },
+        {
+          "end_line": 413,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 406
+        },
+        {
+          "end_line": 493,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 484
+        }
+      ],
+      "region_id": "962312f518345be4",
+      "token_count": 127
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 755,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 745
+        },
+        {
+          "end_line": 969,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 959
+        }
+      ],
+      "region_id": "e3baf626b3c6e751",
+      "token_count": 127
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 719,
+          "file": "native/channel_native/kernels/deterministic_topology.cu",
+          "start_line": 707
+        },
+        {
+          "end_line": 853,
+          "file": "native/channel_native/kernels/deterministic_topology.cu",
+          "start_line": 841
+        }
+      ],
+      "region_id": "8d99010ad7c7ff84",
+      "token_count": 125
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 771,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 763
+        },
+        {
+          "end_line": 985,
+          "file": "native/channel_native/kernels/path_compaction.cu",
+          "start_line": 977
+        }
+      ],
+      "region_id": "ab2fbf32bbed57d6",
+      "token_count": 124
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 194,
+          "file": "native/channel_native/binding/rayd.cpp",
+          "start_line": 162
+        },
+        {
+          "end_line": 373,
+          "file": "native/channel_native/rayd/reflection.cpp",
+          "start_line": 341
+        }
+      ],
+      "region_id": "2647871bf1914a66",
+      "token_count": 123
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 330,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 318
+        },
+        {
+          "end_line": 504,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 492
+        }
+      ],
+      "region_id": "651981f0dc7ee1d9",
+      "token_count": 122
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 127,
+          "file": "native/channel_native/kernels/diffraction_discovery.cu",
+          "start_line": 121
+        },
+        {
+          "end_line": 172,
+          "file": "native/channel_native/kernels/diffraction_discovery.cu",
+          "start_line": 166
+        }
+      ],
+      "region_id": "92db3c4752ca2477",
+      "token_count": 120
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 421,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 407
+        },
+        {
+          "end_line": 574,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 560
+        }
+      ],
+      "region_id": "06342d7e5a635ad3",
+      "token_count": 118
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 30,
+          "file": "native/channel_native/kernels/field_wedge_ad_project.cu",
+          "start_line": 19
+        },
+        {
+          "end_line": 79,
+          "file": "native/channel_native/kernels/field_wedge_ad_project.cu",
+          "start_line": 68
+        }
+      ],
+      "region_id": "29591dce40e20e3c",
+      "token_count": 117
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 252,
+          "file": "native/channel_native/bdpt.cpp",
+          "start_line": 226
+        },
+        {
+          "end_line": 317,
+          "file": "native/channel_native/kernels/bdpt_connect_visibility.cu",
+          "start_line": 291
+        }
+      ],
+      "region_id": "aa1a1f0135d6dcd3",
+      "token_count": 117
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 252,
+          "file": "native/channel_native/binding/rayd.cpp",
+          "start_line": 228
+        },
+        {
+          "end_line": 164,
+          "file": "native/channel_native/rayd/diffraction.cpp",
+          "start_line": 140
+        }
+      ],
+      "region_id": "ed6ac289285f13e1",
+      "token_count": 117
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1247,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1234
+        },
+        {
+          "end_line": 1294,
+          "file": "native/channel_native/kernels/path_trace.cu",
+          "start_line": 1281
+        }
+      ],
+      "region_id": "15144b1272a834bb",
+      "token_count": 116
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 76,
+          "file": "native/channel_native/kernels/diffraction_discovery.cu",
+          "start_line": 70
+        },
+        {
+          "end_line": 90,
+          "file": "native/channel_native/kernels/diffraction_discovery.cu",
+          "start_line": 85
+        }
+      ],
+      "region_id": "5a869cd26cfde7b0",
+      "token_count": 115
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 35,
+          "file": "native/channel_native/kernels/field_transport_free_space.cu",
+          "start_line": 24
+        },
+        {
+          "end_line": 81,
+          "file": "native/channel_native/kernels/field_transport_free_space.cu",
+          "start_line": 70
+        },
+        {
+          "end_line": 188,
+          "file": "native/channel_native/kernels/field_transport_free_space.cu",
+          "start_line": 177
+        }
+      ],
+      "region_id": "1024cd0b4a266a0c",
+      "token_count": 114
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 121,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 112
+        },
+        {
+          "end_line": 175,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 166
+        }
+      ],
+      "region_id": "85faad32c57fe131",
+      "token_count": 113
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 672,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 667
+        },
+        {
+          "end_line": 758,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 751
+        },
+        {
+          "end_line": 804,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 797
+        }
+      ],
+      "region_id": "e8b79b659e5cd11d",
+      "token_count": 113
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 667,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 663
+        },
+        {
+          "end_line": 745,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 741
+        },
+        {
+          "end_line": 792,
+          "file": "native/channel_native/kernels/reflection.cu",
+          "start_line": 788
+        }
+      ],
+      "region_id": "72818521aea3834c",
+      "token_count": 111
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 27,
+          "file": "native/channel_native/kernels/bdpt_sampling.cu",
+          "start_line": 14
+        },
+        {
+          "end_line": 58,
+          "file": "native/channel_native/kernels/bdpt_subpaths.cu",
+          "start_line": 45
+        }
+      ],
+      "region_id": "9cac2e5d2f6db482",
+      "token_count": 110
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 108,
+          "file": "native/channel_native/binding/montecarlo.cpp",
+          "start_line": 98
+        },
+        {
+          "end_line": 412,
+          "file": "native/channel_native/montecarlo_basic.cpp",
+          "start_line": 402
+        }
+      ],
+      "region_id": "d3fc20b351a2eca6",
+      "token_count": 110
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 180,
+          "file": "native/channel_native/kernels/field_transport.cu",
+          "start_line": 167
+        },
+        {
+          "end_line": 102,
+          "file": "native/channel_native/kernels/field_transport_reflection.cu",
+          "start_line": 89
+        }
+      ],
+      "region_id": "736226ef21ad004d",
+      "token_count": 109
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 374,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 368
+        },
+        {
+          "end_line": 400,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 394
+        },
+        {
+          "end_line": 478,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 471
+        }
+      ],
+      "region_id": "f1d8fdd528ee096b",
+      "token_count": 109
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 212,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 203
+        },
+        {
+          "end_line": 290,
+          "file": "native/channel_native/kernels/los.cu",
+          "start_line": 281
+        }
+      ],
+      "region_id": "5b46cc78aedcd003",
+      "token_count": 104
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1299,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1293
+        },
+        {
+          "end_line": 1377,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1371
+        }
+      ],
+      "region_id": "1dd686c2d6766794",
+      "token_count": 103
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 255,
+          "file": "native/channel_native/rayd/bridge.h",
+          "start_line": 238
+        },
+        {
+          "end_line": 15,
+          "file": "native/channel_native/rayd/common.cpp",
+          "start_line": 10
+        }
+      ],
+      "region_id": "5d93b5ac5a1765cd",
+      "token_count": 103
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 47,
+          "file": "native/channel_native/kernels/bdpt_connect_accumulation.cu",
+          "start_line": 32
+        },
+        {
+          "end_line": 111,
+          "file": "native/channel_native/kernels/bdpt_connect_accumulation.cu",
+          "start_line": 96
+        }
+      ],
+      "region_id": "2452c606f1151c92",
+      "token_count": 102
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 181,
+          "file": "native/channel_native/rayd/geometry.cpp",
+          "start_line": 169
+        },
+        {
+          "end_line": 190,
+          "file": "native/channel_native/rayd/reflection.cpp",
+          "start_line": 178
+        }
+      ],
+      "region_id": "6ed62094d3b7940f",
+      "token_count": 102
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 42,
+          "file": "native/channel_native/binding/path.cpp",
+          "start_line": 22
+        },
+        {
+          "end_line": 228,
+          "file": "native/channel_native/rayd/diffraction.cpp",
+          "start_line": 208
+        }
+      ],
+      "region_id": "30703f9b3d6b0d0c",
+      "token_count": 101
+    },
+    {
+      "corpus": "native",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1515,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1486
+        },
+        {
+          "end_line": 1544,
+          "file": "native/channel_native/kernels/diffraction.cu",
+          "start_line": 1515
+        }
+      ],
+      "region_id": "c4735bb3b408816b",
+      "token_count": 101
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 5,
+      "occurrences": [
+        {
+          "end_line": 109,
+          "file": "src/witwin/channel_native/montecarlo/basic/kernels/sampling.py",
+          "start_line": 80
+        },
+        {
+          "end_line": 127,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
+          "start_line": 98
+        },
+        {
+          "end_line": 112,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/candidates.py",
+          "start_line": 98
+        },
+        {
+          "end_line": 87,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/primitives.py",
+          "start_line": 67
+        },
+        {
+          "end_line": 164,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/primitives.py",
+          "start_line": 146
+        }
+      ],
+      "region_id": "1621deeef77b0d42",
+      "token_count": 304
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 6,
+      "occurrences": [
+        {
+          "end_line": 106,
+          "file": "src/witwin/channel_native/propagation/enumerated/diffraction.py",
+          "start_line": 81
+        },
+        {
+          "end_line": 77,
+          "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+          "start_line": 63
+        },
+        {
+          "end_line": 103,
+          "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+          "start_line": 89
+        },
+        {
+          "end_line": 322,
+          "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+          "start_line": 295
+        },
+        {
+          "end_line": 355,
+          "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+          "start_line": 335
+        },
+        {
+          "end_line": 26,
+          "file": "src/witwin/channel_native/propagation/topology/concatenate.py",
+          "start_line": 15
+        }
+      ],
+      "region_id": "bc5f7c8117cbef85",
+      "token_count": 284
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 115,
+          "file": "src/witwin/channel_native/materials/evaluation.py",
+          "start_line": 80
+        },
+        {
+          "end_line": 220,
+          "file": "src/witwin/channel_native/physics/reference/oracle.py",
+          "start_line": 176
+        }
+      ],
+      "region_id": "9075cec2a19027b9",
+      "token_count": 273
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 4,
+      "occurrences": [
+        {
+          "end_line": 156,
+          "file": "src/witwin/channel_native/montecarlo/basic/kernels/sampling.py",
+          "start_line": 134
+        },
+        {
+          "end_line": 171,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/sampling.py",
+          "start_line": 145
+        },
+        {
+          "end_line": 131,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/primitives.py",
+          "start_line": 105
+        },
+        {
+          "end_line": 208,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/primitives.py",
+          "start_line": 182
+        }
+      ],
+      "region_id": "61155589c4b1479d",
+      "token_count": 267
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 120,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 97
+        },
+        {
+          "end_line": 434,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 411
+        }
+      ],
+      "region_id": "cd8f4c416d0170b4",
+      "token_count": 241
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 334,
+          "file": "src/witwin/channel_native/physics/reference/oracle.py",
+          "start_line": 302
+        },
+        {
+          "end_line": 125,
+          "file": "src/witwin/channel_native/scattering/tables.py",
+          "start_line": 104
+        }
+      ],
+      "region_id": "822986c52ce94201",
+      "token_count": 237
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 5,
+      "occurrences": [
+        {
+          "end_line": 37,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 25
+        },
+        {
+          "end_line": 83,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 62
+        },
+        {
+          "end_line": 143,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 120
+        },
+        {
+          "end_line": 387,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 365
+        },
+        {
+          "end_line": 457,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 434
+        }
+      ],
+      "region_id": "5ed4360463420a7b",
+      "token_count": 217
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 52,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "start_line": 37
+        },
+        {
+          "end_line": 203,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/compaction.py",
+          "start_line": 188
+        }
+      ],
+      "region_id": "3242436a74c0e86c",
+      "token_count": 167
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 314,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
+          "start_line": 282
+        },
+        {
+          "end_line": 409,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/paths.py",
+          "start_line": 377
+        }
+      ],
+      "region_id": "18ccbc6a61c763d8",
+      "token_count": 161
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 211,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "start_line": 184
+        },
+        {
+          "end_line": 297,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "start_line": 270
+        }
+      ],
+      "region_id": "b62eda431fcd1344",
+      "token_count": 153
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 150,
+          "file": "src/witwin/channel_native/materials/evaluation.py",
+          "start_line": 139
+        },
+        {
+          "end_line": 261,
+          "file": "src/witwin/channel_native/physics/reference/oracle.py",
+          "start_line": 250
+        }
+      ],
+      "region_id": "f8fede21dbaef0e9",
+      "token_count": 151
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 181,
+          "file": "src/witwin/channel_native/scene/models.py",
+          "start_line": 163
+        },
+        {
+          "end_line": 216,
+          "file": "src/witwin/channel_native/scene/models.py",
+          "start_line": 195
+        },
+        {
+          "end_line": 254,
+          "file": "src/witwin/channel_native/scene/models.py",
+          "start_line": 236
+        }
+      ],
+      "region_id": "602f99c2329c2122",
+      "token_count": 135
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 192,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py",
+          "start_line": 174
+        },
+        {
+          "end_line": 28,
+          "file": "src/witwin/channel_native/propagation/topology/kernels/blocks.py",
+          "start_line": 9
+        }
+      ],
+      "region_id": "cb6b4edbee6eabc8",
+      "token_count": 132
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 332,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+          "start_line": 306
+        },
+        {
+          "end_line": 659,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+          "start_line": 633
+        }
+      ],
+      "region_id": "6476d3cb1932d22c",
+      "token_count": 127
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 3,
+      "occurrences": [
+        {
+          "end_line": 57,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 46
+        },
+        {
+          "end_line": 176,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 165
+        },
+        {
+          "end_line": 282,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 271
+        }
+      ],
+      "region_id": "224ad0c4836925fc",
+      "token_count": 126
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 82,
+          "file": "src/witwin/channel_native/deterministic/accumulation.py",
+          "start_line": 70
+        },
+        {
+          "end_line": 102,
+          "file": "src/witwin/channel_native/deterministic/accumulation.py",
+          "start_line": 90
+        }
+      ],
+      "region_id": "49a43dea8b880914",
+      "token_count": 125
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 180,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/deterministic.py",
+          "start_line": 163
+        },
+        {
+          "end_line": 270,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/deterministic.py",
+          "start_line": 253
+        }
+      ],
+      "region_id": "3bf29855db49aec7",
+      "token_count": 124
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 49,
+          "file": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
+          "start_line": 37
+        },
+        {
+          "end_line": 366,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py",
+          "start_line": 354
+        }
+      ],
+      "region_id": "a10e3b1ea01ebf41",
+      "token_count": 123
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1178,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+          "start_line": 1157
+        },
+        {
+          "end_line": 760,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 739
+        }
+      ],
+      "region_id": "e15a6c3ca8b4bf99",
+      "token_count": 123
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 130,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 110
+        },
+        {
+          "end_line": 219,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 199
+        }
+      ],
+      "region_id": "1d255af1d01dc7a7",
+      "token_count": 122
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 143,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py",
+          "start_line": 129
+        },
+        {
+          "end_line": 88,
+          "file": "src/witwin/channel_native/runtime/native_buffers.py",
+          "start_line": 74
+        }
+      ],
+      "region_id": "2bd5a62aa6e943ab",
+      "token_count": 121
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 284,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 260
+        },
+        {
+          "end_line": 347,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/primitives.py",
+          "start_line": 323
+        }
+      ],
+      "region_id": "90ca5db1b2431d26",
+      "token_count": 121
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 411,
+          "file": "src/witwin/channel_native/montecarlo/basic/kernels/maps.py",
+          "start_line": 400
+        },
+        {
+          "end_line": 276,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py",
+          "start_line": 265
+        }
+      ],
+      "region_id": "86d5ad1f52ad5c35",
+      "token_count": 120
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 221,
+          "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+          "start_line": 208
+        },
+        {
+          "end_line": 474,
+          "file": "src/witwin/channel_native/propagation/enumerated/reflection.py",
+          "start_line": 461
+        }
+      ],
+      "region_id": "49b8802b51890c79",
+      "token_count": 119
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 161,
+          "file": "src/witwin/channel_native/montecarlo/bdpt/kernels/maps.py",
+          "start_line": 144
+        },
+        {
+          "end_line": 111,
+          "file": "src/witwin/channel_native/runtime/native_buffers.py",
+          "start_line": 94
+        }
+      ],
+      "region_id": "a091f9d45593019f",
+      "token_count": 116
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 751,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "start_line": 734
+        },
+        {
+          "end_line": 1113,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "start_line": 1086
+        }
+      ],
+      "region_id": "a3d071f1519ab151",
+      "token_count": 111
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 230,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "start_line": 216
+        },
+        {
+          "end_line": 313,
+          "file": "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+          "start_line": 299
+        }
+      ],
+      "region_id": "0c15425799261dd5",
+      "token_count": 110
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 1628,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/autograd.py",
+          "start_line": 1612
+        },
+        {
+          "end_line": 306,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+          "start_line": 290
+        }
+      ],
+      "region_id": "8f52521f454c3a8f",
+      "token_count": 108
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 188,
+          "file": "src/witwin/channel_native/deterministic/pipeline.py",
+          "start_line": 169
+        },
+        {
+          "end_line": 100,
+          "file": "src/witwin/channel_native/montecarlo/basic/metadata.py",
+          "start_line": 85
+        }
+      ],
+      "region_id": "cb8a35f2d5c3d45f",
+      "token_count": 102
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 434,
+          "file": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "start_line": 421
+        },
+        {
+          "end_line": 461,
+          "file": "src/witwin/channel_native/montecarlo/basic/raydn_components.py",
+          "start_line": 448
+        }
+      ],
+      "region_id": "a17935e1ad7fbb2a",
+      "token_count": 101
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 311,
+          "file": "src/witwin/channel_native/scattering/tables.py",
+          "start_line": 300
+        },
+        {
+          "end_line": 334,
+          "file": "src/witwin/channel_native/scattering/tables.py",
+          "start_line": 323
+        }
+      ],
+      "region_id": "b642ee6e6c5248f3",
+      "token_count": 101
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 289,
+          "file": "src/witwin/channel_native/propagation/fields/evaluation.py",
+          "start_line": 277
+        },
+        {
+          "end_line": 379,
+          "file": "src/witwin/channel_native/propagation/fields/evaluation.py",
+          "start_line": 367
+        }
+      ],
+      "region_id": "6ce0690a21d4d0a8",
+      "token_count": 100
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 25,
+          "file": "src/witwin/channel_native/materials/kernels/functional.py",
+          "start_line": 12
+        },
+        {
+          "end_line": 233,
+          "file": "src/witwin/channel_native/materials/kernels/functional.py",
+          "start_line": 220
+        }
+      ],
+      "region_id": "77167f8aa1ace8da",
+      "token_count": 100
+    },
+    {
+      "corpus": "python",
+      "occurrence_count": 2,
+      "occurrences": [
+        {
+          "end_line": 113,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/deterministic.py",
+          "start_line": 98
+        },
+        {
+          "end_line": 205,
+          "file": "src/witwin/channel_native/propagation/fields/kernels/deterministic.py",
+          "start_line": 190
+        }
+      ],
+      "region_id": "a6bb7f491c236ca3",
+      "token_count": 100
+    }
+  ],
+  "schema_version": 1
+}

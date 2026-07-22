@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "scope": "dormant ADR-029 enumerated canonical capacity selector",
+  "symbol": "enumerated_canonical_capacity_select",
+  "definitions": {
+    "N": "host-known candidate capacity",
+    "P": "host-known endpoint pair count",
+    "S": "primitive_sequence width"
+  },
+  "ordering": {
+    "implementation": "CUB DeviceRadixSort::SortPairs over signed int64 keys",
+    "passes": "S + 7",
+    "stability": "stable",
+    "signed_order": "full 64-bit radix range; CUB inverts the signed-integral sign bit before sorting, preserving ascending signed order",
+    "tie_order": "original source-row ordinal preserved by stable least-significant-first passes"
+  },
+  "logical_device_work": {
+    "explicit_kernels": "S + 16",
+    "stable_radix_sort_operations": "S + 7",
+    "device_select_operations": 2,
+    "host_device_copies": 0,
+    "host_synchronizations": 0,
+    "stream_waits": 0
+  },
+  "memory_bytes_excluding_allocator_rounding": {
+    "published_outputs": "9*N + 4*P + 4",
+    "base_temporary": "51*N + 8*P + 12",
+    "additional_peak": "max(CUB radix-sort scratch(N), CUB DeviceSelect scratch(N))",
+    "scratch_allocations": "one host-known max-sized CUB scratch allocation per call, reused by all S+7 radix passes and both DeviceSelect operations",
+    "notes": "CUB scratch tensors are stream-ordered; no device count is copied to the host for sizing."
+  },
+  "activation_status": "dormant-no-live-caller",
+  "acceptance": "Exact-vs-live tests freeze stable source-row order, canonical deduplication, shortest winner, global/per-pair max_paths, invalid poison handling, all-or-nothing contract failure, and independence from public pair capacity."
+}

@@ -1,0 +1,2496 @@
+{
+  "auto_seed": {
+    "matched_regions": 0,
+    "note": "Primal and AD kernels share device primitives through included headers, so no >=100-token region spans a primal/_ad file pair; every region below is hand-curated.",
+    "rule": "occurrences pairing a primal native file with its _ad counterpart are seeded numeric_sensitive_exempt"
+  },
+  "baseline": {
+    "combined_duplicate_lines": 6479,
+    "combined_total_lines": 63448,
+    "coverage_percent": 10.211512,
+    "git_sha": "4c9f3ec961157c4e410a9ce5981c41a677ec6bb6",
+    "region_count": 121,
+    "report": "docs/dev/baselines/4c9f3ec961157c4e410a9ce5981c41a677ec6bb6/static/duplication.json"
+  },
+  "adr029_lockstep_duplicates": [
+    {
+      "owner": "deterministic PathTable capacity export",
+      "source": "native/channel_native/kernels/deterministic_path_table_capacity_pack.cu::path_table_phase_from_field",
+      "lockstep_with": "native/channel_native/kernels/deterministic_field.cu::deterministic_phase_from_field_kernel",
+      "reason": "Dormant valid rows must preserve the live phase export bit-for-bit without modifying live compiler output; numerical deduplication requires a separate change.",
+      "lockstep_tests": [
+        "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_phase_duplicate_is_explicitly_locked",
+        "tests/deterministic/test_path_table_capacity_pack.py::test_path_table_capacity_pack_matches_live_export_bitwise"
+      ]
+    }
+  ],
+  "adr030_lockstep_duplicates": [
+    {
+      "owner": "deterministic diffraction source-lane pair reduction",
+      "source": "native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu::deterministic_diffraction_pair_reduce_kernel",
+      "lockstep_with": "native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu::deterministic_diffraction_pair_reduce_jvp_kernel",
+      "reason": "ADR-030 freezes the same warp-per-pair lane-0 ascending-state shuffle/add order for primal fields and input tangents; deduplication may not change registers, launch geometry, evaluation order, or compiler output.",
+      "lockstep_tests": [
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_source_contract_is_frozen",
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_autograd_and_forward_ad_use_native_companions"
+      ]
+    }
+  ],
+  "categories": [
+    "host_check",
+    "indexing_packing",
+    "numeric_sensitive_exempt",
+    "fixture_boilerplate",
+    "other"
+  ],
+  "generated_by": "tools/duplication_report.py with hand curation",
+  "metric": "exact-token-duplicate-regions",
+  "min_tokens": 100,
+  "phase6a_refresh": {
+    "combined_duplicate_lines": 11049,
+    "combined_total_lines": 86143,
+    "coverage_percent": 12.826347,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Phase 6A pruned stale IDs and classified current IDs without weakening the frozen maintenance budget.",
+    "region_count": 183,
+    "status": "all current regions classified; frozen coverage budget remains unchanged"
+  },
+  "phase6b_refresh": {
+    "combined_duplicate_lines": 10700,
+    "combined_total_lines": 85188,
+    "coverage_percent": 12.560455,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Phase 6B removed the Channel transmission-sequence owner, pruned stale IDs, and classified replacement regions without weakening the frozen maintenance budget.",
+    "region_count": 178,
+    "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  },
+  "phase8a_refresh": {
+    "combined_duplicate_lines": 10661,
+    "combined_total_lines": 84347,
+    "coverage_percent": 12.639454,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Phase 8A removed the Channel pure-wedge numerical owner, pruned its stale binding/source region, and classified the typed RayD adapter packing regions without weakening the frozen maintenance budget.",
+    "region_count": 179,
+    "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  },
+  "regions": {
+    "06d4aba35fa86f3f": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport_free_space.cu",
+        "field_transport_reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6B hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 127
+    },
+    "087071df59f9130c": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 119
+    },
+    "08e995cd62aad4d1": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_visibility.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 174
+    },
+    "0c0107d82028ece4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 134
+    },
+    "0e638b46f6ebf1be": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 162
+    },
+    "0ecf372b6f3684da": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 151
+    },
+    "1024cd0b4a266a0c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_transport_free_space.cu"
+      ],
+      "owner": "field_transport_free_space",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 114
+    },
+    "1448a12824b7d62c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "owner": "montecarlo-basic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 135
+    },
+    "15144b1272a834bb": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 116
+    },
+    "18ccbc6a61c763d8": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "paths.py"
+      ],
+      "owner": "paths",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 161
+    },
+    "1a9cad1d61e158fe": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "kirchhoff_table_ad.cu",
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 114
+    },
+    "1c108704c3bb7df7": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 102
+    },
+    "1cdcaaca7932bf99": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_subpaths.cu"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 587
+    },
+    "1dd686c2d6766794": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 103
+    },
+    "1eadf7071c0627b9": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression.",
+      "token_count": 101
+    },
+    "1f73e1106deadf6d": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "accumulation.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "ADR-029 C2-D hand-reviewed region refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 134
+    },
+    "20469b8ba1e2057d": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_field.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_deterministic_accum_ad.py"
+      ],
+      "owner": "deterministic-field",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 157
+    },
+    "2452c606f1151c92": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/test_bdpt_native_boundaries.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Deterministic double-precision accumulation; reduction order must not change.",
+      "token_count": 102
+    },
+    "24a9b2a79222fdd8": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 162
+    },
+    "24ac75de500e84ef": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 173
+    },
+    "26b4a4634fea5fd7": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the coupled double-diffraction binding boundary.",
+      "token_count": 155
+    },
+    "29591dce40e20e3c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_project.cu"
+      ],
+      "owner": "field_wedge_ad_project",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 117
+    },
+    "29a332634beff929": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "deterministic_topology.cu",
+        "path_trace.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Shared translation-unit include prologue.",
+      "token_count": 135
+    },
+    "2bd5a62aa6e943ab": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "maps.py",
+        "native_buffers.py"
+      ],
+      "owner": "maps",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python-side tensor validation before the native call.",
+      "token_count": 121
+    },
+    "2f09398c73b234db": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu",
+        "montecarlo_basic.cpp"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 182
+    },
+    "2f7a18e890358ba8": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 288
+    },
+    "30820c2b0c28c542": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_ad_dispatch.cpp",
+        "bdpt_connect_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 211
+    },
+    "31d668c835805b7b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 368
+    },
+    "329271e17c8918f2": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "maps.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 115
+    },
+    "33f205624b330d54": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "scattering.py",
+        "scattering_chain.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 345
+    },
+    "39639ea63f0496c5": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_accum.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "ADR-029 C2-D hand-reviewed region refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 117
+    },
+    "39fba1bdc872f8a6": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 115
+    },
+    "3b374aa97121b317": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_samples.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 167
+    },
+    "3bf29855db49aec7": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "deterministic.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 124
+    },
+    "3da511e52cacd4b7": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "accum.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 135
+    },
+    "49b8802b51890c79": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "reflection.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 119
+    },
+    "4a4431ace8749e13": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_diffraction_pair_reduce.cu"
+      ],
+      "lockstep_tests": [
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_source_contract_is_frozen",
+        "tests/deterministic/test_diffraction_pair_reduce.py::test_diffraction_pair_reduce_autograd_and_forward_ad_use_native_companions"
+      ],
+      "owner": "deterministic",
+      "provenance": "ADR-030 dormant pair-reducer hand-reviewed classification",
+      "reason": "Primal and JVP intentionally repeat the frozen warp-per-pair lane-0 ascending-state shuffle/add sequence; sharing or reordering it requires separate compiler-output and exactness evidence.",
+      "token_count": 129
+    },
+    "4c160fa53e86cc03": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_solver.cpp",
+        "path_trace.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 111
+    },
+    "51af77c218729139": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 236
+    },
+    "51ed96fd75e3bcd8": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "deterministic_path_table_capacity_pack.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "ADR-029 C2-D hand-reviewed refresh",
+      "reason": "Repeated optional tangent/cotangent metadata validation; no numerical computation.",
+      "token_count": 115
+    },
+    "53674b499b83c070": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 106
+    },
+    "574c8d3285c266be": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "primitives.py",
+        "sampling.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 267
+    },
+    "5a869cd26cfde7b0": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction_discovery.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 115
+    },
+    "5b13f8cb8d030e64": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "accum.cu",
+        "bdpt_accum.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 142
+    },
+    "5b46cc78aedcd003": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 104
+    },
+    "5e716c94087d4d49": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 140
+    },
+    "5fb315a9e787f465": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "table_build_ad.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 103
+    },
+    "600d5db5bbda0ae8": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_topology.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 885
+    },
+    "602f99c2329c2122": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "models.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 135
+    },
+    "60fcd47087ddd4ff": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_compaction_common.cuh"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 172
+    },
+    "33b858162352529b": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/path/test_path_result_capacity.py::test_path_result_capacity_endpoint_vjp_is_bitwise_current_torch_reduction",
+        "tests/path/test_path_result_capacity.py::test_endpoint_angle_singular_vjp_and_jvp_match_torch_branches"
+      ],
+      "owner": "path fixed-capacity endpoint VJP reduction",
+      "provenance": "ADR-029 C2-P exact endpoint branch fix",
+      "reason": "TX and RX pair-major serial loops deliberately repeat the fixed-row angle VJP contribution sequence while applying opposite endpoint signs; refactoring the loops risks changing public float32 reduction bits.",
+      "token_count": 101
+    },
+    "63472b1e830460ad": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 365
+    },
+    "64908018cf171f4c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_ad_dispatch.cpp",
+        "bdpt_connect_accumulation.cu"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 336
+    },
+    "67cdf649eb910c3c": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "accum.cu",
+        "bdpt_maps.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 141
+    },
+    "68eb65eef2af709c": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 201
+    },
+    "69b828cd092f61f6": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "bridge.py",
+        "primitives.py"
+      ],
+      "owner": "propagation",
+      "provenance": "ADR-029 C2-D hand-reviewed refresh",
+      "reason": "Repeated CUDA tensor shape/dtype/device facade validation.",
+      "token_count": 112
+    },
+    "6a6cd66ce1fb7900": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_rough_scale.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 118
+    },
+    "6dd8fb87a2462064": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 340
+    },
+    "704e20e8bd10c483": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 140
+    },
+    "72818521aea3834c": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 111
+    },
+    "736226ef21ad004d": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 109
+    },
+    "76fc2effc268231f": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 119
+    },
+    "77167f8aa1ace8da": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 100
+    },
+    "793ce38b12b29f4b": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 122
+    },
+    "7d41c8eaabfb4040": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "montecarlo_basic.cpp",
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 136
+    },
+    "8048f394ebbf8448": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 170
+    },
+    "804a59223ef9470c": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "primitives.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 136
+    },
+    "822986c52ce94201": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "oracle.py",
+        "tables.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 237
+    },
+    "8286022e6fe92069": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "coupled_topology.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 157
+    },
+    "8428b51cf9690a25": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 125
+    },
+    "84d3ed58786cd593": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 202
+    },
+    "86d5ad1f52ad5c35": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "maps.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 120
+    },
+    "8787f39ed8aea454": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "coupled_topology.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 117
+    },
+    "885d871c81128e0f": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 465
+    },
+    "8ad12154d8608118": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 120
+    },
+    "8d99010ad7c7ff84": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_topology.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 125
+    },
+    "8e89bcae3ac23cff": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 133
+    },
+    "9075cec2a19027b9": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "evaluation.py",
+        "oracle.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 273
+    },
+    "90ca5db1b2431d26": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "primitives.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 121
+    },
+    "93bfe40c3a26d66d": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu"
+      ],
+      "owner": "path",
+      "provenance": "ADR-029 C2-D hand-reviewed region refresh",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 184
+    },
+    "94a75dd55bf91386": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "kirchhoff_table_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 190
+    },
+    "94f481028d5c675f": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 108
+    },
+    "97f5f0596e11f82b": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 101
+    },
+    "993244068125503a": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "kirchhoff_table_ad.cu",
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated typed RayD request/result packing at the Channel ABI boundary; no RF physics, geometry, or fallback implementation.",
+      "token_count": 107
+    },
+    "99d66c5a4047c077": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic_accum.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "ADR-029 C2-D hand-reviewed region refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 160
+    },
+    "9cac2e5d2f6db482": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_sampling.cu",
+        "bdpt_subpaths.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 110
+    },
+    "a091f9d45593019f": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "maps.py",
+        "native_buffers.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 116
+    },
+    "a10e3b1ea01ebf41": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "maps.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 123
+    },
+    "a1280c3b7f87cac6": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 128
+    },
+    "a3d071f1519ab151": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 111
+    },
+    "a6bb7f491c236ca3": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "deterministic.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 100
+    },
+    "a81c3138c5e0c778": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 134
+    },
+    "aa1a1f0135d6dcd3": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp",
+        "bdpt_connect_visibility.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 117
+    },
+    "ab2fbf32bbed57d6": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 124
+    },
+    "ae6c3286b7940564": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 166
+    },
+    "ae92a087d34df326": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "concatenate.py",
+        "diffraction.py",
+        "reflection.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 284
+    },
+    "b0a73040392baa4b": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_trace.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 142
+    },
+    "b475dbf93c651169": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_rough_scale.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 135
+    },
+    "b62eda431fcd1344": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 153
+    },
+    "b642ee6e6c5248f3": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "tables.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 101
+    },
+    "b9a56478adf9e8e8": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 C2-D hand-reviewed region refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 228
+    },
+    "bbc3f98551f23d7a": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 183
+    },
+    "bdab82ed0601eef9": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "los.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "domain owner",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 206
+    },
+    "be0980c50ba9b298": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 113
+    },
+    "be3a5f2bef607175": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 112
+    },
+    "c054ffde843f8e08": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_mc_basic_ad.py"
+      ],
+      "owner": "montecarlo-basic-reflection",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 312
+    },
+    "c3b5db868ad3a4eb": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "montecarlo_basic.cpp",
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 136
+    },
+    "c4edac5b268c2667": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "compaction.py"
+      ],
+      "owner": "compaction",
+      "provenance": "ADR-029 C2-D hand-reviewed region refresh",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 167
+    },
+    "c72e314ee9a1edc6": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression.",
+      "token_count": 174
+    },
+    "c96235a200940c25": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_ad.cu",
+        "bdpt_connect_samples.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 216
+    },
+    "ca29e5aa3ea5de86": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_ad_dispatch.cpp",
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 616
+    },
+    "cb8a35f2d5c3d45f": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "metadata.py",
+        "pipeline.py"
+      ],
+      "owner": "metadata",
+      "provenance": "hand-curated",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 102
+    },
+    "cd0ce455a7973fc5": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_free_space.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6B hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 156
+    },
+    "cf67303a54e874de": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 134
+    },
+    "d11a824d77939ed5": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu",
+        "path_trace.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 213
+    },
+    "d5a0a4dae10f85b0": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_transport_reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6B hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 277
+    },
+    "d5e8c089c56f063b": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "kirchhoff_table_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 108
+    },
+    "d6288484ac890965": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "kirchhoff_table_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 299
+    },
+    "d8c17ba0c2e5de8e": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_connect_accumulation.cu",
+        "bdpt_connect_ad.cu",
+        "bdpt_maps.cu",
+        "deterministic_accum.cu",
+        "field_rough_scale.cu",
+        "field_transport_ad_common.cuh",
+        "field_wedge_ad_common.cuh",
+        "kirchhoff_table_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "shared native numerical owners",
+      "provenance": "Phase 10A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 299
+    },
+    "dcacb56ca104985c": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 108
+    },
+    "e1a50386e879093e": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "deterministic_field.cu"
+      ],
+      "owner": "deterministic",
+      "provenance": "hand-curated",
+      "reason": "Structural tensor packing, pointer wiring, or launch bookkeeping with no floating-point expression.",
+      "token_count": 150
+    },
+    "e2ef15655a3d9bf7": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 136
+    },
+    "e38afe8c5b7b5620": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "blocks.py",
+        "maps.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 176
+    },
+    "e3baf626b3c6e751": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "path_compaction.cu"
+      ],
+      "owner": "path",
+      "provenance": "hand-curated",
+      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
+      "token_count": 127
+    },
+    "e40d096024fb7437": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "bdpt_subpaths_ad.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "bdpt",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 108
+    },
+    "e91415034247c119": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "rayd_components.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 108
+    },
+    "eb0805f928df9300": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "primitives.py",
+        "sampling.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
+      "token_count": 260
+    },
+    "eb9126329a65a992": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd_coupled_dd.py",
+        "functional.py"
+      ],
+      "owner": "autograd",
+      "provenance": "hand-curated",
+      "reason": "Repeated Python facade signature and argument plumbing for the coupled double-diffraction field op.",
+      "token_count": 161
+    },
+    "ec154ad9bf4c853e": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "montecarlo.cpp",
+        "montecarlo_basic.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
+      "token_count": 182
+    },
+    "edf2e4d1b98e3f59": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "bdpt.cpp"
+      ],
+      "owner": "bdpt",
+      "provenance": "hand-curated",
+      "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
+      "token_count": 141
+    },
+    "f1d8fdd528ee096b": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "owner": "diffraction",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping with no floating-point expression.",
+      "token_count": 109
+    },
+    "f34ec15d3420e882": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_wedge_ad_coupled.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_solver_diffraction_coupled_ad.py",
+        "tests/test_native_owner_inventory.py"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Coupled double-diffraction primal kernel and its AD dual mirror share pair setup and index bookkeeping in lockstep (ADR-013 D4); the floating-point physics lives in the shared RayD header.",
+      "token_count": 309
+    },
+    "f4cacba1764ffda8": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression.",
+      "token_count": 127
+    },
+    "f6a3fd1ad42d62b4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "field_wedge_ad_coupled.cu"
+      ],
+      "owner": "field-transport",
+      "provenance": "hand-curated",
+      "reason": "Repeated kernel control-flow and index bookkeeping between the coupled R-D and double-diffraction AD companions; no floating-point expression.",
+      "token_count": 136
+    },
+    "f8fede21dbaef0e9": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "python",
+      "files": [
+        "evaluation.py",
+        "oracle.py"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/kernels/test_em_layer_stack.py",
+        "tests/kernels/test_scattering_kernels.py"
+      ],
+      "owner": "materials-evaluation",
+      "provenance": "hand-curated",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 151
+    },
+    "fdae13a3851322c5": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "reflection_candidate_capacity.cu"
+      ],
+      "owner": "propagation.topology",
+      "provenance": "ADR-029 C2-D hand-reviewed refresh",
+      "reason": "Repeated reflection candidate capacity indexing and canonical inert packing.",
+      "token_count": 130
+    },
+    "003356bd2408db73": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity AD gather",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated source-unique cotangent row scatter for the same eleven continuous tensor fields; no reduction or floating-point formula is shared.",
+      "token_count": 353
+    },
+    "089e31c8c3dd4d1e": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "deterministic_path_table_capacity_pack.cu",
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "native fixed-capacity AD boundaries",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated explicit JVP callable signatures at independently owned typed ABI boundaries.",
+      "token_count": 129
+    },
+    "08a840fb2cb6b4ab": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated optional-tensor JVP declaration argument lists at the explicit pybind boundary.",
+      "token_count": 130
+    },
+    "1ff5b21e55e98990": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated optional-tensor backward declaration argument lists at the explicit pybind boundary.",
+      "token_count": 130
+    },
+    "251ea6d7f75cd0c4": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_continuous_gather_ad.cuh",
+        "evaluated_paths_payload_plumbing.h"
+      ],
+      "owner": "propagation.enumerated typed allocation plumbing",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated host-side tensor allocation shapes for continuous and complete evaluated-path payload contracts.",
+      "token_count": 140
+    },
+    "484beedcf38e9196": {
+      "category": "host_check",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_continuous_gather_ad.cuh",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "owner": "native AD boundary validation",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated optional CUDA tensor shape, dtype, device, and stride extraction at typed AD boundaries.",
+      "token_count": 146
+    },
+    "87dc65b298223cb1": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity AD boundary",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated explicit backward signatures for eleven optional continuous cotangents.",
+      "token_count": 129
+    },
+    "dc657c2d5c0f6110": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity AD gather",
+      "provenance": "ADR-029 canonical evaluated-path gather hand-reviewed refresh",
+      "reason": "Repeated valid-first tangent row gather for the same eleven continuous tensor fields; no reduction or floating-point formula is shared.",
+      "token_count": 367
+    },
+    "fdeb673e3d1c15bb": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "montecarlo_basic.cpp",
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "montecarlo",
+      "provenance": "Phase 6A hand-reviewed refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 101
+    },
+    "a673abf6bad42166": {
+      "category": "other",
+      "corpus": "python",
+      "files": [
+        "transmission.py"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
+      "reason": "The private validator and stable typed facade intentionally repeat the complete named input signature for API discoverability; the facade only validates and dispatches native computation.",
+      "token_count": 109
+    },
+    "e0144ba0a1cb062c": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "ADR-027 dormant MC estimator hand-reviewed classification",
+      "reason": "Repeated host-side kernel argument wiring preserves the explicit primal/VJP/JVP launch contracts and contains no numerical implementation.",
+      "token_count": 207
+    },
+    "0741ed62c9f6707a": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "enumerated_transmission_topology_pack.cu"
+      ],
+      "owner": "propagation.topology",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "The initialization and shared-failure sanitizer repeat the fixed-capacity output schema so both paths publish the same fully inert pair-major topology; the region contains only structural row/slot indexing and sentinel packing.",
+      "token_count": 340
+    },
+    "0f0278ca3dfb02fb": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit realization primal/VJP/JVP typed signatures at the Channel-to-RayD boundary preserve stable argument order and contain no scattering computation.",
+      "token_count": 232
+    },
+    "2df09a1243facb7f": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "fields.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated pure-wedge typed request and primal/VJP/JVP signatures preserve the explicit valid-first ABI contract; no diffraction physics is implemented at this boundary.",
+      "token_count": 138
+    },
+    "3eb70547dc615000": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit scattering facade signatures and valid-mask validation preserve keyword, inspect, and native-dispatch contracts without providing a Python numerical backend.",
+      "token_count": 149
+    },
+    "6bdda1482b7cc655": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd_chain.py",
+        "functional_chain.py"
+      ],
+      "owner": "scattering",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit chain-scattering facade signatures, validation, and argument plumbing preserve the required valid-first native contracts and contain no Python RF computation.",
+      "token_count": 263
+    },
+    "a1386ee9b4f36548": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "diffraction.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "RayD diffraction bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "The binding declaration and definition intentionally repeat the stable typed diffraction-path ABI signature; no geometry traversal is duplicated.",
+      "token_count": 126
+    },
+    "a8c718ba50f4e5ac": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py",
+        "functional.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit field facade signatures and valid-mask validation preserve functional/autograd boundary semantics and dispatch only to native companions.",
+      "token_count": 129
+    },
+    "b4f0f25b08b1a3d5": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "geometry.cpp",
+        "rayd.cpp"
+      ],
+      "owner": "RayD segment-penetration bindings",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "Binding declarations/definitions and VJP/JVP tape unpacking repeat the complete typed segment-penetration contract to preserve stable argument order; RayD remains the sole geometry owner.",
+      "token_count": 347
+    },
+    "b9570a364e4f4e94": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated tensor shape, dtype, device, and contiguity validation guards for explicit valid masks; no numerical expression is present.",
+      "token_count": 100
+    },
+    "ee1e5369c2498add": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated ensemble typed request and primal/VJP/JVP signatures preserve the explicit valid-first Channel-to-RayD contract and contain no RF implementation.",
+      "token_count": 125
+    },
+    "ef2dbb06233d6c1c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "materials.cpp"
+      ],
+      "owner": "bindings",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated chain-ensemble primal/VJP/JVP typed signatures preserve stable argument order at the native boundary and contain no scattering computation.",
+      "token_count": 213
+    },
+    "f020f470ebde98ca": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "lockstep_tests": [
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_blocked_slot_does_not_hide_later_contract_error",
+        "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_pins_left_to_right_three_wall_product"
+      ],
+      "owner": "montecarlo.basic",
+      "provenance": "Phase P ADR-027 hand-reviewed refresh",
+      "reason": "VJP and JVP deliberately repeat canonical validity, shared-failure preflight, and ascending wall setup where sharing could change register lifetime, compiler output, or floating-point evaluation order.",
+      "token_count": 159
+    },
+    "f13329e33cb8a917": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "functional.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "Phase P RayD API 6 hand-reviewed refresh",
+      "reason": "Repeated explicit valid-mask tensor contract checks enforce shape, dtype, device, and contiguity before native dispatch; no numerical expression is present.",
+      "token_count": 103
+    },
+    "0c15425799261dd5": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "autograd.py"
+      ],
+      "owner": "autograd",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated dataclass/model construction and argument boilerplate.",
+      "token_count": 110
+    },
+    "29f15a107fda2427": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "propagation.enumerated fixed-capacity payload initialization",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated structural pair/row inert initialization delegates all payload fields to the shared device initialize_row primitive.",
+      "token_count": 153
+    },
+    "3a03c110fcf83a42": {
+      "category": "host_check",
+      "corpus": "python",
+      "files": [
+        "bridge.py"
+      ],
+      "owner": "propagation.geometry segment penetration bridge",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated VJP/JVP tape identity and request-shape validation before native companion dispatch.",
+      "token_count": 101
+    },
+    "3ab36f984254672a": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "path bindings",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated complete evaluated-path tensor declaration order at the explicit typed ABI boundary.",
+      "token_count": 117
+    },
+    "59881bedbaeb7f03": {
+      "category": "fixture_boilerplate",
+      "corpus": "python",
+      "files": [
+        "capacity.py"
+      ],
+      "owner": "propagation.enumerated fixed-capacity autograd facade",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated native-output tuple and setup_context glue for fixed-capacity pack and failure sanitizer companions.",
+      "token_count": 104
+    },
+    "9b4aa0883a0e541a": {
+      "category": "indexing_packing",
+      "corpus": "python",
+      "files": [
+        "canonical_capacity.py",
+        "capacity.py"
+      ],
+      "owner": "propagation.enumerated typed result assembly",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated non-numerical assembly of PathTopology, PathGeometry, and PathFields from native named outputs.",
+      "token_count": 191
+    },
+    "bb7ce2b1f6892aba": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "path.cpp"
+      ],
+      "owner": "path bindings",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated explicit pybind registrations and named arguments preserve stable typed fixed-capacity operation signatures.",
+      "token_count": 214
+    },
+    "c03a4bc38400ad77": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_canonical_capacity_gather_ad.cu",
+        "evaluated_paths_capacity_pack_ad.cu",
+        "path_result_capacity_pack_ad.cu"
+      ],
+      "owner": "native fixed-capacity AD inert initialization",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated AD-only inert tangent initialization remains structural and contains no floating-point formula or reduction.",
+      "token_count": 400
+    },
+    "c5333985f3b9364f": {
+      "category": "indexing_packing",
+      "corpus": "native",
+      "files": [
+        "evaluated_paths_payload_plumbing.h"
+      ],
+      "owner": "propagation.enumerated shared payload plumbing",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Mirrored typed input/output data_ptr view assembly for the resident evaluated-path payload is structural only.",
+      "token_count": 239
+    },
+    "dd885b2b2c57138c": {
+      "category": "other",
+      "corpus": "native",
+      "files": [
+        "enumerated_capacity_failure_sanitize.cu",
+        "evaluated_paths_canonical_capacity_gather.cu",
+        "evaluated_paths_capacity_pack.cu"
+      ],
+      "owner": "native fixed-capacity evaluated-path boundaries",
+      "provenance": "Phase E ADR-027 hand-reviewed refresh",
+      "reason": "Repeated explicit complete callable signatures at independently owned typed boundaries contain no physics implementation.",
+      "token_count": 117
+    }
+  },
+  "schema_version": 1,
+  "adr027_foundation_refresh": {
+    "combined_duplicate_lines": 8714,
+    "combined_total_lines": 90566,
+    "coverage_percent": 9.6217,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 4,
+    "note": "The dormant ADR-027 MC estimator adds one explicit typed facade and one native primal/VJP/JVP family; all new exact-token regions are hand-classified without changing the frozen maintenance budget.",
+    "region_count": 160,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "phase13_phase_p_refresh": {
+    "combined_duplicate_lines": 9611,
+    "combined_total_lines": 94455,
+    "coverage_percent": 10.175216,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 14,
+    "pruned_region_count": 12,
+    "note": "Phase P added the dormant ADR-027 segment-penetration/topology foundation and adapted existing RayD-owned RF facades to the API 6 explicit valid-mask contract. All live exact-token regions were hand-reviewed and stale ids were pruned without changing the frozen maintenance budget or the immutable Phase 11A/11B evidence.",
+    "region_count": 171,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "phase13_phase_e_refresh": {
+    "combined_duplicate_lines": 9621,
+    "combined_total_lines": 95279,
+    "coverage_percent": 10.097713,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 9,
+    "pruned_region_count": 9,
+    "note": "Phase E activated the ADR-027 enumerated batched penetration path, added ADR-029 result-boundary failure sanitization, and consolidated primal evaluated-path payload views plus inert row initialization/copy into shared structural plumbing. All current exact-token regions were hand-reviewed and stale ids were pruned without changing the frozen maintenance budget or historical Phase 11/Phase P evidence.",
+    "region_count": 171,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "adr032_stable_recovery_refresh": {
+    "combined_duplicate_lines": 9591,
+    "combined_total_lines": 95609,
+    "coverage_percent": 10.031482,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 0,
+    "pruned_region_count": 1,
+    "note": "ADR-032 removed the public ADR-029 per-pair capacity fields from the Path and Deterministic solver configs. The associated non-numerical shared validation region therefore no longer exists; no numerical duplicate was deduplicated and historical refresh evidence remains immutable.",
+    "region_count": 170,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "phase10a_refresh": {
+    "combined_duplicate_lines": 9730,
+    "combined_total_lines": 81675,
+    "coverage_percent": 11.91307,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Phase 10A removed the five Channel scattering numerical TUs and private table helper, pruned stale regions, and classified typed RayD adapter packing without weakening the frozen maintenance budget.",
+    "region_count": 169,
+    "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  },
+  "phase10b_refresh": {
+    "combined_duplicate_lines": 8747,
+    "combined_total_lines": 78304,
+    "coverage_percent": 11.170566,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "note": "Phase 10B removed the four Channel scattering-chain numerical TUs, pruned 12 stale regions, and classified three typed RayD adapter packing regions without weakening the frozen maintenance budget.",
+    "region_count": 160,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen coverage budget remains unchanged and remains a known nightly blocker"
+  },
+  "phase11a_refresh": {
+    "combined_duplicate_lines": 8402,
+    "combined_total_lines": 78162,
+    "coverage_percent": 10.749469,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 0,
+    "note": "Phase 11A mechanically deduplicated typed request packing in fields.cpp and materials.cpp, pruned five stale binding-boundary regions, and retained explicit pybind signatures without weakening the frozen maintenance budget.",
+    "region_count": 155,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; boundary deduplication complete; frozen duplication acceptance remains pending Phase 11B"
+  },
+  "phase11b_refresh": {
+    "combined_duplicate_lines": 7826,
+    "combined_total_lines": 77821,
+    "coverage_percent": 10.056413,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 1,
+    "note": "Phase 11B deduplicated Python facade validation/result/argument packing and native non-numerical CUDA launch/configuration boilerplate while retaining every explicit callable signature and the frozen maintenance budget.",
+    "region_count": 143,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance met"
+  },
+  "phase8b_c2d_refresh": {
+    "status": "current duplicate regions classified without weakening the frozen budget",
+    "region_count": 152,
+    "frozen_coverage_percent": 10.211512
+  }
+}

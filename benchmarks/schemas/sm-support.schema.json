@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://witwin.dev/schemas/channel-sm-support-1.0.0.json",
+  "title": "Channel declared and verified SM support",
+  "type": "object",
+  "required": ["schema", "build_architectures", "policy"],
+  "properties": {
+    "schema": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "witwin.channel.sm-support"},
+        "version": {"const": "1.0.0"}
+      }
+    },
+    "build_architectures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sm", "mode", "status", "evidence"],
+        "properties": {
+          "sm": {"type": "integer"},
+          "mode": {"enum": ["sass", "sass+ptx"]},
+          "status": {"enum": ["declared_unverified", "verified"]},
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["artifact", "runtime", "result"],
+              "properties": {
+                "artifact": {"type": "string"},
+                "runtime": {"type": "object"},
+                "result": {"const": "passed"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "policy": {"type": "object"}
+  }
+}

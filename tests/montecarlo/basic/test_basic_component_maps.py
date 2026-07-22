@@ -1,0 +1,420 @@
+import pytest
+import torch
+
+from tests.support.scenes import single_wall_reflection_scene, wedge_diffraction_scene
+from witwin.channel import ReceiverGrid, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.basic import Config, solve
+import witwin.channel.montecarlo.basic.backend as basic_backend
+import witwin.channel.montecarlo.basic.rayd_components as rayd_components
+
+_REFERENCE_EDGE_INFO_PLANE_TOL = 1.34e-5
+
+
+def _grid_at_x(x: float) -> ReceiverGrid:
+    return ReceiverGrid(
+        origin=torch.tensor([x, -1.0, -0.5]),
+        x_axis=torch.tensor([0.0, 1.0, 0.0]),
+        y_axis=torch.tensor([0.0, 0.0, 1.0]),
+        shape=(4, 4),
+        spacing=(2.0 / 3.0, 1.0 / 3.0),
+    )
+
+
+def _non_square_grid_at_x(x: float) -> ReceiverGrid:
+    return ReceiverGrid(
+        origin=torch.tensor([x, -1.0, -0.5]),
+        x_axis=torch.tensor([0.0, 1.0, 0.0]),
+        y_axis=torch.tensor([0.0, 0.0, 1.0]),
+        shape=(2, 3),
+        spacing=(1.0, 0.5),
+    )
+
+
+def _safe_normalize_vectors(vectors: torch.Tensor, *, eps: float = 1.0e-6) -> torch.Tensor:
+    return torch.nn.functional.normalize(vectors, dim=1, eps=eps)
+
+
+def _unsigned_angle(a: torch.Tensor, b: torch.Tensor, axis: torch.Tensor) -> torch.Tensor:
+    cross = torch.cross(a, b, dim=1)
+    signed_norm = torch.sign((cross * axis).sum(dim=1)) * torch.linalg.vector_norm(cross, dim=1)
+    angle = torch.atan2(signed_norm, (a * b).sum(dim=1))
+    return torch.where(angle < 0.0, angle + 2.0 * torch.pi, angle)
+
+
+def _opposite_vertex(face: torch.Tensor, shared0: torch.Tensor, shared1: torch.Tensor) -> torch.Tensor:
+    face = face.to(dtype=torch.long)
+    x_other = (face[:, 0] != shared0) & (face[:, 0] != shared1)
+    y_other = (face[:, 1] != shared0) & (face[:, 1] != shared1)
+    return torch.where(x_other, face[:, 0], torch.where(y_other, face[:, 1], face[:, 2]))
+
+
+def _selected_diffraction_edges_reference(records) -> torch.Tensor:
+    edge_v0 = records.edge_v0.to(dtype=torch.long)
+    edge_v1 = records.edge_v1.to(dtype=torch.long)
+    face0 = records.face0.to(dtype=torch.long)
+    face1 = records.face1.to(dtype=torch.long)
+    vectors = records.vertices[edge_v1] - records.vertices[edge_v0]
+    lengths = torch.linalg.vector_norm(vectors, dim=1).clamp_min(1.0e-12)
+    valid0 = face0 >= 0
+    valid1 = face1 >= 0
+    boundary = valid0 & ~valid1
+    interior = valid0 & valid1
+    safe0 = face0.clamp_min(0)
+    safe1 = face1.clamp_min(0)
+    n0 = _safe_normalize_vectors(records.face_normals[safe0])
+    n1 = _safe_normalize_vectors(records.face_normals[safe1])
+    face_a = records.faces[safe0]
+    face_b = records.faces[safe1]
+    plane_point = records.vertices[edge_v0]
+    point_a = records.vertices[_opposite_vertex(face_a, edge_v0, edge_v1)]
+    point_b = records.vertices[_opposite_vertex(face_b, edge_v0, edge_v1)]
+    normal_dot = (n0 * n1).sum(dim=1)
+    aligned = normal_dot.abs() >= 1.0 - 1.0e-5
+    plane_dist_a = ((point_a - plane_point) * n0).sum(dim=1).abs()
+    plane_dist_b = ((point_b - plane_point) * n0).sum(dim=1).abs()
+    coplanar = (
+        interior
+        & aligned
+        & (plane_dist_a <= _REFERENCE_EDGE_INFO_PLANE_TOL)
+        & (plane_dist_b <= _REFERENCE_EDGE_INFO_PLANE_TOL)
+    )
+    interior_angle = torch.acos(torch.clamp(-normal_dot, -1.0, 1.0))
+    exterior_angle = torch.where(interior, 2.0 * torch.pi - interior_angle, torch.zeros_like(interior_angle))
+    exterior_angle = torch.where(boundary, torch.full_like(exterior_angle, 2.0 * torch.pi), exterior_angle)
+    wedge_n = exterior_angle / torch.pi
+    return (interior | boundary) & ~coplanar & (lengths > 1.0e-6) & (wedge_n > 1.0 + 1.0e-6)
+
+
+def _torch_diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
+    selected = _selected_diffraction_edges_reference(records)
+    edge_v0 = records.edge_v0.to(dtype=torch.long)
+    edge_v1 = records.edge_v1.to(dtype=torch.long)
+    vertices = records.vertices
+    face0 = records.face0.to(dtype=torch.long)
+    face1 = records.face1.to(dtype=torch.long)
+    start = vertices[edge_v0]
+    end = vertices[edge_v1]
+    vectors = vertices[edge_v1] - vertices[edge_v0]
+    lengths = torch.linalg.vector_norm(vectors, dim=1).clamp_min(1.0e-12)
+    edge_dir = vectors / lengths[:, None]
+    safe0 = face0.clamp_min(0)
+    safe1 = face1.clamp_min(0)
+    n0_cand = _safe_normalize_vectors(records.face_normals[safe0])
+    n1_cand = _safe_normalize_vectors(records.face_normals[safe1])
+
+    to1 = _safe_normalize_vectors(torch.cross(n0_cand, edge_dir, dim=1))
+    tn1 = _safe_normalize_vectors(torch.cross(n1_cand, edge_dir, dim=1))
+    to2 = _safe_normalize_vectors(torch.cross(n1_cand, edge_dir, dim=1))
+    tn2 = _safe_normalize_vectors(torch.cross(n0_cand, edge_dir, dim=1))
+    choose_first = _unsigned_angle(to1, tn1, edge_dir) < _unsigned_angle(to2, tn2, edge_dir)
+    ordered_n0 = torch.where(choose_first[:, None], n0_cand, n1_cand)
+    ordered_n1 = torch.where(choose_first[:, None], n1_cand, n0_cand)
+
+    interior = (face0 >= 0) & (face1 >= 0)
+    boundary = face1 < 0
+    n0 = torch.where(interior[:, None], ordered_n0, n0_cand)
+    n1 = torch.where(interior[:, None], ordered_n1, n1_cand)
+    n1 = torch.where(boundary[:, None], -n0_cand, n1)
+    normal_dot = (n0 * n1).sum(dim=1)
+    interior_angle = torch.acos(torch.clamp(-normal_dot, -1.0, 1.0))
+    exterior_angle = torch.where(
+        interior,
+        2.0 * torch.pi - interior_angle,
+        torch.full_like(interior_angle, 2.0 * torch.pi),
+    )
+    return (
+        selected,
+        ((start + end) * 0.5).contiguous(),
+        edge_dir.contiguous(),
+        lengths.contiguous(),
+        (-0.5 * lengths).contiguous(),
+        (0.5 * lengths).contiguous(),
+        n0.contiguous(),
+        n1.contiguous(),
+        records.face0.contiguous(),
+        records.face1.contiguous(),
+        exterior_angle.contiguous(),
+    )
+
+
+def test_basic_solver_emits_zero_maps_for_transmission_and_scattering():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+
+    scene = single_wall_reflection_scene()
+    scene = type(scene)(
+        structures=[],
+        transmitters=scene.transmitters,
+        receivers=[_grid_at_x(5.0)],
+        frequency=scene.frequency,
+    )
+
+    baseline = solve(scene, Config(samples=128, seed=3, components={"los"}))
+    result = solve(
+        scene,
+        Config(
+            samples=128,
+            seed=3,
+            components={"los", "transmission", "scattering"},
+        ),
+    )
+
+    # (a) validates, (b) zero-valued maps and point power: the scene has no
+    # structures, so there is nothing to transmit through or scatter from.
+    assert result.component_maps is not None
+    for name in ("transmission", "scattering"):
+        assert torch.count_nonzero(result.component_maps[name]) == 0
+        assert torch.count_nonzero(result.component_power[name]) == 0
+    torch.testing.assert_close(result.path_gain, baseline.path_gain)
+    # (c) truthful metadata status: both components are live (they just have
+    # no walls / rough faces here).
+    assert result.metadata["components"]["transmission"] == "enabled"
+    assert result.metadata["components"]["scattering"] == "enabled"
+
+
+def test_basic_config_rejects_unknown_component():
+    with pytest.raises(ValueError, match="components"):
+        Config(components={"los", "teleportation"})
+
+
+def test_basic_solver_returns_los_component_map_for_receiver_grid():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+
+    scene = single_wall_reflection_scene()
+    scene = type(scene)(
+        structures=[],
+        transmitters=scene.transmitters,
+        receivers=[_grid_at_x(5.0)],
+        frequency=scene.frequency,
+    )
+
+    result = solve(scene, Config(samples=128, seed=3, components={"los"}))
+
+    assert result.component_maps is not None
+    assert result.component_maps["los"].shape == (1, 4, 4)
+    torch.testing.assert_close(
+        result.component_maps["los"].reshape(1, -1),
+        result.path_gain,
+        rtol=0.0,
+        atol=0.0,
+    )
+
+
+def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+
+    scene = single_wall_reflection_scene()
+    grid = _non_square_grid_at_x(5.0)
+    scene = type(scene)(
+        structures=[],
+        transmitters=scene.transmitters,
+        receivers=[grid],
+        frequency=scene.frequency,
+    )
+
+    result = solve(scene, Config(samples=128, seed=3, components={"los"}))
+
+    assert result.component_maps is not None
+    assert result.component_maps["los"].shape == (1, 3, 2)
+
+    tx = scene.transmitters[0].position.to(device=result.path_gain.device)
+    pol = scene.transmitters[0].polarization.to(device=result.path_gain.device)
+    points = grid.points().reshape(*grid.shape, 3).transpose(0, 1).reshape(-1, 3).to(device=result.path_gain.device)
+    diff = tx[None, :] - points
+    distance = torch.linalg.vector_norm(diff, dim=1).clamp_min(1.0e-6)
+    wavelength = 299_792_458.0 / scene.frequency
+    # R5 polarization consistency: the LoS deposit now carries the short-dipole
+    # sin^2(theta) pattern |p_t|^2 = |pol|^2 - (pol . k_hat)^2 (transverse
+    # projection of the TX polarization onto the tx->rx direction), matching the
+    # reflection/diffraction seed conventions. Fold it into the Friis expectation.
+    k_hat = diff / distance[:, None]
+    pattern = (pol.square().sum() - (k_hat @ pol) ** 2).clamp_min(0.0)
+    expected = (
+        scene.transmitters[0].power_w
+        / ((4.0 * torch.pi * distance / wavelength) ** 2)
+        * pattern
+    )
+
+    torch.testing.assert_close(
+        result.component_maps["los"].reshape(1, -1),
+        expected.reshape(1, -1),
+        rtol=1e-6,
+        atol=1e-12,
+    )
+    torch.testing.assert_close(
+        result.path_gain,
+        expected.reshape(1, -1),
+        rtol=1e-6,
+        atol=1e-12,
+    )
+
+
+def test_basic_solver_reuses_los_export_for_single_receiver_grid(monkeypatch):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+
+    scene = single_wall_reflection_scene()
+    scene = type(scene)(
+        structures=[],
+        transmitters=scene.transmitters,
+        receivers=[_grid_at_x(5.0)],
+        frequency=scene.frequency,
+    )
+    call_count = 0
+    original = basic_backend.path_los_export
+
+    def counted(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(basic_backend, "path_los_export", counted)
+
+    solve(scene, Config(samples=128, seed=3, components={"los"}))
+
+    assert call_count == 1
+
+
+def test_basic_solver_returns_native_reflection_component_map_when_available():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native reflection is not built")
+
+    scene = single_wall_reflection_scene().add(_grid_at_x(5.0))
+    result = solve(scene, Config(samples=2048, seed=5, components={"reflection"}))
+
+    assert result.component_maps is not None
+    assert result.component_maps["reflection"].is_cuda
+    assert result.component_maps["reflection"].shape == (1, 4, 4)
+    assert result.metadata["components"]["reflection"] == "enabled"
+    torch.testing.assert_close(
+        result.component_power["reflection"],
+        result.component_maps["reflection"].sum(),
+        rtol=1e-5,
+        atol=1e-8,
+    )
+    torch.testing.assert_close(
+        result.path_gain,
+        result.component_maps["reflection"].reshape(1, -1),
+        rtol=1e-5,
+        atol=1e-8,
+    )
+
+
+def test_basic_solver_returns_native_diffraction_component_map_when_available():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
+
+    scene = wedge_diffraction_scene().add(_grid_at_x(3.0))
+    result = solve(scene, Config(samples=512, seed=7, components={"diffraction"}))
+
+    assert result.component_maps is not None
+    assert result.component_maps["diffraction"].is_cuda
+    assert result.component_maps["diffraction"].shape == (1, 4, 4)
+    assert result.metadata["components"]["diffraction"] == "enabled"
+    torch.testing.assert_close(
+        result.component_power["diffraction"],
+        result.component_maps["diffraction"].sum(),
+        rtol=1e-5,
+        atol=1e-8,
+    )
+    torch.testing.assert_close(
+        result.path_gain,
+        result.component_maps["diffraction"].reshape(1, -1),
+        rtol=1e-5,
+        atol=1e-8,
+    )
+
+
+def test_basic_solver_reports_native_fused_schedule_for_rayd_components():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic component maps")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native components are not built")
+
+    scene = wedge_diffraction_scene().add(_grid_at_x(3.0))
+    result = solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
+
+    kernel = result.metadata["kernel"]
+    assert kernel["rayd_native"] is True
+    assert kernel["scheduling_strategy"] == "native_fused"
+    assert kernel["fused_stages"] >= 1
+
+
+def test_diffraction_edge_geometry_native_matches_torch_reference():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic diffraction")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
+
+    scene = wedge_diffraction_scene()
+    records = scene.compile().rayd.edge_records()
+
+    reference = _torch_diffraction_edge_geometry(records)
+    native = rayd_components._diffraction_edge_geometry(records)
+
+    torch.testing.assert_close(native[0], reference[0], rtol=0.0, atol=0.0)
+    torch.testing.assert_close(native[8], reference[8], rtol=0.0, atol=0.0)
+    torch.testing.assert_close(native[9], reference[9], rtol=0.0, atol=0.0)
+    for idx in (1, 2, 3, 4, 5, 6, 7, 10):
+        torch.testing.assert_close(native[idx], reference[idx], rtol=1e-6, atol=1e-6)
+
+
+def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmitters(monkeypatch):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic diffraction")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
+
+    base = wedge_diffraction_scene()
+    scene = type(base)(
+        structures=base.structures,
+        transmitters=[
+            base.transmitters[0],
+            Transmitter(position=base.transmitters[0].position + torch.tensor([0.0, -0.25, 0.0])),
+        ],
+        receivers=[_grid_at_x(3.0)],
+        frequency=base.frequency,
+    )
+    call_count = 0
+    original = rayd_components._native_surface_group_edge_candidates
+
+    def counted(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(rayd_components, "_native_surface_group_edge_candidates", counted)
+
+    solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
+
+    assert call_count == 1
+
+
+def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatch):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for MC basic diffraction")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
+
+    scene = wedge_diffraction_scene().add(_grid_at_x(3.0))
+    call_count = 0
+    original = rayd_components._native_surface_group_edge_candidates
+
+    def counted(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(rayd_components, "_native_surface_group_edge_candidates", counted)
+
+    solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
+    solve(scene, Config(samples=512, seed=7, components={"reflection", "diffraction"}))
+
+    assert call_count == 1

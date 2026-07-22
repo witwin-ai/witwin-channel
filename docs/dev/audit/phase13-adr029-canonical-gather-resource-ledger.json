@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "scope": "dormant ADR-029 evaluated-path canonical capacity gather",
+  "symbols": [
+    "evaluated_paths_canonical_capacity_gather",
+    "evaluated_paths_canonical_capacity_gather_backward",
+    "evaluated_paths_canonical_capacity_gather_jvp"
+  ],
+  "owner": "witwin.channel_native.propagation.enumerated",
+  "activation_status": "dormant-no-live-solver-caller",
+  "definitions": {
+    "N": "host-known candidate capacity and fixed output row count",
+    "P": "host-known endpoint pair count equal to num_tx * num_rx",
+    "S": "interaction-sequence width",
+    "W": "ceil(N / 32) uint32 source-uniqueness words"
+  },
+  "primal_launch_contract": {
+    "cuda_kernel_launches_per_nonempty_call": 6,
+    "cuda_memset_async_operations": 3,
+    "kernels": [
+      "canonical inert output initialization",
+      "compact-prefix/source-range/source-valid/source-unique validation",
+      "reported selected-count validation",
+      "endpoint-id validation and observed per-pair counting",
+      "reported per-pair count validation",
+      "all-or-nothing selection and complete-row publication"
+    ],
+    "stream": "caller current CUDA stream for candidate device",
+    "host_device_copies": 0,
+    "host_synchronizations": 0,
+    "stream_waits": 0
+  },
+  "primal_memory_bytes_excluding_allocator_rounding": {
+    "published_outputs": "125*N + 36*N*S + 4*P + 4",
+    "temporary_status": "4*W + 4*P + 4",
+    "second_full_continuous_workspace": 0,
+    "notes": "The sanitized selection copy contributes 9*N + 4*P + 4 published bytes. The source-uniqueness bitset is same-stream zeroed and used only by integer atomicOr validation."
+  },
+  "ad_launch_contract": {
+    "cuda_kernel_launches_per_nonempty_companion": 3,
+    "cuda_memset_async_operations": 1,
+    "kernels": [
+      "positive-zero continuous output initialization",
+      "failure-first compact-prefix/source-range/source-unique validation",
+      "source-unique VJP scatter or valid-first JVP gather"
+    ],
+    "host_device_copies": 0,
+    "host_synchronizations": 0,
+    "floating_point_atomics": 0
+  },
+  "ad_memory_bytes_excluding_allocator_rounding": {
+    "published_continuous_outputs": "88*N + 24*N*S",
+    "temporary_status": "4*W",
+    "missing_cotangent_or_tangent_materialization": 0
+  },
+  "failure_contract": {
+    "owned_bit": "PAIR_CONTRACT_ERROR",
+    "validation_order": "failure, selected validity, source range, source validity, uniqueness, endpoint ids/counts, payload",
+    "failure_outputs": "selected index -1, validity false, counts zero, canonical inert evaluated rows, positive-zero VJP/JVP",
+    "intermediate_traps": 0
+  },
+  "fresh_release_sm120_evidence": {
+    "build_directory": "artifacts/cmake-adr029-canonical-gather-locked-fresh",
+    "rayd_revision": "102470daf44b649030df3b2554d9ace5c1eea482",
+    "cuda_toolkit": "12.9.41",
+    "cmake_build_type": "Release",
+    "cmake_cuda_architectures": "120-real",
+    "torch_cuda_arch_list": "12.0",
+    "artifact_size_bytes": 32008192,
+    "artifact_sha256": "f5ba2317209033c065f79be2ff37ded1881deb2d8348de09ac6c3a6075488573",
+    "build_fingerprint": "882f39a0b649dbf27c9b9935b1f2e0198fdfa2d1f1a61c754956f71cad57422e",
+    "canonical_kernel_resources": {
+      "init": {"registers": 40, "stack": 0, "shared": 0, "local": 0},
+      "structure": {"registers": 24, "stack": 0, "shared": 0, "local": 0},
+      "selected_count": {"registers": 10, "stack": 0, "shared": 0, "local": 0},
+      "pair_count": {"registers": 22, "stack": 0, "shared": 0, "local": 0},
+      "pair": {"registers": 26, "stack": 0, "shared": 0, "local": 0},
+      "publish": {"registers": 48, "stack": 0, "shared": 0, "local": 0},
+      "ad_init": {"registers": 40, "stack": 0, "shared": 0, "local": 0},
+      "ad_selection": {"registers": 24, "stack": 0, "shared": 0, "local": 0},
+      "backward": {"registers": 36, "stack": 0, "shared": 0, "local": 0},
+      "jvp": {"registers": 38, "stack": 0, "shared": 0, "local": 0}
+    },
+    "existing_capacity_pack_non_regression": {
+      "baseline_artifact": "artifacts/cmake-phase8b-102470d-b/_channel_native.cp311-win_amd64.pyd",
+      "compiler_flags_equal": true,
+      "compiler_flags_sha256": "23542d69a8d2dd33942f659e889f47bcd0dc0c3fd0ee114f8a974c84eb071bde",
+      "kernel_resources_equal": true,
+      "primal_init": {"registers": 40, "stack": 0, "shared": 0, "local": 0},
+      "primal_gather": {"registers": 40, "stack": 0, "shared": 0, "local": 0},
+      "ad_init": {"registers": 40, "stack": 0, "shared": 0, "local": 0},
+      "backward": {"registers": 36, "stack": 0, "shared": 0, "local": 0},
+      "jvp": {"registers": 38, "stack": 0, "shared": 0, "local": 0},
+      "launch_sequence_changed": false,
+      "targeted_tests": "12 passed"
+    },
+    "canonical_and_selector_targeted_tests": "42 passed, including six direct malformed-selection backward/JVP cases"
+  },
+  "acceptance": "Direct empty/current-stream, exact-row, poison-invalid, compact-prefix, duplicate-index, count, endpoint, lazy-conjugate VJP, all-field JVP, duality, malformed direct-AD, and no-transfer/no-sync tests passed against the fresh Release/SM120 artifact."
+}

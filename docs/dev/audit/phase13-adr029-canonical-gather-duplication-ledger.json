@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "scope": "ADR-029 evaluated-path canonical capacity gather",
+  "owner": "witwin.channel_native.propagation.enumerated",
+  "sources": [
+    "native/channel_native/kernels/evaluated_paths_canonical_capacity_gather.cu",
+    "native/channel_native/kernels/evaluated_paths_canonical_capacity_gather_ad.cu",
+    "src/witwin/channel_native/propagation/enumerated/canonical_capacity.py"
+  ],
+  "implementation_model": {
+    "native_primal_owners": 1,
+    "native_vjp_owners": 1,
+    "native_jvp_owners": 1,
+    "python_numerical_implementations": 0,
+    "torch_fallbacks": 0,
+    "cpu_fallbacks": 0,
+    "finite_difference_paths": 0,
+    "compatibility_aliases": 0,
+    "live_solver_callers": 0
+  },
+  "reviewed_structural_duplication": {
+    "with": [
+      "native/channel_native/kernels/evaluated_paths_capacity_pack.cu",
+      "native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu"
+    ],
+    "classification": "indexing_packing",
+    "reason": "Both stable operation families materialize the same EvaluatedPaths schema and eleven continuous derivative tensors, but this owner validates and preserves the canonical compact prefix while the existing pack owns later public pair-major capacity and overflow. Sharing a numerical dispatcher would blur ABI/failure ownership; all repeated work is structural row copy/zero initialization with no floating-point formula or reduction."
+  },
+  "source_unique_ad": {
+    "floating_point_atomic_scatter": false,
+    "quadratic_duplicate_scan": false,
+    "device_bitset_validation": true,
+    "lockstep_test": "tests/propagation/enumerated/test_canonical_capacity_gather.py::test_canonical_gather_has_no_host_cardinality_or_intermediate_trap"
+  },
+  "central_duplication_budget": {
+    "classification_file": "docs/dev/audit/duplication-classification.json",
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_numerical_duplication_authorized": false,
+    "current_duplicate_lines": 9163,
+    "current_total_lines": 89883,
+    "current_coverage_percent": 10.194401,
+    "current_region_count": 166,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "generated_region_refresh": "passed without relaxing the frozen budget"
+  }
+}

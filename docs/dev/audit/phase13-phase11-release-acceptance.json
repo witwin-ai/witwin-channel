@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "phase": "Plan 13 Phase 11 release and governance closure",
+  "status": "governance complete; final release evidence pending",
+  "recorded_on": "2026-07-20",
+  "implementation_boundary": {
+    "channel_commit": "d2681c5810d78fdd1132a60a88b568c00581f6e2",
+    "rayd_commit": "102470daf44b649030df3b2554d9ace5c1eea482",
+    "rayd_lock_sha256": "16d4b61dc37f149341c085b07963161a9565949dd5f4413bc0a783bdb12dc308",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435",
+    "integration_identity": "rayd.torch.integration",
+    "integration_api_version": 2
+  },
+  "verified": {
+    "phase11a": "complete; historical evidence retained unchanged",
+    "phase11b": {
+      "status": "complete; frozen duplication acceptance met",
+      "exact_token_match": "7826/77821 = 10.056413%",
+      "frozen_budget_percent": 10.211512,
+      "budget_relaxed": false,
+      "stale_regions": 0,
+      "unclassified_regions": 0
+    },
+    "legacy_rayd_extern_c_retired": true,
+    "stable_integration_naming": true,
+    "compatibility_alias": false,
+    "binding_count": 203,
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 3,
+      "Channel Native": 157
+    },
+    "native_binding_manifest_sha256": "f46a1faafeba71a8357e2c5cd126542d885e0d5d81bbe3f697bfc6b2707d56b4",
+    "contract_coverage_manifest_sha256": "70175bbbcd6a32f31cd3508d518f6cf261d448a310c748d2106d6db36b95a514",
+    "agents_claude_identical": true,
+    "agents_claude_sha256": "ab6ea3c1c9128dbee62bf4e05ae1fec6c4bbcba027dec67f9ceb566b2f8e2675",
+    "historical_evidence_mutated": false,
+    "targeted_governance_tests": "27 passed",
+    "quick_tier": "passed; full quick tier"
+  },
+  "pending_final_acceptance": [
+    "clean-checkout nightly tier at the final Channel commit",
+    "clean-checkout release tier at the final Channel commit",
+    "final wheel contents and SHA-256",
+    "final _channel_native PE/DSO audit and SHA-256",
+    "final native build fingerprint bound to the accepted build",
+    "Phase 12 profiler and performance evidence"
+  ],
+  "release_claim": false,
+  "note": "This record closes Phase 11 live governance without claiming the pending nightly, release, wheel, PE/DSO, build-fingerprint, or Phase 12 gates."
+}

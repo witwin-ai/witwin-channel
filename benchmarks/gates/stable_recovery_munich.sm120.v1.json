@@ -1,0 +1,206 @@
+{
+  "schema": {
+    "name": "witwin.channel_native.stable-recovery-munich",
+    "version": 1
+  },
+  "decision": {
+    "selected_route": "compact_o_k",
+    "stable_production_commit": "e7d82d2d1d290bbc106ef68410ebf88aeb1c99e9",
+    "capacity_routes": "dormant",
+    "retired_public_noop_fields": [
+      "path_capacity_per_pair",
+      "diffraction_state_capacity",
+      "reflection_candidate_capacity_per_pair"
+    ]
+  },
+  "environment": {
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "device_total_bytes": 17094475776,
+    "channel_native_abi_version": 1,
+    "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "rayd_integration_abi_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "cuda_architectures": [
+      "120-real",
+      "120-virtual"
+    ]
+  },
+  "scenario": {
+    "scene": "sionna-rt-reference-2.0.1/munich/munich.xml",
+    "scene_sha256": "90d0338a5efbe17698c7a8fea328db284224865ccf79c1e5b1af8550b657dac3",
+    "frequency_hz": 2400000000.0,
+    "transmitter_position_m": [
+      8.5,
+      21.0,
+      27.0
+    ],
+    "transmitter_power_w": 1.0,
+    "receiver_grid": {
+      "shape": [
+        32,
+        32
+      ],
+      "x_extent_m": [
+        -120.0,
+        120.0
+      ],
+      "y_extent_m": [
+        -120.0,
+        140.0
+      ],
+      "z_m": 1.5
+    },
+    "max_depth": 3,
+    "max_diffraction_order": 1,
+    "components": [
+      "los",
+      "reflection",
+      "diffraction"
+    ],
+    "coherent": false,
+    "return_field": false,
+    "export_paths": true
+  },
+  "release_thresholds": {
+    "wall_median_ms_max": 76.0,
+    "peak_allocated_bytes_max": 1342177280,
+    "steady_throughput_solve_per_s_min": 13.8,
+    "capacity_active_ratio_max": 1.0,
+    "d2h_count_max": 6,
+    "d2h_bytes_max": 24,
+    "device_headroom_bytes_min": 1073741824,
+    "logical_path_fields_bitwise_equal_required": true
+  },
+  "variants": {
+    "compact_o_k": {
+      "commit": "e7d82d2d1d290bbc106ef68410ebf88aeb1c99e9",
+      "allocation_model": "O(K)",
+      "theoretical_candidates_n": 4552704,
+      "endpoint_pairs_p": 1024,
+      "visible_rows_k": 2629,
+      "capacity_active_ratio": 1.0,
+      "per_pair_visible": {
+        "max": 20,
+        "p50": 0,
+        "p95": 13,
+        "p99": 17
+      },
+      "wall_median_ms": 66.46659999387339,
+      "steady_throughput_solve_per_s": 15.374181216654303,
+      "peak_allocated_bytes": 1071493120,
+      "peak_reserved_bytes": 1413480448,
+      "d2h_count": 6,
+      "d2h_bytes": 24,
+      "d2h_and_post_copy_sync_ms": 0.152,
+      "scan_sync_ms": 5.162
+    },
+    "theoretical_capacity_o_n": {
+      "commit": "768718eefa281cbef5123e7f2ca8c902fbd667c8",
+      "allocation_model": "O(N)",
+      "theoretical_candidates_n": 4552704,
+      "endpoint_pairs_p": 1024,
+      "visible_rows_k": 2629,
+      "capacity_active_ratio": 1731.7246101179155,
+      "wall_median_ms": 1009.587400010787,
+      "steady_throughput_solve_per_s": 0.7928232282230531,
+      "peak_allocated_bytes": 17854649344,
+      "peak_reserved_bytes": 19727908864,
+      "oversubscribed_device_memory": true
+    },
+    "per_pair_qr20": {
+      "commit": "4fcd9b67a7b76b5f70f31648c956aafe5ad33fa1",
+      "allocation_model": "O(P*Qr*H)",
+      "qr": 20,
+      "endpoint_pairs_p": 1024,
+      "visible_rows_k": 2629,
+      "request_pair_multiplier_h": 3.0,
+      "capacity_active_ratio": 23.370102700646633,
+      "wall_median_ms": 226.42919997451827,
+      "steady_throughput_solve_per_s": 4.4099682923381005,
+      "peak_allocated_bytes": 11671543808,
+      "peak_reserved_bytes": 13283360768,
+      "oversubscribed_device_memory": false
+    },
+    "per_pair_qr128": {
+      "commit": "4fcd9b67a7b76b5f70f31648c956aafe5ad33fa1",
+      "allocation_model": "O(P*Qr*H)",
+      "qr": 128,
+      "endpoint_pairs_p": 1024,
+      "visible_rows_k": 2629,
+      "request_pair_multiplier_h": 3.0,
+      "capacity_active_ratio": 149.56865728413845,
+      "wall_median_ms": 232.74819998187013,
+      "steady_throughput_solve_per_s": 4.285414481679398,
+      "peak_allocated_bytes": 12171594752,
+      "peak_reserved_bytes": 13591642112,
+      "oversubscribed_device_memory": false
+    }
+  },
+  "exactness": {
+    "logical_path_fields_compared": 24,
+    "logical_path_fields_bitwise_equal": true,
+    "whole_map_bitwise_claimed": false,
+    "whole_map_reason": "Existing atomic accumulation is not bitwise stable across independent processes."
+  },
+  "raw_artifacts": [
+    {
+      "name": "a_counts.json",
+      "sha256": "a7eaf43e64cef648492f004a4c6dd0e2502c241e6bddb35942e6266c540b5824",
+      "bytes": 8981
+    },
+    {
+      "name": "a_memory.json",
+      "sha256": "8359127a3faf40c191be3dd55c2a59f2b32379230f2fc410f4ce906d4758d68f",
+      "bytes": 8443
+    },
+    {
+      "name": "a_timing.json",
+      "sha256": "bedf78303565d1ff79330869dccba69f89189cfbf0cd7aab378250be18868034",
+      "bytes": 8588
+    },
+    {
+      "name": "a_nsys.sqlite",
+      "sha256": "1b13f09dc42e132755f8d287c37dd4b1d74e38a187b9b03c04ef65fcc2e35f29",
+      "bytes": 1368064
+    },
+    {
+      "name": "b_counts.json",
+      "sha256": "4b6b339af2c58275d4840495d30e301d3a90dd062f7b88fb9e93118587c976d5",
+      "bytes": 9006
+    },
+    {
+      "name": "b_memory_cold.json",
+      "sha256": "d06862d7037ed3a3ed5c38b27ff6722078516b98727a0f50ca9f0b486a635985",
+      "bytes": 8384
+    },
+    {
+      "name": "b_timing.json",
+      "sha256": "ab05ec831036f43c4b70a7759ad67b6c653a0cf00afb662e4c314108332ab0fa",
+      "bytes": 8583
+    },
+    {
+      "name": "c_qr128_counts.json",
+      "sha256": "9fd37e918f504b541ab1ee8de69660d8b1e692f72eb1ecedcdc70147ccf9918f",
+      "bytes": 9054
+    },
+    {
+      "name": "c_qr128_memory.json",
+      "sha256": "f469c04cbbf05658996d589e109c9132c2c92be104f755a59370b163c0acfef5",
+      "bytes": 8435
+    },
+    {
+      "name": "c_qr128_timing.json",
+      "sha256": "929e9652199db60df24218c4b0caddc1821966731ee3232355698060b845a705",
+      "bytes": 8647
+    },
+    {
+      "name": "c_qr20_memory.json",
+      "sha256": "1a798a5607dfdce2687739017058df48ded4591a55c8ca2404786afca5bf0f89",
+      "bytes": 8433
+    },
+    {
+      "name": "c_qr20_timing.json",
+      "sha256": "e1df9798733f66c77842097064cffa889630265d98fdfda3487cb0a3701e1c21",
+      "bytes": 8647
+    }
+  ]
+}

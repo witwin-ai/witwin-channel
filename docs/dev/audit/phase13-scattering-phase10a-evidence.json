@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "plan": "Plan 13",
+  "phase": "10A",
+  "adr": "docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md",
+  "status": "active; pushed RayD owner and Channel pin/switch/delete complete",
+  "activation_pin": {
+    "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce",
+    "typed_header": "backends/torch/include/rayd/torch/rf/scattering.h",
+    "typed_header_sha256": "66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a",
+    "shared_table_header": "shared/include/rayd/shared/rf/scattering_table.cuh",
+    "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
+    "binding_manifest_sha256": "54a0e643fd6d5986e3a0ba12c30db5a23372b62b7537f9218c327aadac2ee308",
+    "contract_coverage_manifest_sha256": "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f"
+  },
+  "owner_transfer": {
+    "symbols": [
+      "scattering_table_eval",
+      "scattering_table_eval_backward",
+      "scattering_table_eval_jvp",
+      "scattering_table_sample",
+      "scattering_table_pdf",
+      "scattering_ensemble_eval",
+      "scattering_ensemble_eval_backward",
+      "scattering_ensemble_eval_jvp",
+      "scattering_patch_integral_eval",
+      "scattering_patch_integral_eval_backward",
+      "scattering_patch_integral_eval_jvp"
+    ],
+    "abi_owner": "Channel Native _channel_native",
+    "numerical_owner": "RayD",
+    "expected_active_owner_counts": {
+      "bindings": 202,
+      "rayd_numerical": 37,
+      "layered": 2,
+      "channel_numerical": 163
+    },
+    "binding_count_delta": 0,
+    "public_api_delta": false
+  },
+  "channel_switch": {
+    "typed_adapter": "native/channel_native/binding/materials.cpp",
+    "deleted_numerical_sources": [
+      "native/channel_native/kernels/scattering_table_eval_ad.cu",
+      "native/channel_native/kernels/scattering_ensemble.cu",
+      "native/channel_native/kernels/scattering_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_patch_integral.cu",
+      "native/channel_native/kernels/scattering_patch_integral_ad.cu"
+    ],
+    "deleted_private_header": "native/channel_native/kernels/scattering_table.cuh",
+    "retained_event_source": "native/channel_native/kernels/scattering.cu",
+    "retained_chain_sources": [
+      "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_chain_realization.cu",
+      "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+    ],
+    "forwarding_source_allowed": false,
+    "runtime_fallback_allowed": false
+  },
+  "rayd_candidate": {
+    "source_hash_method": "SHA-256 after CRLF and CR line endings are normalized to LF",
+    "numerical_sources": {
+      "backends/torch/src/torch_ext/rf/scattering.cu": "72fb84a4158652a70c5f4f17e5d1ce61371773cdd54db6835148ee065e474c50",
+      "backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu": "e09cb3992737b028222e205318baea1aa070d300f0126def9759edaa17ad5b7c",
+      "backends/torch/src/torch_ext/rf/scattering_ensemble.cu": "be38ff966dd06afe3f1df46d2eb16094c97111c76534e22d5f3fec6685f1f1fc",
+      "backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu": "8c094b3a6542b1da26e662e38c405ec1d90cf53aaf8934147b0549f66a8fb0ea",
+      "backends/torch/src/torch_ext/rf/scattering_patch_integral.cu": "e1d8555874a1832067e92e9f1973cee38d9ce2f18dac230b56bb1c6504c0c08b",
+      "backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu": "0d3bffe34ecd22656f1c5bdb10a6fe903ad059803547e29ccb95f5fd390858aa"
+    },
+    "direct_contract_test": {
+      "path": "backends/torch/tests/cpp/scattering_test.cpp",
+      "sha256": "4724377f2e7358a8ecf809ac9a344781abfcaf8047660ddd4a7543a9551e7b51",
+      "ctest": "rayd_torch_scattering",
+      "coverage": [
+        "nonempty table primal/backward/JVP/sample/PDF",
+        "nonempty ensemble primal/backward/JVP",
+        "nonempty patch primal/backward/JVP",
+        "zero-row no-launch",
+        "nondefault current stream dependency",
+        "shape/dtype/contiguity/device/optional-tensor negatives"
+      ],
+      "status": "passed; full RayD CTest 3/3"
+    }
+  },
+  "dependency_contract": {
+    "public_table_header_consumers": [
+      "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "native/channel_native/kernels/scattering_chain_ensemble_ad.cu"
+    ],
+    "kirchhoff_table_ad_has_unused_table_include": false,
+    "reverse_rayd_to_channel_private_edge_count": 0,
+    "second_dispatcher_count": 0
+  },
+  "launch_contract": {
+    "active_entry_launch_count": {
+      "scattering_table_eval": 1,
+      "scattering_table_eval_backward": 1,
+      "scattering_table_eval_jvp": 1,
+      "scattering_table_sample": 1,
+      "scattering_table_pdf": 1,
+      "scattering_ensemble_eval": 1,
+      "scattering_ensemble_eval_backward": 1,
+      "scattering_ensemble_eval_jvp": 1,
+      "scattering_patch_integral_eval": 2,
+      "scattering_patch_integral_eval_backward": 1,
+      "scattering_patch_integral_eval_jvp": 2
+    },
+    "threads_per_block": 256,
+    "zero_row_launch_count": 0,
+    "explicit_sync_count": 0,
+    "persistent_tape": false,
+    "materialized_interlaunch_physics_intermediate": false,
+    "active_stream": "caller current Torch CUDA stream"
+  },
+  "compile_contract": {
+    "default_flags_sources": [
+      "RayD:backends/torch/src/torch_ext/rf/scattering.cu",
+      "native/channel_native/kernels/scattering.cu"
+    ],
+    "fmad_false_sources": [
+      "RayD:backends/torch/src/torch_ext/rf/scattering_table_eval_ad.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_ensemble_ad.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral.cu",
+      "RayD:backends/torch/src/torch_ext/rf/scattering_patch_integral_ad.cu"
+    ],
+    "use_fast_math_source_count": 0,
+    "source_local_properties": true
+  },
+  "codegen_resource_contract": {
+    "toolchain": "CUDA 12.9 cuobjdump, sm_120 fatbin",
+    "comparison": "deleted Channel objects versus locked RayD objects; source-specific C++ mangling normalized only",
+    "normalized_sass_equal": true,
+    "resource_usage_equal": true,
+    "normalized_sass_sha256": {
+      "scattering_sample_kernel": "316c8cf30fa0ff22b285df25a7e6de20cdcc43ff0f7f6972894a39310fbc0dbc",
+      "scattering_pdf_kernel": "d94730553f8872870cda3cca4c8d4c0a75e635c897d4781497938abbce6d33b4",
+      "scattering_eval_kernel": "9e3f91d707f63182c383caeae7e8dd92572c741fd2eea1c3544b49e7becc12f9",
+      "table_eval_jvp_kernel": "0e5aded8c7ba5c32ce64f334152858b7d67ff7dfe0a3b34756a6403ea4789100",
+      "table_eval_backward_kernel": "d05da4456afbe63a4c7440500285946eae3cdb2a3aada30b59f7f35ac3b90aa4",
+      "ensemble_eval_kernel": "3a17c5dbe148f90b095241f8ab1c4da48c1de34be628c6d14e39e05837b60f8d",
+      "ensemble_eval_jvp_kernel": "80fd7d0b9af0807d6259cd1c9679bc2784a7c3a7d5ce6570f5ac4b7d7e5775c2",
+      "ensemble_eval_backward_kernel": "ef3b0de8ab3a38fcfebb9a3999b1616bedcba69e5b4a82cfc955c0662d9e4788",
+      "patch_integral_total_kernel": "fddcec26c37a5f6e1bdf1fc3d009ed4f9dc4f307eea38f2fbf60bda13115c194",
+      "patch_integral_rows_kernel": "1ac68bb5152a64f5f4a6aeee0fbe72b6abefe4b474901195c6dc188fd0d5b6b0",
+      "patch_integral_jvp_total_kernel": "fddcec26c37a5f6e1bdf1fc3d009ed4f9dc4f307eea38f2fbf60bda13115c194",
+      "patch_integral_jvp_kernel": "34ca82adcd616d5cbf2b77861f643599ec8c21e0b7fa707cc9a8047f36670021",
+      "patch_integral_backward_kernel": "f361add494672ec1cde2c303db798787f5d112fcde8594db1d2bf06ba65b4e91"
+    },
+    "sm120_resources": {
+      "scattering_eval_kernel": {"registers": 48, "stack": 0, "shared": 0, "local": 0},
+      "scattering_pdf_kernel": {"registers": 34, "stack": 0, "shared": 0, "local": 0},
+      "scattering_sample_kernel": {"registers": 34, "stack": 32, "shared": 0, "local": 0},
+      "table_eval_backward_kernel": {"registers": 122, "stack": 0, "shared": 0, "local": 0},
+      "table_eval_jvp_kernel": {"registers": 122, "stack": 0, "shared": 0, "local": 0},
+      "ensemble_eval_kernel": {"registers": 72, "stack": 0, "shared": 0, "local": 0},
+      "ensemble_eval_backward_kernel": {"registers": 139, "stack": 0, "shared": 0, "local": 0},
+      "ensemble_eval_jvp_kernel": {"registers": 154, "stack": 0, "shared": 0, "local": 0},
+      "patch_integral_rows_kernel": {"registers": 40, "stack": 32, "shared": 3072, "local": 0},
+      "patch_integral_total_kernel": {"registers": 40, "stack": 0, "shared": 3072, "local": 0},
+      "patch_integral_backward_kernel": {"registers": 80, "stack": 32, "shared": 9224, "local": 0},
+      "patch_integral_jvp_kernel": {"registers": 72, "stack": 32, "shared": 5120, "local": 0},
+      "patch_integral_jvp_total_kernel": {"registers": 40, "stack": 0, "shared": 3072, "local": 0}
+    }
+  },
+  "retained_event_contract": {
+    "kernel": "scattering_event_kernel",
+    "normalized_sass_sha256": "8a54c6ef716355e053d68ff633e12b6ff00e2bb1bc62db1867708765dd699701",
+    "instruction_count": 328,
+    "sm120_resources": {"registers": 27, "stack": 0, "shared": 0, "local": 0},
+    "numerical_owner": "Channel Native",
+    "compile_flags": "target default"
+  },
+  "copy_memory_contract": {
+    "host_device_copy_count_delta": 0,
+    "explicit_sync_count_delta": 0,
+    "persistent_tape_bytes_delta": 0,
+    "materialized_intermediate_bytes_delta": 0,
+    "rayd_python_extension_built_or_imported": false
+  },
+  "duplication_contract": {
+    "combined_duplicate_lines": 9730,
+    "combined_total_lines": 81675,
+    "coverage_percent": 11.91307,
+    "frozen_coverage_percent": 10.211512,
+    "region_count": 169,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "budget_relaxed": false
+  },
+  "stops": [
+    "do not accept a second compiled owner, forwarding source, runtime flag, or fallback",
+    "do not accept a launch, stream, synchronization, tape, output, reduction-order, atomic, or compile-flag change",
+    "do not move event policy, table/phase-screen lifecycle, topology, RNG/MIS, accumulation, results, or the six Phase 10B chain contracts"
+  ]
+}
