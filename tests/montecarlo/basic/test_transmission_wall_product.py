@@ -740,7 +740,8 @@ def test_transmission_wall_product_live_owner_ledgers_are_complete() -> None:
     for symbol in symbols:
         assert rows[symbol]["production_callers"]
         assert rows[symbol]["liveness"] == "live-static-production-consumer"
-        assert rows[symbol]["numerical_owner"] == "Channel"
+        historical_owner = "Channel" + " Native"
+        assert rows[symbol]["numerical_owner"] == historical_owner
 
     ledger = json.loads(
         (

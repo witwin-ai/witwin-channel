@@ -155,7 +155,8 @@ def test_phase_m_docs_do_not_claim_adr029_or_phase12_completion() -> None:
         encoding="utf-8"
     )
 
-    assert "Phase M MC Basic atomic switch/delete 已实现" in plan
+    assert "Phase M MC Basic atomic" in plan
+    assert "switch/delete 均已进入 production" in plan
     assert "ADR-029 capacity-pack activation 已由 ADR-032 取消" in plan
     assert "Phase M does not activate ADR-029" in migration
     assert "Final Phase 12 acceptance uses compact E2E" in " ".join(migration.split())

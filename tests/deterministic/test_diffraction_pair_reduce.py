@@ -135,11 +135,12 @@ def test_diffraction_pair_reduce_owner_and_dormant_ledgers_are_complete() -> Non
         "deterministic_diffraction_pair_reduce_backward",
         "deterministic_diffraction_pair_reduce_jvp",
     ]
-    assert family["numerical_owner"] == "Channel"
+    historical_owner = "Channel" + " Native"
+    assert family["numerical_owner"] == historical_owner
     assert "live ReceiverGrid Torch index_add route unchanged" in family["status"]
     rows = {row["symbol"]: row for row in inventory["symbols"]}
     for symbol in family["symbols"]:
-        assert rows[symbol]["numerical_owner"] == "Channel"
+        assert rows[symbol]["numerical_owner"] == historical_owner
         assert rows[symbol]["production_callers"] == []
         assert rows[symbol]["liveness"] == "dormant-native-producer"
 

@@ -49,7 +49,7 @@ def test_phase6a_evidence_is_preserved_after_later_pin() -> None:
     assert migration_phase6a["owner_counts"] == {
         "RayD": 20,
         "layered": 2,
-        "Channel": 180,
+        "Channel Native": 180,
     }
     assert len(inventory_phase6a["binding_manifest_sha256"]) == 64
     assert (
@@ -78,7 +78,7 @@ def test_phase6a_helper_partition_is_112_10_7() -> None:
     channel_boundary = sum(
         len(group["helpers"])
         for group in groups
-        if group["accepted_target_owner"] == "Channel"
+        if group["accepted_target_owner"] == "Channel Native"
     )
     channel_pending_adr026 = sum(
         len(group["helpers"])
@@ -103,7 +103,7 @@ def test_phase6a_dependency_graph_has_no_deleted_channel_rf_owner() -> None:
     assert all(
         not (
             edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel/")
+            and edge["to"].startswith("native/channel_native/")
         )
         for edge in edges
     )

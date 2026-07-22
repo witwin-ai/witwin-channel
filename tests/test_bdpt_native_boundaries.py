@@ -132,7 +132,7 @@ def test_bdpt_split_preserves_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel/kernels/bdpt_connect.cu"
+        if entry["path"] == "native/channel_native/kernels/bdpt_connect.cu"
     )
     sources = {
         unit: (KERNEL_ROOT / unit).read_text(encoding="utf-8-sig")

@@ -31,7 +31,8 @@ _RAYD_LIFECYCLE_AST_DIGESTS = {
     "RayDSceneResource": "e883a145c6a9ce177d63a1055e4d189aba5f57e82961bf83df0b72e47a89ac8e",
     "_empty_tensor": "23843cfd3570ca0ed7fc050e97f9cc27c5b24af88ae0cf079bd0d60ea0a609c2",
     "_mesh_flags": "ab687287bfec1c541820f1eb9f115be95a63ecc04d48e6d2e982012e09dbdd7b",
-    "build_scene_from_structures": "b2f83ad9853f9e71789999bf0a21a8213e00eb1cfa4da9c3de4ce98768969560",
+    # ADR-033 changes only the product identity in this definition's docstring.
+    "build_scene_from_structures": "bf762627176c4503cd405f67d14b145e56598883b082b1bcad0e37da250dc448",
 }
 
 

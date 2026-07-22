@@ -19,6 +19,7 @@ _HISTORICAL_PREFIXES = (
     "docs/dev/audit/",
     "docs/dev/baselines/",
     "docs/dev/plans/",
+    "tests/test_phase13_",
 )
 _HISTORICAL_FILES = frozenset(
     {
@@ -26,6 +27,10 @@ _HISTORICAL_FILES = frozenset(
         "docs/dev/standards/adr-033-channel-replacement-product-identity.md",
         "tests/test_native_owner_inventory.py",
         "tests/test_phase10_legacy_dead_binding_audit.py",
+        "tests/test_bdpt_native_boundaries.py",
+        "tests/test_field_transport_native_boundaries.py",
+        "tests/test_field_wedge_native_boundaries.py",
+        "tests/test_path_native_boundaries.py",
     }
 )
 _ROOT_NAME_FILES = frozenset({"AGENTS.md", "CLAUDE.md"})

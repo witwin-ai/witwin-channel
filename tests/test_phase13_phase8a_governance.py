@@ -114,7 +114,8 @@ def test_phase8a_launch_compile_and_dependency_boundaries_are_frozen() -> None:
     assert "src/torch_ext/rf/diffraction_wedge.cu" in rayd_cmake
     assert 'COMPILE_OPTIONS "$<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>"' in rayd_cmake
     for path in evidence["compile_contract"]["precise_channel_families"]:  # type: ignore[index]
-        assert (ROOT / path).is_file()
+        live = path.replace("native/channel_native/", "native/channel/")
+        assert (ROOT / live).is_file()
 
     codegen = evidence["codegen_resource_contract"]
     assert codegen["normalized_ptx_equal"] is True  # type: ignore[index]
@@ -191,7 +192,7 @@ def test_phase8a_ledgers_and_guardrails_are_closed() -> None:
         for family in matrix["families"]  # type: ignore[index]
         if family["family_id"] == "pure-wedge-fixed-winner-field"
     )
-    assert pure["phase7_current_owner"] == "Channel"
+    assert pure["phase7_current_owner"] == "Channel Native"
     actions = {
         row["symbol"]: row["status"] for row in ledger["actions"]  # type: ignore[index]
     }

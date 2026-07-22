@@ -110,7 +110,7 @@ def test_field_transport_split_preserves_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel/kernels/field_transport_ad.cu"
+        if entry["path"] == "native/channel_native/kernels/field_transport_ad.cu"
     )
     sources = "\n".join(
         path.read_text(encoding="utf-8-sig") for path in TRANSLATION_UNITS.values()
@@ -136,7 +136,7 @@ def test_rayd_transmission_preserves_migrated_launch_budget() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel/kernels/field_transport_ad.cu"
+        if entry["path"] == "native/channel_native/kernels/field_transport_ad.cu"
     )
     ad_source = RAYD_TRANSMISSION_SOURCES[1].read_text(encoding="utf-8-sig")
     actual = Counter(

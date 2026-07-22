@@ -129,7 +129,7 @@ def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel/kernels/path_trace.cu"
+        if entry["path"] == "native/channel_native/kernels/path_trace.cu"
     )
     sources = "\n".join(
         (KERNEL_ROOT / name).read_text(encoding="utf-8-sig")

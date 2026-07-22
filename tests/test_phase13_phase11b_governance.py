@@ -21,33 +21,33 @@ _EXPECTED_PENDING_FINAL_ACCEPTANCE = {
     "clean-checkout nightly tier at the final Channel commit",
     "clean-checkout release tier at the final Channel commit",
     "final wheel contents and SHA-256",
-    "final _channel PE/DSO audit and SHA-256",
+    "final _channel_native PE/DSO audit and SHA-256",
     "final native build fingerprint bound to the accepted build",
     "Phase 12 profiler and performance evidence",
 }
 _PHASE11B_SOURCE_SHA256 = {
-    "src/witwin/channel/propagation/fields/kernels/functional.py": (
+    "src/witwin/channel_native/propagation/fields/kernels/functional.py": (
         "9cc738bb1a5b75e52f7ad7c34ba9f02d4a89492adec3e96702023a965b318ed0"
     ),
-    "src/witwin/channel/scattering/kernels/functional.py": (
+    "src/witwin/channel_native/scattering/kernels/functional.py": (
         "92b3764a6553c5f35e4efc4e5bee838b4d4a4ca1186004ef22ea2bd76084da33"
     ),
-    "src/witwin/channel/scattering/kernels/functional_chain.py": (
+    "src/witwin/channel_native/scattering/kernels/functional_chain.py": (
         "4e158e006a209f5ec1c34662bdfb6b38bbd50fad27b233b311d328e5f74023dc"
     ),
-    "src/witwin/channel/scattering/kernels/autograd_chain.py": (
+    "src/witwin/channel_native/scattering/kernels/autograd_chain.py": (
         "8615d85227ea66f69ffb91bc47baa7f8dec9cf9265e354dbc17b5f83f478d95a"
     ),
-    "native/channel/kernels/bdpt_connect_visibility.cu": (
+    "native/channel_native/kernels/bdpt_connect_visibility.cu": (
         "695686f29e181abd7bd8af7971cce09e15f55ebb4cfa863c1b334e0edf061a89"
     ),
-    "native/channel/kernels/diffraction.cu": (
+    "native/channel_native/kernels/diffraction.cu": (
         "79c08019afae7cd252e5798ededc7767f145b03b54e457177d3d967f829af185"
     ),
-    "native/channel/kernels/los.cu": (
+    "native/channel_native/kernels/los.cu": (
         "7313fd71274564fa24ca32c935d8074b6f4f75e9968ee87a392563a3f8a45911"
     ),
-    "native/channel/kernels/reflection.cu": (
+    "native/channel_native/kernels/reflection.cu": (
         "61d96ef4734c567afe8294e02028786daca7a541cf305547b13f967d3e52d241"
     ),
 }
@@ -181,7 +181,10 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
     assert evidence["ledger_refresh"]["unclassified_region_count"] == 0
     assert evidence["source_sha256"] == _PHASE11B_SOURCE_SHA256
     for relative, digest in evidence["source_sha256"].items():
-        assert (ROOT / relative).is_file()
+        live = relative.replace(
+            "native/channel_native/", "native/channel/"
+        ).replace("src/witwin/channel_native/", "src/witwin/channel/")
+        assert (ROOT / live).is_file()
         assert re.fullmatch(r"[0-9a-f]{64}", digest)
 
     phase10b = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
@@ -316,7 +319,11 @@ def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
     assert isinstance(verified["binding_count"], int)
     assert verified["binding_count"] > 0
     assert verified["binding_count"] == sum(verified["owner_counts"].values())
-    assert set(verified["owner_counts"]) == {"RayD", "layered", "Channel"}
+    assert set(verified["owner_counts"]) == {
+        "RayD",
+        "layered",
+        "Channel Native",
+    }
     for key in (
         "native_binding_manifest_sha256",
         "contract_coverage_manifest_sha256",
@@ -355,7 +362,7 @@ def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
         assert verified["owner_counts"] == {
             "RayD": inventory["counts"]["rayd_numerical"],
             "layered": inventory["counts"]["layered"],
-            "Channel": inventory["counts"]["channel_numerical"],
+            "Channel Native": inventory["counts"]["channel_numerical"],
         }
         assert verified["native_binding_manifest_sha256"] == _sha256(
             ROOT / "ci/native-binding-manifest.json"

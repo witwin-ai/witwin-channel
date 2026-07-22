@@ -106,7 +106,7 @@ def test_field_wedge_split_preserves_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel/kernels/field_wedge_ad.cu"
+        if entry["path"] == "native/channel_native/kernels/field_wedge_ad.cu"
     )
     approved_additions = migration_delta["phase3_current"][
         "approved_post_phase9_field_wedge_launch_additions"
@@ -155,7 +155,7 @@ def test_rayd_pure_wedge_preserves_launch_and_fast_math_boundary() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel/kernels/field_wedge_ad.cu"
+        if entry["path"] == "native/channel_native/kernels/field_wedge_ad.cu"
     )
     source = RAYD_WEDGE_SOURCE.read_text(encoding="utf-8-sig")
     actual = Counter(

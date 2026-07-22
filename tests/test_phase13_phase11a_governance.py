@@ -27,6 +27,12 @@ def _json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _live_path(relative: str) -> Path:
+    return ROOT / relative.replace(
+        "native/channel_native/", "native/channel/"
+    ).replace("src/witwin/channel_native/", "src/witwin/channel/")
+
+
 def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() -> None:
     evidence = _json(EVIDENCE_PATH)
     ledger = _json(LEDGER_PATH)
@@ -105,7 +111,7 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
     assert all(value is False for value in evidence["invariants"].values())
 
     for relative in evidence["scope"]:
-        source = (ROOT / relative).read_text(encoding="utf-8-sig")
+        source = _live_path(relative).read_text(encoding="utf-8-sig")
         assert "py::args" not in source
         assert "pybind11::args" not in source
         assert "<<<" not in source

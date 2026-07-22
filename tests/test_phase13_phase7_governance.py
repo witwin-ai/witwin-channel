@@ -101,7 +101,7 @@ def test_phase7_family_matrix_freezes_all_nine_complete_owners() -> None:
 
     pure = families["pure-wedge-fixed-winner-field"]
     assert set(pure["symbols"]) == PURE_WEDGE  # type: ignore[arg-type]
-    assert pure["phase7_current_owner"] == "Channel"
+    assert pure["phase7_current_owner"] == "Channel Native"
     assert pure["accepted_authoritative_owner"] == "RayD"
     assert pure["activation_phase"] == "8A atomic pin/switch/delete"
 
@@ -112,8 +112,8 @@ def test_phase7_family_matrix_freezes_all_nine_complete_owners() -> None:
     }.items():
         family = families[family_id]
         assert set(family["symbols"]) == symbols  # type: ignore[arg-type]
-        assert family["phase7_current_owner"] == "Channel"
-        assert family["accepted_authoritative_owner"] == "Channel"
+        assert family["phase7_current_owner"] == "Channel Native"
+        assert family["accepted_authoritative_owner"] == "Channel Native"
         assert family["compile_contract"] == "precise math"
 
 
@@ -134,9 +134,9 @@ def test_phase7_pre_activation_pure_wedge_snapshot_is_preserved() -> None:
         "diffraction_wedge_forward_kernel",
         "diffraction_wedge_backward_kernel",
         "diffraction_wedge_jvp_kernel",
-        "channel_field_diffraction_wedge",
-        "channel_field_diffraction_wedge_backward",
-        "channel_field_diffraction_wedge_jvp",
+        "cn_field_diffraction_wedge",
+        "cn_field_diffraction_wedge_backward",
+        "cn_field_diffraction_wedge_jvp",
     } <= {entry["name"] for entry in deletions}
 
 
@@ -178,7 +178,7 @@ def test_phase8b_legacy_audit_closes_deletions_and_sample_tape_rename() -> None:
         "current_numerical_owner": "RayD",
         "real_production_owner": "montecarlo.basic sample-tape production",
         "static_production_caller": (
-            "src/witwin/channel/montecarlo/basic/rayd_components.py"
+            "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
         ),
         "rename_only": True,
         "compatibility_alias_allowed": False,

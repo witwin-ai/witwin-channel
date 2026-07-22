@@ -96,7 +96,7 @@ def test_phase4_current_inventory_counts_and_manifest_hash_are_exact() -> None:
         for owner in {
             "RayD",
             "Channel operation / RayD primitives",
-            "Channel",
+            "Channel Native",
         }
     }
     migration = _load("phase13-migration-delta.json")
@@ -105,7 +105,7 @@ def test_phase4_current_inventory_counts_and_manifest_hash_are_exact() -> None:
         "bindings": len(symbols),
         "rayd_numerical": owner_counts["RayD"],
         "layered": owner_counts["Channel operation / RayD primitives"],
-        "channel_numerical": owner_counts["Channel"],
+        "channel_numerical": owner_counts["Channel Native"],
     }
     assert inventory["phase4_generic_geometry_and_dead_bridge_cleanup"][
         "binding_manifest_sha256"

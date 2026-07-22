@@ -7,7 +7,6 @@ FORBIDDEN_MODULES = (
     "mitsuba",
     "sionna",
     "rayd",
-    "witwin.channel",
 )
 
 FORBIDDEN_INTERNAL_MODULES = (

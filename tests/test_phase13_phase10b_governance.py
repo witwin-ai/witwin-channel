@@ -112,12 +112,12 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     assert migration["phase10b_current"]["owner_counts"] == {
         "RayD": 43,
         "layered": 2,
-        "Channel": 157,
+        "Channel Native": 157,
     }
     assert evidence["owner_transfer"]["owner_counts"] == {
         "RayD": 43,
         "layered": 2,
-        "Channel": 157,
+        "Channel Native": 157,
     }
     assert inventory["phase10b_scattering_chains"]["binding_count"] == 202
     assert migration["phase10b_current"]["binding_count"] == 202
@@ -127,7 +127,7 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     assert Counter(row["numerical_owner"] for row in inventory["symbols"]) == {
         "RayD": current_counts["rayd_numerical"],
         "Channel operation / RayD primitives": current_counts["layered"],
-        "Channel": current_counts["channel_numerical"],
+        "Channel Native": current_counts["channel_numerical"],
     }
     owners = {row["symbol"]: row["numerical_owner"] for row in inventory["symbols"]}
     assert all(owners[symbol] == "RayD" for symbol in CHAIN_SYMBOLS)
@@ -218,7 +218,7 @@ def test_phase10b_compile_launch_codegen_and_dependency_contracts_are_frozen() -
     assert all(
         not (
             edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel/")
+            and edge["to"].startswith("native/channel_native/")
         )
         for edge in graph["edges"]
     )
