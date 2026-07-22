@@ -13,11 +13,12 @@ The audited sibling roots (`core`, `genesis`, `maxwell`, `radar`, and `studio`)
 contain no production Channel imports. This does not prove that external users,
 deployed jobs, plugins, or private repositories have migrated.
 
-The platform `core` package's `channel` and `all` extras now route to
-`witwin-channel>=0.1,<0.2` (companion commit `9ee6655`) instead of the old
-`witwin-channel` distribution. This establishes the repository-owned default
-installation route; application-level canary/default-on state still requires
-confirmation from each consumer owner.
+The platform `core` package's `channel` and `all` extras must route to
+`witwin-channel>=0.4,<0.5` before the replacement becomes default-on. The
+audited sibling checkout does not yet contain that consumer cutover, so it
+remains an explicit external rollout prerequisite rather than accepted
+evidence. Application-level canary/default-on state also requires confirmation
+from each consumer owner.
 
 ### Plan 13 Phase 3: direct typed RayD integration
 

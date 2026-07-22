@@ -1,7 +1,7 @@
 # ADR-033: Channel replacement product identity
 
-- **Status:** Accepted by owner direction (2026-07-22); implementation in
-  progress
+- **Status:** Accepted by owner direction (2026-07-22); product-identity and
+  repository-history migration complete, consumer rollout pending
 - **Kind:** Breaking package, module, native-extension, build-identity, and
   operational-name migration
 - **Related:** ADR-003 (public/internal API), ADR-006 (developer override),
@@ -54,11 +54,11 @@ process or environment containing files from both implementations is invalid;
 wheel smoke must prove the replacement wheel contains only the final package
 and extension paths.
 
-The project version remains `0.1.0` during this preparation change. Selecting
-the externally released replacement version, dependency range, and consumer
-rollout is a separate release decision. Until that decision, replacing an
-installed higher-version legacy distribution requires an explicit uninstall
-or force-install in an isolated acceptance environment.
+The first replacement release is `0.4.0`, which is intentionally newer than
+the existing `0.3.0` distribution and therefore supports an ordinary package
+upgrade. Repository-owned consumers must select `witwin-channel>=0.4,<0.5`
+atomically with their API migration. External consumer rollout remains a
+separate release action and does not authorize a compatibility shim.
 
 ## Compatibility and migration consequences
 

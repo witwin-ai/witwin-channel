@@ -98,9 +98,9 @@
   },
   "default_on": {
    "repository_native_entrypoint": "witwin.channel",
-   "platform_core_optional_dependency": "witwin-channel>=0.1,<0.2",
-   "platform_core_cutover_commit": "9ee6655",
-   "consumer_router_status": "not_verifiable_from_this_repository"
+   "platform_core_optional_dependency": "witwin-channel>=0.4,<0.5",
+   "platform_core_cutover_commit": "pending",
+   "consumer_router_status": "cutover_pending_in_sibling_repository"
   },
   "deletion_status": "blocked",
   "blockers": [
