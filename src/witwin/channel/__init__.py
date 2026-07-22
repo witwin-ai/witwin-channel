@@ -1,4 +1,4 @@
-"""DrJit-free Torch/CUDA RF channel runtime."""
+"""GPU-accelerated differentiable wireless propagation simulation."""
 
 from .core.kernels.extension import build_info
 from .deployment import pipeline_cache_key, runtime_diagnostics

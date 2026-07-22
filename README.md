@@ -1,64 +1,191 @@
-﻿# witwin-channel
+# Witwin Channel
 
-DrJit-free Torch/CUDA RF channel runtime under the `witwin.channel`
-namespace. Python owns solver policy and typed contracts; one validated
-`_channel` extension owns production CUDA/RayD execution.
+Witwin Channel is a GPU-accelerated, differentiable wireless propagation
+simulator for RF digital twins, coverage prediction, channel characterization,
+and inverse optimization. It models a declarative scene and exposes dedicated
+solvers for deterministic fields, explicit propagation paths, and Monte Carlo
+radiomaps through the `witwin.channel` Python package.
 
-## Public API
+> **Project status**
+> Version 0.4 is a breaking replacement for the earlier 0.3 API. The supported
+> runtime requires an NVIDIA GPU and the packaged native extension; APIs may
+> continue to evolve before 1.0.
 
-The curated surface is `witwin.channel` plus the `path`,
-`deterministic`, `montecarlo.basic`, and `montecarlo.bdpt` solver packages.
-Exact exports are frozen in `ci/public-api-snapshot.json`; other domain modules
-are internal unless their README says otherwise.
+## Capabilities
 
-## Architecture
+- Line-of-sight, multi-bounce specular reflection, first-order UTD
+  diffraction, transmission through layered thin-sheet materials, and
+  rough-surface Kirchhoff scattering.
+- Point receivers and structured receiver grids for link-level and radiomap
+  workflows.
+- Complex fields, path gain, delay, departure/arrival angles, interaction
+  geometry, CIR/CFR conversion, polarization, and antenna-array support where
+  advertised by the selected solver.
+- Fixed-topology JVP and VJP derivatives for deterministic, path, and Monte
+  Carlo Basic solves. Supported inputs include material parameters, carrier
+  frequency, endpoint positions, and mesh vertices.
+- CUDA-resident scene, geometry, field, scattering, and derivative execution
+  backed by the native Channel/RayD runtime.
 
-- [`core`](src/witwin/channel/core/README.md): small shared value
-  contracts and build metadata.
-- [`scene`](src/witwin/channel/scene/README.md): models, compilation,
-  stores, caches, and RayD lifetime.
-- [`materials`](src/witwin/channel/materials/README.md): material models,
-  ABI encoding, and electromagnetic evaluation.
-- [`propagation`](src/witwin/channel/propagation/README.md): topology,
-  geometry, fields, and enumerated stages.
-- [`path`](src/witwin/channel/path/README.md) and
-  [`deterministic`](src/witwin/channel/deterministic/README.md): coherent
-  field solvers.
-- [`montecarlo`](src/witwin/channel/montecarlo/README.md): basic and BDPT
-  stochastic solvers.
-- [`physics`](src/witwin/channel/physics/README.md) and
-  [`scattering`](src/witwin/channel/scattering/README.md): reference
-  conventions and rough-surface runtime.
-- [`runtime`](src/witwin/channel/runtime/README.md): validated extension,
-  symbols, tensor/AD contracts, buffers, and native handles.
+The versioned capability manifest is available at runtime:
 
-Dependencies flow from solvers through typed owners to runtime; runtime never
-imports scene or a solver. Production paths never silently fall back to
-CPU/PyTorch, a Python ray tracer, a global extension, a zero result, or a
-lower-fidelity algorithm.
+```python
+import witwin.channel as channel
 
-## Native build
-
-RayD (`backends/torch`) is built in the same CMake graph as `_channel`.
-
-The default source location is `../../RayDi` relative to this repository. Set a
-different checkout explicitly when configuring:
-
-```powershell
-cmake -S . -B build -DRAYD_SOURCE_DIR=E:/Code/RayDi
-cmake --build build --config Release --target _channel
+print(channel.capabilities())
 ```
 
-This integration builds and links `rayd_torch_native_core` directly. It does
-not build/import RayD's Python module, use the Torch dispatcher, or load a
-second DSO with `GetProcAddress`/`dlsym`. The former vendored `ext` snapshots
-are no longer part of the repository; historical plans and audits may still
-refer to them when describing the earlier architecture.
+## Solver entry points
 
-## Contract maintenance
+| Package | Use case | Primary result |
+| --- | --- | --- |
+| `witwin.channel.deterministic` | Repeatable coherent fields and radiomaps | Field, path gain, component maps, optional path table |
+| `witwin.channel.path` | Explicit channel paths for point-to-point links | Complex coefficients, delays, angles, interactions, CIR/CFR |
+| `witwin.channel.montecarlo.basic` | Incoherent sampled power and radiomaps | Path gain and component power/maps |
+| `witwin.channel.montecarlo.bdpt` | Bidirectional Monte Carlo propagation | Path gain, component power, optional BDPT samples |
 
-Public export or signature changes update `ci/public-api-snapshot.json` and a
-migration note. The completed ops migration ledger is immutable historical
-evidence at `docs/dev/audit/phase12-ops-migration-ledger.json`; it is not an
-active routing or compatibility mechanism. Cross-domain imports must satisfy
-the import-graph contract; deleted legacy modules are hard failures.
+Each solver owns its own `Config`, `Result`, and `solve(scene, config)` public
+contract. The exact stable exports are recorded in
+[`ci/public-api-snapshot.json`](ci/public-api-snapshot.json).
+
+## Requirements
+
+- CPython 3.11.
+- PyTorch 2.10 with CUDA 12.8 runtime support.
+- Windows x64 on an NVIDIA GPU with compute capability 12.0 for the currently
+  verified release row. Other declared architectures and platforms require
+  their own release evidence before publication.
+- An ABI-compatible `witwin-channel` wheel, or a source build against the
+  repository-locked RayD integration.
+
+Channel has no production CPU compute backend. Missing CUDA, an unsupported
+GPU architecture, an incompatible extension, or a required native capability
+raises an error before returning a partial result.
+
+## Installation
+
+Install an approved wheel into an environment that already contains the
+matching CUDA-enabled PyTorch build:
+
+```powershell
+python -m pip install .\witwin_channel-0.4.0-cp311-cp311-win_amd64.whl --no-deps
+```
+
+For a source build, select the intended RayD checkout explicitly and keep the
+build in the same Python environment as PyTorch:
+
+```powershell
+conda activate witwin2
+$env:CMAKE_ARGS = "-DRAYD_SOURCE_DIR=E:/Code/RayD"
+python -m pip install . --no-build-isolation --no-deps
+```
+
+When `RAYD_SOURCE_DIR` is omitted, the build may use the unique locked
+`rayd-torch` source bundle exposed by the active Python environment. Discovery
+is limited to package metadata; it does not scan a Conda prefix or load an
+arbitrary global build.
+
+Do not mix files from the 0.3 and 0.4 implementations in one environment.
+
+## Quick start
+
+The following CUDA example evaluates a 10-metre free-space link with the
+deterministic solver:
+
+```python
+import torch
+
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.deterministic import Config, solve
+
+scene = Scene(
+    structures=[],
+    transmitters=[
+        Transmitter(
+            position=torch.tensor([0.0, 0.0, 1.5]),
+            power_w=1.0,
+        )
+    ],
+    receivers=[
+        ReceiverPoint(position=torch.tensor([10.0, 0.0, 1.5]))
+    ],
+    frequency=3.5e9,
+)
+
+result = solve(
+    scene,
+    Config(max_depth=0, components={"los"}),
+)
+
+print(result.path_gain)  # CUDA tensor with shape (1, 1)
+print(result.field)      # complex64 coherent field
+```
+
+Structures use triangle meshes and material objects such as `Dielectric`,
+`LossyDielectric`, `DispersiveMaterial`, `ITUMaterial`, and
+`PerfectConductor`. Replace `ReceiverPoint` with `ReceiverGrid` for radiomap
+solves, or select `witwin.channel.path` when the individual path coefficients,
+delays, angles, and interactions are required.
+
+## Differentiation contract
+
+`path`, `deterministic`, and `montecarlo.basic` accept
+`ad_mode="none"`, `"jvp"`, or `"vjp"`. Derivatives are evaluated through the
+fixed topology selected by the primal solve. Visibility changes, path
+birth/death, and other discrete topology discontinuities are outside this
+contract. Unsupported solver/component/gradient combinations fail explicitly;
+BDPT currently supports primal evaluation only.
+
+## Runtime diagnostics
+
+Use the public diagnostics instead of inspecting private extension modules:
+
+```python
+import witwin.channel as channel
+
+print(channel.runtime_diagnostics())
+print(channel.build_info())
+```
+
+These records identify the package, CUDA architecture, native ABI, build
+fingerprint, and locked RayD source used by the running extension.
+
+## Development
+
+Repository development and validation use the `witwin2` Conda environment:
+
+```powershell
+conda run -n witwin2 python ci/run_ci_tier.py quick
+conda run -n witwin2 python ci/run_ci_tier.py cuda
+```
+
+Architecture and domain-owner documentation lives next to the implementation
+under [`src/witwin/channel`](src/witwin/channel). Contributor rules and the
+full native validation matrix are defined in [`AGENTS.md`](AGENTS.md).
+
+## Citation
+
+If you use Witwin Channel in academic research, please cite:
+
+```bibtex
+@inproceedings{chen2026rfdt,
+  title     = {Physically Accurate Differentiable Inverse Rendering
+               for Radio Frequency Digital Twin},
+  author    = {Chen, Xingyu and Zhang, Xinyu and Zheng, Kai and
+               Fang, Xinmin and Li, Tzu-Mao and Lu, Chris Xiaoxuan
+               and Li, Zhengxiong},
+  booktitle = {Proceedings of the 32nd Annual International Conference
+               on Mobile Computing and Networking (MobiCom)},
+  year      = {2026},
+  doi       = {10.1145/3795866.3796686},
+  publisher = {ACM},
+  address   = {Austin, TX, USA},
+}
+```
+
+## License
+
+Witwin Channel is available under a dual-license model for academic and
+non-commercial research use or for commercial and enterprise use. See
+[`LICENSE`](LICENSE) and the [Witwin licensing page](https://witwin.ai/license)
+for the applicable terms.

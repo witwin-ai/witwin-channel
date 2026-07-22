@@ -9,7 +9,8 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "witwin-channel"
 version = "0.4.0"
-description = "DrJit-free Torch/CUDA RF channel runtime."
+description = "GPU-accelerated differentiable wireless propagation simulation for RF digital twins."
+readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = ["torch==2.10.0"]
 
