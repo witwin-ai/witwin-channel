@@ -215,7 +215,7 @@ def test_diffraction_order1_capacity_owner_has_no_host_count_transfer() -> None:
     source = (
         Path(__file__).resolve().parents[3]
         / "native"
-        / "channel_native"
+        / "channel"
         / "kernels"
         / "diffraction_path_capacity.cu"
     ).read_text(encoding="utf-8")

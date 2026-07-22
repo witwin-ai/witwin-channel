@@ -15,11 +15,11 @@ MANIFEST_PATH = ROOT / "ci/native-binding-manifest.json"
 BOUNDARY_FILES = {"fields.cpp", "materials.cpp"}
 PHASE_P_PRE_SYMBOL_COUNT = 229
 PHASE_P_SYMBOL_PATHS = {
-    "enumerated_transmission_topology_pack": "native/channel_native/binding/path.cpp",
-    "rayd_segment_penetration_backward": "native/channel_native/binding/rayd.cpp",
-    "rayd_segment_penetration_forward": "native/channel_native/binding/rayd.cpp",
-    "rayd_segment_penetration_forward_tape": "native/channel_native/binding/rayd.cpp",
-    "rayd_segment_penetration_jvp": "native/channel_native/binding/rayd.cpp",
+    "enumerated_transmission_topology_pack": "native/channel/binding/path.cpp",
+    "rayd_segment_penetration_backward": "native/channel/binding/rayd.cpp",
+    "rayd_segment_penetration_forward": "native/channel/binding/rayd.cpp",
+    "rayd_segment_penetration_forward_tape": "native/channel/binding/rayd.cpp",
+    "rayd_segment_penetration_jvp": "native/channel/binding/rayd.cpp",
 }
 
 

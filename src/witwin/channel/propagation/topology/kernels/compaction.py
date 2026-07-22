@@ -122,7 +122,7 @@ def deterministic_reflection_order1_compact(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_reflection_order1_compact must return a dict"
+            "_channel.deterministic_reflection_order1_compact must return a dict"
         )
     expected_fields = {
         "selected_faces",
@@ -140,7 +140,7 @@ def deterministic_reflection_order1_compact(
     }
     if set(exported) != expected_fields:
         raise ValueError(
-            "_channel_native.deterministic_reflection_order1_compact returned unexpected fields"
+            "_channel.deterministic_reflection_order1_compact returned unexpected fields"
         )
     selected_count = int(exported["selected_faces"].shape[0])
     validate_cuda_tensor(
@@ -180,7 +180,7 @@ def deterministic_reflection_order1_compact(
     for key in expected_fields - {"selected_faces"}:
         if exported[key].shape[0] != selected_count:
             raise ValueError(
-                f"_channel_native.deterministic_reflection_order1_compact returned bad {key} shape"
+                f"_channel.deterministic_reflection_order1_compact returned bad {key} shape"
             )
     return exported
 
@@ -271,7 +271,7 @@ def deterministic_reflection_sequence_compact(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_reflection_sequence_compact must return a dict"
+            "_channel.deterministic_reflection_sequence_compact must return a dict"
         )
     expected_fields = {
         "selected_sequences",
@@ -293,7 +293,7 @@ def deterministic_reflection_sequence_compact(
     }
     if set(exported) != expected_fields:
         raise ValueError(
-            "_channel_native.deterministic_reflection_sequence_compact returned unexpected fields"
+            "_channel.deterministic_reflection_sequence_compact returned unexpected fields"
         )
     selected_count = int(exported["selected_sequences"].shape[0])
     validate_cuda_tensor(
@@ -371,7 +371,7 @@ def deterministic_reflection_sequence_compact(
     for key, shape in expected_shapes.items():
         if tuple(exported[key].shape) != shape:
             raise ValueError(
-                f"_channel_native.deterministic_reflection_sequence_compact returned bad {key} shape"
+                f"_channel.deterministic_reflection_sequence_compact returned bad {key} shape"
             )
     return exported
 
@@ -443,7 +443,7 @@ def deterministic_diffraction_order1_compact(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_diffraction_order1_compact must return a dict"
+            "_channel.deterministic_diffraction_order1_compact must return a dict"
         )
     expected_fields = {
         "rx_id",
@@ -460,7 +460,7 @@ def deterministic_diffraction_order1_compact(
     }
     if set(exported) != expected_fields:
         raise ValueError(
-            "_channel_native.deterministic_diffraction_order1_compact returned unexpected fields"
+            "_channel.deterministic_diffraction_order1_compact returned unexpected fields"
         )
     selected_count = int(exported["rx_id"].shape[0])
     validate_cuda_tensor("rx_id", exported["rx_id"], dtype=torch.int32, ndim=1)
@@ -483,11 +483,11 @@ def deterministic_diffraction_order1_compact(
     for key in expected_fields - {"interaction_position"}:
         if exported[key].shape != (selected_count,):
             raise ValueError(
-                f"_channel_native.deterministic_diffraction_order1_compact returned bad {key} shape"
+                f"_channel.deterministic_diffraction_order1_compact returned bad {key} shape"
             )
     if exported["interaction_position"].shape != (selected_count, 3):
         raise ValueError(
-            "_channel_native.deterministic_diffraction_order1_compact returned bad interaction_position shape"
+            "_channel.deterministic_diffraction_order1_compact returned bad interaction_position shape"
         )
     return exported
 
@@ -534,7 +534,7 @@ def _name_diffraction_order1_capacity_output(
 ) -> DiffractionOrder1CapacityBlock:
     if not isinstance(raw, dict):
         raise TypeError(
-            "_channel_native.deterministic_diffraction_order1_capacity_block "
+            "_channel.deterministic_diffraction_order1_capacity_block "
             "must return a dict"
         )
     expected = {
@@ -555,7 +555,7 @@ def _name_diffraction_order1_capacity_output(
     }
     if set(raw) != expected:
         raise ValueError(
-            "_channel_native.deterministic_diffraction_order1_capacity_block "
+            "_channel.deterministic_diffraction_order1_capacity_block "
             "returned unexpected fields"
         )
     output_schema = (
@@ -702,10 +702,10 @@ def deterministic_sort_order(
         primitive_sequence,
     )
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.deterministic_sort_order must return a tensor")
+        raise TypeError("_channel.deterministic_sort_order must return a tensor")
     validate_cuda_tensor("out", out, dtype=torch.long, ndim=1)
     if out.shape != valid.shape:
-        raise ValueError("_channel_native.deterministic_sort_order returned bad shape")
+        raise ValueError("_channel.deterministic_sort_order returned bad shape")
     return out
 
 

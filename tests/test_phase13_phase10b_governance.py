@@ -62,10 +62,10 @@ CHAIN_SYMBOLS = {
     "scattering_chain_realization_eval_jvp",
 }
 DELETED = {
-    "native/channel_native/kernels/scattering_chain_ensemble.cu",
-    "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-    "native/channel_native/kernels/scattering_chain_realization.cu",
-    "native/channel_native/kernels/scattering_chain_realization_ad.cu",
+    "native/channel/kernels/scattering_chain_ensemble.cu",
+    "native/channel/kernels/scattering_chain_ensemble_ad.cu",
+    "native/channel/kernels/scattering_chain_realization.cu",
+    "native/channel/kernels/scattering_chain_realization_ad.cu",
 }
 
 
@@ -112,12 +112,12 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     assert migration["phase10b_current"]["owner_counts"] == {
         "RayD": 43,
         "layered": 2,
-        "Channel Native": 157,
+        "Channel": 157,
     }
     assert evidence["owner_transfer"]["owner_counts"] == {
         "RayD": 43,
         "layered": 2,
-        "Channel Native": 157,
+        "Channel": 157,
     }
     assert inventory["phase10b_scattering_chains"]["binding_count"] == 202
     assert migration["phase10b_current"]["binding_count"] == 202
@@ -127,7 +127,7 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     assert Counter(row["numerical_owner"] for row in inventory["symbols"]) == {
         "RayD": current_counts["rayd_numerical"],
         "Channel operation / RayD primitives": current_counts["layered"],
-        "Channel Native": current_counts["channel_numerical"],
+        "Channel": current_counts["channel_numerical"],
     }
     owners = {row["symbol"]: row["numerical_owner"] for row in inventory["symbols"]}
     assert all(owners[symbol] == "RayD" for symbol in CHAIN_SYMBOLS)
@@ -159,10 +159,10 @@ def test_phase10b_rayd_identity_sources_and_direct_contract_are_recorded() -> No
 
 
 def test_phase10b_channel_is_typed_facade_without_duplicate_or_fallback() -> None:
-    materials = (ROOT / "native/channel_native/binding/materials.cpp").read_text(
+    materials = (ROOT / "native/channel/binding/materials.cpp").read_text(
         encoding="utf-8-sig"
     )
-    event_source = (ROOT / "native/channel_native/kernels/scattering.cu").read_text(
+    event_source = (ROOT / "native/channel/kernels/scattering.cu").read_text(
         encoding="utf-8-sig"
     )
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")
@@ -218,7 +218,7 @@ def test_phase10b_compile_launch_codegen_and_dependency_contracts_are_frozen() -
     assert all(
         not (
             edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel_native/")
+            and edge["to"].startswith("native/channel/")
         )
         for edge in graph["edges"]
     )

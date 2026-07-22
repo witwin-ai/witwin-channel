@@ -30,7 +30,7 @@ def bdpt_face_material_tensors(
         face_material_id,
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.bdpt_face_material_tensors must return a dict")
+        raise TypeError("_channel.bdpt_face_material_tensors must return a dict")
     validate_cuda_tensor("eps_r", exported["eps_r"], dtype=torch.float32, ndim=1)
     validate_cuda_tensor("sigma_e", exported["sigma_e"], dtype=torch.float32, ndim=1)
     validate_cuda_tensor("mu_r", exported["mu_r"], dtype=torch.float32, ndim=1)
@@ -61,7 +61,7 @@ def bdpt_face_material_tensors_from_host(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_face_material_tensors_from_host must return a dict"
+            "_channel.bdpt_face_material_tensors_from_host must return a dict"
         )
     validate_cuda_tensor("eps_r", exported["eps_r"], dtype=torch.float32, ndim=1)
     validate_cuda_tensor("sigma_e", exported["sigma_e"], dtype=torch.float32, ndim=1)
@@ -129,7 +129,7 @@ def em_layer_stack_eval(
         float(frequency_hz),
     )
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.em_layer_stack_eval must return a dict")
+        raise TypeError("_channel.em_layer_stack_eval must return a dict")
     if set(out) != set(_EM_LAYER_STACK_FIELDS):
         raise ValueError("em_layer_stack_eval returned unexpected fields")
     for name in _EM_LAYER_STACK_FIELDS:
@@ -181,7 +181,7 @@ def em_layer_stack_backward(
         bool(need_frequency),
     )
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.em_layer_stack_backward must return a dict")
+        raise TypeError("_channel.em_layer_stack_backward must return a dict")
     return out
 
 
@@ -219,7 +219,7 @@ def em_layer_stack_jvp(
         float(tangent_frequency),
     )
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.em_layer_stack_jvp must return a dict")
+        raise TypeError("_channel.em_layer_stack_jvp must return a dict")
     return out
 
 
@@ -245,7 +245,7 @@ def mc_face_material_tensors(
     native = native_extension()
     if native is None or not hasattr(native, "mc_face_material_tensors"):
         raise RuntimeError(
-            "_channel_native.mc_face_material_tensors CUDA kernel is required"
+            "_channel.mc_face_material_tensors CUDA kernel is required"
         )
     exported = native.mc_face_material_tensors(
         material_eps_r,
@@ -254,7 +254,7 @@ def mc_face_material_tensors(
         face_material_id,
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_face_material_tensors must return a dict")
+        raise TypeError("_channel.mc_face_material_tensors must return a dict")
     return exported
 
 

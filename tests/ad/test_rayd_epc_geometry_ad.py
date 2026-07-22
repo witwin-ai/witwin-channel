@@ -1,6 +1,6 @@
 """AD-2 layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
 
-Exercises the new fixed-winner C-ABI directly (channel_native bridge facades
+Exercises the new fixed-winner C-ABI directly (channel bridge facades
 only): d(hit points, emitted unit normals, path length) / d(vertices, source,
 receiver) for the direct-plane EPC forward, at a frozen winner sequence, plus
 jvp-vs-vjp inner-product duality and the face-normal table companions used by
@@ -213,7 +213,7 @@ def _weighted_loss(out, weights) -> torch.Tensor:
 
 @pytest.mark.parametrize("case_builder", (_single_bounce_case, _two_bounce_case))
 def test_epc_paths_plane_contract_matches_scene_tables(case_builder):
-    """Gate from the spec: the plane channel_native passes for prim P must be
+    """Gate from the spec: the plane channel passes for prim P must be
     the plane of that triangle in RayD's own scene tables (anchor = v0,
     normal = normalize(cross(v1 - v0, v2 - v0))), and the emitted hits must
     lie on it."""

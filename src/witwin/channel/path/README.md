@@ -64,7 +64,7 @@ import them directly.
 
 ## Numerical and AD contract
 
-- Solving requires CUDA and channel-native path kernels. Reflection and
+- Solving requires CUDA and channel path kernels. Reflection and
   diffraction additionally require the typed RayD-native scene capability.
 - `PathResult.a` has shape
   `(rx, rx_ant, tx, tx_ant, path, time)` and dtype `complex64`.

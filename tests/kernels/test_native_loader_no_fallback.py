@@ -10,7 +10,7 @@ from witwin.channel.runtime import symbols
 from witwin.channel.scene.kernels import rayd_scene
 
 
-def test_channel_native_extension_loader_has_no_artifact_fallback():
+def test_channel_extension_loader_has_no_artifact_fallback():
     source = inspect.getsource(extension.native_extension)
 
     assert "artifacts" not in source
@@ -28,7 +28,7 @@ def test_rayd_uses_the_validated_fail_loud_native_loader():
     assert symbols.native_extension() is not None
 
 
-def test_rayd_visibility_uses_channel_native_bridge():
+def test_rayd_visibility_uses_channel_bridge():
     source = inspect.getsource(ops.rayd_visibility_forward)
 
     assert "_required_rayd_op" not in source
@@ -37,7 +37,7 @@ def test_rayd_visibility_uses_channel_native_bridge():
     assert "rayd_visibility_forward" in source
 
 
-def test_diffraction_visibility_plan_uses_channel_native_bridge():
+def test_diffraction_visibility_plan_uses_channel_bridge():
     source = inspect.getsource(ops.diffraction_tx_visible_state_plan)
 
     assert "_required_rayd_op" not in source
@@ -46,7 +46,7 @@ def test_diffraction_visibility_plan_uses_channel_native_bridge():
     assert "diffraction_tx_visible_state_plan" in source
 
 
-def test_rayd_intersection_uses_channel_native_bridge():
+def test_rayd_intersection_uses_channel_bridge():
     source = inspect.getsource(ops.rayd_intersect_forward)
 
     assert "_required_rayd_op" not in source
@@ -56,7 +56,7 @@ def test_rayd_intersection_uses_channel_native_bridge():
     assert "_rayd_resource" not in ops.__dict__
 
 
-def test_rayd_diffraction_sample_tape_uses_channel_native_bridge():
+def test_rayd_diffraction_sample_tape_uses_channel_bridge():
     for fn in (ops.rayd_diffraction_sample_tape_forward,):
         source = inspect.getsource(fn)
         assert "_required_rayd_op" not in source
@@ -82,7 +82,7 @@ def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
 
     def missing(name: str):
         raise symbols.NativeSymbolError(
-            f"_channel_native.{name} CUDA kernel is required"
+            f"_channel.{name} CUDA kernel is required"
         )
 
     monkeypatch.setattr(mc_sampling, "required_symbol", missing)
@@ -95,7 +95,7 @@ def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
         mc_sampling.mc_diffraction_discover_edges_counted()
 
 
-def test_rayd_path_exports_use_channel_native_bridge():
+def test_rayd_path_exports_use_channel_bridge():
     for fn in (
         ops.rayd_reflection_epc_paths_forward,
         ops.rayd_diffraction_paths_order1_forward,
@@ -114,7 +114,7 @@ def test_simplified_coherent_diffraction_grid_api_is_not_public():
     )
 
 
-def test_rayd_scene_builder_uses_channel_native_scene_bridge():
+def test_rayd_scene_builder_uses_channel_scene_bridge():
     source = inspect.getsource(rayd_scene.build_scene_from_structures)
     edge_source = inspect.getsource(rayd_scene.RayDSceneResource.edge_records)
 
@@ -127,8 +127,8 @@ def test_rayd_scene_builder_uses_channel_native_scene_bridge():
 def test_production_sources_have_no_rayd_dispatch_or_loader_fallbacks():
     repo = Path(__file__).resolve().parents[2]
     roots = (
-        repo / "src" / "witwin" / "channel_native",
-        repo / "native" / "channel_native",
+        repo / "src" / "witwin" / "channel",
+        repo / "native" / "channel",
     )
     forbidden = (
         "torch.ops.rayd",
@@ -157,8 +157,8 @@ def test_production_sources_have_no_rayd_dispatch_or_loader_fallbacks():
 def test_production_sources_have_no_legacy_fallback_state_terms():
     repo = Path(__file__).resolve().parents[2]
     roots = (
-        repo / "src" / "witwin" / "channel_native",
-        repo / "native" / "channel_native",
+        repo / "src" / "witwin" / "channel",
+        repo / "native" / "channel",
     )
     forbidden = (
         "fallback",
@@ -183,7 +183,7 @@ def test_production_sources_have_no_legacy_fallback_state_terms():
 
 def test_native_kernels_do_not_use_aten_compute_or_cpu_tensor_readback():
     repo = Path(__file__).resolve().parents[2]
-    root = repo / "native" / "channel_native" / "kernels"
+    root = repo / "native" / "channel" / "kernels"
     forbidden = ("at::zeros", ".cpu()")
 
     offenders: list[str] = []
@@ -200,8 +200,8 @@ def test_native_kernels_do_not_use_aten_compute_or_cpu_tensor_readback():
 def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     repo = Path(__file__).resolve().parents[2]
     roots = (
-        repo / "src" / "witwin" / "channel_native" / "montecarlo" / "basic",
-        repo / "src" / "witwin" / "channel_native" / "montecarlo" / "bdpt",
+        repo / "src" / "witwin" / "channel" / "montecarlo" / "basic",
+        repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt",
     )
     forbidden = (".contiguous(", ".reshape(")
 
@@ -218,7 +218,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
 def test_path_solver_uses_the_typed_enumerated_engine():
     repo = Path(__file__).resolve().parents[2]
     source = (
-        repo / "src" / "witwin" / "channel_native" / "path" / "solver.py"
+        repo / "src" / "witwin" / "channel" / "path" / "solver.py"
     ).read_text()
 
     assert "propagation.enumerated.engine import" in source
@@ -234,21 +234,21 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
         repo
         / "src"
         / "witwin"
-        / "channel_native"
+        / "channel"
         / "montecarlo"
         / "basic"
         / "backend.py",
         repo
         / "src"
         / "witwin"
-        / "channel_native"
+        / "channel"
         / "montecarlo"
         / "basic"
         / "rayd_components.py",
         repo
         / "src"
         / "witwin"
-        / "channel_native"
+        / "channel"
         / "montecarlo"
         / "bdpt"
         / "subpaths.py",
@@ -293,7 +293,7 @@ def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_expor
 
 def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
     repo = Path(__file__).resolve().parents[2]
-    root = repo / "src" / "witwin" / "channel_native" / "montecarlo" / "bdpt"
+    root = repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt"
     forbidden = (
         "direct_los_path_gain",
         "visible_los_path_gain",
@@ -318,7 +318,7 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
 
 def test_rayd_bridge_is_source_linked_without_dso_lookup():
     repo = Path(__file__).resolve().parents[2]
-    bridge_root = repo / "native" / "channel_native" / "rayd"
+    bridge_root = repo / "native" / "channel" / "rayd"
     bridge_paths = [bridge_root / "resource.h", *sorted(bridge_root.glob("*.cpp"))]
     bridge_source = "\n".join(path.read_text() for path in bridge_paths)
 

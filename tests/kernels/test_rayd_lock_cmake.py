@@ -92,11 +92,11 @@ def _configure(
         str(ROOT),
         "-B",
         str(build),
-        "-DCHANNEL_NATIVE_VALIDATE_RAYD_ONLY=ON",
+        "-DCHANNEL_VALIDATE_RAYD_ONLY=ON",
         f"-DRAYD_SOURCE_DIR={rayd}",
     ]
     if release is not None:
-        arguments.append(f"-DCHANNEL_NATIVE_RELEASE_BUILD={'ON' if release else 'OFF'}")
+        arguments.append(f"-DCHANNEL_RELEASE_BUILD={'ON' if release else 'OFF'}")
     if cmake_cuda_architectures is not None:
         arguments.append(f"-DCMAKE_CUDA_ARCHITECTURES={cmake_cuda_architectures}")
     if skbuild_state is not None:
@@ -147,7 +147,7 @@ def test_cmake_accepts_the_locked_rayd_checkout(tmp_path: Path):
         in configured.stdout
     )
     assert (
-        "Channel Native CUDA architectures: "
+        "Channel CUDA architectures: "
         "75-real;80-real;86-real;89-real;120-real;120-virtual"
     ) in configured.stdout
 
@@ -162,7 +162,7 @@ def test_cmake_normalizes_explicit_torch_cuda_arch_override(tmp_path: Path):
 
     assert configured.returncode == 0, configured.stdout + configured.stderr
     assert (
-        "Channel Native CUDA architectures: 86-real;120-real;120-virtual"
+        "Channel CUDA architectures: 86-real;120-real;120-virtual"
         in configured.stdout
     )
     cache = (tmp_path / "build" / "CMakeCache.txt").read_text(encoding="utf-8")
@@ -181,7 +181,7 @@ def test_cmake_accepts_matching_explicit_architecture_inputs(tmp_path: Path):
     )
 
     assert configured.returncode == 0, configured.stdout + configured.stderr
-    assert "Channel Native CUDA architectures: 120-real" in configured.stdout
+    assert "Channel CUDA architectures: 120-real" in configured.stdout
 
 
 def test_cmake_rejects_conflicting_architecture_inputs(tmp_path: Path):
@@ -230,7 +230,7 @@ def test_cmake_rejects_unlocked_rayd(
     release = mutation == "dirty-release"
     if mutation == "commit":
         assert (
-            _run(git, "config", "user.name", "Channel Native Test", cwd=rayd).returncode
+            _run(git, "config", "user.name", "Channel Test", cwd=rayd).returncode
             == 0
         )
         assert (
@@ -291,4 +291,4 @@ def test_wheel_configuration_enables_clean_release_guard_by_default(tmp_path: Pa
 
     output = configured.stdout + configured.stderr
     assert configured.returncode != 0, output
-    assert "CHANNEL_NATIVE_RELEASE_BUILD forbids a dirty RayD checkout" in output
+    assert "CHANNEL_RELEASE_BUILD forbids a dirty RayD checkout" in output

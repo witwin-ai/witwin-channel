@@ -88,7 +88,7 @@ def main() -> None:
     device_uuid = str(raw_uuid).strip()
     if not device_uuid:
         raise RuntimeError("CUDA device UUID is empty")
-    spec = importlib.util.find_spec("witwin.channel._channel_native")
+    spec = importlib.util.find_spec("witwin.channel._channel")
     origin = None if spec is None else spec.origin
     if not isinstance(origin, str) or not origin:
         raise RuntimeError("packaged extension origin is unavailable")

@@ -111,7 +111,7 @@ promises. The parent `montecarlo` package exports no solver symbols.
 - The live `MonteCarloTargetInset` traversal is one flattened pair-major RayD
   batch, not one trace per transmitter. It preserves transmitter-major,
   receiver-minor order and routes the resident fixed-capacity hit block through
-  the Channel-native wall-product primal/VJP/JVP family. Penetration and the
+  the Channel wall-product primal/VJP/JVP family. Penetration and the
   estimator share one `CapacityFailureState`; failed work is sanitized before
   the Basic-owned native five-component-map primal/VJP/JVP sanitizer family
   runs before finalization, and the solve enqueues the unique terminal observer
@@ -125,7 +125,7 @@ promises. The parent `montecarlo` package exports no solver symbols.
 
 ## Forbidden fallback
 
-Missing CUDA, the channel-native extension, required native symbols, or RayD
+Missing CUDA, the channel extension, required native symbols, or RayD
 capability is a hard error. Do not add CPU, Python/Torch recomputation,
 finite-difference, legacy RayD/DrJit, zero-result, or reference-oracle
 fallbacks. A less capable accumulation strategy is valid only when it is an

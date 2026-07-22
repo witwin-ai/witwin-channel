@@ -142,7 +142,7 @@ def _segment_penetration_result(
         _SEGMENT_PENETRATION_RESULT_FIELDS
     ):
         raise TypeError(
-            "_channel_native.rayd_segment_penetration_forward must return 11 tensors"
+            "_channel.rayd_segment_penetration_forward must return 11 tensors"
         )
     return SegmentPenetrationResult(
         hit_capacity=hit_capacity,
@@ -223,7 +223,7 @@ def rayd_segment_penetration_forward_tape(
     )
     if not isinstance(values, (tuple, list)) or len(values) != expected:
         raise TypeError(
-            "_channel_native.rayd_segment_penetration_forward_tape must return 17 tensors"
+            "_channel.rayd_segment_penetration_forward_tape must return 17 tensors"
         )
     result = _segment_penetration_result(
         values[:11], hit_capacity=hit_capacity, failure_state=failure_state
@@ -310,7 +310,7 @@ def rayd_segment_penetration_backward(
     )
     if not isinstance(values, (tuple, list)) or len(values) != 3:
         raise TypeError(
-            "_channel_native.rayd_segment_penetration_backward must return 3 gradients"
+            "_channel.rayd_segment_penetration_backward must return 3 gradients"
         )
     return SegmentPenetrationBackwardResult(*values)
 
@@ -366,7 +366,7 @@ def rayd_segment_penetration_jvp(
     )
     if not isinstance(values, (tuple, list)) or len(values) != 6:
         raise TypeError(
-            "_channel_native.rayd_segment_penetration_jvp must return 6 tangents"
+            "_channel.rayd_segment_penetration_jvp must return 6 tangents"
         )
     return SegmentPenetrationJvpResult(*values)
 
@@ -391,7 +391,7 @@ def rayd_visibility_forward(
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.rayd_visibility_forward must return a tensor sequence"
+            "_channel.rayd_visibility_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -452,11 +452,11 @@ def rayd_intersect_forward(
         int(flags),
     )
     if not isinstance(out, (tuple, list)) or len(out) != len(_BDPT_INTERSECTION_FIELDS):
-        raise TypeError("_channel_native.rayd_intersect_forward must return 10 tensors")
+        raise TypeError("_channel.rayd_intersect_forward must return 10 tensors")
     exported = dict(zip(_BDPT_INTERSECTION_FIELDS, out, strict=True))
     validate_cuda_tensor("t", exported["t"], dtype=torch.float32, ndim=1)
     if exported["t"].shape != (ray_o.shape[0],):
-        raise ValueError("_channel_native.rayd_intersect_forward returned bad t shape")
+        raise ValueError("_channel.rayd_intersect_forward returned bad t shape")
     for name in ("p", "n", "geo_n", "barycentric"):
         validate_cuda_tensor(
             name, exported[name], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -480,7 +480,7 @@ def rayd_diffraction_sample_tape_forward(*args: object) -> tuple[torch.Tensor, .
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.rayd_diffraction_sample_tape_forward must return a tensor sequence"
+            "_channel.rayd_diffraction_sample_tape_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -496,7 +496,7 @@ def rayd_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.rayd_trace_reflections_forward must return a tensor sequence"
+            "_channel.rayd_trace_reflections_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -512,7 +512,7 @@ def rayd_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.rayd_reflection_epc_paths_forward must return a tensor sequence"
+            "_channel.rayd_reflection_epc_paths_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -537,7 +537,7 @@ def coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     )
     if not isinstance(out, dict):
         raise TypeError(
-            "_channel_native.coupled_rd_geometry_forward must return a dict"
+            "_channel.coupled_rd_geometry_forward must return a dict"
         )
     required = {
         "valid": (torch.bool, 1),
@@ -601,7 +601,7 @@ def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     )
     if not isinstance(out, dict):
         raise TypeError(
-            "_channel_native.coupled_dd_geometry_forward must return a dict"
+            "_channel.coupled_dd_geometry_forward must return a dict"
         )
     required = {
         "valid": (torch.bool, 1),
@@ -652,7 +652,7 @@ def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, 
     )
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.rayd_diffraction_paths_order1_forward must return a tensor sequence"
+            "_channel.rayd_diffraction_paths_order1_forward must return a tensor sequence"
         )
     return tuple(out)
 
@@ -765,16 +765,16 @@ def diffraction_tx_visible_state_plan(
     )
     if not isinstance(active, torch.Tensor):
         raise TypeError(
-            "_channel_native.diffraction_tx_visible_state_plan must return a tensor"
+            "_channel.diffraction_tx_visible_state_plan must return a tensor"
         )
     validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
     if active.shape != (state_count,):
         raise ValueError(
-            "_channel_native.diffraction_tx_visible_state_plan returned bad shape"
+            "_channel.diffraction_tx_visible_state_plan returned bad shape"
         )
     if active.get_device() != tx.get_device():
         raise ValueError(
-            "_channel_native.diffraction_tx_visible_state_plan returned wrong device"
+            "_channel.diffraction_tx_visible_state_plan returned wrong device"
         )
     return active
 

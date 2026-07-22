@@ -35,7 +35,7 @@ def _git(*args: str, cwd: Path) -> str:
 def _repository(path: Path, *, remote: str | None = None) -> str:
     path.mkdir()
     _git("init", cwd=path)
-    _git("config", "user.name", "Channel Native Test", cwd=path)
+    _git("config", "user.name", "Channel Test", cwd=path)
     _git("config", "user.email", "test@example.invalid", cwd=path)
     (path / "tracked.txt").write_text("clean\n", encoding="utf-8")
     _git("add", "tracked.txt", cwd=path)
@@ -64,20 +64,23 @@ def _validate(
         "-m",
         "cmake",
         f"-DGIT_EXECUTABLE={git}",
-        f"-DCHANNEL_NATIVE_SOURCE_DIR={channel}",
-        f"-DCHANNEL_NATIVE_EXPECTED_GIT_SHA={channel_sha}",
-        f"-DCHANNEL_NATIVE_EXPECTED_GIT_DIRTY={channel_dirty}",
-        f"-DCHANNEL_NATIVE_RAYD_SOURCE_DIR={rayd}",
-        f"-DCHANNEL_NATIVE_EXPECTED_RAYD_SHA={rayd_sha}",
-        f"-DCHANNEL_NATIVE_EXPECTED_RAYD_DIRTY={rayd_dirty}",
-        f"-DCHANNEL_NATIVE_EXPECTED_RAYD_REMOTE={RAYD_REMOTE}",
-        f"-DCHANNEL_NATIVE_RAYD_ABI_FILE={abi}",
-        "-DCHANNEL_NATIVE_EXPECTED_RAYD_ABI_SHA256="
+        f"-DCHANNEL_SOURCE_DIR={channel}",
+        f"-DCHANNEL_EXPECTED_GIT_SHA={channel_sha}",
+        f"-DCHANNEL_EXPECTED_GIT_DIRTY={channel_dirty}",
+        f"-DCHANNEL_RAYD_SOURCE_DIR={rayd}",
+        "-DCHANNEL_RAYD_SOURCE_KIND=git-checkout",
+        f"-DCHANNEL_EXPECTED_RAYD_SHA={rayd_sha}",
+        f"-DCHANNEL_EXPECTED_RAYD_DIRTY={rayd_dirty}",
+        f"-DCHANNEL_EXPECTED_RAYD_REMOTE={RAYD_REMOTE}",
+        f"-DCHANNEL_RAYD_ABI_FILE={abi}",
+        "-DCHANNEL_EXPECTED_RAYD_ABI_SHA256="
         + hashlib.sha256(b"abi-v1\n").hexdigest(),
-        f"-DCHANNEL_NATIVE_RAYD_LOCK_FILE={lock}",
-        "-DCHANNEL_NATIVE_EXPECTED_RAYD_LOCK_SHA256="
+        f"-DCHANNEL_RAYD_LOCK_FILE={lock}",
+        "-DCHANNEL_EXPECTED_RAYD_LOCK_SHA256="
         + hashlib.sha256(b"lock-v1\n").hexdigest(),
-        f"-DCHANNEL_NATIVE_RELEASE_BUILD={'ON' if release else 'OFF'}",
+        f"-DCHANNEL_PYTHON_EXECUTABLE={sys.executable}",
+        f"-DCHANNEL_RAYD_RESOLVER={ROOT / 'cmake' / 'resolve_rayd_source.py'}",
+        f"-DCHANNEL_RELEASE_BUILD={'ON' if release else 'OFF'}",
         "-P",
         str(VALIDATOR),
     )

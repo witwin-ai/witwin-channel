@@ -11,36 +11,36 @@ RAYD_BRIDGE_SOURCES = (
 
 WRAPPERS_BY_SOURCE = {
     "scene.cpp": {
-        "cn_rayd_scene_create",
-        "cn_rayd_scene_edge_records",
+        "channel_rayd_scene_create",
+        "channel_rayd_scene_edge_records",
     },
     "geometry.cpp": {
-        "cn_rayd_intersect_forward",
-        "cn_rayd_visibility_forward",
-        "cn_rayd_intersect_backward",
-        "cn_rayd_intersect_jvp",
-        "cn_rayd_segment_penetration_forward",
-        "cn_rayd_segment_penetration_forward_tape",
-        "cn_rayd_segment_penetration_backward",
-        "cn_rayd_segment_penetration_jvp",
-        "cn_coupled_rd_geometry_forward",
-        "cn_coupled_dd_geometry_forward",
+        "channel_rayd_intersect_forward",
+        "channel_rayd_visibility_forward",
+        "channel_rayd_intersect_backward",
+        "channel_rayd_intersect_jvp",
+        "channel_rayd_segment_penetration_forward",
+        "channel_rayd_segment_penetration_forward_tape",
+        "channel_rayd_segment_penetration_backward",
+        "channel_rayd_segment_penetration_jvp",
+        "channel_coupled_rd_geometry_forward",
+        "channel_coupled_dd_geometry_forward",
     },
     "reflection.cpp": {
-        "cn_rayd_trace_reflections_forward",
-        "cn_rayd_reflection_epc_paths_forward",
-        "cn_rayd_trace_reflections_forward_tape",
-        "cn_rayd_trace_reflections_backward",
-        "cn_rayd_trace_reflections_jvp",
-        "cn_rayd_reflection_epc_paths_backward",
-        "cn_rayd_reflection_epc_paths_jvp",
-        "cn_rayd_scene_face_normals_backward",
-        "cn_rayd_scene_face_normals_jvp",
+        "channel_rayd_trace_reflections_forward",
+        "channel_rayd_reflection_epc_paths_forward",
+        "channel_rayd_trace_reflections_forward_tape",
+        "channel_rayd_trace_reflections_backward",
+        "channel_rayd_trace_reflections_jvp",
+        "channel_rayd_reflection_epc_paths_backward",
+        "channel_rayd_reflection_epc_paths_jvp",
+        "channel_rayd_scene_face_normals_backward",
+        "channel_rayd_scene_face_normals_jvp",
     },
     "diffraction.cpp": {
-        "cn_diffraction_tx_visible_state_plan",
-        "cn_rayd_diffraction_paths_order1_forward",
-        "cn_rayd_diffraction_sample_tape_forward",
+        "channel_diffraction_tx_visible_state_plan",
+        "channel_rayd_diffraction_paths_order1_forward",
+        "channel_rayd_diffraction_sample_tape_forward",
     },
 }
 
@@ -49,11 +49,11 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _cn_wrapper_definitions(source: str) -> set[str]:
+def _channel_wrapper_definitions(source: str) -> set[str]:
     signature = re.compile(
         r"(?m)^(?:pybind11::(?:tuple|dict)|(?:at|torch)::Tensor|"
         r"std::shared_ptr<RayDSceneResource>)\s+"
-        r"(cn_[A-Za-z0-9_]+)\s*\("
+        r"(channel_[A-Za-z0-9_]+)\s*\("
     )
     definitions: set[str] = set()
     for match in signature.finditer(source):
@@ -68,9 +68,9 @@ def _cn_wrapper_definitions(source: str) -> set[str]:
 
 
 def test_rayd_direct_integration_has_only_the_modular_sources():
-    bridge_root = _repo_root() / "native" / "channel_native" / "rayd"
+    bridge_root = _repo_root() / "native" / "channel" / "rayd"
 
-    assert not (_repo_root() / "native" / "channel_native" / "rayd_bridge.cpp").exists()
+    assert not (_repo_root() / "native" / "channel" / "rayd_bridge.cpp").exists()
     assert not (bridge_root / "bridge.h").exists()
     assert not (bridge_root / "common.cpp").exists()
     assert (bridge_root / "resource.h").is_file()
@@ -80,12 +80,12 @@ def test_rayd_direct_integration_has_only_the_modular_sources():
 
 
 def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
-    bridge_root = _repo_root() / "native" / "channel_native" / "rayd"
+    bridge_root = _repo_root() / "native" / "channel" / "rayd"
     expected_wrappers = set().union(*WRAPPERS_BY_SOURCE.values())
     owners: dict[str, list[str]] = {}
 
     for source_name in RAYD_BRIDGE_SOURCES:
-        definitions = _cn_wrapper_definitions((bridge_root / source_name).read_text())
+        definitions = _channel_wrapper_definitions((bridge_root / source_name).read_text())
         assert definitions == WRAPPERS_BY_SOURCE.get(source_name, set())
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
@@ -98,12 +98,12 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
 def test_cmake_builds_every_rayd_source_without_legacy_exception_boundary():
     cmake = (_repo_root() / "CMakeLists.txt").read_text()
     source_paths = tuple(
-        f"native/channel_native/rayd/{source_name}"
+        f"native/channel/rayd/{source_name}"
         for source_name in RAYD_BRIDGE_SOURCES
     )
 
     extension_sources = re.search(
-        r"Python_add_library\(\s*_channel_native\s+MODULE\s+WITH_SOABI(.*?)\n\)",
+        r"Python_add_library\(\s*_channel\s+MODULE\s+WITH_SOABI(.*?)\n\)",
         cmake,
         re.DOTALL,
     )
@@ -121,16 +121,16 @@ def test_cmake_builds_every_rayd_source_without_legacy_exception_boundary():
 
 
 def test_diffraction_visibility_plan_calls_the_typed_rayd_axial_operation() -> None:
-    source = (_repo_root() / "native/channel_native/rayd/diffraction.cpp").read_text(
+    source = (_repo_root() / "native/channel/rayd/diffraction.cpp").read_text(
         encoding="utf-8-sig"
     )
 
-    assert source.count("cn_diffraction_tx_visible_state_plan(") == 1
+    assert source.count("channel_diffraction_tx_visible_state_plan(") == 1
     assert source.count("rayd::torch::AxialEdgeVisibilityRequest request{") == 1
     assert source.count("rayd::torch::axial_edge_visibility_forward(") == 1
     assert "kDiffractionStateCapacity = 4'194'304" in source
-    body = source.split("cn_diffraction_tx_visible_state_plan(", 1)[1].split(
-        "cn_rayd_diffraction_paths_order1_forward(", 1
+    body = source.split("channel_diffraction_tx_visible_state_plan(", 1)[1].split(
+        "channel_rayd_diffraction_paths_order1_forward(", 1
     )[0]
     assert "state_src" not in body
     assert "cudaStreamSynchronize" not in body
@@ -139,13 +139,13 @@ def test_diffraction_visibility_plan_calls_the_typed_rayd_axial_operation() -> N
 
 def test_segment_penetration_bridge_preserves_the_typed_api6_contract() -> None:
     root = _repo_root()
-    resource = (root / "native/channel_native/rayd/resource.h").read_text(
+    resource = (root / "native/channel/rayd/resource.h").read_text(
         encoding="utf-8-sig"
     )
-    geometry = (root / "native/channel_native/rayd/geometry.cpp").read_text(
+    geometry = (root / "native/channel/rayd/geometry.cpp").read_text(
         encoding="utf-8-sig"
     )
-    binding = (root / "native/channel_native/binding/rayd.cpp").read_text(
+    binding = (root / "native/channel/binding/rayd.cpp").read_text(
         encoding="utf-8-sig"
     )
 

@@ -15,7 +15,7 @@ from witwin.channel.propagation.topology.discovery import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 _DIGESTS = {
     "plan_tx_visible_diffraction_states": "2313925423a053c7e466c982425e608aa847811a3c61347bc496a5acd2a99a64",
 }

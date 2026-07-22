@@ -1,7 +1,7 @@
 """Scene-leaf plumbing for the plan 07 AD-2 geometry seam.
 
 Topology discovery stays native and detached: RayD finds the winner (face
-sequence, validity, visibility) and channel_native freezes it. Geometry
+sequence, validity, visibility) and channel freezes it. Geometry
 derivatives under that frozen winner come from RayD's own fixed-winner chain
 companions (``ops.rayd_reflection_epc_paths_ad`` for reflection hit
 geometry, ``ops.rayd_face_normals_ad`` for the transmission wall normals),

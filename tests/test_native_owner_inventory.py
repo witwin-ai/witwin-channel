@@ -158,7 +158,9 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for owner in inventory["owners"]
         for entry in owner["cpp_body_hash_multiset"]
     )
-    current_hashes = cpp_body_hashes(REPOSITORY_ROOT)
+    current_hashes = cpp_body_hashes(
+        REPOSITORY_ROOT, adr033_predecessor_identity=True
+    )
     actual = Counter(_hash_tuple(entry) for entry in current_hashes)
     transfers = migration["phase3_current"][
         "approved_phase9_body_hash_transfer_multiset"
@@ -236,7 +238,8 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     # live cursor, so validate the recorded transformations rather than pinning
     # the repository-wide current phase to the historical cut.
     assert migration["phase11b_current"]["status"] == (
-        "complete; frozen duplication acceptance met"
+        "historical Phase 11B implementation snapshot; frozen duplication "
+        "acceptance met and later release closure completed"
     )
     assert current_inventory["phase10b_scattering_chains"]["rayd_commit"] == (
         "768b96e42a95f70c32d55f98a72000085317e288"

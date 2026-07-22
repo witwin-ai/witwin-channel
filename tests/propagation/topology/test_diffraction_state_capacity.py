@@ -192,7 +192,7 @@ def test_diffraction_state_capacity_selector_has_no_host_count_transfer() -> Non
     source = (
         Path(__file__).resolve().parents[3]
         / "native"
-        / "channel_native"
+        / "channel"
         / "kernels"
         / "diffraction_state_capacity.cu"
     ).read_text(encoding="utf-8")

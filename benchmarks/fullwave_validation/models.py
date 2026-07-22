@@ -174,7 +174,7 @@ class FieldMap:
     def load(cls, path: str | Path) -> FieldMap:
         with np.load(Path(path), allow_pickle=False) as data:
             if str(data["schema_name"].item()) != SCHEMA_NAME:
-                raise ValueError("not a channel-native full-wave reference")
+                raise ValueError("not a channel full-wave reference")
             if int(data["schema_version"].item()) != SCHEMA_VERSION:
                 raise ValueError("unsupported full-wave reference schema version")
             components = {

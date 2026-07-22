@@ -356,7 +356,7 @@ def _run(args: argparse.Namespace) -> None:
             "cuda_event_timing": True, "wall_timing": True,
         },
         "build_crosscheck": {
-            "channel_commit": info["channel_native_git_sha"],
+            "channel_commit": info["channel_git_sha"],
             "rayd_commit": info["rayd_commit"],
             "integration_header_sha256": info["rayd_integration_abi_sha256"],
             "build_fingerprint": info["build_fingerprint"],

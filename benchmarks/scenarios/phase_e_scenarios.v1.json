@@ -4,7 +4,7 @@
     "version": "1.0.0"
   },
   "asset_policy": {
-    "external_root_env": "WITWIN_CHANNEL_NATIVE_SCENE_ROOT",
+    "external_root_env": "WITWIN_CHANNEL_SCENE_ROOT",
     "full_asset_missing": "fail",
     "reduced_fallback": false
   },

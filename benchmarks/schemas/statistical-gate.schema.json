@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://witwin.invalid/channel-native/statistical-gate.schema.json",
-  "title": "Channel Native statistical gate report",
+  "$id": "https://witwin.invalid/channel/statistical-gate.schema.json",
+  "title": "Channel statistical gate report",
   "type": "object",
   "required": ["schema", "mode", "seeds", "cases", "passed"],
   "properties": {

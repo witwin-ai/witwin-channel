@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://witwin.dev/schemas/channel-native-sm-support-1.0.0.json",
-  "title": "Channel Native declared and verified SM support",
+  "$id": "https://witwin.dev/schemas/channel-sm-support-1.0.0.json",
+  "title": "Channel declared and verified SM support",
   "type": "object",
   "required": ["schema", "build_architectures", "policy"],
   "properties": {

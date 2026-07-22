@@ -1,4 +1,4 @@
-"""Exact-token duplicate-region detector for channel-native production sources.
+"""Exact-token duplicate-region detector for channel production sources.
 
 The report is static-first: it tokenizes Python and C++/CUDA sources without
 importing ``witwin.channel`` or loading its native extension. Two
@@ -41,7 +41,7 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 MIN_TOKENS = 100
 PACKAGE_RELATIVE = "src/witwin/channel"
-NATIVE_RELATIVE = "native/channel_native"
+NATIVE_RELATIVE = "native/channel"
 NATIVE_SUFFIXES = frozenset({".cpp", ".cu", ".cuh", ".h", ".hpp"})
 _EXCLUDED_PARTS = frozenset({"tests", "benchmarks", "__pycache__"})
 _STRING_PLACEHOLDER = '"<str>"'

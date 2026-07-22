@@ -73,15 +73,15 @@ def test_phase8a_rayd_identity_sources_and_direct_test_are_locked() -> None:
 
 
 def test_phase8a_channel_is_a_typed_facade_without_numerical_fallback() -> None:
-    fields = (ROOT / "native/channel_native/binding/fields.cpp").read_text(
+    fields = (ROOT / "native/channel/binding/fields.cpp").read_text(
         encoding="utf-8-sig"
     )
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")
-    removed = ROOT / "native/channel_native/kernels/field_wedge_ad_diffraction.cu"
+    removed = ROOT / "native/channel/kernels/field_wedge_ad_diffraction.cu"
 
     assert not removed.exists()
     assert "field_wedge_ad_diffraction.cu" not in cmake
-    assert "CHANNEL_NATIVE_FAST_MATH_WEDGE_TU" not in cmake
+    assert "CHANNEL_FAST_MATH_WEDGE_TU" not in cmake
     assert "<<<" not in fields
     for symbol in PURE_WEDGE:
         assert fields.count(f"rayd::torch::{symbol}(") == 1
@@ -156,7 +156,7 @@ def test_phase8a_launch_compile_and_dependency_boundaries_are_frozen() -> None:
     assert all(
         not (
             edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel_native/")
+            and edge["to"].startswith("native/channel/")
         )
         for edge in graph["edges"]  # type: ignore[index]
     )
@@ -191,7 +191,7 @@ def test_phase8a_ledgers_and_guardrails_are_closed() -> None:
         for family in matrix["families"]  # type: ignore[index]
         if family["family_id"] == "pure-wedge-fixed-winner-field"
     )
-    assert pure["phase7_current_owner"] == "Channel Native"
+    assert pure["phase7_current_owner"] == "Channel"
     actions = {
         row["symbol"]: row["status"] for row in ledger["actions"]  # type: ignore[index]
     }

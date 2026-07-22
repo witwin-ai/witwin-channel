@@ -9,7 +9,7 @@ from ci import audit_windows_pe
 
 
 _DEPENDENTS = """
-Dump of file _channel_native.cp311-win_amd64.pyd
+Dump of file _channel.cp311-win_amd64.pyd
 
   Image has the following dependencies:
 
@@ -24,14 +24,14 @@ Dump of file _channel_native.cp311-win_amd64.pyd
   Summary
 """
 _EXPORTS = """
-Dump of file _channel_native.cp311-win_amd64.pyd
+Dump of file _channel.cp311-win_amd64.pyd
 
            2 number of names
 
     ordinal hint RVA      name
 
           1    0 00015360 ?type@Future@ivalue@c10@@QEBA_NXZ
-          2    1 00013580 PyInit__channel_native
+          2    1 00013580 PyInit__channel
 
   Summary
 """
@@ -49,7 +49,7 @@ def test_dumpbin_parsers_accept_only_declared_dependencies_and_exports():
     ]
     assert audit_windows_pe.parse_exports(_EXPORTS) == [
         "?type@Future@ivalue@c10@@QEBA_NXZ",
-        "PyInit__channel_native",
+        "PyInit__channel",
     ]
 
 
@@ -72,7 +72,7 @@ def test_dependency_parser_fails_loudly(output: str, match: str):
 @pytest.mark.parametrize(
     ("output", "match"),
     [
-        (_EXPORTS.replace("PyInit__channel_native", "rayd_legacy"), "exactly one"),
+        (_EXPORTS.replace("PyInit__channel", "rayd_legacy"), "exactly one"),
         (_EXPORTS.replace("2 number of names", "3 number of names"), "row count"),
         (
             _EXPORTS.replace("?type@Future@ivalue@c10@@QEBA_NXZ", "channel_rf"),
@@ -96,7 +96,7 @@ def test_export_parser_fails_loudly(output: str, match: str):
 def test_audit_pe_invokes_both_dumpbin_modes_and_records_identity(
     tmp_path: Path, monkeypatch
 ):
-    pe = tmp_path / "_channel_native.pyd"
+    pe = tmp_path / "_channel.pyd"
     pe.write_bytes(b"MZ-test")
     calls: list[str] = []
 
@@ -113,11 +113,11 @@ def test_audit_pe_invokes_both_dumpbin_modes_and_records_identity(
     assert evidence["schema_version"] == 1
     assert evidence["sha256"] == __import__("hashlib").sha256(b"MZ-test").hexdigest()
     assert evidence["export_count"] == 2
-    assert evidence["python_init_export"] == "PyInit__channel_native"
+    assert evidence["python_init_export"] == "PyInit__channel"
 
 
 def test_audit_pe_rejects_dumpbin_failure(tmp_path: Path, monkeypatch):
-    pe = tmp_path / "_channel_native.pyd"
+    pe = tmp_path / "_channel.pyd"
     pe.write_bytes(b"MZ-test")
     monkeypatch.setattr(
         audit_windows_pe.subprocess,

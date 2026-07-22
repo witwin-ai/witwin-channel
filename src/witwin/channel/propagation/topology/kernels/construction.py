@@ -62,7 +62,7 @@ def deterministic_los_topology_block(
         )
     if not isinstance(block, dict):
         raise TypeError(
-            "_channel_native.deterministic_los_topology_block must return a dict"
+            "_channel.deterministic_los_topology_block must return a dict"
         )
     _validate_deterministic_topology_block(
         "deterministic_los_topology_block", block, int(sequence_width)
@@ -77,7 +77,7 @@ def deterministic_topology_default_fields(
     exported = _required_native_op("deterministic_topology_default_fields")(reference)
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_topology_default_fields must return a dict"
+            "_channel.deterministic_topology_default_fields must return a dict"
         )
     validate_cuda_tensor(
         "interaction_position",
@@ -107,7 +107,7 @@ def deterministic_topology_default_fields(
         or exported["path_field"].shape != (count,)
     ):
         raise ValueError(
-            "_channel_native.deterministic_topology_default_fields returned bad shape"
+            "_channel.deterministic_topology_default_fields returned bad shape"
         )
     return exported
 
@@ -195,7 +195,7 @@ def deterministic_pad_topology_sequences(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_pad_topology_sequences must return a dict"
+            "_channel.deterministic_pad_topology_sequences must return a dict"
         )
     validate_cuda_tensor(
         "primitive_sequence", exported["primitive_sequence"], dtype=torch.int32, ndim=2
@@ -222,14 +222,14 @@ def deterministic_pad_topology_sequences(
         or exported["material_sequence"].shape != expected_i32
     ):
         raise ValueError(
-            "_channel_native.deterministic_pad_topology_sequences returned bad sequence shape"
+            "_channel.deterministic_pad_topology_sequences returned bad sequence shape"
         )
     if (
         exported["interaction_positions"].shape != expected_vec
         or exported["interaction_normals"].shape != expected_vec
     ):
         raise ValueError(
-            "_channel_native.deterministic_pad_topology_sequences returned bad interaction shape"
+            "_channel.deterministic_pad_topology_sequences returned bad interaction shape"
         )
     return exported
 
@@ -289,7 +289,7 @@ def deterministic_topology_base_fields(
     )
     if not isinstance(block, dict):
         raise TypeError(
-            "_channel_native.deterministic_topology_base_fields must return a dict"
+            "_channel.deterministic_topology_base_fields must return a dict"
         )
     _validate_path_block("deterministic_topology_base_fields", block)
     return block
@@ -309,7 +309,7 @@ def deterministic_repeat_range(
     validate_cuda_tensor("out", out, dtype=torch.int32, ndim=1)
     if out.shape != ((int(end) - int(start)) * int(repeats),):
         raise ValueError(
-            "_channel_native.deterministic_repeat_range returned bad shape"
+            "_channel.deterministic_repeat_range returned bad shape"
         )
     return out
 
@@ -326,12 +326,12 @@ def deterministic_face_anchor_points(
     out = _required_native_op("deterministic_face_anchor_points")(vertices, faces)
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.deterministic_face_anchor_points must return a tensor"
+            "_channel.deterministic_face_anchor_points must return a tensor"
         )
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if out.shape != (faces.shape[0], 3):
         raise ValueError(
-            "_channel_native.deterministic_face_anchor_points returned bad shape"
+            "_channel.deterministic_face_anchor_points returned bad shape"
         )
     return out
 
@@ -385,7 +385,7 @@ def deterministic_reflection_epc_input_batch(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_reflection_epc_input_batch must return a dict"
+            "_channel.deterministic_reflection_epc_input_batch must return a dict"
         )
     expected_fields = {
         "tx_batch",
@@ -397,7 +397,7 @@ def deterministic_reflection_epc_input_batch(
     }
     if set(exported) != expected_fields:
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned unexpected fields"
+            "_channel.deterministic_reflection_epc_input_batch returned unexpected fields"
         )
     pair_count = (int(rx_end) - int(rx_start)) * int(sequences.shape[0])
     depth = int(sequences.shape[1])
@@ -435,27 +435,27 @@ def deterministic_reflection_epc_input_batch(
     )
     if exported["tx_batch"].shape != (pair_count, 3):
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned bad tx_batch shape"
+            "_channel.deterministic_reflection_epc_input_batch returned bad tx_batch shape"
         )
     if exported["rx_batch"].shape != (pair_count, 3):
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned bad rx_batch shape"
+            "_channel.deterministic_reflection_epc_input_batch returned bad rx_batch shape"
         )
     if exported["rx_indices"].shape != (pair_count,):
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned bad rx_indices shape"
+            "_channel.deterministic_reflection_epc_input_batch returned bad rx_indices shape"
         )
     if exported["sequence_batch"].shape != (pair_count, depth):
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned bad sequence_batch shape"
+            "_channel.deterministic_reflection_epc_input_batch returned bad sequence_batch shape"
         )
     if exported["direct_plane_points"].shape != (pair_count, depth, 3):
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned bad direct_plane_points shape"
+            "_channel.deterministic_reflection_epc_input_batch returned bad direct_plane_points shape"
         )
     if exported["direct_plane_normals"].shape != (pair_count, depth, 3):
         raise ValueError(
-            "_channel_native.deterministic_reflection_epc_input_batch returned bad direct_plane_normals shape"
+            "_channel.deterministic_reflection_epc_input_batch returned bad direct_plane_normals shape"
         )
     return exported
 
@@ -491,12 +491,12 @@ def deterministic_face_sequence_chunk(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.deterministic_face_sequence_chunk must return a tensor"
+            "_channel.deterministic_face_sequence_chunk must return a tensor"
         )
     validate_cuda_tensor("out", out, dtype=torch.int32, ndim=2)
     if out.shape != (int(end) - int(start), int(depth)):
         raise ValueError(
-            "_channel_native.deterministic_face_sequence_chunk returned bad shape"
+            "_channel.deterministic_face_sequence_chunk returned bad shape"
         )
     return out
 
@@ -534,11 +534,11 @@ def deterministic_mapped_face_sequence_chunk(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.deterministic_mapped_face_sequence_chunk must return a tensor"
+            "_channel.deterministic_mapped_face_sequence_chunk must return a tensor"
         )
     validate_cuda_tensor("out", out, dtype=torch.int32, ndim=2)
     if out.shape != (int(end) - int(start), int(depth)):
         raise ValueError(
-            "_channel_native.deterministic_mapped_face_sequence_chunk returned bad shape"
+            "_channel.deterministic_mapped_face_sequence_chunk returned bad shape"
         )
     return out

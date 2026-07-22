@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://witwin.dev/schemas/channel-native-performance-1.0.0.json",
-  "title": "Channel Native performance artifact",
+  "$id": "https://witwin.dev/schemas/channel-performance-1.0.0.json",
+  "title": "Channel performance artifact",
   "type": "object",
   "required": ["schema", "benchmark", "scenario", "environment", "results"],
   "properties": {

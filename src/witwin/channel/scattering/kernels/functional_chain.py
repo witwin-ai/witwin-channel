@@ -326,7 +326,7 @@ def scattering_chain_ensemble_eval(
     )
     if not isinstance(out, dict) or set(out) != set(_CHAIN_ENSEMBLE_OUTPUT_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_chain_ensemble_eval returned invalid fields"
+            "_channel.scattering_chain_ensemble_eval returned invalid fields"
         )
     return out
 
@@ -429,7 +429,7 @@ def scattering_chain_ensemble_eval_backward(
     )
     if not isinstance(out, dict) or set(out) != set(_CHAIN_ENSEMBLE_BACKWARD_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_chain_ensemble_eval_backward returned"
+            "_channel.scattering_chain_ensemble_eval_backward returned"
             " invalid fields"
         )
     return out
@@ -548,7 +548,7 @@ def scattering_chain_ensemble_eval_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_CHAIN_ENSEMBLE_TANGENT_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_chain_ensemble_eval_jvp returned invalid fields"
+            "_channel.scattering_chain_ensemble_eval_jvp returned invalid fields"
         )
     return out
 
@@ -683,7 +683,7 @@ def scattering_chain_realization_eval(
     )
     if not isinstance(out, dict) or set(out) != set(_CHAIN_REALIZATION_OUTPUT_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_chain_realization_eval returned invalid fields"
+            "_channel.scattering_chain_realization_eval returned invalid fields"
         )
     return out
 
@@ -793,7 +793,7 @@ def scattering_chain_realization_eval_backward(
     )
     if not isinstance(out, dict) or set(out) != set(_CHAIN_REALIZATION_BACKWARD_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_chain_realization_eval_backward returned"
+            "_channel.scattering_chain_realization_eval_backward returned"
             " invalid fields"
         )
     return out
@@ -917,7 +917,7 @@ def scattering_chain_realization_eval_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_CHAIN_REALIZATION_TANGENT_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_chain_realization_eval_jvp returned invalid fields"
+            "_channel.scattering_chain_realization_eval_jvp returned invalid fields"
         )
     return out
 

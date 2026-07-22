@@ -53,7 +53,7 @@ def deterministic_accumulate_flat(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_accumulate_flat"):
         raise RuntimeError(
-            "_channel_native.deterministic_accumulate_flat CUDA kernel is required"
+            "_channel.deterministic_accumulate_flat CUDA kernel is required"
         )
     exported = native.deterministic_accumulate_flat(
         valid,
@@ -70,7 +70,7 @@ def deterministic_accumulate_flat(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_accumulate_flat must return a dict"
+            "_channel.deterministic_accumulate_flat must return a dict"
         )
     validate_cuda_tensor(
         "power_total", exported["power_total"], dtype=torch.float32, ndim=2
@@ -101,11 +101,11 @@ def deterministic_accumulate_flat(
     expected_component_shape = (6, int(num_tx), int(num_rx))
     if tuple(exported["power_total"].shape) != (int(num_tx), int(num_rx)):
         raise ValueError(
-            "_channel_native.deterministic_accumulate_flat returned bad power_total shape"
+            "_channel.deterministic_accumulate_flat returned bad power_total shape"
         )
     if tuple(exported["component_power"].shape) != expected_component_shape:
         raise ValueError(
-            "_channel_native.deterministic_accumulate_flat returned bad component shape"
+            "_channel.deterministic_accumulate_flat returned bad component shape"
         )
     return exported
 
@@ -166,7 +166,7 @@ def deterministic_accumulate_flat_backward(
     expected = {"grad_path_gain", "grad_field_real", "grad_field_imag"}
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.deterministic_accumulate_flat_backward returned"
+            "_channel.deterministic_accumulate_flat_backward returned"
             " invalid fields"
         )
     return out
@@ -207,7 +207,7 @@ def deterministic_accumulate_flat_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_DETERMINISTIC_ACCUM_FIELDS):
         raise TypeError(
-            "_channel_native.deterministic_accumulate_flat_jvp returned invalid fields"
+            "_channel.deterministic_accumulate_flat_jvp returned invalid fields"
         )
     return out
 

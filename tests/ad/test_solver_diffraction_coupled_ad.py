@@ -482,7 +482,7 @@ def test_coupled_endpoint_position_grad_matches_fd(endpoint):
 # (an off-mirror-symmetry box, _COUPLED_TX/_COUPLED_RX asymmetric, see the
 # _COUPLED_TX note and trap 8) produces cid-7 rows: both interactions along a
 # path are diffraction (type 2). These tests isolate the DD rows so the
-# cn_field_coupled_dd_backward / _jvp companions are exercised directly.
+# channel_field_coupled_dd_backward / _jvp companions are exercised directly.
 # ---------------------------------------------------------------------------
 
 
@@ -586,7 +586,7 @@ def test_coupled_dd_endpoint_position_grad_matches_fd(endpoint):
 def test_coupled_dd_forward_mode_matches_reverse():
     """JVP-vs-VJP inner-product duality on the wedge eps_r seed for cid-7 rows.
 
-    Fires cn_field_coupled_dd_jvp (forward dual) and cn_field_coupled_dd_backward
+    Fires channel_field_coupled_dd_jvp (forward dual) and channel_field_coupled_dd_backward
     (reverse) and checks they agree on the DD-only loss.
     """
 

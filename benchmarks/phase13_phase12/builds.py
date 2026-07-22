@@ -218,7 +218,7 @@ def _validate_cache(
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CUDA_ARCHITECTURES": "120-real",
         "CMAKE_GENERATOR": "Ninja",
-        "CHANNEL_NATIVE_RELEASE_BUILD": "ON",
+        "CHANNEL_RELEASE_BUILD": "ON",
         "BUILD_TESTING": "OFF",
     }
     if any(values.get(name) != value for name, value in exact.items()):
@@ -495,7 +495,7 @@ def _fresh_build(
         f"-DPython_EXECUTABLE={input_variant.python_executable}",
         f"-DRAYD_SOURCE_DIR={config.rayd_checkout}",
         f"-DCMAKE_INSTALL_PREFIX={site_packages}",
-        "-DCHANNEL_NATIVE_RELEASE_BUILD=ON", "-DBUILD_TESTING=OFF",
+        "-DCHANNEL_RELEASE_BUILD=ON", "-DBUILD_TESTING=OFF",
     ]
     configure = run_captured(
         configure_argv, cwd=role_root, environment=environment,
@@ -525,7 +525,7 @@ def _fresh_build(
         build / "CMakeCache.txt", config=config, source=source, install=site_packages
     )
     toolchain = _retain_toolchain(store, role=role, build=build)
-    extensions = list((installed_package / "channel_native").glob("_channel_native*.pyd"))
+    extensions = list((installed_package / "channel").glob("_channel*.pyd"))
     if len(extensions) != 1:
         raise EvidenceError("fresh Channel install must contain one extension module")
     extension = extensions[0].resolve()
@@ -538,7 +538,7 @@ def _fresh_build(
     resource_capture.pop("stderr_bytes")
     compiler_resources = parse_cuobjdump_resource_usage(resource_stdout)
     fingerprints = [
-        installed_package / "channel_native" / "runtime" / "_channel_native.build-fingerprint"
+        installed_package / "channel" / "runtime" / "_channel.build-fingerprint"
     ]
     fingerprints = [path for path in fingerprints if path.is_file()]
     if len(fingerprints) != 1:
@@ -967,7 +967,7 @@ def validate_channel_build_records(
             or f"-DCMAKE_MAKE_PROGRAM={expected_tools['ninja']}" not in argv
             or f"-DCMAKE_INSTALL_PREFIX={install}" not in argv
             or f"-DRAYD_SOURCE_DIR={rayd_source}" not in argv
-            or "-DCHANNEL_NATIVE_RELEASE_BUILD=ON" not in argv
+            or "-DCHANNEL_RELEASE_BUILD=ON" not in argv
             or "-DBUILD_TESTING=OFF" not in argv
         ):
             raise EvidenceError(f"fresh Channel {role} configure argv is not canonical")

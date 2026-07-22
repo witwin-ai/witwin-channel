@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-NATIVE_ROOT = REPOSITORY_ROOT / "native/channel_native"
+NATIVE_ROOT = REPOSITORY_ROOT / "native/channel"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )

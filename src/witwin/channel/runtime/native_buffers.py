@@ -12,14 +12,14 @@ def bdpt_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.
         raise ValueError("rows and cols must be non-negative")
     native = native_extension()
     if native is None or not hasattr(native, "bdpt_zero_matrix"):
-        raise RuntimeError("_channel_native.bdpt_zero_matrix CUDA kernel is required")
+        raise RuntimeError("_channel.bdpt_zero_matrix CUDA kernel is required")
     out = native.bdpt_zero_matrix(reference, int(rows), int(cols))
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_zero_matrix must return a tensor")
+        raise TypeError("_channel.bdpt_zero_matrix must return a tensor")
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
     if out.shape != (int(rows), int(cols)):
         raise ValueError(
-            "_channel_native.bdpt_zero_matrix returned an unexpected shape"
+            "_channel.bdpt_zero_matrix returned an unexpected shape"
         )
     return out
 
@@ -35,11 +35,11 @@ def mc_transmitter_tensors(
     native = native_extension()
     if native is None or not hasattr(native, "mc_transmitter_tensors"):
         raise RuntimeError(
-            "_channel_native.mc_transmitter_tensors CUDA helper is required"
+            "_channel.mc_transmitter_tensors CUDA helper is required"
         )
     exported = native.mc_transmitter_tensors(flat_positions, powers)
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_transmitter_tensors must return a dict")
+        raise TypeError("_channel.mc_transmitter_tensors must return a dict")
     validate_cuda_tensor(
         "positions",
         exported["positions"],
@@ -59,15 +59,15 @@ def mc_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Ten
         raise ValueError("x, y, and z must have the same shape")
     native = native_extension()
     if native is None or not hasattr(native, "mc_pack_vec3"):
-        raise RuntimeError("_channel_native.mc_pack_vec3 CUDA kernel is required")
+        raise RuntimeError("_channel.mc_pack_vec3 CUDA kernel is required")
     packed = native.mc_pack_vec3(x, y, z)
     if not isinstance(packed, torch.Tensor):
-        raise TypeError("_channel_native.mc_pack_vec3 must return a tensor")
+        raise TypeError("_channel.mc_pack_vec3 must return a tensor")
     validate_cuda_tensor(
         "packed", packed, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
     if packed.shape[0] != x.shape[0]:
-        raise ValueError("_channel_native.mc_pack_vec3 returned an unexpected shape")
+        raise ValueError("_channel.mc_pack_vec3 returned an unexpected shape")
     return packed
 
 
@@ -89,7 +89,7 @@ def mc_receiver_grid_points(
     native = native_extension()
     if native is None or not hasattr(native, "mc_receiver_grid_points"):
         raise RuntimeError(
-            "_channel_native.mc_receiver_grid_points CUDA kernel is required"
+            "_channel.mc_receiver_grid_points CUDA kernel is required"
         )
     points = native.mc_receiver_grid_points(
         reference,
@@ -108,12 +108,12 @@ def mc_receiver_grid_points(
         float(spacing[1]),
     )
     if not isinstance(points, torch.Tensor):
-        raise TypeError("_channel_native.mc_receiver_grid_points must return a tensor")
+        raise TypeError("_channel.mc_receiver_grid_points must return a tensor")
     validate_cuda_tensor(
         "points", points, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
     if points.shape[0] != rows * cols:
         raise ValueError(
-            "_channel_native.mc_receiver_grid_points returned an unexpected shape"
+            "_channel.mc_receiver_grid_points returned an unexpected shape"
         )
     return points

@@ -140,7 +140,7 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     path_native_available = bool(info.get("uses_path_native", False))
     if not path_native_available:
         raise RuntimeError(
-            "path solver requires _channel_native path native CUDA kernels"
+            "path solver requires _channel path native CUDA kernels"
         )
     if "reflection" in config.components and not reflection_available:
         raise RuntimeError("reflection paths require RayD native capability")

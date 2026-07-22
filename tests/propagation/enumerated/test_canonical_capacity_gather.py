@@ -462,12 +462,12 @@ def test_canonical_gather_has_no_host_cardinality_or_intermediate_trap() -> None
     root = Path(__file__).resolve().parents[3]
     primal = (
         root
-        / "native/channel_native/kernels/evaluated_paths_canonical_capacity_gather.cu"
+        / "native/channel/kernels/evaluated_paths_canonical_capacity_gather.cu"
     ).read_text(encoding="utf-8")
     ad = (
         root
         / (
-            "native/channel_native/kernels/"
+            "native/channel/kernels/"
             "evaluated_paths_canonical_capacity_gather_ad.cu"
         )
     ).read_text(encoding="utf-8")

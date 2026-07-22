@@ -50,7 +50,7 @@ def scattering_table_eval(
     _validate_table_eval_inputs(valid, wi, wo, f_te, f_tm)
     out = _required_native_op("scattering_table_eval")(valid, wi, wo, f_te, f_tm)
     if not isinstance(out, dict) or set(out) != {"f_te", "f_tm"}:
-        raise TypeError("_channel_native.scattering_table_eval returned invalid fields")
+        raise TypeError("_channel.scattering_table_eval returned invalid fields")
     return out["f_te"], out["f_tm"]
 
 
@@ -111,7 +111,7 @@ def scattering_table_eval_backward(
     )
     if not isinstance(out, dict) or set(out) != set(_TABLE_EVAL_BACKWARD_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_table_eval_backward returned invalid fields"
+            "_channel.scattering_table_eval_backward returned invalid fields"
         )
     return out
 
@@ -149,7 +149,7 @@ def scattering_table_eval_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_TABLE_EVAL_JVP_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_table_eval_jvp returned invalid fields"
+            "_channel.scattering_table_eval_jvp returned invalid fields"
         )
     return out
 
@@ -198,7 +198,7 @@ def scattering_table_sample(
     )
     expected = {"wo", "pdf_forward", "pdf_reverse"}
     if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError("_channel_native.scattering_table_sample returned invalid fields")
+        raise TypeError("_channel.scattering_table_sample returned invalid fields")
     return out
 
 
@@ -233,7 +233,7 @@ def scattering_event_probabilities(
     )
     expected = {"p_scatter", "p_transmit", "r_coh_amplitude", "rough"}
     if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError("_channel_native.scattering_event_probabilities returned invalid fields")
+        raise TypeError("_channel.scattering_event_probabilities returned invalid fields")
     return out
 
 
@@ -322,7 +322,7 @@ def scattering_ensemble_eval(
     expected = {"gain", "amplitude", "length", "keep"}
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.scattering_ensemble_eval returned invalid fields"
+            "_channel.scattering_ensemble_eval returned invalid fields"
         )
     return out
 
@@ -400,7 +400,7 @@ def scattering_patch_integral_eval(
     expected = {"total", "integral", "row_value"}
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.scattering_patch_integral_eval returned invalid fields"
+            "_channel.scattering_patch_integral_eval returned invalid fields"
         )
     return out
 
@@ -512,7 +512,7 @@ def scattering_ensemble_eval_backward(
     )
     if not isinstance(out, dict) or set(out) != set(_ENSEMBLE_BACKWARD_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_ensemble_eval_backward returned invalid fields"
+            "_channel.scattering_ensemble_eval_backward returned invalid fields"
         )
     return out
 
@@ -607,7 +607,7 @@ def scattering_ensemble_eval_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_ENSEMBLE_TANGENT_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_ensemble_eval_jvp returned invalid fields"
+            "_channel.scattering_ensemble_eval_jvp returned invalid fields"
         )
     return out
 
@@ -668,7 +668,7 @@ def scattering_patch_integral_eval_backward(
     )
     if not isinstance(out, dict) or set(out) != set(_PATCH_BACKWARD_FIELDS):
         raise TypeError(
-            "_channel_native.scattering_patch_integral_eval_backward returned"
+            "_channel.scattering_patch_integral_eval_backward returned"
             " invalid fields"
         )
     return out
@@ -738,7 +738,7 @@ def scattering_patch_integral_eval_jvp(
     )
     if not isinstance(out, dict) or set(out) != {"tangent_total"}:
         raise TypeError(
-            "_channel_native.scattering_patch_integral_eval_jvp returned invalid fields"
+            "_channel.scattering_patch_integral_eval_jvp returned invalid fields"
         )
     return out
 

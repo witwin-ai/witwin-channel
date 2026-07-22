@@ -465,7 +465,7 @@ def test_selector_has_no_fallback_sync_or_intermediate_trap() -> None:
     root = Path(__file__).resolve().parents[3]
     native = (
         root
-        / "native/channel_native/kernels/enumerated_canonical_capacity_select.cu"
+        / "native/channel/kernels/enumerated_canonical_capacity_select.cu"
     ).read_text(encoding="utf-8")
     facade = (
         root

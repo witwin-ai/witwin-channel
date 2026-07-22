@@ -39,7 +39,7 @@ def path_los_export(
         tx_positions, tx_power, rx_positions, float(frequency_hz), tx_polarizations
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.path_los_export must return a dict")
+        raise TypeError("_channel.path_los_export must return a dict")
     return exported
 
 
@@ -153,7 +153,7 @@ def deterministic_concat_topology_blocks(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_concat_topology_blocks must return a dict"
+            "_channel.deterministic_concat_topology_blocks must return a dict"
         )
     _validate_path_block("deterministic_concat_topology_blocks", exported)
     _validate_topology_extra_fields(
@@ -165,7 +165,7 @@ def deterministic_concat_topology_blocks(
     expected_count = sum(int(block["valid"].shape[0]) for block in blocks)
     if exported["valid"].shape != (expected_count,):
         raise ValueError(
-            "_channel_native.deterministic_concat_topology_blocks returned bad path count"
+            "_channel.deterministic_concat_topology_blocks returned bad path count"
         )
     return exported
 
@@ -198,7 +198,7 @@ def deterministic_gather_topology_block(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_gather_topology_block must return a dict"
+            "_channel.deterministic_gather_topology_block must return a dict"
         )
     _validate_path_block("deterministic_gather_topology_block", exported)
     _validate_topology_extra_fields(
@@ -214,7 +214,7 @@ def deterministic_gather_topology_block(
     )
     if exported["valid"].shape != (expected_count,):
         raise ValueError(
-            "_channel_native.deterministic_gather_topology_block returned bad path count"
+            "_channel.deterministic_gather_topology_block returned bad path count"
         )
     return exported
 
@@ -239,7 +239,7 @@ def path_los_visibility_inputs(
         tx_positions, rx_positions, tx_id, rx_id
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.path_los_visibility_inputs must return a dict")
+        raise TypeError("_channel.path_los_visibility_inputs must return a dict")
     validate_cuda_tensor(
         "start", exported["start"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -249,7 +249,7 @@ def path_los_visibility_inputs(
     validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
     if exported["active"].shape != tx_id.shape:
         raise ValueError(
-            "_channel_native.path_los_visibility_inputs returned bad active shape"
+            "_channel.path_los_visibility_inputs returned bad active shape"
         )
     return exported
 
@@ -318,7 +318,7 @@ def path_filter_block(
         raise ValueError("visible masks must share the path count")
     out = _required_native_op("path_filter_block")(block, visible0, visible1)
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.path_filter_block must return a dict")
+        raise TypeError("_channel.path_filter_block must return a dict")
     _validate_path_block("path_filter_block", out)
     return out
 
@@ -351,7 +351,7 @@ def path_diffraction_block(
         raise ValueError("tx_index must be non-negative")
     out = _required_native_op("path_diffraction_block")(rayd_output, int(tx_index))
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.path_diffraction_block must return a dict")
+        raise TypeError("_channel.path_diffraction_block must return a dict")
     _validate_path_block("path_diffraction_block", out)
     return out
 
@@ -374,7 +374,7 @@ def path_merge_blocks(
         tuple(blocks), int(tx_count), int(max_depth)
     )
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.path_merge_blocks must return a dict")
+        raise TypeError("_channel.path_merge_blocks must return a dict")
     _validate_path_block("path_merge_blocks", out)
     return out
 

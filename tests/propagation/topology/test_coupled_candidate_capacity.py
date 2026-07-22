@@ -255,7 +255,7 @@ def test_coupled_candidate_capacity_overflow_sets_state_and_is_inert() -> None:
 def test_coupled_candidate_capacity_source_has_no_host_transfer_or_public_cap() -> None:
     root = Path(__file__).resolve().parents[3]
     native = (
-        root / "native/channel_native/kernels/coupled_candidate_capacity.cu"
+        root / "native/channel/kernels/coupled_candidate_capacity.cu"
     ).read_text(encoding="utf-8")
     facade = (
         root / "src/witwin/channel/propagation/topology/kernels/coupled.py"

@@ -86,7 +86,7 @@ def test_reduced_exact_gate_covers_complex_angles_geometry_cir_and_cfr() -> None
         for record in reference_records
     ]
     native = {
-        "provider": "channel_native",
+        "provider": "channel",
         "cases": {"reflection": {"component_stats": _stats(native_records)}},
     }
     reference = {

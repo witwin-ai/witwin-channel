@@ -10,7 +10,7 @@ from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-KERNEL_ROOT = REPOSITORY_ROOT / "native/channel_native/kernels"
+KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
@@ -25,7 +25,7 @@ RAYD_TRANSMISSION_SOURCES = (
     RAYD_ROOT / "backends/torch/src/torch_ext/rf/transmission_sequence.cu",
     RAYD_ROOT / "backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
 )
-FIELDS_BINDING = REPOSITORY_ROOT / "native/channel_native/binding/fields.cpp"
+FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
     "free_space": KERNEL_ROOT / "field_transport_free_space.cu",
@@ -33,19 +33,19 @@ TRANSLATION_UNITS = {
 }
 ABI_BY_OWNER = {
     "free_space": {
-        "cn_field_free_space_fwd64",
-        "cn_field_free_space_backward",
-        "cn_field_free_space_jvp",
+        "channel_field_free_space_fwd64",
+        "channel_field_free_space_backward",
+        "channel_field_free_space_jvp",
     },
     "reflection": {
-        "cn_field_reflection_sequence_backward",
-        "cn_field_reflection_sequence_jvp",
+        "channel_field_reflection_sequence_backward",
+        "channel_field_reflection_sequence_jvp",
     },
 }
 TRANSMISSION_ABI = {
-    "cn_field_transmission_sequence",
-    "cn_field_transmission_sequence_backward",
-    "cn_field_transmission_sequence_jvp",
+    "channel_field_transmission_sequence",
+    "channel_field_transmission_sequence_backward",
+    "channel_field_transmission_sequence_jvp",
 }
 REMOVED_TRANSMISSION_TU = KERNEL_ROOT / "field_transport_transmission.cu"
 COMMON_HELPERS = {
@@ -110,7 +110,7 @@ def test_field_transport_split_preserves_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/field_transport_ad.cu"
+        if entry["path"] == "native/channel/kernels/field_transport_ad.cu"
     )
     sources = "\n".join(
         path.read_text(encoding="utf-8-sig") for path in TRANSLATION_UNITS.values()
@@ -136,7 +136,7 @@ def test_rayd_transmission_preserves_migrated_launch_budget() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/field_transport_ad.cu"
+        if entry["path"] == "native/channel/kernels/field_transport_ad.cu"
     )
     ad_source = RAYD_TRANSMISSION_SOURCES[1].read_text(encoding="utf-8-sig")
     actual = Counter(
@@ -186,7 +186,7 @@ def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None
         "direction",
     }
     assert _dict_keys(
-        _function_body(source, "cn_field_transmission_sequence_backward")
+        _function_body(source, "channel_field_transmission_sequence_backward")
     ) == {
         "grad_layer_thickness_m",
         "grad_layer_eps_r",
@@ -207,13 +207,13 @@ def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None
         "path_length_m",
         "delay_s",
     }
-    backward = _function_body(source, "cn_field_transmission_sequence_backward")
+    backward = _function_body(source, "channel_field_transmission_sequence_backward")
     assert 'out["grad_interaction_positions"] = pybind11::none();' in backward
 
 
 def test_field_transport_common_helpers_have_one_source() -> None:
     names = _function_names_by_path()
-    common = "native/channel_native/kernels/field_transport_ad_common.cuh"
+    common = "native/channel/kernels/field_transport_ad_common.cuh"
 
     assert COMMON_HELPERS == names[common]
     for path in TRANSLATION_UNITS.values():
@@ -241,10 +241,10 @@ def test_output_chain_ad_helpers_are_defined_only_in_locked_rayd_header() -> Non
 
 def test_field_transport_split_is_registered_once_and_below_budget() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    common = "native/channel_native/kernels/field_transport_ad_common.cuh"
+    common = "native/channel/kernels/field_transport_ad_common.cuh"
 
-    assert "native/channel_native/kernels/field_transport_ad.cu" not in cmake
-    assert "native/channel_native/kernels/field_transport_transmission.cu" not in cmake
+    assert "native/channel/kernels/field_transport_ad.cu" not in cmake
+    assert "native/channel/kernels/field_transport_transmission.cu" not in cmake
     assert not REMOVED_TRANSMISSION_TU.exists()
     assert common not in cmake
     for path in TRANSLATION_UNITS.values():

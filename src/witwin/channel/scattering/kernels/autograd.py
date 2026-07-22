@@ -754,7 +754,7 @@ def _required_patch_forward(
     expected = {"total", "integral", "row_value"}
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.scattering_patch_integral_eval returned invalid fields"
+            "_channel.scattering_patch_integral_eval returned invalid fields"
         )
     return out
 

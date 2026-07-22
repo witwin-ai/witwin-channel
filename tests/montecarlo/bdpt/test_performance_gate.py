@@ -25,7 +25,7 @@ def test_single_plane_bdpt_native_is_faster_than_original_channel_when_bridge_av
     try:
         native_info = build_info()
     except ModuleNotFoundError:
-        pytest.skip("_channel_native is required for native-vs-original BDPT benchmark gate")
+        pytest.skip("_channel is required for native-vs-original BDPT benchmark gate")
     if native_info["rayd_integration"] != "source-linked":
         pytest.skip("source-linked RayD is required for native-vs-original BDPT benchmark gate")
 

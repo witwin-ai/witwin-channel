@@ -21,7 +21,7 @@ _EXPECTED_PENDING_FINAL_ACCEPTANCE = {
     "clean-checkout nightly tier at the final Channel commit",
     "clean-checkout release tier at the final Channel commit",
     "final wheel contents and SHA-256",
-    "final _channel_native PE/DSO audit and SHA-256",
+    "final _channel PE/DSO audit and SHA-256",
     "final native build fingerprint bound to the accepted build",
     "Phase 12 profiler and performance evidence",
 }
@@ -38,16 +38,16 @@ _PHASE11B_SOURCE_SHA256 = {
     "src/witwin/channel/scattering/kernels/autograd_chain.py": (
         "8615d85227ea66f69ffb91bc47baa7f8dec9cf9265e354dbc17b5f83f478d95a"
     ),
-    "native/channel_native/kernels/bdpt_connect_visibility.cu": (
+    "native/channel/kernels/bdpt_connect_visibility.cu": (
         "695686f29e181abd7bd8af7971cce09e15f55ebb4cfa863c1b334e0edf061a89"
     ),
-    "native/channel_native/kernels/diffraction.cu": (
+    "native/channel/kernels/diffraction.cu": (
         "79c08019afae7cd252e5798ededc7767f145b03b54e457177d3d967f829af185"
     ),
-    "native/channel_native/kernels/los.cu": (
+    "native/channel/kernels/los.cu": (
         "7313fd71274564fa24ca32c935d8074b6f4f75e9968ee87a392563a3f8a45911"
     ),
-    "native/channel_native/kernels/reflection.cu": (
+    "native/channel/kernels/reflection.cu": (
         "61d96ef4734c567afe8294e02028786daca7a541cf305547b13f967d3e52d241"
     ),
 }
@@ -80,10 +80,10 @@ _TRIANGLE_VERTEX_V2_LINES = {
         "+ b2 * v2.index_select(0, chosen)",
     ),
     (
-        "native/channel_native/kernels/diffraction.cu",
+        "native/channel/kernels/diffraction.cu",
         "const int v2 = tri[2];",
     ),
-    ("native/channel_native/kernels/diffraction.cu", "return v2;"),
+    ("native/channel/kernels/diffraction.cu", "return v2;"),
     (
         "src/witwin/channel/propagation/geometry/kernels/autograd.py",
         "companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))",
@@ -234,27 +234,27 @@ def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved(
     assert autograd["scattering_chain_realization_eval_ad"].args.vararg is None
 
     macros = {
-        "native/channel_native/kernels/bdpt_connect_visibility.cu": (
-            "CN_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS",
-            "CN_BDPT_CHECK_CONNECTION_SAMPLE_ROWS",
-            "CN_BDPT_CONNECTION_OUTPUT_POINTERS",
+        "native/channel/kernels/bdpt_connect_visibility.cu": (
+            "CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS",
+            "CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_ROWS",
+            "CHANNEL_BDPT_CONNECTION_OUTPUT_POINTERS",
         ),
-        "native/channel_native/kernels/diffraction.cu": (
-            "CN_DIFFRACTION_CHECK_STATE_PACK_TENSORS",
-            "CN_DIFFRACTION_CHECK_STATE_PACK_POWER",
-            "CN_DIFFRACTION_CHECK_STATE_PACK_SHAPES",
-            "CN_DIFFRACTION_ALLOCATE_STATE_PACK",
-            "CN_DIFFRACTION_STATE_PACK_INPUT_POINTERS",
-            "CN_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS",
-            "CN_DIFFRACTION_STATE_PACK_RESULTS",
+        "native/channel/kernels/diffraction.cu": (
+            "CHANNEL_DIFFRACTION_CHECK_STATE_PACK_TENSORS",
+            "CHANNEL_DIFFRACTION_CHECK_STATE_PACK_POWER",
+            "CHANNEL_DIFFRACTION_CHECK_STATE_PACK_SHAPES",
+            "CHANNEL_DIFFRACTION_ALLOCATE_STATE_PACK",
+            "CHANNEL_DIFFRACTION_STATE_PACK_INPUT_POINTERS",
+            "CHANNEL_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS",
+            "CHANNEL_DIFFRACTION_STATE_PACK_RESULTS",
         ),
-        "native/channel_native/kernels/los.cu": (
-            "CN_LOS_CHECK_VISIBILITY_APPLICATION",
-            "CN_LOS_VISIBILITY_LAUNCH_ARGUMENTS",
+        "native/channel/kernels/los.cu": (
+            "CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION",
+            "CHANNEL_LOS_VISIBILITY_LAUNCH_ARGUMENTS",
         ),
-        "native/channel_native/kernels/reflection.cu": (
-            "CN_REFLECTION_PREPARE_LAUNCH_INPUTS",
-            "CN_REFLECTION_LAUNCH_INPUT_PREFIX",
+        "native/channel/kernels/reflection.cu": (
+            "CHANNEL_REFLECTION_PREPARE_LAUNCH_INPUTS",
+            "CHANNEL_REFLECTION_LAUNCH_INPUT_PREFIX",
         ),
     }
     for relative, names in macros.items():
@@ -316,7 +316,7 @@ def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
     assert isinstance(verified["binding_count"], int)
     assert verified["binding_count"] > 0
     assert verified["binding_count"] == sum(verified["owner_counts"].values())
-    assert set(verified["owner_counts"]) == {"RayD", "layered", "Channel Native"}
+    assert set(verified["owner_counts"]) == {"RayD", "layered", "Channel"}
     for key in (
         "native_binding_manifest_sha256",
         "contract_coverage_manifest_sha256",
@@ -355,7 +355,7 @@ def test_phase11_release_record_matches_live_governance_and_is_honest() -> None:
         assert verified["owner_counts"] == {
             "RayD": inventory["counts"]["rayd_numerical"],
             "layered": inventory["counts"]["layered"],
-            "Channel Native": inventory["counts"]["channel_numerical"],
+            "Channel": inventory["counts"]["channel_numerical"],
         }
         assert verified["native_binding_manifest_sha256"] == _sha256(
             ROOT / "ci/native-binding-manifest.json"

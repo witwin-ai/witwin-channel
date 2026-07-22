@@ -111,7 +111,7 @@ def los_clearance_factor(
         float(width),
     )
     if not isinstance(tau, torch.Tensor):
-        raise TypeError("_channel_native.los_silhouette_clearance must return a tensor")
+        raise TypeError("_channel.los_silhouette_clearance must return a tensor")
     validate_cuda_tensor("tau", tau, dtype=torch.float32, ndim=1)
     return tau
 
@@ -137,7 +137,7 @@ def apply_los_taper(
         tau.contiguous(),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
-        raise TypeError("_channel_native.los_taper_apply must return four tensors")
+        raise TypeError("_channel.los_taper_apply must return four tensors")
     return {
         "field_vector": out[0],
         "coefficient": out[1],

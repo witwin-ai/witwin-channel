@@ -1,7 +1,7 @@
 """AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences.
 
 Small analytic scenes (a tilted triangle, a quad wall) exercised through the
-channel_native C-bridge AD entry points only. Vertex perturbations rebuild the
+channel C-bridge AD entry points only. Vertex perturbations rebuild the
 native scene per FD evaluation; the winner primitive stays fixed by
 construction (hit points are far from triangle boundaries).
 """

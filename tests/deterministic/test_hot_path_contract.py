@@ -15,7 +15,7 @@ from witwin.channel.propagation.topology.kernels import (
 import witwin.channel.path as path_package
 
 
-def test_los_hot_path_uses_channel_native_kernel_facade(monkeypatch):
+def test_los_hot_path_uses_channel_kernel_facade(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic hot-path contract")
 

@@ -72,7 +72,7 @@ def _canonical_captures(tmp_path: Path) -> tuple[dict[str, object], dict[str, ob
         checkout=checkout,
         python_executable=python,
         runner_site_packages=site_packages,
-        runner_extension=(site_packages / "witwin" / "channel_native" / "_channel_native.pyd"),
+        runner_extension=(site_packages / "witwin" / "channel" / "_channel.pyd"),
     )
     argv = worker_argv(
         variant,

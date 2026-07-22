@@ -19,7 +19,7 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
     metadata["Metadata-Version"] = "2.1"
     metadata["Name"] = name
     metadata["Version"] = version
-    dist_info = f"witwin_channel_native-{version}.dist-info"
+    dist_info = f"witwin_channel-{version}.dist-info"
     repository_root = Path(wheel_smoke.__file__).resolve().parents[1]
     members = {
         member: (repository_root / "src" / member).read_bytes()
@@ -29,10 +29,10 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
         {
             f"{dist_info}/METADATA": metadata.as_bytes(),
             f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\nGenerator: tests\nRoot-Is-Purelib: false\nTag: cp311-cp311-win_amd64\n",
-            "witwin/channel_native/_channel_native.cp311-win_amd64.pyd": b"native",
-            "witwin/channel_native/runtime/_channel_native.build-fingerprint": b"f" * 64
+            "witwin/channel/_channel.cp311-win_amd64.pyd": b"native",
+            "witwin/channel/runtime/_channel.build-fingerprint": b"f" * 64
             + b"\n",
-            "witwin/channel_native/runtime/rayd.lock.json": (
+            "witwin/channel/runtime/rayd.lock.json": (
                 repository_root / "dependencies" / "rayd.lock.json"
             ).read_bytes(),
         }
@@ -64,7 +64,7 @@ def _replace_member(path: Path, member: str, payload: bytes) -> None:
 
 
 def _refresh_record(path: Path) -> None:
-    record_member = "witwin_channel_native-0.1.0.dist-info/RECORD"
+    record_member = "witwin_channel-0.1.0.dist-info/RECORD"
     with zipfile.ZipFile(path) as archive:
         members = {
             info.filename: archive.read(info.filename)
@@ -84,7 +84,7 @@ def _refresh_record(path: Path) -> None:
 
 
 def test_wheel_identity_and_sha256_are_read_from_wheel(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     payload = _write_wheel(wheel, name="witwin-channel", version="0.1.0")
 
     assert wheel_smoke._wheel_identity(wheel) == (
@@ -105,9 +105,9 @@ def test_wheel_identity_rejects_unexpected_distribution(tmp_path: Path):
 
 
 def test_wheel_identity_rejects_dist_info_version_mismatch(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
-    metadata_member = "witwin_channel_native-0.1.0.dist-info/METADATA"
+    metadata_member = "witwin_channel-0.1.0.dist-info/METADATA"
     with zipfile.ZipFile(wheel) as archive:
         metadata = archive.read(metadata_member).replace(
             b"Version: 0.1.0", b"Version: 0.2.0"
@@ -119,16 +119,16 @@ def test_wheel_identity_rejects_dist_info_version_mismatch(tmp_path: Path):
 
 
 def test_wheel_content_audit_accepts_owned_runtime_files(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
 
     assert wheel_smoke._audit_wheel_contents(wheel).endswith("win_amd64.pyd")
 
 
 def test_wheel_content_audit_rejects_missing_checked_in_init(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
-    member = "witwin/channel_native/__init__.py"
+    member = "witwin/channel/__init__.py"
     with zipfile.ZipFile(wheel) as archive:
         members = {
             info.filename: archive.read(info.filename)
@@ -144,9 +144,9 @@ def test_wheel_content_audit_rejects_missing_checked_in_init(tmp_path: Path):
 
 
 def test_wheel_content_audit_rejects_tampered_allowlisted_source(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
-    _replace_member(wheel, "witwin/channel_native/__init__.py", b"tampered")
+    _replace_member(wheel, "witwin/channel/__init__.py", b"tampered")
 
     with pytest.raises(ValueError, match="source bytes differ"):
         wheel_smoke._audit_wheel_contents(wheel)
@@ -167,13 +167,13 @@ def test_wheel_content_audit_does_not_treat_https_url_as_drive_path(tmp_path: Pa
         "../escape.py",
         "/absolute.py",
         "C:/drive.py",
-        "witwin//channel_native/empty.py",
-        "witwin/./channel_native/dot.py",
-        "witwin/channel_native/../traversal.py",
+        "witwin//channel/empty.py",
+        "witwin/./channel/dot.py",
+        "witwin/channel/../traversal.py",
     ],
 )
 def test_wheel_content_audit_rejects_noncanonical_members(tmp_path: Path, member: str):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
         archive.writestr(member, b"injected")
@@ -184,7 +184,7 @@ def test_wheel_content_audit_rejects_noncanonical_members(tmp_path: Path, member
 
 def test_canonical_member_rejects_backslash():
     with pytest.raises(ValueError, match="canonical"):
-        wheel_smoke._canonical_member("witwin\\channel_native\\injected.py")
+        wheel_smoke._canonical_member("witwin\\channel\\injected.py")
 
 
 @pytest.mark.parametrize("member", ["witwin/cafe\u0301.py", "witwin/control\x00.py"])
@@ -194,11 +194,11 @@ def test_canonical_member_rejects_noncanonical_unicode_or_control(member: str):
 
 
 def test_wheel_content_audit_rejects_casefold_duplicate(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
         archive.writestr(
-            "WITWIN/channel_native/runtime/rayd.lock.json", b"casefold duplicate"
+            "WITWIN/channel/runtime/rayd.lock.json", b"casefold duplicate"
         )
 
     with pytest.raises(ValueError, match="duplicate normalized/casefold"):
@@ -209,16 +209,16 @@ def test_wheel_content_audit_rejects_casefold_duplicate(tmp_path: Path):
     "member",
     [
         "bootstrap.pth",
-        "witwin_channel_native-0.1.0.data/scripts/run.py",
+        "witwin_channel-0.1.0.data/scripts/run.py",
         "other_root/file.py",
-        "witwin/channel_native/untracked_injection.py",
-        "witwin_channel_native-0.1.0.dist-info/entry_points.txt",
+        "witwin/channel/untracked_injection.py",
+        "witwin_channel-0.1.0.dist-info/entry_points.txt",
     ],
 )
 def test_wheel_content_audit_rejects_nonallowlisted_members(
     tmp_path: Path, member: str
 ):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
         archive.writestr(member, b"injected")
@@ -230,9 +230,9 @@ def test_wheel_content_audit_rejects_nonallowlisted_members(
 def test_wheel_content_audit_rejects_record_coverage_and_digest_mismatch(
     tmp_path: Path,
 ):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
-    record = "witwin_channel_native-0.1.0.dist-info/RECORD"
+    record = "witwin_channel-0.1.0.dist-info/RECORD"
     with zipfile.ZipFile(wheel) as archive:
         original = archive.read(record).decode("utf-8")
 
@@ -255,14 +255,14 @@ def test_wheel_content_audit_rejects_record_coverage_and_digest_mismatch(
 @pytest.mark.parametrize(
     "member",
     [
-        "witwin/channel_native/vendor/helper.dll",
+        "witwin/channel/vendor/helper.dll",
         "other/package/extension.pyd",
         "lib/unrelated.so",
         "lib/unrelated.dylib",
     ],
 )
 def test_wheel_content_audit_rejects_any_extra_dso(tmp_path: Path, member: str):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
         archive.writestr(member, b"extra shared library")
@@ -276,12 +276,12 @@ def test_wheel_content_audit_rejects_any_extra_dso(tmp_path: Path, member: str):
     [
         ("rayd/torch/_stable_ops.dll", b"leaked dependency", "no DSO except"),
         (
-            "witwin/channel_native/CMakeFiles/kernel.obj",
+            "witwin/channel/CMakeFiles/kernel.obj",
             b"build output",
             "source closure",
         ),
         (
-            "witwin/channel_native/config.txt",
+            "witwin/channel/config.txt",
             b"E:\\private\\checkout",
             "source closure",
         ),
@@ -290,7 +290,7 @@ def test_wheel_content_audit_rejects_any_extra_dso(tmp_path: Path, member: str):
 def test_wheel_content_audit_rejects_build_leaks(
     tmp_path: Path, member: str, payload: bytes, match: str
 ):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
         archive.writestr(member, payload)
@@ -310,18 +310,18 @@ def test_smoke_program_contains_strict_isolation_and_native_checks(tmp_path: Pat
 
     compile(code, "<wheel-smoke>", "exec")
     assert "is_relative_to(target)" in code
-    assert 'find_spec("witwin.channel._channel_native")' in code
+    assert 'find_spec("witwin.channel._channel")' in code
     assert 'build_info.get("uses_dr_jit") is not False' in code
     assert 'build_info.get("uses_rayd_native") is not True' in code
 
 
 def test_wheel_pe_audit_extracts_only_owned_extension(tmp_path: Path, monkeypatch):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     member = wheel_smoke._audit_wheel_contents(wheel)
 
     def fake_audit(path: Path, *, dumpbin: str):
-        assert path.name == "_channel_native.cp311-win_amd64.pyd"
+        assert path.name == "_channel.cp311-win_amd64.pyd"
         assert path.read_bytes() == b"native"
         assert dumpbin == "custom-dumpbin"
         return {"schema_version": 1, "path": str(path), "dependencies": []}
@@ -343,12 +343,12 @@ def _build_info() -> dict[str, object]:
     )
     integration = lock["integration_abi"]
     return {
-        "backend": "channel-native",
+        "backend": "channel",
         "build_fingerprint": "f" * 64,
         "build_type": "Release",
-        "channel_native_abi_version": 1,
-        "channel_native_git_dirty": False,
-        "channel_native_git_sha": "c" * 40,
+        "channel_abi_version": 1,
+        "channel_git_dirty": False,
+        "channel_git_sha": "c" * 40,
         "compiler": "MSVC",
         "cuda_architectures": ["120-real", "120-virtual"],
         "cuda_available": True,
@@ -374,10 +374,10 @@ def _build_info() -> dict[str, object]:
 
 
 def _smoke_evidence(target: Path) -> dict[str, object]:
-    package = target / "witwin" / "channel_native"
+    package = target / "witwin" / "channel"
     package.mkdir(parents=True)
     package_origin = package / "__init__.py"
-    native_origin = package / "_channel_native.cp311-win_amd64.pyd"
+    native_origin = package / "_channel.cp311-win_amd64.pyd"
     package_origin.write_text("", encoding="utf-8")
     native_origin.write_bytes(b"native")
     return {
@@ -398,8 +398,8 @@ def _expected_build_identity(build_info: dict[str, object]) -> dict[str, object]
     return {
         "build_fingerprint": "f" * 64,
         "build_type": "Release",
-        "channel_native_abi_version": 1,
-        "channel_native_git_dirty": False,
+        "channel_abi_version": 1,
+        "channel_git_dirty": False,
         "rayd_commit": build_info["rayd_commit"],
         "rayd_dirty": False,
         "rayd_integration_abi_kind": build_info["rayd_integration_abi_kind"],
@@ -419,7 +419,7 @@ def _parse_evidence(payload: str, target: Path) -> dict[str, object]:
         expected_name="witwin-channel",
         expected_version="0.1.0",
         target=target,
-        native_member="witwin/channel_native/_channel_native.cp311-win_amd64.pyd",
+        native_member="witwin/channel/_channel.cp311-win_amd64.pyd",
         expected_build_identity=_expected_build_identity(_build_info()),
     )
 
@@ -521,20 +521,20 @@ def test_smoke_evidence_parser_requires_distribution_root_exactly_target(
 def test_wheel_runtime_identity_rejects_non_strict_lock_json(
     tmp_path: Path, payload: bytes
 ):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
-    _replace_member(wheel, "witwin/channel_native/runtime/rayd.lock.json", payload)
+    _replace_member(wheel, "witwin/channel/runtime/rayd.lock.json", payload)
 
     with pytest.raises(ValueError, match="strict UTF-8 JSON"):
         wheel_smoke._wheel_runtime_identity(wheel)
 
 
 def test_wheel_runtime_identity_rejects_malformed_fingerprint(tmp_path: Path):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     _replace_member(
         wheel,
-        "witwin/channel_native/runtime/_channel_native.build-fingerprint",
+        "witwin/channel/runtime/_channel.build-fingerprint",
         b"not-a-sha256\n",
     )
 
@@ -545,7 +545,7 @@ def test_wheel_runtime_identity_rejects_malformed_fingerprint(tmp_path: Path):
 def test_wheel_rejects_alternate_valid_rayd_identity_with_synced_record_and_build_info(
     tmp_path: Path,
 ):
-    wheel = tmp_path / "witwin_channel_native-0.1.0-py3-none-any.whl"
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     repository_root = Path(wheel_smoke.__file__).resolve().parents[1]
     alternate = json.loads(
@@ -557,7 +557,7 @@ def test_wheel_rejects_alternate_valid_rayd_identity_with_synced_record_and_buil
     alternate["integration_abi"]["sha256"] = "b" * 64
     _replace_member(
         wheel,
-        "witwin/channel_native/runtime/rayd.lock.json",
+        "witwin/channel/runtime/rayd.lock.json",
         (json.dumps(alternate, indent=2) + "\n").encode("utf-8"),
     )
     _refresh_record(wheel)
@@ -578,7 +578,7 @@ def test_wheel_rejects_alternate_valid_rayd_identity_with_synced_record_and_buil
         expected_name="witwin-channel",
         expected_version="0.1.0",
         target=target,
-        native_member="witwin/channel_native/_channel_native.cp311-win_amd64.pyd",
+        native_member="witwin/channel/_channel.cp311-win_amd64.pyd",
         expected_build_identity=_expected_build_identity(synced_build_info),
     )
     with pytest.raises(ValueError, match="does not exactly match authoritative"):

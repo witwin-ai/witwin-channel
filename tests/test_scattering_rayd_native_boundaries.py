@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-KERNELS = ROOT / "native/channel_native/kernels"
-BINDING = ROOT / "native/channel_native/binding/materials.cpp"
+KERNELS = ROOT / "native/channel/kernels"
+BINDING = ROOT / "native/channel/binding/materials.cpp"
 RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayDi"))
 
 MOVED_TUS = {
@@ -78,20 +78,20 @@ def test_phase10b_channel_has_no_local_scattering_numerical_owner() -> None:
     assert not (KERNELS / "scattering_table.cuh").exists()
     for name in MOVED_TUS:
         assert not (KERNELS / name).exists()
-        assert f"native/channel_native/kernels/{name}" not in cmake
+        assert f"native/channel/kernels/{name}" not in cmake
 
 
 def test_phase10b_retains_only_event_policy_in_scattering_tu() -> None:
     source = (KERNELS / "scattering.cu").read_text(encoding="utf-8-sig")
     assert source.count("scattering_event_kernel<<<") == 1
-    assert source.count("cn_scattering_event_probabilities(") == 1
+    assert source.count("channel_scattering_event_probabilities(") == 1
     for removed in (
         "scattering_eval_kernel",
         "scattering_pdf_kernel",
         "scattering_sample_kernel",
-        "cn_scattering_table_eval",
-        "cn_scattering_table_pdf",
-        "cn_scattering_table_sample",
+        "channel_scattering_table_eval",
+        "channel_scattering_table_pdf",
+        "channel_scattering_table_sample",
     ):
         assert removed not in source
     assert "--fmad=false" not in source

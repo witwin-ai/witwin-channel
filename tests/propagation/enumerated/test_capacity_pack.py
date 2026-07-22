@@ -529,13 +529,13 @@ def test_capacity_pack_family_uses_shared_no_trap_helper_without_host_transfer()
 ):
     root = Path(__file__).resolve().parents[3]
     finalizer = (
-        root / "native/channel_native/kernels/deterministic_capacity_finalize.cu"
+        root / "native/channel/kernels/deterministic_capacity_finalize.cu"
     ).read_text(encoding="utf-8")
     packer = (
-        root / "native/channel_native/kernels/evaluated_paths_capacity_pack.cu"
+        root / "native/channel/kernels/evaluated_paths_capacity_pack.cu"
     ).read_text(encoding="utf-8")
     ad = (
-        root / "native/channel_native/kernels/evaluated_paths_capacity_pack_ad.cu"
+        root / "native/channel/kernels/evaluated_paths_capacity_pack_ad.cu"
     ).read_text(encoding="utf-8")
     assert "deterministic_capacity_finalize_no_trap" in finalizer
     assert "deterministic_capacity_finalize_no_trap" in packer

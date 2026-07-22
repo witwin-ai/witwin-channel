@@ -170,11 +170,11 @@ def test_native_body_hash_uses_comment_and_whitespace_free_tokens(tmp_path: Path
     first = tmp_path / "first"
     second = tmp_path / "second"
     _write(
-        first / "native/channel_native/op.cu",
+        first / "native/channel/op.cu",
         "int add_one(int value) { return value + 1; }\n",
     )
     _write(
-        second / "native/channel_native/op.cu",
+        second / "native/channel/op.cu",
         "int add_one( int value ) { /* preserved math */ return value+1; }\n",
     )
 
@@ -187,10 +187,10 @@ def test_native_body_hash_uses_comment_and_whitespace_free_tokens(tmp_path: Path
 
 def test_native_body_hash_captures_multiline_return_and_signature(tmp_path: Path):
     _write(
-        tmp_path / "native/channel_native/op.cu",
+        tmp_path / "native/channel/op.cu",
         """
 std::tuple<torch::Tensor, torch::Tensor>
-cn_pair_cuda(
+channel_pair_cuda(
     torch::Tensor first,
     torch::Tensor second)
 {
@@ -201,22 +201,53 @@ cn_pair_cuda(
 
     entries = baseline.cpp_body_hashes(tmp_path)
 
-    assert [entry["name"] for entry in entries] == ["cn_pair_cuda"]
+    assert [entry["name"] for entry in entries] == ["channel_pair_cuda"]
     assert entries[0]["token_count"] == 7
+
+
+def test_adr033_identity_normalization_preserves_frozen_native_hashes(
+    tmp_path: Path,
+):
+    former_function = "c" + "n_op"
+    former_namespace = "channel" + "_native"
+    former_macro = "CHANNEL" + "_NATIVE_WITH_RAYD"
+    _write(
+        tmp_path / "former/native/channel/op.cu",
+        f"int {former_function}(int value) "
+        f"{{ return {former_namespace}::adjust(value) + {former_macro}; }}\n",
+    )
+    _write(
+        tmp_path / "current/native/channel/op.cu",
+        "int channel_op(int value) "
+        "{ return channel::adjust(value) + CHANNEL_WITH_RAYD; }\n",
+    )
+
+    former = baseline.cpp_body_hashes(tmp_path / "former")[0]
+    current = baseline.cpp_body_hashes(
+        tmp_path / "current", adr033_predecessor_identity=True
+    )[0]
+
+    assert {
+        key: former[key]
+        for key in ("name", "token_count", "signature_sha256", "body_sha256")
+    } == {
+        key: current[key]
+        for key in ("name", "token_count", "signature_sha256", "body_sha256")
+    }
 
 
 def test_binding_manifest_records_cpp_signature_and_pybind_defaults(tmp_path: Path):
     _write(
-        tmp_path / "native/channel_native/bindings.cpp",
+        tmp_path / "native/channel/bindings.cpp",
         """
 #include <tuple>
-std::tuple<int, float> cn_pair(torch::Tensor value, int count = 2) {
+std::tuple<int, float> channel_pair(torch::Tensor value, int count = 2) {
     return {count, 1.0f};
 }
-PYBIND11_MODULE(_channel_native, module) {
+PYBIND11_MODULE(_channel, module) {
     module.def(
         "pair",
-        &cn_pair,
+        &channel_pair,
         pybind11::arg("value"),
         pybind11::arg("count") = 2);
 }
@@ -229,8 +260,8 @@ PYBIND11_MODULE(_channel_native, module) {
     assert manifest["symbols"] == [
         {
             "name": "pair",
-            "target": "cn_pair",
-            "path": "native/channel_native/bindings.cpp",
+            "target": "channel_pair",
+            "path": "native/channel/bindings.cpp",
             "line": 7,
             "return_type": "std::tuple<int, float>",
             "return_arity": 2,
@@ -342,7 +373,7 @@ def test_git_state_collapses_private_claude_paths(monkeypatch: pytest.MonkeyPatc
     assert "notes.md" not in json.dumps(state)
 
 
-def test_torch_runtime_query_is_isolated_from_channel_native(
+def test_torch_runtime_query_is_isolated_from_channel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     recorded = {}
@@ -374,7 +405,7 @@ def test_torch_runtime_query_is_isolated_from_channel_native(
         "torch_version": "2.8.0",
     }
     assert "import torch" in recorded["command"][2]
-    assert "channel_native" not in recorded["command"][2]
+    assert "channel" not in recorded["command"][2]
 
 
 def test_build_manifest_records_compile_contract_and_redacts_cache_paths(
@@ -383,13 +414,13 @@ def test_build_manifest_records_compile_contract_and_redacts_cache_paths(
     _write(
         tmp_path / "CMakeLists.txt",
         """
-set(CHANNEL_NATIVE_DEFAULT_CUDA_ARCHITECTURES "80-real;90-virtual")
-set(CHANNEL_NATIVE_DEFAULT_TORCH_CUDA_ARCH_LIST "8.0 9.0+PTX")
+set(CHANNEL_DEFAULT_CUDA_ARCHITECTURES "80-real;90-virtual")
+set(CHANNEL_DEFAULT_TORCH_CUDA_ARCH_LIST "8.0 9.0+PTX")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release CACHE STRING "build type")
-target_compile_definitions(_channel_native PRIVATE FEATURE_A=1 FEATURE_B=1)
+target_compile_definitions(_channel PRIVATE FEATURE_A=1 FEATURE_B=1)
 set_source_files_properties(
-    native/channel_native/bridge.cpp
+    native/channel/bridge.cpp
     PROPERTIES COMPILE_OPTIONS "/EHc-")
 """,
     )
@@ -439,7 +470,7 @@ set(CMAKE_CUDA_SIMULATE_VERSION "19.44")
         "target_compile_definitions": ["FEATURE_A=1", "FEATURE_B=1"],
         "per_source_compile_options": [
             {
-                "path": "native/channel_native/bridge.cpp",
+                "path": "native/channel/bridge.cpp",
                 "options": ["/EHc-"],
             }
         ],

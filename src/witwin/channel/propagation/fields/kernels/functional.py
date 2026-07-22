@@ -75,9 +75,9 @@ def field_free_space(
     return _validate_enumerated_field_result(
         out,
         count,
-        type_error="_channel_native.field_free_space must return a dict",
-        field_error="_channel_native.field_free_space returned unexpected fields",
-        shape_error_prefix="_channel_native.field_free_space",
+        type_error="_channel.field_free_space must return a dict",
+        field_error="_channel.field_free_space returned unexpected fields",
+        shape_error_prefix="_channel.field_free_space",
     )
 
 
@@ -106,7 +106,7 @@ def field_project_complex3(
         field_vector, direction, rx_polarization
     )
     if not isinstance(out, dict) or set(out) != {"coefficient", "path_gain"}:
-        raise TypeError("_channel_native.field_project_complex3 returned invalid fields")
+        raise TypeError("_channel.field_project_complex3 returned invalid fields")
     validate_cuda_tensor("coefficient", out["coefficient"], dtype=torch.complex64, ndim=1)
     validate_cuda_tensor("path_gain", out["path_gain"], dtype=torch.float32, ndim=1)
     if out["coefficient"].shape != (count,) or out["path_gain"].shape != (count,):
@@ -183,7 +183,7 @@ def field_reflection_sequence(
     return _validate_enumerated_field_result(
         out,
         count,
-        type_error="_channel_native.field_reflection_sequence must return a dict",
+        type_error="_channel.field_reflection_sequence must return a dict",
         field_error="field_reflection_sequence returned unexpected fields",
         shape_error_prefix="field_reflection_sequence",
     )
@@ -283,7 +283,7 @@ def field_transmission_sequence(
     return _validate_enumerated_field_result(
         out,
         count,
-        type_error="_channel_native.field_transmission_sequence must return a dict",
+        type_error="_channel.field_transmission_sequence must return a dict",
         field_error="field_transmission_sequence returned unexpected fields",
         shape_error_prefix="field_transmission_sequence",
     )
@@ -362,7 +362,7 @@ def field_coupled_rd(
         bool(reverse),
     )
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.field_coupled_rd must return a dict")
+        raise TypeError("_channel.field_coupled_rd must return a dict")
     schema = {
         "field_vector": (torch.complex64, 2, (count, 3)),
         "coefficient": (torch.complex64, 1, (count,)),
@@ -491,7 +491,7 @@ def field_coupled_dd(
         float(frequency_hz),
     )
     if not isinstance(out, dict):
-        raise TypeError("_channel_native.field_coupled_dd must return a dict")
+        raise TypeError("_channel.field_coupled_dd must return a dict")
     schema = {
         "field_vector": (torch.complex64, 2, (count, 3)),
         "coefficient": (torch.complex64, 1, (count,)),
@@ -564,7 +564,7 @@ def field_free_space_backward(
     )
     expected = {"grad_frequency", "grad_source", "grad_target"}
     if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError("_channel_native.field_free_space_backward returned invalid fields")
+        raise TypeError("_channel.field_free_space_backward returned invalid fields")
     return out
 
 
@@ -592,7 +592,7 @@ def field_free_space_jvp(
         tangent_target,
     )
     if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
-        raise TypeError("_channel_native.field_free_space_jvp returned invalid fields")
+        raise TypeError("_channel.field_free_space_jvp returned invalid fields")
     return out
 
 
@@ -664,7 +664,7 @@ def field_reflection_sequence_backward(
     }
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.field_reflection_sequence_backward returned invalid fields"
+            "_channel.field_reflection_sequence_backward returned invalid fields"
         )
     return out
 
@@ -720,7 +720,7 @@ def field_reflection_sequence_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
         raise TypeError(
-            "_channel_native.field_reflection_sequence_jvp returned invalid fields"
+            "_channel.field_reflection_sequence_jvp returned invalid fields"
         )
     return out
 
@@ -798,7 +798,7 @@ def field_transmission_sequence_backward(
     }
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.field_transmission_sequence_backward returned invalid fields"
+            "_channel.field_transmission_sequence_backward returned invalid fields"
         )
     return out
 
@@ -860,7 +860,7 @@ def field_transmission_sequence_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
         raise TypeError(
-            "_channel_native.field_transmission_sequence_jvp returned invalid fields"
+            "_channel.field_transmission_sequence_jvp returned invalid fields"
         )
     return out
 
@@ -942,7 +942,7 @@ def field_diffraction_wedge(
     )
     if not isinstance(out, dict) or set(out) != set(_WEDGE_OUTPUT_FIELDS):
         raise TypeError(
-            "_channel_native.field_diffraction_wedge returned invalid fields"
+            "_channel.field_diffraction_wedge returned invalid fields"
         )
     return out
 
@@ -1006,7 +1006,7 @@ def field_rough_reflection_scale(
     expected = {*_ROUGH_SCALE_OUTPUT_FIELDS, "factor"}
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.field_rough_reflection_scale returned invalid fields"
+            "_channel.field_rough_reflection_scale returned invalid fields"
         )
     return out
 
@@ -1066,7 +1066,7 @@ def field_rough_reflection_scale_backward(
     }
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.field_rough_reflection_scale_backward returned"
+            "_channel.field_rough_reflection_scale_backward returned"
             " invalid fields"
         )
     return out
@@ -1119,7 +1119,7 @@ def field_rough_reflection_scale_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_ROUGH_SCALE_TANGENT_FIELDS):
         raise TypeError(
-            "_channel_native.field_rough_reflection_scale_jvp returned invalid fields"
+            "_channel.field_rough_reflection_scale_jvp returned invalid fields"
         )
     return out
 

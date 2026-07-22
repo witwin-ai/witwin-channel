@@ -1,8 +1,8 @@
 """Pure-torch complex128 reference implementations of the field kernels.
 
-Test-only mirrors of the exact formulas in ``native/channel_native/
+Test-only mirrors of the exact formulas in ``native/channel/
 field_transport.cuh`` (free-space carrier, finite-slab Fresnel reflection
-chain) and ``native/channel_native/em/*.cuh`` (Rouard transmission stack),
+chain) and ``native/channel/em/*.cuh`` (Rouard transmission stack),
 used for (a) forward parity against the native float32 kernels and (b) as a
 gradient oracle: torch autograd through these functions defines the exact
 Wirtinger-convention derivatives the native backward/jvp companions must

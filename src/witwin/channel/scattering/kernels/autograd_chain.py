@@ -664,7 +664,7 @@ def _required_chain_realization_forward(
     expected = set(_CHAIN_REALIZATION_OUTPUT_FIELDS)
     if not isinstance(out, dict) or set(out) != expected:
         raise TypeError(
-            "_channel_native.scattering_chain_realization_eval returned invalid fields"
+            "_channel.scattering_chain_realization_eval returned invalid fields"
         )
     return out
 

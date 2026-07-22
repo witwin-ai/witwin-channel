@@ -70,11 +70,11 @@ def test_path_table_capacity_pack_function_input_arity_and_indices_are_frozen() 
 
 
 def test_path_table_capacity_phase_duplicate_is_explicitly_locked() -> None:
-    live = (_ROOT / "native/channel_native/kernels/deterministic_field.cu").read_text(
+    live = (_ROOT / "native/channel/kernels/deterministic_field.cu").read_text(
         encoding="utf-8"
     )
     capacity = (
-        _ROOT / "native/channel_native/kernels/deterministic_path_table_capacity_pack.cu"
+        _ROOT / "native/channel/kernels/deterministic_path_table_capacity_pack.cu"
     ).read_text(encoding="utf-8")
     assert "float phase = -atan2f(field_imag[index], field_real[index]);" in live
     assert "phase = fmodf(phase, 2.0f * kPi);" in live
@@ -300,7 +300,7 @@ def test_path_table_capacity_pack_include_fields_false_ignores_valid_path_field_
         _assert_bits_equal(actual[valid], expected[valid])
 
     source = (
-        _ROOT / "native/channel_native/kernels/deterministic_path_table_capacity_pack.cu"
+        _ROOT / "native/channel/kernels/deterministic_path_table_capacity_pack.cu"
     ).read_text(encoding="utf-8")
     assert """if (include_fields) {
             const Complex path_field = input.path_field[row];""" in source

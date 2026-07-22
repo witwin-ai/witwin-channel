@@ -1039,7 +1039,7 @@ def probe_variant_identity(
         )
     captured["dependency_artifacts"] = dependency_artifacts
     identity = {
-        "channel_commit": build.get("channel_native_git_sha"),
+        "channel_commit": build.get("channel_git_sha"),
         "rayd_commit": build.get("rayd_commit"),
         "rayd_lock_sha256": lock["lock_sha256"],
         "integration_header_sha256": build.get("rayd_integration_abi_sha256"),
@@ -1121,7 +1121,7 @@ def validate_retained_identity(
         key=lambda row: str(row["path"]),
     )
     expected = {
-        "channel_commit": build.get("channel_native_git_sha"),
+        "channel_commit": build.get("channel_git_sha"),
         "rayd_commit": build.get("rayd_commit"),
         "integration_header_sha256": build.get("rayd_integration_abi_sha256"),
         "build_fingerprint": build.get("build_fingerprint"),

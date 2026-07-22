@@ -93,7 +93,7 @@ def benchmark_operation(
     import torch
 
     if not torch.cuda.is_available():
-        raise RuntimeError("the unified Channel Native benchmark harness requires CUDA")
+        raise RuntimeError("the unified Channel benchmark harness requires CUDA")
     if warmup < 0 or repeats <= 0:
         raise ValueError("warmup must be non-negative and repeats must be positive")
     synchronize = _sync_result if sync is None else sync

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://witwin.local/schemas/phase13-phase12-evidence.schema.json",
-  "title": "Channel Native Plan 13 Phase 12 evidence",
+  "title": "Channel Plan 13 Phase 12 evidence",
   "oneOf": [
     {"$ref": "#/$defs/dryRun"},
     {"$ref": "#/$defs/measured"}

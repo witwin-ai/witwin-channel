@@ -451,7 +451,7 @@ def test_extended_cheapest_cell_is_deterministic_across_two_runs():
     from tests.support.native_ext import inject_native_paths
 
     if not inject_native_paths():
-        pytest.skip("compiled _channel_native extension was not found")
+        pytest.skip("compiled _channel extension was not found")
 
     scene, config, operation, seed = runtime._load_extended_case(
         "path", "rough-reflection-cr", "none"

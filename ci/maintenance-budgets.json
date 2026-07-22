@@ -215,7 +215,7 @@
     }
   },
   "native_file_exemptions": {},
-  "native_source_root": "native/channel_native",
+  "native_source_root": "native/channel",
   "schema_version": 1,
   "source_root": "src/witwin/channel"
 }

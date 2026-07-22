@@ -88,7 +88,7 @@ def test_cuda_profile_mark_emits_only_the_semantic_payload(monkeypatch) -> None:
 
 def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
     source = (
-        _ROOT / "src" / "witwin" / "channel_native" / "runtime" / "profiling.py"
+        _ROOT / "src" / "witwin" / "channel" / "runtime" / "profiling.py"
     ).read_text(encoding="utf-8")
     tree = ast.parse(source)
     torch_calls = {

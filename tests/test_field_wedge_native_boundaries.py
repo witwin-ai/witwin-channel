@@ -10,7 +10,7 @@ from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-KERNEL_ROOT = REPOSITORY_ROOT / "native/channel_native/kernels"
+KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
@@ -23,7 +23,7 @@ RAYD_ROOT = Path(
 RAYD_WEDGE_SOURCE = (
     RAYD_ROOT / "backends/torch/src/torch_ext/rf/diffraction_wedge.cu"
 )
-FIELDS_BINDING = REPOSITORY_ROOT / "native/channel_native/binding/fields.cpp"
+FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
     "coupled": KERNEL_ROOT / "field_wedge_ad_coupled.cu",
@@ -32,22 +32,22 @@ TRANSLATION_UNITS = {
 }
 ABI_BY_OWNER = {
     "coupled": {
-        "cn_field_coupled_rd_backward",
-        "cn_field_coupled_rd_jvp",
+        "channel_field_coupled_rd_backward",
+        "channel_field_coupled_rd_jvp",
     },
     "project": {
-        "cn_field_project_complex3_backward",
-        "cn_field_project_complex3_jvp",
+        "channel_field_project_complex3_backward",
+        "channel_field_project_complex3_jvp",
     },
     "prepare": {
-        "cn_coupled_rd_prepare_backward",
-        "cn_coupled_rd_prepare_jvp",
+        "channel_coupled_rd_prepare_backward",
+        "channel_coupled_rd_prepare_jvp",
     },
 }
 PURE_WEDGE_ABI = {
-    "cn_field_diffraction_wedge",
-    "cn_field_diffraction_wedge_backward",
-    "cn_field_diffraction_wedge_jvp",
+    "channel_field_diffraction_wedge",
+    "channel_field_diffraction_wedge_backward",
+    "channel_field_diffraction_wedge_jvp",
 }
 COMMON_HELPERS = {
     "load3f",
@@ -106,7 +106,7 @@ def test_field_wedge_split_preserves_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/field_wedge_ad.cu"
+        if entry["path"] == "native/channel/kernels/field_wedge_ad.cu"
     )
     approved_additions = migration_delta["phase3_current"][
         "approved_post_phase9_field_wedge_launch_additions"
@@ -155,7 +155,7 @@ def test_rayd_pure_wedge_preserves_launch_and_fast_math_boundary() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/field_wedge_ad.cu"
+        if entry["path"] == "native/channel/kernels/field_wedge_ad.cu"
     )
     source = RAYD_WEDGE_SOURCE.read_text(encoding="utf-8-sig")
     actual = Counter(
@@ -205,7 +205,7 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
         "direction",
     }
     assert _dict_keys(
-        _function_body(source, "cn_field_diffraction_wedge_backward")
+        _function_body(source, "channel_field_diffraction_wedge_backward")
     ) == {
         "grad_source",
         "grad_target",
@@ -225,7 +225,7 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
         _function_body(source, "diffraction_wedge_jvp_result_dict")
     ) == {"tangent_field_vector", "tangent_direction"}
 
-    backward = _function_body(source, "cn_field_diffraction_wedge_backward")
+    backward = _function_body(source, "channel_field_diffraction_wedge_backward")
     for flag in (
         "need_grad_material",
         "need_grad_frequency",
@@ -276,7 +276,7 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
             f"request.{cotangent} = optional_tensor({cotangent});" in backward
         )
 
-    jvp = _function_body(source, "cn_field_diffraction_wedge_jvp")
+    jvp = _function_body(source, "channel_field_diffraction_wedge_jvp")
     for tangent in (
         "tangent_source",
         "tangent_target",
@@ -297,7 +297,7 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
 
 def test_field_wedge_common_and_owner_local_plumbing_are_isolated() -> None:
     names = _function_names_by_path()
-    common = "native/channel_native/kernels/field_wedge_ad_common.cuh"
+    common = "native/channel/kernels/field_wedge_ad_common.cuh"
 
     assert COMMON_HELPERS == names[common]
     for owner, path in TRANSLATION_UNITS.items():
@@ -315,14 +315,14 @@ def test_field_wedge_split_is_registered_once_and_below_budget() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
     policy = inventory["translation_unit_policy"]
-    common = "native/channel_native/kernels/field_wedge_ad_common.cuh"
+    common = "native/channel/kernels/field_wedge_ad_common.cuh"
 
-    assert "native/channel_native/kernels/field_wedge_ad.cu" not in cmake
-    assert "native/channel_native/kernels/field_wedge_ad_diffraction.cu" not in cmake
-    assert "CHANNEL_NATIVE_FAST_MATH_WEDGE_TU" not in cmake
+    assert "native/channel/kernels/field_wedge_ad.cu" not in cmake
+    assert "native/channel/kernels/field_wedge_ad_diffraction.cu" not in cmake
+    assert "CHANNEL_FAST_MATH_WEDGE_TU" not in cmake
     assert "--use_fast_math" not in cmake
     assert not (KERNEL_ROOT / "field_wedge_ad_diffraction.cu").exists()
-    assert "native/channel_native/kernels/field_wedge_ad.cu" not in policy[
+    assert "native/channel/kernels/field_wedge_ad.cu" not in policy[
         "planned_owner_debt"
     ]
     assert common not in cmake

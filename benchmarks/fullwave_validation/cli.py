@@ -26,7 +26,7 @@ def _case_parser(subparsers: argparse._SubParsersAction, name: str, help_text: s
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Compare channel-native deterministic fields with Tidy3D ground truth."
+        description="Compare channel deterministic fields with Tidy3D ground truth."
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--output-dir", type=Path, required=True)
 
     deterministic = _case_parser(
-        commands, "solve-deterministic", "Run channel-native deterministic."
+        commands, "solve-deterministic", "Run channel deterministic."
     )
     deterministic.add_argument("--output", type=Path, required=True)
 
@@ -97,7 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         data_output = args.tidy3d_data_output or args.output.with_suffix(".tidy3d.hdf5")
         reference = submit_tidy3d(
             spec,
-            task_name=args.task_name or f"channel-native-{spec.case_id}",
+            task_name=args.task_name or f"channel-{spec.case_id}",
             data_path=data_output,
         )
     output = reference.save(args.output)

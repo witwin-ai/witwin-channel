@@ -17,9 +17,9 @@ mirrors so the lockstep companion stays honest):
 
 * Per-bounce specular Jones transport (frame, Fresnel, s/p projection, field
   update) mirrors ``reflection_chain_eval`` in
-  ``native/channel_native/kernels/field_transport_reflection.cu`` and the
+  ``native/channel/kernels/field_transport_reflection.cu`` and the
   device primitives ``reflect_frame`` / ``slab_fresnel`` / ``reflect_complex3``
-  in ``native/channel_native/field_transport.cuh``.
+  in ``native/channel/field_transport.cuh``.
 * Rough per-bounce ``C_r = exp(-2*(k0*cos_b*sigma_b)^2)`` attenuation follows
   ``tests/reference/rough_reflection.py::rough_reflection_factor`` (ADR-010
   op 3), applied per specular bounce (ADR-021 section 2.6: the diffuse budget

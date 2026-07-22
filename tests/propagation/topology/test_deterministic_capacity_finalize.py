@@ -281,7 +281,7 @@ def test_capacity_finalize_has_no_host_count_transfer_or_atomic_rank() -> None:
     source = (
         Path(__file__).resolve().parents[3]
         / "native"
-        / "channel_native"
+        / "channel"
         / "kernels"
         / "deterministic_capacity_finalize.cu"
     ).read_text(encoding="utf-8")

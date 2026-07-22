@@ -12,7 +12,7 @@ from witwin.channel.propagation.models import contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 
 _TOPOLOGY_CONFIG_DIGEST = (
     "a1359261cbd2361e26874a6e951b5877f7a9bcda9642bf1eddbfb5bcec41cbee"

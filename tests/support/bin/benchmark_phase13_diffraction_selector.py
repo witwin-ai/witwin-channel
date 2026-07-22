@@ -14,7 +14,7 @@ import torch
 
 _REPO_ROOT = pathlib.Path(
     os.environ.get(
-        "WITWIN_CHANNEL_NATIVE_BENCHMARK_SOURCE_ROOT",
+        "WITWIN_CHANNEL_BENCHMARK_SOURCE_ROOT",
         pathlib.Path(__file__).resolve().parents[3],
     )
 ).resolve()
@@ -98,7 +98,7 @@ def main() -> None:
                 "schema_version": 1,
                 "label": args.label,
                 "build_fingerprint": native_info["build_fingerprint"],
-                "channel_commit": native_info["channel_native_git_sha"],
+                "channel_commit": native_info["channel_git_sha"],
                 "rayd_commit": native_info["rayd_commit"],
                 "cuda_architectures": native_info["cuda_architectures"],
                 "first_wall_ms": first_wall_ms,

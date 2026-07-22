@@ -151,7 +151,7 @@ def test_phase_m_docs_do_not_claim_adr029_or_phase12_completion() -> None:
         ROOT
         / "docs/dev/plans/13-direct-rayd-integration-and-rf-runtime-ownership-plan.md"
     ).read_text(encoding="utf-8")
-    migration = (ROOT / "docs/dev/replacement/channel-native-migration.md").read_text(
+    migration = (ROOT / "docs/dev/replacement/channel-migration.md").read_text(
         encoding="utf-8"
     )
 

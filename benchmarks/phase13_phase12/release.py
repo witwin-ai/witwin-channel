@@ -35,12 +35,12 @@ WHEEL_ARCHITECTURES = (
 TORCH_WHEEL_ARCHITECTURES = "7.5 8.0 8.6 8.9 12.0+PTX"
 FINAL_GROUP = "diffraction"
 WHEEL_SMOKE_NAME = "wheel-smoke-pe-audit.v1.json"
-WHEEL_NATIVE_MEMBER = "witwin/channel_native/_channel_native.cp311-win_amd64.pyd"
+WHEEL_NATIVE_MEMBER = "witwin/channel/_channel.cp311-win_amd64.pyd"
 _FINGERPRINT_FIELDS = (
     "build_type",
-    "channel_native_abi_version",
-    "channel_native_git_dirty",
-    "channel_native_git_sha",
+    "channel_abi_version",
+    "channel_git_dirty",
+    "channel_git_sha",
     "compiler",
     "cuda_architectures",
     "cuda_compiler_version",
@@ -120,11 +120,11 @@ def _prepare_packaged_validation_checkout(
         source_extension = candidate.runner_extension.resolve(strict=True)
     except OSError as exc:
         raise EvidenceError("runner release binding path is missing") from exc
-    installed_package = site_packages / "witwin" / "channel_native"
+    installed_package = site_packages / "witwin" / "channel"
     if not source_extension.is_file() or source_extension.parent != installed_package:
         raise EvidenceError("runner extension is not inside its runner-owned installation")
     source_fingerprint = (
-        installed_package / "runtime" / "_channel_native.build-fingerprint"
+        installed_package / "runtime" / "_channel.build-fingerprint"
     )
     validation = config.build_parent / f"release-validation-{commit}"
     if os.path.lexists(validation):
@@ -153,15 +153,15 @@ def _prepare_packaged_validation_checkout(
         stem="release-validation-checkout",
         timeout_seconds=timeout_seconds,
     )
-    validation_package = validation / "src" / "witwin" / "channel_native"
+    validation_package = validation / "src" / "witwin" / "channel"
     validation_extension = validation_package / source_extension.name
     validation_fingerprint = (
-        validation_package / "runtime" / "_channel_native.build-fingerprint"
+        validation_package / "runtime" / "_channel.build-fingerprint"
     )
     if validation_extension.exists() or validation_fingerprint.exists():
         raise EvidenceError("packaged validation overlay target already exists")
     git_exclude = validation / ".git" / "info" / "exclude"
-    exclude_line = "/src/witwin/channel/runtime/_channel_native.build-fingerprint"
+    exclude_line = "/src/witwin/channel/runtime/_channel.build-fingerprint"
     try:
         existing_excludes = git_exclude.read_text(encoding="utf-8")
         separator = "" if not existing_excludes or existing_excludes.endswith("\n") else "\n"
@@ -189,7 +189,7 @@ def _prepare_packaged_validation_checkout(
     )
     fingerprint_artifact = store.retain_external(
         validation_fingerprint,
-        "release/validation-binding/_channel_native.build-fingerprint",
+        "release/validation-binding/_channel.build-fingerprint",
         label="validation packaged fingerprint",
     )
     if (
@@ -277,7 +277,7 @@ def _runner_channel_environment(
     except (KeyError, OSError) as exc:
         raise EvidenceError("runner packaged validation binding is missing") from exc
     source_root = checkout / "src"
-    expected_extension_parent = source_root / "witwin" / "channel_native"
+    expected_extension_parent = source_root / "witwin" / "channel"
     if extension.parent != expected_extension_parent:
         raise EvidenceError("validation extension is not in the packaged source layout")
     fingerprint = str(validation.get("build_fingerprint", ""))
@@ -289,7 +289,7 @@ def _runner_channel_environment(
             "CMAKE_CUDA_ARCHITECTURES", ";".join(WHEEL_ARCHITECTURES)
         ),
         _quoted_cmake_definition("CMAKE_BUILD_TYPE", "Release"),
-        _quoted_cmake_definition("CHANNEL_NATIVE_RELEASE_BUILD", "ON"),
+        _quoted_cmake_definition("CHANNEL_RELEASE_BUILD", "ON"),
         _quoted_cmake_definition("Python_EXECUTABLE", python_executable),
         _quoted_cmake_definition("CMAKE_CUDA_COMPILER", config.tools.nvcc),
         _quoted_cmake_definition("CMAKE_CXX_COMPILER", config.tools.cl),
@@ -301,9 +301,9 @@ def _runner_channel_environment(
         config.runner_build_environment or controlled_environment(config)
     )
     forbidden_loader_environment = (
-        "WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE",
-        "WITWIN_CHANNEL_NATIVE_EXTENSION_PATH",
-        "WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT",
+        "WITWIN_CHANNEL_DEVELOPER_OVERRIDE",
+        "WITWIN_CHANNEL_EXTENSION_PATH",
+        "WITWIN_CHANNEL_EXPECTED_FINGERPRINT",
     )
     if any(name in environment for name in forbidden_loader_environment):
         raise EvidenceError("release environment must not enable the developer loader")
@@ -497,8 +497,8 @@ def _validate_wheel_smoke(
     assert isinstance(final_history, dict)
     expected = {
         "build_type": "Release",
-        "channel_native_git_dirty": False,
-        "channel_native_git_sha": final_history["candidate_commit"],
+        "channel_git_dirty": False,
+        "channel_git_sha": final_history["candidate_commit"],
         "rayd_dirty": False,
         "rayd_commit": implementation["rayd_commit"],
         "rayd_integration_abi_kind": "source-header-sha256",
@@ -1105,7 +1105,7 @@ def _validate_runner_binding(
         or not site_packages_source.is_absolute()
         or not extension.is_absolute()
         or extension.parent
-        != validation_checkout / "src" / "witwin" / "channel_native"
+        != validation_checkout / "src" / "witwin" / "channel"
         or not rayd_source.is_absolute()
         or not python_executable.is_absolute()
     ):
@@ -1117,7 +1117,7 @@ def _validate_runner_binding(
             "CMAKE_CUDA_ARCHITECTURES", ";".join(WHEEL_ARCHITECTURES)
         ),
         _quoted_cmake_definition("CMAKE_BUILD_TYPE", "Release"),
-        _quoted_cmake_definition("CHANNEL_NATIVE_RELEASE_BUILD", "ON"),
+        _quoted_cmake_definition("CHANNEL_RELEASE_BUILD", "ON"),
         _quoted_cmake_definition("Python_EXECUTABLE", python_executable),
     )
     if not isinstance(cmake_args, str) or any(
@@ -1162,7 +1162,7 @@ def _validate_packaged_validation_checkout(
         value["commit"] != final_history["candidate_commit"]
         or value["build_fingerprint"] != implementation.get("final_build_fingerprint")
         or value["local_exclude"]
-        != "/src/witwin/channel/runtime/_channel_native.build-fingerprint"
+        != "/src/witwin/channel/runtime/_channel.build-fingerprint"
     ):
         raise EvidenceError("packaged validation checkout identity differs")
     checkout = Path(str(value["checkout"]))
@@ -1172,7 +1172,7 @@ def _validate_packaged_validation_checkout(
         not checkout.is_absolute()
         or not source_site_packages.is_absolute()
         or packaged_path.parent
-        != checkout / "src" / "witwin" / "channel_native"
+        != checkout / "src" / "witwin" / "channel"
     ):
         raise EvidenceError("packaged validation checkout paths are not canonical")
     source_extension = value["source_extension"]

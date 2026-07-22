@@ -25,10 +25,10 @@ else:
 
 _DISTRIBUTION = "witwin-channel"
 _DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL"})
-_NATIVE_MEMBER = "witwin/channel_native/_channel_native.cp311-win_amd64.pyd"
+_NATIVE_MEMBER = "witwin/channel/_channel.cp311-win_amd64.pyd"
 _REQUIRED_RUNTIME_MEMBERS = {
-    "witwin/channel_native/runtime/_channel_native.build-fingerprint",
-    "witwin/channel_native/runtime/rayd.lock.json",
+    "witwin/channel/runtime/_channel.build-fingerprint",
+    "witwin/channel/runtime/rayd.lock.json",
 }
 _SPECIAL_PACKAGE_MEMBERS = frozenset({_NATIVE_MEMBER, *_REQUIRED_RUNTIME_MEMBERS})
 _SMOKE_KEYS = frozenset(
@@ -46,9 +46,9 @@ _BUILD_INFO_KEYS = frozenset(
         "backend",
         "build_fingerprint",
         "build_type",
-        "channel_native_abi_version",
-        "channel_native_git_dirty",
-        "channel_native_git_sha",
+        "channel_abi_version",
+        "channel_git_dirty",
+        "channel_git_sha",
         "compiler",
         "cuda_architectures",
         "cuda_available",
@@ -180,7 +180,7 @@ def _metadata_identity(
             f"wheel identity must be {_DISTRIBUTION!r} with a non-empty version; "
             f"found name={name!r}, version={version!r}"
         )
-    dist_info = f"witwin_channel_native-{version}.dist-info"
+    dist_info = f"witwin_channel-{version}.dist-info"
     if metadata_files[0] != f"{dist_info}/METADATA":
         raise ValueError(
             "wheel .dist-info directory does not exactly match METADATA version: "
@@ -279,14 +279,14 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
 
 def _runtime_identity_from_archive(archive: zipfile.ZipFile) -> dict[str, object]:
     fingerprint_member = (
-        "witwin/channel_native/runtime/_channel_native.build-fingerprint"
+        "witwin/channel/runtime/_channel.build-fingerprint"
     )
     fingerprint = archive.read(fingerprint_member)
     match = re.fullmatch(rb"([0-9a-f]{64})(?:\r?\n)?", fingerprint)
     if match is None:
         raise ValueError("wheel build fingerprint must contain exactly one SHA-256")
 
-    lock_member = "witwin/channel_native/runtime/rayd.lock.json"
+    lock_member = "witwin/channel/runtime/rayd.lock.json"
     wheel_lock_payload = archive.read(lock_member)
     repository_root = Path(__file__).resolve().parents[1]
     try:
@@ -312,8 +312,8 @@ def _runtime_identity_from_archive(archive: zipfile.ZipFile) -> dict[str, object
     return {
         "build_fingerprint": match.group(1).decode("ascii"),
         "build_type": "Release",
-        "channel_native_abi_version": 1,
-        "channel_native_git_dirty": False,
+        "channel_abi_version": 1,
+        "channel_git_dirty": False,
         "rayd_dirty": False,
         **wheel_identity,
     }
@@ -393,7 +393,7 @@ def _audit_wheel_contents(path: Path) -> str:
         native_extensions = [name for name in names if name == _NATIVE_MEMBER]
         if native_extensions != [_NATIVE_MEMBER]:
             raise ValueError(
-                "wheel must contain exactly one packaged _channel_native extension; "
+                "wheel must contain exactly one packaged _channel extension; "
                 f"found {native_extensions}"
             )
         native_extension = _NATIVE_MEMBER
@@ -404,7 +404,7 @@ def _audit_wheel_contents(path: Path) -> str:
         ]
         if shared_libraries != [native_extension]:
             raise ValueError(
-                "wheel must contain no DSO except its single _channel_native "
+                "wheel must contain no DSO except its single _channel "
                 f"extension; found {shared_libraries}"
             )
         missing = sorted(_REQUIRED_RUNTIME_MEMBERS.difference(names))
@@ -480,7 +480,7 @@ def _audit_wheel_pe(
 ) -> dict[str, object]:
     with zipfile.ZipFile(path) as archive:
         payload = archive.read(native_member)
-    with tempfile.TemporaryDirectory(prefix="channel-native-pe-audit-") as raw:
+    with tempfile.TemporaryDirectory(prefix="channel-pe-audit-") as raw:
         extracted = Path(raw) / Path(native_member).name
         extracted.write_bytes(payload)
         evidence = audit_windows_pe.audit_pe(extracted, dumpbin=dumpbin)
@@ -528,7 +528,7 @@ def _isolated_path(value: object, *, label: str, target: Path) -> Path:
 def _validate_build_info(value: object) -> dict[str, object]:
     info = _exact_keys(value, _BUILD_INFO_KEYS, label="build_info")
     booleans = {
-        "channel_native_git_dirty",
+        "channel_git_dirty",
         "cuda_available",
         "optix_available",
         "rayd_dirty",
@@ -536,7 +536,7 @@ def _validate_build_info(value: object) -> dict[str, object]:
         "uses_path_native",
         "uses_rayd_native",
     }
-    integers = {"channel_native_abi_version", "material_abi_version"}
+    integers = {"channel_abi_version", "material_abi_version"}
     strings = _BUILD_INFO_KEYS - booleans - integers - {"cuda_architectures"}
     if any(type(info[name]) is not bool for name in booleans):
         raise ValueError("isolated wheel smoke build_info boolean field has wrong type")
@@ -559,9 +559,9 @@ def _validate_build_info(value: object) -> dict[str, object]:
             "isolated wheel smoke build_info CUDA architectures are invalid"
         )
     expected_values = {
-        "backend": "channel-native",
+        "backend": "channel",
         "build_type": "Release",
-        "channel_native_abi_version": 1,
+        "channel_abi_version": 1,
         "material_abi_version": 3,
         "rayd_integration": "source-linked",
         "rayd_integration_abi_kind": "source-header-sha256",
@@ -579,11 +579,11 @@ def _validate_build_info(value: object) -> dict[str, object]:
             "isolated wheel smoke build_info has unexpected release identity: "
             + ", ".join(mismatched)
         )
-    if info["channel_native_git_dirty"] is not False or info["rayd_dirty"] is not False:
+    if info["channel_git_dirty"] is not False or info["rayd_dirty"] is not False:
         raise ValueError(
             "isolated wheel smoke build_info must report clean repositories"
         )
-    if _SHA_PATTERN.fullmatch(str(info["channel_native_git_sha"])) is None:
+    if _SHA_PATTERN.fullmatch(str(info["channel_git_sha"])) is None:
         raise ValueError("isolated wheel smoke Channel Git identity is invalid")
     if _SHA_PATTERN.fullmatch(str(info["rayd_commit"])) is None:
         raise ValueError("isolated wheel smoke RayD Git identity is invalid")
@@ -649,7 +649,7 @@ def _parse_smoke_evidence(
     native_origin = _isolated_path(
         evidence["native_origin"], label="native origin", target=target
     )
-    expected_package_origin = (target / "witwin/channel_native/__init__.py").resolve()
+    expected_package_origin = (target / "witwin/channel/__init__.py").resolve()
     if package_origin != expected_package_origin or not package_origin.is_file():
         raise ValueError("isolated wheel smoke package origin is invalid")
     expected_native_origin = (target / Path(native_member)).resolve()
@@ -714,17 +714,17 @@ package_origin = Path(package_spec.origin).resolve()
 if not package_origin.is_relative_to(target):
     raise RuntimeError(f\"package resolved outside isolated target: {{package_origin}}\")
 
-native_spec = importlib.util.find_spec(\"witwin.channel._channel_native\")
+native_spec = importlib.util.find_spec(\"witwin.channel._channel\")
 if native_spec is None or native_spec.origin is None:
     raise RuntimeError(\"packaged native extension has no import origin\")
 native_origin = Path(native_spec.origin).resolve()
 if not native_origin.is_relative_to(target):
     raise RuntimeError(f\"native extension resolved outside isolated target: {{native_origin}}\")
 
-import witwin.channel as channel_native
+import witwin.channel as channel
 
-build_info = channel_native.build_info()
-if build_info.get(\"backend\") != \"channel-native\":
+build_info = channel.build_info()
+if build_info.get(\"backend\") != \"channel\":
     raise RuntimeError(f\"unexpected native backend: {{build_info.get('backend')!r}}\")
 if build_info.get(\"uses_dr_jit\") is not False:
     raise RuntimeError(\"wheel native extension must report uses_dr_jit=false\")
@@ -769,7 +769,7 @@ def main() -> int:
         parser.error(str(exc))
     wheel_sha256 = _sha256(wheel)
 
-    with tempfile.TemporaryDirectory(prefix="channel-native-wheel-smoke-") as raw:
+    with tempfile.TemporaryDirectory(prefix="channel-wheel-smoke-") as raw:
         target = Path(raw) / "site-packages"
         install = subprocess.run(
             [

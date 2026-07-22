@@ -54,7 +54,7 @@ def core_diffraction_edge_count(
     )
     if not isinstance(value, int):
         raise TypeError(
-            "_channel_native.core_diffraction_edge_count must return an int"
+            "_channel.core_diffraction_edge_count must return an int"
         )
     return value
 
@@ -70,12 +70,12 @@ def deterministic_normalize_vec3(
     out = _required_native_op("deterministic_normalize_vec3")(values, float(eps))
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.deterministic_normalize_vec3 must return a tensor"
+            "_channel.deterministic_normalize_vec3 must return a tensor"
         )
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if out.shape != values.shape:
         raise ValueError(
-            "_channel_native.deterministic_normalize_vec3 returned bad shape"
+            "_channel.deterministic_normalize_vec3 returned bad shape"
         )
     return out
 
@@ -101,12 +101,12 @@ def deterministic_reflect_points(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.deterministic_reflect_points must return a tensor"
+            "_channel.deterministic_reflect_points must return a tensor"
         )
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if out.shape != points.shape:
         raise ValueError(
-            "_channel_native.deterministic_reflect_points returned bad shape"
+            "_channel.deterministic_reflect_points returned bad shape"
         )
     return out
 
@@ -138,7 +138,7 @@ def deterministic_face_groups(
         float(quantization),
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.deterministic_face_groups must return a dict")
+        raise TypeError("_channel.deterministic_face_groups must return a dict")
     expected_fields = {
         "face_group_id",
         "representative_faces",
@@ -149,7 +149,7 @@ def deterministic_face_groups(
     }
     if set(exported) != expected_fields:
         raise ValueError(
-            "_channel_native.deterministic_face_groups returned unexpected fields"
+            "_channel.deterministic_face_groups returned unexpected fields"
         )
     face_count = int(tri_a.shape[0])
     validate_cuda_tensor(
@@ -176,19 +176,19 @@ def deterministic_face_groups(
     group_count = exported["group_count"]
     if not isinstance(group_count, int):
         raise TypeError(
-            "_channel_native.deterministic_face_groups returned non-int group_count"
+            "_channel.deterministic_face_groups returned non-int group_count"
         )
     if exported["face_group_id"].shape != (face_count,) or exported[
         "surface_group_id"
     ].shape != (face_count,):
         raise ValueError(
-            "_channel_native.deterministic_face_groups returned bad face group shape"
+            "_channel.deterministic_face_groups returned bad face group shape"
         )
     if exported["representative_faces"].shape != (group_count,) or exported[
         "surface_group_size"
     ].shape != (group_count,):
         raise ValueError(
-            "_channel_native.deterministic_face_groups returned bad group shape"
+            "_channel.deterministic_face_groups returned bad group shape"
         )
     return exported
 
@@ -200,7 +200,7 @@ def deterministic_surface_face_groups(
     exported = _required_native_op("deterministic_surface_face_groups")(surface_ids)
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_surface_face_groups must return a dict"
+            "_channel.deterministic_surface_face_groups must return a dict"
         )
     expected_fields = {
         "face_group_id",
@@ -212,7 +212,7 @@ def deterministic_surface_face_groups(
     }
     if set(exported) != expected_fields:
         raise ValueError(
-            "_channel_native.deterministic_surface_face_groups returned unexpected fields"
+            "_channel.deterministic_surface_face_groups returned unexpected fields"
         )
     face_count = int(surface_ids.shape[0])
     validate_cuda_tensor(
@@ -239,19 +239,19 @@ def deterministic_surface_face_groups(
     group_count = exported["group_count"]
     if not isinstance(group_count, int):
         raise TypeError(
-            "_channel_native.deterministic_surface_face_groups returned non-int group_count"
+            "_channel.deterministic_surface_face_groups returned non-int group_count"
         )
     if exported["face_group_id"].shape != (face_count,) or exported[
         "surface_group_id"
     ].shape != (face_count,):
         raise ValueError(
-            "_channel_native.deterministic_surface_face_groups returned bad face group shape"
+            "_channel.deterministic_surface_face_groups returned bad face group shape"
         )
     if exported["representative_faces"].shape != (group_count,) or exported[
         "surface_group_size"
     ].shape != (group_count,):
         raise ValueError(
-            "_channel_native.deterministic_surface_face_groups returned bad group shape"
+            "_channel.deterministic_surface_face_groups returned bad group shape"
         )
     return exported
 
@@ -287,7 +287,7 @@ def mc_diffraction_edge_geometry(
     native = native_extension()
     if native is None or not hasattr(native, "mc_diffraction_edge_geometry"):
         raise RuntimeError(
-            "_channel_native.mc_diffraction_edge_geometry CUDA kernel is required"
+            "_channel.mc_diffraction_edge_geometry CUDA kernel is required"
         )
     geometry = native.mc_diffraction_edge_geometry(
         vertices,
@@ -301,7 +301,7 @@ def mc_diffraction_edge_geometry(
     )
     if not isinstance(geometry, tuple) or len(geometry) != 11:
         raise TypeError(
-            "_channel_native.mc_diffraction_edge_geometry must return 11 tensors"
+            "_channel.mc_diffraction_edge_geometry must return 11 tensors"
         )
     validate_cuda_tensor("selected", geometry[0], dtype=torch.bool, ndim=1)
     validate_cuda_tensor(
@@ -360,7 +360,7 @@ def mc_surface_group_edge_candidates(
     native = native_extension()
     if native is None or not hasattr(native, "mc_surface_group_edge_candidates"):
         raise RuntimeError(
-            "_channel_native.mc_surface_group_edge_candidates CUDA kernel is required"
+            "_channel.mc_surface_group_edge_candidates CUDA kernel is required"
         )
     candidates = native.mc_surface_group_edge_candidates(
         vertices,
@@ -375,13 +375,13 @@ def mc_surface_group_edge_candidates(
     )
     if not isinstance(candidates, tuple) or len(candidates) != 2:
         raise TypeError(
-            "_channel_native.mc_surface_group_edge_candidates must return 2 tensors"
+            "_channel.mc_surface_group_edge_candidates must return 2 tensors"
         )
     counts, indices = candidates
     validate_cuda_tensor("counts", counts, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("indices", indices, dtype=torch.int32, ndim=2)
     if counts.shape[0] != faces.shape[0] or indices.shape[0] != faces.shape[0]:
         raise ValueError(
-            "_channel_native.mc_surface_group_edge_candidates returned unexpected shapes"
+            "_channel.mc_surface_group_edge_candidates returned unexpected shapes"
         )
     return counts, indices

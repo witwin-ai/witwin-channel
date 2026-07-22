@@ -147,7 +147,7 @@ def test_reflection_solver_requires_native_field_kernel(monkeypatch):
 
     def fail_native_kernel(**kwargs):
         raise RuntimeError(
-            "_channel_native.deterministic_reflection_field CUDA kernel is required"
+            "_channel.deterministic_reflection_field CUDA kernel is required"
         )
 
     monkeypatch.setattr(

@@ -13,7 +13,7 @@ from witwin.channel.runtime import symbols, tensor_contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 
 
 def test_topology_sampling_is_the_single_object_owner():

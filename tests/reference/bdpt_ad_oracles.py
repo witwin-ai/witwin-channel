@@ -17,7 +17,7 @@ lockstep test (``tests/ad/test_bdpt_companion_ad.py``) compares against. The
 convention for every op is pinned to the native forward it mirrors, cited inline:
 
 * Reflected advance mirrors ``bdpt_reflected_light_subpaths_kernel``
-  (``native/channel_native/kernels/bdpt_subpaths.cu``): the Complex3 field is
+  (``native/channel/kernels/bdpt_subpaths.cu``): the Complex3 field is
   advanced by ``reflect_complex3`` (finite-slab Fresnel, ``slab_fresnel``), and the
   real throughput amplitude proxy is ``sqrt(gain * R_interface)`` with the
   single-INTERFACE reflectance ``effective_power_reflectance`` (no slab phase, no
@@ -27,15 +27,15 @@ convention for every op is pinned to the native forward it mirrors, cited inline
   compensation phase ``exp(-j (k_par*lateral - k0*jump))``; the throughput proxy is
   ``sqrt(cap_t_TE*w_s + cap_t_TM*w_p)`` with the full-stack power transmittance.
 * Endpoint connection mirrors ``bdpt_endpoint_connection_samples_kernel``
-  (``native/channel_native/kernels/bdpt_connect_samples.cu``):
+  (``native/channel/kernels/bdpt_connect_samples.cu``):
   ``contribution = P_src * |proj(F)|^2 * (1/(2 k L))^2 / N`` with ``proj`` the frozen
   transverse receiver projection and ``L`` the frozen unfolded length.
 * Accumulate mirrors ``bdpt_accumulate_connection_samples_*_kernel``
-  (``native/channel_native/kernels/bdpt_connect_accumulation.cu``): power domain bins
+  (``native/channel/kernels/bdpt_connect_accumulation.cu``): power domain bins
   ``contribution*mis``; coherent domain bins the complex coefficient and finalizes
   ``|sum|^2``.
 * Finalize mirrors ``bdpt_finalize_point_components_kernel`` /
-  ``bdpt_finalize_component_maps`` (``native/channel_native/kernels/bdpt_accum.cu``).
+  ``bdpt_finalize_component_maps`` (``native/channel/kernels/bdpt_accum.cu``).
 
 Test-only: MUST NOT be imported from production packages. Imports only ``torch`` and
 the sibling ``tests.reference`` / ``tests.ad`` helpers, so it stays import-clean

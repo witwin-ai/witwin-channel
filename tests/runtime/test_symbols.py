@@ -66,7 +66,7 @@ def test_native_extension_preserves_loader_cache(monkeypatch: pytest.MonkeyPatch
 
     assert symbols.native_extension() is native
     assert symbols.native_extension() is native
-    assert imports == [("._channel_native", "witwin.channel")]
+    assert imports == [("._channel", "witwin.channel")]
 
 
 def test_required_symbol_keeps_lookup_order_and_single_loader_call(
@@ -101,7 +101,7 @@ def test_required_symbol_uses_the_existing_error_contract(
 
     with pytest.raises(
         symbols.NativeSymbolError,
-        match=r"^_channel_native\.missing CUDA kernel is required$",
+        match=r"^_channel\.missing CUDA kernel is required$",
     ):
         symbols.required_symbol("missing")
 
@@ -172,6 +172,6 @@ def test_required_native_op_preserves_missing_kernel_text(
 
     with pytest.raises(
         symbols.NativeSymbolError,
-        match=r"^_channel_native\.kernel CUDA kernel is required$",
+        match=r"^_channel\.kernel CUDA kernel is required$",
     ):
         symbols._required_native_op("kernel")

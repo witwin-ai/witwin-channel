@@ -3,7 +3,7 @@
 The extensions live in out-of-tree CMake build directories under
 ``artifacts/cmake-*``. This helper configures the production loader with the
 newest extension matching the running interpreter. It never makes a bare
-``_channel_native`` module globally importable.
+``_channel`` module globally importable.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ import os
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_ENABLE_ENV = "WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE"
-_PATH_ENV = "WITWIN_CHANNEL_NATIVE_EXTENSION_PATH"
-_FINGERPRINT_ENV = "WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT"
-_FINGERPRINT_FILE = "_channel_native.build-fingerprint"
+_ENABLE_ENV = "WITWIN_CHANNEL_DEVELOPER_OVERRIDE"
+_PATH_ENV = "WITWIN_CHANNEL_EXTENSION_PATH"
+_FINGERPRINT_ENV = "WITWIN_CHANNEL_EXPECTED_FINGERPRINT"
+_FINGERPRINT_FILE = "_channel.build-fingerprint"
 
 
 def _importable(module_name: str) -> bool:
@@ -34,7 +34,7 @@ def _candidate_extensions() -> list[Path]:
     candidates: list[tuple[float, Path]] = []
     for build_dir in artifacts.glob("cmake-*"):
         for suffix in importlib.machinery.EXTENSION_SUFFIXES:
-            pyd = build_dir / f"_channel_native{suffix}"
+            pyd = build_dir / f"_channel{suffix}"
             if pyd.is_file():
                 candidates.append((pyd.stat().st_mtime, pyd.resolve()))
                 break
@@ -43,7 +43,7 @@ def _candidate_extensions() -> list[Path]:
 
 
 def native_extensions_available() -> bool:
-    if _importable("witwin.channel._channel_native"):
+    if _importable("witwin.channel._channel"):
         return True
     configured = os.environ.get(_PATH_ENV)
     fingerprint = os.environ.get(_FINGERPRINT_ENV)
@@ -86,8 +86,8 @@ def inject_native_paths() -> bool:
 
 
 BUILD_GUIDANCE = (
-    "A compiled _channel_native extension with its build-fingerprint sidecar "
+    "A compiled _channel extension with its build-fingerprint sidecar "
     "was not found. Build into artifacts/cmake-<name> (see "
-    "docs/dev/plans/00-channel-native-greenfield-plan.md), or configure the "
-    "three WITWIN_CHANNEL_NATIVE developer loader variables explicitly."
+    "docs/dev/plans/00-channel-greenfield-plan.md), or configure the "
+    "three WITWIN_CHANNEL developer loader variables explicitly."
 )

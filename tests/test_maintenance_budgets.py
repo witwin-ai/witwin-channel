@@ -99,20 +99,20 @@ def test_native_translation_units_are_within_budget() -> None:
 
 
 def test_native_hard_limit_and_waiver_growth_are_enforced(tmp_path: Path) -> None:
-    native_dir = tmp_path / "native" / "channel_native"
+    native_dir = tmp_path / "native" / "channel"
     native_dir.mkdir(parents=True)
     unit = native_dir / "kernel.cu"
     unit.write_text("\n".join(f"// line {index}" for index in range(9)), encoding="utf-8")
 
     config = _config()
-    config["native_source_root"] = "native/channel_native"
+    config["native_source_root"] = "native/channel"
     config["limits"]["native_file_lines"] = {"recommended": 5, "hard": 7}
     config["native_file_exemptions"] = {}
 
     violations = budgets.check_budgets(tmp_path, config)
     assert {(item.kind, item.subject) for item in violations} == {
-        ("unbudgeted-debt", "native/channel_native/kernel.cu"),
-        ("hard-limit", "native/channel_native/kernel.cu"),
+        ("unbudgeted-debt", "native/channel/kernel.cu"),
+        ("hard-limit", "native/channel/kernel.cu"),
     }
 
 

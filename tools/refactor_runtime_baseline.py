@@ -507,7 +507,7 @@ def run_child(
     from tests.support.native_ext import inject_native_paths
 
     if not inject_native_paths():
-        raise RuntimeBaselineError("compiled _channel_native extension was not found")
+        raise RuntimeBaselineError("compiled _channel extension was not found")
     import torch
 
     if not torch.cuda.is_available():
@@ -1420,7 +1420,7 @@ def run_extended_child(
     from tests.support.native_ext import inject_native_paths
 
     if not inject_native_paths():
-        raise RuntimeBaselineError("compiled _channel_native extension was not found")
+        raise RuntimeBaselineError("compiled _channel extension was not found")
     import torch
 
     if not torch.cuda.is_available():

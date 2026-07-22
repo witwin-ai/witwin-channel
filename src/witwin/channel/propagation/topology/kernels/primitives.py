@@ -40,14 +40,14 @@ def deterministic_component_counts(component_id: torch.Tensor) -> dict[str, int]
     exported = _required_native_op("deterministic_component_counts")(component_id)
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_component_counts must return a dict"
+            "_channel.deterministic_component_counts must return a dict"
         )
     counts: dict[str, int] = {}
     for name in ("los", "reflection", "diffraction"):
         value = exported[name]
         if not isinstance(value, int):
             raise TypeError(
-                f"_channel_native.deterministic_component_counts returned non-int {name}"
+                f"_channel.deterministic_component_counts returned non-int {name}"
             )
         counts[name] = value
     return counts
@@ -58,7 +58,7 @@ def deterministic_selected_edge_count(edge_id: torch.Tensor) -> int:
     value = _required_native_op("deterministic_selected_edge_count")(edge_id)
     if not isinstance(value, int):
         raise TypeError(
-            "_channel_native.deterministic_selected_edge_count must return an int"
+            "_channel.deterministic_selected_edge_count must return an int"
         )
     return value
 
@@ -70,10 +70,10 @@ def core_pack_int2(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         raise ValueError("x and y must have the same shape")
     out = _required_native_op("core_pack_int2")(x, y)
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.core_pack_int2 must return a tensor")
+        raise TypeError("_channel.core_pack_int2 must return a tensor")
     validate_cuda_tensor("out", out, dtype=torch.int32, ndim=2, trailing_shape=(2,))
     if out.shape != (x.shape[0], 2):
-        raise ValueError("_channel_native.core_pack_int2 returned an unexpected shape")
+        raise ValueError("_channel.core_pack_int2 returned an unexpected shape")
     return out
 
 
@@ -127,7 +127,7 @@ def deterministic_diffraction_state_pack(
     )
     if not isinstance(states, tuple) or len(states) != 12:
         raise TypeError(
-            "_channel_native.deterministic_diffraction_state_pack must return 12 tensors"
+            "_channel.deterministic_diffraction_state_pack must return 12 tensors"
         )
     validate_cuda_tensor("state_edge_index", states[0], dtype=torch.int32, ndim=1)
     validate_cuda_tensor(
@@ -204,7 +204,7 @@ def deterministic_diffraction_state_pack_selected(
     )
     if not isinstance(states, tuple) or len(states) != 12:
         raise TypeError(
-            "_channel_native.deterministic_diffraction_state_pack_selected must return 12 tensors"
+            "_channel.deterministic_diffraction_state_pack_selected must return 12 tensors"
         )
     validate_cuda_tensor("state_edge_index", states[0], dtype=torch.int32, ndim=1)
     validate_cuda_tensor(
@@ -269,7 +269,7 @@ def _name_diffraction_state_capacity_output(
 ) -> DiffractionStateCapacityBlock:
     if not isinstance(raw, tuple) or len(raw) != 15:
         raise TypeError(
-            "_channel_native.deterministic_diffraction_state_capacity_select "
+            "_channel.deterministic_diffraction_state_capacity_select "
             "must return 15 tensors"
         )
     for name, tensor, dtype, ndim, trailing_shape in (
@@ -391,11 +391,11 @@ def mc_selected_edge_indices(selected: torch.Tensor) -> torch.Tensor:
     native = native_extension()
     if native is None or not hasattr(native, "mc_selected_edge_indices"):
         raise RuntimeError(
-            "_channel_native.mc_selected_edge_indices CUDA kernel is required"
+            "_channel.mc_selected_edge_indices CUDA kernel is required"
         )
     indices = native.mc_selected_edge_indices(selected)
     if not isinstance(indices, torch.Tensor):
-        raise TypeError("_channel_native.mc_selected_edge_indices must return a tensor")
+        raise TypeError("_channel.mc_selected_edge_indices must return a tensor")
     validate_cuda_tensor("indices", indices, dtype=torch.int32, ndim=1)
     return indices
 

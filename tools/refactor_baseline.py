@@ -312,7 +312,7 @@ def _cmake_source_contract(source: str) -> dict[str, object]:
         return (match.group(1) or match.group(2)) if match else None
 
     definitions_match = re.search(
-        r"target_compile_definitions\(\s*_channel_native\s+PRIVATE(?P<body>.*?)\)",
+        r"target_compile_definitions\(\s*_channel\s+PRIVATE(?P<body>.*?)\)",
         source,
         re.DOTALL,
     )
@@ -334,10 +334,10 @@ def _cmake_source_contract(source: str) -> dict[str, object]:
         "cxx_standard": setting("CMAKE_CXX_STANDARD"),
         "default_build_type": setting("CMAKE_BUILD_TYPE"),
         "default_cuda_architectures": setting(
-            "CHANNEL_NATIVE_DEFAULT_CUDA_ARCHITECTURES"
+            "CHANNEL_DEFAULT_CUDA_ARCHITECTURES"
         ),
         "default_torch_cuda_arch_list": setting(
-            "CHANNEL_NATIVE_DEFAULT_TORCH_CUDA_ARCH_LIST"
+            "CHANNEL_DEFAULT_TORCH_CUDA_ARCH_LIST"
         ),
         "target_compile_definitions": definitions,
         "per_source_compile_options": source_options,
@@ -443,7 +443,7 @@ def build_manifest(
     native_binaries: Sequence[Path] = (),
     cmake_cache: Path | None = None,
 ) -> dict[str, object]:
-    native_root = repo / "native" / "channel_native"
+    native_root = repo / "native" / "channel"
     sources = [repo / "CMakeLists.txt", repo / "pyproject.toml"]
     sources.extend(_source_files(native_root, _SOURCE_SUFFIXES))
     source_entries = [
@@ -458,8 +458,8 @@ def build_manifest(
     discovered = sorted(
         path
         for suffix in ("*.pyd", "*.so", "*.dll")
-        for path in (repo / "src" / "witwin" / "channel_native").glob(
-            f"_channel_native{suffix}"
+        for path in (repo / "src" / "witwin" / "channel").glob(
+            f"_channel{suffix}"
         )
     )
     binaries = sorted({path.resolve() for path in (*native_binaries, *discovered)})
@@ -1038,6 +1038,77 @@ def _cpp_tokens(source: str) -> list[str]:
     return _CPP_TOKEN.findall(_mask_cpp_comments(source))
 
 
+_ADR033_UNCHANGED_CHANNEL_IDENTIFIERS = frozenset(
+    {"channel_backward_adjoint", "channel_jvp"}
+)
+_ADR033_METADATA_SUFFIXES = frozenset(
+    {"abi_version", "git_dirty", "git_sha"}
+)
+_ADR033_SHORT_MACRO_SUFFIXES = frozenset(
+    {
+        "BDPT_CHECK_CONNECTION_SAMPLE_ROWS",
+        "BDPT_CHECK_CONNECTION_SAMPLE_TENSORS",
+        "BDPT_CONNECTION_OUTPUT_POINTERS",
+        "DIFFRACTION_ALLOCATE_STATE_PACK",
+        "DIFFRACTION_CHECK_STATE_PACK_POWER",
+        "DIFFRACTION_CHECK_STATE_PACK_SHAPES",
+        "DIFFRACTION_CHECK_STATE_PACK_TENSORS",
+        "DIFFRACTION_STATE_PACK_INPUT_POINTERS",
+        "DIFFRACTION_STATE_PACK_OUTPUT_POINTERS",
+        "DIFFRACTION_STATE_PACK_RESULTS",
+        "DIFFRACTION_WEDGE_COMMON_ARGUMENTS",
+        "LOS_CHECK_VISIBILITY_APPLICATION",
+        "LOS_VISIBILITY_LAUNCH_ARGUMENTS",
+        "MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS",
+        "PATH_BLOCK_APPEND",
+        "PATH_BLOCK_FIELDS",
+        "PATH_BLOCK_LIST",
+        "PATH_BLOCK_RESERVE",
+        "PATH_BLOCK_TO_DICT",
+        "REFLECTION_LAUNCH_INPUT_PREFIX",
+        "REFLECTION_PREPARE_LAUNCH_INPUTS",
+        "SCATTERING_CHAIN_ENSEMBLE_PRIMAL_ARGS",
+        "SCATTERING_CHAIN_MEDIA_ARGS",
+        "SCATTERING_CHAIN_REALIZATION_PRIMAL_ARGS",
+        "SCATTERING_ENSEMBLE_PRIMAL_ARGS",
+        "SCATTERING_PATCH_PRIMAL_ARGS",
+        "TRANSMISSION_SEQUENCE_ARGUMENTS",
+    }
+)
+
+
+def _adr033_predecessor_identifier(identifier: str) -> str:
+    """Normalize only ADR-033 identity renames for frozen numerical hashes."""
+
+    if identifier in _ADR033_UNCHANGED_CHANNEL_IDENTIFIERS:
+        return identifier
+    if identifier.startswith("channel_"):
+        suffix = identifier.removeprefix("channel_")
+        if suffix in _ADR033_METADATA_SUFFIXES:
+            return "channel" + "_native_" + suffix
+        return "c" + "n_" + suffix
+    if identifier.startswith("CHANNEL_"):
+        suffix = identifier.removeprefix("CHANNEL_")
+        if suffix in _ADR033_SHORT_MACRO_SUFFIXES:
+            return "C" + "N_" + suffix
+        return "CHANNEL" + "_NATIVE_" + suffix
+    return identifier
+
+
+def _adr033_predecessor_tokens(tokens: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for index, token in enumerate(tokens):
+        if (
+            token == "channel"
+            and index + 1 < len(tokens)
+            and tokens[index + 1] == "::"
+        ):
+            normalized.append("channel" + "_native")
+        else:
+            normalized.append(_adr033_predecessor_identifier(token))
+    return normalized
+
+
 _CPP_FUNCTION = re.compile(
     r"(?m)^[ \t]*(?P<signature>"
     r"(?:template\s*<[^;{}]+>\s*)?"
@@ -1060,9 +1131,11 @@ _CPP_MULTILINE_FUNCTION = re.compile(
 )
 
 
-def cpp_body_hashes(repo: Path) -> list[dict[str, object]]:
+def cpp_body_hashes(
+    repo: Path, *, adr033_predecessor_identity: bool = False
+) -> list[dict[str, object]]:
     entries = []
-    root = repo / "native" / "channel_native"
+    root = repo / "native" / "channel"
     for path in _source_files(root, _SOURCE_SUFFIXES):
         source = path.read_text(encoding="utf-8-sig")
         masked = _mask_cpp_comments(source)
@@ -1080,6 +1153,10 @@ def cpp_body_hashes(repo: Path) -> list[dict[str, object]]:
                 source[match.start("signature") : open_brace]
             )
             body_tokens = _cpp_tokens(source[open_brace + 1 : close_brace])
+            if adr033_predecessor_identity:
+                name = _adr033_predecessor_identifier(name)
+                signature_tokens = _adr033_predecessor_tokens(signature_tokens)
+                body_tokens = _adr033_predecessor_tokens(body_tokens)
             entries.append(
                 {
                     "path": path.relative_to(repo).as_posix(),
@@ -1197,7 +1274,7 @@ def _return_arity(return_type: str | None) -> int | None:
 
 
 def binding_manifest(repo: Path) -> dict[str, object]:
-    native_root = repo / "native" / "channel_native"
+    native_root = repo / "native" / "channel"
     paths = _source_files(native_root, _SOURCE_SUFFIXES)
     sources = [(path, path.read_text(encoding="utf-8-sig")) for path in paths]
     symbols = []
@@ -1261,7 +1338,7 @@ def binding_manifest(repo: Path) -> dict[str, object]:
         counts[name] = counts.get(name, 0) + 1
     return {
         "schema_version": SCHEMA_VERSION,
-        "module": "_channel_native",
+        "module": "_channel",
         "symbols": symbols,
         "duplicate_symbols": sorted(
             name for name, count in counts.items() if count > 1
@@ -1466,7 +1543,7 @@ def freeze_baseline(
 ) -> Path:
     repo = repo.resolve()
     if not (repo / "pyproject.toml").is_file() or not (repo / ".git").exists():
-        raise BaselineError(f"not a channel-native repository: {repo}")
+        raise BaselineError(f"not a channel repository: {repo}")
     git_state = _git_state(repo)
     sha = str(git_state["sha"])
     output_root = output_root.resolve()

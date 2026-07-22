@@ -140,7 +140,7 @@ def test_phase9_snapshot_is_docs_only_and_records_pre_activation_owners() -> Non
     }
 
     assert "Phase 9 moves no source and changes no production" in (
-        ROOT / "docs/dev/replacement/channel-native-migration.md"
+        ROOT / "docs/dev/replacement/channel-migration.md"
     ).read_text(encoding="utf-8")
     assert "此阶段只接受边界，不执行 Phase\n10A/10B" in plan
     assert all(phase9_targets[symbol] == "RayD after ADR-026" for symbol in MOVING)

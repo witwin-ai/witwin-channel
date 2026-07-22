@@ -24,7 +24,7 @@ from witwin.channel.core.materials import Dielectric
 SCENARIO_MANIFEST_PATH = (
     Path(__file__).resolve().parent / "scenarios" / "phase_e_scenarios.v1.json"
 )
-SCENE_ROOT_ENV = "WITWIN_CHANNEL_NATIVE_SCENE_ROOT"
+SCENE_ROOT_ENV = "WITWIN_CHANNEL_SCENE_ROOT"
 
 
 class FullScenarioAssetError(RuntimeError):

@@ -100,7 +100,7 @@ def test_diffraction_pair_reduce_facade_owns_all_three_native_symbols() -> None:
 def test_diffraction_pair_reduce_source_contract_is_frozen() -> None:
     source = (
         _ROOT
-        / "native/channel_native/kernels/deterministic_diffraction_pair_reduce.cu"
+        / "native/channel/kernels/deterministic_diffraction_pair_reduce.cu"
     ).read_text(encoding="utf-8")
     cmake = (_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "__shfl_sync(kFullWarpMask" in source
@@ -135,11 +135,11 @@ def test_diffraction_pair_reduce_owner_and_dormant_ledgers_are_complete() -> Non
         "deterministic_diffraction_pair_reduce_backward",
         "deterministic_diffraction_pair_reduce_jvp",
     ]
-    assert family["numerical_owner"] == "Channel Native"
+    assert family["numerical_owner"] == "Channel"
     assert "live ReceiverGrid Torch index_add route unchanged" in family["status"]
     rows = {row["symbol"]: row for row in inventory["symbols"]}
     for symbol in family["symbols"]:
-        assert rows[symbol]["numerical_owner"] == "Channel Native"
+        assert rows[symbol]["numerical_owner"] == "Channel"
         assert rows[symbol]["production_callers"] == []
         assert rows[symbol]["liveness"] == "dormant-native-producer"
 

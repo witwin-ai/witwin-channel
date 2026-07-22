@@ -137,7 +137,7 @@ def runtime_diagnostics() -> dict[str, Any]:
         native_build = build_info()
     except (ImportError, OSError) as exc:
         diagnostics["errors"].append(
-            "native extension import failed; install a matching Channel Native "
+            "native extension import failed; install a matching Channel "
             "wheel or configure the explicit developer extension override; "
             f"reason ({type(exc).__name__}): {exc}"
         )
@@ -151,7 +151,7 @@ def require_supported_runtime() -> dict[str, Any]:
     diagnostics = runtime_diagnostics()
     errors = list(diagnostics["errors"])
     if not diagnostics.get("cuda_available", False):
-        errors.append("CUDA is unavailable; Channel Native has no CPU/ROCm backend")
+        errors.append("CUDA is unavailable; Channel has no CPU/ROCm backend")
     device = diagnostics.get("device")
     if diagnostics.get("cuda_available", False) and not isinstance(device, dict):
         errors.append(
@@ -176,12 +176,12 @@ def require_supported_runtime() -> dict[str, Any]:
             or required_architecture not in architectures
         ):
             errors.append(
-                f"installed _channel_native does not contain {required_architecture}; "
+                f"installed _channel does not contain {required_architecture}; "
                 f"compiled CUDA architectures are {architectures!r}"
             )
     if errors:
         raise RuntimeError(
-            "Channel Native runtime requirements failed: " + "; ".join(errors)
+            "Channel runtime requirements failed: " + "; ".join(errors)
         )
     return diagnostics
 

@@ -10,15 +10,15 @@ from witwin.channel.core.kernels.extension import build_info
 def test_build_info_contract():
     info = build_info()
 
-    assert info["backend"] == "channel-native"
+    assert info["backend"] == "channel"
     assert info["uses_dr_jit"] is False
     assert isinstance(info["uses_rayd_native"], bool)
     assert isinstance(info["uses_path_native"], bool)
     assert isinstance(info["cuda_available"], bool)
     assert isinstance(info["optix_available"], bool)
-    assert info["channel_native_abi_version"] == 1
-    assert len(info["channel_native_git_sha"]) == 40
-    assert isinstance(info["channel_native_git_dirty"], bool)
+    assert info["channel_abi_version"] == 1
+    assert len(info["channel_git_sha"]) == 40
+    assert isinstance(info["channel_git_dirty"], bool)
     assert info["rayd_repository_url"] == "https://github.com/Asixa/RayD.git"
     assert info["rayd_commit"] == "402262d3b0c07dffb9d51d1852abb97ab2280f2f"
     assert isinstance(info["rayd_dirty"], bool)
@@ -61,9 +61,9 @@ def test_build_fingerprint_covers_compiled_identity():
     info = build_info()
     identity_keys = {
         "build_type",
-        "channel_native_abi_version",
-        "channel_native_git_dirty",
-        "channel_native_git_sha",
+        "channel_abi_version",
+        "channel_git_dirty",
+        "channel_git_sha",
         "compiler",
         "cuda_architectures",
         "cuda_compiler_version",

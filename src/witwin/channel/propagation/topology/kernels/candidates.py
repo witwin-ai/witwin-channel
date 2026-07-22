@@ -50,7 +50,7 @@ def path_reflection_candidates(
         float(frequency_hz),
     )
     if not isinstance(candidates, dict):
-        raise TypeError("_channel_native.path_reflection_candidates must return a dict")
+        raise TypeError("_channel.path_reflection_candidates must return a dict")
     _validate_path_reflection_candidates("path_reflection_candidates", candidates)
     return candidates
 

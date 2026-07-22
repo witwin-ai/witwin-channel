@@ -72,7 +72,7 @@ def test_phase7_decision_history_is_preserved_after_phase8a_activation() -> None
     ).read_text(encoding="utf-8")
     feature = (ROOT / "FEATURE_LIST.md").read_text(encoding="utf-8")
     migration = (
-        ROOT / "docs/dev/replacement/channel-native-migration.md"
+        ROOT / "docs/dev/replacement/channel-migration.md"
     ).read_text(encoding="utf-8")
     owner_readme = (
         ROOT / "src/witwin/channel/propagation/README.md"
@@ -101,7 +101,7 @@ def test_phase7_family_matrix_freezes_all_nine_complete_owners() -> None:
 
     pure = families["pure-wedge-fixed-winner-field"]
     assert set(pure["symbols"]) == PURE_WEDGE  # type: ignore[arg-type]
-    assert pure["phase7_current_owner"] == "Channel Native"
+    assert pure["phase7_current_owner"] == "Channel"
     assert pure["accepted_authoritative_owner"] == "RayD"
     assert pure["activation_phase"] == "8A atomic pin/switch/delete"
 
@@ -112,13 +112,13 @@ def test_phase7_family_matrix_freezes_all_nine_complete_owners() -> None:
     }.items():
         family = families[family_id]
         assert set(family["symbols"]) == symbols  # type: ignore[arg-type]
-        assert family["phase7_current_owner"] == "Channel Native"
-        assert family["accepted_authoritative_owner"] == "Channel Native"
+        assert family["phase7_current_owner"] == "Channel"
+        assert family["accepted_authoritative_owner"] == "Channel"
         assert family["compile_contract"] == "precise math"
 
 
 def test_phase7_pre_activation_pure_wedge_snapshot_is_preserved() -> None:
-    source = ROOT / "native/channel_native/kernels/field_wedge_ad_diffraction.cu"
+    source = ROOT / "native/channel/kernels/field_wedge_ad_diffraction.cu"
     migration = _json(AUDIT / "phase13-migration-delta.json")
     phase8a = migration["phase8a_current"]  # type: ignore[index]
     manifest = _manifest_symbols()
@@ -134,9 +134,9 @@ def test_phase7_pre_activation_pure_wedge_snapshot_is_preserved() -> None:
         "diffraction_wedge_forward_kernel",
         "diffraction_wedge_backward_kernel",
         "diffraction_wedge_jvp_kernel",
-        "cn_field_diffraction_wedge",
-        "cn_field_diffraction_wedge_backward",
-        "cn_field_diffraction_wedge_jvp",
+        "channel_field_diffraction_wedge",
+        "channel_field_diffraction_wedge_backward",
+        "channel_field_diffraction_wedge_jvp",
     } <= {entry["name"] for entry in deletions}
 
 

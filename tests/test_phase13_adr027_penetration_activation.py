@@ -69,7 +69,7 @@ def test_phase_e_deletes_old_depth_march_without_a_compatibility_alias() -> None
 
 def test_phase_e_sanitizers_are_async_current_stream_and_have_no_trap() -> None:
     source = (
-        ROOT / "native/channel_native/kernels/enumerated_capacity_failure_sanitize.cu"
+        ROOT / "native/channel/kernels/enumerated_capacity_failure_sanitize.cu"
     ).read_text(encoding="utf-8")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 

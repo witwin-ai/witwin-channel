@@ -8,12 +8,12 @@ from ci import check_import_graph as graph
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 ALLOWLIST = REPOSITORY_ROOT / "ci" / "import_graph_allowlist.json"
 
 
 def _synthetic_package(tmp_path: Path, files: dict[str, str]) -> Path:
-    package_root = tmp_path / "src" / "witwin" / "channel_native"
+    package_root = tmp_path / "src" / "witwin" / "channel"
     for relative, source in files.items():
         path = package_root / relative
         path.parent.mkdir(parents=True, exist_ok=True)

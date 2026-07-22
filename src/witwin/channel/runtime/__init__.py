@@ -1,4 +1,4 @@
-"""Runtime ownership for the compiled Channel Native extension and symbols."""
+"""Runtime ownership for the compiled Channel extension and symbols."""
 
 from .capacity import (
     CapacityFailureBit,

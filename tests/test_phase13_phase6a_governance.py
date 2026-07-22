@@ -16,13 +16,13 @@ LAYER_STACK_SYMBOLS = {
     "em_layer_stack_jvp",
 }
 REMOVED_CHANNEL_SOURCES = {
-    "native/channel_native/em/complex.cuh",
-    "native/channel_native/em/medium.cuh",
-    "native/channel_native/em/fresnel.cuh",
-    "native/channel_native/em/layer_stack.cuh",
-    "native/channel_native/field_transport.cuh",
-    "native/channel_native/field_transport_ad.cuh",
-    "native/channel_native/kernels/em_debug.cu",
+    "native/channel/em/complex.cuh",
+    "native/channel/em/medium.cuh",
+    "native/channel/em/fresnel.cuh",
+    "native/channel/em/layer_stack.cuh",
+    "native/channel/field_transport.cuh",
+    "native/channel/field_transport_ad.cuh",
+    "native/channel/kernels/em_debug.cu",
 }
 
 
@@ -49,7 +49,7 @@ def test_phase6a_evidence_is_preserved_after_later_pin() -> None:
     assert migration_phase6a["owner_counts"] == {
         "RayD": 20,
         "layered": 2,
-        "Channel Native": 180,
+        "Channel": 180,
     }
     assert len(inventory_phase6a["binding_manifest_sha256"]) == 64
     assert (
@@ -78,7 +78,7 @@ def test_phase6a_helper_partition_is_112_10_7() -> None:
     channel_boundary = sum(
         len(group["helpers"])
         for group in groups
-        if group["accepted_target_owner"] == "Channel Native"
+        if group["accepted_target_owner"] == "Channel"
     )
     channel_pending_adr026 = sum(
         len(group["helpers"])
@@ -103,7 +103,7 @@ def test_phase6a_dependency_graph_has_no_deleted_channel_rf_owner() -> None:
     assert all(
         not (
             edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel_native/")
+            and edge["to"].startswith("native/channel/")
         )
         for edge in edges
     )

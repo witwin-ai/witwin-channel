@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://witwin.dev/schemas/channel-native-phase-e-performance-1.0.0.json",
-  "title": "Channel Native Phase E performance acceptance artifact",
+  "$id": "https://witwin.dev/schemas/channel-phase-e-performance-1.0.0.json",
+  "title": "Channel Phase E performance acceptance artifact",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -43,7 +43,7 @@
       "required": ["path", "name", "version"],
       "properties": {
         "path": {"type": "string"},
-        "name": {"const": "channel-native-phase-e-sm120"},
+        "name": {"const": "channel-phase-e-sm120"},
         "version": {"const": "1.0.0"}
       }
     },

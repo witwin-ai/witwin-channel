@@ -13,7 +13,7 @@ from witwin.channel.propagation.topology.discovery import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 _COUPLED_DIGEST = "229a286fe971ea970efc5d2821234068a6ca7f0d428454f87e1e35d8450697b3"
 
 

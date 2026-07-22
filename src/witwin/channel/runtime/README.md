@@ -55,7 +55,7 @@ owner and scene/core modules compatibility-re-export the same object.
 Build-time RayD source selection is not a runtime backend choice. The compiled
 identity records `rayd_source_kind` and the lock-pinned full-source manifest
 SHA, but never the source's absolute path. Explicit Git checkout and validated
-`rayd-torch` package source both produce the same single `_channel_native`
+`rayd-torch` package source both produce the same single `_channel`
 runtime boundary; package discovery does not import or dispatch through RayD.
 
 ## Dependency rules

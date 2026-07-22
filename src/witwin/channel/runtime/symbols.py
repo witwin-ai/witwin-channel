@@ -1,4 +1,4 @@
-"""Validated access to Channel Native extension symbols."""
+"""Validated access to Channel extension symbols."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from .extension import _load_native_extension
 
 
 class NativeSymbolError(RuntimeError):
-    """A required Channel Native extension symbol is unavailable."""
+    """A required Channel extension symbol is unavailable."""
 
 
 def native_extension() -> object:
@@ -19,7 +19,7 @@ def native_extension() -> object:
 
 def _required_symbol(extension: object, name: str) -> object:
     if extension is None or not hasattr(extension, name):
-        raise NativeSymbolError(f"_channel_native.{name} CUDA kernel is required")
+        raise NativeSymbolError(f"_channel.{name} CUDA kernel is required")
     return getattr(extension, name)
 
 

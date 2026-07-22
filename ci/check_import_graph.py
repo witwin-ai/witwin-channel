@@ -1,4 +1,4 @@
-"""Enforce the Channel Native architecture import boundaries with AST analysis."""
+"""Enforce the Channel architecture import boundaries with AST analysis."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ _SOLVER_PREFIXES = (
 _PUBLIC_INIT_MODULES = frozenset({PACKAGE, *_SOLVER_PREFIXES})
 _RAW_EXTENSION_MODULES = frozenset(
     {
-        f"{PACKAGE}._channel_native",
+        f"{PACKAGE}._channel",
         f"{PACKAGE}.core.kernels.extension",
         f"{PACKAGE}.runtime.extension",
     }

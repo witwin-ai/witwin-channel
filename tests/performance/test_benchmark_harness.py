@@ -17,7 +17,7 @@ def test_versioned_performance_schema_and_sm_matrix_are_committed():
         )
     )
     matrix = json.loads(
-        (root / "benchmarks/baselines/channel_native_sm_matrix.v1.json").read_text(
+        (root / "benchmarks/baselines/channel_sm_matrix.v1.json").read_text(
             encoding="utf-8"
         )
     )

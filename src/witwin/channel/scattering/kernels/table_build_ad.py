@@ -123,7 +123,7 @@ def kirchhoff_table_build_backward(
     )
     if not isinstance(out, dict) or set(out) != set(_BACKWARD_FIELDS):
         raise TypeError(
-            "_channel_native.kirchhoff_table_build_backward returned invalid fields"
+            "_channel.kirchhoff_table_build_backward returned invalid fields"
         )
     return out
 
@@ -189,7 +189,7 @@ def kirchhoff_table_build_jvp(
     )
     if not isinstance(out, dict) or set(out) != set(_JVP_FIELDS):
         raise TypeError(
-            "_channel_native.kirchhoff_table_build_jvp returned invalid fields"
+            "_channel.kirchhoff_table_build_jvp returned invalid fields"
         )
     return out
 

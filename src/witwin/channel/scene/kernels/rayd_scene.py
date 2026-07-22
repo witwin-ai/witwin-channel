@@ -27,7 +27,7 @@ def rayd_scene_create(
         mesh_flags,
     )
     if resource is None or not bool(getattr(resource, "available", False)):
-        raise RuntimeError("_channel_native.rayd_scene_create returned an invalid resource")
+        raise RuntimeError("_channel.rayd_scene_create returned an invalid resource")
     return resource
 
 
@@ -35,7 +35,7 @@ def rayd_scene_edge_records(resource: object) -> tuple[torch.Tensor, ...]:
     out = _required_native_op("rayd_scene_edge_records")(resource)
     if not isinstance(out, (tuple, list)):
         raise TypeError(
-            "_channel_native.rayd_scene_edge_records must return a tensor sequence"
+            "_channel.rayd_scene_edge_records must return a tensor sequence"
         )
     return tuple(out)
 
@@ -122,10 +122,10 @@ def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -
 
 
 def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneResource:
-    """Build a typed RayD native scene from Channel Native structures.
+    """Build a typed RayD native scene from Channel structures.
 
     This function uses the RayD native core source-linked into
-    `_channel_native`. It does not import a RayD Python package or dispatcher.
+    `_channel`. It does not import a RayD Python package or dispatcher.
     """
 
     if not structures:

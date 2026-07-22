@@ -1,1 +1,1 @@
-"""Test-only support utilities for maintained Channel Native scenes."""
+"""Test-only support utilities for maintained Channel scenes."""

@@ -26,12 +26,12 @@ def bdpt_store_point_component_column(
     out = native(target, source, int(rx_index))
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.bdpt_store_point_component_column must return a tensor"
+            "_channel.bdpt_store_point_component_column must return a tensor"
         )
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
     if out.shape != target.shape:
         raise ValueError(
-            "_channel_native.bdpt_store_point_component_column returned an unexpected shape"
+            "_channel.bdpt_store_point_component_column returned an unexpected shape"
         )
     return out
 
@@ -60,14 +60,14 @@ def bdpt_finalize_point_components(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_finalize_point_components must return a dict"
+            "_channel.bdpt_finalize_point_components must return a dict"
         )
     validate_cuda_tensor(
         "path_gain", exported["path_gain"], dtype=torch.float32, ndim=2
     )
     if exported["path_gain"].shape != los.shape:
         raise ValueError(
-            "_channel_native.bdpt_finalize_point_components returned bad path_gain shape"
+            "_channel.bdpt_finalize_point_components returned bad path_gain shape"
         )
     for name in (
         "los_power",
@@ -87,11 +87,11 @@ def bdpt_point_component_power(
     native = native_extension()
     if native is None or not hasattr(native, "bdpt_point_component_power"):
         raise RuntimeError(
-            "_channel_native.bdpt_point_component_power CUDA kernel is required"
+            "_channel.bdpt_point_component_power CUDA kernel is required"
         )
     exported = native.bdpt_point_component_power(path_gain, bool(include_los))
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.bdpt_point_component_power must return a dict")
+        raise TypeError("_channel.bdpt_point_component_power must return a dict")
     for name in ("los", "reflection", "diffraction"):
         validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
     return exported
@@ -107,7 +107,7 @@ def bdpt_transmitter_tensors(
         raise ValueError("powers must match flat_positions")
     exported = _required_native_op("bdpt_transmitter_tensors")(flat_positions, powers)
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.bdpt_transmitter_tensors must return a dict")
+        raise TypeError("_channel.bdpt_transmitter_tensors must return a dict")
     validate_cuda_tensor(
         "positions",
         exported["positions"],
@@ -159,14 +159,14 @@ def bdpt_receiver_grid_points(
     )
     if not isinstance(points, torch.Tensor):
         raise TypeError(
-            "_channel_native.bdpt_receiver_grid_points must return a tensor"
+            "_channel.bdpt_receiver_grid_points must return a tensor"
         )
     validate_cuda_tensor(
         "points", points, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
     if points.shape[0] != rows * cols:
         raise ValueError(
-            "_channel_native.bdpt_receiver_grid_points returned an unexpected shape"
+            "_channel.bdpt_receiver_grid_points returned an unexpected shape"
         )
     return points
 
@@ -207,7 +207,7 @@ def bdpt_los_export(
         tx_polarizations,
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.bdpt_los_export must return a dict")
+        raise TypeError("_channel.bdpt_los_export must return a dict")
     validate_cuda_tensor(
         "path_gain_matrix", exported["path_gain_matrix"], dtype=torch.float32, ndim=2
     )
@@ -218,11 +218,11 @@ def bdpt_los_component_maps(los: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
     maps = _required_native_op("bdpt_los_component_maps")(los)
     if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_los_component_maps must return a tensor")
+        raise TypeError("_channel.bdpt_los_component_maps must return a tensor")
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     if maps.shape != los.shape:
         raise ValueError(
-            "_channel_native.bdpt_los_component_maps returned an unexpected shape"
+            "_channel.bdpt_los_component_maps returned an unexpected shape"
         )
     return maps
 
@@ -240,12 +240,12 @@ def bdpt_los_component_maps_from_matrix(
     )
     if not isinstance(maps, torch.Tensor):
         raise TypeError(
-            "_channel_native.bdpt_los_component_maps_from_matrix must return a tensor"
+            "_channel.bdpt_los_component_maps_from_matrix must return a tensor"
         )
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     if maps.shape != (los.shape[0], int(cols), int(rows)):
         raise ValueError(
-            "_channel_native.bdpt_los_component_maps_from_matrix returned an unexpected shape"
+            "_channel.bdpt_los_component_maps_from_matrix returned an unexpected shape"
         )
     return maps
 
@@ -265,7 +265,7 @@ def bdpt_los_visibility_inputs(
         tx_positions, int(tx_index), int(rx_count)
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.bdpt_los_visibility_inputs must return a dict")
+        raise TypeError("_channel.bdpt_los_visibility_inputs must return a dict")
     validate_cuda_tensor(
         "start", exported["start"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -290,7 +290,7 @@ def bdpt_apply_los_visibility(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.bdpt_apply_los_visibility must return a tensor"
+            "_channel.bdpt_apply_los_visibility must return a tensor"
         )
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
     return out
@@ -311,12 +311,12 @@ def bdpt_component_map_buffer(
     )
     if not isinstance(maps, torch.Tensor):
         raise TypeError(
-            "_channel_native.bdpt_component_map_buffer must return a tensor"
+            "_channel.bdpt_component_map_buffer must return a tensor"
         )
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     if maps.shape != (tx_count, dim0, dim1):
         raise ValueError(
-            "_channel_native.bdpt_component_map_buffer returned an unexpected shape"
+            "_channel.bdpt_component_map_buffer returned an unexpected shape"
         )
     return maps
 
@@ -331,7 +331,7 @@ def bdpt_store_component_map(
     validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
     out = _required_native_op("bdpt_store_component_map")(maps, source, int(tx_index))
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_store_component_map must return a tensor")
+        raise TypeError("_channel.bdpt_store_component_map must return a tensor")
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
     return out
 
@@ -356,7 +356,7 @@ def bdpt_store_scaled_component_map(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.bdpt_store_scaled_component_map must return a tensor"
+            "_channel.bdpt_store_scaled_component_map must return a tensor"
         )
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
     return out
@@ -386,14 +386,14 @@ def bdpt_finalize_component_maps(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_finalize_component_maps must return a dict"
+            "_channel.bdpt_finalize_component_maps must return a dict"
         )
     validate_cuda_tensor(
         "path_gain", exported["path_gain"], dtype=torch.float32, ndim=3
     )
     if exported["path_gain"].shape != los.shape:
         raise ValueError(
-            "_channel_native.bdpt_finalize_component_maps returned bad path_gain shape"
+            "_channel.bdpt_finalize_component_maps returned bad path_gain shape"
         )
     for name in (
         "los_power",
@@ -492,7 +492,7 @@ def _bdpt_finalize_backward(
     if not isinstance(exported, dict) or set(exported) != set(
         _BDPT_FINALIZE_COMPONENT_GRADS
     ):
-        raise TypeError(f"_channel_native.{op_name} returned unexpected fields")
+        raise TypeError(f"_channel.{op_name} returned unexpected fields")
     return exported
 
 
@@ -534,7 +534,7 @@ def _bdpt_finalize_jvp(
         tangent_scattering,
     )
     if not isinstance(exported, dict) or set(exported) != set(_BDPT_FINALIZE_TANGENTS):
-        raise TypeError(f"_channel_native.{op_name} returned unexpected fields")
+        raise TypeError(f"_channel.{op_name} returned unexpected fields")
     return exported
 
 

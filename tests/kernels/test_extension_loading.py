@@ -12,15 +12,15 @@ from witwin.channel.runtime import extension
 @pytest.fixture(autouse=True)
 def _isolated_loader(monkeypatch: pytest.MonkeyPatch):
     extension._clear_loader_caches()
-    monkeypatch.delenv("WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE", raising=False)
-    monkeypatch.delenv("WITWIN_CHANNEL_NATIVE_EXTENSION_PATH", raising=False)
-    monkeypatch.delenv("WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT", raising=False)
+    monkeypatch.delenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", raising=False)
+    monkeypatch.delenv("WITWIN_CHANNEL_EXTENSION_PATH", raising=False)
+    monkeypatch.delenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", raising=False)
     yield
 
 
 def _valid_build_info() -> dict[str, object]:
     info: dict[str, object] = {
-        "backend": "channel-native",
+        "backend": "channel",
         "uses_dr_jit": False,
         "uses_rayd_native": True,
         "rayd_integration": "source-linked",
@@ -28,9 +28,9 @@ def _valid_build_info() -> dict[str, object]:
         "material_abi_version": 3,
         "cuda_available": True,
         "optix_available": True,
-        "channel_native_abi_version": 1,
-        "channel_native_git_dirty": False,
-        "channel_native_git_sha": "1" * 40,
+        "channel_abi_version": 1,
+        "channel_git_dirty": False,
+        "channel_git_sha": "1" * 40,
         "compiler": "MSVC 19.44",
         "cuda_architectures": ["89-real"],
         "cuda_compiler_version": "12.8",
@@ -94,13 +94,13 @@ def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatc
         ),
     )
     monkeypatch.setattr(extension, "_packaged_expected_fingerprint", lambda: "0" * 64)
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE", "1")
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_EXTENSION_PATH", "ignored")
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT", "0" * 64)
+    monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", "1")
+    monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", "ignored")
+    monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "0" * 64)
 
     assert extension.native_extension() is packaged
     assert extension.native_extension() is packaged
-    assert calls == [("._channel_native", "witwin.channel")]
+    assert calls == [("._channel", "witwin.channel")]
 
 
 def test_native_extension_never_imports_a_global_module(
@@ -138,17 +138,17 @@ def test_native_extension_preserves_packaged_dependency_import_errors(
 
 @pytest.mark.parametrize(
     ("enabled", "path"),
-    (("1", None), (None, "C:/native/_channel_native.pyd"), ("yes", "C:/x.pyd")),
+    (("1", None), (None, "C:/native/_channel.pyd"), ("yes", "C:/x.pyd")),
 )
 def test_developer_override_requires_switch_and_path(
     monkeypatch: pytest.MonkeyPatch, enabled: str | None, path: str | None
 ):
     monkeypatch.setattr(extension.util, "find_spec", lambda _name: None)
     if enabled is not None:
-        monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE", enabled)
+        monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", enabled)
     if path is not None:
-        monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_EXTENSION_PATH", path)
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT", "0" * 64)
+        monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", path)
+    monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "0" * 64)
 
     with pytest.raises(extension.ExtensionLoadError, match="requires"):
         extension.native_extension()
@@ -158,7 +158,7 @@ def test_developer_override_loads_only_the_exact_absolute_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     suffix = extension.machinery.EXTENSION_SUFFIXES[0]
-    path = tmp_path / f"_channel_native{suffix}"
+    path = tmp_path / f"_channel{suffix}"
     path.touch()
     loaded = object()
     calls: list[tuple[str, str]] = []
@@ -171,9 +171,9 @@ def test_developer_override_loads_only_the_exact_absolute_path(
     monkeypatch.setattr(
         extension, "_load_developer_extension", load_developer_extension
     )
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_DEVELOPER_OVERRIDE", "1")
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_EXTENSION_PATH", str(path))
-    monkeypatch.setenv("WITWIN_CHANNEL_NATIVE_EXPECTED_FINGERPRINT", "a" * 64)
+    monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", "1")
+    monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", str(path))
+    monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "a" * 64)
 
     assert extension.native_extension() is loaded
     assert calls == [(str(path.resolve()), "a" * 64)]
@@ -182,7 +182,7 @@ def test_developer_override_loads_only_the_exact_absolute_path(
 def test_packaged_module_origin_cannot_resolve_to_global_extension(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    global_extension = tmp_path / "_channel_native.pyd"
+    global_extension = tmp_path / "_channel.pyd"
     global_extension.touch()
     module = SimpleNamespace(
         __file__=str(global_extension), build_info=lambda: _valid_build_info()
@@ -196,7 +196,7 @@ def test_packaged_module_origin_cannot_resolve_to_global_extension(
 
 
 def test_extension_origin_accepts_spec_origin_when_file_is_missing(tmp_path: Path):
-    extension_file = tmp_path / "_channel_native.pyd"
+    extension_file = tmp_path / "_channel.pyd"
     extension_file.touch()
     module = SimpleNamespace(__spec__=SimpleNamespace(origin=str(extension_file)))
 
@@ -211,7 +211,7 @@ def test_missing_bootstrap_symbol_fails_before_any_computation():
 def test_wrong_channel_abi_is_rejected(monkeypatch: pytest.MonkeyPatch):
     _configure_identity_checks(monkeypatch)
     info = _valid_build_info()
-    info["channel_native_abi_version"] = 99
+    info["channel_abi_version"] = 99
     info["build_fingerprint"] = extension._expected_fingerprint(info)
 
     with pytest.raises(extension.ExtensionABIError, match="ABI mismatch"):
@@ -286,7 +286,7 @@ def test_build_info_validates_once_and_returns_fresh_mappings(
     assert first == second
     assert first is not second
     first["backend"] = "mutated"
-    assert second["backend"] == "channel-native"
+    assert second["backend"] == "channel"
 
 
 def test_real_rayd_lock_uses_the_canonical_schema():

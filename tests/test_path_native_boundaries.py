@@ -9,7 +9,7 @@ from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-KERNEL_ROOT = REPOSITORY_ROOT / "native/channel_native/kernels"
+KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
@@ -26,18 +26,18 @@ MOVED_KERNELS = {
     "path_diffraction_compact_kernel",
 }
 MOVED_ABI = {
-    "cn_path_filter_los_cuda",
-    "cn_deterministic_los_topology_block",
-    "cn_deterministic_reflection_order1_compact",
-    "cn_deterministic_reflection_sequence_compact",
-    "cn_deterministic_diffraction_order1_compact",
-    "cn_path_filter_block_cuda",
-    "cn_path_diffraction_block_cuda",
+    "channel_path_filter_los_cuda",
+    "channel_deterministic_los_topology_block",
+    "channel_deterministic_reflection_order1_compact",
+    "channel_deterministic_reflection_sequence_compact",
+    "channel_deterministic_diffraction_order1_compact",
+    "channel_path_filter_block_cuda",
+    "channel_path_diffraction_block_cuda",
 }
 REMAINING_COMPACTION_ABI = {
-    "cn_path_concat_vec3_cuda",
-    "cn_path_los_visibility_inputs_cuda",
-    "cn_path_finalize_blocks_cuda",
+    "channel_path_concat_vec3_cuda",
+    "channel_path_los_visibility_inputs_cuda",
+    "channel_path_finalize_blocks_cuda",
 }
 EMPTY_FACTORIES = {
     "empty_path_block_from",
@@ -70,11 +70,11 @@ TOPOLOGY_PRIVATE_FUNCTIONS = {
     "gather_tensor_rows",
 }
 TOPOLOGY_ABI = {
-    "cn_deterministic_concat_topology_blocks",
-    "cn_deterministic_gather_topology_block",
-    "cn_deterministic_face_groups",
-    "cn_deterministic_surface_face_groups",
-    "cn_deterministic_sort_order",
+    "channel_deterministic_concat_topology_blocks",
+    "channel_deterministic_gather_topology_block",
+    "channel_deterministic_face_groups",
+    "channel_deterministic_surface_face_groups",
+    "channel_deterministic_sort_order",
 }
 TOPOLOGY_FUNCTIONS = TOPOLOGY_KERNELS | TOPOLOGY_PRIVATE_FUNCTIONS | TOPOLOGY_ABI
 
@@ -88,9 +88,9 @@ def _function_names_by_path() -> dict[str, set[str]]:
 
 def test_path_compaction_translation_unit_owns_the_audited_functions() -> None:
     names = _function_names_by_path()
-    trace = "native/channel_native/kernels/path_trace.cu"
-    compaction = "native/channel_native/kernels/path_compaction.cu"
-    common = "native/channel_native/kernels/path_compaction_common.cuh"
+    trace = "native/channel/kernels/path_trace.cu"
+    compaction = "native/channel/kernels/path_compaction.cu"
+    common = "native/channel/kernels/path_compaction_common.cuh"
 
     assert MOVED_KERNELS | MOVED_ABI <= names[compaction]
     assert not (MOVED_KERNELS | MOVED_ABI) & names[trace]
@@ -115,9 +115,9 @@ def test_path_compaction_translation_unit_owns_the_audited_functions() -> None:
 
 def test_deterministic_topology_translation_unit_owns_the_audited_functions() -> None:
     names = _function_names_by_path()
-    topology = "native/channel_native/kernels/deterministic_topology.cu"
-    trace = "native/channel_native/kernels/path_trace.cu"
-    compaction = "native/channel_native/kernels/path_compaction.cu"
+    topology = "native/channel/kernels/deterministic_topology.cu"
+    trace = "native/channel/kernels/path_trace.cu"
+    compaction = "native/channel/kernels/path_compaction.cu"
 
     assert TOPOLOGY_FUNCTIONS <= names[topology]
     assert not TOPOLOGY_FUNCTIONS & names[trace]
@@ -129,7 +129,7 @@ def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/path_trace.cu"
+        if entry["path"] == "native/channel/kernels/path_trace.cu"
     )
     sources = "\n".join(
         (KERNEL_ROOT / name).read_text(encoding="utf-8-sig")
@@ -182,13 +182,13 @@ def test_path_split_is_registered_once_and_below_the_recommended_limit() -> None
         "path_trace.cu",
         "path_compaction.cu",
     ):
-        relative = f"native/channel_native/kernels/{name}"
+        relative = f"native/channel/kernels/{name}"
         line_count = len(
             (KERNEL_ROOT / name).read_text(encoding="utf-8-sig").splitlines()
         )
         assert cmake.count(relative) == 1
         assert line_count < policy["recommended_limit_lines"]
 
-    assert "native/channel_native/kernels/path_trace.cu" not in policy[
+    assert "native/channel/kernels/path_trace.cu" not in policy[
         "planned_owner_debt"
     ]

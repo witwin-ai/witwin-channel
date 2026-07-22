@@ -76,7 +76,7 @@ def _child(solver: str) -> dict[str, Any]:
     return {
         "solver": solver,
         "torch_and_bootstrap_ms": (import_started - phase_start) * 1000.0,
-        "channel_native_import_ms": import_ms,
+        "channel_import_ms": import_ms,
         "scene_load_ms": scene_load_ms,
         "optix_scene_build_ms": optix_scene_build_ms,
         "optix_scene_build_device_delta_bytes": max(

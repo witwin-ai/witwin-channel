@@ -20,7 +20,7 @@ from witwin.channel.propagation.topology.kernels import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 _RETIRED_NAMES = (
     "TransmissionClosestHitQuery",
     "query_transmission_closest_hit",

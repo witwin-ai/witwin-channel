@@ -154,7 +154,7 @@ def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
     )
     for name in sources:
         source = (
-            root / "native" / "channel_native" / "kernels" / name
+            root / "native" / "channel" / "kernels" / name
         ).read_text(encoding="utf-8")
         for forbidden in (
             "trap;",
@@ -168,7 +168,7 @@ def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
     initializer = (
         root
         / "native"
-        / "channel_native"
+        / "channel"
         / "kernels"
         / "capacity_failure_state.cu"
     ).read_text(encoding="utf-8")

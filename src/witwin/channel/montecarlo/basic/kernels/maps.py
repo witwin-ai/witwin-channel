@@ -58,13 +58,13 @@ def mc_finalize_component_maps(
     native = native_extension()
     if native is None or not hasattr(native, "mc_finalize_component_maps"):
         raise RuntimeError(
-            "_channel_native.mc_finalize_component_maps CUDA kernel is required"
+            "_channel.mc_finalize_component_maps CUDA kernel is required"
         )
     exported = native.mc_finalize_component_maps(
         los, reflection, diffraction, transmission, scattering
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_finalize_component_maps must return a dict")
+        raise TypeError("_channel.mc_finalize_component_maps must return a dict")
     return exported
 
 
@@ -168,7 +168,7 @@ def mc_los_component_maps_adjoint(
     out = _required_native_op("mc_los_component_maps_adjoint")(grad_maps, visible)
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_los_component_maps_adjoint must return a tensor"
+            "_channel.mc_los_component_maps_adjoint must return a tensor"
         )
     return out
 
@@ -250,10 +250,10 @@ def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Te
         raise ValueError("rows and cols must be non-negative")
     out = _required_native_op("mc_zero_matrix")(reference, int(rows), int(cols))
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_zero_matrix must return a tensor")
+        raise TypeError("_channel.mc_zero_matrix must return a tensor")
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
     if out.shape != (int(rows), int(cols)):
-        raise ValueError("_channel_native.mc_zero_matrix returned an unexpected shape")
+        raise ValueError("_channel.mc_zero_matrix returned an unexpected shape")
     return out
 
 
@@ -265,7 +265,7 @@ def mc_point_component_power(
         path_gain, bool(include_los)
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_point_component_power must return a dict")
+        raise TypeError("_channel.mc_point_component_power must return a dict")
     for name in ("los", "reflection", "diffraction"):
         validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
     return exported
@@ -284,17 +284,17 @@ def mc_component_map_buffer(
     native = native_extension()
     if native is None or not hasattr(native, "mc_component_map_buffer"):
         raise RuntimeError(
-            "_channel_native.mc_component_map_buffer CUDA kernel is required"
+            "_channel.mc_component_map_buffer CUDA kernel is required"
         )
     maps = native.mc_component_map_buffer(
         reference, int(tx_count), int(dim0), int(dim1)
     )
     if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel_native.mc_component_map_buffer must return a tensor")
+        raise TypeError("_channel.mc_component_map_buffer must return a tensor")
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     if maps.shape != (tx_count, dim0, dim1):
         raise ValueError(
-            "_channel_native.mc_component_map_buffer returned an unexpected shape"
+            "_channel.mc_component_map_buffer returned an unexpected shape"
         )
     return maps
 
@@ -312,11 +312,11 @@ def mc_store_component_map(
     native = native_extension()
     if native is None or not hasattr(native, "mc_store_component_map"):
         raise RuntimeError(
-            "_channel_native.mc_store_component_map CUDA kernel is required"
+            "_channel.mc_store_component_map CUDA kernel is required"
         )
     out = native.mc_store_component_map(maps, source, int(tx_index))
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_store_component_map must return a tensor")
+        raise TypeError("_channel.mc_store_component_map must return a tensor")
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
     return out
 
@@ -337,7 +337,7 @@ def mc_store_scaled_component_map(
     native = native_extension()
     if native is None or not hasattr(native, "mc_store_scaled_component_map"):
         raise RuntimeError(
-            "_channel_native.mc_store_scaled_component_map CUDA kernel is required"
+            "_channel.mc_store_scaled_component_map CUDA kernel is required"
         )
     out = native.mc_store_scaled_component_map(
         maps,
@@ -348,7 +348,7 @@ def mc_store_scaled_component_map(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_store_scaled_component_map must return a tensor"
+            "_channel.mc_store_scaled_component_map must return a tensor"
         )
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
     return out
@@ -359,11 +359,11 @@ def mc_los_component_maps(los: torch.Tensor) -> torch.Tensor:
     native = native_extension()
     if native is None or not hasattr(native, "mc_los_component_maps"):
         raise RuntimeError(
-            "_channel_native.mc_los_component_maps CUDA kernel is required"
+            "_channel.mc_los_component_maps CUDA kernel is required"
         )
     maps = native.mc_los_component_maps(los)
     if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel_native.mc_los_component_maps must return a tensor")
+        raise TypeError("_channel.mc_los_component_maps must return a tensor")
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     return maps
 
@@ -381,12 +381,12 @@ def mc_los_component_maps_from_matrix(
     )
     if not isinstance(maps, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_los_component_maps_from_matrix must return a tensor"
+            "_channel.mc_los_component_maps_from_matrix must return a tensor"
         )
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     if maps.shape != (los.shape[0], cols, rows):
         raise ValueError(
-            "_channel_native.mc_los_component_maps_from_matrix returned an unexpected shape"
+            "_channel.mc_los_component_maps_from_matrix returned an unexpected shape"
         )
     return maps
 
@@ -406,11 +406,11 @@ def mc_apply_los_visibility(
     native = native_extension()
     if native is None or not hasattr(native, "mc_apply_los_visibility"):
         raise RuntimeError(
-            "_channel_native.mc_apply_los_visibility CUDA kernel is required"
+            "_channel.mc_apply_los_visibility CUDA kernel is required"
         )
     out = native.mc_apply_los_visibility(maps, los, visible, int(tx_index))
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_apply_los_visibility must return a tensor")
+        raise TypeError("_channel.mc_apply_los_visibility must return a tensor")
     return out
 
 
@@ -428,13 +428,13 @@ def mc_los_visibility_inputs(
     native = native_extension()
     if native is None or not hasattr(native, "mc_los_visibility_inputs"):
         raise RuntimeError(
-            "_channel_native.mc_los_visibility_inputs CUDA kernel is required"
+            "_channel.mc_los_visibility_inputs CUDA kernel is required"
         )
     exported = native.mc_los_visibility_inputs(
         tx_positions, int(tx_index), int(rx_count)
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.mc_los_visibility_inputs must return a dict")
+        raise TypeError("_channel.mc_los_visibility_inputs must return a dict")
     validate_cuda_tensor(
         "start", exported["start"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -483,7 +483,7 @@ def mc_los_path_gain_backward(
     native = native_extension()
     if native is None or not hasattr(native, "mc_los_path_gain_backward"):
         raise RuntimeError(
-            "_channel_native.mc_los_path_gain_backward CUDA kernel is required"
+            "_channel.mc_los_path_gain_backward CUDA kernel is required"
         )
     gradients = native.mc_los_path_gain_backward(
         tx_positions,
@@ -495,7 +495,7 @@ def mc_los_path_gain_backward(
     )
     if not isinstance(gradients, tuple) or len(gradients) != 4:
         raise TypeError(
-            "_channel_native.mc_los_path_gain_backward must return 4 tensors"
+            "_channel.mc_los_path_gain_backward must return 4 tensors"
         )
     validate_cuda_tensor(
         "grad_tx", gradients[0], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -507,19 +507,19 @@ def mc_los_path_gain_backward(
     validate_cuda_tensor("grad_frequency", gradients[3], dtype=torch.float32, ndim=1)
     if gradients[0].shape != tx_positions.shape:
         raise ValueError(
-            "_channel_native.mc_los_path_gain_backward returned bad grad_tx shape"
+            "_channel.mc_los_path_gain_backward returned bad grad_tx shape"
         )
     if gradients[1].shape != tx_power.shape:
         raise ValueError(
-            "_channel_native.mc_los_path_gain_backward returned bad grad_power shape"
+            "_channel.mc_los_path_gain_backward returned bad grad_power shape"
         )
     if gradients[2].shape != rx_positions.shape:
         raise ValueError(
-            "_channel_native.mc_los_path_gain_backward returned bad grad_rx shape"
+            "_channel.mc_los_path_gain_backward returned bad grad_rx shape"
         )
     if gradients[3].shape != (1,):
         raise ValueError(
-            "_channel_native.mc_los_path_gain_backward returned bad grad_frequency shape"
+            "_channel.mc_los_path_gain_backward returned bad grad_frequency shape"
         )
     return gradients
 
@@ -579,7 +579,7 @@ def mc_los_path_gain_jvp(
     native = native_extension()
     if native is None or not hasattr(native, "mc_los_path_gain_jvp"):
         raise RuntimeError(
-            "_channel_native.mc_los_path_gain_jvp CUDA kernel is required"
+            "_channel.mc_los_path_gain_jvp CUDA kernel is required"
         )
     out = native.mc_los_path_gain_jvp(
         tx_positions,
@@ -596,11 +596,11 @@ def mc_los_path_gain_jvp(
         tx_polarizations,
     )
     if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel_native.mc_los_path_gain_jvp must return a tensor")
+        raise TypeError("_channel.mc_los_path_gain_jvp must return a tensor")
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
     if out.shape != (tx_positions.shape[0], rx_positions.shape[0]):
         raise ValueError(
-            "_channel_native.mc_los_path_gain_jvp returned an unexpected shape"
+            "_channel.mc_los_path_gain_jvp returned an unexpected shape"
         )
     return out
 
@@ -774,7 +774,7 @@ def mc_sionna_reflection_accumulate(
     native = native_extension()
     if native is None or not hasattr(native, "mc_sionna_reflection_accumulate"):
         raise RuntimeError(
-            "_channel_native.mc_sionna_reflection_accumulate CUDA kernel is required"
+            "_channel.mc_sionna_reflection_accumulate CUDA kernel is required"
         )
     return native.mc_sionna_reflection_accumulate(
         ray_o,
@@ -878,7 +878,7 @@ def mc_sionna_reflection_accumulate_backward(
     )
     if not isinstance(gradients, tuple) or len(gradients) != 5:
         raise TypeError(
-            "_channel_native.mc_sionna_reflection_accumulate_backward must "
+            "_channel.mc_sionna_reflection_accumulate_backward must "
             "return 5 tensors"
         )
     return gradients
@@ -953,7 +953,7 @@ def mc_sionna_reflection_accumulate_jvp(
     )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_sionna_reflection_accumulate_jvp must return a tensor"
+            "_channel.mc_sionna_reflection_accumulate_jvp must return a tensor"
         )
     return output
 
@@ -1323,12 +1323,12 @@ def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
     native = native_extension()
     if native is None or not hasattr(native, "mc_sionna_diffraction_tape_accumulate"):
         raise RuntimeError(
-            "_channel_native.mc_sionna_diffraction_tape_accumulate CUDA kernel is required"
+            "_channel.mc_sionna_diffraction_tape_accumulate CUDA kernel is required"
         )
     output = native.mc_sionna_diffraction_tape_accumulate(*args)
     if not isinstance(output, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_sionna_diffraction_tape_accumulate must return a tensor"
+            "_channel.mc_sionna_diffraction_tape_accumulate must return a tensor"
         )
     return output
 
@@ -1400,7 +1400,7 @@ def mc_sionna_diffraction_tape_accumulate_backward(
     )
     if not isinstance(gradients, tuple) or len(gradients) != 6:
         raise TypeError(
-            "_channel_native.mc_sionna_diffraction_tape_accumulate_backward "
+            "_channel.mc_sionna_diffraction_tape_accumulate_backward "
             "must return 6 tensors"
         )
     return gradients
@@ -1466,7 +1466,7 @@ def mc_sionna_diffraction_tape_accumulate_jvp(
     )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_sionna_diffraction_tape_accumulate_jvp must "
+            "_channel.mc_sionna_diffraction_tape_accumulate_jvp must "
             "return a tensor"
         )
     return output

@@ -18,7 +18,7 @@ def bdpt_sample_directions(
         int(count), reference, int(seed)
     )
     if not isinstance(directions, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_sample_directions must return a tensor")
+        raise TypeError("_channel.bdpt_sample_directions must return a tensor")
     validate_cuda_tensor(
         "directions", directions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -41,7 +41,7 @@ def bdpt_reflection_launch_inputs(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_reflection_launch_inputs must return a dict"
+            "_channel.bdpt_reflection_launch_inputs must return a dict"
         )
     validate_cuda_tensor(
         "ray_o", exported["ray_o"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -64,7 +64,7 @@ def bdpt_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.T
     validate_cuda_tensor("z", z, dtype=torch.float32, ndim=1)
     packed = _required_native_op("bdpt_pack_vec3")(x, y, z)
     if not isinstance(packed, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_pack_vec3 must return a tensor")
+        raise TypeError("_channel.bdpt_pack_vec3 must return a tensor")
     validate_cuda_tensor(
         "packed", packed, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )

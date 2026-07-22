@@ -91,7 +91,7 @@ def _imports(path: Path) -> set[str]:
 
 
 def test_production_and_reference_precompute_have_static_zero_dependency() -> None:
-    root = Path(__file__).parents[2] / "src" / "witwin" / "channel_native"
+    root = Path(__file__).parents[2] / "src" / "witwin" / "channel"
     production_paths = (
         root / "physics" / "conventions.py",
         root / "materials" / "evaluation.py",

@@ -220,7 +220,7 @@ def test_runtime_diagnostics_records_native_library_load_failures(monkeypatch, e
 
     assert diagnostics["cuda_available"] is False
     assert diagnostics["errors"] == [
-        "native extension import failed; install a matching Channel Native wheel "
+        "native extension import failed; install a matching Channel wheel "
         "or configure the explicit developer extension override; reason "
         f"({type(error).__name__}): {error}"
     ]

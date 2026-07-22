@@ -14,10 +14,10 @@ OWNER_SECTIONS = {
     "## Forbidden fallback",
 }
 OWNER_DOCS = (
-    ROOT / "src" / "witwin" / "channel_native" / "runtime" / "README.md",
-    ROOT / "src" / "witwin" / "channel_native" / "scene" / "README.md",
-    ROOT / "src" / "witwin" / "channel_native" / "propagation" / "README.md",
-    ROOT / "src" / "witwin" / "channel_native" / "scattering" / "README.md",
+    ROOT / "src" / "witwin" / "channel" / "runtime" / "README.md",
+    ROOT / "src" / "witwin" / "channel" / "scene" / "README.md",
+    ROOT / "src" / "witwin" / "channel" / "propagation" / "README.md",
+    ROOT / "src" / "witwin" / "channel" / "scattering" / "README.md",
     ROOT / "docs" / "dev" / "materials-owner.md",
 )
 
@@ -33,7 +33,7 @@ def test_materials_package_preserves_public_identity_and_owns_kernel_contracts()
     import witwin.channel.materials as public_materials
     from witwin.channel.core import materials as core_materials
 
-    package_root = ROOT / "src" / "witwin" / "channel_native"
+    package_root = ROOT / "src" / "witwin" / "channel"
     materials_root = package_root / "materials"
 
     assert not (package_root / "materials.py").exists()

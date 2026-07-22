@@ -16,7 +16,7 @@ from witwin.channel.propagation.topology.discovery import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 _DIGESTS = {
     "_face_sequence_count": "d7932ea0ae0bb7b781b5113800044489b7b5356129ccd0169d305749a1dbf121",
     "_face_sequence_chunks": "c2e35ad0f2221530491334a89aec3d102bb34c53816c730a02d511e9964074e5",

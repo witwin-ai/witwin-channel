@@ -22,13 +22,13 @@ def deterministic_los_field(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_los_field"):
         raise RuntimeError(
-            "_channel_native.deterministic_los_field CUDA kernel is required"
+            "_channel.deterministic_los_field CUDA kernel is required"
         )
     exported = native.deterministic_los_field(
         path_gain, path_length_m, float(frequency_hz)
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.deterministic_los_field must return a dict")
+        raise TypeError("_channel.deterministic_los_field must return a dict")
     validate_cuda_tensor(
         "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
     )
@@ -39,7 +39,7 @@ def deterministic_los_field(
         "field_imag", exported["field_imag"], dtype=torch.float32, ndim=1
     )
     if exported["path_gain"].shape != path_gain.shape:
-        raise ValueError("_channel_native.deterministic_los_field returned bad shape")
+        raise ValueError("_channel.deterministic_los_field returned bad shape")
     return exported
 
 
@@ -66,14 +66,14 @@ def deterministic_diffraction_vector_field(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_diffraction_vector_field"):
         raise RuntimeError(
-            "_channel_native.deterministic_diffraction_vector_field CUDA kernel is required"
+            "_channel.deterministic_diffraction_vector_field CUDA kernel is required"
         )
     exported = native.deterministic_diffraction_vector_field(
         x_re, x_im, y_re, y_im, z_re, z_im
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_diffraction_vector_field must return a dict"
+            "_channel.deterministic_diffraction_vector_field must return a dict"
         )
     validate_cuda_tensor(
         "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
@@ -86,7 +86,7 @@ def deterministic_diffraction_vector_field(
     )
     if exported["path_gain"].shape != x_re.shape:
         raise ValueError(
-            "_channel_native.deterministic_diffraction_vector_field returned bad shape"
+            "_channel.deterministic_diffraction_vector_field returned bad shape"
         )
     return exported
 
@@ -143,7 +143,7 @@ def deterministic_reflection_field(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_reflection_field"):
         raise RuntimeError(
-            "_channel_native.deterministic_reflection_field CUDA kernel is required"
+            "_channel.deterministic_reflection_field CUDA kernel is required"
         )
     exported = native.deterministic_reflection_field(
         tx_position,
@@ -159,7 +159,7 @@ def deterministic_reflection_field(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_reflection_field must return a dict"
+            "_channel.deterministic_reflection_field must return a dict"
         )
     validate_cuda_tensor(
         "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
@@ -178,7 +178,7 @@ def deterministic_reflection_field(
         count,
     ):
         raise ValueError(
-            "_channel_native.deterministic_reflection_field returned bad length shape"
+            "_channel.deterministic_reflection_field returned bad length shape"
         )
     return exported
 
@@ -233,7 +233,7 @@ def deterministic_reflection_sequence_field(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_reflection_sequence_field"):
         raise RuntimeError(
-            "_channel_native.deterministic_reflection_sequence_field CUDA kernel is required"
+            "_channel.deterministic_reflection_sequence_field CUDA kernel is required"
         )
     exported = native.deterministic_reflection_sequence_field(
         tx_position,
@@ -249,7 +249,7 @@ def deterministic_reflection_sequence_field(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_reflection_sequence_field must return a dict"
+            "_channel.deterministic_reflection_sequence_field must return a dict"
         )
     validate_cuda_tensor(
         "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
@@ -268,7 +268,7 @@ def deterministic_reflection_sequence_field(
         count,
     ):
         raise ValueError(
-            "_channel_native.deterministic_reflection_sequence_field returned bad length shape"
+            "_channel.deterministic_reflection_sequence_field returned bad length shape"
         )
     return exported
 
@@ -278,13 +278,13 @@ def deterministic_delay_to_path_length(delay_s: torch.Tensor) -> torch.Tensor:
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_delay_to_path_length"):
         raise RuntimeError(
-            "_channel_native.deterministic_delay_to_path_length CUDA kernel is required"
+            "_channel.deterministic_delay_to_path_length CUDA kernel is required"
         )
     path_length = native.deterministic_delay_to_path_length(delay_s)
     validate_cuda_tensor("path_length_m", path_length, dtype=torch.float32, ndim=1)
     if path_length.shape != delay_s.shape:
         raise ValueError(
-            "_channel_native.deterministic_delay_to_path_length returned bad shape"
+            "_channel.deterministic_delay_to_path_length returned bad shape"
         )
     return path_length
 
@@ -299,13 +299,13 @@ def deterministic_pack_complex(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_pack_complex"):
         raise RuntimeError(
-            "_channel_native.deterministic_pack_complex CUDA kernel is required"
+            "_channel.deterministic_pack_complex CUDA kernel is required"
         )
     field = native.deterministic_pack_complex(field_real, field_imag)
     validate_cuda_tensor("field", field, dtype=torch.complex64, ndim=1)
     if field.shape != field_real.shape:
         raise ValueError(
-            "_channel_native.deterministic_pack_complex returned bad shape"
+            "_channel.deterministic_pack_complex returned bad shape"
         )
     return field
 
@@ -320,13 +320,13 @@ def deterministic_phase_from_field(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_phase_from_field"):
         raise RuntimeError(
-            "_channel_native.deterministic_phase_from_field CUDA kernel is required"
+            "_channel.deterministic_phase_from_field CUDA kernel is required"
         )
     phase = native.deterministic_phase_from_field(field_real, field_imag)
     validate_cuda_tensor("phase_rad", phase, dtype=torch.float32, ndim=1)
     if phase.shape != field_real.shape:
         raise ValueError(
-            "_channel_native.deterministic_phase_from_field returned bad shape"
+            "_channel.deterministic_phase_from_field returned bad shape"
         )
     return phase
 
@@ -336,12 +336,12 @@ def deterministic_zero_field_phase(reference: torch.Tensor) -> dict[str, torch.T
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_zero_field_phase"):
         raise RuntimeError(
-            "_channel_native.deterministic_zero_field_phase CUDA kernel is required"
+            "_channel.deterministic_zero_field_phase CUDA kernel is required"
         )
     exported = native.deterministic_zero_field_phase(reference)
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_zero_field_phase must return a dict"
+            "_channel.deterministic_zero_field_phase must return a dict"
         )
     validate_cuda_tensor(
         "path_field", exported["path_field"], dtype=torch.complex64, ndim=1
@@ -354,7 +354,7 @@ def deterministic_zero_field_phase(reference: torch.Tensor) -> dict[str, torch.T
         or exported["phase_rad"].shape != reference.shape
     ):
         raise ValueError(
-            "_channel_native.deterministic_zero_field_phase returned bad shape"
+            "_channel.deterministic_zero_field_phase returned bad shape"
         )
     return exported
 
@@ -368,13 +368,13 @@ def deterministic_phase_from_length(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_phase_from_length"):
         raise RuntimeError(
-            "_channel_native.deterministic_phase_from_length CUDA kernel is required"
+            "_channel.deterministic_phase_from_length CUDA kernel is required"
         )
     phase = native.deterministic_phase_from_length(path_length_m, float(frequency_hz))
     validate_cuda_tensor("phase_rad", phase, dtype=torch.float32, ndim=1)
     if phase.shape != path_length_m.shape:
         raise ValueError(
-            "_channel_native.deterministic_phase_from_length returned bad shape"
+            "_channel.deterministic_phase_from_length returned bad shape"
         )
     return phase
 
@@ -389,12 +389,12 @@ def deterministic_field_from_power_phase(
     native = native_extension()
     if native is None or not hasattr(native, "deterministic_field_from_power_phase"):
         raise RuntimeError(
-            "_channel_native.deterministic_field_from_power_phase CUDA kernel is required"
+            "_channel.deterministic_field_from_power_phase CUDA kernel is required"
         )
     exported = native.deterministic_field_from_power_phase(path_gain, phase_rad)
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.deterministic_field_from_power_phase must return a dict"
+            "_channel.deterministic_field_from_power_phase must return a dict"
         )
     validate_cuda_tensor(
         "field_real", exported["field_real"], dtype=torch.float32, ndim=1
@@ -407,6 +407,6 @@ def deterministic_field_from_power_phase(
         or exported["field_imag"].shape != path_gain.shape
     ):
         raise ValueError(
-            "_channel_native.deterministic_field_from_power_phase returned bad shape"
+            "_channel.deterministic_field_from_power_phase returned bad shape"
         )
     return exported

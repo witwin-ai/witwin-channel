@@ -28,8 +28,8 @@ def _config(tmp_path: Path) -> tuple[SimpleNamespace, dict[str, object]]:
         checkout
         / "src"
         / "witwin"
-        / "channel_native"
-        / "_channel_native.cp311-win_amd64.pyd"
+        / "channel"
+        / "_channel.cp311-win_amd64.pyd"
     )
     extension.parent.mkdir(parents=True)
     extension.write_bytes(b"runner extension")
@@ -64,9 +64,9 @@ def _config(tmp_path: Path) -> tuple[SimpleNamespace, dict[str, object]]:
 def _multiarch_build_info() -> dict[str, object]:
     info: dict[str, object] = {
         "build_type": "Release",
-        "channel_native_abi_version": 1,
-        "channel_native_git_dirty": False,
-        "channel_native_git_sha": "1" * 40,
+        "channel_abi_version": 1,
+        "channel_git_dirty": False,
+        "channel_git_sha": "1" * 40,
         "compiler": "MSVC-19.44",
         "cuda_architectures": list(WHEEL_ARCHITECTURES),
         "cuda_compiler_version": "12.9",
@@ -104,7 +104,7 @@ def test_release_tiers_bind_packaged_checkout_without_developer_override(
     assert "75-real;80-real;86-real;89-real;120-real;120-virtual" in environment[
         "CMAKE_ARGS"
     ]
-    assert not any(name.startswith("WITWIN_CHANNEL_NATIVE_") for name in environment)
+    assert not any(name.startswith("WITWIN_CHANNEL_") for name in environment)
 
 
 def test_wheel_fingerprint_is_multiarch_identity_not_sm120_timing_identity() -> None:
@@ -170,7 +170,7 @@ def test_wheel_native_rejects_casefold_duplicate_member(tmp_path: Path) -> None:
 def test_direct_pe_audit_must_target_retained_wheel_native(tmp_path: Path) -> None:
     store = ArtifactStore.create(tmp_path / "raw")
     artifact = store.write_bytes(
-        "release/wheel-native/_channel_native.cp311-win_amd64.pyd",
+        "release/wheel-native/_channel.cp311-win_amd64.pyd",
         b"multiarch extension",
         allow_empty=False,
     )
@@ -183,7 +183,7 @@ def test_direct_pe_audit_must_target_retained_wheel_native(tmp_path: Path) -> No
         "dependencies": ["python311.dll"],
         "export_count": 1,
         "exports_sha256": "6" * 64,
-        "python_init_export": "PyInit__channel_native",
+        "python_init_export": "PyInit__channel",
     }
     wheel_pe = {
         key: value for key, value in payload.items() if key != "path"

@@ -304,7 +304,7 @@ def test_reflection_candidate_capacity_owner_has_no_host_count_transfer() -> Non
     source = (
         Path(__file__).resolve().parents[3]
         / "native"
-        / "channel_native"
+        / "channel"
         / "kernels"
         / "reflection_candidate_capacity.cu"
     ).read_text(encoding="utf-8")

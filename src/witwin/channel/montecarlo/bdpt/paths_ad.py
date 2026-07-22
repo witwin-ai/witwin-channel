@@ -136,7 +136,7 @@ def bdpt_reflected_light_subpath_state_backward(
     }
     if not isinstance(exported, dict) or set(exported) != expected:
         raise TypeError(
-            "_channel_native.bdpt_reflected_light_subpath_state_backward "
+            "_channel.bdpt_reflected_light_subpath_state_backward "
             "returned unexpected fields"
         )
     return exported
@@ -194,7 +194,7 @@ def bdpt_reflected_light_subpath_state_jvp(
         _BDPT_SUBPATH_TANGENT_FIELDS
     ):
         raise TypeError(
-            "_channel_native.bdpt_reflected_light_subpath_state_jvp "
+            "_channel.bdpt_reflected_light_subpath_state_jvp "
             "returned unexpected fields"
         )
     return exported
@@ -266,7 +266,7 @@ def bdpt_transmitted_light_subpath_state_backward(
     }
     if not isinstance(exported, dict) or set(exported) != expected:
         raise TypeError(
-            "_channel_native.bdpt_transmitted_light_subpath_state_backward "
+            "_channel.bdpt_transmitted_light_subpath_state_backward "
             "returned unexpected fields"
         )
     return exported
@@ -320,7 +320,7 @@ def bdpt_transmitted_light_subpath_state_jvp(
         _BDPT_SUBPATH_TANGENT_FIELDS
     ):
         raise TypeError(
-            "_channel_native.bdpt_transmitted_light_subpath_state_jvp "
+            "_channel.bdpt_transmitted_light_subpath_state_jvp "
             "returned unexpected fields"
         )
     return exported
@@ -384,7 +384,7 @@ def bdpt_endpoint_connection_samples_backward(
     }
     if not isinstance(exported, dict) or set(exported) != expected:
         raise TypeError(
-            "_channel_native.bdpt_endpoint_connection_samples_backward "
+            "_channel.bdpt_endpoint_connection_samples_backward "
             "returned unexpected fields"
         )
     return exported
@@ -430,7 +430,7 @@ def bdpt_endpoint_connection_samples_jvp(
     )
     if not isinstance(exported, dict) or set(exported) != {"tangent_contribution"}:
         raise TypeError(
-            "_channel_native.bdpt_endpoint_connection_samples_jvp "
+            "_channel.bdpt_endpoint_connection_samples_jvp "
             "returned unexpected fields"
         )
     return exported
@@ -471,7 +471,7 @@ def bdpt_accumulate_connection_samples_forward_ad(
         exported
     ):
         raise TypeError(
-            "_channel_native.bdpt_accumulate_connection_samples returned unexpected fields"
+            "_channel.bdpt_accumulate_connection_samples returned unexpected fields"
         )
     matrices = {name: exported[name] for name in _BDPT_COMPONENT_MATRIX_ORDER}
     bin_sums = tuple(
@@ -534,7 +534,7 @@ def bdpt_accumulate_connection_samples_backward(
         "grad_coeff_imag",
     }:
         raise TypeError(
-            "_channel_native.bdpt_accumulate_connection_samples_backward "
+            "_channel.bdpt_accumulate_connection_samples_backward "
             "returned unexpected fields"
         )
     return exported
@@ -584,7 +584,7 @@ def bdpt_accumulate_connection_samples_jvp(
     }
     if not isinstance(exported, dict) or set(exported) != expected:
         raise TypeError(
-            "_channel_native.bdpt_accumulate_connection_samples_jvp "
+            "_channel.bdpt_accumulate_connection_samples_jvp "
             "returned unexpected fields"
         )
     return exported

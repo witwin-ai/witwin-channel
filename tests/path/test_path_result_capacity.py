@@ -1205,10 +1205,10 @@ def test_path_result_capacity_static_contract_has_no_host_compaction_or_trap() -
         root / "src/witwin/channel/path/capacity.py"
     ).read_text(encoding="utf-8")
     native_source = (
-        root / "native/channel_native/kernels/path_result_capacity_pack.cu"
+        root / "native/channel/kernels/path_result_capacity_pack.cu"
     ).read_text(encoding="utf-8")
     ad_source = (
-        root / "native/channel_native/kernels/path_result_capacity_pack_ad.cu"
+        root / "native/channel/kernels/path_result_capacity_pack_ad.cu"
     ).read_text(encoding="utf-8")
     for forbidden in (
         ".item(",

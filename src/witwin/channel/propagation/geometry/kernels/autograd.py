@@ -93,7 +93,7 @@ def rayd_intersect_backward(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
         raise TypeError(
-            "_channel_native.rayd_intersect_backward must return 4 gradients"
+            "_channel.rayd_intersect_backward must return 4 gradients"
         )
     return tuple(out)
 
@@ -147,7 +147,7 @@ def rayd_intersect_jvp(
         int(flags),
     )
     if not isinstance(out, (tuple, list)) or len(out) != 6:
-        raise TypeError("_channel_native.rayd_intersect_jvp must return 6 tangents")
+        raise TypeError("_channel.rayd_intersect_jvp must return 6 tangents")
     return tuple(out)
 
 
@@ -162,7 +162,7 @@ def rayd_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, ..
     )
     if not isinstance(out, (tuple, list)) or len(out) != 9:
         raise TypeError(
-            "_channel_native.rayd_trace_reflections_forward_tape must return 9 tensors"
+            "_channel.rayd_trace_reflections_forward_tape must return 9 tensors"
         )
     return tuple(out)
 
@@ -248,7 +248,7 @@ def rayd_trace_reflections_backward(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 4:
         raise TypeError(
-            "_channel_native.rayd_trace_reflections_backward must return 4 gradients"
+            "_channel.rayd_trace_reflections_backward must return 4 gradients"
         )
     return tuple(out)
 
@@ -330,7 +330,7 @@ def rayd_trace_reflections_jvp(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 2:
         raise TypeError(
-            "_channel_native.rayd_trace_reflections_jvp must return 2 tangents"
+            "_channel.rayd_trace_reflections_jvp must return 2 tangents"
         )
     return tuple(out)
 
@@ -807,7 +807,7 @@ def rayd_reflection_epc_paths_backward(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 3:
         raise TypeError(
-            "_channel_native.rayd_reflection_epc_paths_backward must return"
+            "_channel.rayd_reflection_epc_paths_backward must return"
             " 3 gradients"
         )
     return tuple(out)
@@ -848,7 +848,7 @@ def rayd_reflection_epc_paths_jvp(
     )
     if not isinstance(out, (tuple, list)) or len(out) != 3:
         raise TypeError(
-            "_channel_native.rayd_reflection_epc_paths_jvp must return 3 tangents"
+            "_channel.rayd_reflection_epc_paths_jvp must return 3 tangents"
         )
     return tuple(out)
 
@@ -1149,7 +1149,7 @@ def rayd_scene_face_normals_backward(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.rayd_scene_face_normals_backward must return a tensor"
+            "_channel.rayd_scene_face_normals_backward must return a tensor"
         )
     return out
 
@@ -1166,7 +1166,7 @@ def rayd_scene_face_normals_jvp(
     )
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.rayd_scene_face_normals_jvp must return a tensor"
+            "_channel.rayd_scene_face_normals_jvp must return a tensor"
         )
     return out
 

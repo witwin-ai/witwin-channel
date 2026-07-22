@@ -9,7 +9,7 @@ from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-KERNEL_ROOT = REPOSITORY_ROOT / "native/channel_native/kernels"
+KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
 INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
@@ -17,11 +17,11 @@ INVENTORY_PATH = (
 FUNCTIONS_BY_UNIT = {
     "bdpt_connect_mis.cu": {
         "bdpt_mis_weights_kernel",
-        "cn_bdpt_mis_weights_cuda",
+        "channel_bdpt_mis_weights_cuda",
     },
     "bdpt_connect_samples.cu": {
         "bdpt_endpoint_connection_samples_kernel",
-        "cn_bdpt_endpoint_connection_samples_cuda",
+        "channel_bdpt_endpoint_connection_samples_cuda",
     },
     "bdpt_connect_visibility.cu": {
         "bdpt_endpoint_connection_visibility_inputs_kernel",
@@ -29,11 +29,11 @@ FUNCTIONS_BY_UNIT = {
         "bdpt_compact_connection_samples_kernel",
         "bdpt_copy_connection_samples_kernel",
         "bdpt_count_valid_connection_samples_kernel",
-        "cn_bdpt_endpoint_connection_visibility_inputs_cuda",
-        "cn_bdpt_filter_connection_samples_cuda",
-        "cn_bdpt_count_valid_connection_samples_cuda",
-        "cn_bdpt_compact_connection_samples_cuda",
-        "cn_bdpt_concat_connection_samples_cuda",
+        "channel_bdpt_endpoint_connection_visibility_inputs_cuda",
+        "channel_bdpt_filter_connection_samples_cuda",
+        "channel_bdpt_count_valid_connection_samples_cuda",
+        "channel_bdpt_compact_connection_samples_cuda",
+        "channel_bdpt_concat_connection_samples_cuda",
     },
     "bdpt_connect_accumulation.cu": {
         "bdpt_accumulate_connection_samples_double_kernel",
@@ -43,8 +43,8 @@ FUNCTIONS_BY_UNIT = {
         "bdpt_cast_connection_accumulation_kernel",
         "bdpt_connection_variance_accum_double_kernel",
         "bdpt_connection_variance_finalize_double_kernel",
-        "cn_bdpt_accumulate_connection_samples_cuda",
-        "cn_bdpt_connection_variance_cuda",
+        "channel_bdpt_accumulate_connection_samples_cuda",
+        "channel_bdpt_connection_variance_cuda",
         # ADR-019 coherent combine + ADR-022 coherent/power AD companions and
         # their private accumulate helpers, all owned by this accumulate TU.
         "bdpt_accumulate_connection_samples_coherent_kernel",
@@ -53,8 +53,8 @@ FUNCTIONS_BY_UNIT = {
         "bdpt_accumulate_power_jvp_kernel",
         "bdpt_accumulate_coherent_backward_kernel",
         "bdpt_accumulate_coherent_jvp_kernel",
-        "cn_bdpt_accumulate_connection_samples_backward_cuda",
-        "cn_bdpt_accumulate_connection_samples_jvp_cuda",
+        "channel_bdpt_accumulate_connection_samples_backward_cuda",
+        "channel_bdpt_accumulate_connection_samples_jvp_cuda",
         "accumulate_optional",
         "accumulate_ptr",
         "bdpt_component_matrix",
@@ -85,7 +85,7 @@ COMMON_HELPERS = {
     "zero_float_tensor",
 }
 ABI_BY_UNIT = {
-    unit: {name for name in functions if name.startswith("cn_")}
+    unit: {name for name in functions if name.startswith("channel_")}
     for unit, functions in FUNCTIONS_BY_UNIT.items()
 }
 
@@ -99,18 +99,18 @@ def _function_names_by_path() -> dict[str, set[str]]:
 
 def test_bdpt_functions_have_one_physical_translation_unit_owner() -> None:
     names = _function_names_by_path()
-    common = "native/channel_native/kernels/bdpt_connect_common.cuh"
+    common = "native/channel/kernels/bdpt_connect_common.cuh"
 
     assert names[common] == COMMON_HELPERS
     for unit, expected in FUNCTIONS_BY_UNIT.items():
-        relative = f"native/channel_native/kernels/{unit}"
+        relative = f"native/channel/kernels/{unit}"
         assert names[relative] == expected
 
     all_abi = set().union(*ABI_BY_UNIT.values())
     # Phase 4 retires two audited-dead crude diffraction sample ABIs.
     assert len(all_abi) == 11
     for unit, expected in ABI_BY_UNIT.items():
-        relative = f"native/channel_native/kernels/{unit}"
+        relative = f"native/channel/kernels/{unit}"
         assert expected == (all_abi & names[relative])
 
 
@@ -132,7 +132,7 @@ def test_bdpt_split_preserves_launch_and_sync_multisets() -> None:
     source_evidence = next(
         entry
         for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/bdpt_connect.cu"
+        if entry["path"] == "native/channel/kernels/bdpt_connect.cu"
     )
     sources = {
         unit: (KERNEL_ROOT / unit).read_text(encoding="utf-8-sig")
@@ -179,15 +179,15 @@ def test_bdpt_split_is_registered_once_and_below_budget() -> None:
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
     policy = inventory["translation_unit_policy"]
 
-    assert "native/channel_native/kernels/bdpt_connect.cu" not in cmake
+    assert "native/channel/kernels/bdpt_connect.cu" not in cmake
     assert not (KERNEL_ROOT / "bdpt_connect.cu").exists()
-    assert "native/channel_native/kernels/bdpt_connect_common.cuh" not in cmake
+    assert "native/channel/kernels/bdpt_connect_common.cuh" not in cmake
     for unit in FUNCTIONS_BY_UNIT:
-        relative = f"native/channel_native/kernels/{unit}"
+        relative = f"native/channel/kernels/{unit}"
         assert cmake.count(relative) == 1
         assert len((KERNEL_ROOT / unit).read_text().splitlines()) < policy[
             "recommended_limit_lines"
         ]
-    assert "native/channel_native/kernels/bdpt_connect.cu" not in policy[
+    assert "native/channel/kernels/bdpt_connect.cu" not in policy[
         "planned_owner_debt"
     ]

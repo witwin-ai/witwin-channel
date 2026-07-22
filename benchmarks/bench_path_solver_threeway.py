@@ -400,7 +400,7 @@ def _run_native(args: argparse.Namespace) -> dict[str, Any]:
             "metadata": result.metadata,
         }
     return {
-        "provider": "channel_native",
+        "provider": "channel",
         "build_info": build_info(),
         "scene": scene_stats,
         "load_ms": load_ms,
@@ -1034,12 +1034,12 @@ def _strip_delays(payload: Any) -> Any:
 
 def _speed_summary(providers: dict[str, dict[str, Any]]) -> dict[str, Any]:
     summary: dict[str, Any] = {}
-    native = providers.get("channel_native")
+    native = providers.get("channel")
     if native is None:
         return summary
     for case in ("los", "reflection", "diffraction", "all"):
         native_ms = native["cases"][case]["steady_median_ms"]
-        row = {"channel_native_ms": native_ms}
+        row = {"channel_ms": native_ms}
         for provider_name in ("original_channel", "sionna"):
             provider = providers.get(provider_name)
             if provider is None:
@@ -1148,7 +1148,7 @@ def _diffraction_seed_summary(
             for payload in payloads
             if payload.get("ok")
         }
-        native = providers.get("channel_native")
+        native = providers.get("channel")
         if native is None:
             continue
         for provider_name in ("original_channel", "sionna"):
@@ -1193,7 +1193,7 @@ def _run_all(args: argparse.Namespace) -> dict[str, Any]:
         for payload in provider_payloads
         if payload.get("ok")
     }
-    native = providers.get("channel_native")
+    native = providers.get("channel")
     correctness: dict[str, Any] = {}
     if native is not None:
         for provider_name in ("original_channel", "sionna"):
@@ -1288,7 +1288,7 @@ def _run_all(args: argparse.Namespace) -> dict[str, Any]:
         "speed": _speed_summary(providers),
         "notes": [
             "Original Channel path cases always include LoS; component stats classify paths by interaction type.",
-            "Channel Native diffraction exports all first-order edge paths for this scene, while Original Channel and Sionna return capped or selected path sets.",
+            "Channel diffraction exports all first-order edge paths for this scene, while Original Channel and Sionna return capped or selected path sets.",
             "Diffraction correctness is therefore reported as coverage of Original/Sionna delay samples by the Native full export, not equal path counts.",
         ],
     }

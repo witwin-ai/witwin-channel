@@ -33,7 +33,7 @@ def bdpt_launch_state(
 
     native = native_extension()
     if native is None or not hasattr(native, "bdpt_launch_state"):
-        raise RuntimeError("_channel_native.bdpt_launch_state CUDA kernel is required")
+        raise RuntimeError("_channel.bdpt_launch_state CUDA kernel is required")
     exported = native.bdpt_launch_state(
         reference,
         int(tx_count),
@@ -42,19 +42,19 @@ def bdpt_launch_state(
         int(seed),
     )
     if not isinstance(exported, dict):
-        raise TypeError("_channel_native.bdpt_launch_state must return a dict")
+        raise TypeError("_channel.bdpt_launch_state must return a dict")
     expected = int(tx_count) * int(samples) * int(sample_streams)
     for name in ("tx_id", "sample_id", "stream_id"):
         validate_cuda_tensor(name, exported[name], dtype=torch.int32, ndim=1)
         if exported[name].shape != (expected,):
             raise ValueError(
-                f"_channel_native.bdpt_launch_state returned bad {name} shape"
+                f"_channel.bdpt_launch_state returned bad {name} shape"
             )
     for name in ("light_seed",):
         validate_cuda_tensor(name, exported[name], dtype=torch.int64, ndim=1)
         if exported[name].shape != (expected,):
             raise ValueError(
-                f"_channel_native.bdpt_launch_state returned bad {name} shape"
+                f"_channel.bdpt_launch_state returned bad {name} shape"
             )
     return exported
 
@@ -211,7 +211,7 @@ def bdpt_empty_subpath_state(reference: torch.Tensor) -> dict[str, torch.Tensor]
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     exported = _required_native_op("bdpt_empty_subpath_state")(reference)
     _validate_bdpt_subpath_state(
-        "_channel_native.bdpt_empty_subpath_state", exported, 0
+        "_channel.bdpt_empty_subpath_state", exported, 0
     )
     return exported
 
@@ -269,17 +269,17 @@ def bdpt_endpoint_subpath_state(
     )
     if not isinstance(exported, dict) or set(exported) != {"light", "sensor"}:
         raise TypeError(
-            "_channel_native.bdpt_endpoint_subpath_state must return light/sensor dicts"
+            "_channel.bdpt_endpoint_subpath_state must return light/sensor dicts"
         )
     light = exported["light"]
     sensor = exported["sensor"]
     _validate_bdpt_subpath_state(
-        "_channel_native.bdpt_endpoint_subpath_state.light",
+        "_channel.bdpt_endpoint_subpath_state.light",
         light,
         int(launch_tx_id.shape[0]),
     )
     _validate_bdpt_subpath_state(
-        "_channel_native.bdpt_endpoint_subpath_state.sensor",
+        "_channel.bdpt_endpoint_subpath_state.sensor",
         sensor,
         int(rx_positions.shape[0]),
     )
@@ -293,11 +293,11 @@ def bdpt_subpath_intersection_inputs(
     exported = _required_native_op("bdpt_subpath_intersection_inputs")(subpath)
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_subpath_intersection_inputs must return a dict"
+            "_channel.bdpt_subpath_intersection_inputs must return a dict"
         )
     if set(exported) != {"ray_o", "ray_d", "ray_tmax", "active"}:
         raise ValueError(
-            "_channel_native.bdpt_subpath_intersection_inputs returned unexpected fields"
+            "_channel.bdpt_subpath_intersection_inputs returned unexpected fields"
         )
     validate_cuda_tensor(
         "ray_o", exported["ray_o"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -312,15 +312,15 @@ def bdpt_subpath_intersection_inputs(
         or exported["ray_d"].shape != subpath["direction"].shape
     ):
         raise ValueError(
-            "_channel_native.bdpt_subpath_intersection_inputs returned bad ray shape"
+            "_channel.bdpt_subpath_intersection_inputs returned bad ray shape"
         )
     if exported["active"].shape != subpath["valid"].shape:
         raise ValueError(
-            "_channel_native.bdpt_subpath_intersection_inputs returned bad active shape"
+            "_channel.bdpt_subpath_intersection_inputs returned bad active shape"
         )
     if exported["ray_tmax"].shape != (0,):
         raise ValueError(
-            "_channel_native.bdpt_subpath_intersection_inputs returned bad ray_tmax shape"
+            "_channel.bdpt_subpath_intersection_inputs returned bad ray_tmax shape"
         )
     return exported
 
@@ -414,7 +414,7 @@ def bdpt_reflected_light_subpath_state(
         float(frequency_hz),
     )
     _validate_bdpt_subpath_state(
-        "_channel_native.bdpt_reflected_light_subpath_state", exported, count
+        "_channel.bdpt_reflected_light_subpath_state", exported, count
     )
     return exported
 
@@ -496,7 +496,7 @@ def bdpt_transmitted_light_subpath_state(
         float(frequency_hz),
     )
     _validate_bdpt_subpath_state(
-        "_channel_native.bdpt_transmitted_light_subpath_state", exported, count
+        "_channel.bdpt_transmitted_light_subpath_state", exported, count
     )
     return exported
 
@@ -541,7 +541,7 @@ def bdpt_endpoint_connection_samples(
         int(max_paths_value),
     )
     _validate_bdpt_connection_samples(
-        "_channel_native.bdpt_endpoint_connection_samples", exported, expected_count
+        "_channel.bdpt_endpoint_connection_samples", exported, expected_count
     )
     return exported
 
@@ -566,11 +566,11 @@ def bdpt_endpoint_connection_visibility_inputs(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_endpoint_connection_visibility_inputs must return a dict"
+            "_channel.bdpt_endpoint_connection_visibility_inputs must return a dict"
         )
     if set(exported) != {"start", "end", "active"}:
         raise ValueError(
-            "_channel_native.bdpt_endpoint_connection_visibility_inputs returned unexpected fields"
+            "_channel.bdpt_endpoint_connection_visibility_inputs returned unexpected fields"
         )
     validate_cuda_tensor(
         "start", exported["start"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -581,13 +581,13 @@ def bdpt_endpoint_connection_visibility_inputs(
     validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
     if tuple(exported["start"].shape) != (int(sample_count), 3):
         raise ValueError(
-            "_channel_native.bdpt_endpoint_connection_visibility_inputs returned bad start shape"
+            "_channel.bdpt_endpoint_connection_visibility_inputs returned bad start shape"
         )
     if exported["end"].shape != exported["start"].shape or exported["active"].shape != (
         int(sample_count),
     ):
         raise ValueError(
-            "_channel_native.bdpt_endpoint_connection_visibility_inputs returned bad visibility shape"
+            "_channel.bdpt_endpoint_connection_visibility_inputs returned bad visibility shape"
         )
     return exported
 
@@ -674,7 +674,7 @@ def bdpt_accumulate_connection_samples(
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.bdpt_accumulate_connection_samples must return a dict"
+            "_channel.bdpt_accumulate_connection_samples must return a dict"
         )
     # ADR-022 spec 6.4 supervisor ruling: under combine_domain='coherent' the
     # forward additionally returns its per-component phasor bin-sum buffers
@@ -684,14 +684,14 @@ def bdpt_accumulate_connection_samples(
     # keeps the public return the six component matrices only.
     if not _BDPT_COMPONENT_MATRIX_FIELDS.issubset(exported):
         raise ValueError(
-            "_channel_native.bdpt_accumulate_connection_samples returned unexpected fields"
+            "_channel.bdpt_accumulate_connection_samples returned unexpected fields"
         )
     for name in _BDPT_COMPONENT_MATRIX_ORDER:
         tensor = exported[name]
         validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2)
         if tuple(tensor.shape) != (int(tx_count), int(rx_count)):
             raise ValueError(
-                f"_channel_native.bdpt_accumulate_connection_samples returned bad {name} shape"
+                f"_channel.bdpt_accumulate_connection_samples returned bad {name} shape"
             )
     return {name: exported[name] for name in _BDPT_COMPONENT_MATRIX_ORDER}
 
@@ -708,7 +708,7 @@ def bdpt_filter_connection_samples(
         raise ValueError("visible must share samples device")
     exported = _required_native_op("bdpt_filter_connection_samples")(samples, visible)
     _validate_bdpt_connection_samples(
-        "_channel_native.bdpt_filter_connection_samples", exported, None
+        "_channel.bdpt_filter_connection_samples", exported, None
     )
     return exported
 
@@ -718,11 +718,11 @@ def bdpt_count_valid_connection_samples(samples: dict[str, torch.Tensor]) -> int
     count = _required_native_op("bdpt_count_valid_connection_samples")(samples)
     if not isinstance(count, int):
         raise TypeError(
-            "_channel_native.bdpt_count_valid_connection_samples must return an int"
+            "_channel.bdpt_count_valid_connection_samples must return an int"
         )
     if count < 0 or count > int(samples["valid"].shape[0]):
         raise ValueError(
-            "_channel_native.bdpt_count_valid_connection_samples returned bad count"
+            "_channel.bdpt_count_valid_connection_samples returned bad count"
         )
     return count
 
@@ -740,11 +740,11 @@ def bdpt_compact_connection_samples(
         samples, int(max_paths_value)
     )
     _validate_bdpt_connection_samples(
-        "_channel_native.bdpt_compact_connection_samples", exported, None
+        "_channel.bdpt_compact_connection_samples", exported, None
     )
     if max_paths is not None and int(exported["valid"].shape[0]) > int(max_paths):
         raise ValueError(
-            "_channel_native.bdpt_compact_connection_samples exceeded max_paths"
+            "_channel.bdpt_compact_connection_samples exceeded max_paths"
         )
     return exported
 
@@ -760,7 +760,7 @@ def bdpt_concat_connection_samples(
         expected_count += int(block["valid"].shape[0])
     exported = _required_native_op("bdpt_concat_connection_samples")(tuple(samples))
     _validate_bdpt_connection_samples(
-        "_channel_native.bdpt_concat_connection_samples", exported, expected_count
+        "_channel.bdpt_concat_connection_samples", exported, expected_count
     )
     return exported
 
@@ -784,10 +784,10 @@ def bdpt_connection_variance(
         int(samples_per_tx),
     )
     if not isinstance(variance, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_connection_variance must return a tensor")
+        raise TypeError("_channel.bdpt_connection_variance must return a tensor")
     validate_cuda_tensor("variance", variance, dtype=torch.float32, ndim=2)
     if tuple(variance.shape) != (int(tx_count), int(rx_count)):
-        raise ValueError("_channel_native.bdpt_connection_variance returned bad shape")
+        raise ValueError("_channel.bdpt_connection_variance returned bad shape")
     return variance
 
 
@@ -808,14 +808,14 @@ def bdpt_mis_weights(
 
     native = native_extension()
     if native is None or not hasattr(native, "bdpt_mis_weights"):
-        raise RuntimeError("_channel_native.bdpt_mis_weights CUDA kernel is required")
+        raise RuntimeError("_channel.bdpt_mis_weights CUDA kernel is required")
     weights = native.bdpt_mis_weights(pdf, strategy_pdf_sum, int(mode_id), float(beta))
     if not isinstance(weights, torch.Tensor):
-        raise TypeError("_channel_native.bdpt_mis_weights must return a tensor")
+        raise TypeError("_channel.bdpt_mis_weights must return a tensor")
     validate_cuda_tensor("weights", weights, dtype=torch.float32, ndim=1)
     if weights.shape != pdf.shape:
         raise ValueError(
-            "_channel_native.bdpt_mis_weights returned an unexpected shape"
+            "_channel.bdpt_mis_weights returned an unexpected shape"
         )
     return weights
 

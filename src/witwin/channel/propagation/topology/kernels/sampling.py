@@ -14,11 +14,11 @@ def mc_sample_directions(count: int, reference: torch.Tensor) -> torch.Tensor:
     native = native_extension()
     if native is None or not hasattr(native, "mc_sample_directions"):
         raise RuntimeError(
-            "_channel_native.mc_sample_directions CUDA kernel is required"
+            "_channel.mc_sample_directions CUDA kernel is required"
         )
     directions = native.mc_sample_directions(int(count), reference)
     if not isinstance(directions, torch.Tensor):
-        raise TypeError("_channel_native.mc_sample_directions must return a tensor")
+        raise TypeError("_channel.mc_sample_directions must return a tensor")
     validate_cuda_tensor(
         "directions", directions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )

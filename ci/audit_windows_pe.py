@@ -51,7 +51,7 @@ _EXPORT_PATTERN = re.compile(
     r"(?P<rva>[0-9A-Fa-f]+)\s+(?P<name>\S+)\s*$"
 )
 _EXPORT_COUNT_PATTERN = re.compile(r"^\s*(\d+) number of names\s*$")
-_PYTHON_INIT_EXPORT = "PyInit__channel_native"
+_PYTHON_INIT_EXPORT = "PyInit__channel"
 
 
 class PEAuditError(ValueError):
@@ -112,7 +112,7 @@ def _allowed_export(name: str) -> bool:
     owner_name = name.casefold()
     if any(
         forbidden in owner_name
-        for forbidden in ("rayd", "raydn", "channel_native", "channelnative", "legacy")
+        for forbidden in ("rayd", "raydn", "channel", "channelnative", "legacy")
     ):
         return False
     return name.startswith("?") and any(

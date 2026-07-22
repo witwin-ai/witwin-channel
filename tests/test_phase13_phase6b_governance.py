@@ -21,7 +21,7 @@ TRANSMISSION_SYMBOLS = {
     "field_transmission_sequence_jvp",
 }
 REMOVED_CHANNEL_SOURCE = (
-    ROOT / "native/channel_native/kernels/field_transport_transmission.cu"
+    ROOT / "native/channel/kernels/field_transport_transmission.cu"
 )
 
 
@@ -102,10 +102,10 @@ def test_phase6b_pin_manifest_and_owner_counts_are_consistent() -> None:
 
 def test_phase6b_is_a_complete_source_owner_move_without_a_fallback() -> None:
     fields = (
-        ROOT / "native/channel_native/binding/fields.cpp"
+        ROOT / "native/channel/binding/fields.cpp"
     ).read_text(encoding="utf-8-sig")
     retained = (
-        ROOT / "native/channel_native/kernels/field_transport.cu"
+        ROOT / "native/channel/kernels/field_transport.cu"
     ).read_text(encoding="utf-8-sig")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")
@@ -125,7 +125,7 @@ def test_phase6b_is_a_complete_source_owner_move_without_a_fallback() -> None:
     assert all(
         not (
             edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel_native/")
+            and edge["to"].startswith("native/channel/")
         )
         for edge in graph["edges"]  # type: ignore[index]
     )

@@ -28,14 +28,14 @@ def mc_reflection_launch_inputs(
     native = native_extension()
     if native is None or not hasattr(native, "mc_reflection_launch_inputs"):
         raise RuntimeError(
-            "_channel_native.mc_reflection_launch_inputs CUDA kernel is required"
+            "_channel.mc_reflection_launch_inputs CUDA kernel is required"
         )
     exported = native.mc_reflection_launch_inputs(
         tx_positions, int(tx_index), int(sample_count)
     )
     if not isinstance(exported, dict):
         raise TypeError(
-            "_channel_native.mc_reflection_launch_inputs must return a dict"
+            "_channel.mc_reflection_launch_inputs must return a dict"
         )
     validate_cuda_tensor(
         "ray_o", exported["ray_o"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -98,7 +98,7 @@ def mc_diffraction_discover_edges(*args: torch.Tensor) -> torch.Tensor:
     out = required_symbol("mc_diffraction_discover_edges")(*args)
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_diffraction_discover_edges must return a tensor"
+            "_channel.mc_diffraction_discover_edges must return a tensor"
         )
     return out
 
@@ -108,7 +108,7 @@ def mc_diffraction_discover_edges_counted(*args: torch.Tensor) -> torch.Tensor:
     out = required_symbol("mc_diffraction_discover_edges_counted")(*args)
     if not isinstance(out, torch.Tensor):
         raise TypeError(
-            "_channel_native.mc_diffraction_discover_edges_counted must return a tensor"
+            "_channel.mc_diffraction_discover_edges_counted must return a tensor"
         )
     return out
 
@@ -131,11 +131,11 @@ def mc_diffraction_state_wi(
     native = native_extension()
     if native is None or not hasattr(native, "mc_diffraction_state_wi"):
         raise RuntimeError(
-            "_channel_native.mc_diffraction_state_wi CUDA kernel is required"
+            "_channel.mc_diffraction_state_wi CUDA kernel is required"
         )
     state_wi = native.mc_diffraction_state_wi(state_edge_pos, state_src)
     if not isinstance(state_wi, torch.Tensor):
-        raise TypeError("_channel_native.mc_diffraction_state_wi must return a tensor")
+        raise TypeError("_channel.mc_diffraction_state_wi must return a tensor")
     validate_cuda_tensor(
         "state_wi", state_wi, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
@@ -177,7 +177,7 @@ def mc_diffraction_state_pack(
     native = native_extension()
     if native is None or not hasattr(native, "mc_diffraction_state_pack"):
         raise RuntimeError(
-            "_channel_native.mc_diffraction_state_pack CUDA kernel is required"
+            "_channel.mc_diffraction_state_pack CUDA kernel is required"
         )
     states = native.mc_diffraction_state_pack(
         edge_indices,
@@ -195,7 +195,7 @@ def mc_diffraction_state_pack(
     )
     if not isinstance(states, tuple) or len(states) != 12:
         raise TypeError(
-            "_channel_native.mc_diffraction_state_pack must return 12 tensors"
+            "_channel.mc_diffraction_state_pack must return 12 tensors"
         )
     validate_cuda_tensor("state_edge_index", states[0], dtype=torch.int32, ndim=1)
     validate_cuda_tensor(
