@@ -154,8 +154,8 @@ class PathResult:
         )
         if any(tensor.device != self.a.device for tensor in tensors):
             raise ValueError("all PathResult tensors must share one device")
-        # Device-selected cardinality is owned by the native capacity producer.
-        # Construction is metadata-only and must not recompute or synchronize it.
+        # Device-selected cardinality is already reflected in the compact native
+        # result. Construction is metadata-only and must not recompute it.
 
     @property
     def num_rx(self) -> int:

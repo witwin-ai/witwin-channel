@@ -64,9 +64,9 @@ def _compact_valid_evaluated_paths_for_legacy_result(
 ) -> EvaluatedPaths:
     """Select valid rows before the legacy Ragged Path result pack.
 
-    This structural bridge is deleted by the ADR-029 Phase D capacity-result
-    switch.  It performs no geometry or RF computation; it only prevents inert
-    failure rows from reaching the legacy endpoint-id gathers.
+    ADR-032 retains this compact structural boundary.  It performs no geometry
+    or RF computation; it only prevents inert failure rows from reaching the
+    endpoint-id gathers.
     """
 
     selected = torch.nonzero(paths.topology.valid, as_tuple=False).reshape(-1)

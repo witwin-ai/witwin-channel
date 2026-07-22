@@ -214,18 +214,6 @@
       "reason": "Repeated typed ABI signature, tensor validation, or request/result packing at the binding boundary.",
       "token_count": 114
     },
-    "1b8076e8adcecca8": {
-      "category": "fixture_boilerplate",
-      "corpus": "python",
-      "files": [
-        "deterministic/config.py",
-        "path/config.py"
-      ],
-      "owner": "solver.config",
-      "provenance": "ADR-029 C2-D hand-reviewed refresh",
-      "reason": "Repeated solver configuration validation with no numerical computation.",
-      "token_count": 101
-    },
     "1c108704c3bb7df7": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -2435,6 +2423,20 @@
     "pruned_region_count": 9,
     "note": "Phase E activated the ADR-027 enumerated batched penetration path, added ADR-029 result-boundary failure sanitization, and consolidated primal evaluated-path payload views plus inert row initialization/copy into shared structural plumbing. All current exact-token regions were hand-reviewed and stale ids were pruned without changing the frozen maintenance budget or historical Phase 11/Phase P evidence.",
     "region_count": 171,
+    "stale_region_count": 0,
+    "unclassified_region_count": 0,
+    "status": "all current regions classified; frozen duplication coverage acceptance remains met"
+  },
+  "adr032_stable_recovery_refresh": {
+    "combined_duplicate_lines": 9591,
+    "combined_total_lines": 95609,
+    "coverage_percent": 10.031482,
+    "frozen_coverage_percent": 10.211512,
+    "budget_relaxed": false,
+    "new_region_count": 0,
+    "pruned_region_count": 1,
+    "note": "ADR-032 removed the public ADR-029 per-pair capacity fields from the Path and Deterministic solver configs. The associated non-numerical shared validation region therefore no longer exists; no numerical duplicate was deduplicated and historical refresh evidence remains immutable.",
+    "region_count": 170,
     "stale_region_count": 0,
     "unclassified_region_count": 0,
     "status": "all current regions classified; frozen duplication coverage acceptance remains met"
