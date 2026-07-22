@@ -28,7 +28,9 @@ from witwin.channel_native.propagation.models.penetration import (
 )
 from witwin.channel_native.runtime.capacity import CapacityFailureState
 from witwin.channel_native.runtime.profiling import (
+    CudaProfileMark,
     CudaProfileRange,
+    cuda_profile_mark,
     profiled_cuda_range,
 )
 
@@ -159,6 +161,7 @@ def straight_transmission_chains(
         "scene_diagonal": float(scene_diagonal),
         "failure_state": failure_state,
     }
+    cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
     if not ad:
         return rayd_segment_penetration_forward(rayd, origins, targets, None, **common)
     if vertices is None:

@@ -121,7 +121,7 @@ def test_primal_metadata_reports_no_ad_for_every_solver():
     basic = basic_metadata(
         config=BasicConfig(samples=1, max_depth=0, components={"los"}),
         path_count=1,
-        valid_contribution_count=1,
+        contribution_capacity=1,
         reflection_available=False,
         diffraction_available=False,
     )

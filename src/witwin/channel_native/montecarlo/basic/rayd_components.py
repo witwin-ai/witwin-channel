@@ -255,12 +255,12 @@ def transmission_component_map(
     compiled = scene.compile()
     rx_count = int(rx_pos.shape[0])
     tx_count = int(tx_pos.shape[0])
-    origins = tx_march.repeat_interleave(rx_count, dim=0).contiguous()
-    targets = rx_pos.repeat(tx_count, 1).contiguous()
+    origins = tx_march.repeat_interleave(rx_count, dim=0)
+    targets = rx_pos.repeat(tx_count, 1)
     frequency_value = _frequency_scalar(scene)
     tx_pol = transmitter_polarizations(scene, device=device)
-    pair_polarization = tx_pol.repeat_interleave(rx_count, dim=0).contiguous()
-    base_power = los_matrix.reshape(-1).contiguous()
+    pair_polarization = tx_pol.repeat_interleave(rx_count, dim=0)
+    base_power = los_matrix.view(-1)
     vertices = scene_vertex_table(scene, compiled) if ad else None
     if ad and ledger is not None:
         ledger.add(vertices, origins, targets)
@@ -314,7 +314,7 @@ def transmission_component_map(
             failure_state,
             frequency_hz=frequency_value,
         )
-    matrix = product.scaled_power.reshape(tx_count, rx_count)
+    matrix = product.scaled_power.view(tx_count, rx_count)
     if ad:
         if ledger is not None:
             ledger.add()

@@ -156,11 +156,9 @@ def test_phase_m_docs_do_not_claim_adr029_or_phase12_completion() -> None:
     )
 
     assert "Phase M MC Basic atomic switch/delete 已实现" in plan
-    assert "这不是 ADR-029 完成声明" in plan
-    assert "Phase M does not complete ADR-029" in migration
-    assert "final Phase 12 performance acceptance remain pending" in " ".join(
-        migration.split()
-    )
+    assert "ADR-029 capacity-pack activation 已由 ADR-032 取消" in plan
+    assert "Phase M does not activate ADR-029" in migration
+    assert "Final Phase 12 acceptance uses compact E2E" in " ".join(migration.split())
 
     activation = _json(RESOURCE_LEDGER)["phase_m_activation"]
     assert activation["binding_delta"] == {

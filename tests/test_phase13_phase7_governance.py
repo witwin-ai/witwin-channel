@@ -79,7 +79,7 @@ def test_phase7_decision_history_is_preserved_after_phase8a_activation() -> None
     ).read_text(encoding="utf-8")
 
     assert "**Status:** Accepted (2026-07-19)" in adr
-    assert "ADR-023/024/025" in plan
+    assert "ADR-025 已接受；此阶段只接受边界，不执行 Phase 8A/8B" in plan
     assert "2026-07-19" in plan
     for text in (adr, plan, feature, migration, owner_readme):
         normalized = " ".join(text.split())

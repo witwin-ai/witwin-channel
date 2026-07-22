@@ -95,8 +95,7 @@ def test_phase_e_docs_keep_the_adr029_compaction_blocker_explicit() -> None:
     )
 
     assert "enumerated atomic" in plan
-    assert "ADR-029 capacity activation" in plan
-    assert "不得宣称完整 solver no-D2H" in plan
-    assert (
-        "legacy canonical selector still compacts valid candidate rows" in propagation
-    )
+    assert "ADR-029 capacity-pack activation 已由 ADR-032 取消" in plan
+    assert "不得再宣称或追求 public capacity result 与" in plan
+    assert "The canonical selector still compacts valid candidate rows" in propagation
+    assert "ADR-029's downstream capacity closure is superseded" in propagation

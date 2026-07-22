@@ -22,7 +22,12 @@ from witwin.channel_native.core.materials import Dielectric  # noqa: E402
 from witwin.channel_native.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
-DEFAULT_CHANNEL_ROOT = _REPO_ROOT.parent / "channel"
+def _default_channel_root() -> pathlib.Path:
+    candidates = tuple(parent / "channel" for parent in _REPO_ROOT.parents)
+    return next((path for path in candidates if path.is_dir()), candidates[0])
+
+
+DEFAULT_CHANNEL_ROOT = _default_channel_root()
 FREQUENCY_HZ = 3.0e9
 TX_POSITION = (0.0, -1.0, 0.5)
 GRID_BOUNDS = ((-1.0, 1.0), (0.0, 1.0))
