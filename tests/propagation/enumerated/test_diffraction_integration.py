@@ -5,11 +5,11 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.propagation.enumerated import diffraction
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel.propagation.enumerated import diffraction
+from witwin.channel.propagation.fields.kernels import (
     deterministic as field_kernels,
 )
-from witwin.channel_native.propagation.geometry import (
+from witwin.channel.propagation.geometry import (
     diffraction as geometry_diffraction,
 )
 

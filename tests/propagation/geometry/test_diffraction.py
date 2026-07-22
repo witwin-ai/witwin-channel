@@ -6,7 +6,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel_native.propagation.geometry import diffraction
+from witwin.channel.propagation.geometry import diffraction
 
 
 class _Rayd:

@@ -17,9 +17,9 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
-from witwin.channel_native.core.materials import Dielectric, PerfectConductor  # noqa: E402
-from witwin.channel_native.montecarlo.bdpt import Config, solve  # noqa: E402
+from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
+from witwin.channel.core.materials import Dielectric, PerfectConductor  # noqa: E402
+from witwin.channel.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
 DEFAULT_SIONNA_ROOT = pathlib.Path(

@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from witwin.channel_native.deterministic import Config
-from witwin.channel_native.deterministic import solve
+from witwin.channel.deterministic import Config
+from witwin.channel.deterministic import solve
 from tests.support.scenes import same_side_wall_reflection_scene
 
 

@@ -4,11 +4,11 @@ import inspect
 
 import pytest
 
-from witwin.channel_native.montecarlo.basic import kernels
-from witwin.channel_native.montecarlo.basic.kernels import capacity, maps, sampling
-from witwin.channel_native.propagation import topology
-from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel_native.runtime import (
+from witwin.channel.montecarlo.basic import kernels
+from witwin.channel.montecarlo.basic.kernels import capacity, maps, sampling
+from witwin.channel.propagation import topology
+from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel.runtime import (
     autograd_contracts,
     native_buffers,
     symbols,

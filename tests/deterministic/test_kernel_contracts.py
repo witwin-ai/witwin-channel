@@ -4,10 +4,10 @@ import inspect
 
 import pytest
 
-from witwin.channel_native.deterministic.kernels import accumulation
-from witwin.channel_native.propagation import fields as public_fields
-from witwin.channel_native.propagation.fields.kernels import deterministic as fields
-from witwin.channel_native.runtime import (
+from witwin.channel.deterministic.kernels import accumulation
+from witwin.channel.propagation import fields as public_fields
+from witwin.channel.propagation.fields.kernels import deterministic as fields
+from witwin.channel.runtime import (
     autograd_contracts,
     symbols,
     tensor_contracts,

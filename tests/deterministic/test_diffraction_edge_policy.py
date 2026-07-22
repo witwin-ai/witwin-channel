@@ -2,9 +2,9 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.deterministic import Config
-from witwin.channel_native.propagation.enumerated.engine import evaluate_enumerated_paths
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deterministic import Config
+from witwin.channel.propagation.enumerated.engine import evaluate_enumerated_paths
 
 
 def test_diffraction_topology_uses_selected_edge_ids():

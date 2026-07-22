@@ -7,8 +7,8 @@ from tests.support.scenes import (
     single_wall_reflection_scene,
     wedge_diffraction_scene,
 )
-from witwin.channel_native import ReceiverGrid
-from witwin.channel_native.montecarlo.bdpt import BDPTPathSamples, Config, solve
+from witwin.channel import ReceiverGrid
+from witwin.channel.montecarlo.bdpt import BDPTPathSamples, Config, solve
 
 
 def _reflection_grid() -> ReceiverGrid:

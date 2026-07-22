@@ -1,7 +1,7 @@
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.materials import Dielectric
 
 
 def _scene() -> Scene:

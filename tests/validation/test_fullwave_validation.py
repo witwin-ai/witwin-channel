@@ -24,8 +24,8 @@ from benchmarks.fullwave_validation.scenarios import (
     load_manifest,
     observation_valid_mask,
 )
-from witwin.channel_native import PerfectConductor
-from witwin.channel_native.core.materials import PhysicalSurface
+from witwin.channel import PerfectConductor
+from witwin.channel.core.materials import PhysicalSurface
 
 
 def _map(field, *, components=None, backend="test") -> FieldMap:
@@ -50,7 +50,7 @@ def test_manifest_declares_original_layout_provenance_and_six_cases():
 
     assert MANIFEST_PATH.is_file()
     assert manifest["schema"] == {
-        "name": "witwin.channel_native.fullwave-validation-scenarios",
+        "name": "witwin.channel.fullwave-validation-scenarios",
         "version": "1.0.0",
     }
     assert (

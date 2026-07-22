@@ -2,8 +2,8 @@ import pytest
 import torch
 
 from tests.support.reference_channel import los_path_gain_reference
-from witwin.channel_native import ReceiverGrid, Scene, Transmitter
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel import ReceiverGrid, Scene, Transmitter
+from witwin.channel.deterministic import Config, solve
 
 
 def _grid_scene() -> Scene:

@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
-from witwin.channel_native.montecarlo.bdpt.kernels import paths
+from witwin.channel.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel.montecarlo.bdpt.kernels import paths
 
 
 def test_bdpt_mis_kernel_matches_expected_constants():

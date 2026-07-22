@@ -6,12 +6,12 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.events import transmission
-from witwin.channel_native.montecarlo.basic import rayd_components
-from witwin.channel_native.propagation.models.penetration import (
+from witwin.channel.montecarlo.events import transmission
+from witwin.channel.montecarlo.basic import rayd_components
+from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationPolicy,
 )
-from witwin.channel_native.runtime.capacity import CapacityFailureState
+from witwin.channel.runtime.capacity import CapacityFailureState
 
 
 def _failure_state() -> CapacityFailureState:

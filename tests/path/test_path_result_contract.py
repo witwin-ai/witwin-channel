@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.path import Config, solve
+from witwin.channel.path import Config, solve
 
 
 def test_path_result_exports_topology_and_field_tensors():

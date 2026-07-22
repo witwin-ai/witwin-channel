@@ -14,7 +14,7 @@ sys.modules[SPEC.name] = contract
 SPEC.loader.exec_module(contract)
 
 
-def test_production_sources_do_not_import_legacy_channel_stacks():
+def test_production_sources_do_not_import_forbidden_backends():
     assert contract.scan_roots([ROOT]) == []
 
 
@@ -25,7 +25,6 @@ def test_contract_detects_direct_and_from_imports():
 
     assert [violation.module for violation in violations] == [
         "drjit",
-        "witwin.channel",
         "sionna.rt",
     ]
 
@@ -34,13 +33,5 @@ def test_relative_native_rayd_module_is_not_python_rayd_dependency():
     assert contract.scan_source("from .rayd import RayDSceneResource\n") == []
 
 
-def test_consumer_scan_allows_independent_radar_stack_but_rejects_old_channel():
-    assert contract.scan_source(
-        "import drjit\n", forbidden_modules=contract.LEGACY_CHANNEL_MODULES
-    ) == []
-
-    violations = contract.scan_source(
-        "from witwin import channel\n",
-        forbidden_modules=contract.LEGACY_CHANNEL_MODULES,
-    )
-    assert [violation.module for violation in violations] == ["witwin.channel"]
+def test_replacement_channel_namespace_is_not_a_forbidden_backend():
+    assert contract.scan_source("from witwin import channel\n") == []

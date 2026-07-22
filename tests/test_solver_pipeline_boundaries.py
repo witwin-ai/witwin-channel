@@ -43,17 +43,17 @@ def test_monte_carlo_pipelines_do_not_depend_on_enumerated_engine() -> None:
     for root in SOLVER_ROOTS[2:]:
         imports = _imports(root / "pipeline.py")
         assert not any(
-            module.startswith("witwin.channel_native.propagation.enumerated")
+            module.startswith("witwin.channel.propagation.enumerated")
             for module in imports
         )
 
 
 def test_solver_modules_do_not_import_another_solver() -> None:
     solver_prefixes = (
-        "witwin.channel_native.path",
-        "witwin.channel_native.deterministic",
-        "witwin.channel_native.montecarlo.basic",
-        "witwin.channel_native.montecarlo.bdpt",
+        "witwin.channel.path",
+        "witwin.channel.deterministic",
+        "witwin.channel.montecarlo.basic",
+        "witwin.channel.montecarlo.bdpt",
     )
     for owner, root in zip(solver_prefixes, SOLVER_ROOTS, strict=True):
         for path in (root / "solver.py", root / "pipeline.py"):

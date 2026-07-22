@@ -4,7 +4,7 @@ The previous production per-row assembly and host per-patch loop of
 ``propagation/enumerated/scattering.py::_realization_rows`` (jones, prefactor,
 carrier, per-patch ``patch_phase_integral`` quadrature, weighted total).
 ``patch_phase_integral`` itself remains a public utility in
-``witwin.channel_native.scattering`` (its only production caller was this
+``witwin.channel.scattering`` (its only production caller was this
 loop); this module reproduces the removed loop around it. Test-only: MUST NOT
 be imported from production packages.
 """
@@ -15,8 +15,8 @@ import math
 
 import torch
 
-from witwin.channel_native.core.tensor_math import normalize_vec3
-from witwin.channel_native.scattering import patch_phase_integral
+from witwin.channel.core.tensor_math import normalize_vec3
+from witwin.channel.scattering import patch_phase_integral
 
 
 def _stable_tangent(n: torch.Tensor) -> torch.Tensor:

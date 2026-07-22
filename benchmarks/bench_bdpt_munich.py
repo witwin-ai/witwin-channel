@@ -7,9 +7,9 @@ from pathlib import Path
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric, PerfectConductor
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter
+from witwin.channel.core.materials import Dielectric, PerfectConductor
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def _reduced_scene(grid_size: int) -> Scene:

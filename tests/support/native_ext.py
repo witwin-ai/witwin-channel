@@ -43,7 +43,7 @@ def _candidate_extensions() -> list[Path]:
 
 
 def native_extensions_available() -> bool:
-    if _importable("witwin.channel_native._channel_native"):
+    if _importable("witwin.channel._channel_native"):
         return True
     configured = os.environ.get(_PATH_ENV)
     fingerprint = os.environ.get(_FINGERPRINT_ENV)

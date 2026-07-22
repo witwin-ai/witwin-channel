@@ -63,8 +63,8 @@ def test_nsys_uses_launch_correlation_and_gpu_timeline_for_stage_time(
     database = _database(
         tmp_path / "capture.sqlite",
         ranges=(
-            ("witwin.channel_native:total", 100, 300),
-            ("witwin.channel_native:child", 110, 200),
+            ("witwin.channel:total", 100, 300),
+            ("witwin.channel:child", 110, 200),
         ),
         runtime=((120, 130, 41, 1), (140, 145, 42, 2), (146, 150, 43, 2)),
         # GPU work intentionally occurs after both CPU NVTX ranges close.
@@ -73,7 +73,7 @@ def test_nsys_uses_launch_correlation_and_gpu_timeline_for_stage_time(
     )
 
     parsed = parse_nsys_sqlite(database)
-    child = parsed["nvtx_ranges"]["witwin.channel_native:child"][0]
+    child = parsed["nvtx_ranges"]["witwin.channel:child"][0]
 
     assert child["duration_ms"] == pytest.approx(300 / 1_000_000)
     assert child["kernel_active_ms"] == pytest.approx(100 / 1_000_000)
@@ -86,13 +86,13 @@ def test_nsys_uses_launch_correlation_and_gpu_timeline_for_stage_time(
     assert child["h2d_copy_count"] == 1
     assert child["d2h_copy_count"] == 1
     assert child["device_copy_count"] == 0
-    assert child["parent_range_names"] == ["witwin.channel_native:total"]
+    assert child["parent_range_names"] == ["witwin.channel:total"]
 
 
 def test_nsys_rejects_missing_or_duplicate_kernel_correlation(tmp_path: Path) -> None:
     missing = _database(
         tmp_path / "missing.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 130, 41, 1),),
         kernels=((1_000, 1_100, 99, 7, 0),),
     )
@@ -101,7 +101,7 @@ def test_nsys_rejects_missing_or_duplicate_kernel_correlation(tmp_path: Path) ->
 
     duplicate = _database(
         tmp_path / "duplicate.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 130, 41, 1),),
         kernels=((1_000, 1_100, 41, 7, 0), (1_110, 1_200, 41, 7, 0)),
     )
@@ -112,7 +112,7 @@ def test_nsys_rejects_missing_or_duplicate_kernel_correlation(tmp_path: Path) ->
 def test_nsys_rejects_memcpy_api_without_gpu_activity(tmp_path: Path) -> None:
     database = _database(
         tmp_path / "missing-copy.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 130, 41, 1), (140, 150, 42, 2)),
         kernels=((1_000, 1_100, 41, 7, 0),),
     )
@@ -127,8 +127,8 @@ def test_nsys_allows_nested_ownership_but_rejects_sibling_contamination(
     database = _database(
         tmp_path / "sibling.sqlite",
         ranges=(
-            ("witwin.channel_native:first", 100, 190),
-            ("witwin.channel_native:second", 150, 240),
+            ("witwin.channel:first", 100, 190),
+            ("witwin.channel:second", 150, 240),
         ),
         runtime=((160, 170, 41, 1),),
         kernels=((1_000, 1_100, 41, 7, 0),),
@@ -141,7 +141,7 @@ def test_nsys_allows_nested_ownership_but_rejects_sibling_contamination(
 def test_nsys_rejects_ambiguous_multi_stream_stage(tmp_path: Path) -> None:
     database = _database(
         tmp_path / "streams.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 125, 41, 1), (130, 135, 42, 1)),
         kernels=((1_000, 1_100, 41, 7, 0), (1_110, 1_200, 42, 8, 0)),
     )
@@ -153,7 +153,7 @@ def test_nsys_rejects_ambiguous_multi_stream_stage(tmp_path: Path) -> None:
 def test_nsys_records_copy_streams_but_rejects_cross_device_copy(tmp_path: Path) -> None:
     database = _database(
         tmp_path / "cross-device.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 125, 41, 1), (130, 135, 42, 2)),
         kernels=((1_000, 1_100, 41, 7, 0),),
         copies=((900, 950, 42, 8, 1, 1, 1024),),

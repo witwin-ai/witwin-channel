@@ -11,7 +11,7 @@ def test_peak_memory_report_includes_100m_preflight_artifact():
     )
 
     assert report["schema"] == {
-        "name": "witwin.channel_native.performance",
+        "name": "witwin.channel.performance",
         "version": "1.0.0",
     }
     by_samples = {row["samples"]: row for row in report["results"]}

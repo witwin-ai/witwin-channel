@@ -17,15 +17,15 @@ once that wiring lands.
 import pytest
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverPoint,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface, Roughness
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 _FREQUENCY = 60.0e9

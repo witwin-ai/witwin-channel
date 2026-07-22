@@ -1,6 +1,6 @@
 import pytest
 
-from witwin.channel_native.montecarlo.basic import Config
+from witwin.channel.montecarlo.basic import Config
 
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])

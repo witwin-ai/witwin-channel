@@ -6,14 +6,14 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.propagation.topology.kernels import compaction
-from witwin.channel_native.propagation.topology.concatenate import (
+from witwin.channel.propagation.topology.kernels import compaction
+from witwin.channel.propagation.topology.concatenate import (
     _canonical_selection_order,
 )
-from witwin.channel_native.propagation.topology.kernels.compaction import (
+from witwin.channel.propagation.topology.kernels.compaction import (
     enumerated_canonical_capacity_select,
 )
-from witwin.channel_native.runtime.capacity import (
+from witwin.channel.runtime.capacity import (
     CapacityFailureBit,
     create_capacity_failure_state,
 )
@@ -469,10 +469,10 @@ def test_selector_has_no_fallback_sync_or_intermediate_trap() -> None:
     ).read_text(encoding="utf-8")
     facade = (
         root
-        / "src/witwin/channel_native/propagation/topology/kernels/compaction.py"
+        / "src/witwin/channel/propagation/topology/kernels/compaction.py"
     ).read_text(encoding="utf-8")
     live_engine = (
-        root / "src/witwin/channel_native/propagation/enumerated/engine.py"
+        root / "src/witwin/channel/propagation/enumerated/engine.py"
     ).read_text(encoding="utf-8")
     for forbidden in (
         "cudaMemcpy",

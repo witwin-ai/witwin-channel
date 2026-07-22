@@ -9,7 +9,7 @@
       "type": "object",
       "required": ["name", "version"],
       "properties": {
-        "name": {"const": "witwin.channel_native.sm-support"},
+        "name": {"const": "witwin.channel.sm-support"},
         "version": {"const": "1.0.0"}
       }
     },

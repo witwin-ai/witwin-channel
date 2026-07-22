@@ -59,12 +59,12 @@ from tests.support.scenes import (
     transmission_wall_structure,
     wedge_diffraction_scene,
 )
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface
-from witwin.channel_native.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel_native.montecarlo.bdpt import solve as bdpt_solve
-from witwin.channel_native.montecarlo.events.scattering import rough_material_runtimes
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.montecarlo.bdpt import solve as bdpt_solve
+from witwin.channel.montecarlo.events.scattering import rough_material_runtimes
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for BDPT solver AD"
@@ -132,7 +132,7 @@ def _scattering_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
 
 
 def _coherent_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
-    from witwin.channel_native.core.materials import Dielectric
+    from witwin.channel.core.materials import Dielectric
 
     return wedge_diffraction_scene(
         material=Dielectric(eps_r=5.0, sigma_e=0.02), frequency=frequency

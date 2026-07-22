@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import torch
 
-from witwin.channel_native.propagation.geometry.silhouette_clearance import (
+from witwin.channel.propagation.geometry.silhouette_clearance import (
     apply_los_taper,
     los_clearance_factor,
 )

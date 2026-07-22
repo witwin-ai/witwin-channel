@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from witwin.channel_native.core.kernels import extension
-from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
-from witwin.channel_native.propagation.geometry.kernels import bridge as ops
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native.scene.kernels import rayd_scene
+from witwin.channel.core.kernels import extension
+from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
+from witwin.channel.propagation.geometry.kernels import bridge as ops
+from witwin.channel.runtime import symbols
+from witwin.channel.scene.kernels import rayd_scene
 
 
 def test_channel_native_extension_loader_has_no_artifact_fallback():
@@ -264,7 +264,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
 
 
 def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
-    from witwin.channel_native.montecarlo.basic import pipeline as mc_basic_pipeline
+    from witwin.channel.montecarlo.basic import pipeline as mc_basic_pipeline
 
     solve_source = inspect.getsource(mc_basic_pipeline.solve_pipeline)
     module_source = inspect.getsource(mc_basic_pipeline)
@@ -279,7 +279,7 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
 
 
 def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_export():
-    from witwin.channel_native.montecarlo.bdpt import pipeline as bdpt_pipeline
+    from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
 
     source = inspect.getsource(bdpt_pipeline)
 

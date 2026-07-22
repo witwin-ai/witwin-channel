@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import torch
 
-from witwin.channel_native.core import scene_tensors
-from witwin.channel_native.deterministic import solver
+from witwin.channel.core import scene_tensors
+from witwin.channel.deterministic import solver
 
 
 def test_frequency_scalar_preserves_detached_scalar_contract():

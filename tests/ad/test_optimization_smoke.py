@@ -18,8 +18,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.deterministic import Config, solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for the optimization smoke"

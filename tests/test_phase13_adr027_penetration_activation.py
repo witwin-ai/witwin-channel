@@ -58,7 +58,7 @@ def test_phase_e_symbols_have_one_live_owner_contract_and_e2e_caller() -> None:
 
 
 def test_phase_e_deletes_old_depth_march_without_a_compatibility_alias() -> None:
-    package = ROOT / "src/witwin/channel_native"
+    package = ROOT / "src/witwin/channel"
     assert not (package / "propagation/geometry/transmission.py").exists()
     assert not (package / "propagation/topology/discovery/transmission.py").exists()
     for path in package.rglob("*.py"):
@@ -90,7 +90,7 @@ def test_phase_e_docs_keep_the_adr029_compaction_blocker_explicit() -> None:
         ROOT
         / "docs/dev/plans/13-direct-rayd-integration-and-rf-runtime-ownership-plan.md"
     ).read_text(encoding="utf-8")
-    propagation = (ROOT / "src/witwin/channel_native/propagation/README.md").read_text(
+    propagation = (ROOT / "src/witwin/channel/propagation/README.md").read_text(
         encoding="utf-8"
     )
 

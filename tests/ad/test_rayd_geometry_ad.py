@@ -23,10 +23,10 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
     REL_TOL_PATH,
 )
-from witwin.channel_native import Scene, Structure
-from witwin.channel_native.propagation.geometry.kernels import autograd as ops
-from witwin.channel_native.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel_native.core.materials import Dielectric
+from witwin.channel import Scene, Structure
+from witwin.channel.propagation.geometry.kernels import autograd as ops
+from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.core.materials import Dielectric
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for RayD geometry AD"
@@ -49,7 +49,7 @@ _WALL_FACES = ((0, 1, 2), (0, 2, 3))
 
 
 def _source_linked_rayd_available() -> bool:
-    from witwin.channel_native.core.kernels.extension import build_info
+    from witwin.channel.core.kernels.extension import build_info
 
     try:
         return build_info()["rayd_integration"] == "source-linked"

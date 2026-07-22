@@ -10,12 +10,12 @@ import math
 import numpy as np
 import torch
 
-from witwin.channel_native.core.materials import PhaseScreen, Roughness
-from witwin.channel_native.physics.oracle import (
+from witwin.channel.core.materials import PhaseScreen, Roughness
+from witwin.channel.physics.oracle import (
     C0,
     phase_screen_patch_integral as oracle_patch_integral,
 )
-from witwin.channel_native.scattering import (
+from witwin.channel.scattering import (
     PhaseScreenRuntime,
     generate_gaussian_realization,
     patch_phase_integral,

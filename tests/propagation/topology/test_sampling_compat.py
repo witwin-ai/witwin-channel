@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from ci import check_import_graph
-from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
-from witwin.channel_native.propagation.enumerated import reflection
-from witwin.channel_native.propagation import topology
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
+from witwin.channel.propagation.enumerated import reflection
+from witwin.channel.propagation import topology
+from witwin.channel.propagation.topology.kernels import (
     sampling as topology_sampling,
 )
-from witwin.channel_native.runtime import symbols, tensor_contracts
+from witwin.channel.runtime import symbols, tensor_contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -43,7 +43,7 @@ def test_multibounce_discovery_uses_the_canonical_sampling_owner():
 
 def test_sampling_dependency_uses_the_public_topology_seam():
     edges = check_import_graph.collect_import_edges(PACKAGE_ROOT)
-    package = "witwin.channel_native"
+    package = "witwin.channel"
     mc_source = f"{package}.montecarlo.basic.kernels.sampling"
     public_target = f"{package}.propagation.topology"
     canonical_target = f"{package}.propagation.topology.kernels.sampling"

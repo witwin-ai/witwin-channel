@@ -1,6 +1,6 @@
 {
   "schema": {
-    "name": "witwin.channel_native.fullwave-validation-scenarios",
+    "name": "witwin.channel.fullwave-validation-scenarios",
     "version": "1.0.0"
   },
   "electromagnetic_scaling": {

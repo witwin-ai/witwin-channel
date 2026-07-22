@@ -8,8 +8,8 @@ import sys
 
 import pytest
 
-from witwin.channel_native import Scene
-from witwin.channel_native.core.edge_policy import EdgePolicy
+from witwin.channel import Scene
+from witwin.channel.core.edge_policy import EdgePolicy
 
 
 _MUNICH_XML = (
@@ -71,8 +71,8 @@ from tests.support.native_ext import inject_native_paths
 
 inject_native_paths()
 
-from witwin.channel_native import Scene
-from witwin.channel_native.core.edge_policy import EdgePolicy
+from witwin.channel import Scene
+from witwin.channel.core.edge_policy import EdgePolicy
 
 scene = Scene.load_mitsuba(
     Path({str(_MUNICH_XML)!r}),

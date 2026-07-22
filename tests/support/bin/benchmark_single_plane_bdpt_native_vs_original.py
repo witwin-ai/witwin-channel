@@ -17,9 +17,9 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
-from witwin.channel_native.core.materials import Dielectric  # noqa: E402
-from witwin.channel_native.montecarlo.bdpt import Config, solve  # noqa: E402
+from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
+from witwin.channel.core.materials import Dielectric  # noqa: E402
+from witwin.channel.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
 def _default_channel_root() -> pathlib.Path:

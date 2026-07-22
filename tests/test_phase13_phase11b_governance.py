@@ -26,16 +26,16 @@ _EXPECTED_PENDING_FINAL_ACCEPTANCE = {
     "Phase 12 profiler and performance evidence",
 }
 _PHASE11B_SOURCE_SHA256 = {
-    "src/witwin/channel_native/propagation/fields/kernels/functional.py": (
+    "src/witwin/channel/propagation/fields/kernels/functional.py": (
         "9cc738bb1a5b75e52f7ad7c34ba9f02d4a89492adec3e96702023a965b318ed0"
     ),
-    "src/witwin/channel_native/scattering/kernels/functional.py": (
+    "src/witwin/channel/scattering/kernels/functional.py": (
         "92b3764a6553c5f35e4efc4e5bee838b4d4a4ca1186004ef22ea2bd76084da33"
     ),
-    "src/witwin/channel_native/scattering/kernels/functional_chain.py": (
+    "src/witwin/channel/scattering/kernels/functional_chain.py": (
         "4e158e006a209f5ec1c34662bdfb6b38bbd50fad27b233b311d328e5f74023dc"
     ),
-    "src/witwin/channel_native/scattering/kernels/autograd_chain.py": (
+    "src/witwin/channel/scattering/kernels/autograd_chain.py": (
         "8615d85227ea66f69ffb91bc47baa7f8dec9cf9265e354dbc17b5f83f478d95a"
     ),
     "native/channel_native/kernels/bdpt_connect_visibility.cu": (
@@ -68,15 +68,15 @@ _LIVE_TOP_LEVEL = (
 )
 _TRIANGLE_VERTEX_V2_LINES = {
     (
-        "src/witwin/channel_native/montecarlo/events/scattering.py",
+        "src/witwin/channel/montecarlo/events/scattering.py",
         "v2 = vertices.index_select(0, faces[:, 2])",
     ),
     (
-        "src/witwin/channel_native/montecarlo/events/scattering.py",
+        "src/witwin/channel/montecarlo/events/scattering.py",
         "areas = 0.5 * torch.linalg.cross(v1 - v0, v2 - v0).norm(dim=-1)",
     ),
     (
-        "src/witwin/channel_native/montecarlo/events/scattering.py",
+        "src/witwin/channel/montecarlo/events/scattering.py",
         "+ b2 * v2.index_select(0, chosen)",
     ),
     (
@@ -85,7 +85,7 @@ _TRIANGLE_VERTEX_V2_LINES = {
     ),
     ("native/channel_native/kernels/diffraction.cu", "return v2;"),
     (
-        "src/witwin/channel_native/propagation/geometry/kernels/autograd.py",
+        "src/witwin/channel/propagation/geometry/kernels/autograd.py",
         "companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))",
     ),
 }
@@ -198,10 +198,10 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
 
 def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved() -> None:
     functional_path = (
-        ROOT / "src/witwin/channel_native/scattering/kernels/functional_chain.py"
+        ROOT / "src/witwin/channel/scattering/kernels/functional_chain.py"
     )
     autograd_path = (
-        ROOT / "src/witwin/channel_native/scattering/kernels/autograd_chain.py"
+        ROOT / "src/witwin/channel/scattering/kernels/autograd_chain.py"
     )
     ensemble = _literal_tuple(functional_path, "_CHAIN_ENSEMBLE_PRIMAL_NAMES")
     realization = _literal_tuple(functional_path, "_CHAIN_REALIZATION_PRIMAL_NAMES")

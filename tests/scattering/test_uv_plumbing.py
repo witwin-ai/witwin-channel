@@ -5,8 +5,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import (
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.materials import (
     Dielectric,
     Layer,
     PhaseScreen,
@@ -14,11 +14,11 @@ from witwin.channel_native.core.materials import (
     Roughness,
     SurfaceAssignment,
 )
-from witwin.channel_native.core.objects import planar_uv
+from witwin.channel.core.objects import planar_uv
 
 
 def _source_linked_rayd_available() -> bool:
-    from witwin.channel_native.core.kernels.extension import build_info
+    from witwin.channel.core.kernels.extension import build_info
 
     try:
         return build_info()["rayd_integration"] == "source-linked"
@@ -147,7 +147,7 @@ def test_scene_with_uv_builds_and_traces(with_uv):
     if not _source_linked_rayd_available():
         pytest.skip("RayD native extension is not built")
 
-    from witwin.channel_native.propagation.geometry.kernels.bridge import (
+    from witwin.channel.propagation.geometry.kernels.bridge import (
         rayd_intersect_forward,
     )
 

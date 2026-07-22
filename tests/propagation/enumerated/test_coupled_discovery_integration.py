@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.propagation.enumerated import coupled
-from witwin.channel_native.propagation.topology.discovery import (
+from witwin.channel.propagation.enumerated import coupled
+from witwin.channel.propagation.topology.discovery import (
     coupled as discovery_coupled,
 )
 

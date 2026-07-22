@@ -3,18 +3,18 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native import Scene, Structure
-from witwin.channel_native.core.materials import Dielectric
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.propagation.models.penetration import (
+from witwin.channel import Scene, Structure
+from witwin.channel.core.materials import Dielectric
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
 )
-from witwin.channel_native.propagation.topology.kernels.transmission import (
+from witwin.channel.propagation.topology.kernels.transmission import (
     enumerated_transmission_topology_pack,
 )
-from witwin.channel_native.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime.capacity import create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

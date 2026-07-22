@@ -66,7 +66,7 @@ def test_profile_contract_is_the_only_stable_range_and_scenario_manifest() -> No
             all_names.extend(variant_row["required_ranges"])
             all_names.extend(variant_row["forbidden_ranges"])
             all_names.extend(variant_row["required_markers"])
-    assert all(name.startswith("witwin.channel_native:") for name in all_names)
+    assert all(name.startswith("witwin.channel:") for name in all_names)
 
 
 def test_diffraction_known_live_multiplicity_is_not_historical_compaction() -> None:
@@ -74,11 +74,11 @@ def test_diffraction_known_live_multiplicity_is_not_historical_compaction() -> N
     baseline = diffraction["variants"]["baseline"]["known_range_multiplicity_per_solve"]
     candidate = diffraction["variants"]["candidate"]["known_range_multiplicity_per_solve"]
 
-    assert baseline["witwin.channel_native:diffraction_exporter"] == 13
-    assert baseline["witwin.channel_native:diffraction_topology_packing"] == 13
-    assert baseline["witwin.channel_native:diffraction_total_stage"] == 1
-    assert candidate["witwin.channel_native:diffraction_exporter"] == 2
-    assert candidate["witwin.channel_native:diffraction_total_stage"] == 1
+    assert baseline["witwin.channel:diffraction_exporter"] == 13
+    assert baseline["witwin.channel:diffraction_topology_packing"] == 13
+    assert baseline["witwin.channel:diffraction_total_stage"] == 1
+    assert candidate["witwin.channel:diffraction_exporter"] == 2
+    assert candidate["witwin.channel:diffraction_total_stage"] == 1
 
 
 def test_runner_config_rejects_external_prebuilt_extension_field(tmp_path: Path) -> None:
@@ -93,7 +93,7 @@ def test_runner_config_rejects_external_prebuilt_extension_field(tmp_path: Path)
     }
     config = {
         "schema": {
-            "name": "witwin.channel_native.phase13-phase12-runner-config",
+            "name": "witwin.channel.phase13-phase12-runner-config",
             "version": 3,
         },
         "comparisons": {

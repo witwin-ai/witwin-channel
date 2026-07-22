@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel_native.propagation.topology.discovery.los import (
+from witwin.channel.propagation.topology.discovery.los import (
     LosCandidatePlan,
     prepare_los_candidates,
 )

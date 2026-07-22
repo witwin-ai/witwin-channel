@@ -4,15 +4,15 @@ import inspect
 
 import pytest
 
-from witwin.channel_native.propagation.fields.kernels import autograd as ops
-from witwin.channel_native.propagation import fields
-from witwin.channel_native.propagation.fields import kernels
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel.propagation.fields.kernels import autograd as ops
+from witwin.channel.propagation import fields
+from witwin.channel.propagation.fields import kernels
+from witwin.channel.propagation.fields.kernels import (
     autograd,
     autograd_projection,
     functional,
 )
-from witwin.channel_native.runtime import autograd_contracts, symbols, torch_compat
+from witwin.channel.runtime import autograd_contracts, symbols, torch_compat
 
 
 _OWNER_NAMES = (

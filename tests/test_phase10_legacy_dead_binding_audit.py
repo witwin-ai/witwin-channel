@@ -16,7 +16,7 @@ AUDIT_PATH = (
 OPS_MANIFEST_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase12-ops-migration-ledger.json"
 )
-PYTHON_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel_native"
+PYTHON_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 PHASE12_RETIRED_EVIDENCE_TESTS = frozenset(
     {"tests/propagation/geometry/test_reevaluate_compat.py"}
 )
@@ -174,7 +174,7 @@ def test_phase10_fresnel_scalar_dead_candidate_is_removed_exactly() -> None:
         for item in audit["zero_reference_candidates"]
         if item["name"] == "_fresnel_scalar_coefficient"
     )
-    field_path = REPOSITORY_ROOT / "src/witwin/channel_native/deterministic/field.py"
+    field_path = REPOSITORY_ROOT / "src/witwin/channel/deterministic/field.py"
     production_references = [
         path.relative_to(REPOSITORY_ROOT).as_posix()
         for path in PYTHON_ROOT.rglob("*.py")
@@ -199,7 +199,7 @@ def test_phase10_bdpt_native_diffraction_component_maps_is_removed_exactly() -> 
     )
     pipeline_path = (
         REPOSITORY_ROOT
-        / "src/witwin/channel_native/montecarlo/bdpt/pipeline.py"
+        / "src/witwin/channel/montecarlo/bdpt/pipeline.py"
     )
     tree = ast.parse(pipeline_path.read_text(encoding="utf-8-sig"))
     top_level_names = {

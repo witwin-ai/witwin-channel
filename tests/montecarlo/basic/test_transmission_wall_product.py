@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.basic.kernels import transmission
-from witwin.channel_native.montecarlo.basic.kernels.transmission import (
+from witwin.channel.montecarlo.basic.kernels import transmission
+from witwin.channel.montecarlo.basic.kernels.transmission import (
     mc_transmission_wall_product,
     mc_transmission_wall_product_ad,
     mc_transmission_wall_product_backward,
     mc_transmission_wall_product_jvp,
 )
-from witwin.channel_native.runtime import CapacityFailureBit
-from witwin.channel_native.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime import CapacityFailureBit
+from witwin.channel.runtime.capacity import create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(
@@ -712,7 +712,7 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
         _ROOT / "native/channel_native/kernels/mc_transmission_wall_product.cu"
     ).read_text(encoding="utf-8")
     live_route = (
-        _ROOT / "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
+        _ROOT / "src/witwin/channel/montecarlo/basic/rayd_components.py"
     ).read_text(encoding="utf-8")
     assert "wall_product_shared_backward_kernel" in source
     assert "frequency_owner" in source

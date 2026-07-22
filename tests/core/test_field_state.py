@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel_native import Complex3State, JonesState
+from witwin.channel import Complex3State, JonesState
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")

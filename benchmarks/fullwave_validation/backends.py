@@ -14,7 +14,7 @@ _METERS_TO_MICROMETERS = 1.0e6
 
 
 def solve_deterministic(spec: CaseSpec) -> FieldMap:
-    from witwin.channel_native.deterministic import Config, solve
+    from witwin.channel.deterministic import Config, solve
 
     result = solve(
         build_channel_scene(spec),

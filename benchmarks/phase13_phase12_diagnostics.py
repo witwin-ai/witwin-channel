@@ -16,7 +16,7 @@ from phase13_phase12_worker import _munich_scene, _wall_scene
 
 
 SCHEMA = {
-    "name": "witwin.channel_native.phase13-phase12-diagnostic-worker",
+    "name": "witwin.channel.phase13-phase12-diagnostic-worker",
     "version": 1,
 }
 
@@ -88,10 +88,10 @@ def _peak_host_bytes() -> int:
 
 
 def _enumerated() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
-    from witwin.channel_native.propagation.enumerated.transmission import (
+    from witwin.channel.propagation.enumerated.transmission import (
         _transmission_topology,
     )
-    from witwin.channel_native.scene.tensors import (
+    from witwin.channel.scene.tensors import (
         receiver_positions,
         transmitter_positions,
     )
@@ -140,13 +140,13 @@ def _enumerated() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
 
 
 def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
-    from witwin.channel_native.materials.encoding import face_material_field_bundle
-    from witwin.channel_native.montecarlo.events.transmission import (
+    from witwin.channel.materials.encoding import face_material_field_bundle
+    from witwin.channel.montecarlo.events.transmission import (
         layer_csr_view,
         scene_diagonal_m,
         straight_transmission_chains,
     )
-    from witwin.channel_native.scene.tensors import (
+    from witwin.channel.scene.tensors import (
         receiver_grid_points,
         transmitter_polarizations,
         transmitter_positions,
@@ -177,21 +177,21 @@ def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
 def _diffraction(
     variant: str, munich_scene_xml: Path, sionna_source_root: Path
 ) -> tuple[dict[str, torch.Tensor], dict[str, object]]:
-    from witwin.channel_native.propagation.enumerated.diffraction import (
+    from witwin.channel.propagation.enumerated.diffraction import (
         _deterministic_diffraction_states,
         _diffraction_topology_order1,
     )
-    from witwin.channel_native.propagation.geometry.diffraction import (
+    from witwin.channel.propagation.geometry.diffraction import (
         DiffractionOrder1Query,
         plan_tx_visible_diffraction_states,
         query_diffraction_order1,
     )
-    from witwin.channel_native.scene.tensors import (
+    from witwin.channel.scene.tensors import (
         LIGHT_SPEED_M_PER_S,
         receiver_positions,
         transmitter_positions,
     )
-    from witwin.channel_native.propagation.topology.discovery.diffraction import (
+    from witwin.channel.propagation.topology.discovery.diffraction import (
         prepare_diffraction_order1_plan,
     )
 
@@ -209,10 +209,10 @@ def _diffraction(
     if variant == "baseline":
         return {"target": target}, {"mode": "old_compact_atomic_target"}
 
-    from witwin.channel_native.core.field_state import transmitter_polarizations as field_polarizations
-    from witwin.channel_native.materials.encoding import face_material_tensors
-    from witwin.channel_native.propagation.geometry.diffraction import DiffractionPathLayout
-    from witwin.channel_native.runtime.capacity import create_capacity_failure_state
+    from witwin.channel.core.field_state import transmitter_polarizations as field_polarizations
+    from witwin.channel.materials.encoding import face_material_tensors
+    from witwin.channel.propagation.geometry.diffraction import DiffractionPathLayout
+    from witwin.channel.runtime.capacity import create_capacity_failure_state
 
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (
         face_material_tensors(compiled, device=device)

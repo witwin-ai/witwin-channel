@@ -5,18 +5,18 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.propagation.enumerated.canonical_capacity import (
+from witwin.channel.propagation.enumerated.canonical_capacity import (
     evaluated_paths_canonical_capacity_gather,
 )
-from witwin.channel_native.propagation.models.capacity import (
+from witwin.channel.propagation.models.capacity import (
     CanonicalEvaluatedPaths,
     CanonicalPathSelection,
 )
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
-from witwin.channel_native.runtime import (
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
     create_capacity_failure_state,

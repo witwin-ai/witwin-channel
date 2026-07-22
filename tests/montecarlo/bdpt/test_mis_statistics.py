@@ -4,8 +4,8 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def _estimates(*, samples: int, mis: str) -> list[float]:

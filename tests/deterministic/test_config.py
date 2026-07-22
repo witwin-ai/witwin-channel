@@ -1,6 +1,6 @@
 import pytest
 
-from witwin.channel_native.deterministic import Config
+from witwin.channel.deterministic import Config
 
 
 def test_config_defaults_match_public_contract():

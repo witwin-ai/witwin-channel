@@ -153,7 +153,7 @@ def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
         ROOT / "docs/dev/standards/adr-010-native-scattering-kernels.md"
     ).read_text(encoding="utf-8")
     scattering_readme = (
-        ROOT / "src/witwin/channel_native/scattering/README.md"
+        ROOT / "src/witwin/channel/scattering/README.md"
     ).read_text(encoding="utf-8")
 
     assert "ADR-032 已接受" in plan

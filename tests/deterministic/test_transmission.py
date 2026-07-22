@@ -16,15 +16,15 @@ import pytest
 import torch
 
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.materials.kernels import functional as ops
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import (
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.materials.kernels import functional as ops
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import (
     Layer,
     PerfectConductor,
     PhysicalSurface,
 )
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.deterministic import Config, solve
 
 _FREQUENCY_HZ = 3.0e9
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -185,7 +185,7 @@ def test_max_depth_overflow_is_fail_loud_for_two_walls():
             _vacuum_wall,
         )
         from tests.support.scenes import transmission_wall_structure
-        from witwin.channel_native.deterministic import solve
+        from witwin.channel.deterministic import solve
 
         structures = [
             transmission_wall_structure(

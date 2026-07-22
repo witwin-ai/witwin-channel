@@ -156,7 +156,7 @@ def _native_scene() -> Any:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
-    from witwin.channel_native import ReceiverGrid, Scene, Transmitter
+    from witwin.channel import ReceiverGrid, Scene, Transmitter
 
     dx = (BOUNDS[0][1] - BOUNDS[0][0]) / GRID[0]
     dy = (BOUNDS[1][1] - BOUNDS[1][0]) / GRID[1]
@@ -186,7 +186,7 @@ def run_native_planar_benchmark(
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
-    from witwin.channel_native.montecarlo.basic import Config, solve
+    from witwin.channel.montecarlo.basic import Config, solve
 
     if not torch.cuda.is_available():
         raise RuntimeError("native benchmark requires CUDA")

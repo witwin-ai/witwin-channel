@@ -27,11 +27,11 @@ from benchmarks.statistical_gate import (
 from tests.montecarlo.basic import test_basic_scattering as basic_scattering
 from tests.montecarlo.bdpt import test_transmission as bdpt_transmission
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel_native.core.materials import PerfectConductor
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic import solve as solve_basic
-from witwin.channel_native.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel_native.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.core.materials import PerfectConductor
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.basic import solve as solve_basic
+from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
 
 
 _DEFAULT_GATE = _ROOT / "benchmarks" / "gates" / "phase_c_statistics.v1.json"
@@ -148,7 +148,7 @@ def run(*, mode: str, gate_path: Path) -> dict[str, object]:
         cases[name] = {"summary": summary, "checks": checks, "passed": case_passed}
         passed &= case_passed
     return {
-        "schema": {"name": "witwin.channel_native.statistics", "version": "1.0.0"},
+        "schema": {"name": "witwin.channel.statistics", "version": "1.0.0"},
         "mode": mode,
         "seeds": list(seeds),
         "cases": cases,

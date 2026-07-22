@@ -5,15 +5,15 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.propagation.enumerated import engine, transmission
-from witwin.channel_native.propagation.models.penetration import (
+from witwin.channel.propagation.enumerated import engine, transmission
+from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationPolicy,
 )
-from witwin.channel_native.propagation.topology.export import (
+from witwin.channel.propagation.topology.export import (
     EvaluatedPathSidecars,
     PathExecutionStats,
 )
-from witwin.channel_native.runtime.capacity import CapacityFailureState
+from witwin.channel.runtime.capacity import CapacityFailureState
 
 
 def _unchecked_failure_state() -> CapacityFailureState:

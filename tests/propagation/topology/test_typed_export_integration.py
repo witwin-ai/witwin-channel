@@ -6,13 +6,13 @@ from pathlib import Path
 import torch
 
 from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
-from witwin.channel_native.deterministic import solver as deterministic_solver
-from witwin.channel_native.deterministic import pipeline as deterministic_pipeline
-from witwin.channel_native.montecarlo.bdpt import pipeline as bdpt_pipeline
-from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
-from witwin.channel_native.path import solver as path_solver
-from witwin.channel_native.path import pipeline as path_pipeline
-from witwin.channel_native.propagation.enumerated import engine, scattering
+from witwin.channel.deterministic import solver as deterministic_solver
+from witwin.channel.deterministic import pipeline as deterministic_pipeline
+from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
+from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel.path import solver as path_solver
+from witwin.channel.path import pipeline as path_pipeline
+from witwin.channel.propagation.enumerated import engine, scattering
 
 
 def _function(module, name: str) -> ast.FunctionDef:
@@ -61,8 +61,8 @@ def test_canonical_engine_has_no_legacy_batch_or_adapter_dependency():
         and node.name == "evaluate_enumerated_paths"
     )
 
-    assert "witwin.channel_native.core.path_topology" not in imported_modules
-    assert "witwin.channel_native.propagation.models.adapters" not in imported_modules
+    assert "witwin.channel.core.path_topology" not in imported_modules
+    assert "witwin.channel.propagation.models.adapters" not in imported_modules
     assert not any(
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -147,9 +147,9 @@ def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert "witwin.channel_native.propagation" in imported_modules
-    assert "witwin.channel_native.propagation.enumerated.engine" not in imported_modules
-    assert "witwin.channel_native.propagation.topology.export" not in imported_modules
+    assert "witwin.channel.propagation" in imported_modules
+    assert "witwin.channel.propagation.enumerated.engine" not in imported_modules
+    assert "witwin.channel.propagation.topology.export" not in imported_modules
 
 
 def test_bdpt_connection_samples_read_typed_domains_exactly():

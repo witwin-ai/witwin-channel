@@ -14,7 +14,7 @@ from tests.support.bin.benchmark_munich_deterministic_native_vs_original import 
     _parser,
     run,
 )
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.deterministic import Config, solve
 
 
 def test_reduced_munich_deterministic_parity_emits_artifacts():

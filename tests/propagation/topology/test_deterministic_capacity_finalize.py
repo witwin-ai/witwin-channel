@@ -5,14 +5,14 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.propagation.models import CapacityPathSelection
-from witwin.channel_native.propagation.topology.kernels import compaction
-from witwin.channel_native.runtime import (
+from witwin.channel.propagation.models import CapacityPathSelection
+from witwin.channel.propagation.topology.kernels import compaction
+from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
     create_capacity_failure_state,
 )
-from witwin.channel_native.runtime.symbols import required_symbol
+from witwin.channel.runtime.symbols import required_symbol
 
 
 pytestmark = pytest.mark.skipif(

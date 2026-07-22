@@ -4,9 +4,9 @@ import ast
 import inspect
 from pathlib import Path
 
-from witwin.channel_native.propagation import enumerated
-from witwin.channel_native.propagation.enumerated import engine
-from witwin.channel_native.propagation.topology import export
+from witwin.channel.propagation import enumerated
+from witwin.channel.propagation.enumerated import engine
+from witwin.channel.propagation.topology import export
 
 
 _COMPONENT_STAGES = (

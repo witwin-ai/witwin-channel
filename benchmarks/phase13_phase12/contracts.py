@@ -17,15 +17,15 @@ from pathlib import Path
 import stat
 
 
-SCHEMA_NAME = "witwin.channel_native.phase13-phase12-evidence"
+SCHEMA_NAME = "witwin.channel.phase13-phase12-evidence"
 SCHEMA_VERSION = 2
-WORKER_SCHEMA_NAME = "witwin.channel_native.phase13-phase12-worker"
+WORKER_SCHEMA_NAME = "witwin.channel.phase13-phase12-worker"
 WORKER_SCHEMA_VERSION = 2
-IDENTITY_SCHEMA_NAME = "witwin.channel_native.phase13-phase12-identity-probe"
+IDENTITY_SCHEMA_NAME = "witwin.channel.phase13-phase12-identity-probe"
 IDENTITY_SCHEMA_VERSION = 3
-SUPPORT_SCHEMA_NAME = "witwin.channel_native.phase13-phase12-support"
+SUPPORT_SCHEMA_NAME = "witwin.channel.phase13-phase12-support"
 SUPPORT_SCHEMA_VERSION = 2
-RUNNER_CONFIG_NAME = "witwin.channel_native.phase13-phase12-runner-config"
+RUNNER_CONFIG_NAME = "witwin.channel.phase13-phase12-runner-config"
 RUNNER_CONFIG_VERSION = 3
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GATE = ROOT / "benchmarks/gates/phase13_phase12.json"
@@ -458,7 +458,7 @@ def _validate_gate_structure(gate: Mapping[str, object]) -> None:
         label="gate",
     )
     schema_identity(
-        gate["schema"], name="witwin.channel_native.phase13-phase12-gate",
+        gate["schema"], name="witwin.channel.phase13-phase12-gate",
         version=3, label="gate.schema",
     )
     groups = exact_keys(

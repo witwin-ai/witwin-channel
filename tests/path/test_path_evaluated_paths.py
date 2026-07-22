@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.path import pipeline as path_pipeline
-from witwin.channel_native.path import solver as path_solver
-from witwin.channel_native.path.config import Config
-from witwin.channel_native.path.result import InteractionType, from_evaluated_paths
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
-from witwin.channel_native.propagation.topology.export import (
+from witwin.channel.path import pipeline as path_pipeline
+from witwin.channel.path import solver as path_solver
+from witwin.channel.path.config import Config
+from witwin.channel.path.result import InteractionType, from_evaluated_paths
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.topology.export import (
     EvaluatedPathSidecars,
     PathExecutionStats,
 )

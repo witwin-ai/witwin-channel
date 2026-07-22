@@ -15,62 +15,62 @@ import weakref
 import pytest
 import torch
 
-import witwin.channel_native as public
+import witwin.channel as public
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native import materials as public_materials
-from witwin.channel_native import scattering
-from witwin.channel_native.core import materials as legacy_materials
-from witwin.channel_native.core import objects as legacy_objects
-from witwin.channel_native.core import scene as legacy_scene
-from witwin.channel_native.core.runtime import assignments as legacy_assignments
-from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled
-from witwin.channel_native.core.runtime import geometry as legacy_geometry
-from witwin.channel_native.core.runtime import material_store as legacy_material_store
-from witwin.channel_native.scene.kernels import rayd_scene as legacy_rayd
-from witwin.channel_native.deterministic.result import Result as DeterministicResult
-from witwin.channel_native.montecarlo.basic.result import Result as BasicResult
-from witwin.channel_native.montecarlo.bdpt.result import Result as BDPTResult
-from witwin.channel_native.path.result import BeamformedPathResult, PathResult
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
-from witwin.channel_native.scene import models as canonical_models
-from witwin.channel_native.scene import compiled as canonical_compiled
-from witwin.channel_native.scene import scattering_resources
-from witwin.channel_native.scene.kernels import rayd_scene as canonical_rayd
-from witwin.channel_native.scene.stores import _validation as canonical_validation
-from witwin.channel_native.scene.stores import assignments as canonical_assignments
-from witwin.channel_native.scene.stores import geometry as canonical_geometry
-from witwin.channel_native.scene.stores import materials as canonical_material_stores
+from witwin.channel import materials as public_materials
+from witwin.channel import scattering
+from witwin.channel.core import materials as legacy_materials
+from witwin.channel.core import objects as legacy_objects
+from witwin.channel.core import scene as legacy_scene
+from witwin.channel.core.runtime import assignments as legacy_assignments
+from witwin.channel.core.runtime import compiled_scene as legacy_compiled
+from witwin.channel.core.runtime import geometry as legacy_geometry
+from witwin.channel.core.runtime import material_store as legacy_material_store
+from witwin.channel.scene.kernels import rayd_scene as legacy_rayd
+from witwin.channel.deterministic.result import Result as DeterministicResult
+from witwin.channel.montecarlo.basic.result import Result as BasicResult
+from witwin.channel.montecarlo.bdpt.result import Result as BDPTResult
+from witwin.channel.path.result import BeamformedPathResult, PathResult
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.scene import models as canonical_models
+from witwin.channel.scene import compiled as canonical_compiled
+from witwin.channel.scene import scattering_resources
+from witwin.channel.scene.kernels import rayd_scene as canonical_rayd
+from witwin.channel.scene.stores import _validation as canonical_validation
+from witwin.channel.scene.stores import assignments as canonical_assignments
+from witwin.channel.scene.stores import geometry as canonical_geometry
+from witwin.channel.scene.stores import materials as canonical_material_stores
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 _LEGACY_CLASS_CASES = (
-    ("witwin.channel_native.core.scene", "Scene", public.Scene),
-    ("witwin.channel_native.core.objects", "Structure", public.Structure),
-    ("witwin.channel_native.core.objects", "Transmitter", public.Transmitter),
-    ("witwin.channel_native.core.objects", "ReceiverPoint", public.ReceiverPoint),
-    ("witwin.channel_native.core.objects", "ReceiverGrid", public.ReceiverGrid),
+    ("witwin.channel.core.scene", "Scene", public.Scene),
+    ("witwin.channel.core.objects", "Structure", public.Structure),
+    ("witwin.channel.core.objects", "Transmitter", public.Transmitter),
+    ("witwin.channel.core.objects", "ReceiverPoint", public.ReceiverPoint),
+    ("witwin.channel.core.objects", "ReceiverGrid", public.ReceiverGrid),
     (
-        "witwin.channel_native.core.runtime.compiled_scene",
+        "witwin.channel.core.runtime.compiled_scene",
         "CompiledScene",
         legacy_compiled.CompiledScene,
     ),
     (
-        "witwin.channel_native.core.runtime.geometry",
+        "witwin.channel.core.runtime.geometry",
         "GeometryStore",
         canonical_geometry.GeometryStore,
     ),
     (
-        "witwin.channel_native.core.runtime.material_store",
+        "witwin.channel.core.runtime.material_store",
         "MaterialStore",
         canonical_material_stores.MaterialStore,
     ),
     (
-        "witwin.channel_native.core.runtime.assignments",
+        "witwin.channel.core.runtime.assignments",
         "AssignmentStore",
         canonical_assignments.AssignmentStore,
     ),
@@ -186,7 +186,7 @@ def _assert_object_graph_resource_free(value: object, seen: set[int]) -> None:
 
 def test_public_and_legacy_scene_class_identity_and_pickle_replay():
     assert canonical_models.Scene is legacy_scene.Scene is public.Scene
-    assert canonical_models.Scene.__module__ == "witwin.channel_native.core.scene"
+    assert canonical_models.Scene.__module__ == "witwin.channel.core.scene"
     assert canonical_models.Scene.compile.__globals__ is vars(canonical_models)
     assert "__all__" not in vars(legacy_scene)
     assert (
@@ -222,7 +222,7 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
         is legacy_compiled.CompiledScene
     )
     assert canonical_compiled.CompiledScene.__module__ == (
-        "witwin.channel_native.core.runtime.compiled_scene"
+        "witwin.channel.core.runtime.compiled_scene"
     )
     assert (
         canonical_geometry.GeometryStore
@@ -230,7 +230,7 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
         is legacy_geometry.GeometryStore
     )
     assert canonical_geometry.GeometryStore.__module__ == (
-        "witwin.channel_native.core.runtime.geometry"
+        "witwin.channel.core.runtime.geometry"
     )
     assert (
         canonical_material_stores.MaterialStore
@@ -239,7 +239,7 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
         is canonical_compiled.MaterialStore
     )
     assert canonical_material_stores.MaterialStore.__module__ == (
-        "witwin.channel_native.core.runtime.material_store"
+        "witwin.channel.core.runtime.material_store"
     )
     assert (
         canonical_assignments.AssignmentStore
@@ -248,7 +248,7 @@ def test_public_and_legacy_scene_class_identity_and_pickle_replay():
         is canonical_compiled.AssignmentStore
     )
     assert canonical_assignments.AssignmentStore.__module__ == (
-        "witwin.channel_native.core.runtime.assignments"
+        "witwin.channel.core.runtime.assignments"
     )
 
     for module, name, owner in _LEGACY_CLASS_CASES:
@@ -283,7 +283,7 @@ def test_geometry_store_schema_type_hints_and_validation_owner_are_exact():
         "structure_uv_presence": tuple[tuple[bool, bool], ...],
         "version": int,
     }
-    from witwin.channel_native.core.runtime import _validation as legacy_validation
+    from witwin.channel.core.runtime import _validation as legacy_validation
 
     assert canonical_validation.require_tensor is legacy_validation.require_tensor
 
@@ -390,25 +390,25 @@ def test_assignment_store_schema_type_hints_and_defaults_are_exact():
     "imports",
     (
         (
-            "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
-            "from witwin.channel_native.scene.kernels import rayd_scene as legacy; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene import compiled; "
-            "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled"
+            "from witwin.channel.scene.kernels import rayd_scene as canonical; "
+            "from witwin.channel.scene.kernels import rayd_scene as legacy; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene import compiled; "
+            "from witwin.channel.core.runtime import compiled_scene as legacy_compiled"
         ),
         (
-            "from witwin.channel_native.scene.kernels import rayd_scene as legacy; "
-            "from witwin.channel_native.scene import compiled; "
-            "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
-            "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled; "
-            "from witwin.channel_native.core import scene as core_scene"
+            "from witwin.channel.scene.kernels import rayd_scene as legacy; "
+            "from witwin.channel.scene import compiled; "
+            "from witwin.channel.scene.kernels import rayd_scene as canonical; "
+            "from witwin.channel.core.runtime import compiled_scene as legacy_compiled; "
+            "from witwin.channel.core import scene as core_scene"
         ),
         (
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled; "
-            "from witwin.channel_native.scene.kernels import rayd_scene as legacy; "
-            "from witwin.channel_native.scene.kernels import rayd_scene as canonical; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.core.runtime import compiled_scene as legacy_compiled; "
+            "from witwin.channel.scene.kernels import rayd_scene as legacy; "
+            "from witwin.channel.scene.kernels import rayd_scene as canonical; "
+            "from witwin.channel.scene import compiled"
         ),
     ),
 )
@@ -425,9 +425,9 @@ def test_rayd_scene_fresh_import_order_type_hints_and_legacy_pickle_replay(
         "assert canonical.build_scene_from_structures is "
         "legacy.build_scene_from_structures is core_scene.build_scene_from_structures; "
         "assert scene_owner.__module__ == "
-        "'witwin.channel_native.scene.kernels.rayd_scene'; "
+        "'witwin.channel.scene.kernels.rayd_scene'; "
         "assert edge_owner.__module__ == "
-        "'witwin.channel_native.scene.kernels.rayd_scene'; "
+        "'witwin.channel.scene.kernels.rayd_scene'; "
         "assert get_type_hints(edge_owner)['vertices'] is torch.Tensor; "
         "assert get_type_hints(scene_owner)['mesh_tensors'] == "
         "tuple[tuple[torch.Tensor, ...], ...]; "
@@ -456,22 +456,22 @@ def test_rayd_scene_fresh_import_order_type_hints_and_legacy_pickle_replay(
     "imports",
     (
         (
-            "from witwin.channel_native.scene.stores import geometry as canonical; "
-            "from witwin.channel_native.core.runtime import geometry as legacy; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.scene.stores import geometry as canonical; "
+            "from witwin.channel.core.runtime import geometry as legacy; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene import compiled"
         ),
         (
-            "from witwin.channel_native.core.runtime import geometry as legacy; "
-            "from witwin.channel_native.scene import compiled; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene.stores import geometry as canonical"
+            "from witwin.channel.core.runtime import geometry as legacy; "
+            "from witwin.channel.scene import compiled; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene.stores import geometry as canonical"
         ),
         (
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene.stores import geometry as canonical; "
-            "from witwin.channel_native.core.runtime import geometry as legacy; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene.stores import geometry as canonical; "
+            "from witwin.channel.core.runtime import geometry as legacy; "
+            "from witwin.channel.scene import compiled"
         ),
     ),
 )
@@ -481,10 +481,10 @@ def test_geometry_store_fresh_import_order_and_legacy_pickle_replay(imports: str
         "owner = canonical.GeometryStore; "
         "assert owner is legacy.GeometryStore is core_scene.GeometryStore; "
         "assert owner is compiled.GeometryStore; "
-        "assert owner.__module__ == 'witwin.channel_native.core.runtime.geometry'; "
+        "assert owner.__module__ == 'witwin.channel.core.runtime.geometry'; "
         "assert get_type_hints(owner)['vertices'] is torch.Tensor; "
         "assert pickle.loads("
-        "b'cwitwin.channel_native.core.runtime.geometry\\nGeometryStore\\n.'"
+        "b'cwitwin.channel.core.runtime.geometry\\nGeometryStore\\n.'"
         ") is owner; "
         "assert pickle.loads(pickle.dumps(owner)) is owner"
     )
@@ -510,22 +510,22 @@ def test_geometry_store_fresh_import_order_and_legacy_pickle_replay(imports: str
     "imports",
     (
         (
-            "from witwin.channel_native.scene.stores import materials as canonical; "
-            "from witwin.channel_native.core.runtime import material_store as legacy; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.scene.stores import materials as canonical; "
+            "from witwin.channel.core.runtime import material_store as legacy; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene import compiled"
         ),
         (
-            "from witwin.channel_native.core.runtime import material_store as legacy; "
-            "from witwin.channel_native.scene import compiled; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene.stores import materials as canonical"
+            "from witwin.channel.core.runtime import material_store as legacy; "
+            "from witwin.channel.scene import compiled; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene.stores import materials as canonical"
         ),
         (
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene.stores import materials as canonical; "
-            "from witwin.channel_native.core.runtime import material_store as legacy; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene.stores import materials as canonical; "
+            "from witwin.channel.core.runtime import material_store as legacy; "
+            "from witwin.channel.scene import compiled"
         ),
     ),
 )
@@ -536,10 +536,10 @@ def test_material_store_fresh_import_order_and_legacy_pickle_replay(imports: str
         "assert owner is legacy.MaterialStore is core_scene.MaterialStore; "
         "assert owner is compiled.MaterialStore; "
         "assert owner.__module__ == "
-        "'witwin.channel_native.core.runtime.material_store'; "
+        "'witwin.channel.core.runtime.material_store'; "
         "assert get_type_hints(owner)['material_id'] is torch.Tensor; "
         "assert pickle.loads("
-        "b'cwitwin.channel_native.core.runtime.material_store\\nMaterialStore\\n.'"
+        "b'cwitwin.channel.core.runtime.material_store\\nMaterialStore\\n.'"
         ") is owner; "
         "assert pickle.loads(pickle.dumps(owner)) is owner"
     )
@@ -565,39 +565,39 @@ def test_material_store_fresh_import_order_and_legacy_pickle_replay(imports: str
     "imports",
     (
         (
-            "from witwin.channel_native.scene.stores import assignments as canonical; "
-            "from witwin.channel_native.core.runtime import assignments as legacy; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.scene.stores import assignments as canonical; "
+            "from witwin.channel.core.runtime import assignments as legacy; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene import compiled"
         ),
         (
-            "from witwin.channel_native.core.runtime import assignments as legacy; "
-            "from witwin.channel_native.scene import compiled; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene.stores import assignments as canonical"
+            "from witwin.channel.core.runtime import assignments as legacy; "
+            "from witwin.channel.scene import compiled; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene.stores import assignments as canonical"
         ),
         (
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene.stores import assignments as canonical; "
-            "from witwin.channel_native.core.runtime import assignments as legacy; "
-            "from witwin.channel_native.scene import compiled"
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene.stores import assignments as canonical; "
+            "from witwin.channel.core.runtime import assignments as legacy; "
+            "from witwin.channel.scene import compiled"
         ),
     ),
 )
 def test_assignment_store_fresh_import_order_and_legacy_pickle_replay(imports: str):
     source = (
         f"{imports}; import pickle; from typing import get_type_hints; import torch; "
-        "from witwin.channel_native.core.materials import PhaseScreen; "
+        "from witwin.channel.core.materials import PhaseScreen; "
         "owner = canonical.AssignmentStore; "
         "assert owner is legacy.AssignmentStore is core_scene.AssignmentStore; "
         "assert owner is compiled.AssignmentStore; "
         "assert owner.__module__ == "
-        "'witwin.channel_native.core.runtime.assignments'; "
+        "'witwin.channel.core.runtime.assignments'; "
         "hints = get_type_hints(owner); "
         "assert hints['face_material_id'] is torch.Tensor; "
         "assert hints['structure_phase_screens'] == dict[int, PhaseScreen]; "
         "assert pickle.loads("
-        "b'cwitwin.channel_native.core.runtime.assignments\\nAssignmentStore\\n.'"
+        "b'cwitwin.channel.core.runtime.assignments\\nAssignmentStore\\n.'"
         ") is owner; "
         "assert pickle.loads(pickle.dumps(owner)) is owner"
     )
@@ -624,7 +624,7 @@ def test_rayd_scene_lifecycle_identity_schema_type_hints_and_defaults_are_exact(
     edge_schema = fields(edge_owner)
 
     assert edge_owner is legacy_rayd.RayDEdgeRecords
-    assert edge_owner.__module__ == "witwin.channel_native.scene.kernels.rayd_scene"
+    assert edge_owner.__module__ == "witwin.channel.scene.kernels.rayd_scene"
     assert tuple(item.name for item in edge_schema) == (
         "vertices",
         "faces",
@@ -652,7 +652,7 @@ def test_rayd_scene_lifecycle_identity_schema_type_hints_and_defaults_are_exact(
         is canonical_compiled.RayDSceneResource
         is legacy_compiled.RayDSceneResource
     )
-    assert scene_owner.__module__ == "witwin.channel_native.scene.kernels.rayd_scene"
+    assert scene_owner.__module__ == "witwin.channel.scene.kernels.rayd_scene"
     assert tuple(item.name for item in scene_schema) == (
         "resource",
         "mesh_tensors",
@@ -759,19 +759,19 @@ def test_phase_screen_scene_resource_schema_is_exact():
     "imports",
     (
         (
-            "from witwin.channel_native.scene import compiled as canonical; "
-            "from witwin.channel_native.core.runtime import compiled_scene as legacy; "
-            "from witwin.channel_native.core import scene as core_scene"
+            "from witwin.channel.scene import compiled as canonical; "
+            "from witwin.channel.core.runtime import compiled_scene as legacy; "
+            "from witwin.channel.core import scene as core_scene"
         ),
         (
-            "from witwin.channel_native.core.runtime import compiled_scene as legacy; "
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene import compiled as canonical"
+            "from witwin.channel.core.runtime import compiled_scene as legacy; "
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene import compiled as canonical"
         ),
         (
-            "from witwin.channel_native.core import scene as core_scene; "
-            "from witwin.channel_native.scene import compiled as canonical; "
-            "from witwin.channel_native.core.runtime import compiled_scene as legacy"
+            "from witwin.channel.core import scene as core_scene; "
+            "from witwin.channel.scene import compiled as canonical; "
+            "from witwin.channel.core.runtime import compiled_scene as legacy"
         ),
     ),
 )
@@ -781,9 +781,9 @@ def test_compiled_scene_fresh_import_order_and_legacy_pickle_replay(imports: str
         "owner = canonical.CompiledScene; "
         "assert owner is legacy.CompiledScene is core_scene.CompiledScene; "
         "assert owner.__module__ == "
-        "'witwin.channel_native.core.runtime.compiled_scene'; "
+        "'witwin.channel.core.runtime.compiled_scene'; "
         "assert pickle.loads("
-        "b'cwitwin.channel_native.core.runtime.compiled_scene\\nCompiledScene\\n.'"
+        "b'cwitwin.channel.core.runtime.compiled_scene\\nCompiledScene\\n.'"
         ") is owner; "
         "assert pickle.loads(pickle.dumps(owner)) is owner"
     )
@@ -810,7 +810,7 @@ def test_public_material_identity_and_legacy_pickle_replay():
         owner = getattr(legacy_materials, name)
         assert getattr(public_materials, name) is owner
         assert pickle.loads(
-            _pickle_global("witwin.channel_native.core.materials", name)
+            _pickle_global("witwin.channel.core.materials", name)
         ) is owner
         assert pickle.loads(pickle.dumps(owner)) is owner
 
@@ -936,14 +936,14 @@ def test_compiled_scattering_resources_are_built_once_on_first_access(monkeypatc
     materials_by_index = kirchhoff_resources.materials
     assert compiled.rough_material_runtimes is materials_by_index
     assert materials_by_index[0].table is table_resource
-    from witwin.channel_native.montecarlo.events import scattering as scattering_events
+    from witwin.channel.montecarlo.events import scattering as scattering_events
 
     assert scattering_events.RoughMaterialRuntime is (
         scattering_resources.RoughMaterialRuntime
     )
     assert pickle.loads(
         _pickle_global(
-            "witwin.channel_native.montecarlo.events.scattering",
+            "witwin.channel.montecarlo.events.scattering",
             "RoughMaterialRuntime",
         )
     ) is scattering_resources.RoughMaterialRuntime
@@ -1215,14 +1215,14 @@ class _FakeNativeOwner:
 
 
 def test_solver_results_do_not_retain_compiled_scene_or_native_owner():
-    from witwin.channel_native.deterministic import Config as DeterministicConfig
-    from witwin.channel_native.deterministic import solve as solve_deterministic
-    from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-    from witwin.channel_native.montecarlo.basic import solve as solve_basic
-    from witwin.channel_native.montecarlo.bdpt import Config as BDPTConfig
-    from witwin.channel_native.montecarlo.bdpt import solve as solve_bdpt
-    from witwin.channel_native.path import Config as PathConfig
-    from witwin.channel_native.path import solve as solve_path
+    from witwin.channel.deterministic import Config as DeterministicConfig
+    from witwin.channel.deterministic import solve as solve_deterministic
+    from witwin.channel.montecarlo.basic import Config as BasicConfig
+    from witwin.channel.montecarlo.basic import solve as solve_basic
+    from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+    from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+    from witwin.channel.path import Config as PathConfig
+    from witwin.channel.path import solve as solve_path
 
     assert torch.cuda.is_available()
     scene = empty_space_los_scene()

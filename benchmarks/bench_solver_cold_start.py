@@ -22,7 +22,7 @@ def _child(solver: str) -> dict[str, Any]:
 
     inject_native_paths()
     import_started = time.perf_counter()
-    import witwin.channel_native  # noqa: F401
+    import witwin.channel  # noqa: F401
 
     import_ms = (time.perf_counter() - import_started) * 1000.0
     from tests.support.scenes import same_side_wall_reflection_scene
@@ -43,21 +43,21 @@ def _child(solver: str) -> dict[str, Any]:
     scene_compile_ms = (time.perf_counter() - compile_started) * 1000.0
 
     if solver == "path":
-        from witwin.channel_native.path import Config, solve as solve_fn
+        from witwin.channel.path import Config, solve as solve_fn
 
         config = Config(max_depth=1, components={"los", "reflection"})
     elif solver == "deterministic":
-        from witwin.channel_native.deterministic import Config, solve as solve_fn
+        from witwin.channel.deterministic import Config, solve as solve_fn
 
         config = Config(max_depth=1, components={"los", "reflection"})
     elif solver == "basic":
-        from witwin.channel_native.montecarlo.basic import Config, solve as solve_fn
+        from witwin.channel.montecarlo.basic import Config, solve as solve_fn
 
         config = Config(
             samples=256, max_depth=1, components={"los", "reflection"}
         )
     elif solver == "bdpt":
-        from witwin.channel_native.montecarlo.bdpt import Config, solve as solve_fn
+        from witwin.channel.montecarlo.bdpt import Config, solve as solve_fn
 
         config = Config(
             samples=256, max_depth=1, components={"los", "reflection"}

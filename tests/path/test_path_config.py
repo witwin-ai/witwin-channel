@@ -1,6 +1,6 @@
 import pytest
 
-from witwin.channel_native.path import Config
+from witwin.channel.path import Config
 
 
 def test_path_config_defaults_are_explicit():

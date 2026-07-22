@@ -8,13 +8,13 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.propagation import enumerated
-from witwin.channel_native.propagation.enumerated import contracts, scattering
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
-from witwin.channel_native.propagation.topology.export import (
+from witwin.channel.propagation import enumerated
+from witwin.channel.propagation.enumerated import contracts, scattering
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.topology.export import (
     EvaluatedPathSidecars,
     PathExecutionStats,
 )

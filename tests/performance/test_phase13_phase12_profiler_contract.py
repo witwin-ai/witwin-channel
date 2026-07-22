@@ -68,7 +68,7 @@ def test_nsys_rejects_negative_gpu_placement_ids(
 ) -> None:
     database = _database(
         tmp_path / f"negative-{stream_id}-{device_id}.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 130, 41, 1),),
         kernels=((1_000, 1_100, 41, stream_id, device_id),),
     )
@@ -82,7 +82,7 @@ def test_nsys_rejects_correlation_reuse_across_activity_families(
 ) -> None:
     database = _database(
         tmp_path / "cross-family.sqlite",
-        ranges=(("witwin.channel_native:stage", 100, 200),),
+        ranges=(("witwin.channel:stage", 100, 200),),
         runtime=((120, 125, 41, 1), (130, 135, 41, 2)),
         kernels=((1_000, 1_100, 41, 7, 0),),
         copies=((1_110, 1_120, 41, 7, 0, 3, 16),),
@@ -99,8 +99,8 @@ def test_nsys_rejects_overlapping_instances_of_one_required_range(
     database = _database(
         tmp_path / f"overlap-{second[0]}-{second[1]}.sqlite",
         ranges=(
-            ("witwin.channel_native:stage", 100, 200),
-            ("witwin.channel_native:stage", *second),
+            ("witwin.channel:stage", 100, 200),
+            ("witwin.channel:stage", *second),
         ),
         runtime=((130, 140, 41, 1),),
         kernels=((1_000, 1_100, 41, 7, 0),),
@@ -118,12 +118,12 @@ def test_target_samples_must_share_one_device_and_stream(
     rows[-1][field] = replacement
 
     with pytest.raises(EvidenceError, match="cross CUDA devices/streams"):
-        _require_single_target_placement(rows, name="witwin.channel_native:stage")
+        _require_single_target_placement(rows, name="witwin.channel:stage")
 
 
 def test_target_samples_accept_one_device_and_stream() -> None:
     rows = [{"device_id": 0, "stream_id": 7} for _ in range(7)]
 
     assert _require_single_target_placement(
-        rows, name="witwin.channel_native:stage"
+        rows, name="witwin.channel:stage"
     ) == (0, 7)

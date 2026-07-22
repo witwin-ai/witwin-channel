@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import (
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.materials import (
     Dielectric,
     Layer,
     PerfectConductor,
@@ -11,7 +11,7 @@ from witwin.channel_native.core.materials import (
     Roughness,
     SurfaceAssignment,
 )
-from witwin.channel_native.core.objects import planar_uv
+from witwin.channel.core.objects import planar_uv
 
 
 def rough_wall_structure(

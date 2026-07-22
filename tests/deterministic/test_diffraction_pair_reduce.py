@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.deterministic.kernels import diffraction_pair
-from witwin.channel_native.deterministic.kernels.diffraction_pair import (
+from witwin.channel.deterministic.kernels import diffraction_pair
+from witwin.channel.deterministic.kernels.diffraction_pair import (
     deterministic_diffraction_pair_reduce,
     deterministic_diffraction_pair_reduce_ad,
     deterministic_diffraction_pair_reduce_backward,
     deterministic_diffraction_pair_reduce_jvp,
 )
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native.runtime.capacity import (
+from witwin.channel.runtime import symbols
+from witwin.channel.runtime.capacity import (
     CapacityFailureBit,
     create_capacity_failure_state,
 )

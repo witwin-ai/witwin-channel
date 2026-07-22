@@ -3,8 +3,8 @@ import torch
 
 from tests.support.reference_channel import los_path_gain_reference
 from tests.support.scenes import empty_space_los_scene, single_wall_reflection_scene
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.basic import Config, solve
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.basic import Config, solve
 
 
 def test_basic_solver_matches_empty_space_los_reference():

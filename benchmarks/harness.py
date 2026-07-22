@@ -15,7 +15,7 @@ import tracemalloc
 from typing import Any, TypeVar
 
 
-SCHEMA_NAME = "witwin.channel_native.performance"
+SCHEMA_NAME = "witwin.channel.performance"
 SCHEMA_VERSION = "1.0.0"
 T = TypeVar("T")
 
@@ -159,7 +159,7 @@ def benchmark_operation(
 
 
 def measure_cold_import(
-    module: str = "witwin.channel_native", *, timeout_s: float = 120.0
+    module: str = "witwin.channel", *, timeout_s: float = 120.0
 ) -> dict[str, Any]:
     """Measure a source-tree fresh import; this is not an installed-wheel smoke."""
 
@@ -192,7 +192,7 @@ def measure_cold_import(
 
 
 def environment_record() -> dict[str, Any]:
-    from witwin.channel_native.deployment import runtime_diagnostics
+    from witwin.channel.deployment import runtime_diagnostics
 
     commit = subprocess.run(
         ["git", "rev-parse", "HEAD"],

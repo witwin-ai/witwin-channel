@@ -1,10 +1,10 @@
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.kernels.metadata import validate_metadata
-from witwin.channel_native.montecarlo.basic import Config, solve
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.montecarlo.basic import Config, solve
 
 
 def _scene() -> Scene:

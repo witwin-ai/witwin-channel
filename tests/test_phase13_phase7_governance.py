@@ -75,7 +75,7 @@ def test_phase7_decision_history_is_preserved_after_phase8a_activation() -> None
         ROOT / "docs/dev/replacement/channel-native-migration.md"
     ).read_text(encoding="utf-8")
     owner_readme = (
-        ROOT / "src/witwin/channel_native/propagation/README.md"
+        ROOT / "src/witwin/channel/propagation/README.md"
     ).read_text(encoding="utf-8")
 
     assert "**Status:** Accepted (2026-07-19)" in adr
@@ -178,7 +178,7 @@ def test_phase8b_legacy_audit_closes_deletions_and_sample_tape_rename() -> None:
         "current_numerical_owner": "RayD",
         "real_production_owner": "montecarlo.basic sample-tape production",
         "static_production_caller": (
-            "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
+            "src/witwin/channel/montecarlo/basic/rayd_components.py"
         ),
         "rename_only": True,
         "compatibility_alias_allowed": False,
@@ -193,7 +193,7 @@ def test_phase7_freezes_native_tx_visibility_selection_requirements() -> None:
     matrix = _json(AUDIT / "phase13-diffraction-family-matrix.json")
     selection = matrix["tx_visible_state_selection"]  # type: ignore[index]
     source = (
-        ROOT / "src/witwin/channel_native/propagation/geometry/diffraction.py"
+        ROOT / "src/witwin/channel/propagation/geometry/diffraction.py"
     ).read_text(encoding="utf-8")
 
     assert selection["accepted_native_operation"] == (  # type: ignore[index]

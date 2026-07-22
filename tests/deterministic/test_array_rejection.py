@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native import AntennaArray, ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.deterministic import Config
-from witwin.channel_native.deterministic import solver
+from witwin.channel import AntennaArray, ReceiverPoint, Scene, Transmitter
+from witwin.channel.deterministic import Config
+from witwin.channel.deterministic import solver
 
 
 def test_array_fails_before_cuda() -> None:

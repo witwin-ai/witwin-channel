@@ -3,13 +3,13 @@ import sys
 import pytest
 import torch
 
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric
+from witwin.channel.runtime import symbols
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.materials import Dielectric
 
 
 def _source_linked_rayd_available() -> bool:
-    from witwin.channel_native.core.kernels.extension import build_info
+    from witwin.channel.core.kernels.extension import build_info
 
     try:
         return build_info()["rayd_integration"] == "source-linked"
@@ -20,14 +20,14 @@ def _source_linked_rayd_available() -> bool:
 def test_rayd_scene_wrapper_does_not_import_python_rayd():
     sys.modules.pop("rayd", None)
 
-    from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
+    from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
 
     assert RayDSceneResource.__name__ == "RayDSceneResource"
     assert "rayd" not in sys.modules
 
 
 def test_rayd_scene_exposes_typed_resource():
-    from witwin.channel_native.scene.kernels.rayd_scene import RayDSceneResource
+    from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
 
     resource = object()
     scene = RayDSceneResource(resource)
@@ -154,7 +154,7 @@ def test_rayd_intersect_forward_uses_native_rayd_scene_bridge_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayD native intersection")
 
-    from witwin.channel_native.propagation.geometry.kernels.bridge import (
+    from witwin.channel.propagation.geometry.kernels.bridge import (
         rayd_intersect_forward,
     )
 

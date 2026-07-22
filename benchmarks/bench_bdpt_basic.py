@@ -6,9 +6,9 @@ import time
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene, Transmitter
-from witwin.channel_native.montecarlo import basic
-from witwin.channel_native.montecarlo import bdpt
+from witwin.channel import ReceiverGrid, Scene, Transmitter
+from witwin.channel.montecarlo import basic
+from witwin.channel.montecarlo import bdpt
 
 
 def _grid_scene(grid_size: int) -> Scene:

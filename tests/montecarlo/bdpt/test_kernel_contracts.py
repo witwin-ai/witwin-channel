@@ -7,16 +7,16 @@ import sys
 
 import pytest
 
-from witwin.channel_native.core import scene as core_scene
-from witwin.channel_native.materials.kernels import contracts as material_contracts
-from witwin.channel_native.montecarlo.bdpt import endpoints
-from witwin.channel_native.montecarlo.bdpt import kernels
-from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
-from witwin.channel_native.montecarlo.bdpt.kernels import maps, paths, sampling
-from witwin.channel_native.montecarlo.bdpt.solver import _BDPTTopologyOptions
-from witwin.channel_native.propagation import geometry
-from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.runtime import native_buffers, symbols, tensor_contracts
+from witwin.channel.core import scene as core_scene
+from witwin.channel.materials.kernels import contracts as material_contracts
+from witwin.channel.montecarlo.bdpt import endpoints
+from witwin.channel.montecarlo.bdpt import kernels
+from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel.montecarlo.bdpt.kernels import maps, paths, sampling
+from witwin.channel.montecarlo.bdpt.solver import _BDPTTopologyOptions
+from witwin.channel.propagation import geometry
+from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.runtime import native_buffers, symbols, tensor_contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -151,10 +151,10 @@ def test_bdpt_callers_use_canonical_map_owners():
 def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
     code = (
         "import importlib, pickle, sys; "
-        "package=importlib.import_module('witwin.channel_native.montecarlo.bdpt'); "
-        "assert 'witwin.channel_native.montecarlo.bdpt.solver' not in sys.modules; "
-        "from witwin.channel_native.montecarlo.bdpt import solve; "
-        "solver=importlib.import_module('witwin.channel_native.montecarlo.bdpt.solver'); "
+        "package=importlib.import_module('witwin.channel.montecarlo.bdpt'); "
+        "assert 'witwin.channel.montecarlo.bdpt.solver' not in sys.modules; "
+        "from witwin.channel.montecarlo.bdpt import solve; "
+        "solver=importlib.import_module('witwin.channel.montecarlo.bdpt.solver'); "
         "assert solve is solver.solve; "
         "assert package.solve is solver.solve; "
         "assert pickle.loads(pickle.dumps(solve)) is solve"

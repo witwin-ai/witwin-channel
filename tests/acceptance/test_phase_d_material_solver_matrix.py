@@ -16,8 +16,8 @@ from tests.support.phase_d_acceptance import (
     rough_scene,
     transmission_scene,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.physics.oracle import layer_stack_rt
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.physics.oracle import layer_stack_rt
 
 _FREQUENCIES_HZ = (2.0e9, 12.0e9)
 _SEEDS = (3, 7, 11)

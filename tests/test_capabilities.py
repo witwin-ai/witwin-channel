@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from witwin.channel_native import capabilities
+from witwin.channel import capabilities
 
 
 def test_capability_manifest_is_versioned_serializable_and_defensive():

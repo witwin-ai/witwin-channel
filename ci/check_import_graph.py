@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 
-PACKAGE = "witwin.channel_native"
-DEFAULT_PACKAGE_PATH = Path("src/witwin/channel_native")
+PACKAGE = "witwin.channel"
+DEFAULT_PACKAGE_PATH = Path("src/witwin/channel")
 DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 
 # This digest freezes the debt universe. Entries may be removed from the active
@@ -20,7 +20,7 @@ DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 # extended once to admit the ADR-008 BDPT enumerated-oracle dependency that the
 # re-export canonicalization made visible.
 FROZEN_BASELINE_DIGEST = (
-    "0750e5bf8898eb03911bd15fe3bac1f7bc52082cea0f3cbf863fd52ad8677aba"
+    "d8aafde5ab47c17de341cf4fad8e1b3da77f34d0ab138d89188da7576fd39a45"
 )
 
 _DEBT_GROUP_BY_RULE = {

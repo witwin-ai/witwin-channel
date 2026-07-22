@@ -2,9 +2,9 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene, same_side_wall_reflection_scene
-from witwin.channel_native import ReceiverGrid
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel import ReceiverGrid
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def test_bdpt_fixed_seed_reproduces_outputs_metadata_and_exports():

@@ -1,6 +1,6 @@
 {
   "schema": {
-    "name": "witwin.channel_native.phase_e_scenarios",
+    "name": "witwin.channel.phase_e_scenarios",
     "version": "1.0.0"
   },
   "asset_policy": {

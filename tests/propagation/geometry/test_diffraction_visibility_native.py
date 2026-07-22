@@ -4,12 +4,12 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.propagation.enumerated.diffraction import (
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.propagation.enumerated.diffraction import (
     _deterministic_diffraction_states,
 )
-from witwin.channel_native.propagation.geometry import diffraction
-from witwin.channel_native.propagation.geometry.kernels import bridge
+from witwin.channel.propagation.geometry import diffraction
+from witwin.channel.propagation.geometry.kernels import bridge
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")

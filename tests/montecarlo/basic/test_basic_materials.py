@@ -6,8 +6,8 @@ import pytest
 import torch
 
 from tests.support.scenes import single_wall_reflection_scene
-from witwin.channel_native import ITUMaterial, Scene
-from witwin.channel_native.core.scene_loader import itu_material_parameters
+from witwin.channel import ITUMaterial, Scene
+from witwin.channel.core.scene_loader import itu_material_parameters
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
@@ -15,7 +15,7 @@ def test_store_material_tensors_evaluate_itu_material_at_scene_frequency() -> No
     # Plan 07 AD-3: the solver reads per-face materials from the compiled
     # material store (one source for the primal and the AD modes), so the
     # store must carry the ITU law evaluated at the scene frequency.
-    solver = importlib.import_module("witwin.channel_native.montecarlo.basic.solver")
+    solver = importlib.import_module("witwin.channel.montecarlo.basic.solver")
     original = single_wall_reflection_scene()
     scene = Scene(
         structures=[
@@ -47,7 +47,7 @@ def test_store_material_tensors_evaluate_itu_material_at_scene_frequency() -> No
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
 def test_store_material_tensors_keep_the_store_graph_in_ad_mode() -> None:
-    solver = importlib.import_module("witwin.channel_native.montecarlo.basic.solver")
+    solver = importlib.import_module("witwin.channel.montecarlo.basic.solver")
     scene = single_wall_reflection_scene()
     leaf = scene.compile().materials.eps_r
     leaf.requires_grad_(True)

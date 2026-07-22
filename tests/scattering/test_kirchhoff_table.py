@@ -13,8 +13,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.materials import Roughness
-from witwin.channel_native.scattering import build_kirchhoff_table, eval_bsdf
+from witwin.channel.core.materials import Roughness
+from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
 
 _EPS0 = 8.8541878128e-12
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

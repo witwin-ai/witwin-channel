@@ -15,11 +15,11 @@ import sys
 
 import torch
 
-from witwin.channel_native import build_info
+from witwin.channel import build_info
 
 
 SCHEMA = {
-    "name": "witwin.channel_native.phase13-phase12-identity-probe",
+    "name": "witwin.channel.phase13-phase12-identity-probe",
     "version": 3,
 }
 
@@ -88,12 +88,12 @@ def main() -> None:
     device_uuid = str(raw_uuid).strip()
     if not device_uuid:
         raise RuntimeError("CUDA device UUID is empty")
-    spec = importlib.util.find_spec("witwin.channel_native._channel_native")
+    spec = importlib.util.find_spec("witwin.channel._channel_native")
     origin = None if spec is None else spec.origin
     if not isinstance(origin, str) or not origin:
         raise RuntimeError("packaged extension origin is unavailable")
     extension = Path(origin).resolve(strict=True)
-    package = Path(__import__("witwin.channel_native", fromlist=["x"]).__file__).resolve().parent
+    package = Path(__import__("witwin.channel", fromlist=["x"]).__file__).resolve().parent
     if not extension.is_relative_to(package):
         raise RuntimeError("identity probe refuses a non-packaged extension")
     payload = {

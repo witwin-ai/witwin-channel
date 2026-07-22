@@ -5,9 +5,9 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel_native.propagation.enumerated import coupled, engine
-from witwin.channel_native.propagation.geometry import coupled as geometry_coupled
-from witwin.channel_native.propagation.topology.discovery import (
+from witwin.channel.propagation.enumerated import coupled, engine
+from witwin.channel.propagation.geometry import coupled as geometry_coupled
+from witwin.channel.propagation.topology.discovery import (
     coupled as discovery_coupled,
 )
 
@@ -119,8 +119,8 @@ def test_export_component_stage_order_remains_canonical():
 
 
 def test_coupled_owner_has_no_core_path_dependency_or_scc():
-    owner = "witwin.channel_native.propagation.enumerated.coupled"
-    core = "witwin.channel_native.core.path_topology"
+    owner = "witwin.channel.propagation.enumerated.coupled"
+    core = "witwin.channel.core.path_topology"
     edges = graph.collect_import_edges(PACKAGE_ROOT)
     adjacency: dict[str, set[str]] = {}
     for edge in edges:
@@ -138,6 +138,6 @@ def test_coupled_owner_has_no_core_path_dependency_or_scc():
 
 
 def test_enumerated_public_all_is_unchanged():
-    import witwin.channel_native.propagation.enumerated as enumerated
+    import witwin.channel.propagation.enumerated as enumerated
 
     assert enumerated.__all__ == []

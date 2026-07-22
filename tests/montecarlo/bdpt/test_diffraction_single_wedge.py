@@ -2,10 +2,10 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel_native import ReceiverGrid
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.bdpt import Config, solve
-from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel import ReceiverGrid
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
 
 
 def _grid() -> ReceiverGrid:
@@ -73,8 +73,8 @@ def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    from witwin.channel_native.deterministic import Config as DeterministicConfig
-    from witwin.channel_native.deterministic import solve as deterministic_solve
+    from witwin.channel.deterministic import Config as DeterministicConfig
+    from witwin.channel.deterministic import solve as deterministic_solve
 
     scene = wedge_diffraction_scene()
     observed = (
@@ -112,8 +112,8 @@ def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    from witwin.channel_native import Scene, Structure, Transmitter
-    from witwin.channel_native.core.materials import PerfectConductor
+    from witwin.channel import Scene, Structure, Transmitter
+    from witwin.channel.core.materials import PerfectConductor
 
     def wedge_pair(offset_z: float, tag: str) -> list[Structure]:
         shift = torch.tensor([0.0, 0.0, offset_z])

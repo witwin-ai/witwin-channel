@@ -139,259 +139,259 @@
   },
   "public_exports": [
     [
-      "witwin.channel_native.AntennaArray",
+      "witwin.channel.AntennaArray",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.AntennaPattern",
+      "witwin.channel.AntennaPattern",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.ReceiverGrid",
+      "witwin.channel.ReceiverGrid",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.ReceiverPoint",
+      "witwin.channel.ReceiverPoint",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.Scene",
+      "witwin.channel.Scene",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.Structure",
+      "witwin.channel.Structure",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.Transmitter",
+      "witwin.channel.Transmitter",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.Complex3State",
+      "witwin.channel.Complex3State",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.JonesState",
+      "witwin.channel.JonesState",
       "public-api-snapshot",
       [
         "public-core"
       ]
     ],
     [
-      "witwin.channel_native.build_info",
+      "witwin.channel.build_info",
       "public-api-snapshot",
       [
         "build-info"
       ]
     ],
     [
-      "witwin.channel_native.pipeline_cache_key",
+      "witwin.channel.pipeline_cache_key",
       "public-api-snapshot",
       [
         "public-deployment"
       ]
     ],
     [
-      "witwin.channel_native.runtime_diagnostics",
+      "witwin.channel.runtime_diagnostics",
       "public-api-snapshot",
       [
         "public-deployment"
       ]
     ],
     [
-      "witwin.channel_native.capabilities",
+      "witwin.channel.capabilities",
       "public-api-snapshot",
       [
         "public-capabilities"
       ]
     ],
     [
-      "witwin.channel_native.Dielectric",
+      "witwin.channel.Dielectric",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel_native.DispersiveMaterial",
+      "witwin.channel.DispersiveMaterial",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel_native.ITUMaterial",
+      "witwin.channel.ITUMaterial",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel_native.LossyDielectric",
+      "witwin.channel.LossyDielectric",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel_native.PerfectConductor",
+      "witwin.channel.PerfectConductor",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel_native.path.Config",
+      "witwin.channel.path.Config",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.path.InteractionType",
+      "witwin.channel.path.InteractionType",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.path.PathResult",
+      "witwin.channel.path.PathResult",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.path.RaggedPathSoA",
+      "witwin.channel.path.RaggedPathSoA",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.path.solve",
+      "witwin.channel.path.solve",
       "public-api-snapshot",
       [
         "path-los"
       ]
     ],
     [
-      "witwin.channel_native.path.pack_synthetic_arrays",
+      "witwin.channel.path.pack_synthetic_arrays",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.path.explicit_array_scene",
+      "witwin.channel.path.explicit_array_scene",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.path.pack_explicit_arrays",
+      "witwin.channel.path.pack_explicit_arrays",
       "public-api-snapshot",
       [
         "path-reflection"
       ]
     ],
     [
-      "witwin.channel_native.deterministic.Config",
+      "witwin.channel.deterministic.Config",
       "public-api-snapshot",
       [
         "deterministic-los"
       ]
     ],
     [
-      "witwin.channel_native.deterministic.PathTable",
+      "witwin.channel.deterministic.PathTable",
       "public-api-snapshot",
       [
         "deterministic-los"
       ]
     ],
     [
-      "witwin.channel_native.deterministic.Result",
+      "witwin.channel.deterministic.Result",
       "public-api-snapshot",
       [
         "deterministic-los"
       ]
     ],
     [
-      "witwin.channel_native.deterministic.solve",
+      "witwin.channel.deterministic.solve",
       "public-api-snapshot",
       [
         "deterministic-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.basic.Config",
+      "witwin.channel.montecarlo.basic.Config",
       "public-api-snapshot",
       [
         "mc-basic-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.basic.Result",
+      "witwin.channel.montecarlo.basic.Result",
       "public-api-snapshot",
       [
         "mc-basic-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.basic.solve",
+      "witwin.channel.montecarlo.basic.solve",
       "public-api-snapshot",
       [
         "mc-basic-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.bdpt.BDPTPathSamples",
+      "witwin.channel.montecarlo.bdpt.BDPTPathSamples",
       "public-api-snapshot",
       [
         "bdpt-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.bdpt.Config",
+      "witwin.channel.montecarlo.bdpt.Config",
       "public-api-snapshot",
       [
         "bdpt-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.bdpt.Result",
+      "witwin.channel.montecarlo.bdpt.Result",
       "public-api-snapshot",
       [
         "bdpt-los"
       ]
     ],
     [
-      "witwin.channel_native.montecarlo.bdpt.solve",
+      "witwin.channel.montecarlo.bdpt.solve",
       "public-api-snapshot",
       [
         "bdpt-los"
@@ -401,7 +401,7 @@
   "native_bindings": [
     [
       "bdpt_accumulate_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_accumulate_connection_samples",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_accumulate_connection_samples",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -410,7 +410,7 @@
     ],
     [
       "bdpt_accumulate_connection_samples_backward",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_accumulate_connection_samples_backward",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_accumulate_connection_samples_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -419,7 +419,7 @@
     ],
     [
       "bdpt_accumulate_connection_samples_jvp",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_accumulate_connection_samples_jvp",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_accumulate_connection_samples_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -428,7 +428,7 @@
     ],
     [
       "bdpt_apply_los_visibility",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_apply_los_visibility",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_apply_los_visibility",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -437,7 +437,7 @@
     ],
     [
       "bdpt_compact_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_compact_connection_samples",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_compact_connection_samples",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -446,7 +446,7 @@
     ],
     [
       "bdpt_component_map_buffer",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_component_map_buffer",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_component_map_buffer",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -455,7 +455,7 @@
     ],
     [
       "bdpt_concat_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_concat_connection_samples",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_concat_connection_samples",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -464,7 +464,7 @@
     ],
     [
       "bdpt_connection_variance",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_connection_variance",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_connection_variance",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -473,7 +473,7 @@
     ],
     [
       "bdpt_count_valid_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_count_valid_connection_samples",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_count_valid_connection_samples",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -482,7 +482,7 @@
     ],
     [
       "rayd_diffraction_sample_tape_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_diffraction_sample_tape_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_diffraction_sample_tape_forward",
       "named_wrapper",
       "native-rayd-diffraction-sample-tape",
       [
@@ -491,7 +491,7 @@
     ],
     [
       "mc_diffraction_discover_edges",
-      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges",
+      "witwin.channel.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges",
       "named_wrapper",
       "native-mc-discovery",
       [
@@ -500,7 +500,7 @@
     ],
     [
       "mc_diffraction_discover_edges_counted",
-      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges_counted",
+      "witwin.channel.montecarlo.basic.kernels.sampling.mc_diffraction_discover_edges_counted",
       "named_wrapper",
       "native-mc-discovery",
       [
@@ -509,7 +509,7 @@
     ],
     [
       "bdpt_empty_subpath_state",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_empty_subpath_state",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_empty_subpath_state",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -518,7 +518,7 @@
     ],
     [
       "bdpt_endpoint_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_endpoint_connection_samples",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_endpoint_connection_samples",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -527,7 +527,7 @@
     ],
     [
       "bdpt_endpoint_connection_samples_backward",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_endpoint_connection_samples_backward",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_endpoint_connection_samples_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -536,7 +536,7 @@
     ],
     [
       "bdpt_endpoint_connection_samples_jvp",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_endpoint_connection_samples_jvp",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_endpoint_connection_samples_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -545,7 +545,7 @@
     ],
     [
       "bdpt_endpoint_connection_visibility_inputs",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_endpoint_connection_visibility_inputs",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_endpoint_connection_visibility_inputs",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -554,7 +554,7 @@
     ],
     [
       "bdpt_endpoint_subpath_state",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_endpoint_subpath_state",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_endpoint_subpath_state",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -563,7 +563,7 @@
     ],
     [
       "bdpt_face_material_tensors",
-      "witwin.channel_native.materials.kernels.functional.bdpt_face_material_tensors",
+      "witwin.channel.materials.kernels.functional.bdpt_face_material_tensors",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -572,7 +572,7 @@
     ],
     [
       "bdpt_face_material_tensors_from_host",
-      "witwin.channel_native.materials.kernels.functional.bdpt_face_material_tensors_from_host",
+      "witwin.channel.materials.kernels.functional.bdpt_face_material_tensors_from_host",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -581,7 +581,7 @@
     ],
     [
       "bdpt_filter_connection_samples",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_filter_connection_samples",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_filter_connection_samples",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -590,7 +590,7 @@
     ],
     [
       "bdpt_finalize_component_maps",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_finalize_component_maps",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_finalize_component_maps",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -599,7 +599,7 @@
     ],
     [
       "bdpt_finalize_component_maps_backward",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_finalize_component_maps_backward",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_finalize_component_maps_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -608,7 +608,7 @@
     ],
     [
       "bdpt_finalize_component_maps_jvp",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_finalize_component_maps_jvp",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_finalize_component_maps_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -617,7 +617,7 @@
     ],
     [
       "bdpt_finalize_point_components",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_finalize_point_components",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_finalize_point_components",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -626,7 +626,7 @@
     ],
     [
       "bdpt_finalize_point_components_backward",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_finalize_point_components_backward",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_finalize_point_components_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -635,7 +635,7 @@
     ],
     [
       "bdpt_finalize_point_components_jvp",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_finalize_point_components_jvp",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_finalize_point_components_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -644,7 +644,7 @@
     ],
     [
       "rayd_intersect_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_intersect_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_intersect_forward",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -653,7 +653,7 @@
     ],
     [
       "bdpt_launch_state",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_launch_state",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_launch_state",
       "named_wrapper",
       "native-bdpt-sampling",
       [
@@ -662,7 +662,7 @@
     ],
     [
       "bdpt_los_component_maps",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_los_component_maps",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_los_component_maps",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -671,7 +671,7 @@
     ],
     [
       "bdpt_los_component_maps_from_matrix",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_los_component_maps_from_matrix",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_los_component_maps_from_matrix",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -680,7 +680,7 @@
     ],
     [
       "bdpt_los_export",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_los_export",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_los_export",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -689,7 +689,7 @@
     ],
     [
       "bdpt_los_visibility_inputs",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_los_visibility_inputs",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_los_visibility_inputs",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -698,7 +698,7 @@
     ],
     [
       "bdpt_mis_weights",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_mis_weights",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_mis_weights",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -707,7 +707,7 @@
     ],
     [
       "bdpt_pack_vec3",
-      "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_pack_vec3",
+      "witwin.channel.montecarlo.bdpt.kernels.sampling.bdpt_pack_vec3",
       "named_wrapper",
       "native-bdpt-sampling",
       [
@@ -716,7 +716,7 @@
     ],
     [
       "bdpt_point_component_power",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_point_component_power",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_point_component_power",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -725,7 +725,7 @@
     ],
     [
       "bdpt_receiver_grid_points",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_receiver_grid_points",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_receiver_grid_points",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -734,7 +734,7 @@
     ],
     [
       "bdpt_reflected_light_subpath_state",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_reflected_light_subpath_state",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_reflected_light_subpath_state",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -743,7 +743,7 @@
     ],
     [
       "bdpt_reflected_light_subpath_state_backward",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_reflected_light_subpath_state_backward",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_reflected_light_subpath_state_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -752,7 +752,7 @@
     ],
     [
       "bdpt_reflected_light_subpath_state_jvp",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_reflected_light_subpath_state_jvp",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_reflected_light_subpath_state_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -761,7 +761,7 @@
     ],
     [
       "bdpt_reflection_launch_inputs",
-      "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_reflection_launch_inputs",
+      "witwin.channel.montecarlo.bdpt.kernels.sampling.bdpt_reflection_launch_inputs",
       "named_wrapper",
       "native-bdpt-sampling",
       [
@@ -770,7 +770,7 @@
     ],
     [
       "bdpt_sample_directions",
-      "witwin.channel_native.montecarlo.bdpt.kernels.sampling.bdpt_sample_directions",
+      "witwin.channel.montecarlo.bdpt.kernels.sampling.bdpt_sample_directions",
       "named_wrapper",
       "native-bdpt-sampling",
       [
@@ -779,7 +779,7 @@
     ],
     [
       "bdpt_store_component_map",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_store_component_map",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_store_component_map",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -788,7 +788,7 @@
     ],
     [
       "bdpt_store_point_component_column",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_store_point_component_column",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_store_point_component_column",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -797,7 +797,7 @@
     ],
     [
       "bdpt_store_scaled_component_map",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_store_scaled_component_map",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_store_scaled_component_map",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -806,7 +806,7 @@
     ],
     [
       "bdpt_subpath_intersection_inputs",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_subpath_intersection_inputs",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_subpath_intersection_inputs",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -815,7 +815,7 @@
     ],
     [
       "bdpt_transmitted_light_subpath_state",
-      "witwin.channel_native.montecarlo.bdpt.kernels.paths.bdpt_transmitted_light_subpath_state",
+      "witwin.channel.montecarlo.bdpt.kernels.paths.bdpt_transmitted_light_subpath_state",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -824,7 +824,7 @@
     ],
     [
       "bdpt_transmitted_light_subpath_state_backward",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_transmitted_light_subpath_state_backward",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_transmitted_light_subpath_state_backward",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -833,7 +833,7 @@
     ],
     [
       "bdpt_transmitted_light_subpath_state_jvp",
-      "witwin.channel_native.montecarlo.bdpt.paths_ad.bdpt_transmitted_light_subpath_state_jvp",
+      "witwin.channel.montecarlo.bdpt.paths_ad.bdpt_transmitted_light_subpath_state_jvp",
       "named_wrapper",
       "native-bdpt-ad-companions",
       [
@@ -842,7 +842,7 @@
     ],
     [
       "bdpt_transmitter_tensors",
-      "witwin.channel_native.montecarlo.bdpt.kernels.maps.bdpt_transmitter_tensors",
+      "witwin.channel.montecarlo.bdpt.kernels.maps.bdpt_transmitter_tensors",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -851,7 +851,7 @@
     ],
     [
       "rayd_visibility_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_visibility_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_visibility_forward",
       "named_wrapper",
       "native-bdpt-paths",
       [
@@ -860,7 +860,7 @@
     ],
     [
       "bdpt_zero_matrix",
-      "witwin.channel_native.runtime.native_buffers.bdpt_zero_matrix",
+      "witwin.channel.runtime.native_buffers.bdpt_zero_matrix",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -869,7 +869,7 @@
     ],
     [
       "build_info",
-      "witwin.channel_native.runtime.extension.build_info",
+      "witwin.channel.runtime.extension.build_info",
       "named_wrapper",
       "native-bootstrap",
       [
@@ -878,7 +878,7 @@
     ],
     [
       "capacity_failure_state_create",
-      "witwin.channel_native.runtime.capacity.create_capacity_failure_state",
+      "witwin.channel.runtime.capacity.create_capacity_failure_state",
       "native_call_site",
       "native-capacity-failure-state",
       [
@@ -887,7 +887,7 @@
     ],
     [
       "capacity_failure_terminal_check",
-      "witwin.channel_native.runtime.capacity.capacity_failure_terminal_check",
+      "witwin.channel.runtime.capacity.capacity_failure_terminal_check",
       "native_call_site",
       "native-capacity-failure-terminal",
       [
@@ -896,7 +896,7 @@
     ],
     [
       "core_diffraction_edge_count",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.core_diffraction_edge_count",
+      "witwin.channel.propagation.geometry.kernels.primitives.core_diffraction_edge_count",
       "named_wrapper",
       "native-path-topology",
       [
@@ -905,7 +905,7 @@
     ],
     [
       "core_pack_int2",
-      "witwin.channel_native.propagation.topology.kernels.primitives.core_pack_int2",
+      "witwin.channel.propagation.topology.kernels.primitives.core_pack_int2",
       "named_wrapper",
       "native-path-topology",
       [
@@ -914,7 +914,7 @@
     ],
     [
       "coupled_rd_prepare",
-      "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.forward",
+      "witwin.channel.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.forward",
       "native_call_site",
       "native-field-coupled",
       [
@@ -923,7 +923,7 @@
     ],
     [
       "coupled_rd_prepare_backward",
-      "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.backward",
+      "witwin.channel.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.backward",
       "native_call_site",
       "native-field-coupled",
       [
@@ -932,7 +932,7 @@
     ],
     [
       "coupled_rd_prepare_jvp",
-      "witwin.channel_native.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.jvp",
+      "witwin.channel.propagation.fields.kernels.autograd._CoupledRdPrepareAdFunction.jvp",
       "native_call_site",
       "native-field-coupled",
       [
@@ -941,7 +941,7 @@
     ],
     [
       "deterministic_accumulate_flat",
-      "witwin.channel_native.deterministic.kernels.accumulation.deterministic_accumulate_flat",
+      "witwin.channel.deterministic.kernels.accumulation.deterministic_accumulate_flat",
       "named_wrapper",
       "native-deterministic-accumulation",
       [
@@ -950,7 +950,7 @@
     ],
     [
       "deterministic_accumulate_flat_backward",
-      "witwin.channel_native.deterministic.kernels.accumulation.deterministic_accumulate_flat_backward",
+      "witwin.channel.deterministic.kernels.accumulation.deterministic_accumulate_flat_backward",
       "named_wrapper",
       "native-deterministic-accumulation",
       [
@@ -959,7 +959,7 @@
     ],
     [
       "deterministic_accumulate_flat_fwd64",
-      "witwin.channel_native.deterministic.kernels.accumulation._DeterministicAccumulateFlatAdFunction.forward",
+      "witwin.channel.deterministic.kernels.accumulation._DeterministicAccumulateFlatAdFunction.forward",
       "native_call_site",
       "native-deterministic-accumulation",
       [
@@ -968,7 +968,7 @@
     ],
     [
       "deterministic_accumulate_flat_jvp",
-      "witwin.channel_native.deterministic.kernels.accumulation.deterministic_accumulate_flat_jvp",
+      "witwin.channel.deterministic.kernels.accumulation.deterministic_accumulate_flat_jvp",
       "named_wrapper",
       "native-deterministic-accumulation",
       [
@@ -977,21 +977,21 @@
     ],
     [
       "deterministic_capacity_finalize",
-      "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_capacity_finalize",
+      "witwin.channel.propagation.topology.kernels.compaction.deterministic_capacity_finalize",
       "dormant_named_wrapper",
       "native-deterministic-capacity-finalize",
       []
     ],
     [
       "enumerated_canonical_capacity_select",
-      "witwin.channel_native.propagation.topology.kernels.compaction._EnumeratedCanonicalCapacitySelectFunction.forward",
+      "witwin.channel.propagation.topology.kernels.compaction._EnumeratedCanonicalCapacitySelectFunction.forward",
       "dormant_native_call_site",
       "native-enumerated-canonical-capacity-select",
       []
     ],
     [
       "enumerated_transmission_topology_pack",
-      "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.forward",
+      "witwin.channel.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.forward",
       "native_call_site",
       "native-enumerated-transmission-topology",
       [
@@ -1001,7 +1001,7 @@
     ],
     [
       "enumerated_transmission_topology_pack_backward",
-      "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.backward",
+      "witwin.channel.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.backward",
       "native_call_site",
       "native-enumerated-transmission-topology-ad",
       [
@@ -1011,7 +1011,7 @@
     ],
     [
       "enumerated_transmission_topology_pack_jvp",
-      "witwin.channel_native.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.jvp",
+      "witwin.channel.propagation.topology.kernels.transmission._EnumeratedTransmissionTopologyPackFunction.jvp",
       "native_call_site",
       "native-enumerated-transmission-topology-ad",
       [
@@ -1021,7 +1021,7 @@
     ],
     [
       "enumerated_capacity_failure_sanitize",
-      "witwin.channel_native.propagation.enumerated.capacity._EnumeratedCapacityFailureSanitizeFunction.forward",
+      "witwin.channel.propagation.enumerated.capacity._EnumeratedCapacityFailureSanitizeFunction.forward",
       "native_call_site",
       "native-enumerated-capacity-failure-sanitize",
       [
@@ -1031,7 +1031,7 @@
     ],
     [
       "enumerated_capacity_failure_vector_sanitize",
-      "witwin.channel_native.propagation.enumerated.capacity._enumerated_capacity_failure_vector_sanitize_native",
+      "witwin.channel.propagation.enumerated.capacity._enumerated_capacity_failure_vector_sanitize_native",
       "native_call_site",
       "native-enumerated-capacity-failure-vector-sanitize",
       [
@@ -1041,91 +1041,91 @@
     ],
     [
       "evaluated_paths_canonical_capacity_gather",
-      "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.forward",
+      "witwin.channel.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.forward",
       "dormant_native_call_site",
       "native-evaluated-paths-canonical-capacity-gather",
       []
     ],
     [
       "evaluated_paths_canonical_capacity_gather_backward",
-      "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.backward",
+      "witwin.channel.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.backward",
       "dormant_native_call_site",
       "native-evaluated-paths-canonical-capacity-gather-ad",
       []
     ],
     [
       "evaluated_paths_canonical_capacity_gather_jvp",
-      "witwin.channel_native.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.jvp",
+      "witwin.channel.propagation.enumerated.canonical_capacity._EvaluatedPathsCanonicalCapacityGatherFunction.jvp",
       "dormant_native_call_site",
       "native-evaluated-paths-canonical-capacity-gather-ad",
       []
     ],
     [
       "evaluated_paths_capacity_pack",
-      "witwin.channel_native.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.forward",
+      "witwin.channel.propagation.enumerated.capacity._EvaluatedPathsCapacityPackFunction.forward",
       "dormant_native_call_site",
       "native-evaluated-paths-capacity-pack",
       []
     ],
     [
       "evaluated_paths_capacity_pack_backward",
-      "witwin.channel_native.propagation.enumerated.capacity._evaluated_paths_capacity_pack_backward_native",
+      "witwin.channel.propagation.enumerated.capacity._evaluated_paths_capacity_pack_backward_native",
       "dormant_native_call_site",
       "native-evaluated-paths-capacity-pack-ad",
       []
     ],
     [
       "evaluated_paths_capacity_pack_jvp",
-      "witwin.channel_native.propagation.enumerated.capacity._evaluated_paths_capacity_pack_jvp_native",
+      "witwin.channel.propagation.enumerated.capacity._evaluated_paths_capacity_pack_jvp_native",
       "dormant_native_call_site",
       "native-evaluated-paths-capacity-pack-ad",
       []
     ],
     [
       "deterministic_diffraction_pair_reduce",
-      "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce",
+      "witwin.channel.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce",
       "dormant_named_wrapper",
       "native-deterministic-diffraction-pair-reduce",
       []
     ],
     [
       "deterministic_diffraction_pair_reduce_backward",
-      "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_backward",
+      "witwin.channel.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_backward",
       "dormant_named_wrapper",
       "native-deterministic-diffraction-pair-reduce-backward",
       []
     ],
     [
       "deterministic_diffraction_pair_reduce_jvp",
-      "witwin.channel_native.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_jvp",
+      "witwin.channel.deterministic.kernels.diffraction_pair.deterministic_diffraction_pair_reduce_jvp",
       "dormant_named_wrapper",
       "native-deterministic-diffraction-pair-reduce-jvp",
       []
     ],
     [
       "deterministic_path_table_capacity_pack",
-      "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.forward",
+      "witwin.channel.deterministic.capacity._DeterministicPathTableCapacityPackFunction.forward",
       "dormant_native_call_site",
       "native-deterministic-path-table-capacity-pack",
       []
     ],
     [
       "deterministic_path_table_capacity_pack_backward",
-      "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.backward",
+      "witwin.channel.deterministic.capacity._DeterministicPathTableCapacityPackFunction.backward",
       "dormant_native_call_site",
       "native-deterministic-path-table-capacity-pack-backward",
       []
     ],
     [
       "deterministic_path_table_capacity_pack_jvp",
-      "witwin.channel_native.deterministic.capacity._DeterministicPathTableCapacityPackFunction.jvp",
+      "witwin.channel.deterministic.capacity._DeterministicPathTableCapacityPackFunction.jvp",
       "dormant_native_call_site",
       "native-deterministic-path-table-capacity-pack-jvp",
       []
     ],
     [
       "deterministic_component_counts",
-      "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_component_counts",
+      "witwin.channel.propagation.topology.kernels.primitives.deterministic_component_counts",
       "named_wrapper",
       "native-deterministic-accumulation",
       [
@@ -1134,7 +1134,7 @@
     ],
     [
       "deterministic_concat_topology_blocks",
-      "witwin.channel_native.propagation.topology.kernels.blocks.deterministic_concat_topology_blocks",
+      "witwin.channel.propagation.topology.kernels.blocks.deterministic_concat_topology_blocks",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1143,7 +1143,7 @@
     ],
     [
       "deterministic_delay_to_path_length",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_delay_to_path_length",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_delay_to_path_length",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1152,14 +1152,14 @@
     ],
     [
       "deterministic_diffraction_order1_capacity_block",
-      "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_diffraction_order1_capacity_block",
+      "witwin.channel.propagation.topology.kernels.compaction.deterministic_diffraction_order1_capacity_block",
       "dormant_named_wrapper",
       "native-diffraction-path-capacity",
       []
     ],
     [
       "deterministic_diffraction_order1_compact",
-      "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_diffraction_order1_compact",
+      "witwin.channel.propagation.topology.kernels.compaction.deterministic_diffraction_order1_compact",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1168,14 +1168,14 @@
     ],
     [
       "deterministic_diffraction_state_capacity_select",
-      "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_diffraction_state_capacity_select",
+      "witwin.channel.propagation.topology.kernels.primitives.deterministic_diffraction_state_capacity_select",
       "dormant_named_wrapper",
       "native-diffraction-state-capacity",
       []
     ],
     [
       "deterministic_diffraction_state_pack",
-      "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_diffraction_state_pack",
+      "witwin.channel.propagation.topology.kernels.primitives.deterministic_diffraction_state_pack",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1184,7 +1184,7 @@
     ],
     [
       "deterministic_diffraction_state_pack_selected",
-      "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_diffraction_state_pack_selected",
+      "witwin.channel.propagation.topology.kernels.primitives.deterministic_diffraction_state_pack_selected",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1193,7 +1193,7 @@
     ],
     [
       "deterministic_diffraction_vector_field",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_diffraction_vector_field",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_diffraction_vector_field",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1202,7 +1202,7 @@
     ],
     [
       "deterministic_face_anchor_points",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_face_anchor_points",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_face_anchor_points",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1211,7 +1211,7 @@
     ],
     [
       "deterministic_face_groups",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.deterministic_face_groups",
+      "witwin.channel.propagation.geometry.kernels.primitives.deterministic_face_groups",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1220,7 +1220,7 @@
     ],
     [
       "deterministic_face_sequence_chunk",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_face_sequence_chunk",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_face_sequence_chunk",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1229,7 +1229,7 @@
     ],
     [
       "deterministic_field_from_power_phase",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_field_from_power_phase",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_field_from_power_phase",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1238,7 +1238,7 @@
     ],
     [
       "deterministic_gather_topology_block",
-      "witwin.channel_native.propagation.topology.kernels.blocks.deterministic_gather_topology_block",
+      "witwin.channel.propagation.topology.kernels.blocks.deterministic_gather_topology_block",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1247,7 +1247,7 @@
     ],
     [
       "deterministic_los_field",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_los_field",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_los_field",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1256,7 +1256,7 @@
     ],
     [
       "deterministic_los_topology_block",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_los_topology_block",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_los_topology_block",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1265,7 +1265,7 @@
     ],
     [
       "deterministic_los_topology_block_all_visible",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_los_topology_block",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_los_topology_block",
       "native_call_site",
       "native-deterministic-topology",
       [
@@ -1274,7 +1274,7 @@
     ],
     [
       "deterministic_mapped_face_sequence_chunk",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_mapped_face_sequence_chunk",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_mapped_face_sequence_chunk",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1283,7 +1283,7 @@
     ],
     [
       "deterministic_normalize_vec3",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.deterministic_normalize_vec3",
+      "witwin.channel.propagation.geometry.kernels.primitives.deterministic_normalize_vec3",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1292,7 +1292,7 @@
     ],
     [
       "deterministic_pack_complex",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_pack_complex",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_pack_complex",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1301,7 +1301,7 @@
     ],
     [
       "deterministic_pad_topology_sequences",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_pad_topology_sequences",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_pad_topology_sequences",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1310,7 +1310,7 @@
     ],
     [
       "deterministic_phase_from_field",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_phase_from_field",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_phase_from_field",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1319,7 +1319,7 @@
     ],
     [
       "deterministic_phase_from_length",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_phase_from_length",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_phase_from_length",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1328,7 +1328,7 @@
     ],
     [
       "deterministic_reflect_points",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.deterministic_reflect_points",
+      "witwin.channel.propagation.geometry.kernels.primitives.deterministic_reflect_points",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1337,14 +1337,14 @@
     ],
     [
       "deterministic_reflection_candidate_capacity_block",
-      "witwin.channel_native.propagation.topology.kernels.reflection.deterministic_reflection_candidate_capacity_block",
+      "witwin.channel.propagation.topology.kernels.reflection.deterministic_reflection_candidate_capacity_block",
       "dormant_named_wrapper",
       "native-reflection-candidate-capacity",
       []
     ],
     [
       "deterministic_reflection_epc_input_batch",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_reflection_epc_input_batch",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_reflection_epc_input_batch",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1353,7 +1353,7 @@
     ],
     [
       "deterministic_reflection_field",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_reflection_field",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_reflection_field",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1362,7 +1362,7 @@
     ],
     [
       "deterministic_reflection_order1_compact",
-      "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_reflection_order1_compact",
+      "witwin.channel.propagation.topology.kernels.compaction.deterministic_reflection_order1_compact",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1371,7 +1371,7 @@
     ],
     [
       "deterministic_reflection_sequence_compact",
-      "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_reflection_sequence_compact",
+      "witwin.channel.propagation.topology.kernels.compaction.deterministic_reflection_sequence_compact",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1380,7 +1380,7 @@
     ],
     [
       "deterministic_reflection_sequence_field",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_reflection_sequence_field",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_reflection_sequence_field",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1389,7 +1389,7 @@
     ],
     [
       "deterministic_repeat_range",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_repeat_range",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_repeat_range",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1398,7 +1398,7 @@
     ],
     [
       "deterministic_selected_edge_count",
-      "witwin.channel_native.propagation.topology.kernels.primitives.deterministic_selected_edge_count",
+      "witwin.channel.propagation.topology.kernels.primitives.deterministic_selected_edge_count",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1407,7 +1407,7 @@
     ],
     [
       "deterministic_sort_order",
-      "witwin.channel_native.propagation.topology.kernels.compaction.deterministic_sort_order",
+      "witwin.channel.propagation.topology.kernels.compaction.deterministic_sort_order",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1416,7 +1416,7 @@
     ],
     [
       "deterministic_surface_face_groups",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.deterministic_surface_face_groups",
+      "witwin.channel.propagation.geometry.kernels.primitives.deterministic_surface_face_groups",
       "named_wrapper",
       "native-deterministic-topology",
       [
@@ -1425,7 +1425,7 @@
     ],
     [
       "deterministic_topology_base_fields",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_topology_base_fields",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_topology_base_fields",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1434,7 +1434,7 @@
     ],
     [
       "deterministic_topology_default_fields",
-      "witwin.channel_native.propagation.topology.kernels.construction.deterministic_topology_default_fields",
+      "witwin.channel.propagation.topology.kernels.construction.deterministic_topology_default_fields",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1443,7 +1443,7 @@
     ],
     [
       "deterministic_zero_field_phase",
-      "witwin.channel_native.propagation.fields.kernels.deterministic.deterministic_zero_field_phase",
+      "witwin.channel.propagation.fields.kernels.deterministic.deterministic_zero_field_phase",
       "named_wrapper",
       "native-deterministic-fields",
       [
@@ -1452,7 +1452,7 @@
     ],
     [
       "em_layer_stack_backward",
-      "witwin.channel_native.materials.kernels.functional.em_layer_stack_backward",
+      "witwin.channel.materials.kernels.functional.em_layer_stack_backward",
       "named_wrapper",
       "native-material-layer-stack",
       [
@@ -1461,7 +1461,7 @@
     ],
     [
       "em_layer_stack_eval",
-      "witwin.channel_native.materials.kernels.functional.em_layer_stack_eval",
+      "witwin.channel.materials.kernels.functional.em_layer_stack_eval",
       "named_wrapper",
       "native-material-layer-stack",
       [
@@ -1470,7 +1470,7 @@
     ],
     [
       "em_layer_stack_jvp",
-      "witwin.channel_native.materials.kernels.functional.em_layer_stack_jvp",
+      "witwin.channel.materials.kernels.functional.em_layer_stack_jvp",
       "named_wrapper",
       "native-material-layer-stack",
       [
@@ -1479,7 +1479,7 @@
     ],
     [
       "field_coupled_dd",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_coupled_dd",
+      "witwin.channel.propagation.fields.kernels.functional.field_coupled_dd",
       "named_wrapper",
       "native-field-coupled",
       [
@@ -1488,7 +1488,7 @@
     ],
     [
       "field_coupled_dd_backward",
-      "witwin.channel_native.propagation.fields.kernels.autograd_coupled_dd._FieldCoupledDdAdFunction.backward",
+      "witwin.channel.propagation.fields.kernels.autograd_coupled_dd._FieldCoupledDdAdFunction.backward",
       "native_call_site",
       "native-field-coupled",
       [
@@ -1497,7 +1497,7 @@
     ],
     [
       "field_coupled_dd_jvp",
-      "witwin.channel_native.propagation.fields.kernels.autograd_coupled_dd._FieldCoupledDdAdFunction.jvp",
+      "witwin.channel.propagation.fields.kernels.autograd_coupled_dd._FieldCoupledDdAdFunction.jvp",
       "native_call_site",
       "native-field-coupled",
       [
@@ -1506,7 +1506,7 @@
     ],
     [
       "field_coupled_rd",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_coupled_rd",
+      "witwin.channel.propagation.fields.kernels.functional.field_coupled_rd",
       "named_wrapper",
       "native-field-coupled",
       [
@@ -1515,7 +1515,7 @@
     ],
     [
       "field_coupled_rd_backward",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldCoupledRdAdFunction.backward",
+      "witwin.channel.propagation.fields.kernels.autograd._FieldCoupledRdAdFunction.backward",
       "native_call_site",
       "native-field-coupled",
       [
@@ -1524,7 +1524,7 @@
     ],
     [
       "field_coupled_rd_jvp",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldCoupledRdAdFunction.jvp",
+      "witwin.channel.propagation.fields.kernels.autograd._FieldCoupledRdAdFunction.jvp",
       "native_call_site",
       "native-field-coupled",
       [
@@ -1533,7 +1533,7 @@
     ],
     [
       "field_diffraction_wedge",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_diffraction_wedge",
+      "witwin.channel.propagation.fields.kernels.functional.field_diffraction_wedge",
       "named_wrapper",
       "native-field-diffraction",
       [
@@ -1542,7 +1542,7 @@
     ],
     [
       "field_diffraction_wedge_backward",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldDiffractionWedgeAdFunction.backward",
+      "witwin.channel.propagation.fields.kernels.autograd._FieldDiffractionWedgeAdFunction.backward",
       "native_call_site",
       "native-field-diffraction",
       [
@@ -1551,7 +1551,7 @@
     ],
     [
       "field_diffraction_wedge_jvp",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldDiffractionWedgeAdFunction.jvp",
+      "witwin.channel.propagation.fields.kernels.autograd._FieldDiffractionWedgeAdFunction.jvp",
       "native_call_site",
       "native-field-diffraction",
       [
@@ -1560,7 +1560,7 @@
     ],
     [
       "field_free_space",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_free_space",
+      "witwin.channel.propagation.fields.kernels.functional.field_free_space",
       "named_wrapper",
       "native-field-free-space",
       [
@@ -1569,7 +1569,7 @@
     ],
     [
       "field_free_space_backward",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_free_space_backward",
+      "witwin.channel.propagation.fields.kernels.functional.field_free_space_backward",
       "named_wrapper",
       "native-field-free-space",
       [
@@ -1578,7 +1578,7 @@
     ],
     [
       "field_free_space_fwd64",
-      "witwin.channel_native.propagation.fields.kernels.autograd._FieldFreeSpaceAdFunction.forward",
+      "witwin.channel.propagation.fields.kernels.autograd._FieldFreeSpaceAdFunction.forward",
       "native_call_site",
       "native-field-free-space",
       [
@@ -1587,7 +1587,7 @@
     ],
     [
       "field_free_space_jvp",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_free_space_jvp",
+      "witwin.channel.propagation.fields.kernels.functional.field_free_space_jvp",
       "named_wrapper",
       "native-field-free-space",
       [
@@ -1596,7 +1596,7 @@
     ],
     [
       "field_project_complex3",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_project_complex3",
+      "witwin.channel.propagation.fields.kernels.functional.field_project_complex3",
       "named_wrapper",
       "native-field-reflection",
       [
@@ -1605,7 +1605,7 @@
     ],
     [
       "field_project_complex3_backward",
-      "witwin.channel_native.propagation.fields.kernels.autograd_projection._FieldProjectComplex3AdFunction.backward",
+      "witwin.channel.propagation.fields.kernels.autograd_projection._FieldProjectComplex3AdFunction.backward",
       "native_call_site",
       "native-field-reflection",
       [
@@ -1614,7 +1614,7 @@
     ],
     [
       "field_project_complex3_jvp",
-      "witwin.channel_native.propagation.fields.kernels.autograd_projection._FieldProjectComplex3AdFunction.jvp",
+      "witwin.channel.propagation.fields.kernels.autograd_projection._FieldProjectComplex3AdFunction.jvp",
       "native_call_site",
       "native-field-reflection",
       [
@@ -1623,7 +1623,7 @@
     ],
     [
       "field_reflection_sequence",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_reflection_sequence",
+      "witwin.channel.propagation.fields.kernels.functional.field_reflection_sequence",
       "named_wrapper",
       "native-field-reflection",
       [
@@ -1632,7 +1632,7 @@
     ],
     [
       "field_reflection_sequence_backward",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_reflection_sequence_backward",
+      "witwin.channel.propagation.fields.kernels.functional.field_reflection_sequence_backward",
       "named_wrapper",
       "native-field-reflection",
       [
@@ -1641,7 +1641,7 @@
     ],
     [
       "field_reflection_sequence_jvp",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_reflection_sequence_jvp",
+      "witwin.channel.propagation.fields.kernels.functional.field_reflection_sequence_jvp",
       "named_wrapper",
       "native-field-reflection",
       [
@@ -1650,7 +1650,7 @@
     ],
     [
       "field_rough_reflection_scale",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_rough_reflection_scale",
+      "witwin.channel.propagation.fields.kernels.functional.field_rough_reflection_scale",
       "named_wrapper",
       "native-field-rough-scale",
       [
@@ -1660,7 +1660,7 @@
     ],
     [
       "field_rough_reflection_scale_backward",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_rough_reflection_scale_backward",
+      "witwin.channel.propagation.fields.kernels.functional.field_rough_reflection_scale_backward",
       "named_wrapper",
       "native-field-rough-scale",
       [
@@ -1669,7 +1669,7 @@
     ],
     [
       "field_rough_reflection_scale_jvp",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_rough_reflection_scale_jvp",
+      "witwin.channel.propagation.fields.kernels.functional.field_rough_reflection_scale_jvp",
       "named_wrapper",
       "native-field-rough-scale",
       [
@@ -1678,7 +1678,7 @@
     ],
     [
       "field_transmission_sequence",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_transmission_sequence",
+      "witwin.channel.propagation.fields.kernels.functional.field_transmission_sequence",
       "named_wrapper",
       "native-field-transmission",
       [
@@ -1687,7 +1687,7 @@
     ],
     [
       "field_transmission_sequence_backward",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_transmission_sequence_backward",
+      "witwin.channel.propagation.fields.kernels.functional.field_transmission_sequence_backward",
       "named_wrapper",
       "native-field-transmission",
       [
@@ -1696,7 +1696,7 @@
     ],
     [
       "field_transmission_sequence_jvp",
-      "witwin.channel_native.propagation.fields.kernels.functional.field_transmission_sequence_jvp",
+      "witwin.channel.propagation.fields.kernels.functional.field_transmission_sequence_jvp",
       "named_wrapper",
       "native-field-transmission",
       [
@@ -1705,7 +1705,7 @@
     ],
     [
       "kirchhoff_table_build_backward",
-      "witwin.channel_native.scattering.kernels.table_build_ad.kirchhoff_table_build_backward",
+      "witwin.channel.scattering.kernels.table_build_ad.kirchhoff_table_build_backward",
       "named_wrapper",
       "native-kirchhoff-table-build-ad",
       [
@@ -1714,7 +1714,7 @@
     ],
     [
       "kirchhoff_table_build_jvp",
-      "witwin.channel_native.scattering.kernels.table_build_ad.kirchhoff_table_build_jvp",
+      "witwin.channel.scattering.kernels.table_build_ad.kirchhoff_table_build_jvp",
       "named_wrapper",
       "native-kirchhoff-table-build-ad",
       [
@@ -1723,7 +1723,7 @@
     ],
     [
       "los_silhouette_clearance",
-      "witwin.channel_native.propagation.geometry.silhouette_clearance.los_clearance_factor",
+      "witwin.channel.propagation.geometry.silhouette_clearance.los_clearance_factor",
       "native_call_site",
       "native-isb-taper",
       [
@@ -1732,7 +1732,7 @@
     ],
     [
       "los_taper_apply",
-      "witwin.channel_native.propagation.geometry.silhouette_clearance.apply_los_taper",
+      "witwin.channel.propagation.geometry.silhouette_clearance.apply_los_taper",
       "native_call_site",
       "native-isb-taper",
       [
@@ -1741,7 +1741,7 @@
     ],
     [
       "mc_apply_los_visibility",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_apply_los_visibility",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_apply_los_visibility",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1750,7 +1750,7 @@
     ],
     [
       "mc_component_map_buffer",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_component_map_buffer",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_component_map_buffer",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1759,7 +1759,7 @@
     ],
     [
       "mc_diffraction_edge_geometry",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.mc_diffraction_edge_geometry",
+      "witwin.channel.propagation.geometry.kernels.primitives.mc_diffraction_edge_geometry",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1768,7 +1768,7 @@
     ],
     [
       "mc_diffraction_state_pack",
-      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_state_pack",
+      "witwin.channel.montecarlo.basic.kernels.sampling.mc_diffraction_state_pack",
       "named_wrapper",
       "native-mc-sampling",
       [
@@ -1777,7 +1777,7 @@
     ],
     [
       "mc_diffraction_state_wi",
-      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_diffraction_state_wi",
+      "witwin.channel.montecarlo.basic.kernels.sampling.mc_diffraction_state_wi",
       "named_wrapper",
       "native-mc-sampling",
       [
@@ -1786,7 +1786,7 @@
     ],
     [
       "mc_face_material_tensors",
-      "witwin.channel_native.materials.kernels.functional.mc_face_material_tensors",
+      "witwin.channel.materials.kernels.functional.mc_face_material_tensors",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1795,7 +1795,7 @@
     ],
     [
       "mc_finalize_component_maps",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_finalize_component_maps",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_finalize_component_maps",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1804,7 +1804,7 @@
     ],
     [
       "mc_los_component_maps",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_los_component_maps",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_los_component_maps",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1813,7 +1813,7 @@
     ],
     [
       "mc_los_component_maps_adjoint",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_los_component_maps_adjoint",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_los_component_maps_adjoint",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1822,7 +1822,7 @@
     ],
     [
       "mc_los_component_maps_from_matrix",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_los_component_maps_from_matrix",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_los_component_maps_from_matrix",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1831,7 +1831,7 @@
     ],
     [
       "mc_los_path_gain_backward",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_los_path_gain_backward",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_los_path_gain_backward",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1840,7 +1840,7 @@
     ],
     [
       "mc_los_path_gain_jvp",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_los_path_gain_jvp",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_los_path_gain_jvp",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1849,7 +1849,7 @@
     ],
     [
       "mc_los_visibility_inputs",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_los_visibility_inputs",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_los_visibility_inputs",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1858,7 +1858,7 @@
     ],
     [
       "mc_pack_vec3",
-      "witwin.channel_native.runtime.native_buffers.mc_pack_vec3",
+      "witwin.channel.runtime.native_buffers.mc_pack_vec3",
       "named_wrapper",
       "native-mc-sampling",
       [
@@ -1867,7 +1867,7 @@
     ],
     [
       "mc_point_component_power",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_point_component_power",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_point_component_power",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1876,7 +1876,7 @@
     ],
     [
       "mc_receiver_grid_points",
-      "witwin.channel_native.runtime.native_buffers.mc_receiver_grid_points",
+      "witwin.channel.runtime.native_buffers.mc_receiver_grid_points",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1885,7 +1885,7 @@
     ],
     [
       "mc_reflection_ad_max_depth",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_reflection_ad_max_depth",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_reflection_ad_max_depth",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1894,7 +1894,7 @@
     ],
     [
       "mc_reflection_launch_inputs",
-      "witwin.channel_native.montecarlo.basic.kernels.sampling.mc_reflection_launch_inputs",
+      "witwin.channel.montecarlo.basic.kernels.sampling.mc_reflection_launch_inputs",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1903,7 +1903,7 @@
     ],
     [
       "mc_sample_directions",
-      "witwin.channel_native.propagation.topology.kernels.sampling.mc_sample_directions",
+      "witwin.channel.propagation.topology.kernels.sampling.mc_sample_directions",
       "named_wrapper",
       "native-mc-sampling",
       [
@@ -1912,7 +1912,7 @@
     ],
     [
       "mc_selected_edge_indices",
-      "witwin.channel_native.propagation.topology.kernels.primitives.mc_selected_edge_indices",
+      "witwin.channel.propagation.topology.kernels.primitives.mc_selected_edge_indices",
       "named_wrapper",
       "native-mc-sampling",
       [
@@ -1921,7 +1921,7 @@
     ],
     [
       "mc_sionna_diffraction_tape_accumulate",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1930,7 +1930,7 @@
     ],
     [
       "mc_sionna_diffraction_tape_accumulate_backward",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_backward",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_backward",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1939,7 +1939,7 @@
     ],
     [
       "mc_sionna_diffraction_tape_accumulate_jvp",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_jvp",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_sionna_diffraction_tape_accumulate_jvp",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1948,7 +1948,7 @@
     ],
     [
       "mc_sionna_reflection_accumulate",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1957,7 +1957,7 @@
     ],
     [
       "mc_sionna_reflection_accumulate_backward",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate_backward",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate_backward",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1966,7 +1966,7 @@
     ],
     [
       "mc_sionna_reflection_accumulate_jvp",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate_jvp",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_sionna_reflection_accumulate_jvp",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1975,7 +1975,7 @@
     ],
     [
       "mc_store_component_map",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_store_component_map",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_store_component_map",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1984,7 +1984,7 @@
     ],
     [
       "mc_store_scaled_component_map",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_store_scaled_component_map",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_store_scaled_component_map",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -1993,7 +1993,7 @@
     ],
     [
       "mc_surface_group_edge_candidates",
-      "witwin.channel_native.propagation.geometry.kernels.primitives.mc_surface_group_edge_candidates",
+      "witwin.channel.propagation.geometry.kernels.primitives.mc_surface_group_edge_candidates",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2002,7 +2002,7 @@
     ],
     [
       "mc_capacity_failure_component_maps_sanitize",
-      "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_native",
+      "witwin.channel.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_native",
       "native_call_site",
       "native-mc-capacity-failure-component-maps-sanitize",
       [
@@ -2011,7 +2011,7 @@
     ],
     [
       "mc_capacity_failure_component_maps_sanitize_backward",
-      "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_backward_native",
+      "witwin.channel.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_backward_native",
       "native_call_site",
       "native-mc-capacity-failure-component-maps-sanitize-ad",
       [
@@ -2020,7 +2020,7 @@
     ],
     [
       "mc_capacity_failure_component_maps_sanitize_jvp",
-      "witwin.channel_native.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_jvp_native",
+      "witwin.channel.montecarlo.basic.kernels.capacity._mc_capacity_failure_component_maps_sanitize_jvp_native",
       "native_call_site",
       "native-mc-capacity-failure-component-maps-sanitize-ad",
       [
@@ -2029,7 +2029,7 @@
     ],
     [
       "mc_transmission_wall_product",
-      "witwin.channel_native.montecarlo.basic.kernels.transmission.mc_transmission_wall_product",
+      "witwin.channel.montecarlo.basic.kernels.transmission.mc_transmission_wall_product",
       "named_wrapper",
       "native-mc-transmission-wall-product",
       [
@@ -2038,7 +2038,7 @@
     ],
     [
       "mc_transmission_wall_product_backward",
-      "witwin.channel_native.montecarlo.basic.kernels.transmission.mc_transmission_wall_product_backward",
+      "witwin.channel.montecarlo.basic.kernels.transmission.mc_transmission_wall_product_backward",
       "named_wrapper",
       "native-mc-transmission-wall-product-ad",
       [
@@ -2047,7 +2047,7 @@
     ],
     [
       "mc_transmission_wall_product_jvp",
-      "witwin.channel_native.montecarlo.basic.kernels.transmission.mc_transmission_wall_product_jvp",
+      "witwin.channel.montecarlo.basic.kernels.transmission.mc_transmission_wall_product_jvp",
       "named_wrapper",
       "native-mc-transmission-wall-product-ad",
       [
@@ -2056,7 +2056,7 @@
     ],
     [
       "mc_transmitter_tensors",
-      "witwin.channel_native.runtime.native_buffers.mc_transmitter_tensors",
+      "witwin.channel.runtime.native_buffers.mc_transmitter_tensors",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2065,7 +2065,7 @@
     ],
     [
       "mc_zero_matrix",
-      "witwin.channel_native.montecarlo.basic.kernels.maps.mc_zero_matrix",
+      "witwin.channel.montecarlo.basic.kernels.maps.mc_zero_matrix",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2074,7 +2074,7 @@
     ],
     [
       "path_concat_vec3",
-      "witwin.channel_native.propagation.topology.kernels.primitives.path_concat_vec3",
+      "witwin.channel.propagation.topology.kernels.primitives.path_concat_vec3",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2083,7 +2083,7 @@
     ],
     [
       "path_diffraction_block",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_diffraction_block",
+      "witwin.channel.propagation.topology.kernels.blocks.path_diffraction_block",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2092,7 +2092,7 @@
     ],
     [
       "path_filter_block",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_filter_block",
+      "witwin.channel.propagation.topology.kernels.blocks.path_filter_block",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2101,7 +2101,7 @@
     ],
     [
       "path_filter_los",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_filter_los",
+      "witwin.channel.propagation.topology.kernels.blocks.path_filter_los",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2110,7 +2110,7 @@
     ],
     [
       "path_finalize_blocks",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_finalize_blocks",
+      "witwin.channel.propagation.topology.kernels.blocks.path_finalize_blocks",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2119,7 +2119,7 @@
     ],
     [
       "path_los_export",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_los_export",
+      "witwin.channel.propagation.topology.kernels.blocks.path_los_export",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2128,7 +2128,7 @@
     ],
     [
       "path_los_visibility_inputs",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_los_visibility_inputs",
+      "witwin.channel.propagation.topology.kernels.blocks.path_los_visibility_inputs",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2137,7 +2137,7 @@
     ],
     [
       "path_merge_blocks",
-      "witwin.channel_native.propagation.topology.kernels.blocks.path_merge_blocks",
+      "witwin.channel.propagation.topology.kernels.blocks.path_merge_blocks",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2146,7 +2146,7 @@
     ],
     [
       "path_reflection_candidates",
-      "witwin.channel_native.propagation.topology.kernels.candidates.path_reflection_candidates",
+      "witwin.channel.propagation.topology.kernels.candidates.path_reflection_candidates",
       "named_wrapper",
       "native-path-topology",
       [
@@ -2155,35 +2155,35 @@
     ],
     [
       "path_result_capacity_pack",
-      "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.forward",
+      "witwin.channel.path.capacity._PathResultCapacityPackFunction.forward",
       "dormant_native_call_site",
       "native-path-result-capacity-pack",
       []
     ],
     [
       "path_result_capacity_pack_backward",
-      "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.backward",
+      "witwin.channel.path.capacity._PathResultCapacityPackFunction.backward",
       "dormant_native_call_site",
       "native-path-result-capacity-pack-ad",
       []
     ],
     [
       "path_result_capacity_pack_jvp",
-      "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.jvp",
+      "witwin.channel.path.capacity._PathResultCapacityPackFunction.jvp",
       "dormant_native_call_site",
       "native-path-result-capacity-pack-ad",
       []
     ],
     [
       "coupled_candidate_capacity_block",
-      "witwin.channel_native.propagation.topology.kernels.coupled.coupled_candidate_capacity_block",
+      "witwin.channel.propagation.topology.kernels.coupled.coupled_candidate_capacity_block",
       "dormant_named_wrapper",
       "native-coupled-candidate-capacity",
       []
     ],
     [
       "coupled_dd_geometry_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_dd_geometry_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.coupled_dd_geometry_forward",
       "named_wrapper",
       "native-coupled-dd-geometry",
       [
@@ -2192,7 +2192,7 @@
     ],
     [
       "coupled_rd_geometry_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.coupled_rd_geometry_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.coupled_rd_geometry_forward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2201,7 +2201,7 @@
     ],
     [
       "diffraction_tx_visible_state_plan",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.diffraction_tx_visible_state_plan",
+      "witwin.channel.propagation.geometry.kernels.bridge.diffraction_tx_visible_state_plan",
       "named_wrapper",
       "native-diffraction-visibility-plan",
       [
@@ -2212,7 +2212,7 @@
     ],
     [
       "rayd_diffraction_paths_order1_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_diffraction_paths_order1_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_diffraction_paths_order1_forward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2221,7 +2221,7 @@
     ],
     [
       "rayd_intersect_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_intersect_backward",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_intersect_backward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2230,7 +2230,7 @@
     ],
     [
       "rayd_segment_penetration_backward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_backward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_segment_penetration_backward",
       "named_wrapper",
       "native-rayd-segment-penetration-ad",
       [
@@ -2239,7 +2239,7 @@
     ],
     [
       "rayd_segment_penetration_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward",
       "named_wrapper",
       "native-rayd-segment-penetration",
       [
@@ -2248,7 +2248,7 @@
     ],
     [
       "rayd_segment_penetration_forward_tape",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward_tape",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_segment_penetration_forward_tape",
       "named_wrapper",
       "native-rayd-segment-penetration",
       [
@@ -2258,7 +2258,7 @@
     ],
     [
       "rayd_segment_penetration_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_segment_penetration_jvp",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_segment_penetration_jvp",
       "named_wrapper",
       "native-rayd-segment-penetration-ad",
       [
@@ -2267,7 +2267,7 @@
     ],
     [
       "rayd_intersect_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_intersect_jvp",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_intersect_jvp",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2276,7 +2276,7 @@
     ],
     [
       "rayd_reflection_epc_paths_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_backward",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_backward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2285,7 +2285,7 @@
     ],
     [
       "rayd_reflection_epc_paths_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_reflection_epc_paths_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_reflection_epc_paths_forward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2294,7 +2294,7 @@
     ],
     [
       "rayd_reflection_epc_paths_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_jvp",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_reflection_epc_paths_jvp",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2303,7 +2303,7 @@
     ],
     [
       "rayd_scene_create",
-      "witwin.channel_native.scene.kernels.rayd_scene.rayd_scene_create",
+      "witwin.channel.scene.kernels.rayd_scene.rayd_scene_create",
       "named_wrapper",
       "native-rayd-scene",
       [
@@ -2312,7 +2312,7 @@
     ],
     [
       "rayd_scene_edge_records",
-      "witwin.channel_native.scene.kernels.rayd_scene.rayd_scene_edge_records",
+      "witwin.channel.scene.kernels.rayd_scene.rayd_scene_edge_records",
       "named_wrapper",
       "native-rayd-scene",
       [
@@ -2321,7 +2321,7 @@
     ],
     [
       "rayd_scene_face_normals_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_scene_face_normals_backward",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_scene_face_normals_backward",
       "named_wrapper",
       "native-rayd-scene",
       [
@@ -2330,7 +2330,7 @@
     ],
     [
       "rayd_scene_face_normals_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_scene_face_normals_jvp",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_scene_face_normals_jvp",
       "named_wrapper",
       "native-rayd-scene",
       [
@@ -2339,7 +2339,7 @@
     ],
     [
       "rayd_trace_reflections_backward",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_backward",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_trace_reflections_backward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2348,7 +2348,7 @@
     ],
     [
       "rayd_trace_reflections_forward",
-      "witwin.channel_native.propagation.geometry.kernels.bridge.rayd_trace_reflections_forward",
+      "witwin.channel.propagation.geometry.kernels.bridge.rayd_trace_reflections_forward",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2357,7 +2357,7 @@
     ],
     [
       "rayd_trace_reflections_forward_tape",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_forward_tape",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_trace_reflections_forward_tape",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2366,7 +2366,7 @@
     ],
     [
       "rayd_trace_reflections_jvp",
-      "witwin.channel_native.propagation.geometry.kernels.autograd.rayd_trace_reflections_jvp",
+      "witwin.channel.propagation.geometry.kernels.autograd.rayd_trace_reflections_jvp",
       "named_wrapper",
       "native-rayd-geometry",
       [
@@ -2375,7 +2375,7 @@
     ],
     [
       "scattering_chain_ensemble_eval",
-      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_ensemble_eval",
+      "witwin.channel.scattering.kernels.functional_chain.scattering_chain_ensemble_eval",
       "named_wrapper",
       "native-scattering-chain-ensemble",
       [
@@ -2384,7 +2384,7 @@
     ],
     [
       "scattering_chain_ensemble_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_ensemble_eval_backward",
+      "witwin.channel.scattering.kernels.functional_chain.scattering_chain_ensemble_eval_backward",
       "named_wrapper",
       "native-scattering-chain-ensemble-ad",
       [
@@ -2393,7 +2393,7 @@
     ],
     [
       "scattering_chain_ensemble_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_ensemble_eval_jvp",
+      "witwin.channel.scattering.kernels.functional_chain.scattering_chain_ensemble_eval_jvp",
       "named_wrapper",
       "native-scattering-chain-ensemble-ad",
       [
@@ -2402,7 +2402,7 @@
     ],
     [
       "scattering_chain_realization_eval",
-      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_realization_eval",
+      "witwin.channel.scattering.kernels.functional_chain.scattering_chain_realization_eval",
       "named_wrapper",
       "native-scattering-chain-realization",
       [
@@ -2411,7 +2411,7 @@
     ],
     [
       "scattering_chain_realization_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_realization_eval_backward",
+      "witwin.channel.scattering.kernels.functional_chain.scattering_chain_realization_eval_backward",
       "named_wrapper",
       "native-scattering-chain-realization-ad",
       [
@@ -2420,7 +2420,7 @@
     ],
     [
       "scattering_chain_realization_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional_chain.scattering_chain_realization_eval_jvp",
+      "witwin.channel.scattering.kernels.functional_chain.scattering_chain_realization_eval_jvp",
       "named_wrapper",
       "native-scattering-chain-realization-ad",
       [
@@ -2429,7 +2429,7 @@
     ],
     [
       "scattering_ensemble_eval",
-      "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval",
+      "witwin.channel.scattering.kernels.functional.scattering_ensemble_eval",
       "named_wrapper",
       "native-scattering-ensemble",
       [
@@ -2438,7 +2438,7 @@
     ],
     [
       "scattering_ensemble_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_backward",
+      "witwin.channel.scattering.kernels.functional.scattering_ensemble_eval_backward",
       "named_wrapper",
       "native-scattering-ensemble-ad",
       [
@@ -2447,7 +2447,7 @@
     ],
     [
       "scattering_ensemble_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional.scattering_ensemble_eval_jvp",
+      "witwin.channel.scattering.kernels.functional.scattering_ensemble_eval_jvp",
       "named_wrapper",
       "native-scattering-ensemble-ad",
       [
@@ -2456,7 +2456,7 @@
     ],
     [
       "scattering_event_probabilities",
-      "witwin.channel_native.scattering.kernels.functional.scattering_event_probabilities",
+      "witwin.channel.scattering.kernels.functional.scattering_event_probabilities",
       "named_wrapper",
       "native-scattering",
       [
@@ -2465,7 +2465,7 @@
     ],
     [
       "scattering_patch_integral_eval",
-      "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval",
+      "witwin.channel.scattering.kernels.functional.scattering_patch_integral_eval",
       "named_wrapper",
       "native-scattering-patch-integral",
       [
@@ -2474,7 +2474,7 @@
     ],
     [
       "scattering_patch_integral_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_backward",
+      "witwin.channel.scattering.kernels.functional.scattering_patch_integral_eval_backward",
       "named_wrapper",
       "native-scattering-patch-integral-ad",
       [
@@ -2483,7 +2483,7 @@
     ],
     [
       "scattering_patch_integral_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional.scattering_patch_integral_eval_jvp",
+      "witwin.channel.scattering.kernels.functional.scattering_patch_integral_eval_jvp",
       "named_wrapper",
       "native-scattering-patch-integral-ad",
       [
@@ -2492,7 +2492,7 @@
     ],
     [
       "scattering_table_eval",
-      "witwin.channel_native.scattering.kernels.functional.scattering_table_eval",
+      "witwin.channel.scattering.kernels.functional.scattering_table_eval",
       "named_wrapper",
       "native-scattering",
       [
@@ -2501,7 +2501,7 @@
     ],
     [
       "scattering_table_eval_backward",
-      "witwin.channel_native.scattering.kernels.functional.scattering_table_eval_backward",
+      "witwin.channel.scattering.kernels.functional.scattering_table_eval_backward",
       "named_wrapper",
       "native-scattering-table-eval-ad",
       [
@@ -2510,7 +2510,7 @@
     ],
     [
       "scattering_table_eval_jvp",
-      "witwin.channel_native.scattering.kernels.functional.scattering_table_eval_jvp",
+      "witwin.channel.scattering.kernels.functional.scattering_table_eval_jvp",
       "named_wrapper",
       "native-scattering-table-eval-ad",
       [
@@ -2519,7 +2519,7 @@
     ],
     [
       "scattering_table_pdf",
-      "witwin.channel_native.scattering.kernels.functional.scattering_table_pdf",
+      "witwin.channel.scattering.kernels.functional.scattering_table_pdf",
       "named_wrapper",
       "native-scattering",
       [
@@ -2528,7 +2528,7 @@
     ],
     [
       "scattering_table_sample",
-      "witwin.channel_native.scattering.kernels.functional.scattering_table_sample",
+      "witwin.channel.scattering.kernels.functional.scattering_table_sample",
       "named_wrapper",
       "native-scattering",
       [

@@ -9,13 +9,13 @@ import textwrap
 import pytest
 import torch
 
-from witwin.channel_native.runtime import (
+from witwin.channel.runtime import (
     CapacityFailureState,
     capacity_failure_terminal_check,
     create_capacity_failure_state,
 )
-from witwin.channel_native.runtime import capacity as capacity_runtime
-from witwin.channel_native.runtime import symbols
+from witwin.channel.runtime import capacity as capacity_runtime
+from witwin.channel.runtime import symbols
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -89,8 +89,8 @@ def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
         """
         import torch
 
-        from witwin.channel_native.propagation.topology.kernels import coupled
-        from witwin.channel_native.runtime import (
+        from witwin.channel.propagation.topology.kernels import coupled
+        from witwin.channel.runtime import (
             CapacityFailureBit,
             capacity_failure_terminal_check,
             create_capacity_failure_state,
@@ -170,7 +170,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
     ).read_text(encoding="utf-8")
     facade = (
         REPOSITORY_ROOT
-        / "src/witwin/channel_native/runtime/capacity.py"
+        / "src/witwin/channel/runtime/capacity.py"
     ).read_text(encoding="utf-8")
 
     assert native.count('asm volatile("trap;")') == 1
@@ -206,10 +206,10 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
 
     production_mentions = sorted(
         path.relative_to(REPOSITORY_ROOT).as_posix()
-        for path in (REPOSITORY_ROOT / "src/witwin/channel_native").rglob("*.py")
+        for path in (REPOSITORY_ROOT / "src/witwin/channel").rglob("*.py")
         if "capacity_failure_terminal_check" in path.read_text(encoding="utf-8")
     )
     assert production_mentions == [
-        "src/witwin/channel_native/runtime/__init__.py",
-        "src/witwin/channel_native/runtime/capacity.py",
+        "src/witwin/channel/runtime/__init__.py",
+        "src/witwin/channel/runtime/capacity.py",
     ]

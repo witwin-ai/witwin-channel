@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native.propagation.models.capacity import CapacityExecutionCounts
-from witwin.channel_native.runtime import capacity as capacity_runtime
-from witwin.channel_native.runtime.capacity import (
+from witwin.channel.propagation.models.capacity import CapacityExecutionCounts
+from witwin.channel.runtime import capacity as capacity_runtime
+from witwin.channel.runtime.capacity import (
     SolveCapacityTransaction,
     create_solve_capacity_transaction,
 )

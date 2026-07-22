@@ -13,7 +13,7 @@ from typing import Callable
 import numpy as np
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     Dielectric,
     PerfectConductor,
     ReceiverGrid,
@@ -23,19 +23,19 @@ from witwin.channel_native import (
     Transmitter,
     build_info,
 )
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as solve_deterministic
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic import solve as solve_basic
-from witwin.channel_native.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel_native.montecarlo.bdpt import solve as solve_bdpt
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_path
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as solve_deterministic
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.basic import solve as solve_basic
+from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as solve_path
 
 
-SCHEMA = {"name": "witwin.channel_native.phase13-phase12-worker", "version": 2}
+SCHEMA = {"name": "witwin.channel.phase13-phase12-worker", "version": 2}
 PROFILE_SCHEMA = {
-    "name": "witwin.channel_native.phase13-phase12-profile-worker",
+    "name": "witwin.channel.phase13-phase12-profile-worker",
     "version": 2,
 }
 

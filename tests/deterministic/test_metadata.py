@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.deterministic import Config, solve
 
 
 def test_metadata_reports_deterministic_solver_decisions():

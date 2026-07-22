@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import pytest
 import torch
-import witwin.channel_native.materials as public_materials
-from witwin.channel_native.core import materials as core_materials
-from witwin.channel_native.materials import kernels
-from witwin.channel_native.materials.kernels import autograd, contracts, functional
-from witwin.channel_native.runtime import (
+import witwin.channel.materials as public_materials
+from witwin.channel.core import materials as core_materials
+from witwin.channel.materials import kernels
+from witwin.channel.materials.kernels import autograd, contracts, functional
+from witwin.channel.runtime import (
     autograd_contracts,
     symbols,
     tensor_contracts,

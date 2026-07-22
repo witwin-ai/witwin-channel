@@ -33,13 +33,13 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import rough_wall_structure
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import PhaseScreen
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as deterministic_solve
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as path_solve
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import PhaseScreen
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as deterministic_solve
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as path_solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"
@@ -456,7 +456,7 @@ def test_scattering_ad_mode_none_stays_primal(scene_kind):
 def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
     # rx_pol is a fixed ADR-014 op-1 input; requesting its gradient through the
     # public wrapper must fail loudly (no silent detach, no wrong gradient).
-    from witwin.channel_native.scattering.kernels import autograd as scattering_autograd
+    from witwin.channel.scattering.kernels import autograd as scattering_autograd
 
     device = "cuda"
     generator = torch.Generator(device=device).manual_seed(404)

@@ -5,11 +5,11 @@ import inspect
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.basic.kernels import capacity as capacity_kernels
-from witwin.channel_native.montecarlo.basic.kernels.capacity import (
+from witwin.channel.montecarlo.basic.kernels import capacity as capacity_kernels
+from witwin.channel.montecarlo.basic.kernels.capacity import (
     mc_capacity_failure_component_maps_sanitize,
 )
-from witwin.channel_native.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime.capacity import create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

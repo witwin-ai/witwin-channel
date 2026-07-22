@@ -6,14 +6,14 @@ import pytest
 import torch
 from scipy.stats import chi2
 
-from witwin.channel_native.core.materials import Roughness
-from witwin.channel_native.scattering import (
+from witwin.channel.core.materials import Roughness
+from witwin.channel.scattering import (
     build_kirchhoff_table,
     pdf,
     pdf_reverse,
     sample_directions,
 )
-from witwin.channel_native.runtime import symbols
+from witwin.channel.runtime import symbols
 
 _EPS0 = 8.8541878128e-12
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -140,7 +140,7 @@ def test_runtime_table_ops_have_no_pytorch_fallback(table, monkeypatch):
     monkeypatch.setattr(symbols, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="scattering_table_eval CUDA kernel is required"):
-        from witwin.channel_native.scattering import eval_bsdf
+        from witwin.channel.scattering import eval_bsdf
 
         eval_bsdf(table, _all_valid(1, device=wi.device), wi, wi)
     with pytest.raises(RuntimeError, match="scattering_table_pdf CUDA kernel is required"):

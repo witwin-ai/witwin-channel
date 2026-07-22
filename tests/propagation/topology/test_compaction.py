@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from witwin.channel_native.propagation.topology.kernels import compaction as ops
-from witwin.channel_native.propagation.topology import kernels
-from witwin.channel_native.propagation.topology.kernels import compaction
-from witwin.channel_native.runtime import symbols, tensor_contracts
+from witwin.channel.propagation.topology.kernels import compaction as ops
+from witwin.channel.propagation.topology import kernels
+from witwin.channel.propagation.topology.kernels import compaction
+from witwin.channel.runtime import symbols, tensor_contracts
 
 
 _OWNER_NAMES = (

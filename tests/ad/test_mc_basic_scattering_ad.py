@@ -39,20 +39,20 @@ from tests.ad._tolerances import (
     FD_REL_STEP_FREQUENCY,
     REL_TOL_GENERAL,
 )
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverGrid,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface, Roughness
-from witwin.channel_native.montecarlo.basic import Config, solve
-from witwin.channel_native.montecarlo.events.scattering import (
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
+from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.montecarlo.events.scattering import (
     rough_material_runtimes,
     scattering_map_matrix,
 )
-from witwin.channel_native.scene.tensors import (
+from witwin.channel.scene.tensors import (
     receiver_grid_points,
     transmitter_positions,
 )

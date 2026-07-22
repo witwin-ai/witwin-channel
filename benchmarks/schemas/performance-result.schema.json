@@ -9,7 +9,7 @@
       "type": "object",
       "required": ["name", "version"],
       "properties": {
-        "name": {"const": "witwin.channel_native.performance"},
+        "name": {"const": "witwin.channel.performance"},
         "version": {"const": "1.0.0"}
       }
     },

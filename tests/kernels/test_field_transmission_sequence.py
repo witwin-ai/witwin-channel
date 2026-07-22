@@ -10,8 +10,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.propagation.fields.kernels import functional as ops
-from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel.propagation.fields.kernels import functional as ops
+from witwin.channel.materials.kernels import functional as material_functional
 
 C0 = 299792458.0
 

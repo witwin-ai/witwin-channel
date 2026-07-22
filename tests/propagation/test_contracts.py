@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel_native.propagation import (
+from witwin.channel.propagation import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,

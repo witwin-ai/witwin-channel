@@ -5,16 +5,16 @@ import inspect
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel_native.deterministic import pipeline as deterministic_pipeline
-from witwin.channel_native.montecarlo.bdpt import pipeline as bdpt_pipeline
-from witwin.channel_native.path import pipeline as path_pipeline
-from witwin.channel_native.propagation.enumerated import engine, transmission
-from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.propagation.geometry.kernels import penetration_autograd
-from witwin.channel_native.propagation.models.penetration import (
+from witwin.channel.deterministic import pipeline as deterministic_pipeline
+from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
+from witwin.channel.path import pipeline as path_pipeline
+from witwin.channel.propagation.enumerated import engine, transmission
+from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.propagation.geometry.kernels import penetration_autograd
+from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationPolicy,
 )
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.propagation.topology.kernels import (
     transmission as topology_pack,
 )
 
@@ -149,8 +149,8 @@ def test_retired_depth_march_sources_and_references_are_deleted() -> None:
 
 def test_activation_adds_no_old_owner_import_edge_or_host_actual_count_read() -> None:
     retired_modules = {
-        "witwin.channel_native.propagation.geometry.transmission",
-        "witwin.channel_native.propagation.topology.discovery.transmission",
+        "witwin.channel.propagation.geometry.transmission",
+        "witwin.channel.propagation.topology.discovery.transmission",
     }
     edges = graph.collect_import_edges(PACKAGE_ROOT)
     assert not any(edge.target in retired_modules for edge in edges)

@@ -61,7 +61,7 @@ def test_versioned_schema_and_cold_steady_memory_contract() -> None:
         repeats=2,
     )
 
-    assert benchmark.SCHEMA_NAME == "witwin.channel_native.path_solver_threeway"
+    assert benchmark.SCHEMA_NAME == "witwin.channel.path_solver_threeway"
     assert benchmark.SCHEMA_VERSION == "1.0.0"
     assert result == [4]
     assert cold_ms >= 0.0

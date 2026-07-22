@@ -8,9 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from witwin.channel_native import Scene
-from witwin.channel_native.core import scene as legacy_scene
-from witwin.channel_native.scene import compile as canonical_compile
+from witwin.channel import Scene
+from witwin.channel.core import scene as legacy_scene
+from witwin.channel.scene import compile as canonical_compile
 
 
 _HELPER_BODY_HASHES = {
@@ -83,10 +83,10 @@ def test_compile_owner_has_no_scene_or_solver_dependency_cycle():
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert "witwin.channel_native.core.scene" not in targets
+    assert "witwin.channel.core.scene" not in targets
     assert not any(".solver" in target for target in targets)
     assert not any(
-        target.startswith("witwin.channel_native.scattering") for target in targets
+        target.startswith("witwin.channel.scattering") for target in targets
     )
 
 

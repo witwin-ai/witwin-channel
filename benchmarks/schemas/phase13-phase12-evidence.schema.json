@@ -12,7 +12,7 @@
       "additionalProperties": false,
       "required": ["name", "version"],
       "properties": {
-        "name": {"const": "witwin.channel_native.phase13-phase12-evidence"},
+        "name": {"const": "witwin.channel.phase13-phase12-evidence"},
         "version": {"const": 2}
       }
     },
@@ -115,7 +115,7 @@
           "type": "object", "additionalProperties": false,
           "required": ["name", "version"],
           "properties": {
-            "name": {"const": "witwin.channel_native.phase13-phase12-diagnostic-worker"},
+            "name": {"const": "witwin.channel.phase13-phase12-diagnostic-worker"},
             "version": {"const": 1}
           }
         },

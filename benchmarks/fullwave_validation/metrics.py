@@ -273,7 +273,7 @@ def comparison_report(deterministic: FieldMap, fullwave: FieldMap) -> dict[str, 
     _require_same_case(deterministic, fullwave)
     return {
         "schema": {
-            "name": "witwin.channel_native.fullwave-comparison",
+            "name": "witwin.channel.fullwave-comparison",
             "version": 1,
         },
         "case_id": deterministic.metadata.get("case_id"),

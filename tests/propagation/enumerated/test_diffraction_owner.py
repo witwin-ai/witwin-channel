@@ -5,11 +5,11 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel_native.propagation.enumerated import diffraction
-from witwin.channel_native.propagation.geometry import (
+from witwin.channel.propagation.enumerated import diffraction
+from witwin.channel.propagation.geometry import (
     diffraction as geometry_diffraction,
 )
-from witwin.channel_native.propagation.topology.discovery import (
+from witwin.channel.propagation.topology.discovery import (
     diffraction as discovery,
 )
 
@@ -131,18 +131,18 @@ def test_diffraction_consumers_use_named_geometry_and_canonical_event_order():
 
 
 def test_diffraction_owner_has_no_core_path_dependency_or_scc():
-    core = "witwin.channel_native.core.path_topology"
+    core = "witwin.channel.core.path_topology"
     edges = graph.collect_import_edges(PACKAGE_ROOT)
     adjacency: dict[str, set[str]] = {}
     for edge in edges:
         adjacency.setdefault(edge.source, set()).add(edge.target)
     owners = {
-        "witwin.channel_native.propagation.enumerated.diffraction",
-        "witwin.channel_native.propagation.geometry.diffraction",
-        "witwin.channel_native.propagation.topology.discovery.diffraction",
+        "witwin.channel.propagation.enumerated.diffraction",
+        "witwin.channel.propagation.geometry.diffraction",
+        "witwin.channel.propagation.topology.discovery.diffraction",
     }
     discovery_owner = (
-        "witwin.channel_native.propagation.topology.discovery.diffraction"
+        "witwin.channel.propagation.topology.discovery.diffraction"
     )
     for owner in owners:
         assert core not in adjacency.get(owner, set())
@@ -155,6 +155,6 @@ def test_diffraction_owner_has_no_core_path_dependency_or_scc():
             seen.add(current)
             pending.extend(adjacency.get(current, ()))
         assert core not in seen
-        if owner == "witwin.channel_native.propagation.geometry.diffraction":
+        if owner == "witwin.channel.propagation.geometry.diffraction":
             assert discovery_owner not in seen
     assert not hasattr(diffraction, "_rayd_visibility_mask")

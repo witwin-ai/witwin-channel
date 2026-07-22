@@ -13,9 +13,7 @@ FORBIDDEN_MODULES = (
     "mitsuba",
     "rayd",
     "sionna",
-    "witwin.channel",
 )
-LEGACY_CHANNEL_MODULES = ("witwin.channel",)
 
 _NON_PRODUCTION_PARTS = frozenset(
     {
@@ -116,19 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         default=[Path(__file__).resolve().parents[1]],
         help="repository or source roots (defaults to this repository)",
     )
-    parser.add_argument(
-        "--consumer-roots",
-        action="store_true",
-        help=(
-            "scan sibling products only for witwin.channel; independent stacks "
-            "such as Radar's DrJit tracer remain outside Channel migration"
-        ),
-    )
     args = parser.parse_args(argv)
-    forbidden_modules = (
-        LEGACY_CHANNEL_MODULES if args.consumer_roots else FORBIDDEN_MODULES
-    )
-    violations = scan_roots(args.roots, forbidden_modules=forbidden_modules)
+    violations = scan_roots(args.roots)
     if violations:
         for violation in violations:
             print(f"{violation.path}:{violation.line}: forbidden import {violation.module}")

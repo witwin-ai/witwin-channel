@@ -55,10 +55,10 @@ def _evidence() -> dict[str, object]:
 
 def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
     reflection_calls = _called_attributes(
-        "src/witwin/channel_native/propagation/enumerated/reflection.py"
+        "src/witwin/channel/propagation/enumerated/reflection.py"
     )
     diffraction_calls = _called_attributes(
-        "src/witwin/channel_native/propagation/enumerated/diffraction.py"
+        "src/witwin/channel/propagation/enumerated/diffraction.py"
     )
 
     assert {
@@ -84,13 +84,13 @@ def test_dormant_adr029_and_adr030_producers_have_no_production_caller() -> None
 
 
 def test_public_path_exports_retain_actual_row_compaction() -> None:
-    path_pipeline_relative = "src/witwin/channel_native/path/pipeline.py"
+    path_pipeline_relative = "src/witwin/channel/path/pipeline.py"
     deterministic_pipeline = _source(
-        "src/witwin/channel_native/deterministic/pipeline.py"
+        "src/witwin/channel/deterministic/pipeline.py"
     )
-    path_result = _source("src/witwin/channel_native/path/result.py")
+    path_result = _source("src/witwin/channel/path/result.py")
     path_table = ast.parse(
-        _source("src/witwin/channel_native/deterministic/result.py")
+        _source("src/witwin/channel/deterministic/result.py")
     )
 
     solve_calls = _function_calls(path_pipeline_relative, "_solve_base")
@@ -123,10 +123,10 @@ def test_public_configs_do_not_expose_retired_capacity_controls() -> None:
         "reflection_candidate_capacity_per_pair",
     }
     for relative in (
-        "src/witwin/channel_native/path/config.py",
-        "src/witwin/channel_native/deterministic/config.py",
-        "src/witwin/channel_native/montecarlo/basic/config.py",
-        "src/witwin/channel_native/montecarlo/bdpt/config.py",
+        "src/witwin/channel/path/config.py",
+        "src/witwin/channel/deterministic/config.py",
+        "src/witwin/channel/montecarlo/basic/config.py",
+        "src/witwin/channel/montecarlo/bdpt/config.py",
     ):
         tree = ast.parse(_source(relative), filename=relative)
         config = next(
@@ -164,7 +164,7 @@ def test_munich_recovery_evidence_has_strict_top_level_schema() -> None:
         "raw_artifacts",
     }
     assert evidence["schema"] == {
-        "name": "witwin.channel_native.stable-recovery-munich",
+        "name": "witwin.channel.stable-recovery-munich",
         "version": 1,
     }
     assert evidence["decision"] == {

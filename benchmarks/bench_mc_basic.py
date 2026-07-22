@@ -18,7 +18,7 @@ from tests.support.native_ext import inject_native_paths  # noqa: E402
 inject_native_paths()
 
 from tests.support.scenes import empty_space_los_scene  # noqa: E402
-from witwin.channel_native.montecarlo.basic import Config, solve  # noqa: E402
+from witwin.channel.montecarlo.basic import Config, solve  # noqa: E402
 
 
 def _output_bytes(result: Any) -> int:

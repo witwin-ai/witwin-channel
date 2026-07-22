@@ -19,10 +19,10 @@ from tests.ad._reference_fields import (
     transmission_sequence_reference,
 )
 from tests.ad._tolerances import ABS_TOL, REL_TOL_PATH
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel.propagation.fields.kernels import (
     autograd as field_autograd,
 )
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel.propagation.fields.kernels import (
     functional as field_functional,
 )
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native.propagation.geometry.endpoints import ReceiverLayout
-from witwin.channel_native.deterministic import accumulation
-from witwin.channel_native.propagation.models import (
+from witwin.channel.propagation.geometry.endpoints import ReceiverLayout
+from witwin.channel.deterministic import accumulation
+from witwin.channel.propagation.models import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,

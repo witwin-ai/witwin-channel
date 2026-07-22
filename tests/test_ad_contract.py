@@ -5,21 +5,21 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native import capabilities
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic.solver import (
+from witwin.channel import capabilities
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic.solver import (
     _metadata as deterministic_metadata,
 )
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic.metadata import (
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.basic.metadata import (
     make_solver_metadata as basic_metadata,
 )
-from witwin.channel_native.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel_native.montecarlo.bdpt.metadata import (
+from witwin.channel.montecarlo.bdpt import Config as BdptConfig
+from witwin.channel.montecarlo.bdpt.metadata import (
     make_solver_metadata as bdpt_metadata,
 )
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path.solver import _metadata as path_metadata
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path.solver import _metadata as path_metadata
 
 
 _CONFIG_TYPES = (PathConfig, DeterministicConfig, BasicConfig, BdptConfig)

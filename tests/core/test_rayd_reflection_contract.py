@@ -1,10 +1,10 @@
 import pytest
 import torch
 
-from witwin.channel_native import Scene, Structure
-from witwin.channel_native.propagation.geometry.kernels import bridge as ops
-from witwin.channel_native.core.materials import PerfectConductor
-from witwin.channel_native.runtime import symbols
+from witwin.channel import Scene, Structure
+from witwin.channel.propagation.geometry.kernels import bridge as ops
+from witwin.channel.core.materials import PerfectConductor
+from witwin.channel.runtime import symbols
 
 
 def _native_single_triangle_scene():

@@ -8,7 +8,7 @@ never from the oracle itself.
 import numpy as np
 import pytest
 
-from witwin.channel_native.physics import (
+from witwin.channel.physics import (
     C0,
     EPS0,
     MU0,

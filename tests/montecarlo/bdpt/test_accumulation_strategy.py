@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 @pytest.mark.parametrize("strategy", ["atomic", "staged", "compact", "auto"])

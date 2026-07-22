@@ -7,8 +7,8 @@ from pathlib import Path
 import pickle
 
 from ci import check_import_graph as graph
-from witwin.channel_native.propagation import models
-from witwin.channel_native.propagation.models import contracts
+from witwin.channel.propagation import models
+from witwin.channel.propagation.models import contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -52,8 +52,8 @@ def test_topology_config_identity_and_canonical_introspection_owner():
 def test_topology_config_class_pickle_uses_canonical_owner():
     payload = pickle.dumps(contracts.TopologyConfig)
 
-    assert b"witwin.channel_native.propagation.models.contracts" in payload
-    assert b"witwin.channel_native.core.path_topology" not in payload
+    assert b"witwin.channel.propagation.models.contracts" in payload
+    assert b"witwin.channel.core.path_topology" not in payload
     assert pickle.loads(payload) is contracts.TopologyConfig
 
 
@@ -80,6 +80,6 @@ def test_contracts_do_not_depend_on_removed_core_path_topology():
             pending.extend(adjacency.get(current, ()))
         return False
 
-    core = "witwin.channel_native.core.path_topology"
-    contracts_module = "witwin.channel_native.propagation.models.contracts"
+    core = "witwin.channel.core.path_topology"
+    contracts_module = "witwin.channel.propagation.models.contracts"
     assert not reaches(contracts_module, core)

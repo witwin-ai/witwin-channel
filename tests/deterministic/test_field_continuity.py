@@ -29,15 +29,15 @@ import numpy as np
 import pytest
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     PerfectConductor,
     ReceiverGrid,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deterministic import Config, solve
 
 
 _FREQUENCY_HZ = 5.0e9

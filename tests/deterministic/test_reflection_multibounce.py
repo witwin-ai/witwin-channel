@@ -1,18 +1,18 @@
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Dielectric
-from witwin.channel_native.deterministic import Config, solve
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Dielectric
+from witwin.channel.deterministic import Config, solve
+from witwin.channel.propagation.fields.kernels import (
     deterministic as deterministic_fields,
 )
-from witwin.channel_native.propagation.enumerated import reflection as topology
-from witwin.channel_native.propagation.geometry import reevaluate as topology_geometry
-from witwin.channel_native.propagation.topology.export import evaluated_paths_from_block
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel.propagation.enumerated import reflection as topology
+from witwin.channel.propagation.geometry import reevaluate as topology_geometry
+from witwin.channel.propagation.topology.export import evaluated_paths_from_block
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as solve_paths
 
 
 def test_multibounce_sort_order_uses_full_primitive_sequence():
@@ -362,7 +362,7 @@ def test_two_bounce_reflection_uses_rayd_epc_path_export(monkeypatch):
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    from witwin.channel_native.propagation.geometry.kernels import (
+    from witwin.channel.propagation.geometry.kernels import (
         bridge as geometry_bridge,
     )
 

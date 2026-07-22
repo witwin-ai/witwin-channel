@@ -6,10 +6,10 @@ import pytest
 import torch
 
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface
-from witwin.channel_native.path import Config, InteractionType, solve
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.channel.path import Config, InteractionType, solve
 
 _FREQUENCY_HZ = 3.0e9
 _LIGHT_SPEED_M_PER_S = 299792458.0

@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 
 
-SCHEMA_NAME = "witwin.channel_native.fullwave-reference"
+SCHEMA_NAME = "witwin.channel.fullwave-reference"
 SCHEMA_VERSION = 1
 
 

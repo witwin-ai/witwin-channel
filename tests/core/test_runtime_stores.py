@@ -4,18 +4,18 @@ from dataclasses import replace
 import pytest
 import torch
 
-from witwin.channel_native.core.runtime import _validation as legacy_validation
-from witwin.channel_native.core.runtime.assignments import AssignmentStore
-from witwin.channel_native.core.runtime.geometry import GeometryStore
-from witwin.channel_native.core.runtime.material_store import MaterialStore
-from witwin.channel_native.scene.stores import _validation as canonical_validation
-from witwin.channel_native.scene.stores.assignments import (
+from witwin.channel.core.runtime import _validation as legacy_validation
+from witwin.channel.core.runtime.assignments import AssignmentStore
+from witwin.channel.core.runtime.geometry import GeometryStore
+from witwin.channel.core.runtime.material_store import MaterialStore
+from witwin.channel.scene.stores import _validation as canonical_validation
+from witwin.channel.scene.stores.assignments import (
     AssignmentStore as CanonicalAssignmentStore,
 )
-from witwin.channel_native.scene.stores.geometry import (
+from witwin.channel.scene.stores.geometry import (
     GeometryStore as CanonicalGeometryStore,
 )
-from witwin.channel_native.scene.stores.materials import (
+from witwin.channel.scene.stores.materials import (
     MaterialStore as CanonicalMaterialStore,
 )
 

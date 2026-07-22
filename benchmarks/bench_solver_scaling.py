@@ -24,8 +24,8 @@ from tests.support.native_ext import inject_native_paths  # noqa: E402
 inject_native_paths()
 
 from tests.support.scenes import same_side_wall_reflection_scene  # noqa: E402
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter  # noqa: E402
-from witwin.channel_native.core.memory_budget import (  # noqa: E402
+from witwin.channel import ReceiverPoint, Scene, Transmitter  # noqa: E402
+from witwin.channel.core.memory_budget import (  # noqa: E402
     MemoryBudgetError,
     estimate_monte_carlo_memory,
 )
@@ -61,17 +61,17 @@ def _operation(
 ):
     components = {"los"} if depth == 0 else {"los", "reflection"}
     if solver == "path":
-        from witwin.channel_native.path import Config, solve
+        from witwin.channel.path import Config, solve
 
         config = Config(max_depth=depth, components=components)
         return lambda: solve(scene, config)
     if solver == "deterministic":
-        from witwin.channel_native.deterministic import Config, solve
+        from witwin.channel.deterministic import Config, solve
 
         config = Config(max_depth=depth, components=components)
         return lambda: solve(scene, config)
     if solver == "basic":
-        from witwin.channel_native.montecarlo.basic import Config, solve
+        from witwin.channel.montecarlo.basic import Config, solve
 
         config = Config(
             samples=samples,
@@ -81,7 +81,7 @@ def _operation(
         )
         return lambda: solve(scene, config)
     if solver == "bdpt":
-        from witwin.channel_native.montecarlo.bdpt import Config, solve
+        from witwin.channel.montecarlo.bdpt import Config, solve
 
         config = Config(
             samples=samples,

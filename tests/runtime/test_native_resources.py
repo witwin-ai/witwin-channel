@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from witwin.channel_native.runtime import native_resources
+from witwin.channel.runtime import native_resources
 
 
 def test_native_resource_normalizer_is_a_pure_stdlib_runtime_owner():

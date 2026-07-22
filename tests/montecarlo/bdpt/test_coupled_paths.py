@@ -2,9 +2,9 @@ import pytest
 import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
-from witwin.channel_native import capabilities
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel import capabilities
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def test_bdpt_exports_coupled_paths_with_bidirectional_discrete_mass():

@@ -5,8 +5,8 @@ from tests.support.scenes import (
     empty_space_los_scene,
     same_side_wall_reflection_scene,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deterministic import Config, solve
 
 
 def test_transmission_and_scattering_are_zero_contribution_plumbing():

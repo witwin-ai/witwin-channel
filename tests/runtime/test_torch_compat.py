@@ -7,7 +7,7 @@ from packaging.version import Version
 import pytest
 import torch
 
-from witwin.channel_native.runtime import torch_compat
+from witwin.channel.runtime import torch_compat
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

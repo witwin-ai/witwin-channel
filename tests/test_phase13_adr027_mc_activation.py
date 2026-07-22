@@ -65,10 +65,10 @@ def test_phase_m_native_symbols_have_live_owners_and_complete_coverage() -> None
 
 def test_phase_m_removes_python_torch_penetration_and_wall_product_route() -> None:
     events = (
-        ROOT / "src/witwin/channel_native/montecarlo/events/transmission.py"
+        ROOT / "src/witwin/channel/montecarlo/events/transmission.py"
     ).read_text(encoding="utf-8")
     component = (
-        ROOT / "src/witwin/channel_native/montecarlo/basic/rayd_components.py"
+        ROOT / "src/witwin/channel/montecarlo/basic/rayd_components.py"
     ).read_text(encoding="utf-8")
 
     assert events.count("rayd_segment_penetration_forward(") == 1
@@ -96,7 +96,7 @@ def test_phase_m_removes_python_torch_penetration_and_wall_product_route() -> No
 
 def test_phase_m_pipeline_has_one_transaction_sanitizer_and_terminal_order() -> None:
     source = (
-        ROOT / "src/witwin/channel_native/montecarlo/basic/pipeline.py"
+        ROOT / "src/witwin/channel/montecarlo/basic/pipeline.py"
     ).read_text(encoding="utf-8")
 
     create = source.index("create_solve_capacity_transaction(")
@@ -121,7 +121,7 @@ def test_phase_m_pipeline_has_one_transaction_sanitizer_and_terminal_order() -> 
         assert forbidden not in source
 
     metadata = (
-        ROOT / "src/witwin/channel_native/montecarlo/basic/metadata.py"
+        ROOT / "src/witwin/channel/montecarlo/basic/metadata.py"
     ).read_text(encoding="utf-8")
     assert "per transmitter" not in metadata
     assert (

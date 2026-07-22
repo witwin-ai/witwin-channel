@@ -2,9 +2,9 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.deterministic import Config, solve
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel.deterministic import Config, solve
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as solve_paths
 
 
 def test_export_paths_preserves_path_table_columns_and_field_values():

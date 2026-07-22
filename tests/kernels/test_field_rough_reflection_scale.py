@@ -3,11 +3,11 @@
 import pytest
 import torch
 
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel.propagation.fields.kernels import (
     functional as field_functional,
     rough_scale as field_rough_scale,
 )
-from witwin.channel_native.runtime import symbols
+from witwin.channel.runtime import symbols
 
 from tests.reference import rough_reflection as reference
 

@@ -3,37 +3,37 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.kernels import metadata as kernel_metadata
-from witwin.channel_native.deterministic.kernels import (
+from witwin.channel.core.kernels import metadata as kernel_metadata
+from witwin.channel.deterministic.kernels import (
     accumulation as deterministic_accumulation,
 )
-from witwin.channel_native.propagation.geometry.kernels import (
+from witwin.channel.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )
-from witwin.channel_native.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel.propagation.topology.kernels import (
     candidates as topology_candidates,
 )
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.propagation.topology.kernels import (
     compaction as topology_compaction,
 )
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.propagation.topology.kernels import (
     construction as topology_construction,
 )
-from witwin.channel_native.runtime import tensor_contracts
-from witwin.channel_native.propagation.fields.kernels import (
+from witwin.channel.runtime import tensor_contracts
+from witwin.channel.propagation.fields.kernels import (
     deterministic as deterministic_fields,
 )
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native.materials.kernels import functional as material_functional
-from witwin.channel_native.montecarlo.basic.kernels import sampling as mc_sampling
-from witwin.channel_native.montecarlo.basic.kernels import maps as mc_maps
-from witwin.channel_native.runtime import native_buffers
-from witwin.channel_native.runtime import symbols as runtime_symbols
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.runtime import symbols
+from witwin.channel.materials.kernels import functional as material_functional
+from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
+from witwin.channel.montecarlo.basic.kernels import maps as mc_maps
+from witwin.channel.runtime import native_buffers
+from witwin.channel.runtime import symbols as runtime_symbols
+from witwin.channel.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.propagation.topology.kernels import (
     sampling as topology_sampling,
 )
 

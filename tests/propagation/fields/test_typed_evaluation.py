@@ -5,11 +5,11 @@ from types import SimpleNamespace
 import torch
 
 from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
-from witwin.channel_native.propagation.fields import evaluation
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
+from witwin.channel.propagation.fields import evaluation
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
 
 
 def _patch_field_stages(monkeypatch, events: list[str]) -> None:

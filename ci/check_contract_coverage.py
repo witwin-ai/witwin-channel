@@ -24,7 +24,7 @@ PUBLIC_SNAPSHOT_PATH = Path("ci/public-api-snapshot.json")
 # 0892d855.../static/ is immutable history and is never rewritten.
 BINDING_BASELINE_PATH = Path("ci/native-binding-manifest.json")
 PHASE10_AUDIT_PATH = Path("docs/dev/audit/phase10-legacy-dead-binding.json")
-PYTHON_PACKAGE_PATH = Path("src/witwin/channel_native")
+PYTHON_PACKAGE_PATH = Path("src/witwin/channel")
 EXPECTED_PUBLIC_EXPORT_COUNT = 37
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
@@ -90,201 +90,201 @@ DORMANT_SYMBOL_FACADES = {
 DORMANT_EXPERIMENT_SYMBOLS = frozenset(DORMANT_SYMBOL_FACADES)
 DORMANT_FACADE_OWNERS = {
     "coupled_candidate_capacity_block": (
-        "witwin.channel_native.propagation.topology.kernels.coupled."
+        "witwin.channel.propagation.topology.kernels.coupled."
         "coupled_candidate_capacity_block"
     ),
     "deterministic_capacity_finalize": (
-        "witwin.channel_native.propagation.topology.kernels.compaction."
+        "witwin.channel.propagation.topology.kernels.compaction."
         "deterministic_capacity_finalize"
     ),
     "deterministic_diffraction_order1_capacity_block": (
-        "witwin.channel_native.propagation.topology.kernels.compaction."
+        "witwin.channel.propagation.topology.kernels.compaction."
         "deterministic_diffraction_order1_capacity_block"
     ),
     "deterministic_diffraction_pair_reduce": (
-        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "witwin.channel.deterministic.kernels.diffraction_pair."
         "deterministic_diffraction_pair_reduce"
     ),
     "deterministic_diffraction_pair_reduce_backward": (
-        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "witwin.channel.deterministic.kernels.diffraction_pair."
         "deterministic_diffraction_pair_reduce_backward"
     ),
     "deterministic_diffraction_pair_reduce_jvp": (
-        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "witwin.channel.deterministic.kernels.diffraction_pair."
         "deterministic_diffraction_pair_reduce_jvp"
     ),
     "deterministic_diffraction_pair_reduce_ad": (
-        "witwin.channel_native.deterministic.kernels.diffraction_pair."
+        "witwin.channel.deterministic.kernels.diffraction_pair."
         "deterministic_diffraction_pair_reduce_ad"
     ),
     "deterministic_diffraction_state_capacity_select": (
-        "witwin.channel_native.propagation.topology.kernels.primitives."
+        "witwin.channel.propagation.topology.kernels.primitives."
         "deterministic_diffraction_state_capacity_select"
     ),
     "deterministic_path_table_capacity_pack": (
-        "witwin.channel_native.deterministic.capacity."
+        "witwin.channel.deterministic.capacity."
         "deterministic_path_table_capacity_pack"
     ),
     "deterministic_reflection_candidate_capacity_block": (
-        "witwin.channel_native.propagation.topology.kernels.reflection."
+        "witwin.channel.propagation.topology.kernels.reflection."
         "deterministic_reflection_candidate_capacity_block"
     ),
     "enumerated_canonical_capacity_select": (
-        "witwin.channel_native.propagation.topology.kernels.compaction."
+        "witwin.channel.propagation.topology.kernels.compaction."
         "enumerated_canonical_capacity_select"
     ),
     "evaluated_paths_canonical_capacity_gather": (
-        "witwin.channel_native.propagation.enumerated.canonical_capacity."
+        "witwin.channel.propagation.enumerated.canonical_capacity."
         "evaluated_paths_canonical_capacity_gather"
     ),
     "evaluated_paths_capacity_pack": (
-        "witwin.channel_native.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated.capacity."
         "evaluated_paths_capacity_pack"
     ),
     "from_capacity_evaluated_paths": (
-        "witwin.channel_native.path.capacity.from_capacity_evaluated_paths"
+        "witwin.channel.path.capacity.from_capacity_evaluated_paths"
     ),
 }
 DORMANT_ALLOWED_FACADE_CALLERS = {
     "deterministic_diffraction_pair_reduce": frozenset(
         {
-            "witwin.channel_native.deterministic.kernels.diffraction_pair."
+            "witwin.channel.deterministic.kernels.diffraction_pair."
             "_DeterministicDiffractionPairReduceFunction.forward"
         }
     ),
     "deterministic_diffraction_pair_reduce_backward": frozenset(
         {
-            "witwin.channel_native.deterministic.kernels.diffraction_pair."
+            "witwin.channel.deterministic.kernels.diffraction_pair."
             "_DeterministicDiffractionPairReduceFunction.backward"
         }
     ),
     "deterministic_diffraction_pair_reduce_jvp": frozenset(
         {
-            "witwin.channel_native.deterministic.kernels.diffraction_pair."
+            "witwin.channel.deterministic.kernels.diffraction_pair."
             "_DeterministicDiffractionPairReduceFunction.jvp"
         }
     ),
 }
 BOOTSTRAP_CALL_SITE_OWNERS = {
     "coupled_rd_prepare": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_CoupledRdPrepareAdFunction.forward"
     ),
     "coupled_rd_prepare_backward": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_CoupledRdPrepareAdFunction.backward"
     ),
     "coupled_rd_prepare_jvp": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_CoupledRdPrepareAdFunction.jvp"
     ),
     "deterministic_accumulate_flat_fwd64": (
-        "witwin.channel_native.deterministic.kernels.accumulation."
+        "witwin.channel.deterministic.kernels.accumulation."
         "_DeterministicAccumulateFlatAdFunction.forward"
     ),
     "deterministic_path_table_capacity_pack": (
-        "witwin.channel_native.deterministic.capacity."
+        "witwin.channel.deterministic.capacity."
         "_DeterministicPathTableCapacityPackFunction.forward"
     ),
     "deterministic_path_table_capacity_pack_backward": (
-        "witwin.channel_native.deterministic.capacity."
+        "witwin.channel.deterministic.capacity."
         "_DeterministicPathTableCapacityPackFunction.backward"
     ),
     "deterministic_path_table_capacity_pack_jvp": (
-        "witwin.channel_native.deterministic.capacity."
+        "witwin.channel.deterministic.capacity."
         "_DeterministicPathTableCapacityPackFunction.jvp"
     ),
     "deterministic_los_topology_block_all_visible": (
-        "witwin.channel_native.propagation.topology.kernels.construction."
+        "witwin.channel.propagation.topology.kernels.construction."
         "deterministic_los_topology_block"
     ),
     "enumerated_capacity_failure_sanitize": (
-        "witwin.channel_native.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated.capacity."
         "_EnumeratedCapacityFailureSanitizeFunction.forward"
     ),
     "enumerated_capacity_failure_vector_sanitize": (
-        "witwin.channel_native.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated.capacity."
         "_enumerated_capacity_failure_vector_sanitize_native"
     ),
     "enumerated_transmission_topology_pack_backward": (
-        "witwin.channel_native.propagation.topology.kernels.transmission."
+        "witwin.channel.propagation.topology.kernels.transmission."
         "_EnumeratedTransmissionTopologyPackFunction.backward"
     ),
     "enumerated_transmission_topology_pack_jvp": (
-        "witwin.channel_native.propagation.topology.kernels.transmission."
+        "witwin.channel.propagation.topology.kernels.transmission."
         "_EnumeratedTransmissionTopologyPackFunction.jvp"
     ),
     "evaluated_paths_capacity_pack": (
-        "witwin.channel_native.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated.capacity."
         "_EvaluatedPathsCapacityPackFunction.forward"
     ),
     "evaluated_paths_capacity_pack_backward": (
-        "witwin.channel_native.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated.capacity."
         "_evaluated_paths_capacity_pack_backward_native"
     ),
     "evaluated_paths_capacity_pack_jvp": (
-        "witwin.channel_native.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated.capacity."
         "_evaluated_paths_capacity_pack_jvp_native"
     ),
     "evaluated_paths_canonical_capacity_gather": (
-        "witwin.channel_native.propagation.enumerated.canonical_capacity."
+        "witwin.channel.propagation.enumerated.canonical_capacity."
         "_EvaluatedPathsCanonicalCapacityGatherFunction.forward"
     ),
     "evaluated_paths_canonical_capacity_gather_backward": (
-        "witwin.channel_native.propagation.enumerated.canonical_capacity."
+        "witwin.channel.propagation.enumerated.canonical_capacity."
         "_EvaluatedPathsCanonicalCapacityGatherFunction.backward"
     ),
     "evaluated_paths_canonical_capacity_gather_jvp": (
-        "witwin.channel_native.propagation.enumerated.canonical_capacity."
+        "witwin.channel.propagation.enumerated.canonical_capacity."
         "_EvaluatedPathsCanonicalCapacityGatherFunction.jvp"
     ),
     "path_result_capacity_pack": (
-        "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.forward"
+        "witwin.channel.path.capacity._PathResultCapacityPackFunction.forward"
     ),
     "path_result_capacity_pack_backward": (
-        "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.backward"
+        "witwin.channel.path.capacity._PathResultCapacityPackFunction.backward"
     ),
     "path_result_capacity_pack_jvp": (
-        "witwin.channel_native.path.capacity._PathResultCapacityPackFunction.jvp"
+        "witwin.channel.path.capacity._PathResultCapacityPackFunction.jvp"
     ),
     "field_coupled_rd_backward": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldCoupledRdAdFunction.backward"
     ),
     "field_coupled_rd_jvp": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldCoupledRdAdFunction.jvp"
     ),
     "field_diffraction_wedge_backward": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldDiffractionWedgeAdFunction.backward"
     ),
     "field_diffraction_wedge_jvp": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldDiffractionWedgeAdFunction.jvp"
     ),
     "field_free_space_fwd64": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldFreeSpaceAdFunction.forward"
     ),
     "field_project_complex3_backward": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldProjectComplex3AdFunction.backward"
     ),
     "field_project_complex3_jvp": (
-        "witwin.channel_native.propagation.fields.kernels.autograd."
+        "witwin.channel.propagation.fields.kernels.autograd."
         "_FieldProjectComplex3AdFunction.jvp"
     ),
     "mc_capacity_failure_component_maps_sanitize": (
-        "witwin.channel_native.montecarlo.basic.kernels.capacity."
+        "witwin.channel.montecarlo.basic.kernels.capacity."
         "_mc_capacity_failure_component_maps_sanitize_native"
     ),
     "mc_capacity_failure_component_maps_sanitize_backward": (
-        "witwin.channel_native.montecarlo.basic.kernels.capacity."
+        "witwin.channel.montecarlo.basic.kernels.capacity."
         "_mc_capacity_failure_component_maps_sanitize_backward_native"
     ),
     "mc_capacity_failure_component_maps_sanitize_jvp": (
-        "witwin.channel_native.montecarlo.basic.kernels.capacity."
+        "witwin.channel.montecarlo.basic.kernels.capacity."
         "_mc_capacity_failure_component_maps_sanitize_jvp_native"
     ),
 }
@@ -527,7 +527,7 @@ def _python_definitions(repo: Path) -> dict[str, ast.AST]:
         suffix = list(path.relative_to(root).with_suffix("").parts)
         if suffix[-1] == "__init__":
             suffix.pop()
-        module = ".".join(("witwin", "channel_native", *suffix))
+        module = ".".join(("witwin", "channel", *suffix))
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         visitor = _DefinitionVisitor(module)
         visitor.visit(tree)
@@ -549,7 +549,7 @@ def _python_call_sites(
         suffix = list(path.relative_to(root).with_suffix("").parts)
         if suffix[-1] == "__init__":
             suffix.pop()
-        module = ".".join(("witwin", "channel_native", *suffix))
+        module = ".".join(("witwin", "channel", *suffix))
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         visitor = _CallSiteVisitor(module, targets)
         visitor.visit(tree)
@@ -665,13 +665,13 @@ def _set_mismatch(label: str, actual: set[str], expected: set[str]) -> list[str]
 
 
 def _initial_public_scenario(module: str, name: str) -> str:
-    if module == "witwin.channel_native.path":
+    if module == "witwin.channel.path":
         return "path-los" if name == "solve" else "path-reflection"
-    if module == "witwin.channel_native.deterministic":
+    if module == "witwin.channel.deterministic":
         return "deterministic-los"
-    if module == "witwin.channel_native.montecarlo.basic":
+    if module == "witwin.channel.montecarlo.basic":
         return "mc-basic-los"
-    if module == "witwin.channel_native.montecarlo.bdpt":
+    if module == "witwin.channel.montecarlo.bdpt":
         return "bdpt-los"
     if name == "build_info":
         return "build-info"

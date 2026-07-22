@@ -4,8 +4,8 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-import witwin.channel_native.path as path_api
-from witwin.channel_native.path import (
+import witwin.channel.path as path_api
+from witwin.channel.path import (
     Config,
     InteractionType,
     PathResult,

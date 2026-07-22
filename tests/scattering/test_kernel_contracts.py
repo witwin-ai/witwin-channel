@@ -5,9 +5,9 @@ import inspect
 
 import pytest
 
-from witwin.channel_native.scattering import kernels
-from witwin.channel_native.scattering.kernels import functional
-from witwin.channel_native.runtime import symbols, tensor_contracts
+from witwin.channel.scattering import kernels
+from witwin.channel.scattering.kernels import functional
+from witwin.channel.runtime import symbols, tensor_contracts
 
 
 _OWNER_NAMES = (

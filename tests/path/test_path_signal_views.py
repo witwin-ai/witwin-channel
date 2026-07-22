@@ -2,7 +2,7 @@ import math
 
 import torch
 
-from witwin.channel_native.path import InteractionType, PathResult, RaggedPathSoA
+from witwin.channel.path import InteractionType, PathResult, RaggedPathSoA
 
 
 def _signal_result() -> PathResult:

@@ -43,8 +43,8 @@ QUICK_GATES = (
         (
             "-c",
             "import sys; sys.path.insert(0, 'src'); "
-            "import torch, witwin.channel_native; "
-            "assert 'witwin.channel_native._channel_native' not in sys.modules; "
+            "import torch, witwin.channel; "
+            "assert 'witwin.channel._channel_native' not in sys.modules; "
             "assert not torch.cuda.is_initialized()",
         ),
     ),

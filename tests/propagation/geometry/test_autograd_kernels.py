@@ -4,16 +4,16 @@ import inspect
 
 import pytest
 
-from witwin.channel_native.propagation.geometry.kernels import autograd as ops
-from witwin.channel_native.propagation.geometry import kernels
-from witwin.channel_native.propagation.geometry.kernels import autograd, primitives
-from witwin.channel_native.runtime import (
+from witwin.channel.propagation.geometry.kernels import autograd as ops
+from witwin.channel.propagation.geometry import kernels
+from witwin.channel.propagation.geometry.kernels import autograd, primitives
+from witwin.channel.runtime import (
     autograd_contracts,
     native_resources,
     symbols,
     tensor_contracts,
 )
-from witwin.channel_native.runtime import torch_compat
+from witwin.channel.runtime import torch_compat
 
 
 _OWNER_NAMES = (

@@ -1,6 +1,6 @@
 {
   "schema": {
-    "name": "witwin.channel_native.phase13-phase12-diagnostic-contract",
+    "name": "witwin.channel.phase13-phase12-diagnostic-contract",
     "version": 1
   },
   "execution": {
@@ -11,7 +11,7 @@
   },
   "groups": {
     "enumerated_penetration": {
-      "callable": "witwin.channel_native.propagation.enumerated.transmission._transmission_topology",
+      "callable": "witwin.channel.propagation.enumerated.transmission._transmission_topology",
       "variants": {
         "baseline": {"mode": "high_level_owner", "source_lane_available": false},
         "candidate": {"mode": "high_level_owner", "source_lane_available": false}
@@ -24,7 +24,7 @@
       ]
     },
     "montecarlo_penetration": {
-      "callable": "witwin.channel_native.montecarlo.events.transmission.straight_transmission_chains",
+      "callable": "witwin.channel.montecarlo.events.transmission.straight_transmission_chains",
       "variants": {
         "baseline": {"mode": "high_level_owner", "source_lane_available": false},
         "candidate": {"mode": "high_level_owner", "source_lane_available": false}
@@ -32,7 +32,7 @@
       "arrays": ["distance", "penetrated", "transmittance", "wall_count"]
     },
     "diffraction": {
-      "callable": "witwin.channel_native.propagation.enumerated.diffraction._diffraction_topology_order1",
+      "callable": "witwin.channel.propagation.enumerated.diffraction._diffraction_topology_order1",
       "variants": {
         "baseline": {"mode": "old_compact_atomic_target", "source_lane_available": false},
         "candidate": {"mode": "source_lane_pair_reduce", "source_lane_available": true}

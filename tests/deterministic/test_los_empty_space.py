@@ -3,7 +3,7 @@ import torch
 
 from tests.support.reference_channel import los_path_gain_reference
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.deterministic import Config, solve
 
 
 def test_empty_space_los_matches_analytic_reference():

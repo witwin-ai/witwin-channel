@@ -18,8 +18,8 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.
-from witwin.channel_native import ReceiverGrid, Scene, Transmitter  # noqa: E402
-from witwin.channel_native.deterministic import Config, solve  # noqa: E402
+from witwin.channel import ReceiverGrid, Scene, Transmitter  # noqa: E402
+from witwin.channel.deterministic import Config, solve  # noqa: E402
 
 
 DEFAULT_SIONNA_ROOT = pathlib.Path(

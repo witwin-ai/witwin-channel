@@ -14,17 +14,17 @@ import textwrap
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import (
+from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import (
     Layer,
     PerfectConductor,
     PhysicalSurface,
 )
-from witwin.channel_native.montecarlo.basic import Config, solve
-from witwin.channel_native.montecarlo.basic import pipeline as basic_pipeline
-from witwin.channel_native.physics.oracle import layer_stack_rt
-from witwin.channel_native.runtime.capacity import (
+from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.montecarlo.basic import pipeline as basic_pipeline
+from witwin.channel.physics.oracle import layer_stack_rt
+from witwin.channel.runtime.capacity import (
     CapacityFailureBit,
     SolveCapacityTransaction,
 )
@@ -186,7 +186,7 @@ def test_transmission_d_plus_one_capacity_failure_is_loud_in_subprocess():
             _solve,
             _wall,
         )
-        from witwin.channel_native.core.materials import Layer, PhysicalSurface
+        from witwin.channel.core.materials import Layer, PhysicalSurface
 
         vacuum = PhysicalSurface(
             layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"

@@ -8,10 +8,10 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native import materials as materials_package
-from witwin.channel_native.materials import evaluation
-from witwin.channel_native.montecarlo.basic import solver as mc_solver
-from witwin.channel_native.runtime import autograd_contracts
+from witwin.channel import materials as materials_package
+from witwin.channel.materials import evaluation
+from witwin.channel.montecarlo.basic import solver as mc_solver
+from witwin.channel.runtime import autograd_contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

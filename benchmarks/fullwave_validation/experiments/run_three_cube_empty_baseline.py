@@ -41,8 +41,8 @@ from benchmarks.fullwave_validation.scenarios import (  # noqa: E402
     build_channel_scene,
     load_case,
 )
-from witwin.channel_native import Scene  # noqa: E402
-from witwin.channel_native.deterministic import Config, solve  # noqa: E402
+from witwin.channel import Scene  # noqa: E402
+from witwin.channel.deterministic import Config, solve  # noqa: E402
 
 
 spec = load_case("three_cube_320", "metal")

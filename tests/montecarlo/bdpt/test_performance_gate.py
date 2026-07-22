@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from benchmarks.bench_bdpt_basic import run_benchmark
-from witwin.channel_native.core.kernels.extension import build_info
+from witwin.channel.core.kernels.extension import build_info
 from tests.support.bin.benchmark_single_plane_bdpt_native_vs_original import (
     run_benchmark as run_single_plane_native_vs_original,
 )

@@ -2,9 +2,9 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.kernels.metadata import validate_metadata
-from witwin.channel_native.path import Config, solve
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.path import Config, solve
 
 
 def test_path_solver_metadata_reports_counts_and_capabilities():

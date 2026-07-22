@@ -5,10 +5,10 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.core.objects import ReceiverGrid
-from witwin.channel_native.deterministic import accumulation, solver
-from witwin.channel_native.propagation.enumerated import scattering as enumerated
-from witwin.channel_native.propagation.geometry import endpoints
+from witwin.channel.core.objects import ReceiverGrid
+from witwin.channel.deterministic import accumulation, solver
+from witwin.channel.propagation.enumerated import scattering as enumerated
+from witwin.channel.propagation.geometry import endpoints
 
 
 _ENDPOINT_NAMES = (

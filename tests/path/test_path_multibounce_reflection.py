@@ -5,13 +5,13 @@ from tests.deterministic.test_reflection_multibounce import (
     parallel_wall_corridor_scene,
     two_wall_multibounce_scene,
 )
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.propagation.topology.export import evaluated_paths_from_block
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Dielectric
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as solve_deterministic
-from witwin.channel_native.path import Config, solve
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.propagation.topology.export import evaluated_paths_from_block
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Dielectric
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as solve_deterministic
+from witwin.channel.path import Config, solve
 
 
 def _require_native() -> None:

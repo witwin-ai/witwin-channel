@@ -6,17 +6,17 @@ from typing import Callable, Literal
 import torch
 
 from tests.support.scenes import rough_wall_structure, transmission_wall_structure
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.antenna import orientation_matrix
-from witwin.channel_native.core.materials import DebyeModel, Layer, PhysicalSurface
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as solve_deterministic
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic import solve as solve_basic
-from witwin.channel_native.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel_native.montecarlo.bdpt import solve as solve_bdpt
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import InteractionType, solve as solve_path
+from witwin.channel import ReceiverGrid, ReceiverPoint, Scene, Transmitter
+from witwin.channel.core.antenna import orientation_matrix
+from witwin.channel.core.materials import DebyeModel, Layer, PhysicalSurface
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as solve_deterministic
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.basic import solve as solve_basic
+from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import InteractionType, solve as solve_path
 
 
 @dataclass(frozen=True, slots=True)

@@ -45,11 +45,11 @@ def test_solver_and_deleted_module_boundaries_are_detected(tmp_path: Path):
             "__init__.py": "",
             "path/__init__.py": "",
             "path/pipeline.py": """
-import witwin.channel_native.deterministic.solver
-import witwin.channel_native.montecarlo.scattering_events
-from witwin.channel_native.core.kernels import ops
-from witwin.channel_native.runtime import extension
-from witwin.channel_native.runtime import native_extension
+import witwin.channel.deterministic.solver
+import witwin.channel.montecarlo.scattering_events
+from witwin.channel.core.kernels import ops
+from witwin.channel.runtime import extension
+from witwin.channel.runtime import native_extension
 """,
             "deterministic/solver.py": "",
             "montecarlo/scattering_events.py": "",
@@ -78,20 +78,20 @@ def test_propagation_runtime_oracle_and_kernel_boundaries_are_detected(
             "deterministic/solver.py": "",
             "scene/__init__.py": "",
             "scattering/__init__.py": "",
-            "propagation/enumerated.py": ("import witwin.channel_native.path.result\n"),
-            "propagation/topology.py": "import witwin.channel_native.scene\n",
+            "propagation/enumerated.py": ("import witwin.channel.path.result\n"),
+            "propagation/topology.py": "import witwin.channel.scene\n",
             "propagation/topology/discovery.py": "",
             "propagation/geometry.py": (
-                "import witwin.channel_native.propagation.topology.discovery\n"
+                "import witwin.channel.propagation.topology.discovery\n"
             ),
-            "propagation/fields.py": "import witwin.channel_native.path.result\n",
-            "runtime/state.py": "import witwin.channel_native.scene\n",
+            "propagation/fields.py": "import witwin.channel.path.result\n",
+            "runtime/state.py": "import witwin.channel.scene\n",
             "physics/oracle.py": (
-                "import torch\nimport witwin.channel_native.scattering\n"
+                "import torch\nimport witwin.channel.scattering\n"
             ),
             "scene/kernels/private.py": """
-import witwin.channel_native.deterministic.solver
-import witwin.channel_native.materials.kernels.private
+import witwin.channel.deterministic.solver
+import witwin.channel.materials.kernels.private
 """,
             "materials/kernels/private.py": "",
         },
@@ -119,10 +119,10 @@ def test_topology_cannot_import_canonical_or_legacy_compiled_scene(tmp_path: Pat
             "scene/compiled.py": "",
             "core/runtime/compiled_scene.py": "",
             "propagation/topology/canonical.py": (
-                "from witwin.channel_native.scene.compiled import CompiledScene\n"
+                "from witwin.channel.scene.compiled import CompiledScene\n"
             ),
             "propagation/topology/legacy.py": (
-                "from witwin.channel_native.core.runtime.compiled_scene "
+                "from witwin.channel.core.runtime.compiled_scene "
                 "import CompiledScene\n"
             ),
         },
@@ -140,10 +140,10 @@ def test_topology_and_geometry_cannot_import_scene_handle_helpers(tmp_path: Path
             "__init__.py": "",
             "scene/native_handles.py": "",
             "propagation/topology.py": (
-                "from witwin.channel_native.scene.native_handles import helper\n"
+                "from witwin.channel.scene.native_handles import helper\n"
             ),
             "propagation/geometry/kernels/helper.py": (
-                "from witwin.channel_native.scene.native_handles import helper\n"
+                "from witwin.channel.scene.native_handles import helper\n"
             ),
         },
     )
@@ -162,10 +162,10 @@ def test_deleted_modules_are_global_hard_failures(tmp_path: Path):
         {
             "__init__.py": "",
             "propagation/fields.py": (
-                "from witwin.channel_native.core.path_topology import TopologyBatch\n"
+                "from witwin.channel.core.path_topology import TopologyBatch\n"
             ),
             "propagation/geometry.py": (
-                "from witwin.channel_native.core.kernels import ops\n"
+                "from witwin.channel.core.kernels import ops\n"
             ),
         },
     )
@@ -262,7 +262,7 @@ def test_reexport_map_resolves_facade_symbols_to_defining_modules(tmp_path: Path
     )
 
     reexports = graph.build_reexport_map(package_root)
-    package = "witwin.channel_native"
+    package = "witwin.channel"
 
     assert reexports[(f"{package}.propagation", "evaluate_enumerated_paths")] == (
         f"{package}.propagation.enumerated.engine"
@@ -296,13 +296,13 @@ def test_reexport_canonicalization_reveals_facade_dependency(tmp_path: Path):
             "montecarlo/__init__.py": "",
             "montecarlo/bdpt/__init__.py": "",
             "montecarlo/bdpt/pipeline.py": (
-                "from witwin.channel_native.propagation import "
+                "from witwin.channel.propagation import "
                 "EvaluatedPaths, evaluate_enumerated_paths\n"
             ),
             "montecarlo/basic/__init__.py": "",
             "montecarlo/basic/kernels/__init__.py": "",
             "montecarlo/basic/kernels/sampling.py": (
-                "from witwin.channel_native.propagation.topology "
+                "from witwin.channel.propagation.topology "
                 "import mc_sample_directions\n"
             ),
         },
@@ -331,7 +331,7 @@ def test_module_only_imports_are_not_canonicalized(tmp_path: Path):
             "montecarlo/__init__.py": "",
             "montecarlo/bdpt/__init__.py": "",
             "montecarlo/bdpt/pipeline.py": (
-                "import witwin.channel_native.propagation\n"
+                "import witwin.channel.propagation\n"
             ),
         },
     )
@@ -345,7 +345,7 @@ def test_module_only_imports_are_not_canonicalized(tmp_path: Path):
 
 
 def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
-    package = "witwin.channel_native"
+    package = "witwin.channel"
     reexports = graph.build_reexport_map(PACKAGE_ROOT)
 
     assert reexports[(f"{package}.propagation", "evaluate_enumerated_paths")] == (
@@ -371,7 +371,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     ]
     assert enumerated == [
         graph.Violation(
-            "src/witwin/channel_native/montecarlo/bdpt/pipeline.py",
+            "src/witwin/channel/montecarlo/bdpt/pipeline.py",
             23,
             0,
             "mc_enumerated_dependency",
@@ -391,8 +391,8 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
     entry = group["baseline"][0]
     assert entry["id"] == "mc-enum-001"
     assert entry["rule"] == "mc_enumerated_dependency"
-    assert entry["source"] == "witwin.channel_native.montecarlo.bdpt.pipeline"
-    assert entry["target"] == "witwin.channel_native.propagation.enumerated.engine"
+    assert entry["source"] == "witwin.channel.montecarlo.bdpt.pipeline"
+    assert entry["target"] == "witwin.channel.propagation.enumerated.engine"
     assert "ADR-008" in (entry.get("adr", "") + entry.get("justification", ""))
 
     assert graph._DEBT_GROUP_BY_RULE["mc_enumerated_dependency"] == (
@@ -406,7 +406,7 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
         if violation.rule == "mc_enumerated_dependency"
     ]
     assert len(bound) == 1
-    assert bound[0].source == "witwin.channel_native.montecarlo.bdpt.pipeline"
+    assert bound[0].source == "witwin.channel.montecarlo.bdpt.pipeline"
 
 
 def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
@@ -414,12 +414,12 @@ def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
         tmp_path,
         {
             "__init__.py": (
-                "from witwin.channel_native.materials.kernels import encoding\n"
-                "from witwin.channel_native.scattering.kernels import lobe\n"
-                "from witwin.channel_native.scene.kernels import handles\n"
-                "from witwin.channel_native.deterministic.kernels import accumulate\n"
-                "from witwin.channel_native.propagation.fields.kernels import transport\n"
-                "from witwin.channel_native.core.kernels import extension\n"
+                "from witwin.channel.materials.kernels import encoding\n"
+                "from witwin.channel.scattering.kernels import lobe\n"
+                "from witwin.channel.scene.kernels import handles\n"
+                "from witwin.channel.deterministic.kernels import accumulate\n"
+                "from witwin.channel.propagation.fields.kernels import transport\n"
+                "from witwin.channel.core.kernels import extension\n"
             ),
             "materials/kernels/encoding.py": "",
             "scattering/kernels/lobe.py": "",
@@ -441,10 +441,10 @@ def test_public_init_real_graph_only_admits_core_kernels_extension():
         violation.target
         for violation in violations
         if violation.rule == "public_init_internal"
-        and violation.source == "witwin.channel_native"
+        and violation.source == "witwin.channel"
     }
 
-    assert public_init_targets == {"witwin.channel_native.core.kernels.extension"}
+    assert public_init_targets == {"witwin.channel.core.kernels.extension"}
 
 
 def test_reference_oracle_is_forbidden_from_production_dependencies(tmp_path: Path):
@@ -456,7 +456,7 @@ def test_reference_oracle_is_forbidden_from_production_dependencies(tmp_path: Pa
             "physics/oracle.py": "import torch\n",
             "physics/reference/__init__.py": "",
             "physics/reference/oracle.py": (
-                "import torch\nimport witwin.channel_native.scattering\n"
+                "import torch\nimport witwin.channel.scattering\n"
             ),
         },
     )

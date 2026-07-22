@@ -17,17 +17,17 @@ import pytest
 import torch
 
 from tests.support.scenes import rough_wall_structure
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import PhaseScreen, Roughness
-from witwin.channel_native.deterministic import Config, solve
-from witwin.channel_native.physics.oracle import C0, layer_stack_rt
-from witwin.channel_native.scattering import (
+from witwin.channel import ReceiverGrid, ReceiverPoint, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import PhaseScreen, Roughness
+from witwin.channel.deterministic import Config, solve
+from witwin.channel.physics.oracle import C0, layer_stack_rt
+from witwin.channel.scattering import (
     build_kirchhoff_table,
     generate_gaussian_realization,
     realization_seed,
 )
-from witwin.channel_native.scattering.tables import N_COS_THETA_O, N_PHI_O, _cos_centers
+from witwin.channel.scattering.tables import N_COS_THETA_O, N_PHI_O, _cos_centers
 
 _FREQUENCY_HZ = 3.0e9
 _K0 = 2.0 * math.pi * _FREQUENCY_HZ / C0

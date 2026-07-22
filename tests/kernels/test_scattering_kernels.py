@@ -3,8 +3,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.scattering.kernels import functional as ops
-from witwin.channel_native.runtime import symbols
+from witwin.channel.scattering.kernels import functional as ops
+from witwin.channel.runtime import symbols
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")

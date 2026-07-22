@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 
-SCHEMA_NAME = "witwin.channel_native.refactor-runtime-baseline"
+SCHEMA_NAME = "witwin.channel.refactor-runtime-baseline"
 SCHEMA_VERSION = 1
 SOLVERS = ("path", "deterministic", "montecarlo-basic", "montecarlo-bdpt")
 REDUCED_SCENARIOS = ("empty-los", "single-reflection")
@@ -429,11 +429,11 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
         seed = 5
 
     if solver == "path":
-        from witwin.channel_native.path import Config, solve
+        from witwin.channel.path import Config, solve
 
         config = Config(max_depth=max_depth, components=components)
     elif solver == "deterministic":
-        from witwin.channel_native.deterministic import Config, solve
+        from witwin.channel.deterministic import Config, solve
 
         config = Config(
             max_depth=max_depth,
@@ -442,7 +442,7 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
             diagnostics=True,
         )
     elif solver == "montecarlo-basic":
-        from witwin.channel_native.montecarlo.basic import Config, solve
+        from witwin.channel.montecarlo.basic import Config, solve
 
         config = Config(
             samples=samples,
@@ -452,7 +452,7 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
             diagnostics=True,
         )
     else:
-        from witwin.channel_native.montecarlo.bdpt import Config, solve
+        from witwin.channel.montecarlo.bdpt import Config, solve
 
         config = Config(
             samples=samples,
@@ -470,7 +470,7 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
 
 
 def _child_environment(torch: Any) -> dict[str, object]:
-    from witwin.channel_native import build_info
+    from witwin.channel import build_info
 
     device = torch.cuda.current_device()
     return {
@@ -884,7 +884,7 @@ class _GradientCapture:
 def _extended_receiver_grid(origin, u_axis, v_axis, shape, spacing):
     import torch
 
-    from witwin.channel_native import ReceiverGrid
+    from witwin.channel import ReceiverGrid
 
     return ReceiverGrid(
         origin=torch.tensor(origin),
@@ -896,7 +896,7 @@ def _extended_receiver_grid(origin, u_axis, v_axis, shape, spacing):
 
 
 def _extended_transmission_material():
-    from witwin.channel_native.core.materials import Layer, PhysicalSurface
+    from witwin.channel.core.materials import Layer, PhysicalSurface
 
     return PhysicalSurface(
         layers=(
@@ -918,12 +918,12 @@ def _extended_scene_and_config(solver: str, scenario: str):
         transmission_wall_structure,
         wedge_diffraction_scene,
     )
-    from witwin.channel_native import (
+    from witwin.channel import (
         ReceiverPoint,
         Scene,
         Transmitter,
     )
-    from witwin.channel_native.core.materials import (
+    from witwin.channel.core.materials import (
         Dielectric,
         PhaseScreen,
         Roughness,
@@ -932,7 +932,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
     seed = _EXTENDED_MC_SEEDS.get(scenario, 0)
 
     def _mc_basic(components, *, max_depth, samples):
-        from witwin.channel_native.montecarlo.basic import Config, solve
+        from witwin.channel.montecarlo.basic import Config, solve
 
         return Config(
             samples=samples,
@@ -951,7 +951,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
         coupled=False,
         accumulation_strategy="auto",
     ):
-        from witwin.channel_native.montecarlo.bdpt import Config, solve
+        from witwin.channel.montecarlo.bdpt import Config, solve
 
         return Config(
             samples=samples,
@@ -965,14 +965,14 @@ def _extended_scene_and_config(solver: str, scenario: str):
         ), solve
 
     def _path(components, *, max_depth, coupled=False, **extra):
-        from witwin.channel_native.path import Config, solve
+        from witwin.channel.path import Config, solve
 
         return Config(
             max_depth=max_depth, components=components, coupled_paths=coupled, **extra
         ), solve
 
     def _deterministic(components, *, max_depth, **extra):
-        from witwin.channel_native.deterministic import Config, solve
+        from witwin.channel.deterministic import Config, solve
 
         return Config(
             max_depth=max_depth,
@@ -1122,7 +1122,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
         return scene, config, solve
 
     if scenario == "rough-scattering-realization":
-        from witwin.channel_native.scattering import (
+        from witwin.channel.scattering import (
             generate_gaussian_realization,
             realization_seed,
         )
@@ -1210,8 +1210,8 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
         transmission_wall_structure,
         wedge_diffraction_scene,
     )
-    from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-    from witwin.channel_native.core.materials import Dielectric
+    from witwin.channel import ReceiverPoint, Scene, Transmitter
+    from witwin.channel.core.materials import Dielectric
 
     seed = _EXTENDED_AD_SEEDS[(scenario, ad_mode)]
 
@@ -1264,11 +1264,11 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
         raise RuntimeBaselineError("frequency AD seed is only wired for rough-reflection-cr")
 
     if solver == "path":
-        from witwin.channel_native.path import Config, solve
+        from witwin.channel.path import Config, solve
 
         config = Config(max_depth=max_depth, components=components, ad_mode=ad_mode)
     else:
-        from witwin.channel_native.deterministic import Config, solve
+        from witwin.channel.deterministic import Config, solve
 
         config = Config(
             max_depth=max_depth,

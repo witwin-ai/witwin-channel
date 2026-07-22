@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene, single_wall_reflection_scene
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def test_bdpt_los_empty_space_matches_analytic_reference():

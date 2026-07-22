@@ -20,14 +20,14 @@ import pytest
 import torch
 
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel_native import ReceiverGrid, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface
-from witwin.channel_native.physics.oracle import layer_stack_rt
+from witwin.channel import ReceiverGrid, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.channel.physics.oracle import layer_stack_rt
 
-from witwin.channel_native.deterministic import Config as DetConfig, solve as det_solve
-from witwin.channel_native.montecarlo.basic import Config as McConfig, solve as mc_solve
-from witwin.channel_native.montecarlo.bdpt import Config as BdptConfig, solve as bdpt_solve
+from witwin.channel.deterministic import Config as DetConfig, solve as det_solve
+from witwin.channel.montecarlo.basic import Config as McConfig, solve as mc_solve
+from witwin.channel.montecarlo.bdpt import Config as BdptConfig, solve as bdpt_solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

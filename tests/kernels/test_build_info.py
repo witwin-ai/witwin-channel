@@ -4,7 +4,7 @@ import re
 
 import torch
 
-from witwin.channel_native.core.kernels.extension import build_info
+from witwin.channel.core.kernels.extension import build_info
 
 
 def test_build_info_contract():

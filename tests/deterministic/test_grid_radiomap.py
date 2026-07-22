@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.deterministic.test_component_layout import _grid_scene
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel.deterministic import Config, solve
 
 
 def test_grid_radiomap_outputs_total_and_component_maps():

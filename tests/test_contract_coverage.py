@@ -72,7 +72,7 @@ def test_contract_matrix_rejects_missing_public_and_native_entries():
 def test_contract_matrix_rejects_missing_e2e_callers_and_bad_owners():
     manifest = copy.deepcopy(_manifest())
     symbol = manifest["native_bindings"][0][0]
-    manifest["native_bindings"][0][1] = "witwin.channel_native.missing.owner"
+    manifest["native_bindings"][0][1] = "witwin.channel.missing.owner"
     manifest["native_bindings"][0][4] = []
 
     issues = coverage.check_contract_coverage(REPOSITORY_ROOT, manifest)
@@ -147,8 +147,8 @@ def test_contract_matrix_rejects_injected_dormant_production_caller(
         rows = real_call_sites(repo, targets)
         rows["evaluated_paths_capacity_pack"].append(
             (
-                "witwin.channel_native.path.pipeline._solve_base",
-                "src/witwin/channel_native/path/pipeline.py",
+                "witwin.channel.path.pipeline._solve_base",
+                "src/witwin/channel/path/pipeline.py",
                 1,
             )
         )

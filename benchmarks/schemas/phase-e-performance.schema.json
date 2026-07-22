@@ -20,7 +20,7 @@
       "additionalProperties": false,
       "required": ["name", "version"],
       "properties": {
-        "name": {"const": "witwin.channel_native.phase-e-performance"},
+        "name": {"const": "witwin.channel.phase-e-performance"},
         "version": {"const": "1.0.0"}
       }
     },

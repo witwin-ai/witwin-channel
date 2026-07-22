@@ -15,7 +15,7 @@ sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source and test helpers must resolve from this checkout before importing them.
 from tests.deterministic.test_component_layout import _grid_scene  # noqa: E402
-from witwin.channel_native.deterministic import Config, solve  # noqa: E402
+from witwin.channel.deterministic import Config, solve  # noqa: E402
 
 
 def _output_bytes(result: Any) -> int:

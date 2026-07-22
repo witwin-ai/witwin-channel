@@ -3,7 +3,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     AntennaArray,
     AntennaPattern,
     ReceiverPoint,
@@ -11,15 +11,15 @@ from witwin.channel_native import (
     Transmitter,
     capabilities,
 )
-from witwin.channel_native.path import (
+from witwin.channel.path import (
     Config,
     PathResult,
     RaggedPathSoA,
     pack_synthetic_arrays,
     solve,
 )
-from witwin.channel_native.path import solver as path_solver
-from witwin.channel_native.core.antenna import apply_endpoint_weights
+from witwin.channel.path import solver as path_solver
+from witwin.channel.core.antenna import apply_endpoint_weights
 
 
 def _centre_result() -> PathResult:

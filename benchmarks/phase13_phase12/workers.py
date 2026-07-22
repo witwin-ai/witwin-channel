@@ -33,7 +33,7 @@ IDENTITY_PROBE_REPO_PATH = Path("benchmarks/phase13_phase12_identity_probe.py")
 BOOTSTRAP_REPO_PATH = Path("benchmarks/phase13_phase12_bootstrap.py")
 RAYD_LOCK_REPO_PATH = Path("dependencies/rayd.lock.json")
 DIFFRACTION_ROUTE_REPO_PATH = Path(
-    "src/witwin/channel_native/propagation/enumerated/diffraction.py"
+    "src/witwin/channel/propagation/enumerated/diffraction.py"
 )
 NATIVE_MANIFEST_REPO_PATH = Path("ci/native-binding-manifest.json")
 RUNNER_REPO_PATHS = (

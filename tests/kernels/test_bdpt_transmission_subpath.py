@@ -11,8 +11,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
-from witwin.channel_native.materials.kernels import functional as material_functional
+from witwin.channel.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel.materials.kernels import functional as material_functional
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

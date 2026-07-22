@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.propagation.topology.kernels import (
+from witwin.channel.propagation.topology.kernels import (
     compaction,
     coupled,
     reflection,
 )
-from witwin.channel_native.runtime import (
+from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
     create_capacity_failure_state,

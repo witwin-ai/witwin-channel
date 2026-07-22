@@ -2,12 +2,12 @@ import pytest
 import torch
 
 from tests.support.scenes import same_side_wall_reflection_scene
-from witwin.channel_native import ReceiverGrid, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.bdpt import Config, solve
-from witwin.channel_native.montecarlo.bdpt import solver as bdpt_solver
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel import ReceiverGrid, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as solve_paths
 
 
 def _scene_with_tx_power(power_w: float) -> Scene:

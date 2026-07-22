@@ -4,10 +4,10 @@ import ast
 from pathlib import Path
 
 from tools.refactor_baseline import python_body_hashes
-from witwin.channel_native.core import scene_tensors
-from witwin.channel_native.propagation.fields import evaluation
-from witwin.channel_native.propagation.geometry import reevaluate
-from witwin.channel_native.runtime import autograd_contracts
+from witwin.channel.core import scene_tensors
+from witwin.channel.propagation.fields import evaluation
+from witwin.channel.propagation.geometry import reevaluate
+from witwin.channel.runtime import autograd_contracts
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -159,7 +159,7 @@ def test_typed_field_orchestrator_uses_split_domains_and_no_legacy_dependency():
     assert assignments["topology"] == "paths.topology"
     assert assignments["geometry"] == "paths.geometry"
     assert assignments["input_fields"] == "paths.fields"
-    assert "witwin.channel_native.core.path_topology" not in imported_modules
+    assert "witwin.channel.core.path_topology" not in imported_modules
 
 
 def test_evaluation_preserves_nested_material_tuple_body():

@@ -60,9 +60,9 @@ from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL, REL_TOL_PATH
 from tests.reference import kirchhoff_ensemble as ref_ensemble
 from tests.reference import phase_screen_realization as ref_patch
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native.scattering.kernels import autograd as scattering_autograd
-from witwin.channel_native.scattering.kernels import functional as scattering_functional
+from witwin.channel.runtime import symbols
+from witwin.channel.scattering.kernels import autograd as scattering_autograd
+from witwin.channel.scattering.kernels import functional as scattering_functional
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for scattering AD"

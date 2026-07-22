@@ -22,7 +22,7 @@ from benchmarks.harness import (  # noqa: E402
     tensor_bytes,
 )
 from tests.support.native_ext import inject_native_paths  # noqa: E402
-from witwin.channel_native.core.memory_budget import (  # noqa: E402
+from witwin.channel.core.memory_budget import (  # noqa: E402
     MemoryBudgetError,
     MemoryEstimate,
     enforce_memory_budget,
@@ -33,7 +33,7 @@ from witwin.channel_native.core.memory_budget import (  # noqa: E402
 inject_native_paths()
 
 
-SCHEMA_NAME = "witwin.channel_native.phase-e-performance"
+SCHEMA_NAME = "witwin.channel.phase-e-performance"
 SCHEMA_VERSION = "1.0.0"
 SOLVERS = ("path", "deterministic", "basic", "bdpt")
 FULL_ENDPOINT_PAIRS = ((1, 1), (8, 1_000), (16, 1_000))
@@ -191,17 +191,17 @@ def profile_cases(profile: str) -> tuple[CaseSpec, ...]:
 def _solver_operation(scene: Any, spec: CaseSpec):
     components = {"los"} if spec.depth == 0 else {"los", "reflection"}
     if spec.solver == "path":
-        from witwin.channel_native.path import Config, solve
+        from witwin.channel.path import Config, solve
 
         config = Config(max_depth=spec.depth, components=components)
         return lambda: solve(scene, config)
     if spec.solver == "deterministic":
-        from witwin.channel_native.deterministic import Config, solve
+        from witwin.channel.deterministic import Config, solve
 
         config = Config(max_depth=spec.depth, components=components)
         return lambda: solve(scene, config)
     if spec.solver == "basic":
-        from witwin.channel_native.montecarlo.basic import Config, solve
+        from witwin.channel.montecarlo.basic import Config, solve
 
         config = Config(
             samples=int(spec.samples or 1_000),
@@ -211,7 +211,7 @@ def _solver_operation(scene: Any, spec: CaseSpec):
         )
         return lambda: solve(scene, config)
     if spec.solver == "bdpt":
-        from witwin.channel_native.montecarlo.bdpt import Config, solve
+        from witwin.channel.montecarlo.bdpt import Config, solve
 
         config = Config(
             samples=int(spec.samples or 1_000),
@@ -409,8 +409,8 @@ def preflight_rows(
                     depth=depth,
                 )
             else:
-                from witwin.channel_native.montecarlo.bdpt import Config
-                from witwin.channel_native.montecarlo.bdpt.solver import (
+                from witwin.channel.montecarlo.bdpt import Config
+                from witwin.channel.montecarlo.bdpt.solver import (
                     _estimate_workspace_bytes,
                 )
 

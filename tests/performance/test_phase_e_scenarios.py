@@ -19,7 +19,7 @@ def test_committed_manifest_has_five_truthful_scenario_identities():
 
     assert SCENARIO_MANIFEST_PATH.is_file()
     assert manifest["schema"] == {
-        "name": "witwin.channel_native.phase_e_scenarios",
+        "name": "witwin.channel.phase_e_scenarios",
         "version": "1.0.0",
     }
     assert scenario_names() == (

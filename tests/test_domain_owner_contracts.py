@@ -30,8 +30,8 @@ def test_domain_owner_docs_freeze_required_boundaries(owner_doc: Path):
 
 
 def test_materials_package_preserves_public_identity_and_owns_kernel_contracts():
-    import witwin.channel_native.materials as public_materials
-    from witwin.channel_native.core import materials as core_materials
+    import witwin.channel.materials as public_materials
+    from witwin.channel.core import materials as core_materials
 
     package_root = ROOT / "src" / "witwin" / "channel_native"
     materials_root = package_root / "materials"

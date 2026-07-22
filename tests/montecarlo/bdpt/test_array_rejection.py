@@ -3,15 +3,15 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     AntennaArray,
     AntennaPattern,
     ReceiverPoint,
     Scene,
     Transmitter,
 )
-from witwin.channel_native.montecarlo.bdpt import Config
-from witwin.channel_native.montecarlo.bdpt import solver
+from witwin.channel.montecarlo.bdpt import Config
+from witwin.channel.montecarlo.bdpt import solver
 
 
 def _scene(feature: str) -> Scene:

@@ -6,14 +6,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     PerfectConductor,
     ReceiverGrid,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.materials import Layer, PhysicalSurface
+from witwin.channel.core.materials import Layer, PhysicalSurface
 
 from .models import CaseSpec, MaterialSpec
 

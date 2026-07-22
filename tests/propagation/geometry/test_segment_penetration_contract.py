@@ -6,19 +6,19 @@ from collections.abc import Callable
 import pytest
 import torch
 
-from witwin.channel_native.propagation.geometry.kernels import (
+from witwin.channel.propagation.geometry.kernels import (
     bridge,
     penetration_autograd,
 )
-from witwin.channel_native.propagation.models import penetration
-from witwin.channel_native.propagation.models.penetration import (
+from witwin.channel.propagation.models import penetration
+from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationBackwardResult,
     SegmentPenetrationJvpResult,
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
     SegmentPenetrationTapeResult,
 )
-from witwin.channel_native.runtime.capacity import (
+from witwin.channel.runtime.capacity import (
     CapacityFailureBit,
     CapacityFailureState,
 )

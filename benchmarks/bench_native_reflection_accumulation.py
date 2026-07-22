@@ -40,18 +40,18 @@ def _native_imports() -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
-    from witwin.channel_native import ReceiverGrid, Scene, Transmitter
-    from witwin.channel_native.montecarlo.basic.kernels.maps import (
+    from witwin.channel import ReceiverGrid, Scene, Transmitter
+    from witwin.channel.montecarlo.basic.kernels.maps import (
         mc_component_map_buffer,
         mc_finalize_component_maps,
         mc_store_scaled_component_map,
     )
-    from witwin.channel_native.montecarlo.basic.kernels.sampling import (
+    from witwin.channel.montecarlo.basic.kernels.sampling import (
         mc_reflection_launch_inputs,
     )
-    from witwin.channel_native.core.material_runtime import face_material_tensors
-    from witwin.channel_native.montecarlo.basic.backend import _LIGHT_SPEED_M_PER_S, transmitter_positions
-    from witwin.channel_native.montecarlo.basic.raydn_components import _sample_directions, grid_spec
+    from witwin.channel.core.material_runtime import face_material_tensors
+    from witwin.channel.montecarlo.basic.backend import _LIGHT_SPEED_M_PER_S, transmitter_positions
+    from witwin.channel.montecarlo.basic.raydn_components import _sample_directions, grid_spec
 
     return {
         "torch": torch,

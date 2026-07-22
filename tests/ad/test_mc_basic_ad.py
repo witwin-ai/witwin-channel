@@ -48,15 +48,15 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverGrid,
     ReceiverPoint,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.materials import Dielectric, Layer, PhysicalSurface
-from witwin.channel_native.montecarlo.basic import Config, solve
+from witwin.channel.core.materials import Dielectric, Layer, PhysicalSurface
+from witwin.channel.montecarlo.basic import Config, solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"
@@ -546,7 +546,7 @@ def test_diffraction_frequency_grad_matches_fd():
 def _captured_diffraction_tape(monkeypatch, tx: torch.Tensor) -> tuple:
     """Solve once in vjp mode and capture the tape-accumulate Function args."""
 
-    from witwin.channel_native.montecarlo.basic.kernels import maps as _maps
+    from witwin.channel.montecarlo.basic.kernels import maps as _maps
 
     captured: dict[str, tuple] = {}
     original = _maps._McDiffractionMapAdFunction.forward
@@ -589,7 +589,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
     single-lane FD (measured ~10-15% per lane at the converged step).
     """
 
-    from witwin.channel_native.montecarlo.basic.kernels import maps as _ops
+    from witwin.channel.montecarlo.basic.kernels import maps as _ops
 
     base = torch.tensor([0.0, -1.0, 0.5])
     args = _captured_diffraction_tape(monkeypatch, base)

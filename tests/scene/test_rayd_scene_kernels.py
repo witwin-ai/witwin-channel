@@ -10,15 +10,15 @@ import weakref
 import pytest
 import torch
 
-from witwin.channel_native.runtime import native_resources as ops
-from witwin.channel_native.core import scene as core_scene
-from witwin.channel_native.core.runtime import compiled_scene as legacy_compiled
-from witwin.channel_native.scene.kernels import rayd_scene as legacy_rayd
-from witwin.channel_native.runtime import native_resources as runtime_native_resources
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native.scene import kernels
-from witwin.channel_native.scene import compiled
-from witwin.channel_native.scene.kernels import rayd_scene
+from witwin.channel.runtime import native_resources as ops
+from witwin.channel.core import scene as core_scene
+from witwin.channel.core.runtime import compiled_scene as legacy_compiled
+from witwin.channel.scene.kernels import rayd_scene as legacy_rayd
+from witwin.channel.runtime import native_resources as runtime_native_resources
+from witwin.channel.runtime import symbols
+from witwin.channel.scene import kernels
+from witwin.channel.scene import compiled
+from witwin.channel.scene.kernels import rayd_scene
 
 
 _SCENE_KERNEL_NAMES = (

@@ -4,24 +4,24 @@
   "overall_statement_minimum_percent": 85.0,
   "core_statement_minimum_percent": 90.0,
   "core_files": [
-    "src/witwin/channel_native/deterministic/pipeline.py",
-    "src/witwin/channel_native/materials/kernels/functional.py",
-    "src/witwin/channel_native/montecarlo/basic/pipeline.py",
-    "src/witwin/channel_native/montecarlo/bdpt/pipeline.py",
-    "src/witwin/channel_native/path/pipeline.py",
-    "src/witwin/channel_native/propagation/fields/kernels/functional.py",
-    "src/witwin/channel_native/scattering/kernels/functional.py"
+    "src/witwin/channel/deterministic/pipeline.py",
+    "src/witwin/channel/materials/kernels/functional.py",
+    "src/witwin/channel/montecarlo/basic/pipeline.py",
+    "src/witwin/channel/montecarlo/bdpt/pipeline.py",
+    "src/witwin/channel/path/pipeline.py",
+    "src/witwin/channel/propagation/fields/kernels/functional.py",
+    "src/witwin/channel/scattering/kernels/functional.py"
   ],
   "file_exemptions": [
     {
-      "path": "src/witwin/channel_native/materials/kernels/functional.py",
+      "path": "src/witwin/channel/materials/kernels/functional.py",
       "owner": "materials",
       "reason": "Native material contract branches need dedicated negative-path fixtures.",
       "expires_on": "2027-01-31",
       "minimum_statement_percent": 61.5
     },
     {
-      "path": "src/witwin/channel_native/propagation/fields/kernels/functional.py",
+      "path": "src/witwin/channel/propagation/fields/kernels/functional.py",
       "owner": "propagation-fields",
       "reason": "Optional AD field facades need isolated unsupported-mode scenarios.",
       "expires_on": "2027-01-31",

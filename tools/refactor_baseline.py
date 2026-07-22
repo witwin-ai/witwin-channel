@@ -1,7 +1,7 @@
 """Freeze deterministic, immutable manifests for architecture refactors.
 
 The collector is deliberately static-first: it parses Python and C++ sources
-without importing ``witwin.channel_native`` or loading its native extension.
+without importing ``witwin.channel`` or loading its native extension.
 Solver outputs, launch ledgers, and performance measurements are produced by
 their existing harnesses and can be attached with ``--runtime-artifact``.
 """
@@ -24,7 +24,7 @@ from pathlib import Path
 
 
 SCHEMA_VERSION = 1
-PACKAGE = "witwin.channel_native"
+PACKAGE = "witwin.channel"
 DEFAULT_PUBLIC_MODULES = (
     PACKAGE,
     f"{PACKAGE}.materials",
@@ -500,7 +500,7 @@ def build_manifest(
 
 
 def _python_modules(repo: Path) -> dict[str, Path]:
-    package_root = repo / "src" / "witwin" / "channel_native"
+    package_root = repo / "src" / "witwin" / "channel"
     modules: dict[str, Path] = {}
     for path in sorted(package_root.rglob("*.py")):
         relative = path.relative_to(repo / "src").with_suffix("")

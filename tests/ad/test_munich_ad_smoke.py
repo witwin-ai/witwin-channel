@@ -21,8 +21,8 @@ from tests.support.bin.benchmark_munich_deterministic_native_vs_original import 
     _load_scene,
     _parser,
 )
-from witwin.channel_native import Scene, Transmitter
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel import Scene, Transmitter
+from witwin.channel.deterministic import Config, solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for Munich AD smoke"

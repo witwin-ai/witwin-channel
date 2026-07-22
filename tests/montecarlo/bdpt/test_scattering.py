@@ -12,22 +12,22 @@ import pytest
 import torch
 from scipy.stats import chi2
 
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverGrid,
     ReceiverPoint,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface, Roughness
-from witwin.channel_native.montecarlo.bdpt import Config, solve
-from witwin.channel_native.montecarlo.events.scattering import (
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
+from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.montecarlo.events.scattering import (
     sample_scatter_directions,
     scatter_direction_uniforms,
 )
-from witwin.channel_native.scattering import build_kirchhoff_table, eval_bsdf
-from witwin.channel_native.scattering.tables import pdf as table_pdf
+from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
+from witwin.channel.scattering.tables import pdf as table_pdf
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

@@ -2,12 +2,12 @@ import pytest
 import torch
 import math
 
-from witwin.channel_native.montecarlo.bdpt.kernels import paths as ops
-from witwin.channel_native.materials.kernels import functional as material_functional
-from witwin.channel_native.montecarlo.bdpt.kernels import maps as bdpt_maps
-from witwin.channel_native.runtime import symbols as runtime_symbols
-from witwin.channel_native.montecarlo.bdpt.kernels import paths
-from witwin.channel_native.runtime import symbols
+from witwin.channel.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel.materials.kernels import functional as material_functional
+from witwin.channel.montecarlo.bdpt.kernels import maps as bdpt_maps
+from witwin.channel.runtime import symbols as runtime_symbols
+from witwin.channel.montecarlo.bdpt.kernels import paths
+from witwin.channel.runtime import symbols
 
 
 def _endpoint_subpath_state(

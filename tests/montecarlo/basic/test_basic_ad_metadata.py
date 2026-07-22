@@ -2,8 +2,8 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.core.kernels.metadata import validate_metadata
-from witwin.channel_native.montecarlo.basic import Config, solve
+from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.montecarlo.basic import Config, solve
 
 
 def test_basic_primal_metadata_reports_no_ad_by_default():

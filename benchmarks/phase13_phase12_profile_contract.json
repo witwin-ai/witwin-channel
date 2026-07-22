@@ -1,34 +1,34 @@
 {
   "schema": {
-    "name": "witwin.channel_native.phase13-phase12-profile-contract",
+    "name": "witwin.channel.phase13-phase12-profile-contract",
     "version": 1
   },
   "steady_repeats": 7,
   "groups": {
     "enumerated_penetration": {
       "scenario": "penetration_enumerated",
-      "target_timing_range": "witwin.channel_native:enumerated_penetration_discovery",
-      "solver_entrypoint": "witwin.channel_native.deterministic.solve",
+      "target_timing_range": "witwin.channel:enumerated_penetration_discovery",
+      "solver_entrypoint": "witwin.channel.deterministic.solve",
       "ncu_kernel_family_match": "case_sensitive_substring",
       "variants": {
         "baseline": {
           "ncu_kernel_families": [],
           "required_ranges": [
-            "witwin.channel_native:enumerated_penetration_discovery"
+            "witwin.channel:enumerated_penetration_discovery"
           ],
           "forbidden_ranges": [
-            "witwin.channel_native:montecarlo_basic_penetration_discovery",
-            "witwin.channel_native:diffraction_exporter",
-            "witwin.channel_native:capacity_status",
-            "witwin.channel_native:diffraction_pair_reducer",
-            "witwin.channel_native:diffraction_topology_packing",
-            "witwin.channel_native:diffraction_total_stage"
+            "witwin.channel:montecarlo_basic_penetration_discovery",
+            "witwin.channel:diffraction_exporter",
+            "witwin.channel:capacity_status",
+            "witwin.channel:diffraction_pair_reducer",
+            "witwin.channel:diffraction_topology_packing",
+            "witwin.channel:diffraction_total_stage"
           ],
           "required_markers": [
-            "witwin.channel_native:optix_traversal"
+            "witwin.channel:optix_traversal"
           ],
           "known_range_multiplicity_per_solve": {
-            "witwin.channel_native:enumerated_penetration_discovery": 1
+            "witwin.channel:enumerated_penetration_discovery": 1
           }
         },
         "candidate": {
@@ -36,49 +36,49 @@
             "segment_penetration"
           ],
           "required_ranges": [
-            "witwin.channel_native:enumerated_penetration_discovery"
+            "witwin.channel:enumerated_penetration_discovery"
           ],
           "forbidden_ranges": [
-            "witwin.channel_native:montecarlo_basic_penetration_discovery",
-            "witwin.channel_native:diffraction_exporter",
-            "witwin.channel_native:capacity_status",
-            "witwin.channel_native:diffraction_pair_reducer",
-            "witwin.channel_native:diffraction_topology_packing",
-            "witwin.channel_native:diffraction_total_stage"
+            "witwin.channel:montecarlo_basic_penetration_discovery",
+            "witwin.channel:diffraction_exporter",
+            "witwin.channel:capacity_status",
+            "witwin.channel:diffraction_pair_reducer",
+            "witwin.channel:diffraction_topology_packing",
+            "witwin.channel:diffraction_total_stage"
           ],
           "required_markers": [
-            "witwin.channel_native:optix_traversal"
+            "witwin.channel:optix_traversal"
           ],
           "known_range_multiplicity_per_solve": {
-            "witwin.channel_native:enumerated_penetration_discovery": 1
+            "witwin.channel:enumerated_penetration_discovery": 1
           }
         }
       }
     },
     "montecarlo_penetration": {
       "scenario": "penetration_montecarlo_basic",
-      "target_timing_range": "witwin.channel_native:montecarlo_basic_penetration_discovery",
-      "solver_entrypoint": "witwin.channel_native.montecarlo.basic.solve",
+      "target_timing_range": "witwin.channel:montecarlo_basic_penetration_discovery",
+      "solver_entrypoint": "witwin.channel.montecarlo.basic.solve",
       "ncu_kernel_family_match": "case_sensitive_substring",
       "variants": {
         "baseline": {
           "ncu_kernel_families": [],
           "required_ranges": [
-            "witwin.channel_native:montecarlo_basic_penetration_discovery"
+            "witwin.channel:montecarlo_basic_penetration_discovery"
           ],
           "forbidden_ranges": [
-            "witwin.channel_native:enumerated_penetration_discovery",
-            "witwin.channel_native:diffraction_exporter",
-            "witwin.channel_native:capacity_status",
-            "witwin.channel_native:diffraction_pair_reducer",
-            "witwin.channel_native:diffraction_topology_packing",
-            "witwin.channel_native:diffraction_total_stage"
+            "witwin.channel:enumerated_penetration_discovery",
+            "witwin.channel:diffraction_exporter",
+            "witwin.channel:capacity_status",
+            "witwin.channel:diffraction_pair_reducer",
+            "witwin.channel:diffraction_topology_packing",
+            "witwin.channel:diffraction_total_stage"
           ],
           "required_markers": [
-            "witwin.channel_native:optix_traversal"
+            "witwin.channel:optix_traversal"
           ],
           "known_range_multiplicity_per_solve": {
-            "witwin.channel_native:montecarlo_basic_penetration_discovery": 1
+            "witwin.channel:montecarlo_basic_penetration_discovery": 1
           }
         },
         "candidate": {
@@ -86,52 +86,52 @@
             "segment_penetration"
           ],
           "required_ranges": [
-            "witwin.channel_native:montecarlo_basic_penetration_discovery"
+            "witwin.channel:montecarlo_basic_penetration_discovery"
           ],
           "forbidden_ranges": [
-            "witwin.channel_native:enumerated_penetration_discovery",
-            "witwin.channel_native:diffraction_exporter",
-            "witwin.channel_native:capacity_status",
-            "witwin.channel_native:diffraction_pair_reducer",
-            "witwin.channel_native:diffraction_topology_packing",
-            "witwin.channel_native:diffraction_total_stage"
+            "witwin.channel:enumerated_penetration_discovery",
+            "witwin.channel:diffraction_exporter",
+            "witwin.channel:capacity_status",
+            "witwin.channel:diffraction_pair_reducer",
+            "witwin.channel:diffraction_topology_packing",
+            "witwin.channel:diffraction_total_stage"
           ],
           "required_markers": [
-            "witwin.channel_native:optix_traversal"
+            "witwin.channel:optix_traversal"
           ],
           "known_range_multiplicity_per_solve": {
-            "witwin.channel_native:montecarlo_basic_penetration_discovery": 1
+            "witwin.channel:montecarlo_basic_penetration_discovery": 1
           }
         }
       }
     },
     "diffraction": {
       "scenario": "diffraction_munich",
-      "target_timing_range": "witwin.channel_native:diffraction_total_stage",
-      "solver_entrypoint": "witwin.channel_native.deterministic.solve",
+      "target_timing_range": "witwin.channel:diffraction_total_stage",
+      "solver_entrypoint": "witwin.channel.deterministic.solve",
       "ncu_kernel_family_match": "case_sensitive_substring",
       "variants": {
         "baseline": {
           "ncu_kernel_families": [],
           "required_ranges": [
-            "witwin.channel_native:diffraction_exporter",
-            "witwin.channel_native:diffraction_topology_packing",
-            "witwin.channel_native:diffraction_total_stage"
+            "witwin.channel:diffraction_exporter",
+            "witwin.channel:diffraction_topology_packing",
+            "witwin.channel:diffraction_total_stage"
           ],
           "forbidden_ranges": [
-            "witwin.channel_native:capacity_status",
-            "witwin.channel_native:diffraction_pair_reducer",
-            "witwin.channel_native:enumerated_penetration_discovery",
-            "witwin.channel_native:montecarlo_basic_penetration_discovery"
+            "witwin.channel:capacity_status",
+            "witwin.channel:diffraction_pair_reducer",
+            "witwin.channel:enumerated_penetration_discovery",
+            "witwin.channel:montecarlo_basic_penetration_discovery"
           ],
           "required_markers": [
-            "witwin.channel_native:optix_traversal",
-            "witwin.channel_native:diffraction_exporter_request"
+            "witwin.channel:optix_traversal",
+            "witwin.channel:diffraction_exporter_request"
           ],
           "known_range_multiplicity_per_solve": {
-            "witwin.channel_native:diffraction_exporter": 13,
-            "witwin.channel_native:diffraction_topology_packing": 13,
-            "witwin.channel_native:diffraction_total_stage": 1
+            "witwin.channel:diffraction_exporter": 13,
+            "witwin.channel:diffraction_topology_packing": 13,
+            "witwin.channel:diffraction_total_stage": 1
           }
         },
         "candidate": {
@@ -139,23 +139,23 @@
             "deterministic_diffraction_pair_reduce"
           ],
           "required_ranges": [
-            "witwin.channel_native:diffraction_exporter",
-            "witwin.channel_native:capacity_status",
-            "witwin.channel_native:diffraction_pair_reducer",
-            "witwin.channel_native:diffraction_topology_packing",
-            "witwin.channel_native:diffraction_total_stage"
+            "witwin.channel:diffraction_exporter",
+            "witwin.channel:capacity_status",
+            "witwin.channel:diffraction_pair_reducer",
+            "witwin.channel:diffraction_topology_packing",
+            "witwin.channel:diffraction_total_stage"
           ],
           "forbidden_ranges": [
-            "witwin.channel_native:enumerated_penetration_discovery",
-            "witwin.channel_native:montecarlo_basic_penetration_discovery"
+            "witwin.channel:enumerated_penetration_discovery",
+            "witwin.channel:montecarlo_basic_penetration_discovery"
           ],
           "required_markers": [
-            "witwin.channel_native:optix_traversal",
-            "witwin.channel_native:diffraction_exporter_request"
+            "witwin.channel:optix_traversal",
+            "witwin.channel:diffraction_exporter_request"
           ],
           "known_range_multiplicity_per_solve": {
-            "witwin.channel_native:diffraction_exporter": 2,
-            "witwin.channel_native:diffraction_total_stage": 1
+            "witwin.channel:diffraction_exporter": 2,
+            "witwin.channel:diffraction_total_stage": 1
           }
         }
       }

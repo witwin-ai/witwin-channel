@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.propagation.topology.discovery import reflection
+from witwin.channel.propagation.topology.discovery import reflection
 
 
 def _inputs():

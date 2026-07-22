@@ -3,14 +3,14 @@ import xml.etree.ElementTree as ET
 
 import torch
 
-from witwin.channel_native import Scene, Structure
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
-from witwin.channel_native.core.materials import (
+from witwin.channel import Scene, Structure
+from witwin.channel.core.material_runtime import face_material_field_bundle
+from witwin.channel.core.materials import (
     MATERIAL_ABI_VERSION,
     DispersiveMaterial,
     PerfectConductor,
 )
-from witwin.channel_native.core.scene_loader import _material_defs, _native_material
+from witwin.channel.core.scene_loader import _material_defs, _native_material
 
 
 def _triangle(material, *, name: str = "wall") -> Structure:

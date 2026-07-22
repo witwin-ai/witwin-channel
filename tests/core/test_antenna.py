@@ -2,8 +2,8 @@ import math
 
 import torch
 
-from witwin.channel_native import AntennaArray, AntennaPattern, Transmitter
-from witwin.channel_native.core.antenna import (
+from witwin.channel import AntennaArray, AntennaPattern, Transmitter
+from witwin.channel.core.antenna import (
     apply_endpoint_weights,
     apply_precoding_combining,
     orientation_matrix,

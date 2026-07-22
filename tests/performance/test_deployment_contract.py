@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import witwin.channel_native.deployment as deployment
-from witwin.channel_native.deployment import (
+import witwin.channel.deployment as deployment
+from witwin.channel.deployment import (
     DEPLOYMENT_ABI,
     PIPELINE_CACHE_ABI,
     PIPELINE_CACHE_IMPLEMENTED,

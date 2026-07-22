@@ -3,13 +3,13 @@
 import pytest
 import torch
 
-from witwin.channel_native.core.materials import Roughness
-from witwin.channel_native.scattering import build_kirchhoff_table
-from witwin.channel_native.scattering.kernels import functional as ops
-from witwin.channel_native.scene.scattering_resources import (
+from witwin.channel.core.materials import Roughness
+from witwin.channel.scattering import build_kirchhoff_table
+from witwin.channel.scattering.kernels import functional as ops
+from witwin.channel.scene.scattering_resources import (
     build_kirchhoff_table_stack,
 )
-from witwin.channel_native.runtime import symbols
+from witwin.channel.runtime import symbols
 
 from tests.reference import kirchhoff_ensemble as reference
 

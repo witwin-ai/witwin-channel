@@ -6,18 +6,18 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene
-from witwin.channel_native.core.components import (
+from witwin.channel import ReceiverGrid, Scene
+from witwin.channel.core.components import (
     DEFAULT_COMPONENTS,
     component_availability_status,
     validated_components,
 )
-from witwin.channel_native.core.receiver_geometry import (
+from witwin.channel.core.receiver_geometry import (
     axis_aligned_grid_spec,
     component_grid_shape,
     first_receiver_grid,
 )
-from witwin.channel_native.core.tensor_math import normalize_vec3
+from witwin.channel.core.tensor_math import normalize_vec3
 
 
 def _grid() -> ReceiverGrid:
@@ -91,7 +91,7 @@ def test_core_modules_do_not_depend_on_solver_packages():
             if isinstance(node, ast.ImportFrom) and node.module is not None
         ]
         assert not any(
-            module.startswith("witwin.channel_native.montecarlo")
-            or module.startswith("witwin.channel_native.deterministic")
+            module.startswith("witwin.channel.montecarlo")
+            or module.startswith("witwin.channel.deterministic")
             for module in imported
         ), path.name

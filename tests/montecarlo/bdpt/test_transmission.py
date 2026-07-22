@@ -4,21 +4,21 @@ event-selected shooting sampler for mixed reflection+transmission chains."""
 import pytest
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverGrid,
     ReceiverPoint,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import (
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import (
     Layer,
     PerfectConductor,
     PhysicalSurface,
 )
-from witwin.channel_native.montecarlo.bdpt import Config, solve
-from witwin.channel_native.physics.oracle import layer_stack_rt
+from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.physics.oracle import layer_stack_rt
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

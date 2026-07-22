@@ -5,12 +5,12 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.propagation.enumerated import reflection
-from witwin.channel_native.propagation.fields.kernels import deterministic as fields
-from witwin.channel_native.propagation.geometry import (
+from witwin.channel.propagation.enumerated import reflection
+from witwin.channel.propagation.fields.kernels import deterministic as fields
+from witwin.channel.propagation.geometry import (
     reflection as geometry_reflection,
 )
-from witwin.channel_native.propagation.topology.discovery.reflection import (
+from witwin.channel.propagation.topology.discovery.reflection import (
     ReflectionMultibounceEpcRequest,
     ReflectionOrder1EpcRequest,
 )

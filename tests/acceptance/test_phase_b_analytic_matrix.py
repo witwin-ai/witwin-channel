@@ -8,18 +8,18 @@ from tests.support.scenes import (
     transmission_wall_structure,
     wedge_diffraction_scene,
 )
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.capabilities import capabilities
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as solve_deterministic
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic import solve as solve_basic
-from witwin.channel_native.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel_native.montecarlo.bdpt import solve as solve_bdpt
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel import ReceiverGrid, ReceiverPoint, Scene, Transmitter
+from witwin.channel.capabilities import capabilities
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as solve_deterministic
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.basic import solve as solve_basic
+from witwin.channel.montecarlo.bdpt import Config as BdptConfig
+from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as solve_paths
 
 
 def _transmission_scene() -> Scene:

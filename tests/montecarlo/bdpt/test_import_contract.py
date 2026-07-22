@@ -15,7 +15,7 @@ def test_bdpt_import_exposes_public_api_without_forbidden_modules():
     for name in FORBIDDEN_MODULES:
         sys.modules.pop(name, None)
 
-    bdpt = importlib.import_module("witwin.channel_native.montecarlo.bdpt")
+    bdpt = importlib.import_module("witwin.channel.montecarlo.bdpt")
 
     assert bdpt.Config.__name__ == "Config"
     assert bdpt.Result.__name__ == "Result"

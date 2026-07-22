@@ -25,8 +25,8 @@ import torch
 
 from tests.ad import _tolerances
 from tests.support.scenes import same_side_wall_reflection_scene
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as deterministic_solve
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as deterministic_solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for AD budgets"

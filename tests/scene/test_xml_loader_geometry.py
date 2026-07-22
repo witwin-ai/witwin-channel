@@ -3,9 +3,9 @@ import struct
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as solve_paths
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as solve_paths
 
 
 def _write_ply(path, vertices, faces, *, uv_alias=None):
@@ -137,7 +137,7 @@ def test_shapegroup_instances_expand_with_independent_transforms(tmp_path):
 def test_instance_geometry_builds_edges_and_real_reflection_paths(tmp_path):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for native edge/path acceptance")
-    from witwin.channel_native.core.kernels.extension import build_info
+    from witwin.channel.core.kernels.extension import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")

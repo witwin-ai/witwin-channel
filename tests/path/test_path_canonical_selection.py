@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from witwin.channel_native.propagation.topology import concatenate
-from witwin.channel_native.propagation.topology.export import evaluated_paths_from_block
+from witwin.channel.propagation.topology import concatenate
+from witwin.channel.propagation.topology.export import evaluated_paths_from_block
 
 
 pytestmark = pytest.mark.skipif(

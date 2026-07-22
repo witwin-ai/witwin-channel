@@ -6,19 +6,19 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.path import capacity as capacity_ops
-from witwin.channel_native.path.capacity import from_capacity_evaluated_paths
-from witwin.channel_native.path.result import InteractionType, endpoint_angles
-from witwin.channel_native.propagation.enumerated.capacity import (
+from witwin.channel.path import capacity as capacity_ops
+from witwin.channel.path.capacity import from_capacity_evaluated_paths
+from witwin.channel.path.result import InteractionType, endpoint_angles
+from witwin.channel.propagation.enumerated.capacity import (
     evaluated_paths_capacity_pack,
 )
-from witwin.channel_native.propagation.models.capacity import CapacityEvaluatedPaths
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
-from witwin.channel_native.runtime.capacity import create_capacity_failure_state
-from witwin.channel_native.runtime import symbols
+from witwin.channel.propagation.models.capacity import CapacityEvaluatedPaths
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime import symbols
 
 
 pytestmark = pytest.mark.skipif(
@@ -1202,7 +1202,7 @@ def test_path_result_capacity_angle_gradcheck() -> None:
 def test_path_result_capacity_static_contract_has_no_host_compaction_or_trap() -> None:
     root = Path(__file__).resolve().parents[2]
     python_source = (
-        root / "src/witwin/channel_native/path/capacity.py"
+        root / "src/witwin/channel/path/capacity.py"
     ).read_text(encoding="utf-8")
     native_source = (
         root / "native/channel_native/kernels/path_result_capacity_pack.cu"
@@ -1226,6 +1226,6 @@ def test_path_result_capacity_static_contract_has_no_host_compaction_or_trap() -
         assert forbidden not in ad_source
     assert "path_result_capacity_pack" in python_source
     result_source = (
-        root / "src/witwin/channel_native/path/result.py"
+        root / "src/witwin/channel/path/result.py"
     ).read_text(encoding="utf-8")
     assert "self.valid.sum" not in result_source

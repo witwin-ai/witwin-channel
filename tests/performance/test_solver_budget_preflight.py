@@ -5,20 +5,20 @@ import importlib
 import pytest
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.core.memory_budget import MemoryBudgetError
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.core.memory_budget import MemoryBudgetError
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
 
 
 @pytest.mark.parametrize(
     ("module_name", "config"),
     [
         (
-            "witwin.channel_native.montecarlo.basic.solver",
+            "witwin.channel.montecarlo.basic.solver",
             BasicConfig(samples=1, components={"los"}, workspace_limit_bytes=0),
         ),
         (
-            "witwin.channel_native.montecarlo.bdpt.solver",
+            "witwin.channel.montecarlo.bdpt.solver",
             BDPTConfig(samples=1, components={"los"}, workspace_limit_bytes=0),
         ),
     ],

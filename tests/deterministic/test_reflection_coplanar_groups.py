@@ -3,10 +3,10 @@
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Dielectric
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Dielectric
+from witwin.channel.deterministic import Config, solve
 
 
 def _require_native() -> None:
@@ -198,7 +198,7 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
     field kernels only receive (eps_r, sigma_e, mu_r)."""
 
     _require_native()
-    from witwin.channel_native.core.materials import PerfectConductor
+    from witwin.channel.core.materials import PerfectConductor
 
     wall = Structure(
         vertices=torch.tensor(

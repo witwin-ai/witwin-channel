@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel_native import ReceiverGrid, ReceiverPoint, Scene
+from witwin.channel import ReceiverGrid, ReceiverPoint, Scene
 
 
 _LIGHT_SPEED_M_PER_S = 299_792_458.0

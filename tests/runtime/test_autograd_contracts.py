@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native.runtime import autograd_contracts
+from witwin.channel.runtime import autograd_contracts
 
 
 CONTRACT_NAMES = (

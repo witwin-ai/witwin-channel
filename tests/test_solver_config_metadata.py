@@ -4,20 +4,20 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverGrid
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic.solver import (
+from witwin.channel import ReceiverGrid
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic.solver import (
     _metadata as deterministic_metadata,
 )
-from witwin.channel_native.montecarlo.basic import Config as BasicConfig
-from witwin.channel_native.montecarlo.basic.metadata import (
+from witwin.channel.montecarlo.basic import Config as BasicConfig
+from witwin.channel.montecarlo.basic.metadata import (
     make_solver_metadata as basic_metadata,
 )
-from witwin.channel_native.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel_native.montecarlo.bdpt.metadata import (
+from witwin.channel.montecarlo.bdpt import Config as BdptConfig
+from witwin.channel.montecarlo.bdpt.metadata import (
     make_solver_metadata as bdpt_metadata,
 )
-from witwin.channel_native.montecarlo.bdpt.solver import solve as bdpt_solve
+from witwin.channel.montecarlo.bdpt.solver import solve as bdpt_solve
 
 
 def test_deterministic_metadata_reports_effective_component_depths():

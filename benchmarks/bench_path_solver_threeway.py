@@ -23,7 +23,7 @@ DEFAULT_SIONNA_ROOT = (
 DEFAULT_SCENE = "san_francisco"
 DEFAULT_TX = ((0.0, 0.0, 180.0),)
 DEFAULT_RX = ((250.0, 0.0, 180.0), (-250.0, 120.0, 180.0))
-SCHEMA_NAME = "witwin.channel_native.path_solver_threeway"
+SCHEMA_NAME = "witwin.channel.path_solver_threeway"
 SCHEMA_VERSION = "1.0.0"
 COMPONENT_NAMES = {0: "los", 1: "reflection", 2: "diffraction"}
 
@@ -308,9 +308,9 @@ def _run_native(args: argparse.Namespace) -> dict[str, Any]:
 
     sys.path.insert(0, str(REPO_ROOT / "src"))
     sys.path.insert(0, str(REPO_ROOT))
-    from witwin.channel_native import ReceiverPoint, Scene, Transmitter, build_info
-    from witwin.channel_native.core.edge_policy import EdgePolicy
-    from witwin.channel_native.path import Config, solve
+    from witwin.channel import ReceiverPoint, Scene, Transmitter, build_info
+    from witwin.channel.core.edge_policy import EdgePolicy
+    from witwin.channel.path import Config, solve
 
     tx_points = _parse_points(args.tx)
     rx_points = _parse_points(args.rx)

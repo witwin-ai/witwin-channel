@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.path import Config, solve
+from witwin.channel.path import Config, solve
 
 
 def test_path_solver_does_not_import_python_rayd_or_drjit():

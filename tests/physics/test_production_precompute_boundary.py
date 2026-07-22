@@ -6,16 +6,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from witwin.channel_native.materials.evaluation import (
+from witwin.channel.materials.evaluation import (
     layer_stack_rt as production_layer_stack_rt,
 )
-from witwin.channel_native.physics.oracle import (
+from witwin.channel.physics.oracle import (
     kirchhoff_diffuse_lobe_series as reference_kirchhoff_series,
 )
-from witwin.channel_native.physics.oracle import (
+from witwin.channel.physics.oracle import (
     layer_stack_rt as reference_layer_stack_rt,
 )
-from witwin.channel_native.scattering.tables import (
+from witwin.channel.scattering.tables import (
     _kirchhoff_diffuse_lobe_series as production_kirchhoff_series,
 )
 
@@ -101,11 +101,11 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
         root / "propagation" / "enumerated" / "scattering.py",
     )
     for path in production_paths:
-        assert "witwin.channel_native.physics.oracle" not in _imports(path), path
+        assert "witwin.channel.physics.oracle" not in _imports(path), path
 
     oracle_imports = _imports(root / "physics" / "oracle.py")
     assert not any(
-        name.startswith("witwin.channel_native.materials")
-        or name.startswith("witwin.channel_native.scattering")
+        name.startswith("witwin.channel.materials")
+        or name.startswith("witwin.channel.scattering")
         for name in oracle_imports
     )

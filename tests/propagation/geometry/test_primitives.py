@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from witwin.channel_native.propagation.geometry.kernels import primitives as ops
-from witwin.channel_native.propagation.geometry import kernels
-from witwin.channel_native.propagation.geometry.kernels import primitives
-from witwin.channel_native.runtime import symbols, tensor_contracts
+from witwin.channel.propagation.geometry.kernels import primitives as ops
+from witwin.channel.propagation.geometry import kernels
+from witwin.channel.propagation.geometry.kernels import primitives
+from witwin.channel.runtime import symbols, tensor_contracts
 
 
 _OWNER_NAMES = (

@@ -31,7 +31,7 @@ def load_profile_contract() -> dict[str, object]:
     contract = read_json(ROOT / PROFILE_CONTRACT_REPO_PATH)
     exact_keys(contract, {"schema", "steady_repeats", "groups"}, label="profile contract")
     if contract["schema"] != {
-        "name": "witwin.channel_native.phase13-phase12-profile-contract",
+        "name": "witwin.channel.phase13-phase12-profile-contract",
         "version": 1,
     } or contract["steady_repeats"] != 7:
         raise EvidenceError("profile contract identity/repeat count is not accepted")
@@ -408,7 +408,7 @@ def parse_nsys_sqlite(path: Path) -> dict[str, object]:
             for value in values
         )
 
-    phase_names = sorted({name for name in nvtx_names if name.startswith("witwin.channel_native:")})
+    phase_names = sorted({name for name in nvtx_names if name.startswith("witwin.channel:")})
     if not phase_names:
         raise EvidenceError("Nsight capture contains no Phase 12 NVTX ranges")
     api_rows = runtime_rows + driver_rows
@@ -444,7 +444,7 @@ def parse_nsys_sqlite(path: Path) -> dict[str, object]:
     phase_spans = [
         (index, name, start, end)
         for index, (name, start, end) in enumerate(nvtx_ranges)
-        if name.startswith("witwin.channel_native:")
+        if name.startswith("witwin.channel:")
     ]
     spans_by_name: dict[str, list[tuple[int, int]]] = {}
     for _, name, start, end in phase_spans:
@@ -817,7 +817,7 @@ def validate_nsys_timelines(
         )
     )
     marker_counter_names = {
-        name: name.removeprefix("witwin.channel_native:") for name in marker_names
+        name: name.removeprefix("witwin.channel:") for name in marker_names
     }
     if len(set(marker_counter_names.values())) != len(marker_counter_names):
         raise EvidenceError("profile marker counter names are not unique")
@@ -1117,7 +1117,7 @@ def attach_profile_timings(
                 samples = ranges[range_name]
                 profile_rows.append(
                     {
-                        "name": range_name.removeprefix("witwin.channel_native:"),
+                        "name": range_name.removeprefix("witwin.channel:"),
                         "steady_cuda_ms": [float(row["duration_ms"]) for row in samples],
                         "source": "nsys_nvtx_sqlite",
                     }

@@ -3,9 +3,9 @@ import sys
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.basic import Config, Result, solve
+from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.basic import Config, Result, solve
 
 
 def _empty_space_scene() -> Scene:

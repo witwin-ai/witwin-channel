@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel_native.scene.compile import _compile_penetration_scene_diagonals
+from witwin.channel.scene.compile import _compile_penetration_scene_diagonals
 
 
 class _RayDRecords:

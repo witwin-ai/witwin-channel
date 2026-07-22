@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from witwin.channel_native.core.kernels import extension as compatibility_extension
-from witwin.channel_native.runtime import extension
+from witwin.channel.core.kernels import extension as compatibility_extension
+from witwin.channel.runtime import extension
 
 
 @pytest.fixture(autouse=True)
@@ -100,7 +100,7 @@ def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatc
 
     assert extension.native_extension() is packaged
     assert extension.native_extension() is packaged
-    assert calls == [("._channel_native", "witwin.channel_native")]
+    assert calls == [("._channel_native", "witwin.channel")]
 
 
 def test_native_extension_never_imports_a_global_module(

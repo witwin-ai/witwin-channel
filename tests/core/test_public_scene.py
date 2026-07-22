@@ -1,13 +1,13 @@
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverGrid,
     ReceiverPoint,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.materials import (
+from witwin.channel.core.materials import (
     Dielectric,
     LossyDielectric,
     PerfectConductor,

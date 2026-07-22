@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.bdpt.mis import compute_mis_weights
+from witwin.channel.montecarlo.bdpt.mis import compute_mis_weights
 
 
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for native BDPT MIS")

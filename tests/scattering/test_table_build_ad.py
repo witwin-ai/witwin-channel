@@ -17,7 +17,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.runtime.symbols import has_symbol
+from witwin.channel.runtime.symbols import has_symbol
 from tests.reference.kirchhoff_table_build import (
     build_n_terms,
     phi_centers,
@@ -132,7 +132,7 @@ def _to_native(t: torch.Tensor) -> torch.Tensor:
 
 def _native_backward(out, grids, sigma_h, lx, ly, thickness, eps, sigma, frequency,
                      grad_f_te, grad_f_tm, *, rough, layers, freq):
-    from witwin.channel_native.scattering.kernels.table_build_ad import (
+    from witwin.channel.scattering.kernels.table_build_ad import (
         kirchhoff_table_build_backward,
     )
 
@@ -238,7 +238,7 @@ def test_backward_matches_oracle(iso):
 @_require_native
 @pytest.mark.parametrize("iso", [True, False])
 def test_jvp_vs_vjp_inner_product(iso):
-    from witwin.channel_native.scattering.kernels.table_build_ad import (
+    from witwin.channel.scattering.kernels.table_build_ad import (
         kirchhoff_table_build_jvp,
     )
 
@@ -377,7 +377,7 @@ def test_need_flags_gate_outputs():
 def test_fixed_input_rejection():
     # The Function is self-contained; assert the fixed-input map lists mu_r and
     # the four directional grids so requesting their gradient fails loudly.
-    from witwin.channel_native.scattering.kernels import table_build_ad
+    from witwin.channel.scattering.kernels import table_build_ad
 
     names = {name for _, name in table_build_ad._FIXED}
     assert names == {"layer_mu_r", "cos_i", "phi_i", "cos_o", "phi_o"}
@@ -387,8 +387,8 @@ def test_primal_bitwise_pre_balance_lobe_exported():
     # The numpy build is unchanged; it now also exports the pre-balance lobes,
     # and f_te == a S a bit-for-bit on the table's own grid (the AD wiring never
     # alters the resident primal values).
-    from witwin.channel_native.core.materials import Roughness
-    from witwin.channel_native.scattering import build_kirchhoff_table
+    from witwin.channel.core.materials import Roughness
+    from witwin.channel.scattering import build_kirchhoff_table
 
     device = "cuda"
     sigma_e = 0.1 * 2.0 * math.pi * 60e9 * 8.8541878128e-12
@@ -404,14 +404,14 @@ def test_primal_bitwise_pre_balance_lobe_exported():
 
 @_require_native
 def test_end_to_end_roughness_gradient_is_nonzero():
-    from witwin.channel_native.core.kernels.extension import build_info
+    from witwin.channel.core.kernels.extension import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")
     from tests.support.scenes import rough_wall_structure
-    from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-    from witwin.channel_native.deterministic import Config as DeterministicConfig
-    from witwin.channel_native.deterministic import solve as deterministic_solve
+    from witwin.channel import ReceiverPoint, Scene, Transmitter
+    from witwin.channel.deterministic import Config as DeterministicConfig
+    from witwin.channel.deterministic import solve as deterministic_solve
 
     def make_scene():
         wall = rough_wall_structure(

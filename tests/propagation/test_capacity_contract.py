@@ -6,8 +6,8 @@ from dataclasses import FrozenInstanceError
 import pytest
 import torch
 
-from witwin.channel_native.propagation.models import CapacityPathLayout
-from witwin.channel_native.runtime import (
+from witwin.channel.propagation.models import CapacityPathLayout
+from witwin.channel.runtime import (
     CapacityFailureState,
     create_capacity_failure_state,
 )

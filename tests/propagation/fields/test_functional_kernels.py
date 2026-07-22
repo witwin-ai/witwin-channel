@@ -4,13 +4,13 @@ import inspect
 
 import pytest
 
-from witwin.channel_native import materials
-from witwin.channel_native.propagation.fields.kernels import functional as ops
-from witwin.channel_native.materials.kernels import contracts as material_contracts
-from witwin.channel_native.propagation import fields
-from witwin.channel_native.propagation.fields import kernels
-from witwin.channel_native.propagation.fields.kernels import functional
-from witwin.channel_native.runtime import symbols, tensor_contracts
+from witwin.channel import materials
+from witwin.channel.propagation.fields.kernels import functional as ops
+from witwin.channel.materials.kernels import contracts as material_contracts
+from witwin.channel.propagation import fields
+from witwin.channel.propagation.fields import kernels
+from witwin.channel.propagation.fields.kernels import functional
+from witwin.channel.runtime import symbols, tensor_contracts
 
 
 _OWNER_NAMES = (

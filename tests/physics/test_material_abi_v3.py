@@ -3,9 +3,9 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native import Scene, Structure
-from witwin.channel_native.core.material_runtime import face_material_field_bundle
-from witwin.channel_native.core.materials import (
+from witwin.channel import Scene, Structure
+from witwin.channel.core.material_runtime import face_material_field_bundle
+from witwin.channel.core.materials import (
     MATERIAL_ABI_VERSION,
     PEC_EFFECTIVE_SIGMA_E,
     PHYSICAL_SURFACE_MODEL_ID,

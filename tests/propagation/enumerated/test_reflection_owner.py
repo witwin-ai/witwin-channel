@@ -5,12 +5,12 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel_native.propagation.enumerated import reflection
-from witwin.channel_native.propagation.geometry import (
+from witwin.channel.propagation.enumerated import reflection
+from witwin.channel.propagation.geometry import (
     reflection as geometry_reflection,
 )
-from witwin.channel_native.propagation.geometry import reevaluate
-from witwin.channel_native.propagation.topology.discovery import (
+from witwin.channel.propagation.geometry import reevaluate
+from witwin.channel.propagation.topology.discovery import (
     reflection as discovery,
 )
 
@@ -129,8 +129,8 @@ def test_reflection_consumers_use_only_named_epc_geometry():
 
 def test_reflection_owner_has_no_core_path_dependency_or_scc():
     edges = graph.collect_import_edges(PACKAGE_ROOT)
-    owner = "witwin.channel_native.propagation.enumerated.reflection"
-    core = "witwin.channel_native.core.path_topology"
+    owner = "witwin.channel.propagation.enumerated.reflection"
+    core = "witwin.channel.core.path_topology"
     owner_targets = {edge.target for edge in edges if edge.source == owner}
     assert core not in owner_targets
 
@@ -147,8 +147,8 @@ def test_reflection_owner_has_no_core_path_dependency_or_scc():
         pending.extend(adjacency.get(current, ()))
     assert core not in seen
 
-    geometry_owner = "witwin.channel_native.propagation.geometry.reflection"
-    discovery_owner = "witwin.channel_native.propagation.topology.discovery.reflection"
+    geometry_owner = "witwin.channel.propagation.geometry.reflection"
+    discovery_owner = "witwin.channel.propagation.topology.discovery.reflection"
     pending = [geometry_owner]
     seen = set()
     while pending:
@@ -162,8 +162,8 @@ def test_reflection_owner_has_no_core_path_dependency_or_scc():
 
 
 def test_enumerated_public_all_is_unchanged_and_discovery_init_is_empty():
-    import witwin.channel_native.propagation.enumerated as enumerated
-    import witwin.channel_native.propagation.topology.discovery as package
+    import witwin.channel.propagation.enumerated as enumerated
+    import witwin.channel.propagation.topology.discovery as package
 
     assert enumerated.__all__ == []
     assert not hasattr(package, "_reflection_topology_order1")

@@ -30,12 +30,12 @@ from tests.ad._tolerances import (
     FD_STEP_VERTEX,
     REL_TOL_GENERAL,
 )
-from witwin.channel_native import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import Dielectric
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.deterministic import solve as deterministic_solve
-from witwin.channel_native.path import Config as PathConfig
-from witwin.channel_native.path import solve as path_solve
+from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.channel.core.materials import Dielectric
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.deterministic import solve as deterministic_solve
+from witwin.channel.path import Config as PathConfig
+from witwin.channel.path import solve as path_solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"

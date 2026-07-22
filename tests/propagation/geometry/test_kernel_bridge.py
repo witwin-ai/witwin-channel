@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel_native.propagation.geometry.kernels import bridge as ops
-from witwin.channel_native.propagation.geometry import kernels
-from witwin.channel_native.propagation.geometry.kernels import bridge
-from witwin.channel_native.runtime import native_resources, symbols, tensor_contracts
+from witwin.channel.propagation.geometry.kernels import bridge as ops
+from witwin.channel.propagation.geometry import kernels
+from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.runtime import native_resources, symbols, tensor_contracts
 
 
 _CANONICAL_FUNCTION_NAMES = (

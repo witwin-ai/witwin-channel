@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.montecarlo.basic import Config, solve
+from witwin.channel.montecarlo.basic import Config, solve
 
 
 def test_basic_solver_fixed_seed_is_stable_for_counts_and_outputs():

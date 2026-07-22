@@ -1,6 +1,6 @@
 import pytest
 
-from witwin.channel_native.montecarlo.basic import Config
+from witwin.channel.montecarlo.basic import Config
 
 
 def test_basic_config_defaults_are_explicit():

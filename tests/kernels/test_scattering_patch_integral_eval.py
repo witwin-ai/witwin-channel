@@ -5,11 +5,11 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.core.materials import PhaseScreen
-from witwin.channel_native.physics.conventions import C0
-from witwin.channel_native.scattering import PhaseScreenRuntime
-from witwin.channel_native.scattering.kernels import functional as ops
-from witwin.channel_native.runtime import symbols
+from witwin.channel.core.materials import PhaseScreen
+from witwin.channel.physics.conventions import C0
+from witwin.channel.scattering import PhaseScreenRuntime
+from witwin.channel.scattering.kernels import functional as ops
+from witwin.channel.runtime import symbols
 
 from tests.reference import phase_screen_realization as reference
 

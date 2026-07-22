@@ -10,9 +10,9 @@ import sys
 import numpy as np
 import pytest
 
-import witwin.channel_native.physics as physics
-from witwin.channel_native.physics import oracle as legacy
-from witwin.channel_native.physics.reference import oracle as canonical
+import witwin.channel.physics as physics
+from witwin.channel.physics import oracle as legacy
+from witwin.channel.physics.reference import oracle as canonical
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -62,20 +62,20 @@ def test_reference_oracle_has_one_canonical_owner_and_same_object_facades() -> N
         owner = getattr(canonical, name)
         assert getattr(legacy, name) is owner
         assert getattr(physics, name) is owner
-        assert owner.__module__ == "witwin.channel_native.physics.oracle"
+        assert owner.__module__ == "witwin.channel.physics.oracle"
 
 
 @pytest.mark.parametrize(
     "order",
     (
-        ("witwin.channel_native.physics", "witwin.channel_native.physics.oracle"),
+        ("witwin.channel.physics", "witwin.channel.physics.oracle"),
         (
-            "witwin.channel_native.physics.oracle",
-            "witwin.channel_native.physics.reference.oracle",
+            "witwin.channel.physics.oracle",
+            "witwin.channel.physics.reference.oracle",
         ),
         (
-            "witwin.channel_native.physics.reference.oracle",
-            "witwin.channel_native.physics",
+            "witwin.channel.physics.reference.oracle",
+            "witwin.channel.physics",
         ),
     ),
 )
@@ -86,9 +86,9 @@ def test_reference_oracle_identity_is_import_order_independent(
 import importlib
 for name in {order!r}:
     importlib.import_module(name)
-p = importlib.import_module('witwin.channel_native.physics')
-l = importlib.import_module('witwin.channel_native.physics.oracle')
-c = importlib.import_module('witwin.channel_native.physics.reference.oracle')
+p = importlib.import_module('witwin.channel.physics')
+l = importlib.import_module('witwin.channel.physics.oracle')
+c = importlib.import_module('witwin.channel.physics.reference.oracle')
 for name in {_PUBLIC!r}:
     assert getattr(p, name) is getattr(l, name) is getattr(c, name)
 """
@@ -147,9 +147,9 @@ def test_reference_oracle_is_static_numpy_only_and_production_independent() -> N
     )
     assert "torch" not in imports
     assert not any(
-        name.startswith("witwin.channel_native.materials")
-        or name.startswith("witwin.channel_native.scattering")
-        or name.startswith("witwin.channel_native.propagation")
+        name.startswith("witwin.channel.materials")
+        or name.startswith("witwin.channel.scattering")
+        or name.startswith("witwin.channel.propagation")
         for name in imports
     )
 
@@ -162,4 +162,4 @@ def test_legacy_and_package_facades_import_canonical_owner_directly() -> None:
             for node in ast.walk(ast.parse(source))
             if isinstance(node, ast.ImportFrom) and node.module is not None
         }
-        assert "witwin.channel_native.physics.reference.oracle" in imports
+        assert "witwin.channel.physics.reference.oracle" in imports

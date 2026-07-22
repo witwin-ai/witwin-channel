@@ -2,11 +2,11 @@ import pytest
 import torch
 
 from tests.support.scenes import single_wall_reflection_scene, wedge_diffraction_scene
-from witwin.channel_native import ReceiverGrid, Transmitter
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.montecarlo.basic import Config, solve
-import witwin.channel_native.montecarlo.basic.backend as basic_backend
-import witwin.channel_native.montecarlo.basic.rayd_components as rayd_components
+from witwin.channel import ReceiverGrid, Transmitter
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.montecarlo.basic import Config, solve
+import witwin.channel.montecarlo.basic.backend as basic_backend
+import witwin.channel.montecarlo.basic.rayd_components as rayd_components
 
 _REFERENCE_EDGE_INFO_PLANE_TOL = 1.34e-5
 

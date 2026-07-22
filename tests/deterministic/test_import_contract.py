@@ -11,14 +11,14 @@ FORBIDDEN_MODULES = (
 )
 
 FORBIDDEN_INTERNAL_MODULES = (
-    "witwin.channel_native.path.rayd_export",
+    "witwin.channel.path.rayd_export",
 )
 
 
 def test_deterministic_import_does_not_import_forbidden_solver_stacks():
     for module_name in list(sys.modules):
-        if module_name == "witwin.channel_native.deterministic" or module_name.startswith(
-            "witwin.channel_native.deterministic."
+        if module_name == "witwin.channel.deterministic" or module_name.startswith(
+            "witwin.channel.deterministic."
         ):
             sys.modules.pop(module_name, None)
     for module_name in FORBIDDEN_MODULES:
@@ -26,7 +26,7 @@ def test_deterministic_import_does_not_import_forbidden_solver_stacks():
     for module_name in FORBIDDEN_INTERNAL_MODULES:
         sys.modules.pop(module_name, None)
 
-    importlib.import_module("witwin.channel_native.deterministic")
+    importlib.import_module("witwin.channel.deterministic")
 
     for module_name in FORBIDDEN_MODULES:
         assert module_name not in sys.modules
@@ -35,7 +35,7 @@ def test_deterministic_import_does_not_import_forbidden_solver_stacks():
 
 
 def test_solver_facade_delegates_to_pipeline_owner():
-    from witwin.channel_native.deterministic import pipeline, solver
+    from witwin.channel.deterministic import pipeline, solver
 
     assert solver._metadata is pipeline._metadata
     assert solver.solve.__module__ == solver.__name__

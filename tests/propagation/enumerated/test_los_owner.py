@@ -7,8 +7,8 @@ import pytest
 import torch
 
 from ci import check_import_graph as graph
-from witwin.channel_native.propagation.enumerated import los
-from witwin.channel_native.propagation.geometry import visibility
+from witwin.channel.propagation.enumerated import los
+from witwin.channel.propagation.geometry import visibility
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -182,11 +182,11 @@ def test_los_topology_skips_visibility_for_structure_free_scene(monkeypatch):
 
 def test_los_owners_have_no_core_path_dependency_or_scc():
     owners = {
-        "witwin.channel_native.propagation.enumerated.los",
-        "witwin.channel_native.propagation.geometry.visibility",
-        "witwin.channel_native.propagation.topology.discovery.los",
+        "witwin.channel.propagation.enumerated.los",
+        "witwin.channel.propagation.geometry.visibility",
+        "witwin.channel.propagation.topology.discovery.los",
     }
-    core = "witwin.channel_native.core.path_topology"
+    core = "witwin.channel.core.path_topology"
     edges = graph.collect_import_edges(PACKAGE_ROOT)
     adjacency: dict[str, set[str]] = {}
     for edge in edges:
@@ -205,6 +205,6 @@ def test_los_owners_have_no_core_path_dependency_or_scc():
 
 
 def test_enumerated_public_all_is_unchanged():
-    import witwin.channel_native.propagation.enumerated as enumerated
+    import witwin.channel.propagation.enumerated as enumerated
 
     assert enumerated.__all__ == []

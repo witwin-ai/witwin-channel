@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.propagation.models import CoupledCandidateCapacity
-from witwin.channel_native.propagation.topology.kernels import coupled
-from witwin.channel_native.runtime import (
+from witwin.channel.propagation.models import CoupledCandidateCapacity
+from witwin.channel.propagation.topology.kernels import coupled
+from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
     create_capacity_failure_state,
@@ -258,7 +258,7 @@ def test_coupled_candidate_capacity_source_has_no_host_transfer_or_public_cap() 
         root / "native/channel_native/kernels/coupled_candidate_capacity.cu"
     ).read_text(encoding="utf-8")
     facade = (
-        root / "src/witwin/channel_native/propagation/topology/kernels/coupled.py"
+        root / "src/witwin/channel/propagation/topology/kernels/coupled.py"
     ).read_text(encoding="utf-8")
     for forbidden in (
         "cudaMemcpy",

@@ -29,7 +29,7 @@ DIAGNOSTIC_CONTRACT_REPO_PATH = Path(
     "benchmarks/phase13_phase12_diagnostic_contract.json"
 )
 DIAGNOSTIC_SCHEMA = {
-    "name": "witwin.channel_native.phase13-phase12-diagnostic-worker",
+    "name": "witwin.channel.phase13-phase12-diagnostic-worker",
     "version": 1,
 }
 HASH_FORMAT = "semantic-dtype-shape-little-endian-contiguous"
@@ -40,7 +40,7 @@ def load_diagnostic_contract() -> dict[str, object]:
     contract = read_json(ROOT / DIAGNOSTIC_CONTRACT_REPO_PATH)
     exact_keys(contract, {"schema", "execution", "groups"}, label="diagnostic contract")
     if contract["schema"] != {
-        "name": "witwin.channel_native.phase13-phase12-diagnostic-contract",
+        "name": "witwin.channel.phase13-phase12-diagnostic-contract",
         "version": 1,
     }:
         raise EvidenceError("diagnostic contract identity is not accepted")
@@ -64,13 +64,13 @@ def load_diagnostic_contract() -> dict[str, object]:
         raise EvidenceError("diagnostic contract group set is not canonical")
     expected_callables = {
         "enumerated_penetration": (
-            "witwin.channel_native.propagation.enumerated.transmission._transmission_topology"
+            "witwin.channel.propagation.enumerated.transmission._transmission_topology"
         ),
         "montecarlo_penetration": (
-            "witwin.channel_native.montecarlo.events.transmission.straight_transmission_chains"
+            "witwin.channel.montecarlo.events.transmission.straight_transmission_chains"
         ),
         "diffraction": (
-            "witwin.channel_native.propagation.enumerated.diffraction._diffraction_topology_order1"
+            "witwin.channel.propagation.enumerated.diffraction._diffraction_topology_order1"
         ),
     }
     for group, callable_name in expected_callables.items():

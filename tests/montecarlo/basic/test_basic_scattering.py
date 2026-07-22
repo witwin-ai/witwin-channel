@@ -12,17 +12,17 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native import (
+from witwin.channel import (
     ReceiverGrid,
     ReceiverPoint,
     Scene,
     Structure,
     Transmitter,
 )
-from witwin.channel_native.core.kernels.extension import build_info
-from witwin.channel_native.core.materials import Layer, PhysicalSurface, Roughness
-from witwin.channel_native.montecarlo.basic import Config, solve
-from witwin.channel_native.scattering import build_kirchhoff_table, eval_bsdf
+from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
+from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
@@ -265,7 +265,7 @@ def test_basic_scattering_requires_unobstructed_incident_segment():
     through-wall incident paths)."""
 
     _require_native()
-    from witwin.channel_native.core.materials import PerfectConductor
+    from witwin.channel.core.materials import PerfectConductor
 
     blocker = _wall(PerfectConductor(), x=1.5, surface_id=2)
     result = solve(

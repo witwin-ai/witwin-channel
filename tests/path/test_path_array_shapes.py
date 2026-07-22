@@ -1,6 +1,6 @@
 import torch
 
-from witwin.channel_native.path import PathResult, RaggedPathSoA
+from witwin.channel.path import PathResult, RaggedPathSoA
 
 
 def test_explicit_antenna_and_time_dimensions_pack_without_shape_collapse():

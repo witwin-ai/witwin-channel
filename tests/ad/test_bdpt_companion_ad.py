@@ -46,10 +46,10 @@ import torch
 from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL
 from tests.reference import bdpt_ad_oracles as O
-from witwin.channel_native.montecarlo.bdpt.kernels import maps as M
-from witwin.channel_native.montecarlo.bdpt.kernels import paths as P
-from witwin.channel_native.montecarlo.bdpt import paths_ad as PA
-from witwin.channel_native.runtime import symbols
+from witwin.channel.montecarlo.bdpt.kernels import maps as M
+from witwin.channel.montecarlo.bdpt.kernels import paths as P
+from witwin.channel.montecarlo.bdpt import paths_ad as PA
+from witwin.channel.runtime import symbols
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for BDPT companion AD"
@@ -1122,7 +1122,7 @@ def test_fixed_inputs_reject_gradients_loudly():
     geometry are frozen; requesting their gradient raises.
     """
 
-    from witwin.channel_native.montecarlo.bdpt import autograd as bdpt_autograd
+    from witwin.channel.montecarlo.bdpt import autograd as bdpt_autograd
 
     fx = _reflect_fixture(111)
     light, inter, material = _reflect_native(fx)

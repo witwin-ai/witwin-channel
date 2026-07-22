@@ -14,17 +14,17 @@ import math
 import pytest
 import torch
 
-from witwin.channel_native.propagation.enumerated import scattering as scattering_mod
-from witwin.channel_native.propagation.enumerated import scattering_chain as sc
+from witwin.channel.propagation.enumerated import scattering as scattering_mod
+from witwin.channel.propagation.enumerated import scattering_chain as sc
 
 # ADR-021 refactor: the chain-append path (topology slots, ensemble scatter face
 # selection) moved out of scattering.py into scattering_chain_append.py to meet
 # the file-size maintenance budget; the single-bounce path stays in scattering.
-from witwin.channel_native.propagation.enumerated import (
+from witwin.channel.propagation.enumerated import (
     scattering_chain_append as scattering_append,
 )
-from witwin.channel_native.deterministic import Config as DeterministicConfig
-from witwin.channel_native.path.config import Config as PathConfig
+from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.path.config import Config as PathConfig
 
 
 _D = sc.KMAX_AD_DEPTH
@@ -220,7 +220,7 @@ _FREQUENCY_HZ = 3.0e9
 def _require_cuda_rayd() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA torch is required")
-    from witwin.channel_native.core.kernels.extension import build_info
+    from witwin.channel.core.kernels.extension import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")
@@ -233,9 +233,9 @@ def _two_wall_scene():
     TX -> floor reflection -> rough-wall vertex -> RX.
     """
 
-    from witwin.channel_native import ReceiverPoint, Scene, Transmitter
-    from witwin.channel_native.core.materials import Dielectric
-    from witwin.channel_native import Structure
+    from witwin.channel import ReceiverPoint, Scene, Transmitter
+    from witwin.channel.core.materials import Dielectric
+    from witwin.channel import Structure
     from tests.support.scenes import rough_wall_structure
 
     rough = rough_wall_structure(
@@ -264,7 +264,7 @@ def _two_wall_scene():
 
 
 def _run_discovery(scene, config):
-    from witwin.channel_native.propagation.geometry.endpoints import (
+    from witwin.channel.propagation.geometry.endpoints import (
         receiver_positions_and_layout,
         transmitter_tensors,
     )
@@ -363,7 +363,7 @@ def test_discovery_depth_and_join_bounds():
 
 def test_solver_default_off_appends_no_chain_rows():
     _require_cuda_rayd()
-    from witwin.channel_native.deterministic import solve
+    from witwin.channel.deterministic import solve
 
     scene = _two_wall_scene()
     config = DeterministicConfig(
@@ -387,11 +387,11 @@ def test_solver_chain_enabled_end_to_end():
     _require_cuda_rayd()
     if getattr(scattering_mod.scattering_kernels, "scattering_chain_ensemble_eval", None) is None:
         pytest.skip("ADR-021 D2 Op A facade not yet registered")
-    from witwin.channel_native.runtime.symbols import native_extension
+    from witwin.channel.runtime.symbols import native_extension
 
     if not hasattr(native_extension(), "scattering_chain_ensemble_eval"):
         pytest.skip("ADR-021 D2 Op A native symbol not built into this extension")
-    from witwin.channel_native.deterministic import solve
+    from witwin.channel.deterministic import solve
 
     scene = _two_wall_scene()
     config = DeterministicConfig(
@@ -420,7 +420,7 @@ def test_solver_chain_ad_mode_requires_companion():
     _require_cuda_rayd()
     if getattr(scattering_mod.scattering_autograd, "scattering_chain_ensemble_eval_ad", None) is not None:
         pytest.skip("ADR-021 D5 Op A _ad companion is available")
-    from witwin.channel_native.deterministic import solve
+    from witwin.channel.deterministic import solve
 
     scene = _two_wall_scene()
     config = DeterministicConfig(

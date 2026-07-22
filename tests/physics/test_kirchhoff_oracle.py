@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from scipy.special import jv
 
-from witwin.channel_native.physics import (
+from witwin.channel.physics import (
     C0,
     coherent_attenuation,
     hemisphere_integral,

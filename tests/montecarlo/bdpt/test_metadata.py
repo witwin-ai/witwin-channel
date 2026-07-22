@@ -2,8 +2,8 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel_native.core.kernels.metadata import validate_metadata
-from witwin.channel_native.montecarlo.bdpt import Config, solve
+from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def test_bdpt_metadata_reports_contract_fields():

@@ -15,9 +15,9 @@ import dataclasses
 import pytest
 import torch
 
-from witwin.channel_native import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel_native.core.materials import PerfectConductor
-from witwin.channel_native.deterministic import Config, solve
+from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter
+from witwin.channel.core.materials import PerfectConductor
+from witwin.channel.deterministic import Config, solve
 
 
 def _metal_box(center: tuple[float, float, float], half: float, name: str) -> Structure:

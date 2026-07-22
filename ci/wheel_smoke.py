@@ -23,7 +23,7 @@ else:
     import audit_windows_pe
 
 
-_DISTRIBUTION = "witwin-channel-native"
+_DISTRIBUTION = "witwin-channel"
 _DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL"})
 _NATIVE_MEMBER = "witwin/channel_native/_channel_native.cp311-win_amd64.pyd"
 _REQUIRED_RUNTIME_MEMBERS = {
@@ -707,21 +707,21 @@ if distribution.metadata[\"Name\"] != {expected_name!r}:
 if distribution.version != {expected_version!r}:
     raise RuntimeError(f\"unexpected distribution version: {{distribution.version!r}}\")
 
-package_spec = importlib.util.find_spec(\"witwin.channel_native\")
+package_spec = importlib.util.find_spec(\"witwin.channel\")
 if package_spec is None or package_spec.origin is None:
-    raise RuntimeError(\"witwin.channel_native has no import origin\")
+    raise RuntimeError(\"witwin.channel has no import origin\")
 package_origin = Path(package_spec.origin).resolve()
 if not package_origin.is_relative_to(target):
     raise RuntimeError(f\"package resolved outside isolated target: {{package_origin}}\")
 
-native_spec = importlib.util.find_spec(\"witwin.channel_native._channel_native\")
+native_spec = importlib.util.find_spec(\"witwin.channel._channel_native\")
 if native_spec is None or native_spec.origin is None:
     raise RuntimeError(\"packaged native extension has no import origin\")
 native_origin = Path(native_spec.origin).resolve()
 if not native_origin.is_relative_to(target):
     raise RuntimeError(f\"native extension resolved outside isolated target: {{native_origin}}\")
 
-import witwin.channel_native as channel_native
+import witwin.channel as channel_native
 
 build_info = channel_native.build_info()
 if build_info.get(\"backend\") != \"channel-native\":

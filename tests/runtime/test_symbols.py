@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from witwin.channel_native.core.kernels import extension as compatibility_extension
-from witwin.channel_native.runtime import extension, symbols
+from witwin.channel.core.kernels import extension as compatibility_extension
+from witwin.channel.runtime import extension, symbols
 
 
 def _body_hash(function: object) -> str:
@@ -38,7 +38,7 @@ def test_compatibility_exports_share_the_runtime_symbol_owner():
 def test_required_native_op_has_one_body_preserving_runtime_owner():
     function = symbols._required_native_op
 
-    assert function.__module__ == "witwin.channel_native.runtime.symbols"
+    assert function.__module__ == "witwin.channel.runtime.symbols"
     assert "_required_native_op" not in symbols.__all__
     assert function.__globals__["_native_symbols"] is symbols
     assert _body_hash(function) == (
@@ -66,7 +66,7 @@ def test_native_extension_preserves_loader_cache(monkeypatch: pytest.MonkeyPatch
 
     assert symbols.native_extension() is native
     assert symbols.native_extension() is native
-    assert imports == [("._channel_native", "witwin.channel_native")]
+    assert imports == [("._channel_native", "witwin.channel")]
 
 
 def test_required_symbol_keeps_lookup_order_and_single_loader_call(

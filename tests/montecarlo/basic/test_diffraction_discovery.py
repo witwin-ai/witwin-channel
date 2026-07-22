@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from witwin.channel_native.montecarlo.basic.kernels import sampling as ops
-from witwin.channel_native.runtime import symbols
+from witwin.channel.montecarlo.basic.kernels import sampling as ops
+from witwin.channel.runtime import symbols
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")

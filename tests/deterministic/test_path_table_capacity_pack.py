@@ -7,24 +7,24 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel_native.deterministic.accumulation import build_path_table
-from witwin.channel_native.deterministic.capacity import (
+from witwin.channel.deterministic.accumulation import build_path_table
+from witwin.channel.deterministic.capacity import (
     deterministic_path_table_capacity_pack,
 )
-from witwin.channel_native.deterministic import capacity as capacity_module
-from witwin.channel_native.deterministic.result import PathTable
-from witwin.channel_native.propagation.models.capacity import (
+from witwin.channel.deterministic import capacity as capacity_module
+from witwin.channel.deterministic.result import PathTable
+from witwin.channel.propagation.models.capacity import (
     CapacityEvaluatedPaths,
     CapacityPathLayout,
     CapacityPathSelection,
 )
-from witwin.channel_native.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel_native.propagation.models.fields import PathFields
-from witwin.channel_native.propagation.models.geometry import PathGeometry
-from witwin.channel_native.propagation.models.topology import PathTopology
-from witwin.channel_native.runtime import symbols
-from witwin.channel_native.runtime.capacity import create_capacity_failure_state
-from witwin.channel_native.runtime.symbols import required_symbol
+from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.models.fields import PathFields
+from witwin.channel.propagation.models.geometry import PathGeometry
+from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.runtime import symbols
+from witwin.channel.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime.symbols import required_symbol
 
 
 pytestmark = pytest.mark.skipif(

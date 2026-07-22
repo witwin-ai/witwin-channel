@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from witwin.channel_native.runtime import profiling
+from witwin.channel.runtime import profiling
 
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -53,7 +53,7 @@ def test_cuda_profile_range_is_balanced_on_failure(monkeypatch) -> None:
             raise RuntimeError("sentinel")
 
     assert calls == [
-        ("push", "witwin.channel_native:diffraction_total_stage"),
+        ("push", "witwin.channel:diffraction_total_stage"),
         ("pop", None),
     ]
 
@@ -83,7 +83,7 @@ def test_cuda_profile_mark_emits_only_the_semantic_payload(monkeypatch) -> None:
 
     profiling.cuda_profile_mark(profiling.CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
 
-    assert calls == ["witwin.channel_native:diffraction_exporter_request"]
+    assert calls == ["witwin.channel:diffraction_exporter_request"]
 
 
 def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
@@ -117,7 +117,7 @@ def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
 def test_profile_contract_matches_closed_semantic_name_sets() -> None:
     contract = json.loads(_CONTRACT.read_text(encoding="utf-8"))
     assert contract["schema"] == {
-        "name": "witwin.channel_native.phase13-phase12-profile-contract",
+        "name": "witwin.channel.phase13-phase12-profile-contract",
         "version": 1,
     }
     assert contract["steady_repeats"] == 7
@@ -145,7 +145,7 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
     )
     for group_name, group in contract["groups"].items():
         assert group["target_timing_range"] in range_names
-        assert group["solver_entrypoint"].startswith("witwin.channel_native.")
+        assert group["solver_entrypoint"].startswith("witwin.channel.")
         assert group["ncu_kernel_family_match"] == "case_sensitive_substring"
         assert set(group["variants"]) == {"baseline", "candidate"}
         for variant_name, variant in group["variants"].items():
@@ -180,13 +180,13 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
     assert observed_marks == mark_names
     diffraction = contract["groups"]["diffraction"]["variants"]
     assert diffraction["baseline"]["known_range_multiplicity_per_solve"] == {
-        "witwin.channel_native:diffraction_exporter": 13,
-        "witwin.channel_native:diffraction_topology_packing": 13,
-        "witwin.channel_native:diffraction_total_stage": 1,
+        "witwin.channel:diffraction_exporter": 13,
+        "witwin.channel:diffraction_topology_packing": 13,
+        "witwin.channel:diffraction_total_stage": 1,
     }
     assert diffraction["candidate"]["known_range_multiplicity_per_solve"] == {
-        "witwin.channel_native:diffraction_exporter": 2,
-        "witwin.channel_native:diffraction_total_stage": 1,
+        "witwin.channel:diffraction_exporter": 2,
+        "witwin.channel:diffraction_total_stage": 1,
     }
     assert all(
         token not in name.casefold()
@@ -205,7 +205,7 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
 
 def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     enumerated = _function(
-        "src/witwin/channel_native/propagation/enumerated/transmission.py",
+        "src/witwin/channel/propagation/enumerated/transmission.py",
         "_transmission_topology",
     )
     assert _profile_enum_members(enumerated, "profiled_cuda_range") == {
@@ -213,7 +213,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     }
 
     montecarlo = _function(
-        "src/witwin/channel_native/montecarlo/events/transmission.py",
+        "src/witwin/channel/montecarlo/events/transmission.py",
         "straight_transmission_chains",
     )
     assert _profile_enum_members(montecarlo, "profiled_cuda_range") == {
@@ -222,7 +222,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     assert _profile_enum_members(montecarlo, "cuda_profile_mark") == {"OPTIX_TRAVERSAL"}
 
     diffraction = _function(
-        "src/witwin/channel_native/propagation/enumerated/diffraction.py",
+        "src/witwin/channel/propagation/enumerated/diffraction.py",
         "_diffraction_topology_order1",
     )
     assert _profile_enum_members(diffraction, "profiled_cuda_range") == {
@@ -236,7 +236,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     assert "DIFFRACTION_PAIR_REDUCER" not in ast.dump(diffraction)
 
     diffraction_query = _function(
-        "src/witwin/channel_native/propagation/geometry/diffraction.py",
+        "src/witwin/channel/propagation/geometry/diffraction.py",
         "query_diffraction_order1",
     )
     assert _profile_enum_members(diffraction_query, "cuda_profile_mark") == {
