@@ -310,6 +310,7 @@ def test_smoke_program_contains_strict_isolation_and_native_checks(tmp_path: Pat
 
     compile(code, "<wheel-smoke>", "exec")
     assert "is_relative_to(target)" in code
+    assert 'finder.__class__.__module__ != "_witwin_channel_editable"' in code
     assert 'find_spec("witwin.channel._channel")' in code
     assert 'build_info.get("uses_dr_jit") is not False' in code
     assert 'build_info.get("uses_rayd_native") is not True' in code

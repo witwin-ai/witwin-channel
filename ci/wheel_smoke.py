@@ -689,6 +689,15 @@ import sys
 
 target = Path({str(target)!r}).resolve()
 sys.path.insert(0, str(target))
+# ``-I`` still processes installed ``.pth`` files.  A pre-existing editable
+# witwin-channel install can therefore register its finder ahead of PathFinder
+# and steal ``witwin.channel`` from this isolated wheel target.  Remove only
+# that distribution-owned finder inside the disposable smoke subprocess.
+sys.meta_path[:] = [
+    finder
+    for finder in sys.meta_path
+    if finder.__class__.__module__ != "_witwin_channel_editable"
+]
 wheel = Path({str(wheel)!r}).resolve()
 wheel_digest = hashlib.sha256()
 with wheel.open("rb") as stream:
