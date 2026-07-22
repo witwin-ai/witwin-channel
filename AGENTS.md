@@ -1,5 +1,12 @@
 # Channel Native Architecture Guardrails
 
+ADR-033 accepts the breaking replacement product identity `witwin.channel`,
+the `witwin-channel` distribution, and the single `_channel` extension. The
+checkout directory may retain its current name, but installed/runtime/build
+identifiers must not retain the predecessor suffix or add a compatibility
+alias. During the bounded migration, follow ADR-033 whenever an older name in
+this file conflicts with that accepted target.
+
 These repository instructions apply to every file under `channel_native/` and
 take precedence over the monorepo-level agent guide. Keep `AGENTS.md` and
 `CLAUDE.md` identical. Architecture changes must update both files in the same
@@ -346,6 +353,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-021-multibounce-coherent-scattering.md`
 - `docs/dev/standards/adr-022-bdpt-fixed-topology-ad.md`
 - `docs/dev/standards/adr-023-direct-rayd-typed-integration.md`
+- `docs/dev/standards/adr-033-channel-replacement-product-identity.md`
 - `docs/dev/standards/adr-024-shared-rf-transmission-ownership.md`
 - `docs/dev/standards/adr-025-diffraction-operation-family-ownership.md`
 - `docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md`
