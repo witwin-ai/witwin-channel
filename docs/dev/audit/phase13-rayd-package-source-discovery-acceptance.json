@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "status": "accepted for controlled Python-environment source discovery",
+  "recorded_on": "2026-07-22",
+  "scope": {
+    "channel_commit": "d36b64bc12439bb35ce7cb42309dc557ce172dc6",
+    "rayd_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+    "channel_branch": "codex/plan13-stable-recovery",
+    "rayd_branch": "codex/rayd-package-discovery",
+    "numerical_change": false,
+    "native_owner_change": false,
+    "public_solver_api_change": false,
+    "build_metadata_change": true
+  },
+  "resolution_contract": {
+    "order": [
+      "valid explicit RAYD_SOURCE_DIR",
+      "unique rayd-torch 0.6.0 distribution in the selected Python environment",
+      "fail loudly"
+    ],
+    "invalid_explicit_may_fallback": false,
+    "conda_prefix_scan": false,
+    "site_packages_tree_scan": false,
+    "cmake_registry_scan": false,
+    "rayd_python_import": false,
+    "package_resource": "rayd/torch/_source/rayd-source.json",
+    "package_ownership": "distribution RECORD",
+    "full_source_manifest_required": true,
+    "absolute_source_path_in_fingerprint": false
+  },
+  "locked_identity": {
+    "distribution": "rayd-torch",
+    "distribution_version": "0.6.0",
+    "repository_url": "https://github.com/Asixa/RayD.git",
+    "integration_api_version": 6,
+    "integration_identity": "rayd.torch.integration",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "source_manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
+    "channel_lock_sha256": "2b54492fee4f05b1275a8f1e2e5a50954df409631228b6030f65cb06c8e51436"
+  },
+  "rayd_package_evidence": {
+    "build_mode": "native build disabled; source-bundle packaging validation only",
+    "wheel": "rayd_torch-0.6.0-cp310-cp310-win_amd64.whl",
+    "wheel_bytes": 547450,
+    "wheel_sha256": "0a38b6fb8b620d03bb78abdecd2e2438c101d959002fd1de7844aab7381b1f85",
+    "wheel_entry_count": 203,
+    "source_entry_count": 179,
+    "metadata_dirty": false,
+    "source_manifest_matches_lock": true,
+    "targeted_tests": "12 passed"
+  },
+  "automatic_discovery_evidence": {
+    "environment": "isolated Python 3.11 venv containing only the unpacked RayD wheel source resource",
+    "rayd_source_dir_provided": false,
+    "cmake_validate_only": "passed twice from a fresh build directory",
+    "selected_distribution_count": 1,
+    "resolved_source_kind": "python-package",
+    "resolved_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+    "cmake_cache_rayd_source_dir": "",
+    "manifest_reverified_on_second_configure": true
+  },
+  "channel_validation": {
+    "targeted_contract_and_governance": "112 passed",
+    "runtime_identity_regression": "21 passed",
+    "ruff": "passed",
+    "maintenance_budgets": "passed without budget changes",
+    "quick_tier": "passed",
+    "strict_json_parse": "passed"
+  },
+  "current_platform_wheel": {
+    "purpose": "current Windows/CUDA/SM smoke only; not an all-architecture publication claim",
+    "wheel": "witwin_channel_native-0.1.0-cp311-cp311-win_amd64.whl",
+    "wheel_bytes": 7643422,
+    "wheel_sha256": "69b9538c992b1258a72fa780429d8826daec13af08040e8d9a81c568108fac98",
+    "smoke_artifact_sha256": "694283ba782ff7cd15cf4025f95f95287a7e0a19a5786d183253df0f513a8495",
+    "extension_sha256": "c9b0f52251e71321efd40c6074c0f0a6e2f78ae357bd81f4f34aa2c7e7411b40",
+    "exports_sha256": "a1976faeb608a6bbe8b369724bca29f8a65068aa7a603ed06153917b00a12f8c",
+    "export_count": 78,
+    "build_fingerprint": "c3b738b90c81eeca6231c2d34fbbaac9d6f94da6da49ed3c6da5b16a626af52a",
+    "build_type": "Release",
+    "architectures": [
+      "120-real"
+    ],
+    "source_kind": "git-checkout",
+    "source_manifest_matches_lock": true,
+    "wheel_smoke": true
+  },
+  "deferred_publication_gate": {
+    "local_all_architecture_build_run": false,
+    "reason": "explicitly deferred to GitHub Actions by user decision",
+    "workflows_updated": [
+      "cuda",
+      "nightly",
+      "release"
+    ],
+    "required_before_publication": "clean GitHub Actions all-architecture build, PE audit, isolated install, and fingerprint validation at the pinned commits"
+  },
+  "historical_and_open_evidence": {
+    "historical_munich_rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "historical_munich_evidence_rewritten": false,
+    "rayd_delta_from_historical_commit": "packaging, documentation, CMake packaging control, and source-bundle tests only",
+    "rayd_native_numerical_sources_changed": false,
+    "phase6c_comparative_e2e_resource_gate": "open",
+    "plan13_overall_status": "evidence closure partial"
+  },
+  "workspace_integrity": {
+    "dirty_primary_channel_worktree_touched": false,
+    "dirty_primary_channel_worktree_entry_count": 33,
+    "stable_recovery_worktree_used": true,
+    "rayd_clean_worktree_used": true
+  }
+}

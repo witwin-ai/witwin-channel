@@ -597,3 +597,5 @@ search is used, and `rayd.torch` is not imported.
 path. Local all-architecture recompilation is intentionally deferred to the
 updated CUDA/nightly/release GitHub Actions. Historical Munich/ADR-032 evidence
 remains bound to RayD `474c122` and is not rewritten by this packaging change.
+The isolated package-resolution and current-platform SM120 wheel/PE smoke record
+is `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`.

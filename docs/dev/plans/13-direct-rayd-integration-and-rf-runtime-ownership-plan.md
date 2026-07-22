@@ -15,9 +15,11 @@ wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
 2026-07-22 packaging follow-up 将当前 RayD lock 前进到非数值打包提交
 `402262d3b0c07dffb9d51d1852abb97ab2280f2f`。显式 `RAYD_SOURCE_DIR` 仍具有最高优先级；
 未提供时，仅允许所选 Python 环境中唯一 `rayd-torch 0.6.0` 的 passive source bundle，且
-必须先完成 RECORD 与 lock-pinned full-source manifest 复验。本地全架构重编译明确延期，由
-已更新的 CUDA/nightly/release GitHub Actions 承担 publication gate；这不修改或替代绑定
-RayD `474c122` 的历史 Munich 数值证据。
+必须先完成 RECORD 与 lock-pinned full-source manifest 复验。本机 SM120 Release wheel、PE
+审计和隔离 smoke 已通过；本地全架构重编译明确延期，由已更新的 CUDA/nightly/release
+GitHub Actions 承担 publication gate。验收事实见
+`docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`；这不修改或替代绑定 RayD
+`474c122` 的历史 Munich 数值证据。
 
 **计划日期：** 2026-07-18
 
@@ -851,8 +853,10 @@ lock schema 2 同时钉住 commit、remote、API/identity/header SHA 与 full-so
 解析顺序固定为 valid explicit checkout → selected Python 的唯一 distribution → fail-loud；
 invalid explicit、missing/duplicate package、path escape、dirty metadata、RECORD 非所有权和
 任一 source mutation 均不得 fallback。`build_info`/fingerprint 新增 source kind 与 manifest
-SHA，不记录绝对路径。本轮只执行 single-package/validate-only 与静态/quick 验收；新 lock 的
-全架构 wheel/PE 发布留给已更新 GitHub Actions，不回写历史 release evidence。
+SHA，不记录绝对路径。本轮已执行 package/validate-only、静态/quick 和本机 SM120 Release
+wheel/PE/隔离 smoke 验收；新 lock 的全架构 wheel 发布留给已更新 GitHub Actions，不回写
+历史 release evidence。完整记录见
+`docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`。
 
 ### Phase 12 — Profiling-driven 性能收口
 
