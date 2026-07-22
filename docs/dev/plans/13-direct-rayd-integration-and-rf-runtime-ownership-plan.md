@@ -854,8 +854,9 @@ lock schema 2 同时钉住 commit、remote、API/identity/header SHA 与 full-so
 invalid explicit、missing/duplicate package、path escape、dirty metadata、RECORD 非所有权和
 任一 source mutation 均不得 fallback。`build_info`/fingerprint 新增 source kind 与 manifest
 SHA，不记录绝对路径。本轮已执行 package/validate-only、静态/quick 和本机 SM120 Release
-wheel/PE/隔离 smoke 验收；新 lock 的全架构 wheel 发布留给已更新 GitHub Actions，不回写
-历史 release evidence。完整记录见
+wheel/PE/隔离 smoke 验收；package-source SM120 configure/resolve 通过，但完整 native 编译在
+30 分钟仍未产出 wheel，未计作通过。新 lock 的 package-source/full-architecture publication
+wheel 留给已更新 GitHub Actions，不回写历史 release evidence。完整记录见
 `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`。
 
 ### Phase 12 — Profiling-driven 性能收口

@@ -57,7 +57,9 @@
     "resolved_source_kind": "python-package",
     "resolved_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
     "cmake_cache_rayd_source_dir": "",
-    "manifest_reverified_on_second_configure": true
+    "manifest_reverified_on_second_configure": true,
+    "duplicate_distribution_guard": "the shared witwin2 environment exposes legacy rayd-torch 0.0.0; overlaying 0.6.0 produced two distributions and was not accepted",
+    "shared_environment_mutated": false
   },
   "channel_validation": {
     "targeted_contract_and_governance": "112 passed",
@@ -88,6 +90,13 @@
   "deferred_publication_gate": {
     "local_all_architecture_build_run": false,
     "reason": "explicitly deferred to GitHub Actions by user decision",
+    "python_package_sm120_attempt": {
+      "configure_and_source_resolution": "passed; resolved python-package commit and manifest before native compilation",
+      "selected_python_distribution_count": 1,
+      "build_status": "not accepted; no wheel produced after 30 minutes of continuing native compilation",
+      "compiler_error_observed": false,
+      "remaining_processes_after_cleanup": 0
+    },
     "workflows_updated": [
       "cuda",
       "nightly",

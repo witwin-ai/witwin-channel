@@ -599,3 +599,6 @@ updated CUDA/nightly/release GitHub Actions. Historical Munich/ADR-032 evidence
 remains bound to RayD `474c122` and is not rewritten by this packaging change.
 The isolated package-resolution and current-platform SM120 wheel/PE smoke record
 is `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`.
+The package-source SM120 configure resolved successfully, but its native build
+did not produce a wheel within the bounded local run and is not claimed as
+accepted; that publication build remains a GitHub Actions gate.
