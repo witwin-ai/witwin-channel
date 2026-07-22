@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "status": "stable recovery accepted with disclosed pre-existing debt",
+  "recorded_on": "2026-07-21",
+  "decision": {
+    "production_route": "compact_o_k",
+    "adr032": "accepted",
+    "adr029": "superseded for production; dormant caller-free experiment only",
+    "adr031": "proposed; no public API and no production caller",
+    "adr030": "dormant; live activation deferred",
+    "large_new_feature_added": false
+  },
+  "boundaries": {
+    "compact_recovery_base": "e7d82d2d1d290bbc106ef68410ebf88aeb1c99e9",
+    "measured_runtime_commit": "2fec08b7b620c66fd29f4bdc768d8fa7f0580c84",
+    "reviewed_implementation_commit": "966a4498b501980dee38f08616adde60f00c59a6",
+    "post_measurement_delta": "tests, duplication ledger, and comments only; no native, solver, ABI, public-schema, or numerical change",
+    "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "rayd_integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "rayd_worktree_clean": true,
+    "rayd_changes_required_by_recovery": false
+  },
+  "production_contract": {
+    "reflection_callers": [
+      "deterministic_reflection_order1_compact",
+      "deterministic_reflection_sequence_compact"
+    ],
+    "diffraction_callers": [
+      "deterministic_diffraction_order1_compact"
+    ],
+    "allocation_complexity": "O(K) actual compact rows",
+    "public_capacity_fields_removed": [
+      "path_capacity_per_pair",
+      "diffraction_state_capacity",
+      "reflection_candidate_capacity_per_pair"
+    ],
+    "public_qr": false,
+    "capacity_experiment_production_callers": 0,
+    "silent_truncation": false,
+    "partial_result_on_failure": false,
+    "wip_v2_names": "none; remaining v2 tokens are triangle vertex local variables only"
+  },
+  "munich_frozen_abc": {
+    "evidence": "benchmarks/gates/stable_recovery_munich.sm120.v1.json",
+    "evidence_sha256": "76ae03643b82f9dbbd1b2659c9e477e067c0e71b8fd645199b7904dc8a75988e",
+    "theoretical_candidates_n": 4552704,
+    "endpoint_pairs_p": 1024,
+    "visible_rows_k": 2629,
+    "per_pair_visible": {
+      "max": 20,
+      "p50": 0,
+      "p95": 13,
+      "p99": 17
+    },
+    "candidate_slot_bytes": {
+      "formula": "65 + 48D",
+      "depth_1": 113,
+      "depth_2": 161,
+      "depth_3": 209
+    },
+    "variants": {
+      "a_compact": {
+        "capacity_active_ratio": 1.0,
+        "peak_allocated_bytes": 1071493120,
+        "peak_reserved_bytes": 1413480448,
+        "median_ms": 66.46659999387339,
+        "throughput_solve_per_s": 15.374181216654303
+      },
+      "b_theoretical_capacity": {
+        "capacity_active_ratio": 1731.7246101179155,
+        "peak_allocated_bytes": 17854649344,
+        "peak_reserved_bytes": 19727908864,
+        "median_ms": 1009.587400010787,
+        "throughput_solve_per_s": 0.7928232282230531,
+        "physical_memory_oversubscribed": true
+      },
+      "c_qr20": {
+        "capacity_active_ratio": 23.370102700646633,
+        "peak_allocated_bytes": 11671543808,
+        "peak_reserved_bytes": 13283360768,
+        "median_ms": 226.42919997451827,
+        "throughput_solve_per_s": 4.4099682923381005
+      },
+      "c_qr128": {
+        "capacity_active_ratio": 149.56865728413845,
+        "peak_allocated_bytes": 12171594752,
+        "peak_reserved_bytes": 13591642112,
+        "median_ms": 232.74819998187013,
+        "throughput_solve_per_s": 4.285414481679398
+      }
+    },
+    "logical_path_fields_compared": 24,
+    "logical_path_fields_bitwise_equal": true,
+    "whole_map_bitwise_claimed": false,
+    "insufficient_capacity_contract": "direct CUDA tests prove failure bit, zero count, all-false valid mask, inert payload, and loud terminal observation; no same-Munich public Qr solve is claimed"
+  },
+  "munich_current_head_replay": {
+    "commit": "2fec08b7b620c66fd29f4bdc768d8fa7f0580c84",
+    "timing": {
+      "median_ms": 52.23450000630692,
+      "throughput_solve_per_s": 18.877149402330176,
+      "artifact_sha256": "27c030419e7b113ace114b1238f5614a31f94c58658ce16c39f2c71fccc60e62"
+    },
+    "memory": {
+      "peak_allocated_bytes": 1071486464,
+      "peak_reserved_bytes": 1413480448,
+      "artifact_sha256": "462628dfb461643c83444b96a6c241e3f2de9520f78c4ad9d00f6c1187ac3b21"
+    },
+    "counts": {
+      "n": 4552704,
+      "p": 1024,
+      "k": 2629,
+      "capacity_active_ratio": 1.0,
+      "artifact_sha256": "6708017619f9aeead6b7647d2a22b426eb414fa8ea594c0726067401134c04d3"
+    },
+    "logical_path_hashes_match_frozen_a": true
+  },
+  "transfer_and_sync_audit": {
+    "reflection_compact_owner": {
+      "d2h_count": 6,
+      "d2h_bytes": 24,
+      "copy_and_immediate_sync_ms": 0.152
+    },
+    "whole_solve": {
+      "d2h_count": 66,
+      "d2h_bytes": 282,
+      "stream_sync_count": 125,
+      "stream_sync_cpu_api_ms": 18.830279,
+      "note": "includes metadata and historical structural boundaries"
+    },
+    "thrust_scan_wait_ms": 5.162,
+    "claim_of_zero_d2h": false
+  },
+  "validation": {
+    "quick": "passed",
+    "cuda": "passed: 2019 passed, 3 skipped; four-solver smoke 14 passed; no-fallback 26 passed; AD core 117 passed",
+    "full_ad": "passed: 301 passed, 1 xfailed",
+    "munich_parity": "passed: 17 tests; deterministic Munich 9 tests",
+    "statistics_full": "passed: 3/3 cases, 16 seeds",
+    "coverage": "policy passed after retrying one TEMP/DrJit environment failure; no production failure was hidden",
+    "duplication": "passed: 170 regions, 9591/95609 duplicate lines = 10.031482%, frozen budget 10.211512%, 0 stale, 0 unclassified",
+    "release_phase_e": "passed: 385/385 checks on frozen Munich/SF assets",
+    "release_peak_memory": "passed; 100M sample case rejected before allocation",
+    "release_cold_start": "completed for path, deterministic, basic, and bdpt; 3 independent processes each",
+    "release_scaling": "passed for all four solvers; over-budget cases rejected before launch",
+    "rayd_lock_and_build_identity": "passed: 34 targeted tests with compact result contracts"
+  },
+  "package_evidence": {
+    "commit": "2fec08b7b620c66fd29f4bdc768d8fa7f0580c84",
+    "wheel_sha256": "ccb8f8a9fd17697d918e95f543b94fd4995ce3ae034e1a2a073c7e436ee047b1",
+    "wheel_bytes": 35071560,
+    "extension_sha256": "825c01201834aab4de1a5efaf44c133095e11470601cc000f9a6a55d0c8f03f6",
+    "build_fingerprint": "5d4b990a06c586a8a973008fce58442057e074914b8048bb7b8506c79266c155",
+    "architectures": [
+      "75-real",
+      "80-real",
+      "86-real",
+      "89-real",
+      "120-real",
+      "120-virtual"
+    ],
+    "pe_export_count": 78,
+    "wheel_smoke": true,
+    "wheel_smoke_artifact_sha256": "aa667a73c669527fd033266e45e818f29f984dd5f965baaf0135adc88ceb04b5",
+    "final_docs_head_rebind": "performed after this non-self-referential report commit and recorded in the release handoff"
+  },
+  "release_artifacts": {
+    "phase_e_acceptance_sha256": "9cfc6d0df815c07068af6d368a7f389844d45b9d5b95a3c8b8c1a43542a4622b",
+    "solver_peak_memory_sha256": "76e3cab99998e97fb1324c9c823ad1ee2d14f2060fc6877f4bd0730e2a7cc75e",
+    "solver_cold_start_sha256": "0df272a1dae33cf4ac835111072cdf5d4b4defaf2bd21b909b830ac9c4b97fe5",
+    "solver_scaling_sha256": "a8c2bde55c93121bc828c7cbe0af8d0dc50518b94b6952fa40a750b22f64da11"
+  },
+  "known_debt": {
+    "bdpt_native_vs_old_channel_steady_speedup": {
+      "grid4_samples64": 0.160,
+      "grid16_samples256": 0.166,
+      "grid16_samples4096": 0.179,
+      "classification": "pre-existing steady-state throughput debt outside ADR-032; not hidden by cold-start or absolute-latency gates"
+    },
+    "whole_solve_sync_boundaries": "66 D2H and 125 stream synchronizations remain audit targets; only the reflection compact count owner is accepted by ADR-032",
+    "concurrent_solve_count": "not load-tested; no concurrency claim",
+    "atomic_whole_map_exactness": "not bitwise stable across independent processes",
+    "raw_abc_storage": "raw profiler files remain local ignored artifacts; the tracked gate stores hashes and summarized facts"
+  },
+  "maintenance_hashes": {
+    "rayd_lock_sha256": "c7abb39aa352bec65f3ffd9c52abb9eb2ac9f20cd8dc11fddcf9eed462a8c7e9",
+    "native_binding_manifest_sha256": "9af667e514fb18fcf2bd6166d8c12416a115becac792d37e7fd852e7dc1b5dd4",
+    "contract_coverage_manifest_sha256": "8e5fe27dc2536aa8407f98c38fba10df856b8cfc5cf5ddc213eb94ee2751d9f0",
+    "agents_claude_sha256": "35dec14fc6b6f8dd356a3fbc1325ff2b946f25fa62271cb5f46c3ff45d331192",
+    "binding_count": 241
+  }
+}

@@ -84,12 +84,16 @@ legacy canonical selection, and field work at 10.707, 1.444, 6.888, and
 stage timings; the table's synchronized end-to-end measurement is the
 acceptance truth.
 
-A performed six 4-byte device-to-host count transfers per solve, 24 bytes in
-total. Nsight recorded about 0.152 ms for the copy APIs and their immediate
-post-copy synchronization. A separate approximately 5.162 ms wait belonged to
-the existing Thrust scan boundary and must not be attributed to those 24 bytes.
-B and C eliminated the count transfers but failed the end-to-end, memory, and
-throughput gates by large margins.
+The reflection compact owner performed six 4-byte device-to-host count
+transfers per solve, 24 bytes in total. Nsight recorded about 0.152 ms for the
+copy APIs and their immediate post-copy synchronization. This is not the whole
+solve total: the same A Nsight audit contained approximately 66 D2H transfers
+totalling 282 bytes and 125 stream synchronizations with about 18.830 ms of
+aggregate CPU API time, including metadata and historical structural
+boundaries. A separate approximately 5.162 ms wait belonged to the existing
+Thrust scan boundary and must not be attributed to those 24 bytes. B and C
+eliminated the reflection count transfers but failed the end-to-end, memory,
+and throughput gates by large margins.
 
 For sufficient capacity, all 24 logical PathTable field hashes matched across
 A, B, and C. The final reflection/diffraction maps have pre-existing atomic
@@ -239,3 +243,7 @@ ADR-030 remains a dormant numerical candidate. Future reconsideration must beat
 this compact baseline on E2E latency, peak memory, steady throughput,
 capacity/active ratio, exactness, and concurrency together; eliminating D2H is
 not an independent acceptance criterion.
+
+Final stable-recovery implementation, package, validation, and known-debt
+evidence is recorded in
+[`phase13-adr032-stable-recovery-final-report.md`](../audit/phase13-adr032-stable-recovery-final-report.md).

@@ -1,12 +1,13 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
-**状态：** STABLE RECOVERY IN PROGRESS（2026-07-21）；ADR-032 已接受并选择恢复
+**状态：** STABLE RECOVERY COMPLETE（2026-07-21）；ADR-032 已接受并选择恢复
 `e7d82d2` 的 `O(K)` compact production boundary。ADR-029 已因 Munich E2E/显存/吞吐
 回归被 production supersede，仅保留 caller-free 实验；ADR-031 为 Proposed 且不进入公开
 API/production caller；ADR-030 reducer 保持 dormant，live activation deferred。Phase 8B、
 Phase 10A/10B、Phase 11A/11B、RayD legacy extern-C 删除和稳定 integration 命名保持完成，
-不回退已接受的 owner migration。Phase 12 当前只做最小稳定恢复、clean-checkout
-nightly/release、wheel/fingerprint 与 compact-baseline 性能验收，不再开发新的大功能。
+不回退已接受的 owner migration。Phase 12 已完成最小稳定恢复、nightly/release、
+wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
+`docs/dev/audit/phase13-adr032-stable-recovery-final-report.md`，未开发新的大功能。
 
 **计划日期：** 2026-07-18
 
@@ -797,7 +798,7 @@ move-only 实现已将 duplication 从 Phase 10A 的 11.913070% 降至 11.170566
 
 ### Phase 11 — Release、packaging 与旧 RayD API退役
 
-**实现状态：治理与文档收口完成（2026-07-20）；最终 release evidence 待完成。** RayD
+**实现状态：COMPLETE（2026-07-21）。** RayD
 legacy extern-C API 已经 consumer/reachability 审计并删除；stable typed boundary 使用
 `rayd/torch/integration.h` 与 `rayd.torch.integration`，numeric API version 2 独立校验且没有
 version-suffixed compatibility alias。Phase 11A 仅在
@@ -819,18 +820,17 @@ saved-tensor 顺序、output schema、kernel launch/reduction/RNG 与数值保�
 全部分类，0 stale、0 unclassified。证据见
 `docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json`。
 
-Phase 11 live governance 已同步 FEATURE_LIST、migration docs、203-symbol binding/coverage
-manifests、current-owner delta、final RayD lock 与三个 CUDA workflows；历史 Phase
-6/8/10/11A/11B evidence 保持不可变。当前已验证项和诚实的 pending 边界记录在
-`docs/dev/audit/phase13-phase11-release-acceptance.json`。仍未完成、不得提前宣称通过的仅有：
-
-1. 最终 clean-checkout `nightly`；
-2. 最终 clean-checkout `release`；
-3. 对最终提交重新生成并保存 wheel、PE/DSO、build fingerprint 和 Phase 12 性能证据。
+Phase 11 live governance 已同步 FEATURE_LIST、migration docs、binding/coverage manifests、
+current-owner delta、final RayD lock 与三个 CUDA workflows；历史 Phase 6/8/10/11A/11B
+evidence 保持不可变。`docs/dev/audit/phase13-phase11-release-acceptance.json` 仍是其原始
+Phase 11 boundary 的不可变 pending 快照，不回写后续事实。ADR-032 stable recovery 已在独立
+工作树完成 nightly gate 组合、full release performance、全架构 wheel、隔离加载、PE/DSO、
+build fingerprint 和 RayD lock identity 验收；后续事实由
+`docs/dev/audit/phase13-adr032-stable-recovery-final-report.md` 接续。
 
 ### Phase 12 — Profiling-driven 性能收口
 
-**实现状态：STABLE RECOVERY IN PROGRESS（2026-07-21）。** Phase 12 不再以“绝对无
+**实现状态：STABLE RECOVERY COMPLETE（2026-07-21）。** Phase 12 不再以“绝对无
 D2H”为目标。ADR-032 接受唯一、明确且可审计的 compact count D2H/sync boundary，恢复
 `e7d82d2` 的 `O(K)` production caller；ADR-029 已 production superseded，ADR-031 保持
 Proposed 且无公开 API/caller，ADR-030 reducer 保持 dormant。禁止在本阶段开发 GPU tiled
@@ -848,7 +848,9 @@ reserved 19,727,908,864 bytes 已超过 17,094,475,776-byte physical device。C 
 [ADR-032](../standards/adr-032-controlled-compact-cardinality-boundary.md)。
 
 A 每 solve 的 reflection compact boundary 只有 6 次 4-byte D2H，共 24 bytes；Nsight 中 copy
-API 与紧随其后的同步约 0.152 ms。另一个约 5.162 ms wait 属于既有 Thrust scan，不得错误
+API 与紧随其后的同步约 0.152 ms。它不是 whole-solve 总量：同一 A solve 的完整 Nsight
+盘点约为 66 次/282 bytes D2H，以及 125 次 stream sync、CPU API 累计约 18.830 ms；其中含
+metadata 和历史 structural boundary。另一个约 5.162 ms wait 属于既有 Thrust scan，不得错误
 归因给这 24 bytes。B/C 虽消除 count copy，却让 B/C peak memory 分别成为 A 的 16.663x/
 10.893x，并让 latency 成为 15.189x/3.407x。任何后续局部优化必须先说明 E2E、peak、steady
 throughput、capacity/active、exactness 与可并发 headroom，不能只报告 copy/launch 减少。
@@ -863,7 +865,11 @@ allocation 或 CUDA failure 都不得返回 partial/silent-truncated result。
 实施只允许四个小阶段：R1 治理状态与证据；R2 从 compact base 原子恢复 production caller 与
 公开 schema；R3 manifests/snapshot/migration/no-fallback 同步；R4 quick/cuda/nightly/release、
 wheel/fingerprint 与 Munich final acceptance。每阶段独立 commit。失败即停止并修复稳定恢复
-本身，不以新架构或大规模优化扩大 Plan 13。
+本身，不以新架构或大规模优化扩大 Plan 13。R1-R4 已完成；当前 HEAD Munich 复核为
+`N=4,552,704`、`P=1,024`、`K=2,629`、median 52.235 ms、18.877 solve/s、cold peak
+1,071,486,464 bytes，24 个 logical path fields 与冻结 A 相同。full Phase-E 共 385 个 release
+checks 全部通过。BDPT 相对旧 Channel 的独立 steady-state 对比仍只有 0.160x-0.179x，作为
+既有性能债保留，不以 cold-start 或绝对 latency gate 掩盖。
 
 ## 9. 跨仓 PR/提交顺序
 
