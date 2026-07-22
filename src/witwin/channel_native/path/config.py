@@ -57,35 +57,6 @@ def _validate_isb_boundary_taper(width: float) -> None:
         raise ValueError("isb_boundary_taper_width must be in (0, 4]")
 
 
-def _validate_capacity_config(
-    *,
-    path_capacity_per_pair: int | None,
-    diffraction_state_capacity: int | None,
-    max_paths: int | None,
-) -> None:
-    """Validate the ADR-029 host-known capacity fields."""
-
-    for name, value in (
-        ("path_capacity_per_pair", path_capacity_per_pair),
-        ("diffraction_state_capacity", diffraction_state_capacity),
-    ):
-        if value is None:
-            continue
-        if type(value) is not int:
-            raise ValueError(f"{name} must be an integer when set")
-        if value < 0:
-            raise ValueError(f"{name} must be non-negative when set")
-    if (
-        max_paths is not None
-        and path_capacity_per_pair is not None
-        and max_paths > path_capacity_per_pair
-    ):
-        raise ValueError(
-            "max_paths cannot exceed path_capacity_per_pair when "
-            "max_paths_scope='per_pair'"
-        )
-
-
 @dataclass(frozen=True, slots=True)
 class Config:
     max_depth: int = 1
@@ -125,12 +96,6 @@ class Config:
     # projection-validated optimum is 0.5 (artifacts/isb-taper/report.json).
     isb_boundary_taper: bool = False
     isb_boundary_taper_width: float = 0.5
-    # ADR-029 host-known capacity contracts. None remains constructible during
-    # staged activation; solve rejects it when the corresponding capacity is
-    # required. Capacity is not a path-selection/truncation policy.
-    path_capacity_per_pair: int | None = None
-    diffraction_state_capacity: int | None = None
-
     def __post_init__(self) -> None:
         if self.max_depth < 0:
             raise ValueError("max_depth must be non-negative")
@@ -165,11 +130,6 @@ class Config:
             raise ValueError("max_paths must be positive when set")
         if self.max_paths_scope not in _VALID_MAX_PATHS_SCOPES:
             raise ValueError("path max_paths_scope must be 'per_pair'")
-        _validate_capacity_config(
-            path_capacity_per_pair=self.path_capacity_per_pair,
-            diffraction_state_capacity=self.diffraction_state_capacity,
-            max_paths=self.max_paths,
-        )
         if self.coupled_candidate_limit <= 0:
             raise ValueError("coupled_candidate_limit must be positive")
         if self.coupled_candidate_limit > _MAX_COUPLED_CANDIDATES:

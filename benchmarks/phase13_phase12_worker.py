@@ -181,7 +181,7 @@ def _target(group: str, munich_xml: Path, sionna_root: Path) -> Callable[[], obj
         scene = _wall_scene()
         config = DeterministicConfig(
             max_depth=2, components={"transmission"},
-            export_paths=True, path_capacity_per_pair=16,
+            export_paths=True,
         )
         return lambda: solve_deterministic(scene, config)
     if group == "montecarlo_penetration":
@@ -195,7 +195,6 @@ def _target(group: str, munich_xml: Path, sionna_root: Path) -> Callable[[], obj
     config = DeterministicConfig(
         max_depth=1, max_diffraction_order=1, components={"diffraction"},
         coherent=True, return_field=True, export_paths=True,
-        path_capacity_per_pair=64, diffraction_state_capacity=8192,
     )
     return lambda: solve_deterministic(scene, config)
 
@@ -264,14 +263,12 @@ def _time_workload(
 def _non_target_workloads() -> dict[str, Callable[[], object]]:
     point = _wall_scene(point_receiver=True)
     wedge = _wedge_scene()
-    point_config = DeterministicConfig(
-        components={"los"}, path_capacity_per_pair=4
-    )
+    point_config = DeterministicConfig(components={"los"})
     path_config = PathConfig(
-        components={"los", "reflection"}, max_depth=1, path_capacity_per_pair=32
+        components={"los", "reflection"}, max_depth=1
     )
     deterministic_config = DeterministicConfig(
-        components={"los", "reflection"}, max_depth=1, path_capacity_per_pair=32
+        components={"los", "reflection"}, max_depth=1
     )
     bdpt_config = BDPTConfig(
         samples=1024, seed=13027, max_depth=1, components={"los", "reflection"}

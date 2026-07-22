@@ -11,8 +11,6 @@ def test_path_config_defaults_are_explicit():
     assert config.components == frozenset({"los", "reflection", "diffraction"})
     assert config.max_paths is None
     assert config.max_paths_scope == "per_pair"
-    assert config.path_capacity_per_pair is None
-    assert config.diffraction_state_capacity is None
     assert config.coupled_candidate_limit == 1_000_000
     assert config.ad_mode == "none"
     # ISB boundary taper (ADR-017) is DEFAULT-OFF with the projection-validated
@@ -54,31 +52,17 @@ def test_path_config_validates_inputs():
     assert Config(ad_mode="jvp").ad_mode == "jvp"
 
 
-def test_path_config_validates_explicit_capacity_fields():
-    config = Config(path_capacity_per_pair=0, diffraction_state_capacity=0)
-
-    assert config.path_capacity_per_pair == 0
-    assert config.diffraction_state_capacity == 0
-
-    with pytest.raises(ValueError, match="path_capacity_per_pair must be non-negative"):
-        Config(path_capacity_per_pair=-1)
-    with pytest.raises(
-        ValueError, match="diffraction_state_capacity must be non-negative"
-    ):
-        Config(diffraction_state_capacity=-1)
-    with pytest.raises(
-        ValueError, match="max_paths cannot exceed path_capacity_per_pair"
-    ):
-        Config(max_paths=3, path_capacity_per_pair=2)
-
-
 @pytest.mark.parametrize(
-    "field", ("path_capacity_per_pair", "diffraction_state_capacity")
+    "field",
+    (
+        "path_capacity_per_pair",
+        "diffraction_state_capacity",
+        "reflection_candidate_capacity_per_pair",
+    ),
 )
-@pytest.mark.parametrize("value", (1.5, float("nan"), True, False))
-def test_path_config_rejects_non_integer_capacity(field, value):
-    with pytest.raises(ValueError, match=rf"{field} must be an integer"):
-        Config(**{field: value})
+def test_path_config_rejects_retired_capacity_fields(field):
+    with pytest.raises(TypeError, match=rf"unexpected keyword argument '{field}'"):
+        Config(**{field: 1})
 
 
 def test_path_config_rejects_invalid_coupled_requests_before_solve():
