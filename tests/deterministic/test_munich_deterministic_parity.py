@@ -78,7 +78,10 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     # finite-edge truncation lift the median diffraction delta to ~3.1 dB (was
     # < 2.0 before the continuity fixes).
     assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 4.0
-    assert saved["native"]["metadata"]["kernel"]["launch_count"] <= 12
+    # ADR-032 restores the measured O(K) compact route. Its launch count is
+    # frozen exactly here; E2E latency, memory, throughput, and exactness remain
+    # the performance gates rather than treating a lower launch count as a win.
+    assert saved["native"]["metadata"]["kernel"]["launch_count"] == 23
     # Gross-regression guardrail, not an A/B race: on this 32x32 scene the
     # native and legacy-oracle times are both ~25 ms and dominated by launch
     # overhead, and the F5 finite-edge mend legitimately adds ~2 ms of
@@ -131,9 +134,11 @@ def test_munich_benchmark_defaults_to_stage8_depth_two():
     assert captured["argv"][warmup_index] == "1"
 
 
-@pytest.mark.parametrize("max_depth", [1, 2, 3])
+@pytest.mark.parametrize(
+    ("max_depth", "expected_launch_count"), ((1, 20), (2, 23), (3, 25))
+)
 def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
-    max_depth,
+    max_depth, expected_launch_count
 ):
     if not torch.cuda.is_available():
         pytest.skip(
@@ -167,9 +172,9 @@ def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
     assert result.diagnostics["path_planning"]["guardrail_count"] == 0
     assert result.diagnostics["path_planning"]["candidate_count"] < 200_000
     # Diffraction chunks receivers to bound the rx x edge-state workspace
-    # (audit P-2), trading a handful of extra launches for city-scale memory
-    # safety; the bound still guards against per-pair launch storms (P-4).
-    assert result.diagnostics["native_launch_count"] <= 24
+    # (audit P-2). Freeze the stable compact route exactly so either an added
+    # launch or an unreviewed fusion change is visible.
+    assert result.diagnostics["native_launch_count"] == expected_launch_count
 
 
 def test_original_munich_worker_timeout_returns_unavailable(monkeypatch):
