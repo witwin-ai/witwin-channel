@@ -108,15 +108,31 @@ def test_rayd_lock_is_machine_readable_and_complete():
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
 
     assert lock == {
-        "schema_version": 1,
+        "schema_version": 2,
         "repository_url": "https://github.com/Asixa/RayD.git",
-        "commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+        "commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
         "integration_abi": {
             "kind": "source-header-sha256",
             "path": "backends/torch/include/rayd/torch/integration.h",
             "sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+            "api_version": 6,
+            "identity": "rayd.torch.integration",
+        },
+        "source_bundle": {
+            "distribution": "rayd-torch",
+            "distribution_version": "0.6.0",
+            "metadata_path": "rayd/torch/_source/rayd-source.json",
+            "manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
         },
     }
+
+
+def test_invalid_explicit_rayd_source_never_falls_back_to_package(tmp_path: Path):
+    configured = _configure(tmp_path / "missing", tmp_path / "build")
+
+    output = configured.stdout + configured.stderr
+    assert configured.returncode != 0, output
+    assert "package discovery is not a fallback" in output
 
 
 def test_cmake_accepts_the_locked_rayd_checkout(tmp_path: Path):
@@ -126,7 +142,10 @@ def test_cmake_accepts_the_locked_rayd_checkout(tmp_path: Path):
     configured = _configure(rayd, tmp_path / "build")
 
     assert configured.returncode == 0, configured.stdout + configured.stderr
-    assert f"Validated locked RayD checkout {lock['commit']}" in configured.stdout
+    assert (
+        f"Validated locked RayD git-checkout source {lock['commit']}"
+        in configured.stdout
+    )
     assert (
         "Channel Native CUDA architectures: "
         "75-real;80-real;86-real;89-real;120-real;120-virtual"

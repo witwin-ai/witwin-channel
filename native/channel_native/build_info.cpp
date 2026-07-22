@@ -49,6 +49,8 @@ pybind11::dict cn_build_info() {
     info["rayd_integration_abi_kind"] = CHANNEL_NATIVE_RAYD_INTEGRATION_ABI_KIND;
     info["rayd_integration_abi_path"] = CHANNEL_NATIVE_RAYD_INTEGRATION_ABI_PATH;
     info["rayd_integration_abi_sha256"] = CHANNEL_NATIVE_RAYD_INTEGRATION_ABI_SHA256;
+    info["rayd_source_kind"] = CHANNEL_NATIVE_RAYD_SOURCE_KIND;
+    info["rayd_source_manifest_sha256"] = CHANNEL_NATIVE_RAYD_SOURCE_MANIFEST_SHA256;
     info["torch_version"] = CHANNEL_NATIVE_TORCH_VERSION;
     info["cuda_version"] = CHANNEL_NATIVE_CUDA_VERSION;
     info["cuda_compiler_version"] = CHANNEL_NATIVE_CUDA_COMPILER_VERSION;

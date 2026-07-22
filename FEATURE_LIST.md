@@ -14,10 +14,15 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel_native` is the single production extension. It source-links RayD
-  `474c122aa3cd6b6d098675e076a73e6f485bd6be` and calls the typed
+  `402262d3b0c07dffb9d51d1852abb97ab2280f2f` and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
   legacy `extern "C"` Torch integration entry points are retired.
+- Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
+  may use the active Python environment's unique `rayd-torch 0.6.0` passive
+  source bundle after lock/RECORD/full-manifest verification. No conda-prefix,
+  site-packages, or global CMake scan is performed. `build_info` reports only
+  the source kind and manifest SHA, never a machine-specific source path.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
   handles and the former bridge/common indirection are removed. RayD-owned ABI
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.

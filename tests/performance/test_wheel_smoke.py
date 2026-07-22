@@ -364,6 +364,8 @@ def _build_info() -> dict[str, object]:
         "rayd_integration_abi_path": integration["path"],
         "rayd_integration_abi_sha256": integration["sha256"],
         "rayd_repository_url": lock["repository_url"],
+        "rayd_source_kind": "git-checkout",
+        "rayd_source_manifest_sha256": lock["source_bundle"]["manifest_sha256"],
         "torch_version": "2.10.0",
         "uses_dr_jit": False,
         "uses_path_native": True,
@@ -404,6 +406,9 @@ def _expected_build_identity(build_info: dict[str, object]) -> dict[str, object]
         "rayd_integration_abi_path": build_info["rayd_integration_abi_path"],
         "rayd_integration_abi_sha256": build_info["rayd_integration_abi_sha256"],
         "rayd_repository_url": build_info["rayd_repository_url"],
+        "rayd_source_manifest_sha256": build_info[
+            "rayd_source_manifest_sha256"
+        ],
     }
 
 

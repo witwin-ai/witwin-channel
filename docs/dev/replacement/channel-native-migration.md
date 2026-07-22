@@ -573,3 +573,27 @@ AD family, CUDA Graph, or other large feature is included in this recovery.
 Such work requires a future separately accepted ADR and evidence that improves
 E2E latency, peak memory, throughput, capacity utilization, exactness, and
 concurrency together.
+
+### 2026-07-22: validated RayD package source discovery
+
+RayD `402262d3b0c07dffb9d51d1852abb97ab2280f2f` changes packaging only: the
+stable integration header remains API 6 with SHA-256
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`, and no
+geometry/RF source, owner, launch, numerical order, solver API, or result schema
+changes. The `rayd-torch 0.6.0` wheel now carries a passive relocatable source
+bundle plus the full manifest SHA
+`9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800`.
+
+Channel lock schema 2 resolves a valid explicit `RAYD_SOURCE_DIR` first. With no
+explicit path, it asks only the selected Python interpreter for the unique
+`rayd-torch` distribution and validates its fixed metadata, RECORD ownership,
+commit/repository/API/header and every manifest file before source-linking.
+Invalid explicit paths, missing/duplicate packages and any metadata/path/source
+drift fail without fallback. No `CONDA_PREFIX`, site-packages, or global CMake
+search is used, and `rayd.torch` is not imported.
+
+`build_info` and the complete fingerprint add `rayd_source_kind` and
+`rayd_source_manifest_sha256`; they do not record a machine-specific absolute
+path. Local all-architecture recompilation is intentionally deferred to the
+updated CUDA/nightly/release GitHub Actions. Historical Munich/ADR-032 evidence
+remains bound to RayD `474c122` and is not rewritten by this packaging change.

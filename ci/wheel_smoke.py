@@ -64,6 +64,8 @@ _BUILD_INFO_KEYS = frozenset(
         "rayd_integration_abi_path",
         "rayd_integration_abi_sha256",
         "rayd_repository_url",
+        "rayd_source_kind",
+        "rayd_source_manifest_sha256",
         "torch_version",
         "uses_dr_jit",
         "uses_path_native",
@@ -226,22 +228,43 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
         raise ValueError(f"{label} is not strict UTF-8 JSON") from exc
     lock = _exact_keys(
         lock,
-        frozenset({"commit", "integration_abi", "repository_url", "schema_version"}),
+        frozenset(
+            {
+                "commit",
+                "integration_abi",
+                "repository_url",
+                "schema_version",
+                "source_bundle",
+            }
+        ),
         label=label,
     )
     integration = _exact_keys(
         lock["integration_abi"],
-        frozenset({"kind", "path", "sha256"}),
+        frozenset({"api_version", "identity", "kind", "path", "sha256"}),
         label=f"{label} integration ABI",
     )
-    if type(lock["schema_version"]) is not int or lock["schema_version"] != 1:
-        raise ValueError(f"{label} schema_version must be integer 1")
+    source_bundle = _exact_keys(
+        lock["source_bundle"],
+        frozenset(
+            {
+                "distribution",
+                "distribution_version",
+                "manifest_sha256",
+                "metadata_path",
+            }
+        ),
+        label=f"{label} source bundle",
+    )
+    if type(lock["schema_version"]) is not int or lock["schema_version"] != 2:
+        raise ValueError(f"{label} schema_version must be integer 2")
     strings = {
         "rayd_commit": lock["commit"],
         "rayd_repository_url": lock["repository_url"],
         "rayd_integration_abi_kind": integration["kind"],
         "rayd_integration_abi_path": integration["path"],
         "rayd_integration_abi_sha256": integration["sha256"],
+        "rayd_source_manifest_sha256": source_bundle["manifest_sha256"],
     }
     if any(type(value) is not str or not value for value in strings.values()):
         raise ValueError(f"{label} identity fields must be non-empty strings")
@@ -249,6 +272,8 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
         raise ValueError(f"{label} commit must be a Git SHA")
     if _SHA256_PATTERN.fullmatch(str(strings["rayd_integration_abi_sha256"])) is None:
         raise ValueError(f"{label} integration ABI must be a SHA-256")
+    if _SHA256_PATTERN.fullmatch(str(strings["rayd_source_manifest_sha256"])) is None:
+        raise ValueError(f"{label} source manifest must be a SHA-256")
     return {name: str(value) for name, value in strings.items()}
 
 
@@ -564,6 +589,10 @@ def _validate_build_info(value: object) -> dict[str, object]:
         raise ValueError("isolated wheel smoke RayD Git identity is invalid")
     if _SHA256_PATTERN.fullmatch(str(info["rayd_integration_abi_sha256"])) is None:
         raise ValueError("isolated wheel smoke RayD ABI identity is invalid")
+    if info["rayd_source_kind"] not in {"git-checkout", "python-package"}:
+        raise ValueError("isolated wheel smoke RayD source kind is invalid")
+    if _SHA256_PATTERN.fullmatch(str(info["rayd_source_manifest_sha256"])) is None:
+        raise ValueError("isolated wheel smoke RayD source manifest is invalid")
     if _SHA256_PATTERN.fullmatch(str(info["build_fingerprint"])) is None:
         raise ValueError("isolated wheel smoke build fingerprint is invalid")
     return info

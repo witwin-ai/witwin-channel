@@ -121,6 +121,16 @@ requires them.
   directly; do not build/import a RayD Python extension, add a second
   dispatcher/registry, or route through copied `extern "C"` signatures,
   function-pointer getters, compatibility shims, or dynamic symbol lookup.
+- RayD build-source discovery is explicit and fail-loud. A non-empty
+  `RAYD_SOURCE_DIR` is authoritative and retains Git commit/remote/dirty/ABI
+  validation; an invalid explicit path never falls back. Without it, CMake may
+  use only the selected Python interpreter's unique `rayd-torch` distribution,
+  locate its passive `rayd/torch/_source/rayd-source.json`, and validate the
+  lock-pinned commit, repository, API/identity/header, RECORD ownership, and
+  complete per-file source-manifest digest before `add_subdirectory`. Never
+  import `rayd.torch`, scan `CONDA_PREFIX`/site-packages/CMake registries, trust
+  self-reported package identity without the full manifest, or record an
+  absolute source path in the build fingerprint.
 - The stable public typed boundary is `rayd/torch/integration.h` with identity
   `rayd.torch.integration`. Validate its numeric API version independently; do
   not encode version or capability growth in a WIP filename, target, identity,

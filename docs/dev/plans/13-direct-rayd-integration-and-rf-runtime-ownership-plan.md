@@ -12,6 +12,13 @@ wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
 仍不能整体标记完成：Phase 6C 原始 P→E 与 E→M 独立 comparative E2E/resource gate 尚无
 可审计证据；这项开放项不得由 Phase 12 compact 恢复数据替代或通过放宽阈值关闭。
 
+2026-07-22 packaging follow-up 将当前 RayD lock 前进到非数值打包提交
+`402262d3b0c07dffb9d51d1852abb97ab2280f2f`。显式 `RAYD_SOURCE_DIR` 仍具有最高优先级；
+未提供时，仅允许所选 Python 环境中唯一 `rayd-torch 0.6.0` 的 passive source bundle，且
+必须先完成 RECORD 与 lock-pinned full-source manifest 复验。本地全架构重编译明确延期，由
+已更新的 CUDA/nightly/release GitHub Actions 承担 publication gate；这不修改或替代绑定
+RayD `474c122` 的历史 Munich 数值证据。
+
 **计划日期：** 2026-07-18
 
 **子代理审计更新：** 2026-07-19（补入 transmission、diffraction family matrix、shared RF
@@ -836,6 +843,16 @@ Phase 11 boundary 的不可变 pending 快照，不回写后续事实。ADR-032 
 工作树完成 nightly gate 组合、full release performance、全架构 wheel、隔离加载、PE/DSO、
 build fingerprint 和 RayD lock identity 验收；后续事实由
 `docs/dev/audit/phase13-adr032-stable-recovery-final-report.md` 接续。
+
+Phase 11 packaging follow-up（2026-07-22）保留同一 source-linked native graph，未导出
+跨 compiler/Torch/CUDA/SM 的预编译 RayD static target。RayD `402262d` 在
+`rayd-torch` wheel 中安装固定 passive metadata 和完整逐文件 source manifest；Channel
+lock schema 2 同时钉住 commit、remote、API/identity/header SHA 与 full-source manifest SHA。
+解析顺序固定为 valid explicit checkout → selected Python 的唯一 distribution → fail-loud；
+invalid explicit、missing/duplicate package、path escape、dirty metadata、RECORD 非所有权和
+任一 source mutation 均不得 fallback。`build_info`/fingerprint 新增 source kind 与 manifest
+SHA，不记录绝对路径。本轮只执行 single-package/validate-only 与静态/quick 验收；新 lock 的
+全架构 wheel/PE 发布留给已更新 GitHub Actions，不回写历史 release evidence。
 
 ### Phase 12 — Profiling-driven 性能收口
 

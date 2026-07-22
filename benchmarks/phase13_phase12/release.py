@@ -52,6 +52,8 @@ _FINGERPRINT_FIELDS = (
     "rayd_integration_abi_kind",
     "rayd_integration_abi_path",
     "rayd_repository_url",
+    "rayd_source_kind",
+    "rayd_source_manifest_sha256",
     "torch_version",
 )
 

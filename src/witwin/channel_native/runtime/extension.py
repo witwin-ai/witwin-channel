@@ -51,6 +51,8 @@ _FINGERPRINT_FIELDS = (
     "rayd_integration_abi_kind",
     "rayd_integration_abi_path",
     "rayd_repository_url",
+    "rayd_source_kind",
+    "rayd_source_manifest_sha256",
     "torch_version",
 )
 
@@ -169,6 +171,20 @@ def _expected_fingerprint(info: Mapping[str, object]) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def _locked_rayd_source_manifest(
+    info: Mapping[str, object], lock: Mapping[str, object]
+) -> object:
+    source_manifest = str(info["rayd_source_manifest_sha256"])
+    if _SHA256_PATTERN.fullmatch(source_manifest) is None:
+        raise ExtensionABIError("RayD source manifest must be a SHA-256 digest")
+    if info["rayd_source_kind"] not in {"git-checkout", "python-package"}:
+        raise ExtensionABIError("RayD source kind is not recognized")
+    source_bundle = lock.get("source_bundle")
+    if not isinstance(source_bundle, Mapping):
+        raise ExtensionABIError("the RayD identity lock has no source bundle object")
+    return source_bundle.get("manifest_sha256")
+
+
 def _validate_build_info(raw_info: object) -> dict[str, object]:
     if not isinstance(raw_info, Mapping):
         raise ExtensionABIError("_channel_native.build_info() must return a mapping")
@@ -187,6 +203,8 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
         "rayd_integration_abi_kind",
         "rayd_integration_abi_path",
         "rayd_repository_url",
+        "rayd_source_kind",
+        "rayd_source_manifest_sha256",
         "torch_version",
         "build_type",
         "build_fingerprint",
@@ -233,7 +251,6 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
     rayd_abi = str(info["rayd_integration_abi_sha256"])
     if _SHA256_PATTERN.fullmatch(rayd_abi) is None:
         raise ExtensionABIError("RayD integration ABI must be a SHA-256 digest")
-
     lock = _load_rayd_lock()
     integration_abi = lock.get("integration_abi")
     if not isinstance(integration_abi, Mapping):
@@ -244,6 +261,7 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
         "rayd_integration_abi_kind": integration_abi.get("kind"),
         "rayd_integration_abi_path": integration_abi.get("path"),
         "rayd_integration_abi_sha256": integration_abi.get("sha256"),
+        "rayd_source_manifest_sha256": _locked_rayd_source_manifest(info, lock),
     }
     mismatched_lock_fields = [
         name for name, expected in locked_values.items() if info[name] != expected

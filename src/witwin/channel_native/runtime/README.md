@@ -52,6 +52,12 @@ also exposes internal loader/symbol APIs for domain facades; these are not root
 public promises. `runtime.native_resources._rayd_scene_resource` is the unique
 owner and scene/core modules compatibility-re-export the same object.
 
+Build-time RayD source selection is not a runtime backend choice. The compiled
+identity records `rayd_source_kind` and the lock-pinned full-source manifest
+SHA, but never the source's absolute path. Explicit Git checkout and validated
+`rayd-torch` package source both produce the same single `_channel_native`
+runtime boundary; package discovery does not import or dispatch through RayD.
+
 ## Dependency rules
 
 Runtime code may depend on the standard library and the supported Torch runtime

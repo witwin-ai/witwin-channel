@@ -20,7 +20,7 @@
         }
     },
     "current_phase": 12,
-    "current_subphase": "ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
+    "current_subphase": "validated RayD package-source discovery implemented; ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
     "transfers_applied": [
         {
             "phase": 3,
@@ -1302,5 +1302,22 @@
         "foundation_resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json",
         "stable_recovery_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
         "comparative_evidence_open": true
+    },
+    "rayd_package_source_discovery": {
+        "status": "implemented and validate-only accepted; all-architecture publication delegated to GitHub Actions",
+        "rayd_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+        "distribution": "rayd-torch==0.6.0",
+        "metadata_path": "rayd/torch/_source/rayd-source.json",
+        "source_manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
+        "source_resolution": "explicit valid Git checkout first; otherwise the selected Python interpreter's unique lock-valid distribution; no prefix or global CMake scan",
+        "build_identity_delta": [
+            "rayd_source_kind",
+            "rayd_source_manifest_sha256"
+        ],
+        "native_owner_changed": false,
+        "numerical_code_changed": false,
+        "public_solver_api_changed": false,
+        "historical_munich_evidence_mutated": false,
+        "full_architecture_local_build_deferred": true
     }
 }

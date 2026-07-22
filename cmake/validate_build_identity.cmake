@@ -6,6 +6,7 @@ foreach(required_variable IN ITEMS
         CHANNEL_NATIVE_EXPECTED_GIT_SHA
         CHANNEL_NATIVE_EXPECTED_GIT_DIRTY
         CHANNEL_NATIVE_RAYD_SOURCE_DIR
+        CHANNEL_NATIVE_RAYD_SOURCE_KIND
         CHANNEL_NATIVE_EXPECTED_RAYD_SHA
         CHANNEL_NATIVE_EXPECTED_RAYD_DIRTY
         CHANNEL_NATIVE_EXPECTED_RAYD_REMOTE
@@ -13,6 +14,8 @@ foreach(required_variable IN ITEMS
         CHANNEL_NATIVE_EXPECTED_RAYD_ABI_SHA256
         CHANNEL_NATIVE_RAYD_LOCK_FILE
         CHANNEL_NATIVE_EXPECTED_RAYD_LOCK_SHA256
+        CHANNEL_NATIVE_PYTHON_EXECUTABLE
+        CHANNEL_NATIVE_RAYD_RESOLVER
         CHANNEL_NATIVE_RELEASE_BUILD)
     if(NOT DEFINED ${required_variable})
         message(FATAL_ERROR "Build identity validation is missing ${required_variable}.")
@@ -68,21 +71,38 @@ validate_git_checkout(
     "${CHANNEL_NATIVE_SOURCE_DIR}"
     "${CHANNEL_NATIVE_EXPECTED_GIT_SHA}"
     "${CHANNEL_NATIVE_EXPECTED_GIT_DIRTY}")
-validate_git_checkout(
-    "RayD"
-    "${CHANNEL_NATIVE_RAYD_SOURCE_DIR}"
-    "${CHANNEL_NATIVE_EXPECTED_RAYD_SHA}"
-    "${CHANNEL_NATIVE_EXPECTED_RAYD_DIRTY}")
-
-read_git_value(
-    "${CHANNEL_NATIVE_RAYD_SOURCE_DIR}"
-    actual_rayd_remote
-    remote get-url origin)
-if(NOT actual_rayd_remote STREQUAL CHANNEL_NATIVE_EXPECTED_RAYD_REMOTE)
+if(CHANNEL_NATIVE_RAYD_SOURCE_KIND STREQUAL "git-checkout")
+    validate_git_checkout(
+        "RayD"
+        "${CHANNEL_NATIVE_RAYD_SOURCE_DIR}"
+        "${CHANNEL_NATIVE_EXPECTED_RAYD_SHA}"
+        "${CHANNEL_NATIVE_EXPECTED_RAYD_DIRTY}")
+    read_git_value(
+        "${CHANNEL_NATIVE_RAYD_SOURCE_DIR}"
+        actual_rayd_remote
+        remote get-url origin)
+    if(NOT actual_rayd_remote STREQUAL CHANNEL_NATIVE_EXPECTED_RAYD_REMOTE)
+        message(FATAL_ERROR
+            "RayD origin changed after configure: expected "
+            "'${CHANNEL_NATIVE_EXPECTED_RAYD_REMOTE}', found '${actual_rayd_remote}'; "
+            "rerun CMake configure.")
+    endif()
+elseif(CHANNEL_NATIVE_RAYD_SOURCE_KIND STREQUAL "python-package")
+    execute_process(
+        COMMAND
+            "${CHANNEL_NATIVE_PYTHON_EXECUTABLE}"
+            "${CHANNEL_NATIVE_RAYD_RESOLVER}"
+            --lock "${CHANNEL_NATIVE_RAYD_LOCK_FILE}"
+            --expected-source "${CHANNEL_NATIVE_RAYD_SOURCE_DIR}"
+        RESULT_VARIABLE package_validation_result
+        ERROR_VARIABLE package_validation_error)
+    if(NOT package_validation_result EQUAL 0)
+        message(FATAL_ERROR
+            "RayD package source changed after configure: ${package_validation_error}")
+    endif()
+else()
     message(FATAL_ERROR
-        "RayD origin changed after configure: expected "
-        "'${CHANNEL_NATIVE_EXPECTED_RAYD_REMOTE}', found '${actual_rayd_remote}'; "
-        "rerun CMake configure.")
+        "Unknown RayD source kind '${CHANNEL_NATIVE_RAYD_SOURCE_KIND}'.")
 endif()
 
 file(SHA256 "${CHANNEL_NATIVE_RAYD_ABI_FILE}" actual_rayd_abi_sha256)

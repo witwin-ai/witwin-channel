@@ -42,6 +42,8 @@ def _valid_build_info() -> dict[str, object]:
         "rayd_integration_abi_kind": "source-header-sha256",
         "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration.h",
         "rayd_repository_url": "https://example.invalid/RayD.git",
+        "rayd_source_kind": "git-checkout",
+        "rayd_source_manifest_sha256": "4" * 64,
         "torch_version": "2.10.0",
         "build_type": "Release",
     }
@@ -61,6 +63,7 @@ def _configure_identity_checks(monkeypatch: pytest.MonkeyPatch) -> None:
                 "path": "backends/torch/include/rayd/torch/integration.h",
                 "sha256": "3" * 64,
             },
+            "source_bundle": {"manifest_sha256": "4" * 64},
         },
     )
     monkeypatch.setattr(
@@ -289,7 +292,19 @@ def test_build_info_validates_once_and_returns_fresh_mappings(
 def test_real_rayd_lock_uses_the_canonical_schema():
     lock = extension._load_rayd_lock()
 
-    assert lock["schema_version"] == 1
+    assert lock["schema_version"] == 2
     assert isinstance(lock["repository_url"], str)
     assert len(lock["commit"]) == 40
-    assert set(lock["integration_abi"]) == {"kind", "path", "sha256"}
+    assert set(lock["integration_abi"]) == {
+        "api_version",
+        "identity",
+        "kind",
+        "path",
+        "sha256",
+    }
+    assert set(lock["source_bundle"]) == {
+        "distribution",
+        "distribution_version",
+        "manifest_sha256",
+        "metadata_path",
+    }

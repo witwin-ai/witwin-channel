@@ -1,7 +1,8 @@
 # ADR-023: Direct RayD typed integration and RayDN retirement
 
 - **Status:** Accepted (2026-07-19); typed switch, legacy retirement, and stable
-  integration naming implemented; final release evidence pending
+  integration naming implemented; validated package-source discovery amendment
+  accepted 2026-07-22; new-lock multi-architecture publication delegated to CI
 - **Date:** 2026-07-19
 - **Kind:** Native integration boundary and lifecycle ownership. This ADR does
   not change physics, numerical order, fusion, launch configuration, solver
@@ -141,13 +142,26 @@ same build graph. Normal builds and wheels must not:
 
 - build, package, import, or dynamically load a RayD Python module;
 - ship a second RayD Torch extension or an undeclared RayD DSO;
-- search for a global/stale RayD installation;
+- scan a conda prefix, site-packages tree, global CMake registry, or other
+  uncontrolled location for RayD;
 - create an independent scene registry or load a second copy of the runtime.
+
+An explicit `RAYD_SOURCE_DIR` remains the highest-priority build input and is
+validated as a Git checkout. When it is absent, Channel may locate only the
+selected Python interpreter's unique `rayd-torch` distribution and read its
+passive `rayd/torch/_source/rayd-source.json` resource without importing
+`rayd.torch`. Before source-linking, Channel validates the lock-pinned
+distribution/version, repository, commit, stable API/identity/header,
+distribution RECORD ownership, and every file in the complete source manifest.
+Missing, duplicate, dirty, escaped, or mutated package sources fail loudly.
+This is build-source discovery, not a second runtime backend or dispatcher.
 
 The packaged RayD commit, integration-header hash/version, compiler/CUDA/Torch
 ABI, supported SM set, and relevant build flags are part of Channel's complete
-fingerprint. A developer override remains subject to ADR-006 and must validate
-that full fingerprint; it is not a fallback.
+fingerprint. Source provenance and the lock-pinned full-source manifest digest
+also participate, while machine-specific absolute paths do not. A developer
+override remains subject to ADR-006 and must validate that full fingerprint;
+it is not a fallback.
 
 ### 5. Ownership-aware names and zero Channel shims
 

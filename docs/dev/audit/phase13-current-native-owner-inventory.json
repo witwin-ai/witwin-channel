@@ -33,7 +33,7 @@
     "channel_numerical": 191
   },
   "current_phase": 12,
-  "current_subphase": "ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
+  "current_subphase": "validated RayD package-source discovery implemented; ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
   "phase3_direct_typed_boundary": {
     "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
     "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
@@ -13137,5 +13137,30 @@
     "resource_ledger_scope": "immutable Phase P foundation snapshot",
     "stable_recovery_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
     "comparative_evidence_open": true
+  },
+  "rayd_package_source_discovery": {
+    "status": "implementation and validate-only package acceptance complete; new-lock all-architecture publication delegated to GitHub Actions",
+    "rayd_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+    "repository_url": "https://github.com/Asixa/RayD.git",
+    "distribution": "rayd-torch==0.6.0",
+    "metadata_path": "rayd/torch/_source/rayd-source.json",
+    "source_manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "integration_api_version": 6,
+    "integration_identity": "rayd.torch.integration",
+    "resolution_order": [
+      "valid explicit RAYD_SOURCE_DIR git checkout",
+      "selected Python interpreter unique lock-valid rayd-torch distribution",
+      "fail loudly"
+    ],
+    "native_owner_changed": false,
+    "numerical_code_changed": false,
+    "public_solver_api_changed": false,
+    "build_info_delta": [
+      "rayd_source_kind",
+      "rayd_source_manifest_sha256"
+    ],
+    "absolute_source_path_in_fingerprint": false,
+    "full_architecture_local_build_deferred": true
   }
 }

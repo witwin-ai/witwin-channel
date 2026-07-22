@@ -20,7 +20,7 @@ def test_build_info_contract():
     assert len(info["channel_native_git_sha"]) == 40
     assert isinstance(info["channel_native_git_dirty"], bool)
     assert info["rayd_repository_url"] == "https://github.com/Asixa/RayD.git"
-    assert info["rayd_commit"] == "474c122aa3cd6b6d098675e076a73e6f485bd6be"
+    assert info["rayd_commit"] == "402262d3b0c07dffb9d51d1852abb97ab2280f2f"
     assert isinstance(info["rayd_dirty"], bool)
     assert info["rayd_integration_abi_kind"] == "source-header-sha256"
     assert (
@@ -30,6 +30,11 @@ def test_build_info_contract():
     assert (
         info["rayd_integration_abi_sha256"]
         == "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14"
+    )
+    assert info["rayd_source_kind"] in {"git-checkout", "python-package"}
+    assert (
+        info["rayd_source_manifest_sha256"]
+        == "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800"
     )
     assert isinstance(info["torch_version"], str) and info["torch_version"]
     assert isinstance(info["cuda_version"], str) and info["cuda_version"]
@@ -70,6 +75,8 @@ def test_build_fingerprint_covers_compiled_identity():
         "rayd_integration_abi_path",
         "rayd_integration_abi_sha256",
         "rayd_repository_url",
+        "rayd_source_kind",
+        "rayd_source_manifest_sha256",
         "torch_version",
     }
     canonical = json.dumps(

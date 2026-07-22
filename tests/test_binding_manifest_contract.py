@@ -86,6 +86,7 @@ def test_native_binding_semantics_match_the_phase_zero_baseline() -> None:
     assert current["duplicate_symbols"] == []
     assert migration["current_phase"] == 12
     assert migration["current_subphase"] == (
+        "validated RayD package-source discovery implemented; "
         "ADR-032 compact stable recovery accepted; "
         "ADR-027 comparative evidence closure open"
     )

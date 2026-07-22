@@ -80,6 +80,8 @@ def _multiarch_build_info() -> dict[str, object]:
             "backends/torch/include/rayd/torch/integration.h"
         ),
         "rayd_repository_url": "https://github.com/Asixa/RayD.git",
+        "rayd_source_kind": "git-checkout",
+        "rayd_source_manifest_sha256": "4" * 64,
         "torch_version": "2.10.0",
     }
     info["build_fingerprint"] = _build_fingerprint(info)
