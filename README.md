@@ -80,9 +80,11 @@ $env:CMAKE_ARGS = "-DRAYD_SOURCE_DIR=E:/Code/RayD"
 python -m pip install . --no-build-isolation --no-deps
 ```
 
-When `RAYD_SOURCE_DIR` is omitted, the build may use the unique locked
-`rayd-torch` source bundle exposed by the active Python environment. Discovery
-is limited to package metadata; it does not scan a Conda prefix or load an
+When `RAYD_SOURCE_DIR` is omitted, the build may use a unique locked
+`rayd-torch` source bundle only when its package metadata reports a clean,
+matching source tree. The published `rayd-torch` 0.7.0 bundle does not satisfy
+that release guard, so Channel 0.4.0 source builds must set `RAYD_SOURCE_DIR`
+to the locked clean checkout. Discovery never scans a Conda prefix or loads an
 arbitrary global build.
 
 Do not mix files from the 0.3 and 0.4 implementations in one environment.

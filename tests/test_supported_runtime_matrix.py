@@ -33,8 +33,19 @@ def test_supported_runtime_matrix_matches_project_metadata_and_constraints():
     assert runtime["python_spec"] == project["project"]["requires-python"]
     assert f"torch{runtime['torch_spec']}" in project["project"]["dependencies"]
     assert runtime["constraints"] == "constraints/ci-py311-cu128.txt"
+    assert runtime["cuda_toolkit"] == "12.8.1"
     assert runtime["verified_sm"] == [120]
-    assert runtime["declared_unverified_sm"] == [75, 80, 86, 89]
+    assert runtime["declared_unverified_sm"] == [
+        70,
+        75,
+        80,
+        86,
+        87,
+        89,
+        90,
+        100,
+        101,
+    ]
 
     constraints = _constraints()
     assert constraints["torch"] == "2.10.0"

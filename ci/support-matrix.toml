@@ -6,9 +6,9 @@ python_spec = ">=3.11,<3.12"
 torch = "2.10"
 torch_spec = "==2.10.0"
 cuda_runtime = "12.8"
-cuda_toolkit = "12.9"
+cuda_toolkit = "12.8.1"
 constraints = "constraints/ci-py311-cu128.txt"
 verified_sm = [120]
-declared_unverified_sm = [75, 80, 86, 89]
+declared_unverified_sm = [70, 75, 80, 86, 87, 89, 90, 100, 101]
 ptx_forward_compatibility_sm = 120
 evidence = "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/environment.json"

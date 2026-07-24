@@ -116,6 +116,26 @@ set(CHANNEL_TORCH_CUDA_ARCH_LIST "$ENV{TORCH_CUDA_ARCH_LIST}")
 if(CHANNEL_TORCH_CUDA_ARCH_LIST STREQUAL "OFF")
     message(FATAL_ERROR "TORCH_CUDA_ARCH_LIST must not be OFF for Channel.")
 endif()
+set(
+    CHANNEL_CUDA_GENCODE_FLAGS
+    ""
+    CACHE STRING
+    "Optional explicit NVCC gencode flags that share CUDA front-end work.")
+if(DEFINED ENV{CHANNEL_CUDA_GENCODE_FLAGS}
+   AND NOT "$ENV{CHANNEL_CUDA_GENCODE_FLAGS}" STREQUAL "")
+    set(
+        CHANNEL_CUDA_GENCODE_FLAGS
+        "$ENV{CHANNEL_CUDA_GENCODE_FLAGS}"
+        CACHE STRING
+        "Optional explicit NVCC gencode flags that share CUDA front-end work."
+        FORCE)
+endif()
+if(NOT CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
+    separate_arguments(
+        CHANNEL_CUDA_GENCODE_OPTIONS
+        NATIVE_COMMAND
+        "${CHANNEL_CUDA_GENCODE_FLAGS}")
+endif()
 separate_arguments(
     CHANNEL_TORCH_CUDA_ARCH_TOKENS
     NATIVE_COMMAND
@@ -589,9 +609,20 @@ Python_add_library(
     native/channel/montecarlo_basic.cpp
     native/channel/path_solver.cpp
 )
-set_target_properties(
-    _channel
-    PROPERTIES CUDA_ARCHITECTURES "${CHANNEL_CUDA_ARCHITECTURES}")
+if(CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
+    set_target_properties(
+        _channel
+        PROPERTIES CUDA_ARCHITECTURES "${CHANNEL_CUDA_ARCHITECTURES}")
+else()
+    set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)
+    foreach(CHANNEL_CUDA_GENCODE_OPTION IN LISTS CHANNEL_CUDA_GENCODE_OPTIONS)
+        target_compile_options(
+            _channel
+            PRIVATE
+                "$<$<COMPILE_LANGUAGE:CUDA>:${CHANNEL_CUDA_GENCODE_OPTION}>")
+    endforeach()
+    message(STATUS "Channel grouped CUDA gencode flags: ${CHANNEL_CUDA_GENCODE_FLAGS}")
+endif()
 add_dependencies(_channel channel_validate_build_identity)
 if(WIN32)
     # CMake 4.3 may append CMAKE_SHARED_MODULE_SUFFIX after the SOABI suffix,

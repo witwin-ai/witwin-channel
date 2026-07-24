@@ -14,15 +14,17 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `402262d3b0c07dffb9d51d1852abb97ab2280f2f` and calls the typed
+  `49c58c4cb8212f6babb920cc88fb937509826cc5` (`rayd-torch 0.7.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
   legacy `extern "C"` Torch integration entry points are retired.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
-  may use the active Python environment's unique `rayd-torch 0.6.0` passive
-  source bundle after lock/RECORD/full-manifest verification. No conda-prefix,
-  site-packages, or global CMake scan is performed. `build_info` reports only
-  the source kind and manifest SHA, never a machine-specific source path.
+  may use a unique passive `rayd-torch` source bundle only after clean-state,
+  lock, RECORD, and full-manifest verification. The published 0.7.0 bundle
+  reports a dirty source and is therefore rejected; Channel 0.4.0 release
+  builds use the locked clean Git checkout. No conda-prefix, site-packages, or
+  global CMake scan is performed. `build_info` reports only the source kind
+  and manifest SHA, never a machine-specific source path.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
   handles and the former bridge/common indirection are removed. RayD-owned ABI
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
@@ -395,3 +397,10 @@ priority `scattering > diffraction > transmission > reflection > los`.
   free-space carrier, finite-slab Fresnel reflection chain, and Rouard
   transmission stack used as forward-parity and gradient oracles for the
   native AD companion kernels.
+
+## Distribution
+
+- GitHub Actions prebuilds Windows and manylinux_2_28 wheels from the locked,
+  clean RayD 0.7.0 source checkout. Release fatbins include native SM87 SASS
+  alongside the maintained CUDA 12.8 architecture set. Ordinary commits,
+  pull requests, and schedules do not start paid native builds.
