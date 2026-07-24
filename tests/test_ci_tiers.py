@@ -231,6 +231,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "CMAKE_BUILD_PARALLEL_LEVEL: \"2\"" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
+    assert "safe.directory /project/channel" in workflow
+    assert "safe.directory /host${{ github.workspace }}/rayd" in workflow
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "CHANNEL_CUDA_GENCODE_FLAGS" in cmake
     assert "set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)" in cmake

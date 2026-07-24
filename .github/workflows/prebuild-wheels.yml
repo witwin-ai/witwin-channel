@@ -396,6 +396,8 @@ jobs:
             CC=/opt/rh/gcc-toolset-12/root/usr/bin/gcc
             CXX=/opt/rh/gcc-toolset-12/root/usr/bin/g++
           CIBW_BEFORE_BUILD_LINUX: >-
+            git config --global --add safe.directory /project/channel &&
+            git config --global --add safe.directory /host${{ github.workspace }}/rayd &&
             pip install --upgrade pip build twine &&
             pip install "cmake>=4.3,<4.4" "ninja>=1.13,<1.14" "scikit-build-core>=0.12,<0.13" &&
             pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
