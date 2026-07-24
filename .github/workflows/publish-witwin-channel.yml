@@ -228,6 +228,8 @@ jobs:
       - name: Build Windows wheel
         shell: pwsh
         run: |
+          python -m build core --wheel --no-isolation --outdir core/dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $startedAt = Get-Date
           python -m build channel --wheel --no-isolation --outdir channel/dist `
             -Cbuild-dir="$env:RUNNER_TEMP/channel-skbuild"
@@ -249,7 +251,9 @@ jobs:
             $wheel
           python -m twine check $wheel
           python -c "import sys,zipfile; n=zipfile.ZipFile(sys.argv[1]).namelist(); e=[x for x in n if '/_channel' in x and x.endswith('.pyd')]; assert len(e)==1,e; assert not any(x.startswith('rayd/') for x in n), 'RayD Python package leaked into Channel wheel'" $wheel
+          $coreWheel = (Get-ChildItem core/dist/*.whl -File -ErrorAction Stop).FullName
           python channel/ci/wheel_smoke.py $wheel `
+            --core-wheel $coreWheel `
             --output channel/dist/windows-wheel-smoke.json
           sccache --show-stats
 
@@ -455,9 +459,10 @@ jobs:
       - name: Verify Linux wheel metadata
         shell: bash
         run: |
-          python -m pip install twine
+          python -m pip install build twine
           python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
           python -m pip install --no-deps ./core
+          python -m build core --wheel --outdir core/dist
           python -m twine check channel/dist/*.whl
           python - <<'PY'
           import importlib.metadata
@@ -470,6 +475,8 @@ jobs:
 
           wheels = list(Path("channel/dist").glob("*.whl"))
           assert len(wheels) == 1, wheels
+          core_wheels = list(Path("core/dist").glob("*.whl"))
+          assert len(core_wheels) == 1, core_wheels
           names = zipfile.ZipFile(wheels[0]).namelist()
           extensions = [
               name
@@ -491,6 +498,7 @@ jobs:
                       "--no-deps",
                       "--target",
                       str(target),
+                      str(core_wheels[0]),
                       str(wheels[0]),
                   ],
                   check=True,
@@ -507,9 +515,11 @@ jobs:
           ]
           import witwin.channel as channel
           import witwin.channel._channel as native
+          import witwin.core as core
           from witwin.channel.propagation import consumer
           assert Path(channel.__file__).resolve().is_relative_to(target)
           assert Path(native.__file__).resolve().is_relative_to(target)
+          assert Path(core.__file__).resolve().is_relative_to(target)
           assert channel.build_info()["backend"] == "channel"
           assert consumer.CONTRACT_VERSION == 1
           required = {{

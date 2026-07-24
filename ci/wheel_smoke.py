@@ -24,7 +24,8 @@ else:
 
 
 _DISTRIBUTION = "witwin-channel"
-_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL"})
+_DIST_INFO_LICENSE = "licenses/LICENSE"
+_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", _DIST_INFO_LICENSE})
 _NATIVE_MEMBER = "witwin/channel/_channel.cp311-win_amd64.pyd"
 _REQUIRED_RUNTIME_MEMBERS = {
     "witwin/channel/runtime/_channel.build-fingerprint",
@@ -463,7 +464,14 @@ def _audit_wheel_contents(path: Path) -> str:
         dist_info_members = {name for name in names if name.startswith(f"{dist_info}/")}
         if dist_info_members != allowed_dist_info:
             raise ValueError(
-                "wheel dist-info must contain exactly METADATA, WHEEL, and RECORD"
+                "wheel dist-info must contain exactly METADATA, WHEEL, RECORD, "
+                "and licenses/LICENSE"
+            )
+        license_member = f"{dist_info}/{_DIST_INFO_LICENSE}"
+        repository_license = Path(__file__).resolve().parents[1] / "LICENSE"
+        if archive.read(license_member) != repository_license.read_bytes():
+            raise ValueError(
+                "wheel dist-info license bytes differ from the repository LICENSE"
             )
         _audit_record(archive, names, dist_info=dist_info)
         _runtime_identity_from_archive(archive)
@@ -729,12 +737,26 @@ if distribution.metadata[\"Name\"] != {expected_name!r}:
 if distribution.version != {expected_version!r}:
     raise RuntimeError(f\"unexpected distribution version: {{distribution.version!r}}\")
 
+core_distribution = importlib.metadata.distribution("witwin")
+core_distribution_root = Path(core_distribution.locate_file("")).resolve()
+if not core_distribution_root.is_relative_to(target):
+    raise RuntimeError(
+        f\"Core distribution resolved outside isolated target: {{core_distribution_root}}\"
+    )
+
 package_spec = importlib.util.find_spec(\"witwin.channel\")
 if package_spec is None or package_spec.origin is None:
     raise RuntimeError(\"witwin.channel has no import origin\")
 package_origin = Path(package_spec.origin).resolve()
 if not package_origin.is_relative_to(target):
     raise RuntimeError(f\"package resolved outside isolated target: {{package_origin}}\")
+
+core_spec = importlib.util.find_spec(\"witwin.core\")
+if core_spec is None or core_spec.origin is None:
+    raise RuntimeError(\"witwin.core has no import origin\")
+core_origin = Path(core_spec.origin).resolve()
+if not core_origin.is_relative_to(target):
+    raise RuntimeError(f\"Core resolved outside isolated target: {{core_origin}}\")
 
 native_spec = importlib.util.find_spec(\"witwin.channel._channel\")
 if native_spec is None or native_spec.origin is None:
@@ -792,11 +814,18 @@ def main() -> int:
         description="Install a built wheel into an isolated target and smoke its native ABI."
     )
     parser.add_argument("wheel", type=Path)
+    parser.add_argument(
+        "--core-wheel",
+        type=Path,
+        required=True,
+        help="Locked witwin-core wheel installed into the same isolated target.",
+    )
     parser.add_argument("--dumpbin", default="dumpbin")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
         wheel = _resolve_wheel(args.wheel)
+        core_wheel = _resolve_wheel(args.core_wheel)
         expected_name, expected_version = _wheel_identity(wheel)
         native_member = _audit_wheel_contents(wheel)
         expected_build_identity = _wheel_runtime_identity(wheel)
@@ -822,6 +851,7 @@ def main() -> int:
                 "--no-deps",
                 "--target",
                 str(target),
+                str(core_wheel),
                 str(wheel),
             ],
             capture_output=True,
