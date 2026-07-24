@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import tomllib
 
 from ci import run_ci_tier as tiers
@@ -194,9 +195,11 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     ]
 
     assert {path.name for path in WORKFLOWS.glob("*.yml")} == {
-        "prebuild-wheels.yml"
+        "publish-witwin-channel.yml"
     }
-    workflow = (WORKFLOWS / "prebuild-wheels.yml").read_text(encoding="utf-8")
+    workflow = (WORKFLOWS / "publish-witwin-channel.yml").read_text(
+        encoding="utf-8"
+    )
     assert "\n  push:" not in workflow
     assert "\n  pull_request:" not in workflow
     assert "\n  schedule:" not in workflow
@@ -228,7 +231,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
     assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
     assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
-    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"2\"" in workflow
+    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"3\"" in workflow
     assert ".Path.Replace('\\', '/')" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
@@ -251,13 +254,33 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
 
     kernels = ROOT / "native" / "channel" / "kernels"
     cuda_sources = [*kernels.rglob("*.cu"), *kernels.rglob("*.cuh")]
-    assert all(
-        "#include <torch/extension.h>" not in path.read_text(encoding="utf-8")
-        for path in cuda_sources
-    )
+    native_root = ROOT / "native" / "channel"
+    pending = list(cuda_sources)
+    reachable_sources: set[Path] = set()
+    while pending:
+        source = pending.pop()
+        if source in reachable_sources:
+            continue
+        reachable_sources.add(source)
+        text = source.read_text(encoding="utf-8")
+        for include in re.findall(r'^\s*#include\s+"([^"]+)"', text, re.MULTILINE):
+            candidate = (source.parent / include).resolve()
+            if candidate.is_file() and candidate.is_relative_to(native_root):
+                pending.append(candidate)
+    extension_includes = [
+        path
+        for path in reachable_sources
+        if "#include <torch/extension.h>" in path.read_text(encoding="utf-8")
+    ]
+    assert extension_includes == []
     minimal_header = (kernels / "torch_cuda_minimal.h").read_text(encoding="utf-8")
     assert "#include <ATen/ATen.h>" in minimal_header
     assert "#include <torch/csrc/utils/pybind.h>" in minimal_header
+    assert "#include <torch/types.h>" not in minimal_header
+    assert all(
+        not re.search(r"(?<!rayd::)torch::", path.read_text(encoding="utf-8"))
+        for path in cuda_sources
+    )
 
     publish_guard = (
         "github.event_name == 'release' && github.event.action == 'published'"

@@ -90,7 +90,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 150
     env:
-      CMAKE_BUILD_PARALLEL_LEVEL: "2"
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
       CMAKE_C_COMPILER_LAUNCHER: sccache
       CMAKE_CXX_COMPILER_LAUNCHER: sccache
       CMAKE_CUDA_COMPILER_LAUNCHER: ""

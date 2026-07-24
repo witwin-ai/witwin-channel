@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <c10/util/complex.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include "../tensor_checks.h"
 
