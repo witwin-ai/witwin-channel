@@ -14,6 +14,7 @@ on:
           - windows-smoke
           - full
           - windows-release-recovery
+          - publish-recovery-artifacts
       source_sha:
         description: Release source commit for Windows recovery
         required: false
@@ -24,6 +25,10 @@ on:
         type: string
       linux_artifact_run_id:
         description: Prior run containing channel-wheel-linux
+        required: false
+        type: string
+      windows_artifact_run_id:
+        description: Prior run containing channel-wheel-windows
         required: false
         type: string
 
@@ -99,13 +104,18 @@ jobs:
           PY
 
       - name: Validate Windows release recovery request
-        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          (inputs.scope == 'windows-release-recovery' ||
+          inputs.scope == 'publish-recovery-artifacts')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           LINUX_ARTIFACT_RUN_ID: ${{ inputs.linux_artifact_run_id }}
+          WINDOWS_ARTIFACT_RUN_ID: ${{ inputs.windows_artifact_run_id }}
+          RECOVERY_SCOPE: ${{ inputs.scope }}
         run: |
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$RELEASE_TAG" == "witwin-channel-v0.4.0" ]]
@@ -125,9 +135,23 @@ jobs:
               --jq '[.artifacts[] | select(.name == "channel-wheel-linux" and (.expired | not))] | length'
           )"
           [[ "$artifact_count" == "1" ]]
+          if [[ "$RECOVERY_SCOPE" == "publish-recovery-artifacts" ]]; then
+            [[ "$WINDOWS_ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]
+            windows_run_conclusion="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${WINDOWS_ARTIFACT_RUN_ID}" \
+                --jq '.conclusion'
+            )"
+            [[ "$windows_run_conclusion" == "success" ]]
+            windows_artifact_count="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${WINDOWS_ARTIFACT_RUN_ID}/artifacts" \
+                --jq '[.artifacts[] | select(.name == "channel-wheel-windows" and (.expired | not))] | length'
+            )"
+            [[ "$windows_artifact_count" == "1" ]]
+          fi
 
   build-windows:
     name: Wheel / Windows / Python 3.11 / Torch 2.10
+    if: github.event_name == 'release' || inputs.scope != 'publish-recovery-artifacts'
     needs: metadata
     runs-on: channel-windows-8core
     timeout-minutes: 150
@@ -509,12 +533,16 @@ jobs:
     name: Validate complete wheel set
     if: >-
       always() &&
-      needs.build-windows.result == 'success' &&
-      (needs.build-linux.result == 'success' || needs.build-linux.result == 'skipped')
+      ((inputs.scope == 'publish-recovery-artifacts' &&
+      needs.build-windows.result == 'skipped' &&
+      needs.build-linux.result == 'skipped') ||
+      (needs.build-windows.result == 'success' &&
+      (needs.build-linux.result == 'success' || needs.build-linux.result == 'skipped')))
     needs: [build-windows, build-linux]
     runs-on: ubuntu-22.04
     steps:
       - name: Download wheel artifacts
+        if: inputs.scope != 'publish-recovery-artifacts'
         uses: actions/download-artifact@v4
         with:
           pattern: channel-wheel-*
@@ -522,7 +550,10 @@ jobs:
           merge-multiple: true
 
       - name: Download recovered Linux wheel
-        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          (inputs.scope == 'windows-release-recovery' ||
+          inputs.scope == 'publish-recovery-artifacts')
         uses: actions/download-artifact@v4
         with:
           name: channel-wheel-linux
@@ -530,10 +561,19 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.linux_artifact_run_id }}
 
+      - name: Download recovered Windows wheel
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'publish-recovery-artifacts'
+        uses: actions/download-artifact@v4
+        with:
+          name: channel-wheel-windows
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.windows_artifact_run_id }}
+
       - name: Validate artifact count and tags
         shell: bash
         env:
-          EXPECTED_COUNT: ${{ (needs.build-linux.result == 'success' || inputs.scope == 'windows-release-recovery') && '2' || '1' }}
+          EXPECTED_COUNT: ${{ (needs.build-linux.result == 'success' || inputs.scope == 'windows-release-recovery' || inputs.scope == 'publish-recovery-artifacts') && '2' || '1' }}
         run: |
           python - <<'PY'
           import os
@@ -562,8 +602,12 @@ jobs:
   publish:
     name: Publish witwin-channel to PyPI
     if: >-
-      (github.event_name == 'release' && github.event.action == 'published') ||
-      (github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery')
+      always() &&
+      needs.validate-wheels.result == 'success' &&
+      ((github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.scope == 'windows-release-recovery' ||
+      inputs.scope == 'publish-recovery-artifacts')))
     needs: validate-wheels
     runs-on: ubuntu-latest
     environment:
@@ -575,6 +619,7 @@ jobs:
       id-token: write
     steps:
       - name: Download wheel artifacts
+        if: inputs.scope != 'publish-recovery-artifacts'
         uses: actions/download-artifact@v4
         with:
           pattern: channel-wheel-*
@@ -582,13 +627,25 @@ jobs:
           merge-multiple: true
 
       - name: Download recovered Linux wheel
-        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          (inputs.scope == 'windows-release-recovery' ||
+          inputs.scope == 'publish-recovery-artifacts')
         uses: actions/download-artifact@v4
         with:
           name: channel-wheel-linux
           path: dist
           github-token: ${{ github.token }}
           run-id: ${{ inputs.linux_artifact_run_id }}
+
+      - name: Download recovered Windows wheel
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'publish-recovery-artifacts'
+        uses: actions/download-artifact@v4
+        with:
+          name: channel-wheel-windows
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.windows_artifact_run_id }}
 
       - name: Publish wheels
         uses: pypa/gh-action-pypi-publish@release/v1

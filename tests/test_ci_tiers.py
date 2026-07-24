@@ -208,9 +208,11 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "          - windows-smoke" in workflow
     assert "          - full" in workflow
     assert "          - windows-release-recovery" in workflow
+    assert "          - publish-recovery-artifacts" in workflow
     assert "      source_sha:" in workflow
     assert "      release_tag:" in workflow
     assert "      linux_artifact_run_id:" in workflow
+    assert "      windows_artifact_run_id:" in workflow
     assert "self-hosted" not in workflow
     assert "runs-on: channel-windows-8core" in workflow
     assert "runs-on: channel-linux-8core" in workflow
@@ -322,8 +324,12 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     )
     assert recovery_guard in workflow
     assert "actions/runs/${LINUX_ARTIFACT_RUN_ID}/artifacts" in workflow
+    assert "actions/runs/${WINDOWS_ARTIFACT_RUN_ID}/artifacts" in workflow
     assert "run-id: ${{ inputs.linux_artifact_run_id }}" in workflow
+    assert "run-id: ${{ inputs.windows_artifact_run_id }}" in workflow
     assert workflow.count("Download recovered Linux wheel") == 2
+    assert workflow.count("Download recovered Windows wheel") == 2
     assert "inputs.source_sha || github.sha" in workflow
+    assert "needs.validate-wheels.result == 'success'" in workflow
     assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "id-token: write" in workflow
