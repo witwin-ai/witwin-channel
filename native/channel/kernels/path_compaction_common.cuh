@@ -1,6 +1,6 @@
 #pragma once
 
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include <tuple>
 

@@ -4,7 +4,7 @@
 #include <cub/device/device_radix_sort.cuh>
 #include <cub/device/device_select.cuh>
 #include <cuda_runtime_api.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include "../tensor_checks.h"
 #include "capacity_failure_state.h"

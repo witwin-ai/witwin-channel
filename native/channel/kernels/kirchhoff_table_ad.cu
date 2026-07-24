@@ -44,7 +44,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <cusolverDn.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include <rayd/shared/rf/layer_stack.cuh>
 #include <rayd/torch/rf/field_transport_ad.cuh>

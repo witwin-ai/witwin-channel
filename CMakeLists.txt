@@ -412,6 +412,20 @@ if(WIN32 AND NOT EXISTS "${TORCH_CMAKE_PREFIX}/Torch/TorchConfig.cmake")
     endif()
 endif()
 find_package(Torch REQUIRED)
+if(NOT CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
+    # Channel consumes Torch after RayD's subdirectory has already sanitized
+    # Caffe2's per-architecture flags. This second find_package call appends
+    # them again, so remove them before creating the Channel CUDA target.
+    string(
+        REGEX REPLACE
+        "(^|[ \t])-gencode[ \t]+arch=[^ \t]+,code=[^ \t]+"
+        ""
+        CMAKE_CUDA_FLAGS
+        "${CMAKE_CUDA_FLAGS}")
+    string(STRIP "${CMAKE_CUDA_FLAGS}" CMAKE_CUDA_FLAGS)
+    message(STATUS
+        "Channel CUDA flags after removing Torch gencode flags: ${CMAKE_CUDA_FLAGS}")
+endif()
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c
         "import torch; print(torch.__version__.split('+', 1)[0]); print(torch.version.cuda or '')"

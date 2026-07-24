@@ -236,8 +236,28 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "safe.directory /host${{ github.workspace }}/rayd" in workflow
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "CHANNEL_CUDA_GENCODE_FLAGS" in cmake
+    second_torch_find = cmake.index("find_package(Torch REQUIRED)", cmake.index("add_subdirectory("))
+    channel_gencode_cleanup = cmake.index(
+        "Channel CUDA flags after removing Torch gencode flags"
+    )
+    channel_target = cmake.index("Python_add_library(")
+    assert second_torch_find < channel_gencode_cleanup < channel_target
+    assert (
+        '"(^|[ \\t])-gencode[ \\t]+arch=[^ \\t]+,code=[^ \\t]+"'
+        in cmake
+    )
     assert "set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)" in cmake
     assert "target_compile_options(" in cmake
+
+    kernels = ROOT / "native" / "channel" / "kernels"
+    cuda_sources = [*kernels.rglob("*.cu"), *kernels.rglob("*.cuh")]
+    assert all(
+        "#include <torch/extension.h>" not in path.read_text(encoding="utf-8")
+        for path in cuda_sources
+    )
+    minimal_header = (kernels / "torch_cuda_minimal.h").read_text(encoding="utf-8")
+    assert "#include <ATen/ATen.h>" in minimal_header
+    assert "#include <torch/csrc/utils/pybind.h>" in minimal_header
 
     publish_guard = (
         "github.event_name == 'release' && github.event.action == 'published'"

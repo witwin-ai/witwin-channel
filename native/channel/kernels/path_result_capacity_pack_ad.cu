@@ -3,7 +3,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include "../tensor_checks.h"
 
