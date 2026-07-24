@@ -13,13 +13,14 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Native runtime boundary
 
-- `_channel` is the single production extension. It source-links RayD
-  `402262d3b0c07dffb9d51d1852abb97ab2280f2f` and calls the typed
+- `_channel` is the single production extension. It source-links the RayD
+  `v0.7.0` release at
+  `49c58c4cb8212f6babb920cc88fb937509826cc5` and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
   legacy `extern "C"` Torch integration entry points are retired.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
-  may use the active Python environment's unique `rayd-torch 0.6.0` passive
+  may use the active Python environment's unique `rayd-torch 0.7.0` passive
   source bundle after lock/RECORD/full-manifest verification. No conda-prefix,
   site-packages, or global CMake scan is performed. `build_info` reports only
   the source kind and manifest SHA, never a machine-specific source path.
@@ -32,6 +33,12 @@ priority `scattering > diffraction > transmission > reflection > los`.
   and identity
   `rayd.torch.integration`. The numeric API version is 6 and is validated
   independently from this stable, capability-neutral source name.
+- Under ADR-035, RayD owns native trace selection behind that typed boundary.
+  `TraceBackend::Auto` prefers OptiX and may select RayD's full-result
+  pure-CUDA path when OptiX is unavailable. This is not a Torch, CPU, Dr.Jit,
+  retry, reduced-result, or second-owner fallback. Operations unsupported by
+  the selected RayD backend fail typed capability validation before the
+  operation launches or exposes output.
 - ADR-027 exposes the complete RayD fixed-capacity straight-segment
   penetration primal/tape/VJP/JVP family, Channel named facades, shared
   capacity-failure wiring, compile-frozen policy diagonals, component-5

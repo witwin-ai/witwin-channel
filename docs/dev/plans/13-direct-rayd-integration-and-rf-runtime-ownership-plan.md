@@ -1,7 +1,6 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
-**状态：** STABLE RECOVERY ACCEPTANCE COMPLETE / OVERALL EVIDENCE CLOSURE PARTIAL
-（2026-07-22）；ADR-032 已接受并选择恢复
+**状态：** PRODUCTION ARCHITECTURE COMPLETE（2026-07-23）；ADR-032 已接受并选择恢复
 `e7d82d2` 的 `O(K)` compact production boundary。ADR-029 已因 Munich E2E/显存/吞吐
 回归被 Superseded；ADR-031 已 Rejected；ADR-030 reducer 保持 Dormant。三者均不构成
 implementation、test、manifest 或 release 要求。Phase 8B、
@@ -9,8 +8,9 @@ Phase 10A/10B、Phase 11A/11B、RayD legacy extern-C 删除和稳定 integration
 不回退已接受的 owner migration。Phase 12 已完成最小稳定恢复、nightly/release、
 wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
 `docs/dev/audit/phase13-adr032-stable-recovery-final-report.md`，未开发新的大功能。Plan 13
-仍不能整体标记完成：Phase 6C 原始 P→E 与 E→M 独立 comparative E2E/resource gate 尚无
-可审计证据；这项开放项不得由 Phase 12 compact 恢复数据替代或通过放宽阈值关闭。
+production architecture 已完成。Phase 6C 原始 P→E 与 E→M comparative reports 保留为
+archived historical evidence，不再是 implementation、test、manifest、release 或后续 Stage-I
+gate，也不触发 Plan 13 重验收。
 
 2026-07-22 packaging follow-up 将当前 RayD lock 前进到非数值打包提交
 `402262d3b0c07dffb9d51d1852abb97ab2280f2f`。显式 `RAYD_SOURCE_DIR` 仍具有最高优先级；
@@ -20,6 +20,21 @@ wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
 GitHub Actions 承担 publication gate。验收事实见
 `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`；这不修改或替代绑定 RayD
 `474c122` 的历史 Munich 数值证据。
+
+2026-07-23 Stage-I Phase 0A 将 dependency candidate 前进到正式轻量 tag `v0.7.0`
+（`49c58c4cb8212f6babb920cc88fb937509826cc5`，`rayd-torch==0.7.0`）。稳定
+`rayd/torch/integration.h` 仍为 API 6、identity `rayd.torch.integration` 和 SHA-256
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`；clean tag
+生成的完整 source manifest SHA-256 为
+`e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4`。
+该 tag 同时加入 automatic pure-CUDA tracing 和新的 CUDA fused
+visibility/reflection/diffraction/multipath implementations；这不是 packaging-only delta。
+ADR-035 已接受 RayD `TraceBackend::Auto` 在 RayD-owned OptiX 与 pure-CUDA native tracing
+之间选择：OptiX 是首选性能路径，missing OptiX 本身不再是 Channel capability failure；
+这不允许 Torch/CPU/Dr.Jit、retry、reduced-result 或 second-owner fallback。Phase 0A 只验收
+dependency/static compatibility；两条 native trace path 的完整 capability、数值、AD、launch/
+resource、性能和 wheel/fingerprint evidence 集中在 Phase 2/3 大模块 checkpoint。详见
+`docs/dev/audit/stage1-phase0a-rayd-0.7.0-dependency-baseline.json`。
 
 **计划日期：** 2026-07-18
 

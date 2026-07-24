@@ -603,3 +603,30 @@ is `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`.
 The package-source SM120 configure resolved successfully, but its native build
 did not produce a wheel within the bounded local run and is not claimed as
 accepted; that publication build remains a GitHub Actions gate.
+
+### 2026-07-23: RayD 0.7.0 Stage-I dependency candidate
+
+The Stage-I candidate lock now identifies the formal lightweight tag `v0.7.0`
+at `49c58c4cb8212f6babb920cc88fb937509826cc5` and
+`rayd-torch==0.7.0`. A clean tag archive reproduces integration API 6,
+identity `rayd.torch.integration`, header SHA-256
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`,
+and source-manifest SHA-256
+`e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4`.
+
+ADR-035 accepts this immutable dependency baseline while recording that it is
+not a packaging-only delta. RayD owns `TraceBackend::Auto`: OptiX is preferred,
+and RayD may select its full-result pure-CUDA native implementation when OptiX
+is unavailable. This selection is not a Torch, CPU, Dr.Jit, retry,
+reduced-result, or second-owner fallback. An operation unsupported by the
+selected backend must fail its typed capability validation before that
+operation launches or exposes output.
+
+Phase 0A accepts the final dependency, header, source-manifest, workflow-pin,
+product-identity, and compact-owner static baseline. It does not inherit
+OptiX evidence for pure CUDA or claim complete numerical certification. The
+Phase 2 and Phase 3 large-module checkpoints retain the separate capability,
+numerical, AD, launch/resource, performance, wheel, and fingerprint gates for
+both RayD-owned native trace paths.
+Historical Plan 13 P-to-E and E-to-M comparative reports remain archived and
+are not reactivated by this dependency review.

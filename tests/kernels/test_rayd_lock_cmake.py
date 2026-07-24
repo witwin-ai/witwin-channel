@@ -30,7 +30,8 @@ def _run(
 
 def _rayd_source() -> Path:
     configured = os.environ.get("RAYD_SOURCE_DIR")
-    source = Path(configured) if configured else ROOT.parent.parent / "RayDi"
+    platform_root = ROOT.parent.parent if ROOT.parent.name == ".worktrees" else ROOT.parent
+    source = Path(configured) if configured else platform_root / "RayD"
     assert (source / ".git").exists(), f"locked RayD checkout is missing: {source}"
     return source
 
@@ -110,7 +111,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
     assert lock == {
         "schema_version": 2,
         "repository_url": "https://github.com/Asixa/RayD.git",
-        "commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+        "commit": "49c58c4cb8212f6babb920cc88fb937509826cc5",
         "integration_abi": {
             "kind": "source-header-sha256",
             "path": "backends/torch/include/rayd/torch/integration.h",
@@ -120,9 +121,9 @@ def test_rayd_lock_is_machine_readable_and_complete():
         },
         "source_bundle": {
             "distribution": "rayd-torch",
-            "distribution_version": "0.6.0",
+            "distribution_version": "0.7.0",
             "metadata_path": "rayd/torch/_source/rayd-source.json",
-            "manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
+            "manifest_sha256": "e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4",
         },
     }
 
