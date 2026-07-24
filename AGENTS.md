@@ -27,6 +27,14 @@ compiled native CUDA/RayD extension.
 - CPU production computation and CPU fallback are forbidden. Missing CUDA,
   RayD capability, a native symbol, a supported SM, or an ABI-compatible
   extension must fail loudly before partial computation.
+- Under ADR-035, RayD `TraceBackend::Auto` may select RayD-owned OptiX or
+  RayD-owned pure-CUDA tracing during scene construction. OptiX is the
+  preferred performance path; missing OptiX alone is not a missing Channel
+  capability. This native implementation choice is not a Torch/CPU/Dr.Jit
+  fallback, a second owner, a retry policy, or permission for reduced results.
+  An operation unsupported by the selected RayD backend must fail its typed
+  capability validation before that operation launches numerical work or
+  exposes output.
 - Never recover from a native failure by using Torch operations, NumPy, Python
   loops, CPU code, finite differences, legacy RayD/DrJit dispatch, a reduced
   algorithm, zero tensors, empty success results, or detached gradients.
@@ -85,6 +93,28 @@ flag, capability probe, import fallback, or compatibility shim.
 ## Architecture and ownership
 
 Organize code by RF domain capability, with a single owner for each operation:
+
+- Under ADR-034, `witwin.core` is the sole owner of logical `Scene`,
+  `SceneSnapshot`, `Structure`, stable world IDs, physical-material
+  specifications, logical assignments, antenna state, dynamics, and the four
+  topology/geometry/material/assignment version domains. Core world contracts
+  never own frequency, native resources, stores, caches, compiled records,
+  propagation results, solver tapes, or Radar RCS data.
+- Channel is the sole owner of
+  `scene.compile(..., reference_frequency_hz=...)`, `CompiledScene`, the
+  Channel cache registry, RayD scene/BVH facade, GPU stores, material ABI and
+  resident resources, propagation compute, compact assembly, and failure
+  observation. A request/reference-frequency mismatch fails before native
+  compute. Do not add an implicit recompile or host material replay.
+- The Phase-2 Scene owner switch is intentionally breaking. Root logical world
+  exports must resolve directly to `witwin.core`; delete the old Channel
+  logical implementations and compatibility facades atomically with the four
+  solver caller switch.
+- The Phase-3 consumer reuses the ADR-032 native compact cardinality
+  observation and publishes actual `K` rows with native-produced stable pair
+  segmentation. It must not add a second count D2H/synchronization or use
+  Torch/Python compaction. A public Jones result is a complete source-basis to
+  sink-basis `2 x 2` transport operator, not a renamed two-component field.
 
 - `runtime`: packaged extension loading, ABI/build identity, symbol validation,
   Torch compatibility isolation, native buffers, and AD dispatch contracts.
@@ -315,6 +345,8 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-030-deterministic-diffraction-pair-reduction.md`
 - `docs/dev/standards/adr-031-per-pair-raw-reflection-epc-capacity.md`
 - `docs/dev/standards/adr-032-controlled-compact-cardinality-boundary.md`
+- `docs/dev/standards/adr-034-stage-i-world-and-propagation-boundary.md`
+- `docs/dev/standards/adr-035-rayd-native-trace-backend-selection.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032
