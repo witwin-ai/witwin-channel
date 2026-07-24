@@ -3,8 +3,8 @@
 ## Outcome
 
 Plan 13 stable recovery is accepted at the compact `O(K)` production boundary.
-ADR-029 is superseded for production, ADR-031 remains Proposed without public
-API or a production caller, and ADR-030 remains dormant. The already accepted
+ADR-029 is Superseded, ADR-031 is Rejected without public API or a production
+caller, and ADR-030 remains Dormant. The already accepted
 RayD ownership migration is preserved at RayD
 `474c122aa3cd6b6d098675e076a73e6f485bd6be`; stable recovery required no new
 RayD change.

@@ -1,7 +1,7 @@
 # ADR-030: Deterministic diffraction pair reduction
 
-- **Status:** Accepted for a dormant numerical experiment (2026-07-20);
-  dormant reducer family retained, live activation deferred by ADR-032
+- **Status:** Dormant (2026-07-21); not production-authoritative, and any
+  reactivation requires a new accepted ADR
 - **Date:** 2026-07-20
 - **Kind:** Numerical-order, cross-repository typed storage, native reduction,
   AD, and performance decision.
@@ -14,9 +14,11 @@
 ## Stable-recovery disposition
 
 The `deterministic_diffraction_pair_reduce` primal/VJP/JVP family and RayD
-`SourceLane` layout may remain implemented and directly tested, but they have
-no production solver caller. Live activation, deletion of the working compact
-route, and any public/API consequence are deferred. ADR-032's `O(K)` compact
+`SourceLane` layout currently remain implemented, but they have no production
+solver caller and are not a supported feature. This ADR creates no
+implementation, direct-test, manifest, release, or preservation requirement
+for them. Live activation, deletion of the working compact route, and any
+public/API consequence require a new accepted ADR. ADR-032's `O(K)` compact
 production boundary is authoritative.
 
 This reducer cannot repair ADR-029's memory regression. `SourceLane` requires

@@ -1,7 +1,6 @@
 # ADR-029: Device-resident capacity results
 
-- **Status:** Superseded for production by ADR-032 (2026-07-21); retained as a
-  Proposed, caller-free experiment
+- **Status:** Superseded by ADR-032 (2026-07-21); historical experiment only
 - **Date:** 2026-07-20
 - **Kind:** Public result, dynamic-cardinality, native selection, AD, and
   launch-contract decision.
@@ -20,12 +19,12 @@ capacity-selector/gather, and no-count-D2H requirements below describe a
 retained experiment only. They must not be reached by a production solver,
 advertised as a capability, or treated as architecture guardrails.
 
-The dormant capacity producers, shared failure-state protocol, inert-output
-sanitizers, and direct tests may remain for research and for already accepted
-fixed-capacity operations. They do not authorize propagation of theoretical
-capacity through reflection, diffraction, canonical selection, field
-evaluation, or public result storage. ADR-032 controls wherever this text
-conflicts with the compact production boundary.
+Existing caller-free capacity artifacts may remain temporarily as cleanup
+debt, but this ADR creates no implementation, direct-test, manifest, release,
+or preservation requirement for them. Independently accepted fixed-capacity
+operations may retain shared failure-state and inert-output primitives under
+their own active ADRs. ADR-032 controls wherever this text conflicts with the
+compact production boundary.
 
 ## Context
 

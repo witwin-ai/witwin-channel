@@ -8,7 +8,7 @@
   ADR-007 (propagation data ownership), ADR-009 (native fusion ownership),
   ADR-027 (batched segment penetration), ADR-028 (device-resident diffraction
   state selection), ADR-029 (superseded capacity-result experiment), ADR-030
-  (dormant deterministic diffraction reducer), and ADR-031 (proposed raw
+  (dormant deterministic diffraction reducer), and ADR-031 (rejected raw
   reflection capacity experiment).
 
 ## Context
@@ -159,15 +159,15 @@ require reflection, canonical selection, field evaluation, or public results
 to remain `O(capacity)`. The compact boundary must publish either the complete
 `K` rows in stable order or no usable result.
 
-### Retain experiments as dormant, not production policy
+### Retire experiments from production policy
 
-ADR-029 capacity producers, selector, gather, public packers, and their direct
-tests may remain in the source tree as caller-free experimental native
-operations. ADR-031 remains Proposed; `Qr` has no production caller and is not
-part of the formal public API. ADR-030's pair reducer may remain dormant, but
-its `SourceLane` activation is deferred because it inherits the same
-`O(P*M)` lane storage amplification and does not repair ADR-029's regression.
-None of these dormant operations may be reached through a production solver,
+ADR-029/030 implementation artifacts may remain temporarily as caller-free
+cleanup debt, but they are not supported features and create no implementation,
+direct-test, manifest, release, or preservation requirements. ADR-031 is
+Rejected; `Qr` has no production caller and is not part of the formal public
+API. ADR-030's `SourceLane` activation remains dormant because it inherits the
+same `O(P*M)` lane storage amplification and does not repair ADR-029's
+regression. None of these artifacts may be reached through a production solver,
 capability claim, default, fallback, or compatibility mode.
 
 No GPU tiled EPC/incremental merge, new exporter AD family, new public
@@ -176,8 +176,8 @@ Such work needs a future, separately measured and accepted ADR.
 
 ## Recovery commit sequence
 
-1. Accept this ADR and mark ADR-029 superseded for production, ADR-031
-   Proposed, and ADR-030 live activation deferred.
+1. Accept this ADR and mark ADR-029 Superseded, ADR-031 Rejected, and ADR-030
+   Dormant.
 2. Establish `e7d82d2d1d290bbc106ef68410ebf88aeb1c99e9` as the compact production
    recovery base with the same locked RayD revision and header.
 3. Remove capacity-result and `Qr` public configuration/schema changes and
@@ -236,13 +236,13 @@ cardinality is again represented by compact result shape at this boundary.
 Device residence remains the default everywhere else, and all numerical work
 remains in native CUDA/RayD.
 
-ADR-029 remains useful as a documented rejected production experiment and as a
-source of dormant fail-loud primitives. ADR-031 remains a proposal whose
-measured implementation does not justify public API or production activation.
-ADR-030 remains a dormant numerical candidate. Future reconsideration must beat
-this compact baseline on E2E latency, peak memory, steady throughput,
-capacity/active ratio, exactness, and concurrency together; eliminating D2H is
-not an independent acceptance criterion.
+ADR-029 remains a historical record of a superseded production experiment.
+ADR-031 is a rejected proposal, and ADR-030 is a dormant numerical candidate.
+None creates an active implementation or release requirement. Future
+reconsideration requires a new accepted ADR and must beat this compact baseline
+on E2E latency, peak memory, steady throughput, capacity/active ratio, exactness,
+and concurrency together; eliminating D2H is not an independent acceptance
+criterion.
 
 Final stable-recovery implementation, package, validation, and known-debt
 evidence is recorded in
