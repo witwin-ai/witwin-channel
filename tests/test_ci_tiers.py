@@ -214,9 +214,10 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "      linux_artifact_run_id:" in workflow
     assert "      windows_artifact_run_id:" in workflow
     assert "self-hosted" not in workflow
-    assert "runs-on: channel-windows-8core" in workflow
-    assert "runs-on: channel-linux-8core" in workflow
+    assert "runs-on: windows-2022" in workflow
     assert "runs-on: ubuntu-22.04" in workflow
+    assert "channel-windows-8core" not in workflow
+    assert "channel-linux-8core" not in workflow
     assert "manylinux_2_28" in workflow
 
     locked_rayd = "49c58c4cb8212f6babb920cc88fb937509826cc5"
@@ -240,8 +241,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
     assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
     assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
-    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"6\"" in workflow
-    assert "CMAKE_BUILD_PARALLEL_LEVEL=6" in workflow
+    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"3\"" in workflow
+    assert "CMAKE_BUILD_PARALLEL_LEVEL=2" in workflow
     assert "Windows Channel wheel build: {0:N2} minutes" in workflow
     assert "exceeded the previous 100-minute target; continuing" in workflow
     assert "throw \"Windows Channel wheel build exceeded" not in workflow

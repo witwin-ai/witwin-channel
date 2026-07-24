@@ -153,10 +153,10 @@ jobs:
     name: Wheel / Windows / Python 3.11 / Torch 2.10
     if: github.event_name == 'release' || inputs.scope != 'publish-recovery-artifacts'
     needs: metadata
-    runs-on: channel-windows-8core
+    runs-on: windows-2022
     timeout-minutes: 150
     env:
-      CMAKE_BUILD_PARALLEL_LEVEL: "6"
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
       CMAKE_C_COMPILER_LAUNCHER: sccache
       CMAKE_CXX_COMPILER_LAUNCHER: sccache
       CMAKE_CUDA_COMPILER_LAUNCHER: ""
@@ -319,7 +319,7 @@ jobs:
     name: Wheel / manylinux_2_28 / Python 3.11 / Torch 2.10
     if: github.event_name == 'release' || inputs.scope == 'full'
     needs: metadata
-    runs-on: channel-linux-8core
+    runs-on: ubuntu-22.04
     timeout-minutes: 150
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/channel-sccache
@@ -453,7 +453,7 @@ jobs:
             CMAKE_ARGS="-DRAYD_SOURCE_DIR=/host${{ github.workspace }}/rayd -DOPTIX_INCLUDE_DIR=/host${{ github.workspace }}/optix/include -DCMAKE_CUDA_ARCHITECTURES=70-real;75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real;120-virtual -DCHANNEL_RELEASE_BUILD=ON"
             CHANNEL_CUDA_GENCODE_FLAGS="--generate-code=arch=compute_70,code=[sm_70,sm_75] --generate-code=arch=compute_80,code=[sm_80,sm_86,sm_87,sm_89] --generate-code=arch=compute_90,code=sm_90 --generate-code=arch=compute_100,code=[sm_100,sm_101] --generate-code=arch=compute_120,code=[sm_120,compute_120]"
             RAYD_TORCH_CUDA_GENCODE_FLAGS="--generate-code=arch=compute_70,code=[sm_70,sm_75] --generate-code=arch=compute_80,code=[sm_80,sm_86,sm_87,sm_89] --generate-code=arch=compute_90,code=sm_90 --generate-code=arch=compute_100,code=[sm_100,sm_101] --generate-code=arch=compute_120,code=[sm_120,compute_120]"
-            CMAKE_BUILD_PARALLEL_LEVEL=6
+            CMAKE_BUILD_PARALLEL_LEVEL=2
             CMAKE_C_COMPILER_LAUNCHER=/host${{ github.workspace }}/.cache/sccache-bin/sccache
             CMAKE_CXX_COMPILER_LAUNCHER=/host${{ github.workspace }}/.cache/sccache-bin/sccache
             SCCACHE_DIR=/host${{ github.workspace }}/.cache/channel-sccache
