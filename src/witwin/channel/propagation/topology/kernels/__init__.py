@@ -28,6 +28,11 @@ from .compaction import (
     deterministic_sort_order,
     enumerated_canonical_capacity_select,
 )
+from .compact_autograd import (
+    COMPACT_CONTINUOUS_FIELDS,
+    evaluated_paths_compact_finalize_backward,
+    evaluated_paths_compact_finalize_jvp,
+)
 from .construction import (
     deterministic_face_anchor_points,
     deterministic_face_sequence_chunk,
@@ -62,6 +67,7 @@ __all__ = [
     "_validate_path_block",
     "_validate_path_reflection_candidates",
     "_validate_topology_extra_fields",
+    "COMPACT_CONTINUOUS_FIELDS",
     "DiffractionStateCapacityBlock",
     "DiffractionOrder1CapacityBlock",
     "deterministic_capacity_finalize",
@@ -88,6 +94,8 @@ __all__ = [
     "deterministic_selected_edge_count",
     "deterministic_sort_order",
     "enumerated_canonical_capacity_select",
+    "evaluated_paths_compact_finalize_backward",
+    "evaluated_paths_compact_finalize_jvp",
     "enumerated_transmission_topology_pack",
     "deterministic_topology_base_fields",
     "deterministic_topology_default_fields",

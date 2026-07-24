@@ -26,6 +26,43 @@ RayD `Auto` may choose its full-result pure-CUDA tracer when OptiX is
 unavailable; this remains a native GPU implementation choice, not a CPU/Torch
 fallback.
 
+## Stage-I Phase 3: propagation consumer contract
+
+External consumers must import the stable versioned module:
+
+```python
+from witwin.channel.propagation.consumer import (
+    CONTRACT_VERSION,
+    EndpointBatch,
+    PropagationRequest,
+    evaluate,
+    reevaluate,
+)
+```
+
+Version 1 replaces any direct dependency on internal `EvaluatedPaths`,
+`propagation.enumerated`, solver results, or native extension helpers. It
+publishes actual compact rows and native pair segmentation. There is no
+capacity-shaped compatibility result and no public `path_capacity_per_pair`,
+`diffraction_state_capacity`, or `Qr`.
+
+The version-1 component set is `los`, `reflection`, `transmission`, and
+`diffraction`. Scattering remains outside this consumer boundary: its current
+enumerated representation is incoherent power-domain output and does not meet
+the coherent transport or canonical pair-major row contracts. A consumer
+request containing `scattering` fails during preflight before compute.
+
+Breaking consumer schema or semantics increment `CONTRACT_VERSION` and require
+an atomic consumer update. Channel does not preserve both versions or add a
+fallback adapter. Radar adoption is a later Stage-II change; Phase 3 does not
+change Radar production source or dependencies.
+
+The supported Stage-I release row is CPython 3.11 and Torch 2.10.0. `_channel`
+uses the versioned LibTorch/Python extension ABI and is not a LibTorch Stable
+ABI artifact. Release wheels are built for Windows x64 and real
+`manylinux_2_28_x86_64`, contain native SM87 SASS as part of the full release
+architecture set, and retain compute_120 PTX.
+
 ## Current decision
 
 `witwin.channel` is the native entrypoint for the capabilities it

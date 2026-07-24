@@ -66,6 +66,7 @@ def test_multibounce_sort_order_uses_full_primitive_sequence():
         max_paths=None,
         max_paths_scope="global",
         tx_count=1,
+        rx_count=1,
         max_depth=2,
         launch_count=0,
     )

@@ -875,7 +875,11 @@ def compile(
         materials=materials,
         assignments=assignments,
         rayd=rayd,
-        reference_frequency_hz=reference_frequency_hz,
+        reference_frequency_hz=(
+            reference_frequency_hz
+            if isinstance(reference_frequency_hz, torch.Tensor)
+            else frequency_value
+        ),
         reference_frequency_revision=(
             int(reference_frequency_hz._version)
             if isinstance(reference_frequency_hz, torch.Tensor)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import tomllib
 
 from ci import run_ci_tier as tiers
@@ -174,85 +175,126 @@ def test_actual_execution_is_fail_fast(monkeypatch, tmp_path: Path) -> None:
     ]
 
 
-def test_workflows_use_only_the_verified_windows_cuda_runner() -> None:
+def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     with (ROOT / "ci" / "support-matrix.toml").open("rb") as stream:
         runtime = tomllib.load(stream)["runtime"][0]
     assert runtime["python"] == "3.11"
     assert runtime["cuda_runtime"] == "12.8"
+    assert runtime["cuda_toolkit"] == "12.8.1"
     assert runtime["verified_sm"] == [120]
+    assert runtime["declared_unverified_sm"] == [
+        70,
+        75,
+        80,
+        86,
+        87,
+        89,
+        90,
+        100,
+        101,
+    ]
 
-    expected = {
-        "quick-pr.yml": ("pull_request:", "quick"),
-        "cuda-pr.yml": ("pull_request:", "cuda"),
-        "nightly.yml": ("schedule:", "nightly"),
-        "release.yml": ("release:", "release"),
+    assert {path.name for path in WORKFLOWS.glob("*.yml")} == {
+        "publish-witwin-channel.yml"
     }
-    assert {path.name for path in WORKFLOWS.glob("*.yml")} == set(expected)
-    for name, (trigger, tier) in expected.items():
-        source = (WORKFLOWS / name).read_text(encoding="utf-8")
-        assert trigger in source
-        assert "workflow_dispatch:" in source
-        assert "runs-on: [self-hosted, Windows, X64, CUDA]" in source
-        assert "${{ vars.WITWIN2_PYTHON }}" in source
-        assert "Repository variable WITWIN2_PYTHON is required" in source
-        assert "C:\\Users\\" not in source
-        assert "sys.version_info[:2] == (3, 11)" in source
-        assert "torch.version.cuda == '12.8'" in source
-        assert f"ci/run_ci_tier.py {tier}" in source
-
-    quick = (WORKFLOWS / "quick-pr.yml").read_text(encoding="utf-8")
-    assert "torch.cuda.is_available()" not in quick
-    assert "torch.cuda.get_device_capability()" not in quick
-    assert "SM120" not in quick
+    workflow = (WORKFLOWS / "publish-witwin-channel.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "\n  push:" not in workflow
+    assert "\n  pull_request:" not in workflow
+    assert "\n  schedule:" not in workflow
+    assert "\n  release:\n    types: [published]" in workflow
+    assert "\n  workflow_dispatch:" in workflow
+    assert "self-hosted" not in workflow
+    assert "runs-on: windows-2022" in workflow
+    assert "runs-on: ubuntu-22.04" in workflow
+    assert "manylinux_2_28" in workflow
 
     locked_rayd = "49c58c4cb8212f6babb920cc88fb937509826cc5"
+    locked_core = "42b7b067b4512ebe05c462b79a75577458010b48"
     lock = json.loads(
         (ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
     )
     assert lock["commit"] == locked_rayd
-    for name in ("cuda-pr.yml", "nightly.yml", "release.yml"):
-        source = (WORKFLOWS / name).read_text(encoding="utf-8")
-        rayd_checkout = source.split("- name: Checkout locked RayD", maxsplit=1)[
-            1
-        ].split("- name: Verify immutable RayD checkout", maxsplit=1)[0]
-        assert "repository: Asixa/RayD" in source
-        assert [
-            line.strip()
-            for line in rayd_checkout.splitlines()
-            if line.strip().startswith("ref:")
-        ] == [f"ref: {locked_rayd}"]
-        assert f"$expected = '{locked_rayd}'" in source
-        assert "dependencies/rayd.lock.json" in source
-        assert "ConvertFrom-Json" in source
-        assert "git -C $rayd rev-parse HEAD" in source
-        assert source.index(f"ref: {locked_rayd}") < source.index(
-            "dependencies/rayd.lock.json"
-        )
-        assert "torch.cuda.is_available()" in source
-        assert "torch.cuda.get_device_capability() == (12, 0)" in source
-        assert "-m cmake -S . -B $buildDir" in source
-        assert "-m cmake --build $buildDir" in source
-        assert "WITWIN_CHANNEL_DEVELOPER_OVERRIDE=1" in source
-        assert "WITWIN_CHANNEL_EXTENSION_PATH=" in source
-        assert "WITWIN_CHANNEL_EXPECTED_FINGERPRINT=" in source
-        assert "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd" in source
-        assert "WITWIN_RAYD_DIR" in source
+    assert lock["source_bundle"]["distribution_version"] == "0.7.0"
+    assert f"RAYD_COMMIT: {locked_rayd}" in workflow
+    assert f"CORE_COMMIT: {locked_core}" in workflow
+    assert "repository: witwin-ai/witwin-core" in workflow
+    assert "python -m pip install --no-deps ./core" in workflow
+    assert "repository: Asixa/RayD" in workflow
+    assert "RAYD_SOURCE_DIR=" in workflow
+    assert "-DCHANNEL_RELEASE_BUILD=ON" in workflow
 
-    cuda = (WORKFLOWS / "cuda-pr.yml").read_text(encoding="utf-8")
-    nightly_source = (WORKFLOWS / "nightly.yml").read_text(encoding="utf-8")
-    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
-    assert "-DCHANNEL_RELEASE_BUILD=OFF" in cuda
-    assert "-DCHANNEL_RELEASE_BUILD=ON" not in cuda
-    assert "-DCHANNEL_RELEASE_BUILD=ON" in nightly_source
-    assert "-DCHANNEL_RELEASE_BUILD=OFF" not in nightly_source
-    assert "-DCHANNEL_RELEASE_BUILD=ON" in release
-    assert "-DCHANNEL_RELEASE_BUILD=OFF" not in release
-    assert "actions/upload-artifact@v4" in nightly_source
-    assert "artifacts/nightly/wheel-smoke-pe-audit.v1.json" in nightly_source
-    assert "actions/upload-artifact@v4" in release
-    assert "artifacts/nightly/wheel-smoke-pe-audit.v1.json" in release
-    assert "artifacts/release/wheel-smoke-pe-audit.v1.json" in release
-    assert "schedule:" in release
-    assert "types: [published]" in release
-    assert "github.run_id" in release
-    assert "fetch-depth: 0" in release
+    full_arches = (
+        "70-real;75-real;80-real;86-real;87-real;89-real;"
+        "90-real;100-real;101-real;120-real;120-virtual"
+    )
+    assert full_arches in workflow
+    assert "--expected-sass 70,75,80,86,87,89,90,100,101,120" in workflow
+    assert "--expected-ptx 120" in workflow
+    assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
+    assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
+    assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
+    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"3\"" in workflow
+    assert ".Path.Replace('\\', '/')" in workflow
+    assert "actions/cache@v5" in workflow
+    assert "sub-packages:" in workflow
+    assert "safe.directory /project/channel" in workflow
+    assert "safe.directory /host${{ github.workspace }}/rayd" in workflow
+    assert "python channel/ci/wheel_smoke.py" in workflow
+    assert "import witwin.channel as channel" in workflow
+    assert "from witwin.channel.propagation import consumer" in workflow
+    assert '"enumerated_canonical_compact"' in workflow
+    assert '"enumerated_exact_pair_metadata"' in workflow
+    assert '"consumer_los_jones"' in workflow
+    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "CHANNEL_CUDA_GENCODE_FLAGS" in cmake
+    second_torch_find = cmake.index("find_package(Torch REQUIRED)", cmake.index("add_subdirectory("))
+    channel_gencode_cleanup = cmake.index(
+        "Channel CUDA flags after removing Torch gencode flags"
+    )
+    channel_target = cmake.index("Python_add_library(")
+    assert second_torch_find < channel_gencode_cleanup < channel_target
+    assert (
+        '"(^|[ \\t])-gencode[ \\t]+arch=[^ \\t]+,code=[^ \\t]+"'
+        in cmake
+    )
+    assert "set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)" in cmake
+    assert "target_compile_options(" in cmake
+
+    kernels = ROOT / "native" / "channel" / "kernels"
+    cuda_sources = [*kernels.rglob("*.cu"), *kernels.rglob("*.cuh")]
+    native_root = ROOT / "native" / "channel"
+    pending = list(cuda_sources)
+    reachable_sources: set[Path] = set()
+    while pending:
+        source = pending.pop()
+        if source in reachable_sources:
+            continue
+        reachable_sources.add(source)
+        text = source.read_text(encoding="utf-8")
+        for include in re.findall(r'^\s*#include\s+"([^"]+)"', text, re.MULTILINE):
+            candidate = (source.parent / include).resolve()
+            if candidate.is_file() and candidate.is_relative_to(native_root):
+                pending.append(candidate)
+    extension_includes = [
+        path
+        for path in reachable_sources
+        if "#include <torch/extension.h>" in path.read_text(encoding="utf-8")
+    ]
+    assert extension_includes == []
+    minimal_header = (kernels / "torch_cuda_minimal.h").read_text(encoding="utf-8")
+    assert "#include <ATen/ATen.h>" in minimal_header
+    assert "#include <torch/csrc/utils/pybind.h>" in minimal_header
+    assert "#include <torch/types.h>" not in minimal_header
+    assert all(
+        not re.search(r"(?<!rayd::)torch::", path.read_text(encoding="utf-8"))
+        for path in cuda_sources
+    )
+
+    publish_guard = (
+        "github.event_name == 'release' && github.event.action == 'published'"
+    )
+    assert publish_guard in workflow
+    assert "pypa/gh-action-pypi-publish@release/v1" in workflow
+    assert "id-token: write" in workflow

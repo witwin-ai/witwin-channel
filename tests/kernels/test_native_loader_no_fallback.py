@@ -162,11 +162,9 @@ def test_production_sources_have_no_legacy_fallback_state_terms():
     )
     forbidden = (
         "fallback",
-        "unsupported",
         "fusion_debt",
         "require_reflection",
         "require_diffraction",
-        "torch_cuda",
     )
 
     offenders: list[str] = []

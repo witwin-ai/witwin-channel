@@ -116,6 +116,26 @@ set(CHANNEL_TORCH_CUDA_ARCH_LIST "$ENV{TORCH_CUDA_ARCH_LIST}")
 if(CHANNEL_TORCH_CUDA_ARCH_LIST STREQUAL "OFF")
     message(FATAL_ERROR "TORCH_CUDA_ARCH_LIST must not be OFF for Channel.")
 endif()
+set(
+    CHANNEL_CUDA_GENCODE_FLAGS
+    ""
+    CACHE STRING
+    "Optional explicit NVCC gencode flags that share CUDA front-end work.")
+if(DEFINED ENV{CHANNEL_CUDA_GENCODE_FLAGS}
+   AND NOT "$ENV{CHANNEL_CUDA_GENCODE_FLAGS}" STREQUAL "")
+    set(
+        CHANNEL_CUDA_GENCODE_FLAGS
+        "$ENV{CHANNEL_CUDA_GENCODE_FLAGS}"
+        CACHE STRING
+        "Optional explicit NVCC gencode flags that share CUDA front-end work."
+        FORCE)
+endif()
+if(NOT CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
+    separate_arguments(
+        CHANNEL_CUDA_GENCODE_OPTIONS
+        NATIVE_COMMAND
+        "${CHANNEL_CUDA_GENCODE_FLAGS}")
+endif()
 separate_arguments(
     CHANNEL_TORCH_CUDA_ARCH_TOKENS
     NATIVE_COMMAND
@@ -392,6 +412,20 @@ if(WIN32 AND NOT EXISTS "${TORCH_CMAKE_PREFIX}/Torch/TorchConfig.cmake")
     endif()
 endif()
 find_package(Torch REQUIRED)
+if(NOT CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
+    # Channel consumes Torch after RayD's subdirectory has already sanitized
+    # Caffe2's per-architecture flags. This second find_package call appends
+    # them again, so remove them before creating the Channel CUDA target.
+    string(
+        REGEX REPLACE
+        "(^|[ \t])-gencode[ \t]+arch=[^ \t]+,code=[^ \t]+"
+        ""
+        CMAKE_CUDA_FLAGS
+        "${CMAKE_CUDA_FLAGS}")
+    string(STRIP "${CMAKE_CUDA_FLAGS}" CMAKE_CUDA_FLAGS)
+    message(STATUS
+        "Channel CUDA flags after removing Torch gencode flags: ${CMAKE_CUDA_FLAGS}")
+endif()
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c
         "import torch; print(torch.__version__.split('+', 1)[0]); print(torch.version.cuda or '')"
@@ -568,6 +602,9 @@ Python_add_library(
     native/channel/kernels/evaluated_paths_canonical_capacity_gather_ad.cu
     native/channel/kernels/evaluated_paths_capacity_pack.cu
     native/channel/kernels/evaluated_paths_capacity_pack_ad.cu
+    native/channel/kernels/evaluated_paths_compact_finalize.cu
+    native/channel/kernels/consumer_los_jones.cu
+    native/channel/kernels/consumer_fixed_los_gather.cu
     native/channel/kernels/deterministic_path_table_capacity_pack.cu
     native/channel/kernels/deterministic_diffraction_pair_reduce.cu
     native/channel/kernels/path_result_capacity_pack.cu
@@ -589,9 +626,20 @@ Python_add_library(
     native/channel/montecarlo_basic.cpp
     native/channel/path_solver.cpp
 )
-set_target_properties(
-    _channel
-    PROPERTIES CUDA_ARCHITECTURES "${CHANNEL_CUDA_ARCHITECTURES}")
+if(CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
+    set_target_properties(
+        _channel
+        PROPERTIES CUDA_ARCHITECTURES "${CHANNEL_CUDA_ARCHITECTURES}")
+else()
+    set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)
+    foreach(CHANNEL_CUDA_GENCODE_OPTION IN LISTS CHANNEL_CUDA_GENCODE_OPTIONS)
+        target_compile_options(
+            _channel
+            PRIVATE
+                "$<$<COMPILE_LANGUAGE:CUDA>:${CHANNEL_CUDA_GENCODE_OPTION}>")
+    endforeach()
+    message(STATUS "Channel grouped CUDA gencode flags: ${CHANNEL_CUDA_GENCODE_FLAGS}")
+endif()
 add_dependencies(_channel channel_validate_build_identity)
 if(WIN32)
     # CMake 4.3 may append CMAKE_SHARED_MODULE_SUFFIX after the SOABI suffix,

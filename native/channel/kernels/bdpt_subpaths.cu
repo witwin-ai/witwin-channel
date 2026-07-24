@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

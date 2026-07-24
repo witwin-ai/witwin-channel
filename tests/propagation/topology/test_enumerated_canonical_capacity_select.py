@@ -474,6 +474,9 @@ def test_selector_has_no_fallback_sync_or_intermediate_trap() -> None:
     live_engine = (
         root / "src/witwin/channel/propagation/enumerated/engine.py"
     ).read_text(encoding="utf-8")
+    selector_native = native.split(
+        "pybind11::dict channel_deterministic_gather_topology_block", 1
+    )[0]
     for forbidden in (
         "cudaMemcpy",
         "cudaStreamSynchronize",
@@ -483,7 +486,7 @@ def test_selector_has_no_fallback_sync_or_intermediate_trap() -> None:
         "thrust::",
         'asm volatile("trap;")',
     ):
-        assert forbidden not in native
+        assert forbidden not in selector_native
     assert 'required_symbol as _required_native_op' in facade
     assert "enumerated_canonical_capacity_select" in facade
     assert "path_capacity_per_pair" not in native

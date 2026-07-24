@@ -94,7 +94,10 @@ def test_public_path_exports_retain_actual_row_compaction() -> None:
     )
 
     solve_calls = _function_calls(path_pipeline_relative, "_solve_base")
-    assert max(solve_calls["_compact_valid_evaluated_paths_for_legacy_result"]) < min(
+    assert max(solve_calls["sanitize_enumerated_capacity_transaction"]) < min(
+        solve_calls["compact_evaluated_paths"]
+    )
+    assert max(solve_calls["compact_evaluated_paths"]) < min(
         solve_calls["pack_evaluated_paths"]
     )
     assert "max_paths_per_pair = int(counts.max().item())" in path_result

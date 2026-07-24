@@ -35,6 +35,39 @@ import witwin.channel as channel
 print(channel.capabilities())
 ```
 
+## Propagation consumer API
+
+External simulation packages can use the solver-neutral, versioned consumer
+boundary without importing a Channel solver or internal propagation contract:
+
+```python
+from witwin.channel.propagation.consumer import (
+    CONTRACT_VERSION,
+    EndpointBatch,
+    PropagationRequest,
+    evaluate,
+)
+
+assert CONTRACT_VERSION == 1
+```
+
+The consumer publishes exact compact `K` rows with native-produced stable pair
+segmentation and scalar, Complex3, or complete source-basis-to-sink-basis Jones
+transport when advertised by its typed capabilities. It reuses the owning
+ADR-032 compact boundary; no adapter performs a second count observation or
+Torch/Python compaction. Unsupported component, response, frequency-offset, or
+AD combinations fail before a partial result is returned.
+
+Contract version 1 supports LoS, reflection, transmission, and diffraction.
+Scattering is not advertised or accepted: its current enumerated rows are
+incoherent power-domain output and do not satisfy the consumer's coherent
+transport or canonical pair-major row contracts.
+
+The consumer is intentionally propagation-only. It contains no Radar target,
+RCS, waveform, IQ, ADC, detection, or processing policy. See
+[`docs/dev/propagation-consumer-contract.md`](docs/dev/propagation-consumer-contract.md)
+for the versioning, convention, zero-copy, and failure contracts.
+
 ## Solver entry points
 
 | Package | Use case | Primary result |
@@ -53,14 +86,20 @@ contract. The exact stable exports are recorded in
 - CPython 3.11.
 - PyTorch 2.10 with CUDA 12.8 runtime support.
 - Windows x64 on an NVIDIA GPU with compute capability 12.0 for the currently
-  verified release row. Other declared architectures and platforms require
-  their own release evidence before publication.
+  runtime-verified row. Release wheels must contain the repository-wide native
+  SASS set, including SM87, and compute_120 PTX; SM87 runtime validation remains
+  separate evidence.
 - An ABI-compatible `witwin-channel` wheel, or a source build against the
   repository-locked RayD integration.
 
 Channel has no production CPU compute backend. Missing CUDA, an unsupported
 GPU architecture, an incompatible extension, or a required native capability
 raises an error before returning a partial result.
+
+`_channel` uses the versioned LibTorch/Python extension ABI. The Stage-I wheel
+is CPython 3.11 / Torch 2.10.0 only and is not advertised as a LibTorch Stable
+ABI binary. Linux release wheels are compiled inside a real
+`manylinux_2_28` environment.
 
 ## Installation
 

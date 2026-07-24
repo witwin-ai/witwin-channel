@@ -198,6 +198,7 @@ def test_shared_topology_deduplicates_canonical_sequences_and_caps_each_pair():
         max_paths=1,
         max_paths_scope="per_pair",
         tx_count=1,
+        rx_count=2,
         max_depth=1,
         launch_count=0,
     )

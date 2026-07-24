@@ -27,6 +27,31 @@ priority `scattering > diffraction > transmission > reflection > los`.
 - RayD `TraceBackend::Auto` remains GPU-only: it prefers OptiX and may select
   RayD's full-result pure-CUDA tracer. It is not a Torch or CPU fallback.
 
+## Solver-neutral propagation consumer
+
+- `witwin.channel.propagation.consumer` contract version 1 is a stable public
+  module; it is not duplicated at the package root and does not expose
+  `EvaluatedPaths` or a solver result.
+- Typed endpoint/request/convention/capability/evaluation contracts publish
+  exact compact `K` rows, native-produced `pair_index`/`pair_offsets`, and
+  scalar, Complex3, or complete 2x2 Jones transport according to capability.
+- Contract version 1 supports `los`, `reflection`, `transmission`, and
+  `diffraction`. It rejects `scattering` before compute because the current
+  scattering rows are incoherent power-domain output without the required
+  coherent transport and canonical pair-major row semantics.
+- Equivalent compact fields preserve exact object/storage/stride/device/grad
+  identity. Consumer-only fields have one native producer; no Python/Torch
+  gather, compaction, or physics reconstruction is used.
+- Fixed-topology reevaluation supports only advertised continuous inputs with
+  fixed row identity, winners, and pair segmentation. Unsupported response,
+  frequency-offset, topology-tangent, and AD cells fail before partial output.
+- The consumer reuses the ADR-032 owning count observation. Its count D2H and
+  stream-synchronization delta relative to the same internal evaluation is
+  zero. Failure state, raw bits, handles, resources, caches, and tapes do not
+  cross the boundary.
+- The API is propagation-only and has no Radar waveform, target/RCS, IQ, ADC,
+  detection, or processing fields.
+
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links the RayD

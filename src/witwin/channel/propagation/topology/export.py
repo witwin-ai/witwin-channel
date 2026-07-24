@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 
 import torch
@@ -11,13 +11,15 @@ from witwin.channel.propagation.models.fields import PathFields
 from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.propagation.topology.concatenate import (
-    _canonical_selection_order,
     _interaction_type_sequence,
+)
+from witwin.channel.propagation.topology.kernels.canonical_compact import (
+    ExactPairMetadata,
+    enumerated_canonical_compact,
 )
 from witwin.channel.propagation.topology.kernels import (
     construction as topology_construction,
 )
-from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
 from witwin.channel.runtime.capacity import SolveCapacityTransaction
 
 
@@ -42,6 +44,7 @@ class EvaluatedPathSidecars:
     diffraction_vector_field: torch.Tensor | None
     capacity_execution: CapacityExecutionCounts | None = None
     capacity_transaction: SolveCapacityTransaction | None = None
+    compact_metadata: ExactPairMetadata | None = None
 
 
 def evaluated_paths_from_result(
@@ -202,31 +205,45 @@ def evaluated_paths_from_block(
     max_paths: int | None,
     max_paths_scope: str,
     tx_count: int,
+    rx_count: int,
     max_depth: int,
     launch_count: int,
     visibility_rejection_count: int = 0,
     selected_edge_count: int = 0,
     candidate_count: int | None = None,
     guardrail_count: int = 0,
+    source_stable_ids: torch.Tensor | None = None,
+    sink_stable_ids: torch.Tensor | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Select a canonical path block and construct split typed contracts."""
 
-    order = _canonical_selection_order(
+    if "primitive_sequence" not in paths and int(paths["valid"].shape[0]) == 0:
+        device = paths["valid"].device
+        empty_i32 = torch.empty((0, max_depth), device=device, dtype=torch.int32)
+        empty_vec3 = torch.empty(
+            (0, max_depth, 3), device=device, dtype=torch.float32
+        )
+        paths = _ensure_topology_fields(
+            paths,
+            primitive_sequence=empty_i32,
+            material_sequence=empty_i32,
+            interaction_positions=empty_vec3,
+            interaction_normals=empty_vec3,
+        )
+    compact = enumerated_canonical_compact(
         paths,
-        tx_count=tx_count,
-        max_depth=max_depth,
+        pair_count=tx_count * rx_count,
+        num_tx=tx_count,
+        num_rx=rx_count,
         max_paths=max_paths,
         max_paths_scope=max_paths_scope,
-    )
-    selected = topology_blocks.deterministic_gather_topology_block(
-        paths,
-        order,
-        max_count=-1,
         sequence_width=max_depth,
+        source_stable_ids=source_stable_ids,
+        sink_stable_ids=sink_stable_ids,
     )
-    return evaluated_paths_from_result(
+    evaluated, sidecars = evaluated_paths_from_result(
         SimpleNamespace(
-            **selected,
+            **compact.block,
             launch_count=launch_count,
             visibility_rejection_count=visibility_rejection_count,
             selected_edge_count=selected_edge_count,
@@ -237,6 +254,19 @@ def evaluated_paths_from_block(
             ),
             guardrail_count=guardrail_count,
         )
+    )
+    return evaluated, replace(
+        sidecars,
+        compact_metadata=ExactPairMetadata(
+            pair_index=compact.pair_index,
+            pair_offsets=compact.pair_offsets,
+            source_id=compact.source_id,
+            sink_id=compact.sink_id,
+            path_count=compact.path_count,
+            count_d2h_copies=compact.count_d2h_copies,
+            count_d2h_bytes=compact.count_d2h_bytes,
+            count_synchronizations=compact.count_synchronizations,
+        ),
     )
 
 

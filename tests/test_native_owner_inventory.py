@@ -162,6 +162,29 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         REPOSITORY_ROOT, adr033_predecessor_identity=True
     )
     actual = Counter(_hash_tuple(entry) for entry in current_hashes)
+    compact_count_helper_transformations = {
+        "cn_path_filter_los_cuda",
+        "cn_deterministic_los_topology_block",
+        "cn_deterministic_reflection_order1_compact",
+        "cn_deterministic_reflection_sequence_compact",
+        "cn_deterministic_diffraction_order1_compact",
+        "cn_path_filter_block_cuda",
+        "cn_path_diffraction_block_cuda",
+    }
+    compact_count_helper_before = Counter(
+        _hash_tuple(entry)
+        for owner in inventory["owners"]
+        for entry in owner["cpp_body_hash_multiset"]
+        if entry["name"] in compact_count_helper_transformations
+    )
+    compact_count_helper_after_entries = [
+        entry
+        for entry in current_hashes
+        if entry["name"] in compact_count_helper_transformations
+    ]
+    compact_count_helper_after = Counter(
+        _hash_tuple(entry) for entry in compact_count_helper_after_entries
+    )
     transfers = migration["phase3_current"][
         "approved_phase9_body_hash_transfer_multiset"
     ]
@@ -245,7 +268,28 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         "768b96e42a95f70c32d55f98a72000085317e288"
     )
     assert len(live_transfers) == len(transferred_names)
-    assert expected - actual == approved_before + approved_deletions + phase11b_before
+    assert expected - actual == (
+        approved_before
+        + approved_deletions
+        + phase11b_before
+        + compact_count_helper_before
+    )
+    assert {
+        entry["name"] for entry in compact_count_helper_after_entries
+    } == compact_count_helper_transformations
+    assert len(compact_count_helper_after) == len(
+        compact_count_helper_transformations
+    )
+    frozen_compact_signatures = {
+        entry["name"]: entry["signature_sha256"]
+        for owner in inventory["owners"]
+        for entry in owner["cpp_body_hash_multiset"]
+        if entry["name"] in compact_count_helper_transformations
+    }
+    assert {
+        entry["name"]: entry["signature_sha256"]
+        for entry in compact_count_helper_after_entries
+    } == frozen_compact_signatures
     assert actual_transferred == approved_after
     assert actual_phase11b == phase11b_after
     assert len(phase11b_transformations) == len(phase11b_names) == 2

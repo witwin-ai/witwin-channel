@@ -2,7 +2,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/scan.h>
@@ -510,22 +510,8 @@ channel_path_filter_los_cuda(
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
 
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t out_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t out_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     if (out_count == 0) {
         return empty_path_block_from(tx_id);
     }
@@ -624,22 +610,8 @@ pybind11::dict channel_deterministic_los_topology_block(
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
 
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t out_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t out_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     if (out_count == 0) {
         return empty_deterministic_los_topology_block_from(tx_id, sequence_width);
     }
@@ -817,22 +789,8 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
         thrust::device_pointer_cast(flags.data_ptr<int>()),
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t out_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t out_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     if (out_count == 0) {
         return empty_out();
     }
@@ -1034,22 +992,8 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
         thrust::device_pointer_cast(flags.data_ptr<int>()),
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t visible_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t visible_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     const int64_t out_count = max_count < 0 ? visible_count : std::min<int64_t>(visible_count, max_count);
     if (out_count == 0) {
         return empty_out();
@@ -1230,22 +1174,8 @@ pybind11::dict channel_deterministic_diffraction_order1_compact(
         thrust::device_pointer_cast(flags.data_ptr<int>()),
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t out_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t out_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     if (out_count == 0) {
         return empty_out();
     }
@@ -1333,22 +1263,8 @@ channel_path_filter_block_cuda(
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
 
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t out_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t out_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     if (out_count == 0) {
         return empty_path_block_from(valid);
     }
@@ -1453,22 +1369,8 @@ channel_path_diffraction_block_cuda(
         thrust::device_pointer_cast(flags.data_ptr<int>() + count),
         thrust::device_pointer_cast(offsets.data_ptr<int>()));
 
-    int last_flag = 0;
-    int last_offset = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t out_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t out_count =
+        observe_compact_count(flags, offsets, count, stream).count;
     if (out_count == 0) {
         return empty_path_block_from(valid);
     }

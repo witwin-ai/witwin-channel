@@ -3,7 +3,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include "../tensor_checks.h"
 #include "evaluated_paths_continuous_gather_ad.cuh"
@@ -219,7 +219,7 @@ void check_selection(
 
 }  // namespace
 
-pybind11::dict channel_evaluated_paths_capacity_pack_backward(
+pybind11::dict channel_evaluated_paths_compact_finalize_backward(
     at::Tensor valid,
     at::Tensor selected_row_index,
     std::optional<at::Tensor> grad_path_length_m,
@@ -279,7 +279,7 @@ pybind11::dict channel_evaluated_paths_capacity_pack_backward(
     return outputs.dict();
 }
 
-pybind11::dict channel_evaluated_paths_capacity_pack_jvp(
+pybind11::dict channel_evaluated_paths_compact_finalize_jvp(
     at::Tensor valid,
     at::Tensor selected_row_index,
     std::optional<at::Tensor> tangent_path_length_m,
@@ -335,4 +335,72 @@ pybind11::dict channel_evaluated_paths_capacity_pack_jvp(
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return outputs.dict();
+}
+
+pybind11::dict channel_evaluated_paths_capacity_pack_backward(
+    at::Tensor valid,
+    at::Tensor selected_row_index,
+    std::optional<at::Tensor> grad_path_length_m,
+    std::optional<at::Tensor> grad_delay_s,
+    std::optional<at::Tensor> grad_field_direction,
+    std::optional<at::Tensor> grad_interaction_position,
+    std::optional<at::Tensor> grad_interaction_normal,
+    std::optional<at::Tensor> grad_interaction_positions,
+    std::optional<at::Tensor> grad_interaction_normals,
+    std::optional<at::Tensor> grad_path_gain,
+    std::optional<at::Tensor> grad_path_field,
+    std::optional<at::Tensor> grad_field_xyz,
+    std::optional<at::Tensor> grad_coefficient,
+    int64_t candidate_count,
+    int64_t sequence_width) {
+    return channel_evaluated_paths_compact_finalize_backward(
+        valid,
+        selected_row_index,
+        grad_path_length_m,
+        grad_delay_s,
+        grad_field_direction,
+        grad_interaction_position,
+        grad_interaction_normal,
+        grad_interaction_positions,
+        grad_interaction_normals,
+        grad_path_gain,
+        grad_path_field,
+        grad_field_xyz,
+        grad_coefficient,
+        candidate_count,
+        sequence_width);
+}
+
+pybind11::dict channel_evaluated_paths_capacity_pack_jvp(
+    at::Tensor valid,
+    at::Tensor selected_row_index,
+    std::optional<at::Tensor> tangent_path_length_m,
+    std::optional<at::Tensor> tangent_delay_s,
+    std::optional<at::Tensor> tangent_field_direction,
+    std::optional<at::Tensor> tangent_interaction_position,
+    std::optional<at::Tensor> tangent_interaction_normal,
+    std::optional<at::Tensor> tangent_interaction_positions,
+    std::optional<at::Tensor> tangent_interaction_normals,
+    std::optional<at::Tensor> tangent_path_gain,
+    std::optional<at::Tensor> tangent_path_field,
+    std::optional<at::Tensor> tangent_field_xyz,
+    std::optional<at::Tensor> tangent_coefficient,
+    int64_t candidate_count,
+    int64_t sequence_width) {
+    return channel_evaluated_paths_compact_finalize_jvp(
+        valid,
+        selected_row_index,
+        tangent_path_length_m,
+        tangent_delay_s,
+        tangent_field_direction,
+        tangent_interaction_position,
+        tangent_interaction_normal,
+        tangent_interaction_positions,
+        tangent_interaction_normals,
+        tangent_path_gain,
+        tangent_path_field,
+        tangent_field_xyz,
+        tangent_coefficient,
+        candidate_count,
+        sequence_width);
 }

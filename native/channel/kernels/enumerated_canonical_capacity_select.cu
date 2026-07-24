@@ -2,9 +2,10 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cub/device/device_radix_sort.cuh>
+#include <cub/device/device_scan.cuh>
 #include <cub/device/device_select.cuh>
 #include <cuda_runtime_api.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include "../tensor_checks.h"
 #include "capacity_failure_state.h"
@@ -12,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <utility>
 
 namespace {
@@ -431,6 +433,68 @@ __global__ void publish_kernel(
     }
 }
 
+__global__ void compact_control_record_kernel(
+    const int* __restrict__ failure_state,
+    const int* __restrict__ selected_count,
+    int64_t candidate_count,
+    int64_t* __restrict__ control_record) {
+    if (blockIdx.x == 0 && threadIdx.x == 0) {
+        const int count = selected_count[0];
+        control_record[0] =
+            failure_state[0] == 0 && count >= 0 &&
+                    static_cast<int64_t>(count) <= candidate_count
+                ? static_cast<int64_t>(count)
+                : -1;
+    }
+}
+
+__global__ void exact_pair_metadata_kernel(
+    const int64_t* __restrict__ selected_row_index,
+    const int* __restrict__ tx_id,
+    const int* __restrict__ rx_id,
+    const int64_t* __restrict__ source_stable_ids,
+    const int64_t* __restrict__ sink_stable_ids,
+    int64_t* __restrict__ pair_index,
+    int64_t* __restrict__ source_id,
+    int64_t* __restrict__ sink_id,
+    int64_t* __restrict__ pair_counts,
+    int64_t row_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    bool has_stable_ids) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t destination =
+             static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         destination < row_count;
+         destination += stride) {
+        const int64_t source =
+            selected_row_index == nullptr ? destination
+                                          : selected_row_index[destination];
+        const int tx = tx_id[source];
+        const int rx = rx_id[source];
+        if (tx < 0 || static_cast<int64_t>(tx) >= num_tx ||
+            rx < 0 || static_cast<int64_t>(rx) >= num_rx) {
+            pair_index[destination] = 0;
+            if (has_stable_ids) {
+                source_id[destination] = 0;
+                sink_id[destination] = 0;
+            }
+            CUDA_KERNEL_ASSERT(
+                false && "exact pair metadata endpoint id is out of range");
+            continue;
+        }
+        const int64_t pair = static_cast<int64_t>(rx) * num_tx + tx;
+        pair_index[destination] = pair;
+        atomicAdd(
+            reinterpret_cast<unsigned long long*>(pair_counts + pair),
+            static_cast<unsigned long long>(1));
+        if (has_stable_ids) {
+            source_id[destination] = source_stable_ids[tx];
+            sink_id[destination] = sink_stable_ids[rx];
+        }
+    }
+}
+
 void device_select(
     const at::Tensor& input,
     const at::Tensor& flags,
@@ -453,7 +517,7 @@ void device_select(
 
 }  // namespace
 
-pybind11::dict channel_enumerated_canonical_capacity_select(
+static pybind11::dict canonical_capacity_select_impl(
     at::Tensor failure_state,
     at::Tensor valid,
     at::Tensor tx_id,
@@ -690,5 +754,310 @@ pybind11::dict channel_enumerated_canonical_capacity_select(
     result["valid"] = selected_valid;
     result["num_selected"] = num_selected;
     result["num_paths"] = num_paths;
+    return result;
+}
+
+pybind11::dict channel_enumerated_canonical_capacity_select(
+    at::Tensor failure_state,
+    at::Tensor valid,
+    at::Tensor tx_id,
+    at::Tensor rx_id,
+    at::Tensor depth,
+    at::Tensor component_id,
+    at::Tensor primitive_id,
+    at::Tensor edge_id,
+    at::Tensor primitive_sequence,
+    at::Tensor path_length_m,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t max_paths,
+    int64_t max_paths_scope) {
+    return canonical_capacity_select_impl(
+        std::move(failure_state),
+        std::move(valid),
+        std::move(tx_id),
+        std::move(rx_id),
+        std::move(depth),
+        std::move(component_id),
+        std::move(primitive_id),
+        std::move(edge_id),
+        std::move(primitive_sequence),
+        std::move(path_length_m),
+        pair_count,
+        num_tx,
+        num_rx,
+        max_paths,
+        max_paths_scope);
+}
+
+pybind11::dict channel_deterministic_gather_topology_block(
+    pybind11::dict block,
+    at::Tensor order,
+    int64_t max_count,
+    int64_t sequence_width);
+
+namespace {
+
+at::Tensor require_block_tensor(
+    const pybind11::dict& block,
+    const char* name) {
+    TORCH_CHECK(block.contains(name), "block must contain ", name);
+    return pybind11::cast<at::Tensor>(block[name]);
+}
+
+void validate_optional_stable_ids(
+    const std::optional<at::Tensor>& source_stable_ids,
+    const std::optional<at::Tensor>& sink_stable_ids,
+    const at::Tensor& reference,
+    int64_t num_tx,
+    int64_t num_rx) {
+    TORCH_CHECK(
+        source_stable_ids.has_value() == sink_stable_ids.has_value(),
+        "source_stable_ids and sink_stable_ids must be provided together");
+    if (!source_stable_ids.has_value()) {
+        return;
+    }
+    check_tensor(*source_stable_ids, "source_stable_ids", at::kLong, 1);
+    check_tensor(*sink_stable_ids, "sink_stable_ids", at::kLong, 1);
+    TORCH_CHECK(
+        source_stable_ids->size(0) == num_tx,
+        "source_stable_ids must match num_tx");
+    TORCH_CHECK(
+        sink_stable_ids->size(0) == num_rx,
+        "sink_stable_ids must match num_rx");
+    TORCH_CHECK(
+        source_stable_ids->get_device() == reference.get_device() &&
+            sink_stable_ids->get_device() == reference.get_device(),
+        "stable ID tables must share the path device");
+}
+
+void build_pair_offsets(
+    const at::Tensor& pair_counts,
+    at::Tensor pair_offsets,
+    cudaStream_t stream) {
+    const int64_t pair_count = pair_counts.size(0);
+    C10_CUDA_CHECK(cudaMemsetAsync(
+        pair_offsets.data_ptr<int64_t>(), 0, sizeof(int64_t), stream));
+    if (pair_count == 0) {
+        return;
+    }
+    size_t scratch_bytes = 0;
+    C10_CUDA_CHECK(cub::DeviceScan::InclusiveSum(
+        nullptr,
+        scratch_bytes,
+        pair_counts.data_ptr<int64_t>(),
+        pair_offsets.data_ptr<int64_t>() + 1,
+        static_cast<int>(pair_count),
+        stream));
+    auto scratch = at::empty(
+        {static_cast<int64_t>(scratch_bytes)},
+        pair_counts.options().dtype(at::kByte));
+    C10_CUDA_CHECK(cub::DeviceScan::InclusiveSum(
+        scratch.data_ptr<uint8_t>(),
+        scratch_bytes,
+        pair_counts.data_ptr<int64_t>(),
+        pair_offsets.data_ptr<int64_t>() + 1,
+        static_cast<int>(pair_count),
+        stream));
+}
+
+pybind11::dict exact_pair_metadata(
+    const at::Tensor& selected_row_index,
+    const at::Tensor& tx_id,
+    const at::Tensor& rx_id,
+    int64_t row_count,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    const std::optional<at::Tensor>& source_stable_ids,
+    const std::optional<at::Tensor>& sink_stable_ids,
+    cudaStream_t stream) {
+    auto long_options = tx_id.options().dtype(at::kLong);
+    auto pair_index = at::empty({row_count}, long_options);
+    auto pair_offsets = at::empty({pair_count + 1}, long_options);
+    auto pair_counts = channel::empty_zero_cuda(
+        {pair_count}, long_options, stream);
+    const bool has_stable_ids = source_stable_ids.has_value();
+    auto source_id = at::empty(
+        {has_stable_ids ? row_count : 0}, long_options);
+    auto sink_id = at::empty(
+        {has_stable_ids ? row_count : 0}, long_options);
+    if (row_count > 0) {
+        exact_pair_metadata_kernel<<<
+            launch_blocks(row_count), kBlockSize, 0, stream>>>(
+            selected_row_index.defined()
+                ? selected_row_index.data_ptr<int64_t>()
+                : nullptr,
+            tx_id.data_ptr<int>(),
+            rx_id.data_ptr<int>(),
+            has_stable_ids ? source_stable_ids->data_ptr<int64_t>() : nullptr,
+            has_stable_ids ? sink_stable_ids->data_ptr<int64_t>() : nullptr,
+            pair_index.data_ptr<int64_t>(),
+            has_stable_ids ? source_id.data_ptr<int64_t>() : nullptr,
+            has_stable_ids ? sink_id.data_ptr<int64_t>() : nullptr,
+            pair_counts.data_ptr<int64_t>(),
+            row_count,
+            num_tx,
+            num_rx,
+            has_stable_ids);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    build_pair_offsets(pair_counts, pair_offsets, stream);
+    pybind11::dict result;
+    result["pair_index"] = pair_index;
+    result["pair_offsets"] = pair_offsets;
+    result["source_id"] = source_id;
+    result["sink_id"] = sink_id;
+    return result;
+}
+
+}  // namespace
+
+pybind11::dict channel_enumerated_canonical_compact(
+    pybind11::dict block,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t max_paths,
+    int64_t max_paths_scope,
+    int64_t sequence_width,
+    std::optional<at::Tensor> source_stable_ids,
+    std::optional<at::Tensor> sink_stable_ids) {
+    auto valid = require_block_tensor(block, "valid");
+    auto tx_id = require_block_tensor(block, "tx_id");
+    auto rx_id = require_block_tensor(block, "rx_id");
+    auto depth = require_block_tensor(block, "depth");
+    auto component_id = require_block_tensor(block, "component_id");
+    auto primitive_id = require_block_tensor(block, "primitive_id");
+    auto edge_id = require_block_tensor(block, "edge_id");
+    auto primitive_sequence = require_block_tensor(block, "primitive_sequence");
+    auto path_length_m = require_block_tensor(block, "path_length_m");
+    validate_optional_stable_ids(
+        source_stable_ids, sink_stable_ids, valid, num_tx, num_rx);
+
+    const int device = valid.get_device();
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+    auto failure_state = channel::empty_zero_cuda(
+        {1}, valid.options().dtype(at::kInt), stream);
+    pybind11::dict capacity = canonical_capacity_select_impl(
+        failure_state,
+        valid,
+        tx_id,
+        rx_id,
+        depth,
+        component_id,
+        primitive_id,
+        edge_id,
+        primitive_sequence,
+        path_length_m,
+        pair_count,
+        num_tx,
+        num_rx,
+        max_paths,
+        max_paths_scope);
+    auto capacity_index =
+        pybind11::cast<at::Tensor>(capacity["selected_row_index"]);
+    auto selected_count = pybind11::cast<at::Tensor>(capacity["num_selected"]);
+    const int64_t candidate_count = valid.size(0);
+    int64_t path_count = 0;
+    if (candidate_count > 0) {
+        auto control_record = at::empty(
+            {1}, valid.options().dtype(at::kLong));
+        compact_control_record_kernel<<<1, 1, 0, stream>>>(
+            failure_state.data_ptr<int>(),
+            selected_count.data_ptr<int>(),
+            candidate_count,
+            control_record.data_ptr<int64_t>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+        C10_CUDA_CHECK(cudaMemcpyAsync(
+            &path_count,
+            control_record.data_ptr<int64_t>(),
+            sizeof(int64_t),
+            cudaMemcpyDeviceToHost,
+            stream));
+        C10_CUDA_CHECK(cudaStreamSynchronize(stream));
+        TORCH_CHECK(
+            path_count >= 0,
+            "canonical compact selection failed its native contract");
+    }
+
+    auto exact_index = at::empty(
+        {path_count}, valid.options().dtype(at::kLong));
+    if (path_count > 0) {
+        C10_CUDA_CHECK(cudaMemcpyAsync(
+            exact_index.data_ptr<int64_t>(),
+            capacity_index.data_ptr<int64_t>(),
+            static_cast<size_t>(path_count) * sizeof(int64_t),
+            cudaMemcpyDeviceToDevice,
+            stream));
+    }
+    pybind11::dict gathered = channel_deterministic_gather_topology_block(
+        block, exact_index, -1, sequence_width);
+    pybind11::dict metadata = exact_pair_metadata(
+        exact_index,
+        tx_id,
+        rx_id,
+        path_count,
+        pair_count,
+        num_tx,
+        num_rx,
+        source_stable_ids,
+        sink_stable_ids,
+        stream);
+    gathered["selected_row_index"] = exact_index;
+    gathered["pair_index"] = metadata["pair_index"];
+    gathered["pair_offsets"] = metadata["pair_offsets"];
+    gathered["source_id"] = metadata["source_id"];
+    gathered["sink_id"] = metadata["sink_id"];
+    gathered["path_count"] = path_count;
+    gathered["count_d2h_copies"] =
+        candidate_count > 0 ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
+    gathered["count_d2h_bytes"] =
+        candidate_count > 0 ? static_cast<int64_t>(8) : static_cast<int64_t>(0);
+    gathered["count_synchronizations"] =
+        candidate_count > 0 ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
+    return gathered;
+}
+
+pybind11::dict channel_enumerated_exact_pair_metadata(
+    at::Tensor tx_id,
+    at::Tensor rx_id,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    std::optional<at::Tensor> source_stable_ids,
+    std::optional<at::Tensor> sink_stable_ids) {
+    check_tensor(tx_id, "tx_id", at::kInt, 1);
+    check_tensor(rx_id, "rx_id", at::kInt, 1);
+    TORCH_CHECK(rx_id.sizes() == tx_id.sizes(), "rx_id must match tx_id");
+    TORCH_CHECK(
+        rx_id.get_device() == tx_id.get_device(),
+        "rx_id must share tx_id device");
+    TORCH_CHECK(num_tx >= 0 && num_rx >= 0, "endpoint counts must be non-negative");
+    TORCH_CHECK(
+        num_tx == 0 || num_rx <= std::numeric_limits<int64_t>::max() / num_tx,
+        "endpoint pair count overflows int64 indexing");
+    TORCH_CHECK(pair_count == num_tx * num_rx, "pair_count must match endpoints");
+    validate_optional_stable_ids(
+        source_stable_ids, sink_stable_ids, tx_id, num_tx, num_rx);
+    cudaStream_t stream =
+        at::cuda::getCurrentCUDAStream(tx_id.get_device()).stream();
+    at::Tensor no_selection;
+    pybind11::dict result = exact_pair_metadata(
+        no_selection,
+        tx_id,
+        rx_id,
+        tx_id.size(0),
+        pair_count,
+        num_tx,
+        num_rx,
+        source_stable_ids,
+        sink_stable_ids,
+        stream);
+    result["path_count"] = tx_id.size(0);
+    result["count_d2h_copies"] = static_cast<int64_t>(0);
+    result["count_d2h_bytes"] = static_cast<int64_t>(0);
+    result["count_synchronizations"] = static_cast<int64_t>(0);
     return result;
 }

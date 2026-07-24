@@ -2,7 +2,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include <rayd/shared/rf/field_transport.cuh>
 #include "../tensor_checks.h"

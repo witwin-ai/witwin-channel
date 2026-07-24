@@ -1,7 +1,8 @@
 # ADR-034: Stage-I world and propagation boundary
 
-- **Status:** Accepted for Stage I; activated by the accepted RayD 0.7.0
-  Phase 0A dependency baseline
+- **Status:** Accepted and active for Stage I; Phase 0A locked RayD 0.7.0,
+  Phase 1 established Core world contracts, Phase 2 switched Channel owners,
+  and Phase 3 activates consumer contract version 1
 - **Date:** 2026-07-23
 - **Kind:** Ownership, public API, frequency, material, invalidation,
   propagation convention, AD, cardinality, and release decision
@@ -283,6 +284,13 @@ The first integrated Stage-I release locks Torch to 2.10.0. Python 3.10 through
 3.14 are candidates, not claims, until each row has clean build, import,
 native-load, and wheel evidence with the final RayD 0.7.0 artifacts.
 
+The activated Channel matrix remains CPython 3.11 and Torch 2.10.0 only.
+`_channel` uses the versioned LibTorch/Python extension ABI and is not a
+LibTorch Stable ABI binary. The repository-wide Stable ABI floor of Torch 2.10
+applies only to artifacts that actually implement and test that boundary; it
+does not turn Channel into one. Core metadata likewise advertises only the
+Python row verified for this Stage-I release.
+
 The release matrix must also satisfy the repository-wide wheel policy:
 
 - Linux wheels are built inside a real `manylinux_2_28` environment;
@@ -295,6 +303,29 @@ An infeasible Python row requires an explicit breaking support decision before
 Phase 1 is released. Metadata must not claim an unverified row. Phase 2 adds an
 exact dependency on the Phase-1 Core distribution (`witwin==<released
 version>`), not only a namespace import.
+
+### Phase-3 activation record
+
+The stable owner is `witwin.channel.propagation.consumer`, contract version 1.
+The public module remains solver-neutral and Radar-neutral. It publishes typed
+endpoint/request/path/convention/capability/evaluation contracts, scalar,
+Complex3, and complete source-basis-to-sink-basis Jones response contracts,
+plus fixed-topology reevaluation. Unsupported component, response, offset, or
+AD combinations fail before partial output.
+
+Contract version 1 advertises only LoS, reflection, transmission, and
+diffraction. Scattering is rejected before compute because the current
+enumerated scattering representation is incoherent power-domain output and
+does not satisfy the consumer's coherent transport or canonical pair-major row
+contracts.
+
+The consumer reuses the ADR-032 compact owner. Its count-observation and
+synchronization delta relative to the corresponding internal evaluation is
+zero. Channel terminates failures before constructing the public evaluation;
+the public result cannot contain a failure state, observer, native handle,
+resource, cache, or tape. ADR-029 remains Superseded, ADR-030 remains Dormant,
+and ADR-031 remains Rejected; none gains a consumer caller, capability,
+binding-preservation requirement, or release obligation.
 
 ### Validation cadence
 

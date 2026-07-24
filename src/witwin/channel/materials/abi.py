@@ -1,7 +1,7 @@
 """Channel-owned material ABI constants.
 
 Logical material specifications are owned by :mod:`witwin.core`; this module
-contains only the finite encodings consumed by Channel native kernels.
+contains only the finite encodings consumed by native Channel kernels.
 """
 
 from __future__ import annotations

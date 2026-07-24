@@ -1,6 +1,6 @@
 # ADR-007: Propagation data ownership
 
-Status: accepted for the modular hardening migration.
+Status: Accepted; stable consumer boundary added by ADR-034.
 
 ## Decision
 
@@ -33,6 +33,23 @@ Propagation contracts cannot hold `Scene`, `CompiledScene`, native handles,
 mutable caches, or workspaces. Required runtime resources are explicit pipeline
 inputs and remain owned by `CompiledScene`. `EvaluatedPaths` is not a public
 solver `Result` and does not own solver accumulation or execution metadata.
+
+## Stable consumer boundary
+
+`witwin.channel.propagation.consumer` does not publish these internal
+contracts. Its version-1 `PropagationPathBatch` is a distinct, compact public
+contract with native-produced pair segmentation. Fields that are semantically
+and layout-identical to the owning compact output alias the same tensor
+object/storage/stride; fields absent from the internal schema are produced
+once by the owning native producer. The consumer never exposes internal row
+identity objects, failure state, solver tape, mutable workspace, or defining
+module.
+
+The public batch contains exactly `K` valid rows, a host
+`path_count == K`, native-produced `pair_index`, and native-produced
+`pair_offsets`. Its order is the owning compact stage order. A consumer adapter
+may validate metadata and assemble immutable typed contracts, but it may not
+clone, gather, compact, reorder, recompute physics, or transfer payload.
 
 ## Final migration state
 

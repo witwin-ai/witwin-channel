@@ -232,6 +232,115 @@
           "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
         }
       ]
+    },
+    {
+      "module": "witwin.channel.propagation.consumer",
+      "exports": [
+        {
+          "name": "CONTRACT_VERSION",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.CONTRACT_VERSION",
+          "contract_sha256": "89b3aeb88c64435cc95c65a949adcb329efc94031bd55e826e956518785eedbb"
+        },
+        {
+          "name": "Complex3Transport",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.Complex3Transport",
+          "contract_sha256": "f02c96cbaa00a2d9e799127202dcb292849f2837ef21db8008de5d78044da74a"
+        },
+        {
+          "name": "EndpointBatch",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.EndpointBatch",
+          "contract_sha256": "4750752121684732660cfbb503bd1c9cb4d64ac20aa9acca7286645add744179"
+        },
+        {
+          "name": "FixedTopologyEvaluation",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyEvaluation",
+          "contract_sha256": "cf0ec9265f4a8e47b5fd9787be0daced87d5ee458a320a5b3e3df27c9a09a692"
+        },
+        {
+          "name": "FixedTopologyRequest",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyRequest",
+          "contract_sha256": "ce78fdffcddc2c01b4312ca06433fc0e660ff0d2b4f8e2c246ae96e9cb808587"
+        },
+        {
+          "name": "JonesTransport",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.JonesTransport",
+          "contract_sha256": "5a3d3ce987b0e01424a55b8f2b09bb74df0d57af035fe291662ca62094a66641"
+        },
+        {
+          "name": "PropagationCapabilities",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationCapabilities",
+          "contract_sha256": "b53c64ee789be5b5b3469310209cd9bd018d1da9f25a2695e5722f17acccf920"
+        },
+        {
+          "name": "PropagationConvention",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationConvention",
+          "contract_sha256": "a4d0ba9a570b81f9523c439d50b7ac9260c67b95a0ee68ee9ef0c2d0df03953c"
+        },
+        {
+          "name": "PropagationDiagnostics",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationDiagnostics",
+          "contract_sha256": "f94b96a6c2b8e7e57da8b7a4e0a06089704c0ab5405306bb91e60eecd345fd19"
+        },
+        {
+          "name": "PropagationEvaluation",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationEvaluation",
+          "contract_sha256": "75ea9352ff15e22415f5aa27472ca5ce68a3d5d7577073679d1489aa0715f841"
+        },
+        {
+          "name": "PropagationGeometry",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationGeometry",
+          "contract_sha256": "8d69f4a4072878bee6277a87836864b51b1532bdc15c7fa18d385d1beba04c13"
+        },
+        {
+          "name": "PropagationPathBatch",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationPathBatch",
+          "contract_sha256": "251607e545bbf2a21268317806c191d03990402a04faa60b020a04291542fa90"
+        },
+        {
+          "name": "PropagationRequest",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationRequest",
+          "contract_sha256": "d0958e47c6e56d711743f8fc11fee7b0fdeb359193461844e825992e660f60de"
+        },
+        {
+          "name": "PropagationTopology",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationTopology",
+          "contract_sha256": "37d7244e6fa39748517cc66f942750636782897ad48ed209a03baed91542c53b"
+        },
+        {
+          "name": "ScalarTransport",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.ScalarTransport",
+          "contract_sha256": "e0e70ad1c35c4723ad2d8d1c1aa5bf5354a66741f0fa977a9ffa115722349d63"
+        },
+        {
+          "name": "evaluate",
+          "kind": "function",
+          "target": "witwin.channel.propagation.consumer.service.evaluate",
+          "contract_sha256": "4c1201a20a2a25ff9ff7818d56990830b20c0583da22f82e7c7bed7068f7c402",
+          "signature": "(compiled_scene: CompiledScene, request: PropagationRequest)"
+        },
+        {
+          "name": "reevaluate",
+          "kind": "function",
+          "target": "witwin.channel.propagation.consumer.service.reevaluate",
+          "contract_sha256": "361ec98c1e2b4ca844cc56899e6744de390fb6240065cbb81e664bf87bd94f37",
+          "signature": "(compiled_scene: CompiledScene, request: FixedTopologyRequest)"
+        }
+      ]
     }
   ]
 }

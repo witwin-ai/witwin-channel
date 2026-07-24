@@ -744,6 +744,8 @@ if not native_origin.is_relative_to(target):
     raise RuntimeError(f\"native extension resolved outside isolated target: {{native_origin}}\")
 
 import witwin.channel as channel
+import witwin.channel._channel as native
+from witwin.channel.propagation import consumer
 
 build_info = channel.build_info()
 if build_info.get(\"backend\") != \"channel\":
@@ -752,6 +754,23 @@ if build_info.get(\"uses_dr_jit\") is not False:
     raise RuntimeError(\"wheel native extension must report uses_dr_jit=false\")
 if build_info.get(\"uses_rayd_native\") is not True:
     raise RuntimeError(\"wheel native extension must report uses_rayd_native=true\")
+if consumer.CONTRACT_VERSION != 1:
+    raise RuntimeError(
+        f\"unexpected propagation consumer contract: {{consumer.CONTRACT_VERSION!r}}\"
+    )
+for symbol in (
+    \"enumerated_canonical_compact\",
+    \"enumerated_exact_pair_metadata\",
+    \"evaluated_paths_compact_finalize\",
+    \"evaluated_paths_compact_finalize_backward\",
+    \"evaluated_paths_compact_finalize_jvp\",
+    \"consumer_los_jones\",
+    \"consumer_fixed_los_gather\",
+    \"consumer_fixed_los_gather_backward\",
+    \"consumer_fixed_los_gather_jvp\",
+):
+    if not hasattr(native, symbol):
+        raise RuntimeError(f\"packaged native extension is missing {{symbol!r}}\")
 
 print(json.dumps({{
     \"wheel_smoke\": True,

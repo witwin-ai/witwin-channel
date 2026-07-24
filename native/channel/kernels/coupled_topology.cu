@@ -3,7 +3,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include <rayd/shared/utd/utd_math.h>
-#include <torch/extension.h>
+#include "torch_cuda_minimal.h"
 
 #include "../tensor_checks.h"
 

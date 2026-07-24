@@ -54,6 +54,7 @@ from witwin.channel.propagation.geometry.silhouette_clearance import (
 from witwin.channel.propagation.geometry.reevaluate import (
     _geometry_participates_in_ad,
     _opposite_vertex_ids,
+    _participates_in_ad,
     _reflection_geometry_ad,
     _vertices_participate_in_ad,
 )
@@ -830,6 +831,9 @@ def evaluate_path_fields(
     ad_mode: str = "none",
     frequency_value: float | None = None,
     isb_boundary_taper_width: float = 0.0,
+    endpoint_tx_polarizations: torch.Tensor | None = None,
+    endpoint_rx_polarizations: torch.Tensor | None = None,
+    explicit_endpoint_geometry: bool = False,
 ) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
 
@@ -901,22 +905,42 @@ def evaluate_path_fields(
     # winner sequence plus its backward/jvp CUDA kernels), so the field
     # kernels see geometry with a gradient without any torch-side re-solve.
     # Otherwise the detached native discovery output is used unchanged (AD-1).
-    geometry_ad = ad_enabled and _geometry_participates_in_ad(scene)
+    if (endpoint_tx_polarizations is None) != (endpoint_rx_polarizations is None):
+        raise ValueError("explicit endpoint polarizations must be provided together")
+    explicit_geometry_ad = explicit_endpoint_geometry and any(
+        _participates_in_ad(value) for value in (tx_positions, rx_positions)
+    )
+    geometry_ad = ad_enabled and (
+        explicit_geometry_ad
+        or _vertices_participate_in_ad(scene)
+        or (not explicit_endpoint_geometry and _geometry_participates_in_ad(scene))
+    )
     if geometry_ad:
         vertices = ad_geometry.scene_vertex_table(scene, compiled)
-        tx_positions = ad_geometry.transmitter_positions_ad(
-            scene, tx_positions, device=device
-        )
-        rx_positions = ad_geometry.receiver_positions_ad(
-            scene, rx_positions, device=device
-        )
+        if not explicit_endpoint_geometry:
+            tx_positions = ad_geometry.transmitter_positions_ad(
+                scene, tx_positions, device=device
+            )
+            rx_positions = ad_geometry.receiver_positions_ad(
+                scene, rx_positions, device=device
+            )
     tx_id = topology.tx_id.to(dtype=torch.int64)
     rx_id = topology.rx_id.to(dtype=torch.int64)
     source = tx_positions[tx_id].contiguous()
     target = rx_positions[rx_id].contiguous()
     source_power = tx_power[tx_id].to(dtype=torch.float32).contiguous()
-    tx_pol = transmitter_polarizations(scene, device=device)[tx_id].contiguous()
-    rx_pol = receiver_polarizations(scene, device=device)[rx_id].contiguous()
+    tx_pol_batch = (
+        transmitter_polarizations(scene, device=device)
+        if endpoint_tx_polarizations is None
+        else endpoint_tx_polarizations
+    )
+    rx_pol_batch = (
+        receiver_polarizations(scene, device=device)
+        if endpoint_rx_polarizations is None
+        else endpoint_rx_polarizations
+    )
+    tx_pol = tx_pol_batch[tx_id].contiguous()
+    rx_pol = rx_pol_batch[rx_id].contiguous()
 
     field_xyz = input_fields.field_xyz.clone()
     coefficient = input_fields.coefficient.clone()

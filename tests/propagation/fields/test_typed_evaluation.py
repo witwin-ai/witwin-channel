@@ -50,6 +50,7 @@ def _patch_field_stages(monkeypatch, events: list[str]) -> None:
 
     monkeypatch.setattr(evaluation, "AdLaunchLedger", _Ledger)
     monkeypatch.setattr(evaluation, "_geometry_participates_in_ad", lambda _scene: False)
+    monkeypatch.setattr(evaluation, "_vertices_participate_in_ad", lambda _scene: False)
     monkeypatch.setattr(
         evaluation,
         "transmitter_polarizations",

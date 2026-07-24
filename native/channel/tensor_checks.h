@@ -1,6 +1,6 @@
 #pragma once
 
-#include <torch/extension.h>
+#include "kernels/torch_cuda_minimal.h"
 
 namespace channel {
 

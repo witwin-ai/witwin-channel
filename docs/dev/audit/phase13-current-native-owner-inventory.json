@@ -27,10 +27,10 @@
     "layered_owner": "a Channel-composed operation may consume RayD device/trace primitives without transferring the complete operation"
   },
   "counts": {
-    "bindings": 241,
+    "bindings": 250,
     "rayd_numerical": 47,
     "layered": 3,
-    "channel_numerical": 191
+    "channel_numerical": 200
   },
   "current_phase": 12,
   "current_subphase": "validated RayD package-source discovery implemented; ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
@@ -12990,8 +12990,8 @@
     "liveness": "live-static-production-consumer",
     "plan13_disposition": "ADR-027/ADR-032 live compact-route final failure sanitizer"
   },
-  {
-    "symbol": "enumerated_capacity_failure_vector_sanitize",
+    {
+      "symbol": "enumerated_capacity_failure_vector_sanitize",
     "abi_owner": "Channel Native _channel_native",
     "binding_target": "cn_enumerated_capacity_failure_vector_sanitize",
     "binding_registration": {
@@ -13036,9 +13036,413 @@
       "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert"
     ],
     "surface": "internal-native-ABI",
-    "liveness": "live-static-production-consumer",
-    "plan13_disposition": "ADR-027/ADR-032 live compact-route diffraction sidecar sanitizer"
-  }
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "ADR-027/ADR-032 live compact-route diffraction sidecar sanitizer"
+    },
+    {
+      "symbol": "enumerated_canonical_compact",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_enumerated_canonical_compact",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1198
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/enumerated_canonical_capacity_select.cu",
+          "lines": [917],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.topology.kernels.canonical_compact.enumerated_canonical_compact",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/canonical_compact.py",
+          "line": 338
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/topology/export.py",
+          "line": 233
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/canonical_compact.py",
+          "line": 94
+        }
+      ],
+      "contract_test": "tests/path/test_path_canonical_selection.py::test_exact_owner_carries_empty_pair_offsets_and_one_sync_ledger",
+      "e2e_callers": [
+        "tests/propagation/consumer/test_e2e.py::test_discover_general_path_uses_one_canonical_compact_owner"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 canonical exact-row and pair-segmentation owner"
+    },
+    {
+      "symbol": "enumerated_exact_pair_metadata",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_enumerated_exact_pair_metadata",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1211
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/enumerated_canonical_capacity_select.cu",
+          "lines": [1021],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.topology.kernels.canonical_compact.enumerated_exact_pair_metadata",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/canonical_compact.py",
+          "line": 431
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/enumerated/engine.py",
+          "line": 413
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/canonical_compact.py",
+          "line": 455
+        }
+      ],
+      "contract_test": "tests/path/test_path_canonical_selection.py::test_exact_owner_carries_empty_pair_offsets_and_one_sync_ledger",
+      "e2e_callers": [
+        "tests/propagation/consumer/test_e2e.py::test_discover_los_exact_rows_add_no_count_observation"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 exact LoS pair metadata owner"
+    },
+    {
+      "symbol": "evaluated_paths_compact_finalize",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_evaluated_paths_compact_finalize",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1275
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/evaluated_paths_compact_finalize.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.consumer._native.evaluated_paths_compact_finalize",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_native.py",
+          "line": 131
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/path/pipeline.py",
+          "line": 167
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_native.py",
+          "line": 134
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_native_compact_finalizer.py::test_compact_finalize_radix_order_vjp_and_jvp_use_real_native",
+      "e2e_callers": [
+        "tests/path/test_path_canonical_selection.py::test_exact_owner_carries_empty_pair_offsets_and_one_sync_ledger"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 legacy scattering-only final reorder"
+    },
+    {
+      "symbol": "evaluated_paths_compact_finalize_backward",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_evaluated_paths_compact_finalize_backward",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1279
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/evaluated_paths_compact_finalize.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.topology.kernels.compact_autograd.evaluated_paths_compact_finalize_backward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/compact_autograd.py",
+          "line": 51
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/canonical_compact.py",
+          "line": 146
+        },
+        {
+          "path": "src/witwin/channel/propagation/consumer/_native.py",
+          "line": 178
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/compact_autograd.py",
+          "line": 64
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_native_compact_finalizer.py::test_compact_finalize_radix_order_vjp_and_jvp_use_real_native",
+      "e2e_callers": [
+        "tests/path/test_path_canonical_selection.py::test_exact_owner_vjp_scatters_continuous_rows_to_unique_sources"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 shared compact continuous-row VJP"
+    },
+    {
+      "symbol": "evaluated_paths_compact_finalize_jvp",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_evaluated_paths_compact_finalize_jvp",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1283
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/evaluated_paths_compact_finalize.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.topology.kernels.compact_autograd.evaluated_paths_compact_finalize_jvp",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/compact_autograd.py",
+          "line": 71
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/canonical_compact.py",
+          "line": 190
+        },
+        {
+          "path": "src/witwin/channel/propagation/consumer/_native.py",
+          "line": 208
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/topology/kernels/compact_autograd.py",
+          "line": 84
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_native_compact_finalizer.py::test_compact_finalize_radix_order_vjp_and_jvp_use_real_native",
+      "e2e_callers": [
+        "tests/path/test_path_canonical_selection.py::test_exact_owner_jvp_gathers_path_and_interaction_tangents"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 shared compact continuous-row JVP"
+    },
+    {
+      "symbol": "consumer_los_jones",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_consumer_los_jones",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1287
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/consumer_los_jones.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.consumer._native.consumer_los_jones",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_native.py",
+          "line": 306
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/service.py",
+          "line": 331
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_native.py",
+          "line": 314
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_los_jones.py::test_los_jones_is_complete_row_major_transport",
+      "e2e_callers": [
+        "tests/propagation/consumer/test_e2e.py::test_discover_los_jones_end_to_end"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 complete LoS Jones transport"
+    },
+    {
+      "symbol": "consumer_fixed_los_gather",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_consumer_fixed_los_gather",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1291
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/consumer_fixed_los_gather.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.forward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_fixed_los.py",
+          "line": 58
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/service.py",
+          "line": 517
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_fixed_los.py",
+          "line": 59
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_rejects_bad_topology_before_field_compute",
+      "e2e_callers": [
+        "tests/propagation/consumer/test_e2e.py::test_fixed_los_reevaluation_vjp_and_jvp_end_to_end"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 fixed-LoS endpoint gather"
+    },
+    {
+      "symbol": "consumer_fixed_los_gather_backward",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_consumer_fixed_los_gather_backward",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1295
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/consumer_fixed_los_gather.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.backward",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_fixed_los.py",
+          "line": 79
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/service.py",
+          "line": 517
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_fixed_los.py",
+          "line": 91
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_vjp_scatter_adds_duplicate_endpoint_rows",
+      "e2e_callers": [
+        "tests/propagation/consumer/test_e2e.py::test_fixed_los_reevaluation_vjp_and_jvp_end_to_end"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 fixed-LoS endpoint-gather VJP"
+    },
+    {
+      "symbol": "consumer_fixed_los_gather_jvp",
+      "abi_owner": "Channel _channel",
+      "binding_target": "channel_consumer_fixed_los_gather_jvp",
+      "binding_registration": {
+        "path": "native/channel/binding/path.cpp",
+        "line": 1299
+      },
+      "target_source_evidence": [
+        {
+          "path": "native/channel/kernels/consumer_fixed_los_gather.cu",
+          "lines": [1],
+          "count": 1
+        }
+      ],
+      "numerical_owner": "Channel Native",
+      "owner_kind": "Channel native implementation",
+      "python_owner": "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.jvp",
+      "python_definitions": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_fixed_los.py",
+          "line": 104
+        }
+      ],
+      "production_callers": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/service.py",
+          "line": 517
+        }
+      ],
+      "native_dispatch_evidence": [
+        {
+          "path": "src/witwin/channel/propagation/consumer/_fixed_los.py",
+          "line": 114
+        }
+      ],
+      "contract_test": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_jvp_uses_native_endpoint_gather",
+      "e2e_callers": [
+        "tests/propagation/consumer/test_e2e.py::test_fixed_los_reevaluation_vjp_and_jvp_end_to_end"
+      ],
+      "surface": "internal-native-ABI",
+      "liveness": "live-static-production-consumer",
+      "plan13_disposition": "Stage-I Phase 3 fixed-LoS endpoint-gather JVP"
+    }
   ],
   "phase8b_c2d_deterministic_path_table_capacity": {
     "status": "dormant producer; live Result.paths unchanged",

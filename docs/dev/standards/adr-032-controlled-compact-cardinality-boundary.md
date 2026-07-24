@@ -128,6 +128,35 @@ in copies is welcome only when the same row order, values, E2E performance, and
 resource gates pass. Adding copies or synchronization requires a separate
 accepted decision with measurement.
 
+ADR-034 Phase 3 reuses this owning observation for the public propagation
+consumer. Relative to the same Phase-2 internal evaluation, consumer
+projection has a zero count-observation delta: no additional count D2H, no
+additional stream synchronization, and no Python/Torch cardinality query.
+`pair_index`, `pair_offsets`, and consumer-only payload are produced within
+the same owning native compact stage. A second scan/read/synchronization in an
+adapter is not an implementation of this decision.
+
+The Phase-3 general enumerated implementation names that owner
+`enumerated_canonical_compact`. It replaces Torch canonical sorting,
+`nonzero`, Boolean selection, deduplication, and hidden dynamic-cardinality
+observation with one native fixed-width radix/select/gather operation. For a
+nonempty candidate batch it performs one 8-byte `int64` control-record D2H and
+one caller-current-stream synchronization; the record carries `K` or a
+negative contract-error code. A zero-candidate batch performs no D2H or
+synchronization. A device histogram plus inclusive scan produces
+`pair_offsets` in `O(K + P)` without another host observation.
+
+The already-exact LoS fast path uses `enumerated_exact_pair_metadata`. It
+derives `K` from the existing exact tensor shape and produces pair segmentation
+without a count D2H or synchronization. Consumer projection aliases either
+source-pipeline result and does not run another compact, gather, or scan.
+
+The legacy Path solver's incoherent scattering component is outside consumer
+contract version 1. Because that solver appends scattering rows after the
+coherent canonical block, it conditionally uses
+`evaluated_paths_compact_finalize` for the final stable pair-major reorder.
+Non-scattering Path calls do not reach that second boundary.
+
 Public Path and Deterministic results recover their compact semantics. A path
 axis or flat PathTable row count represents actual compact rows, and
 `max_num_paths` represents the maximum actual path count of the compact result,

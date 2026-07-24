@@ -48,7 +48,9 @@ COMMON_HOST_HELPERS = {
     "check_vec3_table",
     "check_path_block_shapes",
     "launch_blocks",
+    "observe_compact_count",
 }
+COMMON_CONTROL_KERNELS = {"compact_count_control_metadata_kernel"}
 TOPOLOGY_KERNELS = {
     "deterministic_order_init_kernel",
     "deterministic_sort_key_1d_kernel",
@@ -96,7 +98,10 @@ def test_path_compaction_translation_unit_owns_the_audited_functions() -> None:
     assert not (MOVED_KERNELS | MOVED_ABI) & names[trace]
     assert REMAINING_COMPACTION_ABI <= names[trace]
     assert not REMAINING_COMPACTION_ABI & names[compaction]
-    assert EMPTY_FACTORIES | COMMON_HOST_HELPERS == names[common]
+    assert (
+        EMPTY_FACTORIES | COMMON_HOST_HELPERS | COMMON_CONTROL_KERNELS
+        == names[common]
+    )
     assert not COMMON_HOST_HELPERS & names[trace]
     assert not COMMON_HOST_HELPERS & names[compaction]
 
@@ -151,9 +156,24 @@ def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     )
 
     assert actual_launches == expected_launches
-    assert sources.count("cudaStreamSynchronize(") == len(
-        source_evidence["explicit_sync_sites"]
+    compaction_source = (
+        KERNEL_ROOT / "path_compaction.cu"
+    ).read_text(encoding="utf-8-sig")
+    common_source = (
+        KERNEL_ROOT / "path_compaction_common.cuh"
+    ).read_text(encoding="utf-8-sig")
+    delegated_count_observations = compaction_source.count(
+        "observe_compact_count("
     )
+    assert (
+        sources.count("cudaStreamSynchronize(")
+        + delegated_count_observations
+        == len(source_evidence["explicit_sync_sites"])
+    )
+    assert delegated_count_observations == 7
+    # The helper has one null-control branch for the seven historical call
+    # sites and one fused control-record branch for the Phase-3 finalizer.
+    assert common_source.count("cudaStreamSynchronize(") == 2
     actual_by_unit = {}
     for name in (
         "deterministic_topology.cu",
@@ -168,7 +188,7 @@ def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
     assert actual_by_unit == {
         "deterministic_topology.cu": (16, 4),
         "path_trace.cu": (19, 0),
-        "path_compaction.cu": (16, 7),
+        "path_compaction.cu": (16, 0),
     }
 
 

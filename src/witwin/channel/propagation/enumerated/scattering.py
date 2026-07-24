@@ -953,6 +953,7 @@ def _collect_scattering_rows(
     device: torch.device,
     info: dict[str, Any],
     ad_mode: str = "none",
+    endpoint_tensors: object | None = None,
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = require_compiled(scene)
     screens = realization_phase_screens(compiled.materials, compiled.assignments)
@@ -980,12 +981,19 @@ def _collect_scattering_rows(
             "deterministic scattering requires RayD native scene capability"
         )
 
-    tx_positions, tx_power = transmitter_tensors(scene, device=device)
-    rx_positions, _layout = receiver_positions_and_layout(scene, device=device)
+    if endpoint_tensors is None:
+        tx_positions, tx_power = transmitter_tensors(scene, device=device)
+        rx_positions, _layout = receiver_positions_and_layout(scene, device=device)
+        tx_pol = transmitter_polarizations(scene, device=device)
+        rx_pol = receiver_polarizations(scene, device=device)
+    else:
+        tx_positions = endpoint_tensors.tx_positions
+        tx_power = endpoint_tensors.tx_power
+        rx_positions = endpoint_tensors.rx_positions
+        tx_pol = endpoint_tensors.tx_polarizations
+        rx_pol = endpoint_tensors.rx_polarizations
     if tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return None, 0, 0, 0
-    tx_pol = transmitter_polarizations(scene, device=device)
-    rx_pol = receiver_polarizations(scene, device=device)
     records = compiled.rayd.edge_records()
     vertices = records.vertices
     scene_diagonal = (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
@@ -1065,6 +1073,8 @@ def append_scattering_evaluated_paths(
     config: TopologyConfig,
     evaluated: EvaluatedPaths,
     sidecars: EvaluatedPathSidecars,
+    *,
+    endpoint_tensors: object | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars, dict[str, Any]]:
     """Append scattering rows to canonical typed path contracts."""
 
@@ -1076,12 +1086,15 @@ def append_scattering_evaluated_paths(
         return evaluated, sidecars, info
 
     ad_mode = str(getattr(config, "ad_mode", "none"))
+    collector_kwargs = {
+        "device": evaluated.device,
+        "info": info,
+        "ad_mode": ad_mode,
+    }
+    if endpoint_tensors is not None:
+        collector_kwargs["endpoint_tensors"] = endpoint_tensors
     rows, launch_delta, candidate_delta, guardrail_delta = _collect_scattering_rows(
-        scene,
-        config,
-        device=evaluated.device,
-        info=info,
-        ad_mode=ad_mode,
+        scene, config, **collector_kwargs
     )
     if rows is not None:
         evaluated, sidecars = _extend_evaluated_paths(

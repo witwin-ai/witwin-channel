@@ -111,10 +111,28 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/propagation/enumerated/engine.py::evaluate_enumerated_paths": {
-      "ceiling": 24,
+      "ceiling": 31,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt plus the Phase-2 internal fixed-tx-power field seam is frozen pending focused decomposition."
+      "reason": "Phase-3 exact-row ownership and explicit endpoint batches extended the existing enumerated orchestration; the measured control-flow surface is frozen pending focused decomposition."
+    },
+    "src/witwin/channel/propagation/enumerated/engine.py::EnumeratedEndpointTensors.__post_init__": {
+      "ceiling": 21,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Phase-3 endpoint batches validate six aligned CUDA tensors plus stable identity vectors at one typed boundary; the exact validation surface is frozen."
+    },
+    "src/witwin/channel/propagation/consumer/_native.py::compact_evaluated_paths": {
+      "ceiling": 18,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "The legacy scattering-only final reorder validates alias mode and differentiable compact mode in one internal facade; its exact Phase-3 surface is frozen."
+    },
+    "src/witwin/channel/propagation/consumer/service.py::_preflight_evaluate": {
+      "ceiling": 28,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "The public consumer performs all-or-nothing request, capability, endpoint, response, and AD validation before compute; the exact Phase-3 preflight surface is frozen."
     },
     "src/witwin/channel/propagation/fields/evaluation.py::_evaluate_coupled_fields": {
       "ceiling": 17,
@@ -188,11 +206,17 @@
       "owner": "scene maintainers",
       "reason": "Core-world runtime structure projection is frozen at the Phase-2 compiler boundary pending focused decomposition."
     },
+    "src/witwin/channel/propagation/fields/evaluation.py::evaluate_path_fields": {
+      "ceiling": 24,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Phase-3 explicit endpoint geometry added one typed field-dispatch branch while preserving the existing component owners; the measured dispatcher surface is frozen."
+    },
     "src/witwin/channel/scene/compiler.py::compile": {
-      "ceiling": 33,
+      "ceiling": 34,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
-      "reason": "Single Core Scene compiler orchestration is frozen at the Phase-2 owner switch pending focused decomposition."
+      "reason": "Single Core Scene compiler orchestration plus the Phase-3 product-identity material ABI guard is frozen at its measured surface pending focused decomposition."
     }
   },
   "limits": {

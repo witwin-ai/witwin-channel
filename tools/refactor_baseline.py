@@ -29,6 +29,7 @@ DEFAULT_PUBLIC_MODULES = (
     PACKAGE,
     f"{PACKAGE}.materials",
     f"{PACKAGE}.capabilities",
+    f"{PACKAGE}.propagation.consumer",
     f"{PACKAGE}.path",
     f"{PACKAGE}.deterministic",
     f"{PACKAGE}.montecarlo.basic",

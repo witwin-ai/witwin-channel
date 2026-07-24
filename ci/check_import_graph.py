@@ -233,6 +233,85 @@ def build_reexport_map(package_root: Path) -> dict[tuple[str, str], str]:
                 reexports[(module, exposed)] = _target_module(
                     base, alias.name, known_modules
                 )
+        for function in (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "__getattr__"
+        ):
+            for branch in (node for node in ast.walk(function) if isinstance(node, ast.If)):
+                names: set[str] = set()
+                if (
+                    isinstance(branch.test, ast.Compare)
+                    and isinstance(branch.test.left, ast.Name)
+                    and branch.test.left.id == "name"
+                    and len(branch.test.ops) == 1
+                    and len(branch.test.comparators) == 1
+                ):
+                    comparator = branch.test.comparators[0]
+                    if (
+                        isinstance(branch.test.ops[0], ast.Eq)
+                        and isinstance(comparator, ast.Constant)
+                        and isinstance(comparator.value, str)
+                    ):
+                        names.add(comparator.value)
+                    elif isinstance(branch.test.ops[0], ast.In) and isinstance(
+                        comparator, (ast.Set, ast.Tuple, ast.List)
+                    ):
+                        names.update(
+                            item.value
+                            for item in comparator.elts
+                            if isinstance(item, ast.Constant)
+                            and isinstance(item.value, str)
+                        )
+                for assignment in (
+                    node
+                    for node in branch.body
+                    if isinstance(node, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == "value"
+                        for target in node.targets
+                    )
+                ):
+                    value = assignment.value
+                    imported_module: str | None = None
+                    imported_name: str | None = None
+                    if (
+                        isinstance(value, ast.Attribute)
+                        and isinstance(value.value, ast.Call)
+                        and isinstance(value.value.func, ast.Name)
+                        and value.value.func.id == "import_module"
+                        and value.value.args
+                        and isinstance(value.value.args[0], ast.Constant)
+                        and isinstance(value.value.args[0].value, str)
+                    ):
+                        imported_module = value.value.args[0].value
+                        imported_name = value.attr
+                    elif (
+                        isinstance(value, ast.Call)
+                        and isinstance(value.func, ast.Name)
+                        and value.func.id == "getattr"
+                        and len(value.args) == 2
+                        and isinstance(value.args[0], ast.Call)
+                        and isinstance(value.args[0].func, ast.Name)
+                        and value.args[0].func.id == "import_module"
+                        and value.args[0].args
+                        and isinstance(value.args[0].args[0], ast.Constant)
+                        and isinstance(value.args[0].args[0].value, str)
+                        and isinstance(value.args[1], ast.Name)
+                        and value.args[1].id == "name"
+                    ):
+                        imported_module = value.args[0].args[0].value
+                    if imported_module is None or not _matches(
+                        imported_module, PACKAGE
+                    ):
+                        continue
+                    for exposed in names:
+                        reexports[(module, exposed)] = _target_module(
+                            imported_module,
+                            imported_name or exposed,
+                            known_modules,
+                        )
     return reexports
 
 

@@ -17,10 +17,7 @@ from witwin.channel.propagation.enumerated.capacity import (
 from witwin.channel.propagation.enumerated.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.consumer._native import compact_evaluated_paths
 from witwin.channel.runtime.capacity import SolveCapacityTransaction
 from witwin.channel.scene.tensors import (
     receiver_positions as _shared_receiver_positions,
@@ -59,58 +56,22 @@ class _DeferredPathResult:
     capacity_transaction: SolveCapacityTransaction | None
 
 
-def _compact_valid_evaluated_paths_for_legacy_result(
-    paths: EvaluatedPaths,
-) -> EvaluatedPaths:
-    """Select valid rows before the legacy Ragged Path result pack.
-
-    ADR-032 retains this compact structural boundary.  It performs no geometry
-    or RF computation; it only prevents inert failure rows from reaching the
-    endpoint-id gathers.
-    """
-
-    selected = torch.nonzero(paths.topology.valid, as_tuple=False).reshape(-1)
-    topology = PathTopology(
-        **{
-            name: getattr(paths.topology, name).index_select(0, selected).contiguous()
-            for name in (
-                "valid",
-                "tx_id",
-                "rx_id",
-                "depth",
-                "component_id",
-                "primitive_id",
-                "edge_id",
-                "material_id",
-                "primitive_sequence",
-                "material_sequence",
-                "interaction_type",
-            )
-        }
+def _stable_endpoint_id_lookups(
+    scene: Scene, *, device: torch.device
+) -> tuple[torch.Tensor, torch.Tensor]:
+    source_ids = tuple(int(view.source.antenna_id) for view in scene.transmitters)
+    sink_ids: list[int] = []
+    for view in scene.receivers:
+        sample_count = (
+            int(view.shape[0]) * int(view.shape[1])
+            if hasattr(view, "shape")
+            else 1
+        )
+        sink_ids.extend((int(view.source.antenna_id),) * sample_count)
+    return (
+        torch.tensor(source_ids, device=device, dtype=torch.int64),
+        torch.tensor(sink_ids, device=device, dtype=torch.int64),
     )
-    geometry = PathGeometry(
-        row_identity=topology.row_identity,
-        **{
-            name: getattr(paths.geometry, name).index_select(0, selected).contiguous()
-            for name in (
-                "path_length_m",
-                "delay_s",
-                "field_direction",
-                "interaction_position",
-                "interaction_normal",
-                "interaction_positions",
-                "interaction_normals",
-            )
-        },
-    )
-    fields = PathFields(
-        row_identity=topology.row_identity,
-        **{
-            name: getattr(paths.fields, name).index_select(0, selected).contiguous()
-            for name in ("path_gain", "path_field", "field_xyz", "coefficient")
-        },
-    )
-    return EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
 
 
 def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
@@ -187,7 +148,8 @@ def _solve_base(
         scene, config, defer_capacity_terminal=True
     )
     scattering_info = None
-    if "scattering" in config.components:
+    appended_scattering = "scattering" in config.components
+    if appended_scattering:
         evaluated, sidecars, scattering_info = append_scattering_evaluated_paths(
             scene,
             config,
@@ -195,7 +157,18 @@ def _solve_base(
             sidecars,
         )
     evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
-    evaluated = _compact_valid_evaluated_paths_for_legacy_result(evaluated)
+    if appended_scattering:
+        # The legacy incoherent scattering owner appends independently
+        # compacted rows after the canonical coherent block. Re-establish the
+        # public Path pair-major order only for that legacy solver route.
+        source_ids, sink_ids = _stable_endpoint_id_lookups(
+            scene, device=evaluated.device
+        )
+        evaluated = compact_evaluated_paths(
+            evaluated,
+            source_stable_ids=source_ids,
+            sink_stable_ids=sink_ids,
+        ).evaluated
     path_count = evaluated.row_count
     if ad_instrumented:
         torch.cuda.synchronize()
