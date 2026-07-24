@@ -229,7 +229,7 @@ _FREQUENCY_HZ = 3.0e9
 def _require_cuda_rayd() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA torch is required")
-    from witwin.channel.core.kernels.extension import build_info
+    from witwin.channel.deployment import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")

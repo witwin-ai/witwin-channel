@@ -87,13 +87,13 @@ def _install_cpu_compile_seams(monkeypatch):
     return builds
 
 
-def test_root_logical_contracts_are_core_owned():
-    import witwin.core as core
+def test_root_does_not_republish_the_core_world_model():
+    """Each world type has exactly one import path, and it is ``witwin.core``."""
 
-    assert channel.Scene is core.Scene
-    assert channel.Structure is core.Structure
-    assert channel.PhysicalMaterial is core.PhysicalMaterial
-    assert channel.ReceiverGrid is core.ReceiverGrid
+    for name in ("Scene", "SceneSnapshot", "Structure", "PhysicalMaterial",
+                 "ReceiverGrid", "AntennaState"):
+        assert not hasattr(channel, name), name
+        assert name not in channel.__all__, name
 
 
 def test_compile_maps_stable_ids_to_dense_runtime_rows(monkeypatch):

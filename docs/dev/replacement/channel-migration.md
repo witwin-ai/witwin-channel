@@ -693,3 +693,103 @@ numerical, AD, launch/resource, performance, wheel, and fingerprint gates for
 both RayD-owned native trace paths.
 Historical Plan 13 P-to-E and E-to-M comparative reports remain archived and
 are not reactivated by this dependency review.
+
+## Stage-I module and public-API standardization
+
+This pass is structural only: no physics, numerical order, launch
+configuration, reduction order, or result schema changed.
+
+### Package root no longer re-exports the Core world model
+
+`witwin.channel` exports only what Channel owns:
+
+```python
+from witwin.channel import (
+    Complex3State, JonesState, build_info, capabilities,
+    pipeline_cache_key, runtime_diagnostics,
+)
+```
+
+`Scene`, `SceneSnapshot`, `Structure`, `PhysicalMaterial`, `MaterialLayer`,
+`PhaseScreen`, `SurfaceRoughness`, `AntennaPattern`, `AntennaState`, and
+`ReceiverGrid` are removed from the Channel root. Import them from
+`witwin.core`, which is their owner. Each world type now has exactly one import
+path.
+
+```python
+# before
+from witwin.channel import Scene, Structure, PhysicalMaterial
+# after
+from witwin.core import Scene, Structure, PhysicalMaterial
+```
+
+Core also drops its `Material` alias; `PhysicalMaterial` is the only public
+name. `Structure` and `MaterialAssignment` moved to `witwin.core.structure`,
+though both stay exported from `witwin.core`.
+
+### `witwin.channel.core` is dissolved
+
+The package collided with `witwin.core` and was not a domain owner. Every
+module moved to its real owner:
+
+| Before | After |
+|---|---|
+| `core.kernels.extension` | deleted; `build_info` comes from `deployment` |
+| `core.kernels.metadata` | `runtime.kernel_metadata` |
+| `core.memory_budget` | `runtime.memory_budget` |
+| `core.edge_policy` | `scene.edge_policy` |
+| `core.edge_selection` | `scene.edge_selection` |
+| `core.ad_geometry` | `scene.ad_geometry` |
+| `core.antenna` | `scene.antenna` |
+| `core.receiver_geometry` | `scene.receiver_geometry` |
+| `core.diffraction_geometry` | `propagation.geometry.edge_state` |
+| `core.components` | `components` |
+| `core.field_state` | `field_state` |
+| `core.tensor_math` | `tensor_math` |
+
+`core.kernels.extension` described itself as a compatibility facade and was the
+package root's only route to `build_info`. Deleting it repays the
+`boundary-001` import-graph debt; `runtime` is now the sole owner of extension
+loading and `deployment` the sole public reporting facade.
+
+### `witwin.channel.physics` is dissolved
+
+`physics.conventions` became the package-root `witwin.channel.constants`, which
+also owns the phase convention that solver metadata and the consumer contract
+quote. `physics.oracle` was a compatibility facade that re-exported private
+names and rewrote `__module__` to impersonate itself; it is deleted. The NumPy
+CPU reference oracle moved to `tests/reference/em_oracle.py`, where CLAUDE.md
+requires reference implementations to live, and no longer ships in the wheel.
+
+Note: Core's `VACUUM_PERMITTIVITY` and Channel's derived `EPS0` still differ in
+the ninth significant digit. That is a numerical question and needs its own
+ADR; this pass did not touch either value.
+
+### Propagation consumer contract
+
+Still contract version 1; the changes are removals of things that were never
+implemented plus additions that are purely descriptive.
+
+- `capabilities()` is exported. Query supported components, responses, topology
+  modes, and AD modes before building a request.
+- `PropagationComponent`, `PropagationResponse`, `PropagationTopologyMode`, and
+  `PropagationAdMode` are `Literal` aliases, with `COMPONENTS`, `RESPONSES`,
+  `TOPOLOGY_MODES`, `AD_MODES`, and `MAX_DEPTH` exported alongside them.
+- `PropagationRequest` and `FixedTopologyRequest` validate their structure at
+  construction instead of only inside `evaluate` / `reevaluate`.
+- `PropagationGeometry.interaction_position_m` and `.interaction_normal` are
+  removed. They were column 0 of `interaction_positions_m` and
+  `interaction_normals`; slice those instead.
+- `frequency_offsets_hz` and `PropagationConvention.frequency_offset_law` are
+  removed. They were declared but always rejected. Frequency offsets will
+  arrive with a `CONTRACT_VERSION` bump.
+- `PropagationCapabilities` drops `supports_frequency_offsets` and gains
+  `components_for`, `ad_modes_for`, and `ad_modes_for_component`.
+
+### Capability manifests
+
+`witwin.channel.capabilities()` stays the solver-level manifest and keeps
+`scattering` in its component list. It now embeds the consumer contract record
+under `propagation_consumer`, generated from
+`witwin.channel.propagation.consumer.capabilities()` rather than restated, so
+the two cannot drift.

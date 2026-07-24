@@ -39,21 +39,31 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         )
     )
     assert exported == [
+        "AD_MODES",
+        "COMPONENTS",
         "CONTRACT_VERSION",
         "Complex3Transport",
         "EndpointBatch",
         "FixedTopologyEvaluation",
         "FixedTopologyRequest",
         "JonesTransport",
+        "MAX_DEPTH",
+        "PropagationAdMode",
         "PropagationCapabilities",
+        "PropagationComponent",
         "PropagationConvention",
         "PropagationDiagnostics",
         "PropagationEvaluation",
         "PropagationGeometry",
         "PropagationPathBatch",
         "PropagationRequest",
+        "PropagationResponse",
         "PropagationTopology",
+        "PropagationTopologyMode",
+        "RESPONSES",
         "ScalarTransport",
+        "TOPOLOGY_MODES",
+        "capabilities",
         "evaluate",
         "reevaluate",
     ]
@@ -208,3 +218,35 @@ def test_compact_autograd_native_companions_have_one_topology_owner() -> None:
     assert "witwin.channel.propagation.topology.kernels" in _top_level_imports(
         CONSUMER_ROOT / "_native.py"
     )
+
+
+def test_consumer_vocabulary_has_one_source_of_truth() -> None:
+    """The accepted values live in ``contracts``, not in the service layer."""
+
+    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    service = (CONSUMER_ROOT / "service.py").read_text(encoding="utf-8")
+
+    for name in ("COMPONENTS", "RESPONSES", "TOPOLOGY_MODES", "AD_MODES"):
+        assert f"{name}: frozenset[str] = frozenset(" in contracts, name
+        assert f"_{name} = frozenset(" not in service, name
+    assert "PropagationCapabilities(" not in service
+    assert "capabilities()" in service
+
+
+def test_consumer_v1_declares_no_unimplemented_frequency_offsets() -> None:
+    """A field that is always rejected is not part of a frozen contract."""
+
+    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    assert "frequency_offsets_hz" not in contracts
+    assert "frequency_offset_law" not in contracts
+    assert "supports_frequency_offsets" not in contracts
+
+
+def test_consumer_geometry_has_no_duplicate_first_interaction_fields() -> None:
+    """``interaction_position_m`` was column 0 of ``interaction_positions_m``."""
+
+    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    assert "interaction_position_m" not in contracts
+    assert "interaction_normal:" not in contracts
+    assert "interaction_positions_m: torch.Tensor" in contracts
+    assert "interaction_normals: torch.Tensor" in contracts

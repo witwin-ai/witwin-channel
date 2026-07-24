@@ -117,9 +117,11 @@ Organize code by RF domain capability, with a single owner for each operation:
   sink-basis `2 x 2` transport operator, not a renamed two-component field.
 
 - `runtime`: packaged extension loading, ABI/build identity, symbol validation,
-  Torch compatibility isolation, native buffers, and AD dispatch contracts.
-- `scene`: scene lifecycle, compilation, immutable native resources, and RayD
-  handles.
+  Torch compatibility isolation, native buffers, kernel metadata, memory
+  budgets, and AD dispatch contracts.
+- `scene`: scene lifecycle, compilation, immutable native resources, RayD
+  handles, endpoint/antenna/receiver geometry, diffraction edge policy and
+  selection, and the scene-leaf AD geometry seam.
 - `materials`: material contracts and native material evaluation facades.
 - `scattering`: scattering models, resident tables, phase screens, and their
   native kernel facades.
@@ -130,9 +132,40 @@ Organize code by RF domain capability, with a single owner for each operation:
 - `propagation.fields`: RF field evaluation and native derivative companions.
 - `propagation.enumerated`: shared deterministic path evaluation for Path and
   Deterministic solvers.
+- `propagation.models`: the typed internal row contracts those stages exchange.
+- `propagation.consumer`: the stable solver-neutral public propagation
+  contract, its vocabulary, and its capability record. It owns no physics, adds
+  no second compaction, and must never import a solver.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
+
+Four package-root modules hold cross-domain values that the public root and
+several domains all need, and that therefore cannot live under `runtime`,
+`propagation`, or a `kernels` package without tripping the public-init boundary:
+
+- `constants`: electromagnetic constants and the package-wide phase convention.
+  It is the single owner of the phasor and time-dependence strings that solver
+  metadata and the consumer contract quote.
+- `field_state`: the `Complex3State` / `JonesState` native field ABI contracts.
+- `components`: cross-domain component identity.
+- `tensor_math`: shared tensor helpers with no domain of their own.
+
+`capabilities` reports solver-level capability and embeds the consumer contract
+record under `propagation_consumer` rather than restating it. `deployment` owns
+package-level build and runtime reporting, including the public `build_info`.
+
+There is no `core` or `physics` package. `core` was a grab-bag that collided
+with `witwin.core` and has been dissolved into the owners above. `physics` held
+a NumPy CPU reference oracle inside the shipped wheel; that oracle now lives in
+`tests/reference/em_oracle.py`, where CLAUDE.md requires it. Do not recreate
+either namespace.
+
+The package root exports only what Channel owns: `build_info`, `capabilities`,
+`pipeline_cache_key`, `runtime_diagnostics`, `Complex3State`, and `JonesState`.
+The logical world model is owned by `witwin.core` and must be imported from
+there. Channel does not re-export it, so each world type has exactly one import
+path.
 
 The only enumerated/Monte Carlo exception is ADR-008: `montecarlo.bdpt.pipeline`
 may call the public `evaluate_enumerated_paths` entry read-only as an opaque
@@ -347,6 +380,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-032-controlled-compact-cardinality-boundary.md`
 - `docs/dev/standards/adr-034-stage-i-world-and-propagation-boundary.md`
 - `docs/dev/standards/adr-035-rayd-native-trace-backend-selection.md`
+- `docs/dev/standards/adr-036-channel-public-surface-and-module-ownership.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

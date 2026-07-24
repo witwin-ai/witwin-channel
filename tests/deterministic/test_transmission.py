@@ -19,7 +19,7 @@ import witwin.core as core_package
 from tests.support.scenes import transmission_wall_structure
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.materials.kernels import functional as ops
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 

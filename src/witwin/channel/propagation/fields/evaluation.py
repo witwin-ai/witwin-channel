@@ -7,16 +7,16 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core import ad_geometry
-from witwin.channel.core.diffraction_geometry import (
+from witwin.channel.scene import ad_geometry
+from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel.core.field_state import (
+from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
-from witwin.channel.core.kernels.metadata import AdLaunchLedger
+from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
 from witwin.channel.materials.encoding import (
     face_material_field_bundle,
     face_material_tensors,

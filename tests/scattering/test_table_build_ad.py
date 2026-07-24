@@ -412,7 +412,7 @@ def test_primal_bitwise_pre_balance_lobe_exported():
 
 @_require_native
 def test_end_to_end_roughness_gradient_is_nonzero():
-    from witwin.channel.core.kernels.extension import build_info
+    from witwin.channel.deployment import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")

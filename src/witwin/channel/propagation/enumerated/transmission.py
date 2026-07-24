@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core import ad_geometry
+from witwin.channel.scene import ad_geometry
 from witwin.channel.propagation.geometry.kernels import (
     rayd_segment_penetration_ad,
     rayd_segment_penetration_forward,

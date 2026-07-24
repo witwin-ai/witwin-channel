@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING, Any
 import torch
 
 
-from witwin.channel.core.antenna import validate_scalar_endpoint_features
+from witwin.channel.scene.antenna import validate_scalar_endpoint_features
 from witwin.channel.capabilities import (
     capabilities,
     config_metadata,
     serialize_config,
 )
 from witwin.channel import build_info
-from witwin.channel.core.kernels.metadata import make_metadata
-from witwin.channel.core.field_state import PHASE_CONVENTION
+from witwin.channel.runtime.kernel_metadata import make_metadata
+from witwin.channel.constants import PHASE_CONVENTION
 from witwin.channel.scene.endpoints import ReceiverGrid
 from witwin.channel.scene.tensors import _frequency_scalar
 from witwin.channel.propagation.geometry.endpoints import (
@@ -34,7 +34,7 @@ from witwin.channel.propagation.enumerated.capacity import (
 from witwin.channel.propagation.enumerated.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.core.components import component_availability_status
+from witwin.channel.components import component_availability_status
 
 from .accumulation import (
     _OPTIONAL_COMPONENTS,

@@ -211,3 +211,8 @@ def pipeline_cache_key(
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+# The package root publishes ``build_info`` through this reporting facade. It is
+# the same object the runtime extension loader defines, not a second wrapper.
+build_info = _import_native_build_info()

@@ -26,10 +26,10 @@ from witwin.core import (
     Scene,
     Structure,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.montecarlo.basic import pipeline as basic_pipeline
-from witwin.channel.physics.oracle import layer_stack_rt
+from tests.reference.em_oracle import layer_stack_rt
 from witwin.channel.runtime.capacity import (
     CapacityFailureBit,
     SolveCapacityTransaction,

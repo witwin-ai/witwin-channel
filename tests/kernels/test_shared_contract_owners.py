@@ -7,7 +7,7 @@ import inspect
 import pytest
 import torch
 
-from witwin.channel.core.kernels import metadata
+from witwin.channel.runtime import kernel_metadata as metadata
 from witwin.channel.montecarlo.bdpt.kernels import paths
 from witwin.channel.runtime import tensor_contracts
 
@@ -63,7 +63,7 @@ def test_validate_cuda_tensor_preserves_exact_error_order_and_text():
 def test_noop_metadata_has_one_canonical_owner_and_preserved_body():
     assert (
         metadata.noop_metadata.__module__
-        == "witwin.channel.core.kernels.metadata"
+        == "witwin.channel.runtime.kernel_metadata"
     )
     assert _body_hash(metadata.noop_metadata) == (
         "e38c9bc1703f1d1360e2f971485a447d1aa51700d1399ab8f59f67e75656aed1"

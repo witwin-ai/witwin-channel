@@ -1,5 +1,6 @@
 import importlib.util
-import importlib
+
+import pytest
 
 import witwin.channel as channel
 import witwin.channel.scene as channel_scene
@@ -8,6 +9,8 @@ from witwin.channel.scene.compiled import CompiledScene
 
 
 def test_public_logical_world_contracts_are_core_owned():
+    """Core owns the world model, and Channel does not republish it."""
+
     for name in (
         "AntennaPattern",
         "AntennaState",
@@ -20,8 +23,20 @@ def test_public_logical_world_contracts_are_core_owned():
         "Structure",
         "SurfaceRoughness",
     ):
-        assert getattr(channel, name) is getattr(core, name)
-        assert getattr(channel, name).__module__.startswith("witwin.core")
+        assert getattr(core, name).__module__.startswith("witwin.core")
+        assert not hasattr(channel, name), name
+        assert name not in channel.__all__, name
+
+
+def test_channel_root_exports_only_channel_owned_names():
+    assert sorted(channel.__all__) == [
+        "Complex3State",
+        "JonesState",
+        "build_info",
+        "capabilities",
+        "pipeline_cache_key",
+        "runtime_diagnostics",
+    ]
 
 
 def test_channel_scene_package_owns_only_compile_runtime_contracts():
@@ -55,17 +70,29 @@ def test_core_scene_has_no_channel_compile_or_frequency_facades():
 
 
 def test_deleted_legacy_owner_modules_do_not_resolve():
+    """The whole ``witwin.channel.core`` namespace is gone, not just its leaves.
+
+    ``find_spec`` on a child of a missing package raises rather than returning
+    ``None``, so assert the parent is absent and that every historical leaf is
+    unreachable through it.
+    """
+
+    assert importlib.util.find_spec("witwin.channel.core") is None
     for module_name in (
-        "witwin.channel.core.scene",
-        "witwin.channel.core.scene_loader",
-        "witwin.channel.core.materials",
-        "witwin.channel.core.material_runtime",
-        "witwin.channel.core.runtime.compiled_scene",
-        "witwin.channel.core.runtime.geometry",
-        "witwin.channel.core.runtime.material_store",
-        "witwin.channel.core.runtime.assignments",
+        "scene",
+        "scene_loader",
+        "materials",
+        "material_runtime",
+        "runtime.compiled_scene",
+        "runtime.geometry",
+        "runtime.material_store",
+        "runtime.assignments",
+        "kernels.extension",
+        "kernels.ops",
+        "path_topology",
     ):
-        assert importlib.util.find_spec(module_name) is None
+        with pytest.raises(ModuleNotFoundError):
+            importlib.util.find_spec(f"witwin.channel.core.{module_name}")
 
 
 def test_deleted_public_logical_facades_are_not_reintroduced():

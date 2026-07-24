@@ -12,7 +12,7 @@ import torch
 from tests.support.core_world import make_receiver, make_transmitter
 from tests.support.scenes import rough_wall_structure
 from witwin.core import Scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.path import Config, InteractionType, solve
 
 _FREQUENCY_HZ = 3.0e9

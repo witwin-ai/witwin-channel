@@ -14,7 +14,7 @@ import math
 
 import torch
 
-from witwin.channel.core.tensor_math import normalize_vec3
+from witwin.channel.tensor_math import normalize_vec3
 from witwin.channel.scattering import eval_bsdf
 
 

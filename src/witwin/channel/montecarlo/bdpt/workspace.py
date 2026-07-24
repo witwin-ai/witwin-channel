@@ -17,11 +17,11 @@ from typing import Any
 
 import torch
 
-from witwin.channel.core.field_state import (
+from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
-from witwin.channel.core.kernels.metadata import AdLaunchLedger
+from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
 from witwin.channel.scene.endpoints import ReceiverGrid, SolverScene as Scene
 from witwin.channel.montecarlo.bdpt.autograd import (
     bdpt_endpoint_connection_samples_ad,

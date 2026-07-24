@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
-from witwin.channel.core.field_state import (
+from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
@@ -59,7 +59,7 @@ from witwin.channel.propagation.models.fields import PathFields
 from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
-from witwin.channel.physics.conventions import C0
+from witwin.channel.constants import C0
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene

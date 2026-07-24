@@ -73,7 +73,7 @@ import numpy as np
 import torch
 
 from witwin.channel.materials.evaluation import layer_stack_rt
-from witwin.channel.physics.conventions import C0
+from witwin.channel.constants import C0
 
 __all__ = [
     "KirchhoffTable",

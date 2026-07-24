@@ -3,7 +3,7 @@ import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel import capabilities
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.bdpt import Config, solve
 
 

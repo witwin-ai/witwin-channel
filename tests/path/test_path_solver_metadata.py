@@ -2,8 +2,8 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.deployment import build_info
+from witwin.channel.runtime.kernel_metadata import validate_metadata
 from witwin.channel.path import Config, solve
 
 

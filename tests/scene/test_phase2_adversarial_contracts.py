@@ -14,7 +14,7 @@ from witwin.core import (
     Scene,
     Structure,
 )
-from witwin.channel.core.antenna import pattern_field_response
+from witwin.channel.scene.antenna import pattern_field_response
 from witwin.channel.montecarlo.basic import Config as MonteCarloBasicConfig
 from witwin.channel.montecarlo.basic import solver as montecarlo_basic_solver
 from witwin.channel.scene.endpoints import (

@@ -1,14 +1,41 @@
-"""Stable solver-neutral propagation consumer contracts."""
+"""Stable solver-neutral propagation consumer contracts.
+
+This module is the single source of truth for the consumer vocabulary. The
+accepted component, response, topology, and AD-mode values are declared here as
+``Literal`` aliases with matching frozen sets, and :func:`capabilities` returns
+the frozen capability record. A consumer can therefore discover what the
+contract supports before building a request instead of learning it from a
+rejected call.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Literal, TypeAlias, get_args
 
 import torch
 
+from witwin.channel.constants import PHASOR, TIME_DEPENDENCE
+
 
 CONTRACT_VERSION = 1
+
+
+PropagationComponent: TypeAlias = Literal[
+    "los", "reflection", "transmission", "diffraction"
+]
+PropagationResponse: TypeAlias = Literal[
+    "scalar_transport", "complex3_transport", "polarimetric_transport"
+]
+PropagationTopologyMode: TypeAlias = Literal["discover"]
+PropagationAdMode: TypeAlias = Literal["none", "jvp", "vjp"]
+
+COMPONENTS: frozenset[str] = frozenset(get_args(PropagationComponent))
+RESPONSES: frozenset[str] = frozenset(get_args(PropagationResponse))
+TOPOLOGY_MODES: frozenset[str] = frozenset(get_args(PropagationTopologyMode))
+AD_MODES: frozenset[str] = frozenset(get_args(PropagationAdMode))
+
+MAX_DEPTH = 5
 
 
 def _require_tensor(
@@ -109,18 +136,70 @@ class EndpointBatch:
         return self.positions_m.device
 
 
+def _require_vocabulary(name: str, value: object, allowed: frozenset[str]) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string")
+    if value not in allowed:
+        raise NotImplementedError(
+            f"unsupported {name} {value!r}; supported values are {sorted(allowed)}"
+        )
+    return value
+
+
+def _require_components(value: object) -> frozenset[str]:
+    if type(value) is not frozenset or not value:
+        raise TypeError("components must be a non-empty frozenset")
+    unsupported = value - COMPONENTS
+    if unsupported:
+        raise NotImplementedError(
+            f"unsupported propagation components: {sorted(unsupported)}"
+        )
+    return value
+
+
+def _require_endpoints(sources: object, sinks: object) -> None:
+    if not isinstance(sources, EndpointBatch) or not isinstance(sinks, EndpointBatch):
+        raise TypeError("sources and sinks must be EndpointBatch instances")
+    if sources.powers_w is None:
+        raise ValueError("sources.powers_w is required")
+    if sinks.powers_w is not None:
+        raise ValueError("sinks.powers_w must be absent")
+    if sources.device != sinks.device:
+        raise ValueError("source and sink batches must share one CUDA device")
+
+
 @dataclass(frozen=True, slots=True)
 class PropagationRequest:
+    """A discovery request against a compiled scene.
+
+    Structural validity is enforced here. Capability compatibility that depends
+    on the compiled scene  -  reference-frequency match, response/component and
+    response/AD combinations, polarimetric basis requirements  -  is enforced by
+    :func:`witwin.channel.propagation.consumer.evaluate` before any native work.
+    """
+
     sources: EndpointBatch
     sinks: EndpointBatch
     reference_frequency_hz: float | torch.Tensor
     components: frozenset[str]
     max_depth: int
-    response: str
-    topology_mode: str
-    ad_mode: str
-    frequency_offsets_hz: torch.Tensor | None = None
+    response: PropagationResponse
+    topology_mode: PropagationTopologyMode
+    ad_mode: PropagationAdMode
     max_paths: int | None = None
+
+    def __post_init__(self) -> None:
+        _require_endpoints(self.sources, self.sinks)
+        _require_components(self.components)
+        _require_vocabulary("response", self.response, RESPONSES)
+        _require_vocabulary("topology_mode", self.topology_mode, TOPOLOGY_MODES)
+        _require_vocabulary("ad_mode", self.ad_mode, AD_MODES)
+        if type(self.max_depth) is not int or not 0 <= self.max_depth <= MAX_DEPTH:
+            raise ValueError(f"max_depth must be an int in [0, {MAX_DEPTH}]")
+        if self.max_paths is not None and (
+            type(self.max_paths) is not int or self.max_paths <= 0
+        ):
+            raise ValueError("max_paths must be a positive int when set")
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -204,8 +283,6 @@ class PropagationGeometry:
     path_length_m: torch.Tensor
     delay_s: torch.Tensor
     field_direction: torch.Tensor
-    interaction_position_m: torch.Tensor
-    interaction_normal: torch.Tensor
     interaction_positions_m: torch.Tensor
     interaction_normals: torch.Tensor
 
@@ -222,18 +299,13 @@ class PropagationGeometry:
             shape=(rows,),
             device=device,
         )
-        for name in (
+        _require_tensor(
             "field_direction",
-            "interaction_position_m",
-            "interaction_normal",
-        ):
-            _require_tensor(
-                name,
-                getattr(self, name),
-                dtype=torch.float32,
-                shape=(rows, 3),
-                device=device,
-            )
+            self.field_direction,
+            dtype=torch.float32,
+            shape=(rows, 3),
+            device=device,
+        )
         positions = _require_tensor(
             "interaction_positions_m",
             self.interaction_positions_m,
@@ -397,10 +469,9 @@ class PropagationConvention:
     )
     distance_unit: str = "m"
     delay_unit: str = "s"
-    phasor: str = "exp(-j*k*d)"
-    time_dependence: str = "exp(+j*2*pi*f*t)"
+    phasor: str = PHASOR
+    time_dependence: str = TIME_DEPENDENCE
     coefficient_reference: str = "includes_reference_frequency_phase"
-    frequency_offset_law: str = "H(f_ref+df)=C(f_ref)*exp(-j*2*pi*df*delay_s)"
     complex3_basis: str = "world_cartesian"
     jones_mapping: str = "source_transverse_basis_to_sink_transverse_basis"
 
@@ -417,9 +488,52 @@ class PropagationCapabilities:
     component_ad_modes: tuple[tuple[str, frozenset[str]], ...]
     fixed_topology_components: frozenset[str]
     fixed_topology_responses: frozenset[str]
-    supports_frequency_offsets: bool
     supports_fixed_topology: bool
     supports_los_jones: bool
+
+    def components_for(self, response: str) -> frozenset[str]:
+        return dict(self.response_components)[response]
+
+    def ad_modes_for(self, response: str) -> frozenset[str]:
+        return dict(self.response_ad_modes)[response]
+
+    def ad_modes_for_component(self, component: str) -> frozenset[str]:
+        return dict(self.component_ad_modes)[component]
+
+
+_CAPABILITIES = PropagationCapabilities(
+    contract_version=CONTRACT_VERSION,
+    components=COMPONENTS,
+    responses=RESPONSES,
+    topology_modes=TOPOLOGY_MODES,
+    ad_modes=AD_MODES,
+    response_components=(
+        ("scalar_transport", COMPONENTS),
+        ("complex3_transport", COMPONENTS),
+        ("polarimetric_transport", frozenset({"los"})),
+    ),
+    response_ad_modes=(
+        ("scalar_transport", AD_MODES),
+        ("complex3_transport", AD_MODES),
+        ("polarimetric_transport", frozenset({"none"})),
+    ),
+    component_ad_modes=tuple((component, AD_MODES) for component in sorted(COMPONENTS)),
+    fixed_topology_components=frozenset({"los"}),
+    fixed_topology_responses=frozenset({"scalar_transport", "complex3_transport"}),
+    supports_fixed_topology=True,
+    supports_los_jones=True,
+)
+
+
+def capabilities() -> PropagationCapabilities:
+    """Return what this consumer contract version supports.
+
+    Call this before building a :class:`PropagationRequest` to check that a
+    component, response, and AD-mode combination is available. The record is
+    frozen and identical across calls.
+    """
+
+    return _CAPABILITIES
 
 
 @dataclass(frozen=True, slots=True)
@@ -445,13 +559,31 @@ class PropagationEvaluation:
 
 @dataclass(frozen=True, slots=True)
 class FixedTopologyRequest:
+    """A reevaluation request against an already-discovered topology.
+
+    Structural validity is enforced here; scene-dependent capability checks
+    belong to :func:`witwin.channel.propagation.consumer.reevaluate`.
+    """
+
     sources: EndpointBatch
     sinks: EndpointBatch
     reference_frequency_hz: float | torch.Tensor
     topology: PropagationTopology
-    response: str
-    ad_mode: str
-    frequency_offsets_hz: torch.Tensor | None = None
+    response: PropagationResponse
+    ad_mode: PropagationAdMode
+
+    def __post_init__(self) -> None:
+        _require_endpoints(self.sources, self.sinks)
+        if not isinstance(self.topology, PropagationTopology):
+            raise TypeError("topology must be a PropagationTopology")
+        response = _require_vocabulary("response", self.response, RESPONSES)
+        _require_vocabulary("ad_mode", self.ad_mode, AD_MODES)
+        if response not in _CAPABILITIES.fixed_topology_responses:
+            raise NotImplementedError(
+                f"fixed-topology reevaluation does not support {response!r}; "
+                f"supported responses are "
+                f"{sorted(_CAPABILITIES.fixed_topology_responses)}"
+            )
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -463,19 +595,29 @@ class FixedTopologyEvaluation:
 
 
 __all__ = [
+    "AD_MODES",
+    "COMPONENTS",
     "CONTRACT_VERSION",
     "Complex3Transport",
     "EndpointBatch",
     "FixedTopologyEvaluation",
     "FixedTopologyRequest",
     "JonesTransport",
+    "MAX_DEPTH",
+    "PropagationAdMode",
     "PropagationCapabilities",
+    "PropagationComponent",
     "PropagationConvention",
     "PropagationDiagnostics",
     "PropagationEvaluation",
     "PropagationGeometry",
     "PropagationPathBatch",
     "PropagationRequest",
+    "PropagationResponse",
     "PropagationTopology",
+    "PropagationTopologyMode",
+    "RESPONSES",
     "ScalarTransport",
+    "TOPOLOGY_MODES",
+    "capabilities",
 ]

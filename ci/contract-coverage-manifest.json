@@ -131,7 +131,6 @@
     "public-capabilities": "tests/test_capabilities.py::test_capability_manifest_is_versioned_serializable_and_defensive",
     "public-core": "tests/core/test_public_scene.py::test_public_scene_objects_capture_structured_inputs",
     "public-deployment": "tests/performance/test_deployment_contract.py::test_pipeline_cache_key_is_stable_and_invalidates_all_contract_inputs",
-    "public-materials": "tests/core/test_public_scene.py::test_materials_expose_canonical_samples",
     "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive",
     "deterministic-rough-reflection-ad": "tests/ad/test_solver_rough_reflection_ad.py::test_rough_reflection_frequency_grad_matches_fd",
     "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
@@ -152,55 +151,6 @@
     "consumer-jones-native": "tests/propagation/consumer/test_los_jones.py::test_consumer_los_jones_matches_analytic_rotated_basis"
   },
   "public_exports": [
-    [
-      "witwin.channel.AntennaState",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.AntennaPattern",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.ReceiverGrid",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.Material",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.Scene",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.Structure",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.MaterialLayer",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
     [
       "witwin.channel.Complex3State",
       "public-api-snapshot",
@@ -223,6 +173,13 @@
       ]
     ],
     [
+      "witwin.channel.capabilities",
+      "public-api-snapshot",
+      [
+        "public-capabilities"
+      ]
+    ],
+    [
       "witwin.channel.pipeline_cache_key",
       "public-api-snapshot",
       [
@@ -234,41 +191,6 @@
       "public-api-snapshot",
       [
         "public-deployment"
-      ]
-    ],
-    [
-      "witwin.channel.capabilities",
-      "public-api-snapshot",
-      [
-        "public-capabilities"
-      ]
-    ],
-    [
-      "witwin.channel.PhaseScreen",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.PhysicalMaterial",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.SceneSnapshot",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.SurfaceRoughness",
-      "public-api-snapshot",
-      [
-        "public-materials"
       ]
     ],
     [
@@ -384,6 +306,20 @@
       ]
     ],
     [
+      "witwin.channel.propagation.consumer.AD_MODES",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.COMPONENTS",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
       "witwin.channel.propagation.consumer.CONTRACT_VERSION",
       "consumer-public-contract",
       [
@@ -428,11 +364,32 @@
       ]
     ],
     [
+      "witwin.channel.propagation.consumer.MAX_DEPTH",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationAdMode",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
       "witwin.channel.propagation.consumer.PropagationCapabilities",
       "consumer-public-contract",
       [
         "consumer-discover",
         "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationComponent",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
       ]
     ],
     [
@@ -482,6 +439,13 @@
       ]
     ],
     [
+      "witwin.channel.propagation.consumer.PropagationResponse",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
       "witwin.channel.propagation.consumer.PropagationTopology",
       "consumer-public-contract",
       [
@@ -490,11 +454,39 @@
       ]
     ],
     [
+      "witwin.channel.propagation.consumer.PropagationTopologyMode",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.RESPONSES",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
       "witwin.channel.propagation.consumer.ScalarTransport",
       "consumer-public-contract",
       [
         "consumer-discover",
         "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.TOPOLOGY_MODES",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.capabilities",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
       ]
     ],
     [

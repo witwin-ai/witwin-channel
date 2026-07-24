@@ -3,7 +3,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel.core.kernels import metadata as kernel_metadata
+from witwin.channel.runtime import kernel_metadata
 from witwin.channel.deterministic.kernels import (
     accumulation as deterministic_accumulation,
 )

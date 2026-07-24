@@ -60,11 +60,9 @@ def test_rayd_scene_lifecycle_has_one_canonical_owner():
     )
     assert rayd_scene.RayDSceneResource.__module__ == legacy_rayd.__name__
     assert rayd_scene.RayDEdgeRecords.__module__ == legacy_rayd.__name__
-    assert importlib.util.find_spec("witwin.channel.core.scene") is None
-    assert (
+    assert importlib.util.find_spec("witwin.channel.core") is None
+    with pytest.raises(ModuleNotFoundError):
         importlib.util.find_spec("witwin.channel.core.runtime.compiled_scene")
-        is None
-    )
 
 
 @pytest.mark.parametrize("name, expected", _RAYD_LIFECYCLE_AST_DIGESTS.items())

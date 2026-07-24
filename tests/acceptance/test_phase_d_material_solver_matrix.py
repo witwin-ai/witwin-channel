@@ -16,8 +16,8 @@ from tests.support.phase_d_acceptance import (
     rough_scene,
     transmission_scene,
 )
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.physics.oracle import layer_stack_rt
+from witwin.channel.deployment import build_info
+from tests.reference.em_oracle import layer_stack_rt
 
 _FREQUENCIES_HZ = (2.0e9, 12.0e9)
 _SCATTERING_FREQUENCY_HZ = 3.0e9

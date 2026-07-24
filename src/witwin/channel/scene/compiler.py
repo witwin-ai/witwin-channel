@@ -790,7 +790,7 @@ def compile(
     )
     if rayd is None:
         rayd = build_scene_from_structures(structures)
-        from witwin.channel.core.edge_selection import resolve_scene_edge_policy
+        from witwin.channel.scene.edge_selection import resolve_scene_edge_policy
 
         rayd.runtime_cache["edge_policy"] = resolve_scene_edge_policy(
             scene_or_snapshot

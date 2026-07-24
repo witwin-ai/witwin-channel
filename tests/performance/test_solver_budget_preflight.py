@@ -5,7 +5,7 @@ import importlib
 import pytest
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.core.memory_budget import MemoryBudgetError
+from witwin.channel.runtime.memory_budget import MemoryBudgetError
 from witwin.channel.montecarlo.basic import Config as BasicConfig
 from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
 from witwin.channel.scene.compiler import compile as compile_scene

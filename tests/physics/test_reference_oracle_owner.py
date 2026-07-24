@@ -1,21 +1,25 @@
+"""The NumPy reference oracle has exactly one owner, and it lives under tests.
+
+CLAUDE.md allows CPU/NumPy reference implementations only under ``tests/``.
+Before this module moved, the oracle shipped inside the production wheel behind
+a two-level facade whose objects rewrote ``__module__`` to impersonate the
+facade. Both the shipping and the impersonation are gone; what remains is a
+single module that production code structurally cannot reach.
+"""
+
 from __future__ import annotations
 
 import ast
-import os
 from pathlib import Path
 import pickle
-import subprocess
-import sys
 
 import numpy as np
-import pytest
 
-import witwin.channel.physics as physics
-from witwin.channel.physics import oracle as legacy
-from witwin.channel.physics.reference import oracle as canonical
+from tests.reference import em_oracle
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 
 _PUBLIC = (
     "Medium",
@@ -33,116 +37,47 @@ _PUBLIC = (
     "vacuum_medium",
 )
 
-_EXPECTED_ALL = [
-    "C0",
-    "EPS0",
-    "ETA0",
-    "MU0",
-    "Medium",
-    "RTCoefficients",
-    "coherent_attenuation",
-    "complex_sqrt_passive",
-    "fresnel_interface",
-    "hemisphere_integral",
-    "kirchhoff_diffuse_lobe_quadrature",
-    "kirchhoff_diffuse_lobe_series",
-    "layer_stack_rt",
-    "medium_params",
-    "phase_screen_patch_integral",
-    "refraction_direction",
-    "vacuum_medium",
-]
+_EXPECTED_ALL = ["C0", "EPS0", "ETA0", "MU0", *sorted(_PUBLIC)]
 
 
-def test_reference_oracle_has_one_canonical_owner_and_same_object_facades() -> None:
-    assert physics.__all__ == _EXPECTED_ALL
-    assert legacy.__all__ == _EXPECTED_ALL
-    assert canonical.__all__ == _EXPECTED_ALL
+def test_reference_oracle_has_exactly_one_owner_module() -> None:
+    assert em_oracle.__all__ == _EXPECTED_ALL
     for name in _PUBLIC:
-        owner = getattr(canonical, name)
-        assert getattr(legacy, name) is owner
-        assert getattr(physics, name) is owner
-        assert owner.__module__ == "witwin.channel.physics.oracle"
+        owner = getattr(em_oracle, name)
+        assert owner.__module__ == "tests.reference.em_oracle", name
 
 
-@pytest.mark.parametrize(
-    "order",
-    (
-        ("witwin.channel.physics", "witwin.channel.physics.oracle"),
-        (
-            "witwin.channel.physics.oracle",
-            "witwin.channel.physics.reference.oracle",
-        ),
-        (
-            "witwin.channel.physics.reference.oracle",
-            "witwin.channel.physics",
-        ),
-    ),
-)
-def test_reference_oracle_identity_is_import_order_independent(
-    order: tuple[str, str],
-) -> None:
-    code = f"""
-import sys
-sys.meta_path = [
-    finder
-    for finder in sys.meta_path
-    if "_witwin_channel_editable" not in type(finder).__module__
-]
-import importlib
-for name in {order!r}:
-    importlib.import_module(name)
-p = importlib.import_module('witwin.channel.physics')
-l = importlib.import_module('witwin.channel.physics.oracle')
-c = importlib.import_module('witwin.channel.physics.reference.oracle')
-for name in {_PUBLIC!r}:
-    assert getattr(p, name) is getattr(l, name) is getattr(c, name)
-"""
-    environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
-    core_root = str(REPOSITORY_ROOT.parent / "core-radar-architecture-stage1")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value
-        for value in (core_root, source_root, environment.get("PYTHONPATH"))
-        if value
-    )
-    subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+def test_no_facade_impersonates_the_oracle_module() -> None:
+    """No object rewrites ``__module__`` to point at a re-export shim."""
+
+    source = Path(em_oracle.__file__).read_text(encoding="utf-8")
+    assert "__module__ =" not in source
 
 
-def test_legacy_pickle_paths_replay_to_canonical_objects() -> None:
-    medium = canonical.vacuum_medium(3.5e9)
+def test_oracle_is_not_reachable_from_the_production_package() -> None:
+    """The shipped package contains no path to the reference oracle."""
+
+    for path in PACKAGE_ROOT.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        relative = path.relative_to(REPOSITORY_ROOT).as_posix()
+        assert "tests.reference" not in text, relative
+        assert "witwin.channel.physics" not in text, relative
+    assert not (PACKAGE_ROOT / "physics").exists()
+
+
+def test_pickle_round_trips_against_the_owner() -> None:
+    medium = em_oracle.vacuum_medium(3.5e9)
     restored = pickle.loads(pickle.dumps(medium))
-    assert type(restored) is canonical.Medium
+    assert type(restored) is em_oracle.Medium
     assert restored == medium
     assert (
-        pickle.loads(pickle.dumps(canonical.layer_stack_rt)) is canonical.layer_stack_rt
+        pickle.loads(pickle.dumps(em_oracle.layer_stack_rt))
+        is em_oracle.layer_stack_rt
     )
 
 
-def test_legacy_facade_preserves_pre_move_reachable_globals() -> None:
-    for name in (
-        "Callable",
-        "Sequence",
-        "dataclass",
-        "np",
-        "_admittances",
-        "_interface_rt",
-        "_power_coefficients",
-        "_stack_rt_one_pol",
-    ):
-        assert getattr(legacy, name) is getattr(canonical, name)
-    assert legacy.np is np
-
-
-def test_reference_oracle_is_static_numpy_only_and_production_independent() -> None:
-    tree = ast.parse(Path(canonical.__file__).read_text(encoding="utf-8"))
+def test_reference_oracle_is_numpy_only_and_production_independent() -> None:
+    tree = ast.parse(Path(em_oracle.__file__).read_text(encoding="utf-8"))
     imports = {
         node.module
         for node in ast.walk(tree)
@@ -161,14 +96,5 @@ def test_reference_oracle_is_static_numpy_only_and_production_independent() -> N
         or name.startswith("witwin.channel.propagation")
         for name in imports
     )
-
-
-def test_legacy_and_package_facades_import_canonical_owner_directly() -> None:
-    for module in (legacy, physics):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        imports = {
-            node.module
-            for node in ast.walk(ast.parse(source))
-            if isinstance(node, ast.ImportFrom) and node.module is not None
-        }
-        assert "witwin.channel.physics.reference.oracle" in imports
+    # Physical constants are the one thing it shares with production, by design.
+    assert em_oracle.np is np

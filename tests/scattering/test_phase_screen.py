@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from witwin.core import PhaseScreen, SurfaceRoughness
-from witwin.channel.physics.oracle import (
+from tests.reference.em_oracle import (
     C0,
     phase_screen_patch_integral as oracle_patch_integral,
 )

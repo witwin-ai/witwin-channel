@@ -6,14 +6,14 @@ from typing import Any
 
 import torch
 
-from witwin.channel.core.antenna import validate_scalar_endpoint_features
-from witwin.channel.core.edge_selection import resolve_scene_edge_policy
-from witwin.channel.core.kernels.metadata import AdLaunchLedger
-from witwin.channel.core.memory_budget import (
+from witwin.channel.scene.antenna import validate_scalar_endpoint_features
+from witwin.channel.scene.edge_selection import resolve_scene_edge_policy
+from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
+from witwin.channel.runtime.memory_budget import (
     MemoryEstimate,
     enforce_memory_budget,
 )
-from witwin.channel.core.receiver_geometry import (
+from witwin.channel.scene.receiver_geometry import (
     first_receiver_grid,
 )
 from witwin.channel.materials.encoding import face_material_field_bundle

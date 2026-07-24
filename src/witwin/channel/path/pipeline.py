@@ -7,7 +7,9 @@ from typing import Any
 
 import torch
 
-from witwin.channel import Scene, build_info
+from witwin.channel import build_info
+
+from witwin.core import Scene
 from witwin.channel.propagation.enumerated.engine import (
     evaluate_enumerated_paths,
 )

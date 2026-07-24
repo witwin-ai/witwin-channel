@@ -13,7 +13,7 @@ from witwin.channel.path import (
 )
 from witwin.channel.path.arrays import pack_synthetic_arrays
 from witwin.channel.path import solver as path_solver
-from witwin.channel.core.antenna import apply_endpoint_weights
+from witwin.channel.scene.antenna import apply_endpoint_weights
 from witwin.channel.scene.endpoints import _ReceiverPointView, _TransmitterView
 from witwin.core import AntennaPattern, Scene
 

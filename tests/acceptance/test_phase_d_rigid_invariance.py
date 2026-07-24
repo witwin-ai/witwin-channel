@@ -15,7 +15,7 @@ from tests.support.phase_d_acceptance import (
     rough_scene,
     transmission_scene,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 
 _FREQUENCY_HZ = 2.0e9
 _SEEDS = (3, 7, 11)

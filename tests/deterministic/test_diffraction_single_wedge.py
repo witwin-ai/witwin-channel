@@ -3,7 +3,7 @@ import torch
 from witwin.core import Scene
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
@@ -94,7 +94,7 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    from witwin.channel.core.edge_policy import EdgePolicy
+    from witwin.channel.scene.edge_policy import EdgePolicy
 
     base_scene = wedge_diffraction_scene()
     scene = Scene(

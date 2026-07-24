@@ -84,7 +84,7 @@ import math
 from typing import Any
 
 import torch
-from witwin.channel.core.tensor_math import normalize_vec3
+from witwin.channel.tensor_math import normalize_vec3
 
 from witwin.channel.scattering.kernels.autograd import scattering_table_eval_ad
 from witwin.channel.scattering.kernels.functional import (

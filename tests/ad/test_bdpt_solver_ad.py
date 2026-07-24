@@ -65,7 +65,7 @@ from tests.support.core_world import (
     make_receiver,
     make_transmitter,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
 from witwin.channel.montecarlo.bdpt import solve as bdpt_solve

@@ -9,17 +9,17 @@ import torch
 
 from witwin.core import ReceiverGrid
 from tests.support.core_world import make_receiver_grid
-from witwin.channel.core.components import (
+from witwin.channel.components import (
     DEFAULT_COMPONENTS,
     component_availability_status,
     validated_components,
 )
-from witwin.channel.core.receiver_geometry import (
+from witwin.channel.scene.receiver_geometry import (
     axis_aligned_grid_spec,
     component_grid_shape,
     first_receiver_grid,
 )
-from witwin.channel.core.tensor_math import normalize_vec3
+from witwin.channel.tensor_math import normalize_vec3
 from witwin.channel.scene.endpoints import (
     ReceiverGrid as RuntimeReceiverGrid,
 )

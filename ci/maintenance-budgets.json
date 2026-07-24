@@ -20,7 +20,7 @@
     }
   },
   "function_exemptions": {
-    "src/witwin/channel/core/kernels/metadata.py::validate_metadata": {
+    "src/witwin/channel/runtime/kernel_metadata.py::validate_metadata": {
       "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "core maintainers",
@@ -129,7 +129,7 @@
       "reason": "The legacy scattering-only final reorder validates alias mode and differentiable compact mode in one internal facade; its exact Phase-3 surface is frozen."
     },
     "src/witwin/channel/propagation/consumer/service.py::_preflight_evaluate": {
-      "ceiling": 28,
+      "ceiling": 16,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "The public consumer performs all-or-nothing request, capability, endpoint, response, and AD validation before compute; the exact Phase-3 preflight surface is frozen."

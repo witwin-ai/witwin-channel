@@ -23,7 +23,7 @@ import numpy as np
 import torch
 
 from witwin.core import PhaseScreen, SurfaceRoughness
-from witwin.channel.physics.conventions import C0
+from witwin.channel.constants import C0
 
 __all__ = [
     "PhaseScreenRuntime",

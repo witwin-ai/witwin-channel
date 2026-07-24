@@ -4,7 +4,7 @@ import torch
 from tests.support.core_world import make_receiver_grid, make_transmitter
 from tests.support.scenes import single_wall_reflection_scene, wedge_diffraction_scene
 from witwin.core import ReceiverGrid, Scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.scene import compile as compile_scene
 import witwin.channel.montecarlo.basic.backend as basic_backend

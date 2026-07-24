@@ -40,7 +40,8 @@ def _native_imports() -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
-    from witwin.channel import ReceiverGrid, Scene, Transmitter
+    from witwin.channel import Transmitter
+    from witwin.core import ReceiverGrid, Scene
     from witwin.channel.montecarlo.basic.kernels.maps import (
         mc_component_map_buffer,
         mc_finalize_component_maps,

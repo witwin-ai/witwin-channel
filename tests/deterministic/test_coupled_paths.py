@@ -12,7 +12,7 @@ import pytest
 import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
 

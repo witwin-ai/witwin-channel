@@ -40,16 +40,13 @@ _PUBLIC_INIT_MODULES = frozenset({PACKAGE, *_SOLVER_PREFIXES})
 _RAW_EXTENSION_MODULES = frozenset(
     {
         f"{PACKAGE}._channel",
-        f"{PACKAGE}.core.kernels.extension",
         f"{PACKAGE}.runtime.extension",
     }
 )
-_COMPILED_SCENE_MODULES = frozenset(
-    {
-        f"{PACKAGE}.scene.compiled",
-        f"{PACKAGE}.core.runtime.compiled_scene",
-    }
-)
+_COMPILED_SCENE_MODULES = frozenset({f"{PACKAGE}.scene.compiled"})
+# The `core` grab-bag was dissolved into its real domain owners. Nothing may
+# recreate that namespace or import through it.
+_DISSOLVED_PREFIXES = (f"{PACKAGE}.core",)
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -365,15 +362,13 @@ def _is_solver_result(module: str) -> bool:
 def _kernel_owner(module: str) -> str | None:
     marker = ".kernels"
     index = module.find(marker, len(PACKAGE))
-    if index < 0 or _matches(module, f"{PACKAGE}.core.kernels"):
+    if index < 0:
         return None
     return module[:index]
 
 
 def _is_kernels_module(module: str) -> bool:
-    return (
-        _matches(module, f"{PACKAGE}.core.kernels") or _kernel_owner(module) is not None
-    )
+    return _kernel_owner(module) is not None
 
 
 def _violation(edge: ImportEdge, rule: str) -> Violation:
@@ -404,6 +399,8 @@ def _basic_boundary_violations(edge: ImportEdge) -> list[Violation]:
         f"{PACKAGE}.core.kernels.ops",
         f"{PACKAGE}.core.path_topology",
     }
+    if any(_matches(target, prefix) for prefix in _DISSOLVED_PREFIXES):
+        violations.append(_violation(edge, "dissolved_module_dependency"))
     imported_target = (
         f"{target}.{edge.imported_name}"
         if edge.kind == "from" and edge.imported_name not in {"", "*"}
@@ -430,7 +427,7 @@ def _solver_boundary_violations(edge: ImportEdge) -> list[Violation]:
     if source_solver is not None and (
         edge.target in _RAW_EXTENSION_MODULES
         or (
-            edge.target in {f"{PACKAGE}.core.kernels", f"{PACKAGE}.runtime"}
+            edge.target == f"{PACKAGE}.runtime"
             and edge.imported_name == "native_extension"
         )
     ):
@@ -467,7 +464,6 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
         or _matches(target, f"{PACKAGE}.propagation.fields")
         or target_solver is not None
         or _matches(target, f"{PACKAGE}.scene")
-        or _matches(target, f"{PACKAGE}.core.scene")
         or target in _COMPILED_SCENE_MODULES
     ):
         violations.append(_violation(edge, "topology_forbidden_dependency"))
@@ -480,7 +476,6 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
             _matches(source, f"{PACKAGE}.propagation.geometry.kernels")
             and (
                 _matches(target, f"{PACKAGE}.scene")
-                or _matches(target, f"{PACKAGE}.core.scene")
                 or target in _COMPILED_SCENE_MODULES
             )
         )
@@ -512,23 +507,9 @@ def _runtime_oracle_violations(edge: ImportEdge) -> list[Violation]:
     ):
         violations.append(_violation(edge, "runtime_forbidden_dependency"))
 
-    if (
-        source == f"{PACKAGE}.physics.oracle"
-        or _matches(source, f"{PACKAGE}.physics.reference")
-    ) and any(
-        _matches(target, prefix)
-        for prefix in (
-            "torch",
-            f"{PACKAGE}.core.kernels",
-            f"{PACKAGE}.runtime",
-            f"{PACKAGE}.scene",
-            f"{PACKAGE}.materials",
-            f"{PACKAGE}.propagation",
-            f"{PACKAGE}.scattering",
-            *_SOLVER_PREFIXES,
-        )
-    ):
-        violations.append(_violation(edge, "oracle_production_dependency"))
+    # The NumPy reference oracle now lives in ``tests/reference/em_oracle.py``.
+    # Its isolation from production is structural: this checker only walks the
+    # shipped package, so a production module cannot reach it at all.
     return violations
 
 

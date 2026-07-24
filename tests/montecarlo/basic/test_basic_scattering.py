@@ -26,7 +26,7 @@ from witwin.core import (
     Structure,
     SurfaceRoughness,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
 

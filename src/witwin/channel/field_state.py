@@ -7,14 +7,6 @@ import torch
 from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
 
 
-PHASE_CONVENTION = {
-    "phasor": "exp(-j*k*d)",
-    "time_dependence": "exp(+j*2*pi*f*t)",
-    "free_space_amplitude": "sqrt(tx_power)*wavelength/(4*pi*distance)",
-    "polarization": "world_cartesian_complex3_then_receiver_projection",
-}
-
-
 def _validate_rows(name: str, tensor: torch.Tensor, width: int) -> torch.Tensor:
     if tensor.ndim != 2 or tensor.shape[1] != width:
         raise ValueError(f"{name} must have shape (N, {width})")

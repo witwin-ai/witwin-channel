@@ -3,7 +3,7 @@ import torch
 
 from witwin.channel.runtime import symbols as ops
 from tests.support.scenes import same_side_wall_reflection_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.propagation.fields.kernels import (
     deterministic as deterministic_fields,

@@ -8,7 +8,7 @@ from tests.support.core_world import (
     make_transmitter,
 )
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.bdpt import Config, solve
 from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
 

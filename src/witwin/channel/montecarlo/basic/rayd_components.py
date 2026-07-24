@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core.ad_geometry import (
+from witwin.channel.scene.ad_geometry import (
     scene_vertex_table,
     transmitter_positions_ad,
 )
-from witwin.channel.core.diffraction_geometry import (
+from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel.core.receiver_geometry import (
+from witwin.channel.scene.receiver_geometry import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
 )

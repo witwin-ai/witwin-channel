@@ -29,7 +29,7 @@ def test_current_import_debt_is_exact_and_allowlisted():
     assert Counter(
         graph._DEBT_GROUP_BY_RULE[violation.rule] for violation in violations
     ) == {
-        "existing_boundary": 2,
+        "existing_boundary": 1,
         "mc_enumerated_dependency": 1,
     }
 
@@ -63,6 +63,7 @@ from witwin.channel.runtime import native_extension
         "solver_to_solver": 1,
         "enumerated_pipeline_mc_internal": 1,
         "deleted_module_dependency": 1,
+        "dissolved_module_dependency": 1,
         "solver_raw_extension": 2,
     }
 
@@ -86,9 +87,6 @@ def test_propagation_runtime_oracle_and_kernel_boundaries_are_detected(
             ),
             "propagation/fields.py": "import witwin.channel.path.result\n",
             "runtime/state.py": "import witwin.channel.scene\n",
-            "physics/oracle.py": (
-                "import torch\nimport witwin.channel.scattering\n"
-            ),
             "scene/kernels/private.py": """
 import witwin.channel.deterministic.solver
 import witwin.channel.materials.kernels.private
@@ -105,7 +103,6 @@ import witwin.channel.materials.kernels.private
         "geometry_forbidden_dependency": 1,
         "fields_forbidden_dependency": 1,
         "runtime_forbidden_dependency": 1,
-        "oracle_production_dependency": 2,
         "domain_kernel_solver_dependency": 1,
         "cross_domain_private_kernel": 1,
     }
@@ -130,7 +127,10 @@ def test_topology_cannot_import_canonical_or_legacy_compiled_scene(tmp_path: Pat
 
     rules = Counter(violation.rule for violation in graph.scan_package(package_root))
 
-    assert rules == {"topology_forbidden_dependency": 2}
+    assert rules == {
+        "topology_forbidden_dependency": 1,
+        "dissolved_module_dependency": 1,
+    }
 
 
 def test_topology_and_geometry_cannot_import_scene_handle_helpers(tmp_path: Path):
@@ -172,7 +172,10 @@ def test_deleted_modules_are_global_hard_failures(tmp_path: Path):
 
     rules = Counter(violation.rule for violation in graph.scan_package(package_root))
 
-    assert rules == {"deleted_module_dependency": 2}
+    assert rules == {
+        "deleted_module_dependency": 2,
+        "dissolved_module_dependency": 2,
+    }
 
 
 def test_real_graph_has_no_deleted_module_dependency():
@@ -419,23 +422,27 @@ def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
                 "from witwin.channel.scene.kernels import handles\n"
                 "from witwin.channel.deterministic.kernels import accumulate\n"
                 "from witwin.channel.propagation.fields.kernels import transport\n"
-                "from witwin.channel.core.kernels import extension\n"
             ),
             "materials/kernels/encoding.py": "",
             "scattering/kernels/lobe.py": "",
             "scene/kernels/handles.py": "",
             "deterministic/kernels/accumulate.py": "",
             "propagation/fields/kernels/transport.py": "",
-            "core/kernels/extension.py": "",
         },
     )
 
     rules = Counter(violation.rule for violation in graph.scan_package(package_root))
 
-    assert rules == {"public_init_internal": 6}
+    assert rules == {"public_init_internal": 5}
 
 
-def test_public_init_real_graph_only_admits_core_kernels_extension():
+def test_public_init_real_graph_has_no_internal_targets():
+    """The root reaches ``build_info`` through ``deployment``, not a shim.
+
+    Deleting ``core.kernels.extension`` repaid the last ``public_init_internal``
+    debt the package root carried.
+    """
+
     violations = graph.scan_package(PACKAGE_ROOT)
     public_init_targets = {
         violation.target
@@ -444,28 +451,32 @@ def test_public_init_real_graph_only_admits_core_kernels_extension():
         and violation.source == "witwin.channel"
     }
 
-    assert public_init_targets == {"witwin.channel.core.kernels.extension"}
+    assert public_init_targets == set()
 
 
-def test_reference_oracle_is_forbidden_from_production_dependencies(tmp_path: Path):
+def test_dissolved_namespaces_cannot_be_recreated(tmp_path: Path):
+    """``core`` was dissolved into real owners and must not come back.
+
+    The NumPy reference oracle that used to live in ``physics`` now sits in
+    ``tests/reference/em_oracle.py``, so its isolation is structural: this
+    checker only walks the shipped package and cannot reach it at all.
+    """
+
     package_root = _synthetic_package(
         tmp_path,
         {
             "__init__.py": "",
             "scattering/__init__.py": "",
-            "physics/oracle.py": "import torch\n",
-            "physics/reference/__init__.py": "",
-            "physics/reference/oracle.py": (
-                "import torch\nimport witwin.channel.scattering\n"
+            "core/field_state.py": "",
+            "scattering/lobe.py": (
+                "from witwin.channel.core.field_state import Complex3State\n"
             ),
         },
     )
 
     rules = Counter(violation.rule for violation in graph.scan_package(package_root))
 
-    # Both the facade oracle and the reference implementation are held to the
-    # same production-dependency prohibition.
-    assert rules == {"oracle_production_dependency": 3}
+    assert rules == {"dissolved_module_dependency": 1}
 
 
 def test_cli_passes_with_repository_defaults(capsys):

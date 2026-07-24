@@ -209,7 +209,7 @@ def _diffraction(
     if variant == "baseline":
         return {"target": target}, {"mode": "old_compact_atomic_target"}
 
-    from witwin.channel.core.field_state import transmitter_polarizations as field_polarizations
+    from witwin.channel.field_state import transmitter_polarizations as field_polarizations
     from witwin.channel.materials.encoding import face_material_tensors
     from witwin.channel.propagation.geometry.diffraction import DiffractionPathLayout
     from witwin.channel.runtime.capacity import create_capacity_failure_state

@@ -19,10 +19,10 @@ import torch
 from tests.support.scenes import rough_wall_structure
 from witwin.core import Scene
 from tests.support.core_world import make_receiver, make_receiver_grid, make_transmitter
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.physics.oracle import C0, layer_stack_rt
+from tests.reference.em_oracle import C0, layer_stack_rt
 from witwin.channel.scattering import (
     build_kirchhoff_table,
     generate_gaussian_realization,

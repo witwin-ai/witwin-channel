@@ -8,13 +8,13 @@ from typing import Any
 # transmission registers one flattened RayD geometry companion, one native
 # wall-product companion, and one final capacity-map sanitizer companion; the
 # finalize sum registers no native companion (its cotangent is a view).
-from witwin.channel.core.kernels.metadata import AdLaunchLedger, make_metadata
+from witwin.channel.runtime.kernel_metadata import AdLaunchLedger, make_metadata
 from witwin.channel.capabilities import (
     capabilities,
     config_metadata,
     serialize_config,
 )
-from witwin.channel.core.components import component_availability_status
+from witwin.channel.components import component_availability_status
 
 from .config import Config
 

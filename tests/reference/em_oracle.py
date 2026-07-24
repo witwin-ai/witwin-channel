@@ -455,16 +455,3 @@ def hemisphere_integral(f: Callable, n_theta: int = 64, n_phi: int = 128):
 
 # Preserve the historical public import/pickle path for one compatibility
 # cycle while this implementation is owned by ``physics.reference``.
-Medium.__module__ = "witwin.channel.physics.oracle"
-RTCoefficients.__module__ = "witwin.channel.physics.oracle"
-complex_sqrt_passive.__module__ = "witwin.channel.physics.oracle"
-medium_params.__module__ = "witwin.channel.physics.oracle"
-vacuum_medium.__module__ = "witwin.channel.physics.oracle"
-fresnel_interface.__module__ = "witwin.channel.physics.oracle"
-layer_stack_rt.__module__ = "witwin.channel.physics.oracle"
-refraction_direction.__module__ = "witwin.channel.physics.oracle"
-coherent_attenuation.__module__ = "witwin.channel.physics.oracle"
-kirchhoff_diffuse_lobe_series.__module__ = "witwin.channel.physics.oracle"
-kirchhoff_diffuse_lobe_quadrature.__module__ = "witwin.channel.physics.oracle"
-phase_screen_patch_integral.__module__ = "witwin.channel.physics.oracle"
-hemisphere_integral.__module__ = "witwin.channel.physics.oracle"

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core.field_state import transmitter_polarizations
+from witwin.channel.field_state import transmitter_polarizations
 from witwin.channel.materials.encoding import face_material_tensors
 from witwin.channel.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,

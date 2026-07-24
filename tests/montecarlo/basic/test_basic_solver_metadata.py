@@ -3,8 +3,8 @@ import torch
 
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.core import Scene
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.deployment import build_info
+from witwin.channel.runtime.kernel_metadata import validate_metadata
 from witwin.channel.montecarlo.basic import Config, solve
 
 

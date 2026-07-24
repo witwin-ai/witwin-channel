@@ -8,13 +8,11 @@ from typing import TYPE_CHECKING
 import torch
 
 from .contracts import (
-    CONTRACT_VERSION,
     Complex3Transport,
     EndpointBatch,
     FixedTopologyEvaluation,
     FixedTopologyRequest,
     JonesTransport,
-    PropagationCapabilities,
     PropagationConvention,
     PropagationDiagnostics,
     PropagationEvaluation,
@@ -23,6 +21,7 @@ from .contracts import (
     PropagationRequest,
     PropagationTopology,
     ScalarTransport,
+    capabilities,
 )
 
 if TYPE_CHECKING:
@@ -37,41 +36,7 @@ if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene
 
 
-_COMPONENTS = frozenset({"los", "reflection", "transmission", "diffraction"})
-_RESPONSES = frozenset(
-    {"scalar_transport", "complex3_transport", "polarimetric_transport"}
-)
-_AD_MODES = frozenset({"none", "jvp", "vjp"})
-_TOPOLOGY_MODES = frozenset({"discover"})
-
-_CAPABILITIES = PropagationCapabilities(
-    contract_version=CONTRACT_VERSION,
-    components=_COMPONENTS,
-    responses=_RESPONSES,
-    topology_modes=_TOPOLOGY_MODES,
-    ad_modes=_AD_MODES,
-    response_components=(
-        ("scalar_transport", _COMPONENTS),
-        ("complex3_transport", _COMPONENTS),
-        ("polarimetric_transport", frozenset({"los"})),
-    ),
-    response_ad_modes=(
-        ("scalar_transport", _AD_MODES),
-        ("complex3_transport", _AD_MODES),
-        ("polarimetric_transport", frozenset({"none"})),
-    ),
-    component_ad_modes=(
-        ("los", _AD_MODES),
-        ("reflection", _AD_MODES),
-        ("transmission", _AD_MODES),
-        ("diffraction", _AD_MODES),
-    ),
-    fixed_topology_components=frozenset({"los"}),
-    fixed_topology_responses=frozenset({"scalar_transport", "complex3_transport"}),
-    supports_frequency_offsets=False,
-    supports_fixed_topology=True,
-    supports_los_jones=True,
-)
+_CAPABILITIES = capabilities()
 _CONVENTION = PropagationConvention()
 
 
@@ -99,44 +64,6 @@ class _ConsumerRows:
     count_d2h_copies: int
     count_d2h_bytes: int
     count_synchronizations: int
-
-
-def _require_endpoint_roles(sources: EndpointBatch, sinks: EndpointBatch) -> None:
-    if sources.powers_w is None:
-        raise ValueError("request.sources.powers_w is required")
-    if sinks.powers_w is not None:
-        raise ValueError("request.sinks.powers_w must be absent")
-    if sources.device != sinks.device:
-        raise ValueError("source and sink batches must share one CUDA device")
-
-
-def _require_frequency_offsets(value: torch.Tensor | None) -> None:
-    if value is not None:
-        raise NotImplementedError(
-            "frequency_offsets_hz is unsupported by consumer contract version 1"
-        )
-
-
-def _require_response(value: object) -> str:
-    if not isinstance(value, str):
-        raise TypeError("response must be a string")
-    if value not in _RESPONSES:
-        raise NotImplementedError(
-            f"unsupported propagation response {value!r}; "
-            f"supported responses are {sorted(_RESPONSES)}"
-        )
-    return value
-
-
-def _require_ad_mode(value: object) -> str:
-    if not isinstance(value, str):
-        raise TypeError("ad_mode must be a string")
-    if value not in _AD_MODES:
-        raise NotImplementedError(
-            f"unsupported propagation AD mode {value!r}; "
-            f"supported modes are {sorted(_AD_MODES)}"
-        )
-    return value
 
 
 def _has_forward_tangent(value: torch.Tensor) -> bool:
@@ -169,49 +96,20 @@ def _preflight_evaluate(
         raise TypeError("evaluate requires a CompiledScene")
     if not isinstance(request, PropagationRequest):
         raise TypeError("request must be a PropagationRequest")
-    if not isinstance(request.sources, EndpointBatch) or not isinstance(
-        request.sinks, EndpointBatch
-    ):
-        raise TypeError("sources and sinks must be EndpointBatch instances")
-    _require_endpoint_roles(request.sources, request.sinks)
-    if type(request.components) is not frozenset or not request.components:
-        raise TypeError("components must be a non-empty frozenset")
-    unsupported = request.components - _COMPONENTS
-    if unsupported:
-        raise NotImplementedError(
-            f"unsupported propagation components: {sorted(unsupported)}"
-        )
-    if type(request.max_depth) is not int or not 0 <= request.max_depth <= 5:
-        raise ValueError("max_depth must be an int in [0, 5]")
-    if request.max_paths is not None and (
-        type(request.max_paths) is not int or request.max_paths <= 0
-    ):
-        raise ValueError("max_paths must be a positive int when set")
-    if not isinstance(request.topology_mode, str):
-        raise TypeError("topology_mode must be a string")
-    if request.topology_mode not in _TOPOLOGY_MODES:
-        raise NotImplementedError(
-            f"unsupported topology_mode {request.topology_mode!r}"
-        )
-    _require_response(request.response)
-    _require_ad_mode(request.ad_mode)
-    _require_frequency_offsets(request.frequency_offsets_hz)
-    response_components = dict(_CAPABILITIES.response_components)[request.response]
+    response_components = _CAPABILITIES.components_for(request.response)
     if not request.components.issubset(response_components):
         raise NotImplementedError(
             f"{request.response} does not support components "
             f"{sorted(request.components - response_components)}"
         )
-    response_ad_modes = dict(_CAPABILITIES.response_ad_modes)[request.response]
-    if request.ad_mode not in response_ad_modes:
+    if request.ad_mode not in _CAPABILITIES.ad_modes_for(request.response):
         raise NotImplementedError(
             f"{request.response} does not support AD mode {request.ad_mode!r}"
         )
-    component_ad_modes = dict(_CAPABILITIES.component_ad_modes)
     unsupported_ad = sorted(
         component
         for component in request.components
-        if request.ad_mode not in component_ad_modes[component]
+        if request.ad_mode not in _CAPABILITIES.ad_modes_for_component(component)
     )
     if unsupported_ad:
         raise NotImplementedError(
@@ -375,8 +273,6 @@ def _path_batch(
         path_length_m=continuous.path_length_m,
         delay_s=continuous.delay_s,
         field_direction=continuous.field_direction,
-        interaction_position_m=continuous.interaction_position,
-        interaction_normal=continuous.interaction_normal,
         interaction_positions_m=continuous.interaction_positions,
         interaction_normals=continuous.interaction_normals,
     )
@@ -471,26 +367,12 @@ def _preflight_reevaluate(
         raise TypeError("reevaluate requires a CompiledScene")
     if not isinstance(request, FixedTopologyRequest):
         raise TypeError("request must be a FixedTopologyRequest")
-    if not isinstance(request.sources, EndpointBatch) or not isinstance(
-        request.sinks, EndpointBatch
-    ):
-        raise TypeError("sources and sinks must be EndpointBatch instances")
-    if not isinstance(request.topology, PropagationTopology):
-        raise TypeError("topology must be a PropagationTopology")
-    _require_endpoint_roles(request.sources, request.sinks)
     if request.topology.device != request.sources.device:
         raise ValueError("fixed topology and endpoint batches must share a device")
-    _require_frequency_offsets(request.frequency_offsets_hz)
-    _require_response(request.response)
-    _require_ad_mode(request.ad_mode)
     compiled.require_reference_frequency(request.reference_frequency_hz)
     if not _CAPABILITIES.supports_fixed_topology:
         raise NotImplementedError(
             "fixed-topology reevaluation is unavailable in this build"
-        )
-    if request.response not in _CAPABILITIES.fixed_topology_responses:
-        raise NotImplementedError(
-            f"response {request.response!r} has no fixed-topology provider"
         )
     if request.topology.primitive_sequence.shape[1] != 0:
         raise NotImplementedError(
@@ -543,13 +425,10 @@ def reevaluate(
     )
     row_count = rows.row_count
     empty_interactions = rows.source.new_empty((row_count, 0, 3))
-    inert_interaction = rows.source.new_zeros((row_count, 3))
     geometry = PropagationGeometry(
         path_length_m=field_rows["path_length_m"],
         delay_s=field_rows["delay_s"],
         field_direction=field_rows["direction"],
-        interaction_position_m=inert_interaction,
-        interaction_normal=inert_interaction,
         interaction_positions_m=empty_interactions,
         interaction_normals=empty_interactions,
     )

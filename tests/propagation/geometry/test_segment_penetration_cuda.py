@@ -7,7 +7,7 @@ from tests.support.core_world import make_mesh_structure
 from witwin.core import Scene
 from witwin.channel.scene import compile as compile_scene
 from witwin.core import PhysicalMaterial
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.propagation.geometry.kernels import bridge
 from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationPolicy,

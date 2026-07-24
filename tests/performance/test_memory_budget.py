@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from witwin.channel.core.memory_budget import (
+from witwin.channel.runtime.memory_budget import (
     MemoryBudgetError,
     checked_product,
     enforce_memory_budget,

@@ -3,10 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from witwin.channel.core.kernels import extension
 from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
 from witwin.channel.propagation.geometry.kernels import bridge as ops
-from witwin.channel.runtime import symbols
+from witwin.channel.runtime import extension, symbols
 from witwin.channel.scene.kernels import rayd_scene
 
 

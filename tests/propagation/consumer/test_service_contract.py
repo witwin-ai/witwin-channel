@@ -211,11 +211,10 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
     )
 
 
-def test_unsupported_request_fails_before_engine(monkeypatch) -> None:
-    from witwin.channel.propagation.consumer import (
-        PropagationRequest,
-        evaluate,
-    )
+def test_unsupported_response_fails_at_request_construction(monkeypatch) -> None:
+    """An unsupported response is rejected before a request object exists."""
+
+    from witwin.channel.propagation.consumer import PropagationRequest
     from witwin.channel.propagation.enumerated import engine
 
     sources, sinks = _endpoints()
@@ -224,26 +223,24 @@ def test_unsupported_request_fails_before_engine(monkeypatch) -> None:
         raise AssertionError("engine must not run")
 
     monkeypatch.setattr(engine, "evaluate_enumerated_paths", forbidden)
-    request = PropagationRequest(
-        sources=sources,
-        sinks=sinks,
-        reference_frequency_hz=77.0e9,
-        components=frozenset({"los"}),
-        max_depth=0,
-        response="unsupported",
-        topology_mode="discover",
-        ad_mode="none",
-    )
 
-    with pytest.raises(NotImplementedError, match="unsupported propagation response"):
-        evaluate(_compiled(), request)
+    with pytest.raises(NotImplementedError, match="unsupported response"):
+        PropagationRequest(
+            sources=sources,
+            sinks=sinks,
+            reference_frequency_hz=77.0e9,
+            components=frozenset({"los"}),
+            max_depth=0,
+            response="unsupported",
+            topology_mode="discover",
+            ad_mode="none",
+        )
 
 
-def test_scattering_fails_before_engine(monkeypatch) -> None:
-    from witwin.channel.propagation.consumer import (
-        PropagationRequest,
-        evaluate,
-    )
+def test_scattering_fails_at_request_construction(monkeypatch) -> None:
+    """Scattering is not a v1 consumer component and never reaches the engine."""
+
+    from witwin.channel.propagation.consumer import PropagationRequest
     from witwin.channel.propagation.enumerated import engine
 
     sources, sinks = _endpoints()
@@ -252,22 +249,21 @@ def test_scattering_fails_before_engine(monkeypatch) -> None:
         raise AssertionError("engine must not run")
 
     monkeypatch.setattr(engine, "evaluate_enumerated_paths", forbidden)
-    request = PropagationRequest(
-        sources=sources,
-        sinks=sinks,
-        reference_frequency_hz=77.0e9,
-        components=frozenset({"scattering"}),
-        max_depth=1,
-        response="scalar_transport",
-        topology_mode="discover",
-        ad_mode="none",
-    )
 
     with pytest.raises(
         NotImplementedError,
         match=r"unsupported propagation components: \['scattering'\]",
     ):
-        evaluate(_compiled(), request)
+        PropagationRequest(
+            sources=sources,
+            sinks=sinks,
+            reference_frequency_hz=77.0e9,
+            components=frozenset({"scattering"}),
+            max_depth=1,
+            response="scalar_transport",
+            topology_mode="discover",
+            ad_mode="none",
+        )
 
 
 def test_reevaluate_reuses_frozen_topology_without_discovery(
@@ -362,11 +358,12 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
     assert result.diagnostics.validation_sync_count == 1
 
 
-def test_unsupported_fixed_response_fails_before_gather(monkeypatch) -> None:
-    from witwin.channel.propagation.consumer import (
-        FixedTopologyRequest,
-        reevaluate,
-    )
+def test_unsupported_fixed_response_fails_at_request_construction(
+    monkeypatch,
+) -> None:
+    """A response with no fixed-topology provider is rejected at construction."""
+
+    from witwin.channel.propagation.consumer import FixedTopologyRequest
     from witwin.channel.propagation.consumer import _fixed_los
 
     sources, sinks = _endpoints()
@@ -375,17 +372,18 @@ def test_unsupported_fixed_response_fails_before_gather(monkeypatch) -> None:
         raise AssertionError("fixed gather must not run")
 
     monkeypatch.setattr(_fixed_los, "fixed_los_gather", forbidden)
-    request = FixedTopologyRequest(
-        sources=sources,
-        sinks=sinks,
-        reference_frequency_hz=77.0e9,
-        topology=_fixed_topology(),
-        response="polarimetric_transport",
-        ad_mode="none",
-    )
 
-    with pytest.raises(NotImplementedError, match="no fixed-topology provider"):
-        reevaluate(_compiled(), request)
+    with pytest.raises(
+        NotImplementedError, match="does not support 'polarimetric_transport'"
+    ):
+        FixedTopologyRequest(
+            sources=sources,
+            sinks=sinks,
+            reference_frequency_hz=77.0e9,
+            topology=_fixed_topology(),
+            response="polarimetric_transport",
+            ad_mode="none",
+        )
 
 
 def test_fixed_primal_only_endpoint_ad_fails_before_gather(monkeypatch) -> None:

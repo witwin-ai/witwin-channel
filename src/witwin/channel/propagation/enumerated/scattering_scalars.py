@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.physics.conventions import C0
+from witwin.channel.constants import C0
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene

@@ -3,7 +3,7 @@ import torch
 
 from tests.support.reference_channel import los_path_gain_reference
 from tests.support.scenes import empty_space_los_scene, single_wall_reflection_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve
 
 

@@ -1,4 +1,4 @@
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 
 
 def test_build_info_reports_rayd_native_capability_key():

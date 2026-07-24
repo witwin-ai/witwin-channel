@@ -6,88 +6,28 @@
       "module": "witwin.channel",
       "exports": [
         {
-          "name": "AntennaPattern",
-          "kind": "external-or-missing",
-          "target": "witwin.core.AntennaPattern",
-          "contract_sha256": "82cf7ba46cda5953405a50961a12fee8655dbe9ac9f84177b0580af07d92e2c9"
-        },
-        {
-          "name": "AntennaState",
-          "kind": "external-or-missing",
-          "target": "witwin.core.AntennaState",
-          "contract_sha256": "a4ae9d46019ce9432d37ca6d9e5cd8565d280ad4575c33c3a7afad0031bb2af6"
-        },
-        {
-          "name": "Material",
-          "kind": "external-or-missing",
-          "target": "witwin.core.Material",
-          "contract_sha256": "f1f70fb7e90afd030de335844805fa8ffc0d64a0f8cbc3a511cece68213c35e5"
-        },
-        {
-          "name": "MaterialLayer",
-          "kind": "external-or-missing",
-          "target": "witwin.core.MaterialLayer",
-          "contract_sha256": "a80c0f026007b7bb14b49656a1a1eddf025cbc41453302a6badf2d5db5a6d707"
-        },
-        {
-          "name": "PhaseScreen",
-          "kind": "external-or-missing",
-          "target": "witwin.core.PhaseScreen",
-          "contract_sha256": "78b93708f6aa89ef33832c6de35b628ec0ac9f9b3f7fbb82699a16c2fa700f01"
-        },
-        {
-          "name": "PhysicalMaterial",
-          "kind": "external-or-missing",
-          "target": "witwin.core.PhysicalMaterial",
-          "contract_sha256": "d793829fe4fd5a1d05b18dab77dc553a12b9a7ad29fa046d6c38536c482239d0"
-        },
-        {
-          "name": "ReceiverGrid",
-          "kind": "external-or-missing",
-          "target": "witwin.core.ReceiverGrid",
-          "contract_sha256": "57ecaa86fc6aa38d427ae00b735399a4af7076247d5da450e2d09358f362858c"
-        },
-        {
-          "name": "Scene",
-          "kind": "external-or-missing",
-          "target": "witwin.core.Scene",
-          "contract_sha256": "6c3198e1a62731854876507fd735b4af3424dfe26b9aae0b244cfff641ec4cad"
-        },
-        {
-          "name": "SceneSnapshot",
-          "kind": "external-or-missing",
-          "target": "witwin.core.SceneSnapshot",
-          "contract_sha256": "9681188b3d0ef5beba3688e09fdda20d12110d7050a0cdbfc84ae9cc57f98794"
-        },
-        {
-          "name": "Structure",
-          "kind": "external-or-missing",
-          "target": "witwin.core.Structure",
-          "contract_sha256": "61a6353aaca681a19a05d2cab8cc2ee134e837f1da09a5ad9a29129ec8bfad87"
-        },
-        {
-          "name": "SurfaceRoughness",
-          "kind": "external-or-missing",
-          "target": "witwin.core.SurfaceRoughness",
-          "contract_sha256": "c4583f9aeedce92bdef82b4b54fe9c3ff67d02f475da3e153785f5acffada32c"
-        },
-        {
           "name": "Complex3State",
           "kind": "class",
-          "target": "witwin.channel.core.field_state.Complex3State",
-          "contract_sha256": "84f6813e0bcacd144d3eee772fe7503d21e2680da3f6ec76170c65ea75ed8c69"
+          "target": "witwin.channel.field_state.Complex3State",
+          "contract_sha256": "cf3b27735ee25949c27445ee62f51d7a8341f9d0c6ba7029ec2eb0d2760d7b3e"
         },
         {
           "name": "JonesState",
           "kind": "class",
-          "target": "witwin.channel.core.field_state.JonesState",
-          "contract_sha256": "ccf154ad8da7924ec55191e0cb9234936d157a3badccc5b2415a90bb9834ff7c"
+          "target": "witwin.channel.field_state.JonesState",
+          "contract_sha256": "8175d1252607e06f8e253e30a6cb40fa9340b7f36415370e88d48fd4729e0b28"
         },
         {
           "name": "build_info",
+          "kind": "unresolved",
+          "target": "witwin.channel.deployment.build_info",
+          "contract_sha256": "57f3b67b122ef24d736d47ebe7601ec2b9a9613fbf857fd51769bc403d8690d3"
+        },
+        {
+          "name": "capabilities",
           "kind": "function",
-          "target": "witwin.channel.runtime.extension.build_info",
-          "contract_sha256": "3329b87877737b430ed74131fead9129f2320f344231349f291935d83875128a",
+          "target": "witwin.channel.capabilities.capabilities",
+          "contract_sha256": "5a95838ac1c1931883d57059ca3deff19566b643b0332d7c049bde06c00899b6",
           "signature": "()"
         },
         {
@@ -102,13 +42,6 @@
           "kind": "function",
           "target": "witwin.channel.deployment.runtime_diagnostics",
           "contract_sha256": "529782034551a2009f0b6ab70153b4a36c6375113c3575b2c83d4721ebdcd033",
-          "signature": "()"
-        },
-        {
-          "name": "capabilities",
-          "kind": "function",
-          "target": "witwin.channel.capabilities.capabilities",
-          "contract_sha256": "5a95838ac1c1931883d57059ca3deff19566b643b0332d7c049bde06c00899b6",
           "signature": "()"
         }
       ]
@@ -237,6 +170,18 @@
       "module": "witwin.channel.propagation.consumer",
       "exports": [
         {
+          "name": "AD_MODES",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.AD_MODES",
+          "contract_sha256": "06e1bce6abd4ea2595300bbf2daacc0f91cb9e9b41f63dbecd0d61752a2789f3"
+        },
+        {
+          "name": "COMPONENTS",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.COMPONENTS",
+          "contract_sha256": "2f5bf21c47a93045c033aee07c5da3544c5e0baea87914e3f8566fd8fd4e7456"
+        },
+        {
           "name": "CONTRACT_VERSION",
           "kind": "unresolved",
           "target": "witwin.channel.propagation.consumer.contracts.CONTRACT_VERSION",
@@ -264,7 +209,7 @@
           "name": "FixedTopologyRequest",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyRequest",
-          "contract_sha256": "ce78fdffcddc2c01b4312ca06433fc0e660ff0d2b4f8e2c246ae96e9cb808587"
+          "contract_sha256": "baed68a795be3cb925b4cdfa2fd95ab43e8ebaf44966631bbca54ee480f79341"
         },
         {
           "name": "JonesTransport",
@@ -273,16 +218,34 @@
           "contract_sha256": "5a3d3ce987b0e01424a55b8f2b09bb74df0d57af035fe291662ca62094a66641"
         },
         {
+          "name": "MAX_DEPTH",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.MAX_DEPTH",
+          "contract_sha256": "b967197ec307cbe0193d87f451ba13515c9813687116f579317b158c3e8d00aa"
+        },
+        {
+          "name": "PropagationAdMode",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationAdMode",
+          "contract_sha256": "1736490395be8d73b76f950bd8fc2cffff4778d18e081586f5509e0cbf4194b8"
+        },
+        {
           "name": "PropagationCapabilities",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationCapabilities",
-          "contract_sha256": "b53c64ee789be5b5b3469310209cd9bd018d1da9f25a2695e5722f17acccf920"
+          "contract_sha256": "9ba63c67c638ae11be5842af5fb894fb2321ec7e05bfccf9c0b9cd15e48c772c"
+        },
+        {
+          "name": "PropagationComponent",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationComponent",
+          "contract_sha256": "8cacf31393110479041c0740582f84e5c1fa4c7736d21e19ec338c760e80bb37"
         },
         {
           "name": "PropagationConvention",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationConvention",
-          "contract_sha256": "a4d0ba9a570b81f9523c439d50b7ac9260c67b95a0ee68ee9ef0c2d0df03953c"
+          "contract_sha256": "79ef4127728d1e4e4243c26060ceb1089528866ca2d7978ae0ace50b93a2fa32"
         },
         {
           "name": "PropagationDiagnostics",
@@ -300,7 +263,7 @@
           "name": "PropagationGeometry",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationGeometry",
-          "contract_sha256": "8d69f4a4072878bee6277a87836864b51b1532bdc15c7fa18d385d1beba04c13"
+          "contract_sha256": "f9bf147b7f89bbd120ba8ba3962d9e959b5de56f52edb955ea8adf7425c26e60"
         },
         {
           "name": "PropagationPathBatch",
@@ -312,7 +275,13 @@
           "name": "PropagationRequest",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationRequest",
-          "contract_sha256": "d0958e47c6e56d711743f8fc11fee7b0fdeb359193461844e825992e660f60de"
+          "contract_sha256": "2a44e030836b3e52e9940087be490db08bd6094fe2d2606cd6fb526c485027de"
+        },
+        {
+          "name": "PropagationResponse",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationResponse",
+          "contract_sha256": "de5bd9375b3618fc8fb7036ea302d7959679af105a6869524ff2a71b8833440e"
         },
         {
           "name": "PropagationTopology",
@@ -321,10 +290,35 @@
           "contract_sha256": "37d7244e6fa39748517cc66f942750636782897ad48ed209a03baed91542c53b"
         },
         {
+          "name": "PropagationTopologyMode",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.PropagationTopologyMode",
+          "contract_sha256": "72ccdf4152a89d9d2805360a92bbd2d0890c32df5686ed10dd1f654ae6d2e840"
+        },
+        {
+          "name": "RESPONSES",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.RESPONSES",
+          "contract_sha256": "8482e7cbc4bd0722a30e47329a23a310641af0522e1dfdae1c545aab8d4474b4"
+        },
+        {
           "name": "ScalarTransport",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.ScalarTransport",
           "contract_sha256": "e0e70ad1c35c4723ad2d8d1c1aa5bf5354a66741f0fa977a9ffa115722349d63"
+        },
+        {
+          "name": "TOPOLOGY_MODES",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.contracts.TOPOLOGY_MODES",
+          "contract_sha256": "cd487a0e7acd8c7a50b83989239d9f5add8c83b85fb741d8f61de71aafba5deb"
+        },
+        {
+          "name": "capabilities",
+          "kind": "function",
+          "target": "witwin.channel.propagation.consumer.contracts.capabilities",
+          "contract_sha256": "cb6573f72c4ddd96dd366b9a7b1aff6209351769b0fadd309c4815b730593964",
+          "signature": "()"
         },
         {
           "name": "evaluate",

@@ -12,7 +12,7 @@ from tests.support.core_world import (
 )
 from witwin.core import PhysicalMaterial, Scene, Structure
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as solve_deterministic
 from witwin.channel.path import Config, solve

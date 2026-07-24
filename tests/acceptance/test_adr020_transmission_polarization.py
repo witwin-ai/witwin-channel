@@ -21,8 +21,8 @@ import torch
 
 from tests.support.core_world import make_receiver_grid, make_transmitter
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.physics.oracle import layer_stack_rt
+from witwin.channel.deployment import build_info
+from tests.reference.em_oracle import layer_stack_rt
 from witwin.core import MaterialLayer, PhysicalMaterial, ReceiverGrid, Scene
 
 from witwin.channel.deterministic import Config as DetConfig, solve as det_solve

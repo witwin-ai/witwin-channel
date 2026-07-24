@@ -34,7 +34,7 @@ from tests.support.core_world import (
     make_receiver_grid,
     make_transmitter,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.core import PhysicalMaterial, Scene
 

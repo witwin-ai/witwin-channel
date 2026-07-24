@@ -11,10 +11,10 @@ from tests.support.core_world import (
     make_receiver_grid,
     make_transmitter,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.montecarlo.bdpt import Config, solve
-from witwin.channel.physics.oracle import layer_stack_rt
+from tests.reference.em_oracle import layer_stack_rt
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

@@ -42,10 +42,7 @@ _REQUIRE_TENSOR_SOURCE = '''def require_tensor(
 
 
 def test_runtime_tensor_validation_owner_and_body_are_exact():
-    assert (
-        importlib.util.find_spec("witwin.channel.core.runtime._validation")
-        is None
-    )
+    assert importlib.util.find_spec("witwin.channel.core") is None
     assert inspect.getsource(canonical_validation.require_tensor) == _REQUIRE_TENSOR_SOURCE
 
 

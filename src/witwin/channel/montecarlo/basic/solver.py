@@ -4,7 +4,7 @@ import torch
 from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
-from witwin.channel.core.antenna import validate_scalar_endpoint_features
+from witwin.channel.scene.antenna import validate_scalar_endpoint_features
 from witwin.channel.materials.evaluation import (
     _require_frequency_ad_constant_materials,
 )

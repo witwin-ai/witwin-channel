@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from typing import TYPE_CHECKING
-from witwin.channel.core.ad_geometry import (
+from witwin.channel.scene.ad_geometry import (
     receiver_positions_ad,
     transmitter_positions_ad,
 )

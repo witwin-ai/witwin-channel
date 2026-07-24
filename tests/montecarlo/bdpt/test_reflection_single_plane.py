@@ -4,7 +4,7 @@ import torch
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.core import ReceiverGrid, Scene
 from tests.support.core_world import make_receiver_grid, make_transmitter
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.bdpt import Config, solve
 from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
 from witwin.channel.path import Config as PathConfig

@@ -5,7 +5,7 @@ from tests.support.scenes import (
     empty_space_los_scene,
     same_side_wall_reflection_scene,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 
 

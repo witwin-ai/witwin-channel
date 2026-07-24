@@ -49,9 +49,9 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import torch
-from witwin.channel.core.tensor_math import normalize_vec3
+from witwin.channel.tensor_math import normalize_vec3
 
-from witwin.channel.core.field_state import (
+from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
@@ -75,7 +75,7 @@ from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
 from witwin.core import PhaseScreen
-from witwin.channel.physics.conventions import C0
+from witwin.channel.constants import C0
 from witwin.channel.scene.scattering_resources import (
     realization_phase_screens,
 )

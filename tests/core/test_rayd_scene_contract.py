@@ -15,7 +15,7 @@ from witwin.core import PhysicalMaterial
 
 
 def _source_linked_rayd_available() -> bool:
-    from witwin.channel.core.kernels.extension import build_info
+    from witwin.channel.deployment import build_info
 
     try:
         return build_info()["rayd_integration"] == "source-linked"

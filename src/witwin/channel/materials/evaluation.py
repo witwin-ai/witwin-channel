@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Sequence
 
 import numpy as np
 
-from witwin.channel.physics.conventions import C0, EPS0, MU0
+from witwin.channel.constants import C0, EPS0, MU0
 from witwin.channel.runtime.autograd_contracts import (
     _frequency_participates_in_ad,
 )

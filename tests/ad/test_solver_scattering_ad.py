@@ -35,7 +35,7 @@ from tests.ad._tolerances import (
 from tests.support.scenes import rough_wall_structure
 from witwin.core import Scene
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.core import PhaseScreen
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve

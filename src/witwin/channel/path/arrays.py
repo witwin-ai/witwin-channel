@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import torch
 
-from witwin.channel.core.antenna import (
+from witwin.channel.scene.antenna import (
     orientation_matrix,
     pattern_field_response,
     steering_vector,
